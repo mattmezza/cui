@@ -134,7 +134,9 @@ class Audit:
         owner = self.target(predicate=lambda s: s['f'][17] and s['f'][21] > 40 and s['f'][4] > 12)
         before = owner['f'][19]
         point = self.point(owner, .5, .5)
-        delta = 35 if before < owner['f'][21]-35 else -35
+        forward = max(0, owner['f'][21] - before)
+        delta = min(35, forward) if forward >= before else -min(35, before)
+        assert abs(delta) > 1, 'Fixture has no scrollable range for pixel pan'
         self.dispatch('touchStart', [point])
         self.dispatch('touchMove', [{**point, 'y': point['y']-delta}])
         self.dispatch('touchEnd', [])

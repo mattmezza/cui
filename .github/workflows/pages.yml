@@ -29,6 +29,10 @@ jobs:
         run: uv run tests/web/test_browser.py
       - name: Verify real touch contacts scrolling and opt-in pinch
         run: uv run tests/web/test_touch.py
+      - name: Verify native IME composition in built-in text consumers
+        run: uv run tests/web/test_ime.py
+      - name: Audit representative touch behavior across the catalog
+        run: uv run tests/web/test_touch_components.py
       - name: Verify interaction guides design controls and composed app
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions

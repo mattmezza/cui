@@ -1536,8 +1536,8 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .background = options.no_appearance ? (cui_color){0} : background,
                             .border = frame_border,
                             .border_width = border});
-    cui_str text = cui_edit_get_text(edit);
-    cui_edit_state selection = cui_edit_get_state(edit);
+    cui_str text = cui_edit_composition_view(edit, state->behavior.composition);
+    cui_edit_state selection = cui_edit_composition_selection(edit, state->behavior.composition);
     if (multiline) {
         cui_text_with_line_height(ui, text.length ? text : cui_string(" "), metrics.font_size,
                                   foreground, metrics.line_height);
@@ -1576,6 +1576,15 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .fixed_height = true});
     size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
     size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    if (focused && state->behavior.composition && state->behavior.composition->active) {
+        cui_edit_composition *c = state->behavior.composition;
+        float left = cui_measure_text(ui, (cui_str){text.data, c->start}, metrics.font_size).width;
+        float right =
+            cui_measure_text(ui, (cui_str){text.data, c->start + c->length}, metrics.font_size)
+                .width;
+        cui_set_underlay(ui, (cui_rect){left, metrics.line_height - 1, right - left, 1}, t->caret,
+                         (cui_corner_radii){0});
+    }
     if (focused && first != last) {
         float left = cui_measure_text(ui, (cui_str){text.data, first}, metrics.font_size).width;
         float right = cui_measure_text(ui, (cui_str){text.data, last}, metrics.font_size).width;
@@ -1592,6 +1601,10 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                   metrics.line_height);
     }
     if (focused) {
+        cui_rect viewport = cui_bounds(ui, viewport_id);
+        cui_set_text_input_rect(
+            ui, id,
+            (cui_rect){viewport.x + caret - state->scroll_x, viewport.y, 1, metrics.line_height});
         float height = metrics.line_height * .85f;
         cui_begin_absolute_box(ui, id ^ UINT64_C(0xb1642b97583fbd65),
                                (cui_box){.background = t->caret},
@@ -1636,8 +1649,13 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
 
 cui_input_result cui_input(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                            cui_edit *edit, bool disabled) {
-    cui_input_state state = {0};
-    return cui_input_ex(ui, id, t, name, edit, &state, (cui_input_options){.disabled = disabled});
+    if (!ui || !id || !t || !edit)
+        return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_input_state *state =
+        cui_resource_get(ui, id, UINT64_C(0x5a2a3f8d00e3af41), sizeof(*state), NULL, NULL);
+    if (!state)
+        return (cui_input_result){.error = CUI_EDIT_CAPACITY};
+    return cui_input_ex(ui, id, t, name, edit, state, (cui_input_options){.disabled = disabled});
 }
 
 cui_progress_circle_options cui_progress_circle_defaults(void) {

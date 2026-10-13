@@ -301,7 +301,7 @@ static cui_edit_result cui_editor_completion_events(cui_context *ui, cui_id id,
             continue;
         /* Never accept before an earlier queued text/navigation edit. Let the
          * textarea process that queue in order, then discard stale proposals. */
-        if (e.type == CUI_EVENT_TEXT)
+        if (e.type == CUI_EVENT_TEXT || e.type >= CUI_EVENT_COMPOSITION_START)
             break;
         if (e.type != CUI_EVENT_KEY_DOWN)
             continue;
@@ -668,6 +668,9 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t event_index = 0; event_index < event_count; ++event_index) {
         cui_event event = events[event_index];
+        if (editor->view.composition && editor->view.composition->active &&
+            event.type != CUI_EVENT_CANCEL)
+            continue;
         if (event.type == CUI_EVENT_CANCEL) {
             editor->multi_pointer = false;
             editor->column_dragged = false;
@@ -901,7 +904,10 @@ static cui_textarea_result cui_editor_multi_events(cui_context *ui, cui_id id,
                     while (length < sizeof event.text && event.text[length])
                         ++length;
                     error =
-                        length == sizeof event.text
+                        event.text_data
+                            ? cui_edit_type_selections(
+                                  editor->edit, (cui_str){event.text_data, event.text_length})
+                        : length == sizeof event.text
                             ? CUI_EDIT_INVALID_UTF8
                             : cui_edit_type_selections(editor->edit, (cui_str){event.text, length});
                 }
@@ -1131,6 +1137,8 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     cui_edit_selection saved[CUI_EDIT_MAX_SELECTIONS];
     if (saved_live)
         memcpy(saved, saved_live, saved_count * sizeof(*saved));
+    if (s->view.composition && s->view.composition->active)
+        cui_editor_cancel_completion(s);
     cui_edit_result completion_error = cui_editor_completion_events(ui, id, s, o.textarea);
     cui_textarea_result multiple = cui_editor_multi_events(ui, id, s, o, metrics, width);
     if (multiple.error != CUI_TEXTAREA_OK)
@@ -1150,7 +1158,7 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
     }
     if (multiple.edit_error != CUI_EDIT_OK)
         result.edit_error = multiple.edit_error;
-    if (selection_capacity)
+    if (selection_capacity && !(s->view.composition && s->view.composition->active))
         cui_editor_cursor_sync(ui, s, o.textarea.text_style, metrics.font_size);
     cui_edit_state after = cui_edit_get_state(s->edit);
     result.changed |= before.revision != after.revision;
@@ -1957,7 +1965,7 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
     result = cui_base_editor(ui, id, name, editor, config, metrics);
     if (result.error != CUI_TEXTAREA_OK)
         return result;
-    document = cui_edit_get_text(edit);
+    document = cui_edit_composition_view(edit, state->composition);
     float updated_gutter = cui_editor_gutter(ui, document, metrics.font_size, options.text_style,
                                              config.line_numbers, state->fold_count);
     width = fmaxf(1, width + gutter - updated_gutter);
@@ -2084,14 +2092,25 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                             .fixed_width = true,
                             .height = state->count * metrics.line_height,
                             .fixed_height = true});
-    cui_str text = cui_edit_get_text(edit);
-    cui_edit_state selection = cui_edit_get_state(edit);
+    cui_str text = cui_edit_composition_view(edit, state->composition);
+    cui_edit_state selection = cui_edit_composition_selection(edit, state->composition);
     size_t selection_count;
     const cui_edit_selection *selections = cui_edit_get_selections(edit, &selection_count);
     cui_edit_selection primary = {0, selection.anchor, selection.cursor};
-    if (!selections) {
+    if (!selections || (state->composition && state->composition->active)) {
         selections = &primary;
         selection_count = 1;
+    }
+    if (focused && state->count) {
+        cui_textarea_line caret_row = state->lines[state->caret_line];
+        float cx = cui_editor_prefix(ui, text, caret_row, selection.cursor, metrics.font_size,
+                                     options.text_style);
+        cui_set_text_input_rect(ui, id,
+                                (cui_rect){state->viewport.x + cx - state->scroll_x,
+                                           state->viewport.y +
+                                               state->caret_line * metrics.line_height -
+                                               state->scroll_y,
+                                           1, metrics.line_height});
     }
     size_t begin = (size_t)floorf(state->scroll_y / metrics.line_height);
     if (begin >= state->count)
@@ -2194,6 +2213,19 @@ cui_textarea_result cui_editor(cui_context *ui, cui_id id, const cui_theme *them
                               color, metrics.line_height, options.text_style);
                 cui_end_box(ui);
                 start = next;
+            }
+        }
+        if (state->composition && state->composition->active) {
+            cui_edit_composition *c = state->composition;
+            size_t a = c->start > line.start ? c->start : line.start;
+            size_t b = c->start + c->length < line.end ? c->start + c->length : line.end;
+            if (a < b) {
+                float left =
+                    cui_editor_prefix(ui, text, line, a, metrics.font_size, options.text_style);
+                float right =
+                    cui_editor_prefix(ui, text, line, b, metrics.font_size, options.text_style);
+                cui_set_underlay(ui, (cui_rect){left, metrics.line_height - 1, right - left, 1},
+                                 theme->caret, (cui_corner_radii){0});
             }
         }
         if (caret)

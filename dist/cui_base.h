@@ -72,7 +72,12 @@ size_t cui_base_input_hit_test(void *geometry, cui_str, float x, float y);
 typedef size_t (*cui_input_hit_test_fn)(void *user, cui_str text, float x, float y);
 typedef struct {
     bool dragging;
+    cui_edit_composition *composition; /* Optional caller-owned session and view buffers. */
+    bool composition_owned;            /* Internal default resource flag; initialize false. */
 } cui_input_behavior_state;
+/* Lazy bounded default session (4095 preedit / 65535 rendered bytes). */
+cui_edit_composition *cui_base_composition(cui_context *, cui_id, cui_edit_composition *,
+                                           bool *owned);
 typedef struct {
     bool disabled, readonly, required, invalid;
     const cui_platform *clipboard;  /* Optional synchronous host clipboard interface. */
@@ -373,6 +378,14 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         return result;
     }
     cui_edit_state before = cui_edit_get_state(edit);
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    if (state->composition && state->composition->active)
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_GESTURE}, true);
+    if (state->composition && (options.disabled || options.readonly || cui_focused(ui) != id))
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
     if (options.disabled)
         state->dragging = false;
     cui_event event = events[i];
@@ -384,6 +397,30 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
     if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
         (event.type == CUI_EVENT_KEY_DOWN && (event.ime_composing || event.prefer_character_input)))
         return result;
+    if (!state->composition && event.type >= CUI_EVENT_COMPOSITION_START &&
+        event.type <= CUI_EVENT_COMPOSITION_COMMIT) {
+        result.error = CUI_EDIT_CAPACITY;
+        cui_consume_event(ui, i);
+        return result;
+    }
+    if (state->composition &&
+        (event.type == CUI_EVENT_CANCEL || (event.type >= CUI_EVENT_COMPOSITION_START &&
+                                            event.type <= CUI_EVENT_COMPOSITION_CANCEL))) {
+        result.error =
+            cui_edit_composition_event(edit, state->composition, event, !options.readonly);
+        result.changed = before.revision != cui_edit_get_state(edit).revision;
+        cui_consume_event(ui, i);
+        return result;
+    }
+    if (state->composition && state->composition->active) {
+        if (event.type == CUI_EVENT_KEY_DOWN || event.type == CUI_EVENT_TEXT) {
+            cui_consume_event(ui, i);
+            return result;
+        }
+        if (event.type == CUI_EVENT_POINTER_DOWN)
+            (void)cui_edit_composition_event(
+                edit, state->composition, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, true);
+    }
     if (options.delegate_up_down && event.type == CUI_EVENT_KEY_DOWN &&
         (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN))
         return result;
@@ -459,6 +496,14 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
     cui_edit_state before = cui_edit_get_state(edit);
     (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, options.disabled, false,
                        (float)before.length);
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    if (state->composition && state->composition->active)
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_GESTURE}, true);
+    if (state->composition && (options.disabled || options.readonly || cui_focused(ui) != id))
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
     size_t count = 0;
     (void)cui_frame_events(ui, &count);
     if (options.disabled)
@@ -579,6 +624,36 @@ bool cui_progress_circle_raster(cui_progress_circle_geometry geometry, cui_color
     }
     *out = (cui_bitmap){pixels, extent, extent, (size_t)extent * 4, 1};
     return true;
+}
+
+cui_edit_composition *cui_base_composition(cui_context *ui, cui_id id, cui_edit_composition *c,
+                                           bool *owned) {
+    if (!ui || !owned || (c && !*owned))
+        return c;
+    bool needed = *owned;
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count && !needed; i++)
+        needed = cui_event_target(ui, i) == id && events[i].type >= CUI_EVENT_COMPOSITION_START &&
+                 events[i].type <= CUI_EVENT_COMPOSITION_COMMIT;
+    if (!needed)
+        return NULL;
+    typedef struct {
+        cui_edit_composition session;
+        char preedit[4096], view[65536];
+    } storage;
+    storage *r =
+        cui_resource_get(ui, id, UINT64_C(0xd8c8d89f55a451e1), sizeof(storage), NULL, NULL);
+    if (!r)
+        return NULL;
+    if (!r->session.buffer) {
+        r->session.buffer = r->preedit;
+        r->session.capacity = sizeof(r->preedit);
+        r->session.view_buffer = r->view;
+        r->session.view_capacity = sizeof(r->view);
+    }
+    *owned = true;
+    return &r->session;
 }
 
 /* src/base/cui_models.c */

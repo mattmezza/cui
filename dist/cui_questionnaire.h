@@ -193,6 +193,8 @@ void cui_questionnaire_part_end(cui_context *);
 typedef struct {
     bool dragging;
     float scroll_x;
+    cui_edit_composition *composition;
+    bool composition_owned;
 } cui_questionnaire_input_state;
 /* Keep one input state per item. Text editing updates the retained answer and
  * emits AnswerChanged; a capacity error leaves the previous semantic answer. */
@@ -1510,7 +1512,15 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
     bool disabled = o.disabled || s->storage.items[item].disabled || d->input_disabled;
     cui_str label = d->input_label.length ? d->input_label : d->label;
-    cui_input_state input = {.behavior = {.dragging = view->dragging}, .scroll_x = view->scroll_x};
+    cui_input_state input = {.behavior = {.dragging = view->dragging,
+                                          .composition = view->composition,
+                                          .composition_owned = view->composition_owned},
+                             .scroll_x = view->scroll_x};
+    input.behavior.composition =
+        cui_base_composition(ui, id, input.behavior.composition, &input.behavior.composition_owned);
+    if (input.behavior.composition && (disabled || cui_focused(ui) != id))
+        (void)cui_edit_composition_event(d->input, input.behavior.composition,
+                                         (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
     cui_input_options paint = {.width = -1,
                                .size = (cui_input_size)o.size,
                                .disabled = disabled,
@@ -1585,6 +1595,8 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
             }
         }
     }
+    view->composition = input.behavior.composition;
+    view->composition_owned = input.behavior.composition_owned;
     view->dragging = input.behavior.dragging;
     cui_update_semantic(ui, id, false, (float)cui_edit_get_state(d->input).length);
     paint.invalid |= error != CUI_EDIT_OK ||

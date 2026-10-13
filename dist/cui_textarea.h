@@ -50,6 +50,8 @@ typedef struct {
     cui_textarea_fold *folds;
     size_t fold_count;
     uint64_t fold_revision;
+    cui_edit_composition *composition;
+    bool composition_owned, layout_composing;
 } cui_textarea_state;
 typedef struct {
     cui_textarea_size size;
@@ -121,6 +123,7 @@ cui_textarea_result cui_textarea(cui_context *, cui_id, const cui_theme *, cui_s
 #include "cui_edit.h"
 /* src/base/cui_textarea.c */
 /* SPDX-License-Identifier: MIT */
+
 
 #include <math.h>
 #include <string.h>
@@ -313,11 +316,15 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     cui_edit_content content = cui_edit_get_content(edit);
     if (content.token_count && !cui_edit_content_valid(content))
         return state->error = CUI_TEXTAREA_INVALID;
-    cui_str text = content.text;
-    cui_edit_state selection = cui_edit_get_state(edit);
+    cui_str text = cui_edit_composition_view(edit, state->composition);
+    cui_edit_state selection = cui_edit_composition_selection(edit, state->composition);
+    bool composing = state->composition && state->composition->active;
+    if (composing)
+        content = (cui_edit_content){.text = text};
     bool reusable =
-        state->initialized && state->error == CUI_TEXTAREA_OK && !state->fold_count &&
-        !content.token_count && !state->layout_fold_count && !state->layout_token_count &&
+        !composing && !state->layout_composing && state->initialized &&
+        state->error == CUI_TEXTAREA_OK && !state->fold_count && !content.token_count &&
+        !state->layout_fold_count && !state->layout_token_count &&
         state->lines == state->layout_lines && state->capacity == state->layout_capacity &&
         state->text_metrics_revision == cui_text_metrics_revision(ui) &&
         state->font_size == metrics.font_size && state->line_height == metrics.line_height &&
@@ -336,6 +343,7 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
             isfinite(state->scroll_x) ? fminf(state->maximum_x, fmaxf(0, state->scroll_x)) : 0;
         return CUI_TEXTAREA_OK;
     }
+    state->layout_composing = composing;
     size_t prefix_count = 0;
     if (reusable && state->count && state->revision + 1 == selection.revision) {
         cui_edit_change change = cui_edit_get_change(edit);
@@ -360,9 +368,10 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         state->folds = NULL;
         state->fold_count = 0;
     }
-    if (!cui_textarea_folds_valid(text, state->folds, state->fold_count))
+    size_t effective_fold_count = composing ? 0 : state->fold_count;
+    if (!cui_textarea_folds_valid(text, state->folds, effective_fold_count))
         return state->error = CUI_TEXTAREA_INVALID;
-    if (state->fold_count) {
+    if (effective_fold_count) {
         size_t cursor_line = 0, anchor_line = 0;
         for (size_t i = 0; i < text.length; ++i) {
             if (text.data[i] != '\r' && text.data[i] != '\n')
@@ -408,7 +417,7 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     state->text_metrics_revision = cui_text_metrics_revision(ui);
     size_t logical_line = 0, fold_index = 0, hidden_until = 0;
     for (;;) {
-        while (fold_index < state->fold_count &&
+        while (fold_index < effective_fold_count &&
                state->folds[fold_index].start_line < logical_line) {
             cui_textarea_fold fold = state->folds[fold_index++];
             if (fold.collapsed && fold.end_line > hidden_until)
@@ -469,7 +478,7 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         if (hard)
             ++logical_line;
     }
-    cui_edit_state current = cui_edit_get_state(edit);
+    cui_edit_state current = cui_edit_composition_selection(edit, state->composition);
     state->caret_line = cui_textarea_cursor_line(state, current.cursor);
     state->widest_width = maximum;
     state->widest_row = widest_row;
@@ -555,7 +564,7 @@ size_t cui_textarea_hit_test(cui_context *ui, cui_edit *edit, cui_textarea_state
     return cursor;
 }
 static void cui_textarea_reveal(cui_context *ui, cui_edit *edit, cui_textarea_state *state) {
-    cui_str text = cui_edit_get_text(edit);
+    cui_str text = cui_edit_composition_view(edit, state->composition);
     cui_textarea_line line = state->lines[state->caret_line];
     size_t cursor = state->cursor < line.end ? state->cursor : line.end;
     float x = cui_textarea_width(ui, text, line.start, cursor, state->font_size, state->text_style);
@@ -622,6 +631,14 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
         state->upstream_affinity = false;
         state->dragging = false;
     }
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    if (state->composition && state->composition->active)
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_GESTURE}, true);
+    if (state->composition && (options.disabled || options.readonly || cui_focused(ui) != id))
+        (void)cui_edit_composition_event(edit, state->composition,
+                                         (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
     float width = state->viewport.w > 0 ? state->viewport.w : state->wrap_width;
     result.error = cui_textarea_layout_ex(ui, edit, state, metrics, width, !options.no_wrap,
                                           options.text_style);
@@ -654,6 +671,42 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             (event.type == CUI_EVENT_KEY_DOWN &&
              (event.ime_composing || event.prefer_character_input)))
             continue;
+        if (!state->composition && event.type >= CUI_EVENT_COMPOSITION_START &&
+            event.type <= CUI_EVENT_COMPOSITION_COMMIT) {
+            result.edit_error = CUI_EDIT_CAPACITY;
+            cui_consume_event(ui, i);
+            continue;
+        }
+        if (state->composition &&
+            (event.type == CUI_EVENT_CANCEL || (event.type >= CUI_EVENT_COMPOSITION_START &&
+                                                event.type <= CUI_EVENT_COMPOSITION_CANCEL))) {
+            uint64_t revision = cui_edit_get_state(edit).revision;
+            cui_edit_result r =
+                cui_edit_composition_event(edit, state->composition, event, !options.readonly);
+            if (result.edit_error == CUI_EDIT_OK)
+                result.edit_error = r;
+            cui_consume_event(ui, i);
+            result.changed |= revision != cui_edit_get_state(edit).revision;
+            result.error = cui_textarea_layout_ex(ui, edit, state, metrics, width, !options.no_wrap,
+                                                  options.text_style);
+            reveal = true;
+            continue;
+        }
+        if (state->composition && state->composition->active) {
+            if (event.type == CUI_EVENT_KEY_DOWN || event.type == CUI_EVENT_TEXT) {
+                cui_consume_event(ui, i);
+                continue;
+            }
+            if (event.type == CUI_EVENT_POINTER_DOWN) {
+                (void)cui_edit_composition_event(edit, state->composition,
+                                                 (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL},
+                                                 true);
+                result.error = cui_textarea_layout_ex(ui, edit, state, metrics, width,
+                                                      !options.no_wrap, options.text_style);
+                if (result.error != CUI_TEXTAREA_OK)
+                    break;
+            }
+        }
         cui_edit_state event_before = cui_edit_get_state(edit);
         cui_edit_result error = CUI_EDIT_OK;
         bool handled = false, move = false;
@@ -696,7 +749,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                    (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN ||
                     event.key == CUI_KEY_PAGEUP || event.key == CUI_KEY_PAGEDOWN)) {
             cui_edit_state selection = cui_edit_get_state(edit);
-            cui_str text = cui_edit_get_text(edit);
+            cui_str text = cui_edit_composition_view(edit, state->composition);
             bool up = event.key == CUI_KEY_UP || event.key == CUI_KEY_PAGEUP;
             bool collapse = !shift && selection.anchor != selection.cursor &&
                             (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN);
@@ -964,10 +1017,21 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
                             .fixed_width = true,
                             .height = state->count * metrics.line_height,
                             .fixed_height = true});
-    cui_str text = cui_edit_get_text(edit);
-    cui_edit_state selection = cui_edit_get_state(edit);
+    cui_str text = cui_edit_composition_view(edit, state->composition);
+    cui_edit_state selection = cui_edit_composition_selection(edit, state->composition);
     size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
     size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    if (focused && state->count) {
+        cui_textarea_line caret_row = state->lines[state->caret_line];
+        float cx = cui_textarea_prefix(ui, text, caret_row, selection.cursor, metrics.font_size,
+                                       options.text_style);
+        cui_set_text_input_rect(ui, id,
+                                (cui_rect){state->viewport.x + cx - state->scroll_x,
+                                           state->viewport.y +
+                                               state->caret_line * metrics.line_height -
+                                               state->scroll_y,
+                                           1, metrics.line_height});
+    }
     size_t begin = (size_t)floorf(state->scroll_y / metrics.line_height);
     if (begin >= state->count)
         begin = state->count - 1;
@@ -1004,6 +1068,19 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         else if (line.end > line.start)
             cui_text_line(ui, (cui_str){text.data + line.start, line.end - line.start},
                           metrics.font_size, foreground, metrics.line_height, options.text_style);
+        if (state->composition && state->composition->active) {
+            cui_edit_composition *c = state->composition;
+            size_t a = c->start > line.start ? c->start : line.start;
+            size_t b = c->start + c->length < line.end ? c->start + c->length : line.end;
+            if (a < b) {
+                float left =
+                    cui_textarea_prefix(ui, text, line, a, metrics.font_size, options.text_style);
+                float right =
+                    cui_textarea_prefix(ui, text, line, b, metrics.font_size, options.text_style);
+                cui_set_underlay(ui, (cui_rect){left, metrics.line_height - 1, right - left, 1},
+                                 theme->caret, (cui_corner_radii){0});
+            }
+        }
         if (caret && row == state->caret_line) {
             float x = cui_textarea_prefix(ui, text, line, selection.cursor, metrics.font_size,
                                           options.text_style);

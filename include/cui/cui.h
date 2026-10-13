@@ -258,6 +258,9 @@ typedef struct {
     bool gesture_pan, gesture_zoom; /* Explicit viewport opt-in; disabled by default. */
     bool touch_drag_priority;   /* Custom drag control retains pointer moves over ancestor pan. */
     bool touch_scroll_disabled; /* Scroll owners accept touch pan by default. */
+    /* Preserve keyboard/programmatic focus while refusing pointer focus.
+     * Set pointer_activatable as well to retain pointer activation/capture. */
+    bool no_pointer_focus;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

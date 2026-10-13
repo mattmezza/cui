@@ -259,6 +259,9 @@ typedef struct {
     bool gesture_pan, gesture_zoom; /* Explicit viewport opt-in; disabled by default. */
     bool touch_drag_priority;   /* Custom drag control retains pointer moves over ancestor pan. */
     bool touch_scroll_disabled; /* Scroll owners accept touch pan by default. */
+    /* Preserve keyboard/programmatic focus while refusing pointer focus.
+     * Set pointer_activatable as well to retain pointer activation/capture. */
+    bool no_pointer_focus;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -6313,7 +6316,7 @@ static bool cui_core_previous_allowed(const cui_context *ui, size_t i) {
 }
 static cui_id cui_core_pointer_focus_target(cui_context *ui, size_t index) {
     const cui_semantic *s = &ui->previous[index];
-    if (s->disabled)
+    if (s->disabled || s->details.no_pointer_focus)
         return 0;
     if (!s->details.focus_target)
         return cui_core_focusable(s) ? s->id : 0;

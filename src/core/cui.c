@@ -576,7 +576,7 @@ static bool cui_core_previous_allowed(const cui_context *ui, size_t i) {
 }
 static cui_id cui_core_pointer_focus_target(cui_context *ui, size_t index) {
     const cui_semantic *s = &ui->previous[index];
-    if (s->disabled)
+    if (s->disabled || s->details.no_pointer_focus)
         return 0;
     if (!s->details.focus_target)
         return cui_core_focusable(s) ? s->id : 0;

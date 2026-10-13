@@ -22,6 +22,7 @@ typedef struct {
     float cell_size, font_size, gap, group_gap;
     bool disabled, hide_focus_ring;
     double now_seconds, blink_interval; /* Host monotonic time; interval defaults to .5s. */
+    cui_design_size design_size;        /* INHERIT preserves legacy size; styled APIs only. */
 } cui_otp_options;
 typedef struct {
     bool changed, complete, focused, blurred;
@@ -194,8 +195,21 @@ cui_otp_result cui_base_otp(cui_context *ui, cui_id id, cui_otp_state *s, cui_ot
 #include <math.h>
 cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_state *s,
                        cui_otp_options o) {
-    if (!t)
+    if (!t || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_otp_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+    cui_design_metrics design = {0};
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        if (!cui_design_measure(o.design_size, t->font_size / 16, &design))
+            return (cui_otp_result){.error = CUI_EDIT_INVALID_ARGUMENT};
+        if (o.cell_size == 0)
+            o.cell_size = design.control_height;
+        if (o.font_size == 0)
+            o.font_size = design.font_size;
+        if (o.gap == 0)
+            o.gap = design.gap;
+        if (o.group_gap == 0)
+            o.group_gap = design.gap * 3;
+    }
     cui_otp_result out = cui_base_otp(ui, id, s, o);
     if (out.error == CUI_EDIT_INVALID_ARGUMENT)
         return out;
@@ -240,7 +254,10 @@ cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_s
             } else if (s->focused && cell == cursor && s->cursor_visible) {
                 cui_begin_box(
                     ui, 0,
-                    (cui_box){.width = 3, .height = fminf(16, size * .5f), .background = t->text});
+                    (cui_box){.width = 3,
+                              .height = fminf(o.design_size == CUI_DESIGN_INHERIT ? 16 : font,
+                                              size * .5f),
+                              .background = t->text});
                 cui_end_box(ui);
             }
             cui_end_box(ui);

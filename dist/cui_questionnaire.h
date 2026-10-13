@@ -1094,6 +1094,11 @@ static void cui_questionnaire_root_capture(cui_context *ui, cui_questionnaire_ro
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count; ++i) {
+        /* The input owner must interleave edits and composite keys. A root
+         * prepass cannot confirm against a later text event's old answer. */
+        cui_questionnaire_binding *input = cui_questionnaire_bound(r, r->state->current, 2, 0);
+        if (input && input->id == cui_focused(ui))
+            break;
         const cui_event *e = &events[i];
         if (cui_event_consumed(ui, i) || e->type != CUI_EVENT_KEY_DOWN || e->repeat ||
             e->ime_composing || e->prefer_character_input)
@@ -1502,45 +1507,98 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
     cui_questionnaire_bind(ui, id, s, item, 0, 2,
                            o.disabled || d->input_disabled || s->storage.items[item].disabled);
 
-    if (!o.disabled && !s->storage.items[item].disabled && !d->input_disabled &&
-        cui_focused(ui) == id && cui_questionnaire_freeform(s, item).length) {
-        size_t count;
-        const cui_event *events = cui_frame_events(ui, &count);
-        for (size_t n = 0; n < count; n++)
-            if (!cui_event_consumed(ui, n) && events[n].type == CUI_EVENT_KEY_DOWN &&
-                events[n].key == CUI_KEY_ENTER && !events[n].repeat && !events[n].modifiers) {
-                if (cui_questionnaire_confirm(s)) {
-                    cui_consume_event(ui, n);
-                    cui_invalidate(ui);
-                }
-                if (s->current != item)
-                    return CUI_QUESTIONNAIRE_OK;
-            }
-    }
     cui_questionnaire_metrics m = cui_questionnaire_measure(o.size);
+    bool disabled = o.disabled || s->storage.items[item].disabled || d->input_disabled;
+    cui_str label = d->input_label.length ? d->input_label : d->label;
     cui_input_state input = {.behavior = {.dragging = view->dragging}, .scroll_x = view->scroll_x};
-    cui_input_result result = cui_input_ex(
-        ui, id, t, d->input_label.length ? d->input_label : d->label, d->input, &input,
-        (cui_input_options){
-            .width = -1,
-            .size = (cui_input_size)o.size,
-            .disabled = o.disabled || s->storage.items[item].disabled || d->input_disabled,
-            .required = d->required,
-            .invalid = cui_questionnaire_item_error(s, item).kind != CUI_QUESTIONNAIRE_VALID,
-            .clipboard = clipboard,
-            .custom_padding = true,
-            .padding_x = m.px});
-    view->dragging = input.behavior.dragging;
-    view->scroll_x = input.scroll_x;
-    if (result.error != CUI_EDIT_OK)
+    cui_input_options paint = {.width = -1,
+                               .size = (cui_input_size)o.size,
+                               .disabled = disabled,
+                               .required = d->required,
+                               .invalid = cui_questionnaire_item_error(s, item).kind !=
+                                          CUI_QUESTIONNAIRE_VALID,
+                               .clipboard = clipboard,
+                               .custom_padding = true,
+                               .padding_x = m.px};
+    cui_input_metrics metrics;
+    if (!cui_input_measure(paint, t->font_size, &metrics))
         return CUI_QUESTIONNAIRE_INVALID;
-    if (result.changed) {
-        cui_questionnaire_result sync = cui_questionnaire_sync_input(s, item, true);
-        cui_invalidate(ui);
-        return sync;
+    cui_input_hit_geometry hit = {ui, cui_bounds(ui, cui_input_viewport_id(id)), metrics.font_size,
+                                  input.scroll_x};
+    cui_base_input_options base = {
+        .disabled = disabled,
+        .required = d->required,
+        .invalid = paint.invalid,
+        .clipboard = clipboard,
+        .hit_test = cui_edit_get_state(d->input).multiline ? NULL : cui_base_input_hit_test,
+        .hit_test_user = &hit};
+    (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, label, disabled, false,
+                       (float)cui_edit_get_state(d->input).length);
+    if (disabled)
+        input.behavior.dragging = false;
+    cui_questionnaire_routes *stack = cui_questionnaire_route_stack(ui);
+    cui_questionnaire_route *route =
+        stack && stack->active && stack->active->state == s ? stack->active : NULL;
+    cui_edit_result error = CUI_EDIT_OK;
+    cui_questionnaire_result sync = CUI_QUESTIONNAIRE_OK;
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t n = 0; n < count && s->current == item; ++n) {
+        const cui_event *event = &events[n];
+        bool eligible = !disabled && !cui_event_consumed(ui, n) && cui_event_target(ui, n) == id &&
+                        cui_focused(ui) == id;
+        bool key = eligible && event->type == CUI_EVENT_KEY_DOWN && !event->repeat &&
+                   !event->ime_composing && !event->prefer_character_input;
+        bool handled = false;
+        if (key && route)
+            handled = cui_questionnaire_root_key(ui, route, event);
+        else if (key && event->key == CUI_KEY_ENTER && !event->modifiers &&
+                 cui_questionnaire_freeform(s, item).length)
+            handled = cui_questionnaire_confirm(s);
+        if (handled) {
+            cui_consume_event(ui, n);
+            if (event->key == CUI_KEY_ENTER)
+                cui_cancel_event_activation(ui, n);
+            cui_invalidate(ui);
+        }
+        if (s->current != item || (handled && s->complete)) {
+            input.behavior.dragging = false;
+            view->dragging = false;
+            view->scroll_x = input.scroll_x;
+            if (route && s->current != item)
+                route->focus_pending = true;
+            return error != CUI_EDIT_OK ? CUI_QUESTIONNAIRE_INVALID : sync;
+        }
+        /* Focus can move to a choice without moving the questionnaire item. */
+        if (!handled && (cui_focused(ui) == id ||
+                         (event->type != CUI_EVENT_TEXT && event->type != CUI_EVENT_KEY_DOWN &&
+                          event->type != CUI_EVENT_KEY_UP))) {
+            cui_input_result result =
+                cui_base_input_reduce_event(ui, id, d->input, &input.behavior, base, n);
+            if (error == CUI_EDIT_OK && result.error != CUI_EDIT_OK)
+                error = result.error;
+            if (result.changed) {
+                sync = cui_questionnaire_sync_input(s, item, true);
+                cui_invalidate(ui);
+                if (sync != CUI_QUESTIONNAIRE_OK)
+                    break;
+            }
+        }
     }
-    return CUI_QUESTIONNAIRE_OK;
+    view->dragging = input.behavior.dragging;
+    cui_update_semantic(ui, id, false, (float)cui_edit_get_state(d->input).length);
+    paint.invalid |= error != CUI_EDIT_OK ||
+                     cui_questionnaire_item_error(s, item).kind != CUI_QUESTIONNAIRE_VALID;
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.required = d->required,
+                               .invalid = paint.invalid,
+                               .multiline = cui_edit_get_state(d->input).multiline});
+    cui_input_paint(ui, id, t, label, d->input, &input, paint);
+    view->scroll_x = input.scroll_x;
+    return error != CUI_EDIT_OK ? CUI_QUESTIONNAIRE_INVALID : sync;
 }
+
 bool cui_questionnaire_radio_keys(cui_context *ui, cui_questionnaire_state *s, const cui_id *ids,
                                   size_t count) {
     if (!ui || !s || !s->initialized || s->current >= s->count || !ids)
@@ -1709,6 +1767,9 @@ bool cui_questionnaire_confirm_keys(cui_context *ui, cui_id scope, cui_questionn
             continue;
         bool filled = false;
         cui_id focus = cui_focused(ui);
+        cui_questionnaire_routes *stack = cui_questionnaire_route_stack(ui);
+        if (input_id && focus == input_id && stack && stack->active && stack->active->state == s)
+            continue; /* Input control confirms after preceding edit events. */
         if (input_id && focus == input_id)
             filled = cui_questionnaire_freeform(s, item).length != 0;
         for (size_t c = 0; c < count; c++)

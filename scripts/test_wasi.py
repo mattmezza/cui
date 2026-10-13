@@ -95,7 +95,8 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths = list(SOURCES)
     paths += [f"tests/unit/test_{name}.c" for name in SUITES]
     paths += ["tests/unit/test_core_embed.c", "tests/distribution/single.c",
-              "tests/distribution/implementation.c", "tests/distribution/consumer.c"]
+              "tests/distribution/implementation.c", "tests/distribution/consumer.c",
+              "tests/distribution/effects.c"]
     paths += [f"examples/{name}/main.c" for name in ("unstyled", "styled_settings")]
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
@@ -229,6 +230,7 @@ def main() -> int:
         targets += [(f"example_{name}", [f"examples/{name}/main.c"], True, [])
                     for name in ("unstyled", "styled_settings")]
         distribution_flags = ["-I", str(root / "dist"), "-DCUI_DISTRIBUTION_CONTROLS=1"]
+        targets += [("effects_distribution", ["tests/distribution/effects.c"], False, distribution_flags)]
         targets += [("distribution_single", ["tests/distribution/single.c"], False, distribution_flags),
                     ("distribution_multi", ["tests/distribution/implementation.c", "tests/distribution/consumer.c"], False, distribution_flags)]
         failures = []

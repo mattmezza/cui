@@ -16,22 +16,23 @@ function shareRoute(path,raw,title,description){
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
 const textBaselineOffsets=new Map();
-function canvasFont(size,weight=0,italic=false,monospace=false){
- const family=monospace?'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace':'system-ui';
+function canvasFont(size,weight=0,italic=false,monospace=false,familyId=0){
+ const families={1:"Arial, Helvetica, sans-serif",2:"Georgia, Times New Roman, serif",3:"ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"};
+ const family=families[familyId]||(monospace?'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace':'system-ui');
  return `${italic?'italic ':''}${[400,500,600,700][weight]||400} ${size}px ${family}`;
 }
-function canvasFontMetrics(size,weight=0,italic=false,monospace=false){
+function canvasFontMetrics(size,weight=0,italic=false,monospace=false,familyId=0){
  if(!Number.isFinite(size)||size<=0)return null;
- ctx.font=canvasFont(size,weight,italic,monospace);
+ ctx.font=canvasFont(size,weight,italic,monospace,familyId);
  const metrics=ctx.measureText('');
  const ascent=metrics.fontBoundingBoxAscent,descent=metrics.fontBoundingBoxDescent,lineHeight=size*1.25;
  if(!Number.isFinite(ascent)||!Number.isFinite(descent)||!Number.isFinite(lineHeight)||ascent<0||descent<0||ascent+descent<=0||lineHeight<=0)return null;
  return [ascent,descent,lineHeight];
 }
-function textBaselineOffset(size,weight=0,italic=false,monospace=false){
- const key=`${size}:${weight}:${Number(italic)}:${Number(monospace)}`;
+function textBaselineOffset(size,weight=0,italic=false,monospace=false,familyId=0){
+ const key=`${size}:${weight}:${Number(italic)}:${Number(monospace)}:${familyId}`;
  if(textBaselineOffsets.has(key))return textBaselineOffsets.get(key);
- const metrics=canvasFontMetrics(size,weight,italic,monospace);
+ const metrics=canvasFontMetrics(size,weight,italic,monospace,familyId);
  const offset=metrics?(metrics[2]-metrics[0]-metrics[1])/2+metrics[0]:null;
  textBaselineOffsets.set(key,offset);return offset;
 }
@@ -250,9 +251,11 @@ function wasiImports(){
 function requestFrame(){if(framePending||!wasm)return;framePending=true;requestAnimationFrame(()=>{framePending=false;try{render();}catch(e){fatal(e);}});}
 function render(){
  clearTimeout(wakeTimer);
- if(!selected || !(selected.name in stories))return;
+ if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=Number($('design-size').value),designHeights=[0,20,24,32,32,40,48,56,64,80];
- const width=canvas.clientWidth,height=selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+100):selected.name==='Plot'?440:selected.name==='Dock'?400:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?660:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const gaps=[0,4,4,6,6,8,8,12,12,16];
+ canvas.style.minWidth=selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
+ const width=canvas.clientWidth,height=selected.example?720:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+100):selected.name==='Plot'?440:selected.name==='Dock'?400:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -271,6 +274,7 @@ function render(){
  wasm.gallery_settings_options(Number($('settings-size').value),Number($('settings-variant').value));
  wasm.gallery_carousel_options(Number($('carousel-axis').value),Number($('carousel-loop').checked));
  wasm.gallery_command_palette_options(Number($('command-modal').checked),Number($('command-loading').checked),Number($('command-filterable').checked));
+ wasm.gallery_text_view_motion(Number($('motion-duration').value),Number($('motion-stagger').value),Number($('motion-easing').value));
  wasm.gallery_text_view_options(Number($('text-view-format').value),Number($('text-view-scroll').checked),Number($('text-view-fade').checked));
  wasm.gallery_chart_options(Number($('chart-kind').value),Number($('chart-curve').value),Number($('chart-dots').checked),Number($('chart-labels').checked),Number($('chart-animate').checked));
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));
@@ -278,6 +282,8 @@ function render(){
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
+ wasm.gallery_typography_options(Number($('text-family').value),Number($('text-size').value),Number($('text-weight').value),Number($('text-italic').checked));
+ wasm.gallery_effects_options(Number($('effect-angle').value),Number($('effect-opacity').value),Number($('effect-blur').value));
  wasm.gallery_design_options(Number($('design-size').value),Number($('design-radius').value),Number($('design-spacing').value));
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
@@ -296,14 +302,14 @@ function render(){
  const frameReducedMotion=reducedMotion.matches;
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(frameReducedMotion));lastTime=now;
  wasm.gallery_theme_preset(themeChoice==='high-contrast'?-1:selectedPreset());
- if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
+ if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
  let clips=0;
  for(let i=0;i<wasm.gallery_count();i++){
   const f=n=>wasm.gallery_command(i,n);const type=f(0),x=f(1),y=f(2),w=f(3),h=f(4);
   if(type===3){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();clips++;continue;}
   if(type===4){if(clips){ctx.restore();clips--;}continue;}
   ctx.fillStyle=ctx.strokeStyle=`rgba(${f(5)},${f(6)},${f(7)},${f(8)/255})`;
-  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24);ctx.font=canvasFont(size,weight,italic,monospace);const baseline=textBaselineOffset(size,weight,italic,monospace);ctx.textBaseline=baseline===null?'top':'alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+(baseline??0));}
+  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24),familyId=wasm.gallery_command_family(i)>>>0;ctx.font=canvasFont(size,weight,italic,monospace,familyId);const baseline=textBaselineOffset(size,weight,italic,monospace,familyId);ctx.textBaseline=baseline===null?'top':'alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+(baseline??0));}
   else if(w>0&&h>0){
    const radii=(f(12)?[f(13),f(14),f(16),f(15)]:[f(9),f(9),f(9),f(9)]).map(r=>Math.min(Math.max(0,r),Math.min(w,h)/2));
    if(type===5){paintBitmap(i,x,y,w,h,radii);continue;}
@@ -470,18 +476,26 @@ async function pickScreenColor(){
 }
 function cancelScreenColor(){if(screenColorRequest){const request=screenColorRequest;screenColorRequest=null;request.abort();}screenColorControls();}
 $('screen-color').addEventListener('click',pickScreenColor);
+const exampleDescriptor={name:'Northstar workspace',example:true,status:'tested',public_header:'examples/composed_apps/app.h',reference_url:'https://github.com/mattmezza/cui/tree/main/examples/composed_apps',features:[],limitations:['Session-local demo state; sign-in and pricing actions are examples without a server.','Native Linux/X11 and portable headless interactions are validated; other native platforms remain unverified.'],usage:{composition:'Application model + immediate frame composition',state_ownership:'Retain composed_app until its draw lists finish rendering.',interaction:'Pass app_callback to composed_app_create for navigation, session, plan and save events.',usage:'Open Overview, try a plan CTA, use the account menu, then edit and save workspace settings.',docs:['docs/COMPOSED_APPS.md']}};
 function selectComponent(){
- let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
- document.title=`${selected.name} · CUI`;shareRoute(`components/${componentSlug(selected.name)}/`,encodeURIComponent(selected.name),document.title,`Explore CUI ${selected.name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. GPUI Kit parity remains in progress.`); $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
- const live=selected.name in stories;
+ let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=name==='examples/northstar'?exampleDescriptor:catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
+ document.title=`${selected.name} · CUI`;shareRoute(selected.example?'examples/northstar/':`components/${componentSlug(selected.name)}/`,selected.example?'examples/northstar':encodeURIComponent(selected.name),document.title,`Explore CUI ${selected.name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. GPUI Kit parity remains in progress.`); $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
+ const live=selected.example||selected.name in stories;
  window.cuiGallery.renderedComponent=live?'':selected.name;
  if(modelStories.has(selected.name))$('status').textContent+=' / base model'; $('preview-card').hidden=!live; $('pending').hidden=live;
  $('description').textContent=live?`Explore ${selected.name.toLowerCase()} through the same CUI core, base behavior and theme used by native applications.`:`${selected.name} is part of the complete GPUI Kit 0.7.1 comparison catalog.`;
  if(modelStories.has(selected.name))$('description').textContent='Interactive demonstration of the implemented base model. The complete styled component remains pending.';
  $('pending-message').textContent=selected.status==='not_started'?'Implementation and browser story are pending. This entry stays visible to preserve the complete component scope.':'Repository implementation exists for part of this entry. A browser story is pending; see implementation scope and source for details.';
- $('snippet').textContent=snippets[selected.name]||(live?`/* See the public ${selected.public_header || 'component'} API. */`:'/* No complete styled browser example yet. */');
+ $('snippet').textContent=(selected.example?'/* Retain app across frames. Include examples/composed_apps/app.h. */\ncomposed_app *app = composed_app_create(on_app_event, user);\n/* Inside each active CUI frame: */\ncomposed_app_set_theme(app, &theme);\ncomposed_app_scene(ui, app, width, height);':snippets[selected.name])||(live?`/* See the public ${selected.public_header || 'component'} API. */`:'/* No complete styled browser example yet. */');
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
  $('reference').href=selected.reference_url;
+ const usage=selected.usage;
+ $('component-composition').textContent=usage?.composition||'Immediate frame composition';
+ $('component-state').textContent=usage?.state_ownership||'Retain application values between frames.';
+ $('component-events').textContent=usage?.interaction||'Use the linked guide for the example callbacks.';
+ $('component-usage-note').textContent=usage?.usage||'';
+ $('component-guides').replaceChildren();for(const path of usage?.docs||[]){const doc=documents.find(d=>d.source.endsWith('/'+path));if(doc){const a=document.createElement('a');a.href='#docs/'+doc.slug;a.textContent=doc.title;$('component-guides').append(a,document.createTextNode(' '));}}
+
  $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
  $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental. IME composition and a complete platform accessibility bridge remain pending.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
  $('table-pin').hidden=selected.name!=='DataTable';$('table-pin').value='0';
@@ -500,13 +514,14 @@ function selectComponent(){
  $('speech-size').value='0';$('speech-unavailable').checked=false;
  for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control'])$(id).hidden=selected.name!=='Chart';
  $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;
- for(const id of ['text-view-format','text-view-scroll-control','text-view-fade-control'])$(id).hidden=selected.name!=='TextView';
- $('text-view-format').value='0';$('text-view-scroll').checked=false;$('text-view-fade').checked=false;
+ for(const id of ['text-view-format','text-view-scroll-control','text-view-fade-control','motion-duration','motion-stagger','motion-easing'])$(id).hidden=selected.name!=='TextView';
+ $('motion-duration').value='0.35';$('motion-stagger').value='0';$('motion-easing').value='0';$('text-view-format').value='0';$('text-view-scroll').checked=false;$('text-view-fade').checked=false;
  for(const id of ['command-modal-control','command-loading-control','command-filterable-control'])$(id).hidden=selected.name!=='Command';
  $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea','Input','NumberInput'].includes(selected.name);
  $('control-size').value='0';
  $('control-size').disabled=false;
- $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea'].includes(selected.name);$('design-size').value='0';
+ for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control'])$(id).hidden=selected.name!=='Theme';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput'].includes(selected.name);$('design-size').value='0';
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
@@ -577,7 +592,7 @@ canvas.addEventListener('wheel',e=>{
  if(!wasm)return;const rect=canvas.getBoundingClientRect(),x=e.clientX-rect.left,y=e.clientY-rect.top;
  const scale=e.deltaMode===1?32:e.deltaMode===2?canvas.clientHeight:1,dx=e.deltaX*scale,dy=e.deltaY*scale;
  const consumes=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).some(i=>{const f=n=>wasm.gallery_semantic(i,n);if(!f(17)||f(5)||x<f(1)||y<f(2)||x>=f(1)+f(3)||y>=f(2)+f(4))return false;return(dx>0&&f(18)<f(20))||(dx<0&&f(18)>0)||(dy>0&&f(19)<f(21))||(dy<0&&f(19)>0);});
- if(consumes){e.preventDefault();if(['Scrollable','Sidebar','VirtualList'].includes(selected.name))wasm.gallery_scroll_pixels(x,y,-dx,-dy);else wasm.gallery_scroll(x,y,-dx/32,-dy/32);requestFrame();}
+ if(consumes){e.preventDefault();if(selected.example||['Scrollable','Sidebar','VirtualList'].includes(selected.name))wasm.gallery_scroll_pixels(x,y,-dx,-dy);else wasm.gallery_scroll(x,y,-dx/32,-dy/32);requestFrame();}
 },{passive:false});
 canvas.addEventListener('pointerleave',()=>{wasm?.gallery_event(0,-100,-100,0,0,0,0,0);requestFrame();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
@@ -636,7 +651,7 @@ for(const id of ['image-state','image-fit','image-grayscale','image-opacity','at
 for(const id of ['description-columns','description-size','description-vertical','description-plain','status-right','status-custom','resizable-vertical','resizable-disabled','icon-choice','icon-size','icon-rotate','icon-color'])$(id).addEventListener('change',requestFrame);
 for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEventListener('change',requestFrame);
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);
-for(const id of ['questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
+for(const id of ['motion-duration','motion-stagger','motion-easing','questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
 for(const id of ['control-size','choice-required','choice-invalid','choice-skip-tab','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
 for(const id of ['design-size','design-radius','design-spacing'])$(id).addEventListener('change',()=>{$('control-size').disabled=Number($('design-size').value)>0;requestFrame();});
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});
@@ -657,8 +672,10 @@ $('disabled').addEventListener('change',()=>{cancelScreenColor();requestFrame();
 try{
  const [response,data,docs,presets]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json()),fetch('./docs.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch documentation');return r.json();}),fetch('./themes.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch themes');return r.json();})]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;documents=docs;themes=presets;
  const module=await WebAssembly.compile(await response.arrayBuffer());
- const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=canvasFont(size);return ctx.measureText(stringAt(ptr,len)).width;},measure_styled:(ptr,len,size,weight,italic,monospace)=>{ctx.font=canvasFont(size,weight,!!italic,!!monospace);return ctx.measureText(stringAt(ptr,len)).width;},font_metrics:(size,weight,italic,monospace,pointer)=>{const metrics=canvasFontMetrics(size,weight,!!italic,!!monospace);if(!metrics)return 0;new Float32Array(wasm.memory.buffer,pointer,3).set(metrics);return 1;}}};
+ const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=canvasFont(size);return ctx.measureText(stringAt(ptr,len)).width;},measure_styled:(ptr,len,size,weight,italic,monospace,familyId)=>{ctx.font=canvasFont(size,weight,!!italic,!!monospace,familyId>>>0);return ctx.measureText(stringAt(ptr,len)).width;},font_metrics:(size,weight,italic,monospace,familyId,pointer)=>{const metrics=canvasFontMetrics(size,weight,!!italic,!!monospace,familyId>>>0);if(!metrics)return 0;new Float32Array(wasm.memory.buffer,pointer,3).set(metrics);return 1;}}};
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();if(!wasm.gallery_init())throw Error('CUI initialization failed');
  let saved;try{saved=localStorage.getItem('cui.theme');}catch{}themeChoice=saved==='system'||saved==='high-contrast'||themes.some(theme=>theme.id===saved)?saved:'system';buildPaletteMenu();syncTheme();
  window.cuiGallery={exports:wasm,stories,catalog,documents,themes,render,get themeChoice(){return themeChoice;}};$('home-story-count').textContent=String(Object.keys(stories).length);route();
 }catch(error){fatal(error);}
+
+for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic'])$(id).addEventListener('change',requestFrame);

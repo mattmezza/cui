@@ -8,7 +8,7 @@ without changing your operating system's display scale.
 ## Control and typography sizes
 
 Set `design_size` on Button, Checkbox, Radio, Switch, Toggle, Input, Textarea,
-List, Select, Menu or Combobox options. Zero (`CUI_DESIGN_INHERIT`) preserves the
+List, Select, Menu, Combobox, NumberInput, Form, InputGroup or OtpInput options. Zero (`CUI_DESIGN_INHERIT`) preserves the
 existing GPUI size enum and its metrics. The shared scale is opt-in; existing
 applications keep their current dimensions.
 
@@ -99,8 +99,11 @@ A box's `background` accepts RGBA color. `custom_opacity=true` and `opacity`
 apply inherited draw opacity to its children as well as the box. Use
 `cui_paint_bitmap` for a generated gradient or other image fill; keep its pixels
 alive until rendering completes and increment its revision after changing them.
-The current generic box API has no backdrop-blur or gradient-stop command.
-A CSS blur on website chrome would not establish native CUI blur support.
+Use the portable [background effects helpers](BACKGROUNDS.md) to generate
+multi-stop gradients, apply opacity or blur caller-owned RGBA pixels.
+The Theme gallery applies these helpers in C before painting its bitmap panels.
+A backdrop effect needs a captured image supplied by the host; generic boxes do
+not capture pixels behind themselves.
 
 Progress supports indeterminate animation with host time. Sheet supports timed
 entry/exit motion through `sheet_animation_seconds`, including reduced-motion
@@ -108,3 +111,22 @@ behavior. Tabs expose an application-owned spring indicator. See
 [Progress](PROGRESS.md), [surfaces](SURFACES.md) and [choices](CHOICE.md) for their
 actual APIs. Animate your own state using frame time and request another frame
 with `cui_invalidate`; respect `cui_reduced_motion(ui)` in the host's motion policy.
+
+## Font families and text styles
+
+The Theme gallery includes an interactive typography specimen with system,
+sans-serif, serif and monospace families, four weights, italic and xs–9xl sizes.
+These browser families are host mappings of `cui_text_style.family`; they are not
+font files bundled with CUI. A native application registers its own faces and
+uses the same family ID for measurement and rendering. See
+[TYPOGRAPHY.md](TYPOGRAPHY.md) for a complete native program and fallback rules.
+
+## Motion examples
+
+TextView exposes duration, word stagger and easing controls in its preview;
+Sheet demonstrates entering and leaving, and Progress offers an indeterminate
+mode. Examples forward the operating system's reduced-motion preference. See
+[TEXT_VIEW.md](TEXT_VIEW.md) for a complete headless motion program and
+[SURFACES.md](SURFACES.md) for sheet lifetimes and deferred callbacks. Motion is
+explicit state driven by host time, rather than a stylesheet or a background
+thread.

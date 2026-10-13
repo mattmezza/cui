@@ -33,6 +33,7 @@ typedef struct {
     float custom_size, density;
     bool no_appearance, hide_focus_ring;
     cui_str placeholder;
+    cui_design_size design_size; /* INHERIT preserves legacy size; styled APIs only. */
 } cui_number_options;
 bool cui_number_measure(cui_number_options, float root_font_size, cui_number_metrics *);
 typedef struct {
@@ -642,7 +643,8 @@ bool cui_number_measure(cui_number_options options, float root_font_size,
     cui_input_metrics input;
     if (!cui_input_measure((cui_input_options){.size = (cui_input_size)options.size,
                                                .custom_size = options.custom_size,
-                                               .density = options.density},
+                                               .density = options.density,
+                                               .design_size = options.design_size},
                            root_font_size, &input))
         return false;
     float d = options.density > 0 ? options.density : root_font_size / 16;
@@ -651,7 +653,10 @@ bool cui_number_measure(cui_number_options options, float root_font_size,
                  : options.size == CUI_NUMBER_SMALL ? 14
                  : options.size == CUI_NUMBER_LARGE ? 24
                                                     : 16;
-    if (options.size == CUI_NUMBER_CUSTOM) {
+    if (options.design_size != CUI_DESIGN_INHERIT) {
+        width = input.height / d;
+        icon = input.font_size / d;
+    } else if (options.size == CUI_NUMBER_CUSTOM) {
         width = options.custom_size / d;
         icon = options.custom_size / d;
     }
@@ -742,6 +747,7 @@ cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *
     cui_input_state input = {.scroll_x = s->scroll_x};
     cui_input_paint(ui, id, t, name, s->edit, &input,
                     (cui_input_options){.size = (cui_input_size)o.size,
+                                        .design_size = o.design_size,
                                         .custom_size = o.custom_size,
                                         .density = o.density,
                                         .height = inner,

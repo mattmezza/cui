@@ -40,7 +40,7 @@ class SharingTests(unittest.TestCase):
         output = ROOT / 'build/web'
         routes = json.loads((output / 'routes.json').read_text())
         documents = json.loads((output / 'docs.json').read_text())
-        self.assertEqual(len(routes), 79+len(documents))
+        self.assertEqual(len(routes), 80+len(documents))
         self.assertEqual(len({r['url'] for r in routes}), len(routes))
         self.assertEqual(sum(r['path'].startswith('components/') for r in routes), 78)
         for route in routes:

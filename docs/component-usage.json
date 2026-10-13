@@ -392,7 +392,8 @@
       "interaction": "Presentation only; no action callback.",
       "usage": "Submit text inside the current parent layout.",
       "docs": [
-        "docs/COMPONENTS.md"
+        "docs/COMPONENTS.md",
+        "docs/TYPOGRAPHY.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -1424,7 +1425,8 @@
       "interaction": "cui_theme_icon_loader_fn resolves icon SVG; theme selection is an application event.",
       "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it.",
       "docs": [
-        "docs/THEME_GUIDE.md"
+        "docs/THEME_GUIDE.md",
+        "docs/TYPOGRAPHY.md"
       ],
       "callback_symbols": [
         "cui_theme_icon_loader_fn"

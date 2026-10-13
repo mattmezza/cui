@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "../examples/composed_apps/app.h"
 #include "cui/cui_carousel.h"
 #include "cui/cui_chart.h"
 #include "cui/cui_choice.h"
@@ -9,6 +10,7 @@
 #include "cui/cui_description.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
+#include "cui/cui_effects.h"
 #include "cui/cui_form.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_media.h"
@@ -39,22 +41,25 @@
 __attribute__((import_module("host"), import_name("measure"))) extern float
 host_measure(const char *, size_t, float);
 __attribute__((import_module("host"), import_name("measure_styled"))) extern float
-host_measure_styled(const char *, size_t, float, int, int, int);
+host_measure_styled(const char *, size_t, float, int, int, int, uint32_t);
 __attribute__((import_module("host"), import_name("font_metrics"))) extern int
-host_font_metrics(float, int, int, int, float *);
+host_font_metrics(float, int, int, int, uint32_t, float *);
 #else
 static float host_measure(const char *s, size_t n, float size) {
     (void)s;
     return n * size * .6f;
 }
 static float host_measure_styled(const char *s, size_t n, float size, int weight, int italic,
-                                 int monospace) {
+                                 int monospace, uint32_t family) {
+    (void)family;
     (void)weight;
     (void)italic;
     (void)monospace;
     return host_measure(s, n, size);
 }
-static int host_font_metrics(float size, int weight, int italic, int monospace, float *out) {
+static int host_font_metrics(float size, int weight, int italic, int monospace, uint32_t family,
+                             float *out) {
+    (void)family;
     (void)size;
     (void)weight;
     (void)italic;
@@ -66,6 +71,16 @@ static int host_font_metrics(float size, int weight, int italic, int monospace, 
 static cui_context *ui;
 static cui_theme current_theme;
 static int gallery_preset_index = -1;
+static uint32_t typography_family;
+static float typography_size = 24;
+static int typography_weight;
+static bool typography_italic;
+void gallery_typography_options(uint32_t family, float size, int weight, int italic) {
+    typography_family = family;
+    typography_size = isfinite(size) && size >= 8 && size <= 128 ? size : 24;
+    typography_weight = weight >= 0 && weight <= 3 ? weight : 0;
+    typography_italic = italic != 0;
+}
 
 void gallery_theme_preset(int index) {
     gallery_preset_index = index >= 0 && (size_t)index < cui_theme_preset_count() ? index : -1;
@@ -126,6 +141,7 @@ static cui_text_view_block text_view_blocks[256];
 static cui_text_view_glyph text_view_glyphs[4096];
 static cui_text_view_highlight text_view_highlights[32];
 static int text_view_format, text_view_scrollable, text_view_fade;
+static cui_text_view_motion text_view_motion = {.duration = .35f};
 static int text_view_links;
 static cui_text_view_error text_view_error;
 static bool gallery_text_view_load(void);
@@ -1220,21 +1236,27 @@ static bool form_email_valid(void) {
 }
 static void form_control(cui_context *context, const cui_theme *theme, void *user, float width) {
     gallery_form_control *control = user;
-    cui_input_result result = cui_input_ex(context, control->id, theme, cui_string(control->name),
-                                           control->edit, control->state,
-                                           (cui_input_options){.width = width,
-                                                               .disabled = control->disabled,
-                                                               .readonly = control->readonly,
-                                                               .required = true,
-                                                               .invalid = control->invalid});
+    cui_input_result result = cui_input_ex(
+        context, control->id, theme, cui_string(control->name), control->edit, control->state,
+        (cui_input_options){.width = width,
+                            .design_size = design_size,
+                            .density = current_theme.font_size / 16,
+                            .disabled = control->disabled,
+                            .readonly = control->readonly,
+                            .required = true,
+                            .invalid = control->invalid});
     if (result.changed)
         redraw = true;
 }
 static void form_footer(cui_context *context, const cui_theme *theme, void *user, float width) {
     bool disabled = *(bool *)user;
     (void)width;
-    if (cui_button(context, cui_id_from(context, "form-save"), theme, cui_string("Save profile"),
-                   disabled)) {
+    cui_theme control_theme = *theme;
+    if (design_size != CUI_DESIGN_INHERIT)
+        control_theme.font_size = current_theme.font_size;
+    if (cui_button_ex(context, cui_id_from(context, "form-save"), &control_theme,
+                      cui_string("Save profile"),
+                      (cui_button_options){.disabled = disabled, .design_size = design_size})) {
         if (form_name_buffer[0] && form_email_valid()) {
             form_submissions++;
             snprintf(form_status, sizeof(form_status), "Profile saved. Submissions: %d",
@@ -1327,14 +1349,15 @@ static cui_size measure(void *user, cui_str text, float size) {
 static cui_size measure_styled(void *user, cui_str text, float size, cui_text_style style) {
     (void)user;
     return (cui_size){host_measure_styled(text.data, text.length, size, style.weight, style.italic,
-                                          style.monospace),
+                                          style.monospace, style.family),
                       size * 1.25f};
 }
 static bool measure_font_metrics(void *user, float size, cui_text_style style,
                                  cui_font_metrics *out) {
     (void)user;
     float metrics[3];
-    if (!host_font_metrics(size, style.weight, style.italic, style.monospace, metrics))
+    if (!host_font_metrics(size, style.weight, style.italic, style.monospace, style.family,
+                           metrics))
         return false;
     *out = (cui_font_metrics){metrics[0], metrics[1], metrics[2]};
     return true;
@@ -1370,6 +1393,22 @@ void gallery_text_view_options(int format, int scrollable, int fade) {
     text_view_scrollable = scrollable != 0;
     text_view_fade = fade != 0;
     redraw = true;
+}
+void gallery_text_view_motion(float duration, float stagger, int easing) {
+    cui_text_view_motion motion = {
+        .duration = duration, .stagger = stagger, .easing = (cui_text_view_fade_easing)easing};
+    if (cui_text_view_set_motion(&text_view_state, motion))
+        text_view_motion = motion;
+}
+float gallery_text_view_motion_stat(int field) {
+    if (field == 0)
+        return text_view_state.fade_duration;
+    if (field == 1)
+        return text_view_state.fade_stagger;
+    if (field == 2)
+        return (float)text_view_state.fade_easing;
+    return cui_text_view_stream_opacity(
+        &text_view_state, text_view_state.text_length ? text_view_state.text_length - 1 : 0);
 }
 int gallery_text_view_stats(int field) {
     return field == 0   ? (int)text_view_state.text_length
@@ -1429,9 +1468,81 @@ static bool gallery_text_view_load(void) {
     }
     return text_view_error == CUI_TEXT_VIEW_OK;
 }
+static unsigned char effect_source[128 * 64 * 4], effect_pixels[128 * 64 * 4];
+static float effect_scratch[128 * 64 * 4], effect_angle = 35, effect_opacity = 1;
+static unsigned effect_blur;
+static uint64_t effect_revision;
+static bool effect_dirty = true;
+void gallery_effects_options(float angle, float opacity, unsigned blur) {
+    if (!isfinite(angle) || !isfinite(opacity) || opacity < 0 || opacity > 1 || blur > 16)
+        return;
+    if (effect_angle != angle || effect_opacity != opacity || effect_blur != blur) {
+        effect_angle = angle;
+        effect_opacity = opacity;
+        effect_blur = blur;
+        effect_dirty = true;
+    }
+}
+float gallery_effect_pixel(unsigned x, unsigned y, unsigned channel) {
+    return x < 128 && y < 64 && channel < 4 ? effect_pixels[(y * 128 + x) * 4 + channel] : -1;
+}
+static void gallery_effect_preview(const cui_theme *theme, float width) {
+    if (effect_dirty) {
+        const cui_gradient_stop stops[] = {{0, {12, 23, 43, 255}},
+                                           {.45f, {29, 49, 77, 255}},
+                                           {.55f, {36, 116, 129, 255}},
+                                           {1, {62, 103, 112, 255}}};
+        cui_effect_buffer source = {effect_source, 128, 64, 128 * 4, sizeof(effect_source)};
+        cui_effect_buffer output = {effect_pixels, 128, 64, 128 * 4, sizeof(effect_pixels)};
+        if (!cui_effect_linear_gradient(source, stops, 4, effect_angle))
+            return;
+        for (unsigned y = 20; y < 44; y++)
+            for (unsigned x = 50; x < 78; x++) {
+                unsigned char *pixel = effect_source + (y * 128 + x) * 4;
+                pixel[0] = 235;
+                pixel[1] = 244;
+                pixel[2] = 245;
+                pixel[3] = 255;
+            }
+        cui_bitmap bitmap = {effect_source, 128, 64, 128 * 4, ++effect_revision};
+        if (!cui_effect_blur(bitmap, output, effect_blur, effect_scratch, 128 * 64 * 4))
+            return;
+        bitmap.pixels = effect_pixels;
+        if (!cui_effect_opacity(bitmap, output, effect_opacity))
+            return;
+        effect_dirty = false;
+    }
+    cui_label(ui, theme, cui_string("Gradient, image blur and opacity"));
+    cui_begin_box(ui, cui_id_from(ui, "effects-row"), (cui_box){.row = true, .gap = 12});
+    float panel = fminf(260, (width - 60) * .5f);
+    cui_paint_bitmap(
+        ui, cui_id_from(ui, "gradient-original"),
+        (cui_bitmap_paint){.bitmap = {effect_source, 128, 64, 128 * 4, effect_revision},
+                           .opacity = 1},
+        (cui_box){.width = panel, .height = 100, .radius = theme->radius_lg});
+    cui_paint_bitmap(
+        ui, cui_id_from(ui, "gradient-processed"),
+        (cui_bitmap_paint){.bitmap = {effect_pixels, 128, 64, 128 * 4, effect_revision},
+                           .opacity = 1},
+        (cui_box){.width = panel, .height = 100, .radius = theme->radius_lg});
+    cui_end_box(ui);
+}
+static composed_app *gallery_app;
+float gallery_app_stat(int field) {
+    app_snapshot state = composed_app_snapshot(gallery_app);
+    return field == 0   ? state.page
+           : field == 1 ? state.plan
+           : field == 2 ? state.logged_in
+           : field == 3 ? state.saves
+           : field == 4 ? state.notifications
+                        : state.sync;
+}
 int gallery_init(void) {
     if (ui)
         return 1;
+    gallery_app = composed_app_create(NULL, NULL);
+    if (!gallery_app)
+        return 0;
     if (!cui_speech_init(
             &speech_state,
             (cui_speech_workspace){speech_transcript, sizeof(speech_transcript), speech_messages,
@@ -1782,9 +1893,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     /* The host has synchronously painted the preceding draw list by this call. */
     cui_icon_state_collect(&icon_state);
     current_theme = t;
+    if (story == 80)
+        composed_app_set_theme(gallery_app, &t);
     cui_begin_frame(ui, width, height, host_dt);
     cui_set_reduced_motion(ui, reduced_motion);
-    if (story != 75)
+    if (story != 75 && story != 80)
         cui_begin_box(ui, cui_id_from(ui, "preview"),
                       (cui_box){.width = width,
                                 .height = height,
@@ -1792,6 +1905,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                 .gap = design_spacing >= 0 ? t.gap : 16,
                                 .background = t.background});
     switch (story) {
+    case 80:
+        composed_app_scene(ui, gallery_app, width, height);
+        break;
     case 64: {
         cui_description_item items[] = {
             {.id = cui_id_from(ui, "description-owner"),
@@ -2182,6 +2298,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.dt = host_dt;
         options.scrollable = text_view_scrollable != 0;
         options.stream_fade = text_view_fade != 0;
+        options.custom_motion = true;
+        options.motion = text_view_motion;
         options.reduced_motion = reduced_motion;
         options.disabled = disabled != 0;
         options.code_actions_height = 0;
@@ -2664,6 +2782,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     (cui_otp_options){.name = cui_string("Verification code"),
                                       .groups = (size_t)otp_groups,
                                       .size = (cui_otp_size)gallery_xsmall_second_size(),
+                                      .design_size = design_size,
                                       .disabled = disabled,
                                       .now_seconds = host_seconds});
         next_wake = result.next_wake_seconds;
@@ -2715,6 +2834,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             (cui_input_group_options){
                 .width = width > 460 ? 400 : width - 48,
                 .size = (cui_form_size)gallery_xsmall_second_size(),
+                .design_size = design_size,
                 .name = cui_string("Workspace address"),
                 .placeholder = cui_string("workspace"),
                 .input = {.disabled = disabled || group_mode == 2, .readonly = group_mode == 1}});
@@ -2769,6 +2889,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                  (cui_form_options){.width = width - 48,
                                     .columns = width > 580 ? 2 : 1,
                                     .size = (cui_form_size)gallery_xsmall_second_size(),
+                                    .design_size = design_size,
                                     .name = cui_string("Profile form"),
                                     .render_footer = form_footer,
                                     .footer_user = &save_disabled});
@@ -2869,6 +2990,18 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_text(ui, name, t.font_size, t.text);
             cui_end_box(ui);
         }
+        gallery_effect_preview(&t, width);
+        cui_label(ui, &t, cui_string("Typography: host-mapped family, size, weight and italic"));
+        cui_begin_box(
+            ui, cui_id_from(ui, "typography-sample"),
+            (cui_box){.width = width - 48, .height = typography_size * 1.5f, .clip = true});
+        cui_text_ex(ui, cui_string("WiiW: Build with CUI"), typography_size, t.text,
+                    typography_size * 1.25f,
+                    (cui_text_style){.family = typography_family,
+                                     .weight = (cui_text_weight)typography_weight,
+                                     .italic = typography_italic});
+        cui_end_box(ui);
+
         break;
     }
     case 12:
@@ -3564,6 +3697,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                               .has_maximum = true,
                                               .disabled = disabled,
                                               .size = (cui_number_size)control_size,
+                                              .design_size = design_size,
                                               .width = width > 360 ? 280 : width - 48});
         char text[64];
         snprintf(text, sizeof(text), "Controlled value: %.2f", number);
@@ -3706,7 +3840,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string("This component has no browser story yet."));
         break;
     }
-    if (story != 75)
+    if (story != 75 && story != 80)
         cui_end_box(ui);
     draw = cui_end_frame(ui);
     if (notification_clear) {
@@ -3937,6 +4071,9 @@ float gallery_command(unsigned i, unsigned field) {
 }
 const char *gallery_command_text(unsigned i) {
     return i < draw.count ? draw.commands[i].text.data : NULL;
+}
+uint32_t gallery_command_family(unsigned i) {
+    return i < draw.count ? draw.commands[i].text_style.family : 0;
 }
 unsigned gallery_command_length(unsigned i) {
     return i < draw.count ? (unsigned)draw.commands[i].text.length : 0;

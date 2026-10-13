@@ -82,6 +82,9 @@ def build(output, site_url=DEFAULT_SITE):
         description = f'Explore CUI {name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. GPUI Kit parity remains in progress.'
         fallback = '<h1>'+escape(name)+'</h1><p>'+escape(description)+'</p><ul>' + ''.join('<li>'+escape(limit)+'</li>' for limit in component.get('limitations', [])) + '</ul>'
         page('components/'+slug+'/', name+' · CUI', description, name, fallback)
+    page('examples/northstar/', 'Northstar workspace · CUI',
+         'Try a native CUI workspace composition: navigation, account menu, pricing actions and editable settings.',
+         'examples/northstar', '<h1>Northstar workspace</h1><p>A real CUI composition with session-local example actions.</p><p><a href="../../docs/composed-apps/">Read the buildable example guide</a></p>')
     for document in documents:
         if not re.fullmatch(r'[\w-]+', document['slug']):
             raise ValueError('Unsafe documentation slug')

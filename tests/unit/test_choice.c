@@ -4190,7 +4190,10 @@ static void test_design_scale_rows_and_triggers(void) {
     const cui_choice_item entries[] = {{8101, {"One", 3}, false}, {8102, {"Two", 3}, false}};
     for (size_t t = 0; t < 4; t++) {
         for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; size++) {
-            cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1600});
+            /* This two-item fixture does not need production-sized arenas on
+               each of its 56 theme/size iterations. */
+            cui_context *ui = cui_create((cui_config){
+                .width = 1800, .height = 1600, .max_elements = 256, .max_commands = 512});
             assert(ui);
             cui_design_metrics m;
             assert(cui_design_measure((cui_design_size)size, themes[t].font_size / 16, &m));

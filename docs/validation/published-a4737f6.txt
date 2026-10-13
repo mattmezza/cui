@@ -1,0 +1,19 @@
+Release a4737f65fedd7d4cee6a658c33a9f4089f6616fd: library CI38333385611 and Pages38333385615 success.
+Actual HTTPS verification: full78 stories, direct component/docs URLs and JS-disabled fallbacks pass.
+166files including everystaticpage and LANGUAGE_BINDINGS.md byte-match Pagesartifact.
+
+published-a4737f6-browser.log
+Installed 4 packages in 12ms
+PASS: 78 usage excerpts covered; 78 displayed excerpts compile
+Alert second confirmation: {'attempts': 2, 'open': 0, 'pointers': [1, 1, 143, 143], 'canvas': [339, 371.390625], 'semantics': [{'name': 'Delete workspace', 'role': 1, 'bounds': [24, 24, 136.73153686523438, 32], 'focused': 1, 'scroll': 0, 'maximum': 0}]}
+PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting
+
+published-a4737f6-hashes.log
+PASS routes.json b03c2b200e5fc2ee50eb72702e285e7928410b7e37d0de1a2cbaa15d4301603e
+PASS assets/cui-social.png 549c2b0a20ab40c709a942c66e27e9420c1d5be79e4858bf27c4f9c56c1286b0
+PASS assets/cui-workspace-light.png 54f27a9684c3fb729b1286ac467379cf0adc243eef7bad8f9e00518c5ccff741
+PASS assets/cui-workspace-dark.png 221811b28c94e7ae7f697a00d8cf558688d2be89f40fd615b2fe11f03c82cf45
+PASS markdown/docs/SURFACES.md abeafc3a2382ad6f1d14579dcd63519966420ae4c22592c41364de91db42728b
+PASS markdown/docs/WEB_GALLERY.md 6f47a69ae5b89a96605bd4ff7fc48fbc76e20132f3fca6e27a500d3de91a09bf
+PASS markdown/docs/LANGUAGE_BINDINGS.md 674e5c02db0781c81c8d02b1821a28b6227908061c308d5732f5cdb9d85b284f
+166/166 published files byte-match the Pages artifact

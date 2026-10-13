@@ -10,6 +10,21 @@ extern "C" {
  * Bytes are borrowed only while the icon is prepared. No implicit I/O. */
 typedef bool (*cui_theme_icon_loader_fn)(void *user, cui_str path, cui_str *svg);
 typedef enum {
+    CUI_SCROLLBAR_INHERIT,
+    CUI_SCROLLBAR_VISIBLE,
+    CUI_SCROLLBAR_HIDDEN,
+    CUI_SCROLLBAR_AUTO_HIDE
+} cui_scrollbar_visibility;
+/* Shared skin. INHERIT preserves each component's legacy bar availability.
+ * Zero thickness/minimum keep that component's default. Timing defaults to
+ * 1 second idle + .15 second fade; no_fade/reduced_motion hide without fading. */
+typedef struct cui_scrollbar_style {
+    cui_scrollbar_visibility visibility;
+    bool no_track, custom_thumb_color, custom_track_color, no_fade, reduced_motion;
+    float thickness, min_thumb, thumb_radius, track_radius, idle_seconds, fade_seconds;
+    cui_color thumb_color, track_color;
+} cui_scrollbar_style;
+typedef enum {
     CUI_THEME_BUTTON_DEFAULT,
     CUI_THEME_BUTTON_PRIMARY,
     CUI_THEME_BUTTON_SECONDARY,
@@ -97,6 +112,7 @@ typedef struct {
     bool dark;            /* Explicit palette mode; independent of individual color luminance. */
     cui_color chart_1, chart_2, chart_3, chart_4, chart_5;
     cui_color chart_bullish, chart_bearish, chart_grid;
+    cui_scrollbar_style scrollbar;
 } cui_theme;
 cui_theme cui_theme_light(void);
 cui_theme cui_theme_dark(void);

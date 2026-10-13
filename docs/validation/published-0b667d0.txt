@@ -8,6 +8,8 @@ Public Python and Node guides and both real Copy-button clipboard recipes passed
 Additional actual public checks pass all14 design sizes across12 legacy families,
 both Tabs overflow axes, intrinsic HoverCard, simulated TitleBar actions and
 functional Toolbar Find, plus actual Sidebar image clipping.
+Public DatePicker locale/year selection passes28/28, and Plot physical mouse,
+one/two-contact gestures and actual repainted shapes pass17/17.
 Prior release 6ef61af deployed successfully and matched 325 files, but its
 distribution/style job failed formatting; 0b667d0 incorporates the correction.
 Formatter source 072899d passed native97/97 and WASI80/80 after correction.

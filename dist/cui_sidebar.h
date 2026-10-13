@@ -51,6 +51,7 @@ typedef struct {
     cui_str label;
     bool custom_box;
     cui_box box; /* Surface appearance; component owns padding/layout/dimensions. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_sidebar_options;
 cui_sidebar_options cui_sidebar_default(void);
 /* Pure bounded cache reconciliation and motion; no theme implementation needed. */
@@ -752,12 +753,16 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
     float width = s->viewport.w > 0 ? s->viewport.w : s->target_child_width;
     float height = s->viewport.h > 0 ? s->viewport.h : o.height > 0 ? o.height : 300;
     float total = cui_sidebar_content_height(s) + (s->icon_collapsed ? 16 : 0);
+    cui_scrollbar_style scrollbar_skin = o.scrollbar_style ? *o.scrollbar_style : t->scrollbar;
+    scrollbar_skin.reduced_motion |= o.reduced_motion;
     cui_scroll_options scroll = {.width = width,
                                  .height = height,
                                  .content_height = total,
                                  .vertical = true,
                                  .bar_thickness = 8,
-                                 .wheel_step = 40};
+                                 .wheel_step = 40,
+                                 .scrollbar_style = &scrollbar_skin};
+    scroll = cui_scroll_resolve(t, scroll);
     cui_scroll_geometry geometry = cui_scroll_layout(scroll);
     cui_base_scrollable(ui, body, &s->scroll, scroll);
     cui_begin_box(ui, body, (cui_box){.width = -1, .height = -1, .clip = true, .row = true});
@@ -795,7 +800,11 @@ bool cui_sidebar(cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_sta
     cui_end_box(ui);
     if (geometry.maximum_y > 0) {
         cui_sidebar_spacer(ui, -1, 0);
-        cui_begin_box(ui, 0, (cui_box){.width = 8, .height = -1, .clip = true});
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = scroll.hide_scrollbars ? 0 : scroll.bar_thickness,
+                                .fixed_width = true,
+                                .height = -1,
+                                .clip = true});
         cui_begin_absolute_box(ui, 0, (cui_box){0}, (cui_rect){.w = -1, .h = -1});
         cui_scrollbar(ui, body, t, &s->scroll, geometry, scroll, true);
         cui_end_box(ui);

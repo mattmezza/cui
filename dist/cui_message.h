@@ -101,6 +101,7 @@ typedef struct {
     /* Adjust a configured button's appearance without replacing its action. */
     cui_message_slot jump_content;
     float jump_width, jump_height;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_message_scroller_options;
 typedef struct {
     cui_message_scroller_view view;
@@ -463,6 +464,14 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
     if (!ui || !id || !s || !cui_message_scroller_validate_options(o))
         return r;
     r.valid = true;
+    if (o.scrollbar_style) {
+        if (isfinite(o.scrollbar_style->thickness) && o.scrollbar_style->thickness > 0)
+            o.bar_thickness = o.scrollbar_style->thickness;
+        if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+            o.scrollbar = false;
+    }
+    if (!o.scrollbar)
+        s->scrollbar.dragging_y = false;
     for (size_t i = s->previous_begin; i < s->previous_end && i < s->count; i++) {
         double height = fmax(0, s->rows[i].bounds.h - s->rows[i].render_gap);
         if (s->rows[i].bounds.h > 0 && height != s->rows[i].raw_height) {
@@ -480,6 +489,7 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
                                  .content_height = (float)fmin(r.view.total, FLT_MAX),
                                  .bar_thickness = o.bar_thickness,
                                  .wheel_step = o.wheel_step,
+                                 .scrollbar_style = o.scrollbar_style,
                                  .vertical = o.scrollbar};
     cui_scroll_geometry geometry = {
         .viewport = {o.width - (o.scrollbar ? fminf(o.bar_thickness, o.width * .5f) : 0), o.height},
@@ -807,6 +817,16 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
     cui_message_scroller_result r = {0};
     if (!ui || !t || !s || !render || !cui_message_scroller_validate_options(o))
         return r;
+    cui_scrollbar_style scrollbar_skin = o.scrollbar_style ? *o.scrollbar_style : t->scrollbar;
+    scrollbar_skin.reduced_motion |= o.reduced_motion;
+    o.scrollbar_style = &scrollbar_skin;
+    if (isfinite(o.scrollbar_style->thickness) && o.scrollbar_style->thickness > 0)
+        o.bar_thickness = o.scrollbar_style->thickness;
+    if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+        o.scrollbar = false;
+    else if (o.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
+             o.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE)
+        o.scrollbar = true;
     if (s->previous_width > 0 && s->previous_width != o.width)
         cui_message_scroller_remeasure(s);
     s->previous_width = o.width;
@@ -855,6 +875,7 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
                                  .bar_thickness = o.bar_thickness,
                                  .content_height = (float)fmin(r.view.total, FLT_MAX),
                                  .wheel_step = o.wheel_step};
+    scroll.scrollbar_style = o.scrollbar_style;
     cui_scroll_geometry geometry = {.viewport = {width, o.height},
                                     .maximum_y = (float)fmax(0, r.view.total - o.height)};
     s->scrollbar.y = (float)s->scroll;

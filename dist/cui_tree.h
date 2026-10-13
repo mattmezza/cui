@@ -53,6 +53,7 @@ typedef struct {
     bool disabled, manual_selection;
     float width, height, row_height, dt;
     size_t overscan;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_tree_options;
 typedef struct {
     bool selection_changed, expansion_changed;
@@ -545,6 +546,7 @@ cui_tree_result cui_base_tree(cui_context *ui, cui_id id, cui_tree_model *m, cui
 /* SPDX-License-Identifier: MIT */
 
 
+
 #include <math.h>
 static cui_id cui_tree_style_id(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x18d9f87aab972b61) + UINT64_C(0x9e3779b97f4a7c15) * index);
@@ -560,6 +562,17 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
     float width = isfinite(options.width) && options.width > 0 ? options.width : 320;
     cui_tree_result result = cui_tree_reduce(ui, id, model, state, selected, options);
     cui_tree_view view = cui_tree_viewport(model, state->scroll, height, row, options.overscan);
+    cui_scroll_options bars =
+        cui_scroll_resolve(t, (cui_scroll_options){.vertical = true,
+                                                   .disabled = options.disabled,
+                                                   .wheel_step = row,
+                                                   .scrollbar_style = options.scrollbar_style});
+    float x = 0;
+    bool bar_changed =
+        cui_base_scrollbar_overlay(ui, id, &x, &state->scroll, (cui_rect){0, 0, width, height},
+                                   (cui_size){width, view.total}, bars);
+    if (bar_changed)
+        view = cui_tree_viewport(model, state->scroll, height, row, options.overscan);
     cui_begin_box(ui, id,
                   (cui_box){.width = width,
                             .height = height,
@@ -618,6 +631,8 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
                           : t->text);
         cui_end_box(ui);
     }
+    cui_scrollbar_overlay_paint(ui, id, t, 0, state->scroll, (cui_rect){0, 0, width, height},
+                                (cui_size){width, view.total}, bars);
     cui_end_box(ui);
     return result;
 }

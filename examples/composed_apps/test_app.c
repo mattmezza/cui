@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "app.h"
+#include "cui/cui_scroll.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -35,7 +36,7 @@ static cui_draw_list last_list;
 static void frame(void) {
     cui_draw_list list = composed_app_frame(ui, app, width, height);
     last_list = list;
-    assert(cui_last_error(ui) == CUI_OK && list.count > 30);
+    assert(cui_last_error(ui) == CUI_OK && list.count > (height >= 800 ? 30u : 10u));
     for (size_t i = 0; i < list.count; ++i) {
         cui_rect b = list.commands[i].bounds;
         assert(isfinite(b.x) && isfinite(b.y) && isfinite(b.w) && isfinite(b.h));
@@ -245,6 +246,73 @@ static void theme_render(const cui_theme *theme) {
     composed_app_destroy(app);
     cui_destroy(ui);
 }
+static const cui_semantic *semantic(cui_id id) {
+    size_t count = 0;
+    const cui_semantic *items = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (items[i].id == id)
+            return &items[i];
+    return NULL;
+}
+static bool fully_visible(cui_id id) {
+    cui_rect b = cui_bounds(ui, id);
+    return b.w > 0 && b.h > 0 && b.x >= 0 && b.x + b.w <= width && b.y >= 72 && b.y + b.h <= height;
+}
+static void narrow_pricing_scroll(const cui_theme *theme, float w, float h) {
+    width = w;
+    height = h;
+    ui = cui_create((cui_config){.width = width, .height = height});
+    app = composed_app_create(NULL, NULL);
+    assert(ui && app);
+    composed_app_set_theme(app, theme);
+    frame();
+    click(APP_MENU);
+    click(APP_NAV_PRICING);
+    assert(composed_app_snapshot(app).page == APP_PRICING);
+    assert(semantic(APP_PLAN_TEAM)); /* Raw semantic exists even below the visible viewport. */
+    assert(!fully_visible(APP_PLAN_TEAM));
+    unsigned steps = 0;
+    while (!fully_visible(APP_PLAN_TEAM) && steps++ < 20) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                               .x = width / 2,
+                                               .y = height / 2,
+                                               .dy = -96,
+                                               .scroll_precise = true}));
+        frame();
+        frame();
+    }
+    assert(fully_visible(APP_PLAN_TEAM));
+    click(APP_PLAN_TEAM);
+    assert(composed_app_snapshot(app).plan == 1);
+    /* Keyboard End on the actual scrollbar must reveal the final Studio CTA. */
+    cui_id bar = cui_scrollbar_id(APP_CONTENT, true);
+    const cui_semantic *scrollbar = semantic(bar);
+    assert(scrollbar && scrollbar->role == CUI_ROLE_SCROLLBAR && !scrollbar->disabled &&
+           scrollbar->details.maximum > 0);
+    cui_focus(ui, bar);
+    key(CUI_KEY_END, 0);
+    frame();
+    assert(fully_visible(APP_PLAN_STUDIO));
+    click(APP_PLAN_STUDIO);
+    assert(composed_app_snapshot(app).plan == 2);
+    /* Inverse pixel scrolling returns to the top, and wheel units work as well. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = width / 2,
+                                           .y = height / 2,
+                                           .dy = 10000,
+                                           .scroll_precise = true}));
+    frame();
+    frame();
+    float top = cui_bounds(ui, APP_PLAN_STARTER).y;
+    assert(!fully_visible(APP_PLAN_TEAM));
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = width / 2, .y = height / 2, .dy = -1}));
+    frame();
+    frame();
+    assert(fabsf(cui_bounds(ui, APP_PLAN_STARTER).y - (top - 48)) < .1f);
+    composed_app_destroy(app);
+    cui_destroy(ui);
+}
 #ifdef APP_THEME_NATIVE
 static void native_callback(void *user, app_event event, app_snapshot state) {
     callback(user, event, state);
@@ -373,6 +441,8 @@ int main(int argc, char **argv) {
     for (size_t i = 0; i < 4; ++i) {
         theme_render(&themes[i]);
         workflow(&themes[i]);
+        narrow_pricing_scroll(&themes[i], 390, 844);
+        narrow_pricing_scroll(&themes[i], 360, 420);
     }
     puts("composed app: default and four themes passed geometry, readable ink, copied palette, "
          "focus, navigation, session, plans, editing, validation, save and responsive scrolling");

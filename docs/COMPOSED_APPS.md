@@ -188,6 +188,45 @@ Artifacts appear in `build/native-interactions.log` and
 
 ![Native settings after editing and saving](../examples/composed_apps/screenshots/settings-saved-desktop.png)
 
+### Scrolling in an embedding or browser host
+
+Narrow pricing cards stack vertically. Team (`APP_PLAN_TEAM`, 131) and Studio
+(132) may start below the viewport; this is expected. CUI retains their raw
+semantic bounds, but hit geometry is clipped to the document viewport. A host
+that exports only visible controls may omit those IDs until you scroll. Do not
+click stale offscreen centers or assume all three CTAs are immediately visible.
+
+Route scroll input to a point inside `APP_CONTENT` (150), rather than the header,
+sidebar or an open account menu. For a pixel-based host such as DOM wheel input:
+
+```c
+cui_rect content = cui_bounds(ui, APP_CONTENT);
+cui_queue_event(ui, (cui_event){
+    .type = CUI_EVENT_SCROLL,
+    .x = content.x + content.w / 2,
+    .y = content.y + content.h / 2,
+    .dy = -192,              /* Negative moves the document downward. */
+    .scroll_precise = true /* Logical pixels, not wheel ticks. */
+});
+composed_app_frame(ui, app, width, height);
+/* Re-read current bounds/visible semantics; repeat until the CTA is visible. */
+```
+
+For DOM `deltaMode == DOM_DELTA_PIXEL`, map positive `deltaY` to negative CUI
+`dy` and account for CSS-to-logical-pixel scaling in coordinates/deltas. With
+`scroll_precise == false`, deltas are wheel units: `dy = -1` moves this scene
+48 logical pixels downward. Feeding pixel deltas as nonprecise units multiplies
+them by 48 and usually jumps straight to the end. Re-read bounds after rendering
+the scrolled frame before dispatching pointer down/up.
+
+The real vertical scrollbar is `cui_scrollbar_id(APP_CONTENT, true)` from
+`cui/cui_scroll.h`. It exposes current value/minimum/maximum in its semantic
+record, supports pointer dragging, and supports Home/End/PageUp/PageDown when
+focused. Its End key reveals the last Studio CTA. Tests exercise precise wheel
+reveal/click of Team, scrollbar-keyboard reveal/click of Studio, reverse pixel
+scroll and exact wheel-unit movement for all four themes at both 390×844 and
+360×420. No scene-specific browser scrolling API is required.
+
 ### Reproduce native host-theme validation
 
 The optional native audit driver lives in `test_app.c` behind

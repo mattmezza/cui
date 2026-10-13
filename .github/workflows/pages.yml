@@ -55,6 +55,8 @@ jobs:
         run: uv run tests/web/test_example_polish.py
       - name: Verify Plot mouse and touch viewport interactions
         run: uv run tests/web/test_plot_interactions.py
+      - name: Verify portrait stacks and compact conversation touch behavior
+        run: uv run tests/web/test_avatar_message.py
       - name: Upload static gallery
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

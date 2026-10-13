@@ -92,14 +92,20 @@
     },
     {
       "api_symbols": [
-        "cui_avatar"
+        "cui_avatar",
+        "cui_avatar_ex",
+        "cui_avatar_stack",
+        "cui_avatar_image_init"
       ],
-      "state_types": [],
-      "state_ownership": "Caller owns the displayed name; no separate avatar model.",
-      "interaction": "Presentation only; no activation callback.",
-      "usage": "Submit a name and size each frame; initials are derived from the name.",
+      "state_types": [
+        "cui_avatar_image"
+      ],
+      "state_ownership": "Caller retains name, borrowed RGBA pixels, bounded circular cache and destination storage through rendering.",
+      "interaction": "Interactive avatars return activation; interactive stacks return the selected index or SIZE_MAX. Application opens the selected profile.",
+      "usage": "Initialize a circular image cache once; submit borrowed image pixels with a revision. Missing images fall back to initials; stacks use stable application keys.",
       "docs": [
-        "docs/CONTENT.md"
+        "docs/CONTENT.md",
+        "docs/AVATAR_MESSAGE_EXAMPLES.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -439,7 +445,8 @@
       "interaction": "cui_message_render_fn composes slots; action controls inside slots supply events.",
       "usage": "Submit body and slot options each frame; compose application actions in designated slots.",
       "docs": [
-        "docs/MESSAGE.md"
+        "docs/MESSAGE.md",
+        "docs/AVATAR_MESSAGE_EXAMPLES.md"
       ],
       "callback_symbols": [
         "cui_message_render_fn"
@@ -462,7 +469,8 @@
       "interaction": "cui_message_scroller_result reports scrolling/jump behavior; cui_message_row_render_fn composes visible rows.",
       "usage": "Append/prepend through model operations, then submit visible messages through the row callback each frame.",
       "docs": [
-        "docs/MESSAGE.md"
+        "docs/MESSAGE.md",
+        "docs/AVATAR_MESSAGE_EXAMPLES.md"
       ],
       "callback_symbols": [
         "cui_message_row_render_fn"

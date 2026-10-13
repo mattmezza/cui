@@ -153,13 +153,13 @@ API: `cui_attachment`. [Public header](../include/cui/cui_media.h); [guide](MEDI
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns the displayed name; no separate avatar model.
+**State:** Caller retains name, borrowed RGBA pixels, bounded circular cache and destination storage through rendering.
 
-**Interaction:** Presentation only; no activation callback.
+**Interaction:** Interactive avatars return activation; interactive stacks return the selected index or SIZE_MAX. Application opens the selected profile.
 
-**Usage:** Submit a name and size each frame; initials are derived from the name.
+**Usage:** Initialize a circular image cache once; submit borrowed image pixels with a revision. Missing images fall back to initials; stacks use stable application keys.
 
-API: `cui_avatar`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`. [Public header](../include/cui/cui_content.h); [content guide](CONTENT.md); [profile images and conversations](AVATAR_MESSAGE_EXAMPLES.md).
 
 ## Badge
 

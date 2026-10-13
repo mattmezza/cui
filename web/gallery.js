@@ -112,7 +112,7 @@ const snippets = {
  'Focus Trap':'if (cui_begin_focus_scope(ui, scope_id, true)) {\n    /* Paint focusable children here. */\n    cui_end_focus_scope(ui);\n}',
  Clipboard:'/* Install clipboard_set/get on cui_platform first. */\nif (cui_button(ui, id, &theme, cui_string("Copy"), false))\n    platform.clipboard_set(platform.user, cui_string("Copied text"));',
  Shimmer:'cui_shimmer_text(ui, id, &theme, &shimmer,\n    cui_string("Loading content"), cui_shimmer_options_default());',
- Message:'cui_message(ui, id, &theme, (cui_message_options){\n    .width = 360, .body = bodies, .body_count = body_count});',
+ Message:'cui_message_body body = {\n    .slot = {.text = cui_string("Can you review the release notes?")},\n    .typed_bubble = true, .bubble = CUI_BUBBLE_SECONDARY};\ncui_message_options options = cui_message_options_default();\noptions.width = 360;\noptions.max_bubble_width = 280;\noptions.header.text = cui_string("Alex Morgan · 09:30");\noptions.body = &body;\noptions.body_count = 1;\noptions.footer.text = cui_string("Delivered · 09:30");\ncui_message(ui, id, &theme, options);\n/* Supply slot render callbacks for portraits and reaction controls. */',
  MessageScroller:'cui_message_scroller(ui, id, &theme, scroll_state,\n    draw_message_row, user, cui_message_scroller_options_default());',
 
  Editor:'/* Retain edit, state, query and workspace; call find bar every frame. */\ncui_editor_find_bar(ui, search_id, id, &theme, &state, &search, 640, false);\ncui_editor(ui, id, &theme, cui_string("C code"), &state, cui_editor_default());',
@@ -136,7 +136,7 @@ const snippets = {
  Accordion:'cui_accordion(ui, id, &theme, items, 3,\n    expanded, options, draw_panel, user);',
  Collapsible:'cui_collapsible(ui, id, &theme, label,\n    &open, false, draw_panel, user);',
  Tabs:'cui_tabs(ui, id, &theme, items, 3,\n    &selection, options, draw_panel, user);',
- Avatar:'cui_avatar(ui, id, &theme,\n    cui_string("Alex Morgan"), 56);',
+ Avatar:'/* Retain the cache, storage and borrowed RGBA8 photo pixels. */\nstatic unsigned char pixels[96 * 96 * 4];\nstatic cui_avatar_image circle;\nif (!circle.storage)\n    cui_avatar_image_init(&circle, pixels, sizeof pixels, 96);\nif (cui_avatar_ex(ui, id, &theme, cui_string("Alex Morgan"),\n    (cui_avatar_options){.size = 48, .ring_width = 2,\n        .image = photo, .image_state = &circle, .interactive = true})) {\n    /* Open this profile in your application. */\n}\n/* Missing pixels fall back to initials. See cui_avatar_stack for teams. */',
  Kbd:'cui_kbd(ui, id, &theme,\n    cui_string("Ctrl + K"));',
  Theme:'cui_theme theme = cui_theme_dark();\ncui_button(ui, id, &theme,\n    cui_string("Primary action"), false);',
  Image:'cui_image(ui, id, &state, source, loader, user, options);\n/* The host loader supplies borrowed RGBA8 frames. */',

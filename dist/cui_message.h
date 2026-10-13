@@ -41,6 +41,9 @@ typedef struct {
     cui_message_slot avatar, header, footer;
     const cui_message_body *body;
     size_t body_count;
+    /* Optional compact column cap; zero preserves the legacy available width.
+     * Row alignment keeps outgoing content at the end of the full message row. */
+    float max_bubble_width;
 } cui_message_options;
 typedef struct {
     bool avatar, header, footer, ghost, header_inset, footer_inset;
@@ -146,9 +149,10 @@ bool cui_base_message(cui_message_options o, cui_message_plan *out) {
     if (!out || o.alignment < CUI_MESSAGE_START || o.alignment > CUI_MESSAGE_END ||
         !isfinite(o.width) || o.width <= 0 || !isfinite(o.stack_gap) || o.stack_gap < 0 ||
         !isfinite(o.row_gap) || o.row_gap < 0 || !isfinite(o.metadata_gap) || o.metadata_gap < 0 ||
-        (o.body_count && !o.body) || o.body_count > 256 ||
-        !cui_message_private_slot_valid(o.avatar) || !cui_message_private_slot_valid(o.header) ||
-        !cui_message_private_slot_valid(o.footer) || (!o.name.data && o.name.length))
+        !isfinite(o.max_bubble_width) || o.max_bubble_width < 0 || (o.body_count && !o.body) ||
+        o.body_count > 256 || !cui_message_private_slot_valid(o.avatar) ||
+        !cui_message_private_slot_valid(o.header) || !cui_message_private_slot_valid(o.footer) ||
+        (!o.name.data && o.name.length))
         return false;
     cui_message_plan p = {.avatar = cui_message_private_slot_present(o.avatar),
                           .header = cui_message_private_slot_present(o.header),
@@ -164,7 +168,9 @@ bool cui_base_message(cui_message_options o, cui_message_plan *out) {
     p.footer_inset = o.footer.inset == CUI_MESSAGE_INSET_ON ||
                      (o.footer.inset == CUI_MESSAGE_INSET_DEFAULT && !p.ghost);
     p.column_width = fmaxf(0, o.width - (p.avatar ? fmaxf(32, o.avatar.width) + o.row_gap : 0));
-    p.footer_offset = p.avatar ? 40 : 0;
+    if (o.max_bubble_width > 0)
+        p.column_width = fminf(p.column_width, o.max_bubble_width);
+    p.footer_offset = p.avatar ? fmaxf(32, o.avatar.width) + o.row_gap : 0;
     *out = p;
     return true;
 }
@@ -483,10 +489,13 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
     for (size_t i = 0; i < count; i++)
         if (cui_event_target(ui, i) == id) {
             cui_event e = events[i];
-            if (e.type == CUI_EVENT_SCROLL && fabsf(e.dy) >= fabsf(e.dx) && isfinite(e.dy))
+            if (e.type == CUI_EVENT_SCROLL && fabsf(e.dy) >= fabsf(e.dx) && isfinite(e.dy)) {
+                double before = s->scroll;
                 cui_message_scroller_scroll(s, s->scroll -
                                                    e.dy * (e.scroll_precise ? 1 : o.wheel_step));
-            else if (e.type == CUI_EVENT_KEY_DOWN && cui_focused(ui) == id) {
+                if (s->scroll != before)
+                    cui_consume_event(ui, i);
+            } else if (e.type == CUI_EVENT_KEY_DOWN && cui_focused(ui) == id) {
                 double target = s->scroll;
                 switch (e.key) {
                 case CUI_KEY_HOME:
@@ -703,9 +712,12 @@ bool cui_message(cui_context *ui, cui_id id, const cui_theme *t, cui_message_opt
         cui_interact(ui, id, o.role, o.name, false, false, 0);
         cui_set_tab_stop(ui, id, false);
     }
-    cui_begin_box(
-        ui, cui_message_component_child(id, 0),
-        (cui_box){.width = o.width, .row = true, .gap = o.row_gap, .align_y = CUI_ALIGN_END});
+    cui_begin_box(ui, cui_message_component_child(id, 0),
+                  (cui_box){.width = o.width,
+                            .row = true,
+                            .gap = o.row_gap,
+                            .align_y = CUI_ALIGN_END,
+                            .align_x = align});
     if (p.avatar && o.alignment == CUI_MESSAGE_START)
         cui_message_component_avatar(ui, cui_message_component_child(id, 1), t, o.avatar,
                                      o.alignment);

@@ -58,6 +58,7 @@ def main():
             assert token in headers, (story, token)
     compiled = tuple(stories)
     extra = {
+        'Avatar': 'cui_bitmap photo = {0};',
         'Button': 'cui_str label = {0};',
         'Checkbox': 'cui_str label = {0}; cui_check_state state = CUI_CHECK_UNCHECKED;',
         'Switch': 'cui_str label = {0}; bool enabled = false; cui_switch_state spring = {0}; double now = 0;',

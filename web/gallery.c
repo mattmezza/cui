@@ -1098,6 +1098,15 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
     }
 }
 static int clicks;
+static cui_button_state gallery_button_label;
+static void gallery_button_action(void *user) {
+    (void)user;
+    clicks++;
+}
+static void gallery_button_badge(cui_context *context, void *user) {
+    const cui_theme *theme = user;
+    cui_text(context, cui_string("NEW"), theme->font_size * .75f, theme->text);
+}
 static cui_id radio_selected;
 static cui_radio_group_state radio_group_state;
 static unsigned radio_requests;
@@ -3155,34 +3164,59 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 0: {
         char label[64];
-        if (cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
-                          (cui_button_options){.size = (cui_control_size)control_size,
-                                               .design_size = design_size,
-                                               .disabled = disabled}))
-            clicks++;
+        cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                      (cui_button_options){.size = (cui_control_size)control_size,
+                                           .design_size = design_size,
+                                           .disabled = disabled,
+                                           .on_click = gallery_button_action,
+                                           .prevent_pointer_focus = true,
+                                           .custom_cursor = true,
+                                           .cursor = CUI_CURSOR_POINTER});
         snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
         int columns = design_size == CUI_DESIGN_INHERIT ? 3 : width < 600 ? 1 : 2;
-        for (int row = 0; row < (6 + columns - 1) / columns; row++) {
+        for (int row = 0; row < (12 + columns - 1) / columns; row++) {
             cui_begin_box(ui, cui_id_from(ui, "variant-row") ^ (cui_id)(row + 1),
                           (cui_box){.row = true, .gap = design_spacing >= 0 ? t.gap : 8});
-            const char *names[6] = {"Secondary", "Outline", "Ghost", "Danger", "Link", "Loading"};
-            cui_button_variant variants[6] = {CUI_BUTTON_SECONDARY, CUI_BUTTON_OUTLINE,
-                                              CUI_BUTTON_GHOST,     CUI_BUTTON_DANGER,
-                                              CUI_BUTTON_LINK,      CUI_BUTTON_PRIMARY};
+            const char *names[12] = {"Secondary", "Outline", "Ghost",   "Danger", "Link", "Loading",
+                                     "Default",   "Warning", "Success", "Info",   "Text", "Custom"};
+            cui_button_variant variants[12] = {
+                CUI_BUTTON_SECONDARY, CUI_BUTTON_OUTLINE, CUI_BUTTON_GHOST,   CUI_BUTTON_DANGER,
+                CUI_BUTTON_LINK,      CUI_BUTTON_PRIMARY, CUI_BUTTON_DEFAULT, CUI_BUTTON_WARNING,
+                CUI_BUTTON_SUCCESS,   CUI_BUTTON_INFO,    CUI_BUTTON_TEXT,    CUI_BUTTON_CUSTOM};
             for (int column = 0; column < columns; column++) {
                 int v = row * columns + column;
-                if (v >= 6)
+                if (v >= 12)
                     break;
                 cui_button_ex(ui, cui_id_from(ui, names[v]), &t, cui_string(names[v]),
                               (cui_button_options){.variant = variants[v],
                                                    .size = CUI_CONTROL_SMALL,
                                                    .design_size = design_size,
                                                    .disabled = disabled || v == 2,
-                                                   .loading = v == 5});
+                                                   .loading = v == 5,
+                                                   .custom_colors = v == 11,
+                                                   .colors = t.buttons[CUI_THEME_BUTTON_INFO]});
             }
             cui_end_box(ui);
         }
+        cui_button_options extra = {
+            .size = (cui_control_size)control_size, .design_size = design_size, .disabled = disabled};
+        extra.icon = cui_string("download");
+        extra.trailing_icon = cui_string("arrow-right");
+        extra.dropdown_caret = true;
+        cui_button_ex(ui, cui_id_from(ui, "button-icons"), &t, cui_string("With icon"), extra);
+        extra.icon = (cui_str){0};
+        extra.trailing_icon = (cui_str){0};
+        extra.dropdown_caret = false;
+        extra.children = gallery_button_badge;
+        extra.children_user = &t;
+        cui_button_ex(ui, cui_id_from(ui, "button-children"), &t, cui_string("Custom content"), extra);
+        extra.children = NULL;
+        extra.width = fminf(width - 48, 340);
+        extra.label_width = fmaxf(1, extra.width - 48);
+        extra.state = &gallery_button_label;
+        cui_button_ex(ui, cui_id_from(ui, "button-truncated"), &t,
+                      cui_string("A long accessible action label with bounded ellipsis"), extra);
         break;
     }
     case 1: {

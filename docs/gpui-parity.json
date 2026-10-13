@@ -3047,7 +3047,7 @@
       "limitations": [
         "Styled multiline caret/selection/scroll, gutter/wrap, host syntax colors, ASCII-insensitive retained search and atomic replacement, visible match highlights, caller-owned folding and completion have headless/browser tests.",
         "Unicode17 grapheme and word keyboard editing passes pinned conformance fixtures; explicit scalar APIs remain compatible.",
-        "Language parsers/LSP, diagnostics, bidi and the multicursor styled adapter remain incomplete. Multi-selection editing/history is opt-in model behavior only; folds require host refresh after edits.",
+        "The measured multicursor adapter supports caller-owned selections/anchors, cursor creation, grapheme navigation, wraps/folds, readonly behavior, atomic typing and full-selection Undo/Redo. Rectangular drag, distributed clipboard, multirange indentation, undo coalescing, multicursor IME and restored preferred columns remain incomplete in this release. Language parsers/LSP, diagnostics and bidi remain incomplete; folds require host refresh after edits.",
         "The200K-line performance obligation is not yet validated."
       ],
       "owner": "integrator",
@@ -3101,6 +3101,15 @@
             "tests/unit/test_edit.c",
             "tests/unit/test_editor.c"
           ]
+        },
+        {
+          "name": "measured multicursor interaction, painting and atomic selection history",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_edit.c",
+            "tests/unit/test_editor.c",
+            "tests/web/test_browser.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3121,10 +3130,9 @@
           "Appearance"
         ]
       },
-      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "last_tested_commit": "8e00114d894b8eba3e39f942171f7184bf35328e",
       "evidence": [
-        "Partial coverage only; see limitations and named tests. Full family definition of done not met.",
-        "Styled adapter has partial headless coverage; full family definition of done and browser integration remain pending."
+        "Partial coverage only; see limitations and named headless/browser tests. Full family definition of done not met."
       ]
     },
     {
@@ -4290,7 +4298,7 @@
       "limitations": [
         "Styled tabs, menus, bulk close, zoom placement, nested resize, independent edge regions and atomic cross-region transfers are headless tested.",
         "Opt-in collapsed bottom tab strip and real resize reopening match the frozen bottom-edge behavior.",
-        "N-ary sized layouts, sealed/per-group locks, dynamic panel lifecycle/payload reconstruction/visibility and title presentation overrides remain incomplete; per-edge collapsibility and custom title/suffix callbacks are tested. See DOCK.md frozen export audit."
+        "Opt-in canonical n-ary sized layouts, root normalization policies, sealed/per-group locks, panel visibility, payload reconstruction, deferred lifecycle reconciliation and simple-title palettes are tested subsets. Source-shaped PanelState/DockAreaState persistence and automatic lifecycle delivery remain incomplete in this release; hosts own descriptors, pure callbacks and commit timing. See DOCK.md frozen export audit."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4305,8 +4313,12 @@
         },
         {
           "name": "drag reorder/resize/edge docks",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "tests/unit/test_dock_styled.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "versioned serialization/restore",
@@ -4340,6 +4352,15 @@
             "tests/unit/test_dock_styled.c",
             "tests/web/test_browser.py"
           ]
+        },
+        {
+          "name": "canonical n-ary sibling splits, second-divider resizing and pinned root policies",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_dock.c",
+            "tests/unit/test_dock_styled.c",
+            "tests/web/test_browser.py"
+          ]
         }
       ],
       "upstream_doc": {
@@ -4354,9 +4375,9 @@
           "Runnable example"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e",
+      "last_tested_commit": "8e00114d894b8eba3e39f942171f7184bf35328e",
       "evidence": [
-        "Styled adapter has partial headless coverage; full family definition of done and browser integration remain pending."
+        "Documented retained/styled/browser subsets are tested; full family definition of done remains incomplete."
       ]
     },
     {
@@ -5925,7 +5946,8 @@
       },
       "limitations": [
         "Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.",
-        "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state."
+        "Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.",
+        "Source scale and shape subsets are tested. Broader grouped scale/legend/selection backlog is not fully implemented; numeric appearance/hover helpers require explicit host ownership and frame scheduling. Automatic styled appearance/hover orchestration, Core prepaint/hitbox integration, native path mesh caching and antialiasing remain incomplete in this release."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5947,8 +5969,12 @@
         },
         {
           "name": "headless geometry and themed output",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot.c",
+            "tests/unit/test_plot_styled.c",
+            "tests/web/test_browser.py"
+          ]
         },
         {
           "name": "pure category scales and paths, themed axes, bounded software output and grid/bar geometry",
@@ -5956,6 +5982,24 @@
           "evidence": [
             "tests/unit/test_plot.c",
             "tests/unit/test_plot_styled.c"
+          ]
+        },
+        {
+          "name": "source Linear/Band/Point/Ordinal scales and Natural/Step/Area/Pie/Arc/Stack/Sankey geometry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot.c",
+            "tests/unit/test_plot_styled.c",
+            "docs/PLOT_MODEL.md"
+          ]
+        },
+        {
+          "name": "caller-owned appearance scopes, projected transition clocks, pointer springs and cached tessellation",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_plot.c",
+            "tests/unit/test_plot_styled.c",
+            "docs/PLOT_MODEL.md"
           ]
         }
       ],
@@ -5981,7 +6025,7 @@
           "Custom Bar Chart Implementation"
         ]
       },
-      "last_tested_commit": "01865d5b99bb7908ac838bdf4efe642c31ce6e9e"
+      "last_tested_commit": "8e00114d894b8eba3e39f942171f7184bf35328e"
     },
     {
       "name": "Table",

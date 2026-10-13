@@ -1,0 +1,12 @@
+Published main: 15885d6d796a67e6546c9cd7c88954c76ba4a4df
+Library CI 38354274341: success (Linux GCC/Clang, macOS, Windows).
+Pages workflow 38354274332: success.
+195/195 actual HTTPS files byte-match the downloaded Pages artifact.
+Actual HTTPS CI Chromium: all78 stories and78 compiled usage excerpts pass.
+Actual HTTPS full Chromium design/app/mobile extensions: pass.
+Chart extreme Sankey arithmetic no longer requires extended long-double range.
+All88 registered native tests have60-second timeout, including late Base-only tests.
+Local logs: /home/matteo/.cache/cui-validation/published-15885d6-{hashes,browser,extensions}.log
+Previous6a81c25 library run38351906791 exposed macOS arithmetic failure and Windows
+unbounded assertion popup; canceled after replacement CI passed. Pages6a passed.
+Full-family parity remains unfinished:2 implemented /76 tested /0 verified.

@@ -422,6 +422,16 @@ cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *, cui_plot_re
 cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *, cui_plot_rect bounds,
                                         cui_plot_point live_global_position, bool appearing,
                                         cui_plot_point *relative, bool *resolved);
+/* Shape identity helper: extras then source-style f32 point/value bits, with
+ * original FNV-1a hashing. Keys are opaque process-local values, not compatible
+ * with Rust DefaultHasher or persistent cross-platform serialization. Include
+ * curve/stroke/dash/radii inputs; exclude origin and paint-only color. */
+typedef struct {
+    uint64_t value;
+} cui_plot_shape_key;
+cui_plot_shape_key cui_plot_shape_key_init(uint64_t extra);
+cui_plot_result cui_plot_shape_key_float(cui_plot_shape_key *, float value);
+cui_plot_result cui_plot_shape_key_point(cui_plot_shape_key *, cui_plot_point);
 /* Projected scalar transition clock used by Plot enter/exit policies. Seconds
  * are caller-supplied monotonic timestamps; backward time saturates elapsed to
  * zero. Zero-initialize each independently keyed channel. First target is
@@ -2856,6 +2866,32 @@ cui_plot_result cui_plot_spring_step(cui_plot_spring_clock *clock, double target
     *clock = next;
     *out = value;
     return CUI_PLOT_OK;
+}
+
+static void plot_shape_key_bytes(cui_plot_shape_key *key, const void *data, size_t count) {
+    const unsigned char *bytes = data;
+    for (size_t i = 0; i < count; ++i) {
+        key->value ^= bytes[i];
+        key->value *= UINT64_C(1099511628211);
+    }
+}
+cui_plot_shape_key cui_plot_shape_key_init(uint64_t extra) {
+    cui_plot_shape_key key = {UINT64_C(14695981039346656037)};
+    plot_shape_key_bytes(&key, &extra, sizeof extra);
+    return key;
+}
+cui_plot_result cui_plot_shape_key_float(cui_plot_shape_key *key, float value) {
+    if (!key)
+        return CUI_PLOT_INVALID;
+    plot_shape_key_bytes(key, &value, sizeof value);
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_shape_key_point(cui_plot_shape_key *key, cui_plot_point point) {
+    if (!key || !isfinite(point.x) || !isfinite(point.y) || fabs(point.x) > FLT_MAX ||
+        fabs(point.y) > FLT_MAX)
+        return CUI_PLOT_INVALID;
+    (void)cui_plot_shape_key_float(key, (float)point.x);
+    return cui_plot_shape_key_float(key, (float)point.y);
 }
 
 #endif

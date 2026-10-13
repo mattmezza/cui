@@ -79,6 +79,9 @@ static cui_editor_match editor_matches[512];
 static cui_editor_matcher editor_matcher;
 static cui_edit *editor_edit, *editor_query;
 static cui_editor_state editor_state;
+static cui_edit_selection editor_selections[8];
+static cui_edit_selection_snapshot editor_selection_history[65];
+static cui_editor_cursor_anchor editor_cursor_anchors[8];
 static cui_editor_search_state editor_search;
 static const cui_editor_completion_item editor_completions[] = {
     {{"cui_label", 9}, {"Draw a themed label", 18}, {"cui_label", 9}},
@@ -116,6 +119,11 @@ double gallery_editor_stat(int field) {
         return editor_matcher.case_insensitive;
     case 12:
         return (double)editor_matcher.current;
+    case 13: {
+        size_t count = 0;
+        cui_edit_get_selections(editor_edit, &count);
+        return (double)count;
+    }
     default:
         return -1;
     }
@@ -1822,7 +1830,10 @@ int gallery_init(void) {
     editor_replacement = cui_edit_create((cui_edit_config){
         .buffer = editor_replacement_buffer, .capacity = sizeof editor_replacement_buffer});
     if (!editor_edit || !editor_query || !editor_replacement ||
+        cui_edit_attach_selections(editor_edit, editor_selections, 8, editor_selection_history,
+                                   65) != CUI_EDIT_OK ||
         !cui_editor_state_init(&editor_state, editor_edit, editor_lines, 512) ||
+        !cui_editor_multicursor_init(&editor_state, editor_cursor_anchors, 8) ||
         !cui_editor_search_init(&editor_search, editor_query) ||
         !cui_editor_matcher_init(&editor_matcher, editor_matches, 512) ||
         !cui_editor_search_enable_replace(&editor_search, &editor_matcher, editor_replacement,
@@ -3459,6 +3470,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(
             ui, &t,
             cui_string("Editable C code: line numbers, syntax colors, undo and Ctrl/Meta-F."));
+        cui_text(ui,
+                 cui_string("Ctrl/Alt+Up/Down or Alt-click adds cursors; Escape returns to one."),
+                 12, t.muted);
         cui_begin_box(ui, cui_id_from(ui, "edit-actions"),
                       (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});
         if (cui_button(ui, cui_id_from(ui, "editor-find-open"), &t, cui_string("Find"), disabled))

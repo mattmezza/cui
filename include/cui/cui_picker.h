@@ -11,6 +11,35 @@ typedef struct {
     cui_date start, end;
 } cui_date_selection;
 typedef bool (*cui_date_disabled_fn)(void *user, cui_date date);
+typedef enum {
+    CUI_DATE_ISO,
+    CUI_DATE_MONTH_DAY_YEAR,
+    CUI_DATE_DAY_MONTH_YEAR,
+    CUI_DATE_YEAR_MONTH_DAY
+} cui_date_order;
+/* Borrowed UTF-8 labels; keep the table/strings alive while using the options.
+ * NULL labels fall back to English. Numeric formatting uses the chosen order
+ * and literal separator; this is not an OS locale or arbitrary pattern parser. */
+typedef struct {
+    const char *months[12], *weekdays[7]; /* weekdays indexed Sunday=0 */
+    unsigned first_weekday;
+    cui_date_order order;
+    const char *separator;
+    const char *calendar, *choose_year, *choose_month;
+    const char *navigation[4];
+} cui_date_locale;
+typedef enum {
+    CUI_DATE_LOCALE_EN_US,
+    CUI_DATE_LOCALE_EN_GB,
+    CUI_DATE_LOCALE_IT,
+    CUI_DATE_LOCALE_FR,
+    CUI_DATE_LOCALE_DE,
+    CUI_DATE_LOCALE_ES,
+    CUI_DATE_LOCALE_JA
+} cui_date_locale_kind;
+const cui_date_locale *cui_date_locale_builtin(cui_date_locale_kind);
+size_t cui_date_format_locale(cui_date, const cui_date_locale *, char *, size_t capacity);
+typedef enum { CUI_CALENDAR_DAYS, CUI_CALENDAR_YEARS, CUI_CALENDAR_MONTHS } cui_calendar_view;
 typedef struct {
     bool range, disabled;
     unsigned first_weekday, months; /* Sunday=0; months 1..3 */
@@ -18,10 +47,14 @@ typedef struct {
     cui_date_disabled_fn is_disabled;
     void *disabled_user;
     float cell_size;
+    const cui_date_locale *locale; /* NULL preserves ISO formatting/legacy week start. */
+    bool first_weekday_override;   /* explicit locale uses its week start unless true */
 } cui_calendar_options;
 typedef struct {
     cui_date month, cursor;
     bool selecting_end;
+    cui_calendar_view view;
+    unsigned year_page, year_cursor, month_cursor;
 } cui_calendar_state;
 typedef struct {
     bool changed, activated, navigated;
@@ -32,7 +65,13 @@ int cui_date_compare(cui_date a, cui_date b);
 void cui_calendar_grid(cui_date month, unsigned first_weekday, cui_date output[42]);
 bool cui_calendar_date_enabled(cui_date, cui_calendar_options);
 cui_id cui_calendar_day_id(cui_id, cui_date);
-/* navigation parts 1=previous year,2=previous month,3=next month,4=next year */
+/* navigation parts 1=previous year/page,2=previous month,3=next month,4=next year/page,
+ * 5=year header. Year grid is 20 entries; month grid is 12. */
+unsigned cui_calendar_first_weekday(cui_calendar_options);
+bool cui_calendar_year_enabled(unsigned year, cui_calendar_options);
+bool cui_calendar_month_enabled(unsigned year, unsigned month, cui_calendar_options);
+cui_id cui_calendar_year_id(cui_id, unsigned year);
+cui_id cui_calendar_month_id(cui_id, unsigned month);
 cui_id cui_calendar_navigation_id(cui_id, unsigned part);
 /* Separate reduction/submission lets popups close before adding a modal scope. */
 cui_calendar_result cui_calendar_reduce(cui_context *, cui_id, cui_calendar_state *,

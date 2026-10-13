@@ -90,6 +90,170 @@ static cui_calendar_result calendar_scene(cui_context *ui, const cui_theme *them
     assert(cui_last_error(ui) == CUI_OK);
     return result;
 }
+static void locale_models(void) {
+    const char *expected[] = {"02/29/1980", "29/02/1980", "29/02/1980", "29/02/1980",
+                              "29.02.1980", "29/02/1980", "1980/02/29"};
+    for (int kind = CUI_DATE_LOCALE_EN_US; kind <= CUI_DATE_LOCALE_JA; kind++) {
+        const cui_date_locale *locale = cui_date_locale_builtin((cui_date_locale_kind)kind);
+        char text[80];
+        assert(cui_date_format_locale((cui_date){1980, 2, 29}, locale, text, sizeof text) ==
+               strlen(expected[kind]));
+        assert(!strcmp(text, expected[kind]));
+        assert(cui_date_format_locale((cui_date){1980, 2, 29}, locale, NULL, 0) ==
+               strlen(expected[kind]));
+        cui_calendar_options o = {.locale = locale};
+        assert(cui_calendar_first_weekday(o) == locale->first_weekday);
+        o.first_weekday_override = true;
+        o.first_weekday = 6;
+        assert(cui_calendar_first_weekday(o) == 6);
+        assert(locale->months[1] && locale->weekdays[0]);
+    }
+    char legacy[16];
+    assert(cui_date_format_locale((cui_date){1980, 2, 29}, NULL, legacy, sizeof legacy) == 10 &&
+           !strcmp(legacy, "1980-02-29"));
+    cui_date_locale custom = {.months = {"One", "Two"},
+                              .weekdays = {"Sun"},
+                              .first_weekday = 2,
+                              .order = CUI_DATE_DAY_MONTH_YEAR,
+                              .separator = "·"};
+    char custom_text[30], tiny[3];
+    size_t length =
+        cui_date_format_locale((cui_date){1980, 2, 29}, &custom, custom_text, sizeof custom_text);
+    assert(!strcmp(custom_text, "29·02·1980"));
+    assert(cui_date_format_locale((cui_date){1980, 2, 29}, &custom, tiny, sizeof tiny) == length &&
+           tiny[2] == 0);
+    assert(cui_date_format_locale((cui_date){0}, &custom, custom_text, sizeof custom_text) == 0 &&
+           !custom_text[0]);
+    assert(cui_date_locale_builtin((cui_date_locale_kind)99) == NULL);
+}
+static void calendar_year_grid(void) {
+#ifdef CUI_PICKER_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 500});
+    assert(ui);
+    cui_calendar_state state;
+    cui_calendar_init(&state, (cui_date){2024, 2, 15});
+    cui_date_selection selected = {.start = {2024, 2, 15}};
+    cui_calendar_options o = {.locale = cui_date_locale_builtin(CUI_DATE_LOCALE_IT)};
+    calendar_scene(ui, &theme, &state, &selected, o);
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_YEARS && state.year_page == 2021);
+    assert(cui_focused(ui) == cui_calendar_year_id(10, 2024));
+    for (unsigned i = 0; i < 3; i++) {
+        click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 1)));
+        calendar_scene(ui, &theme, &state, &selected, o);
+    }
+    assert(state.year_page == 1961);
+    click(ui, cui_bounds(ui, cui_calendar_year_id(10, 1980)));
+    cui_calendar_result result = calendar_scene(ui, &theme, &state, &selected, o);
+    assert(!result.changed && !result.activated && state.view == CUI_CALENDAR_MONTHS &&
+           state.month.year == 1980);
+    key(ui, CUI_KEY_PAGEUP, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.month.year == 1979);
+    key(ui, CUI_KEY_PAGEDOWN, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.month.year == 1980);
+    key(ui, CUI_KEY_HOME, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.month_cursor == 1);
+    key(ui, CUI_KEY_END, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.month_cursor == 12);
+    key(ui, CUI_KEY_UP, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.month_cursor == 8);
+    click(ui, cui_bounds(ui, cui_calendar_month_id(10, 2)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_DAYS &&
+           cui_focused(ui) == cui_calendar_day_id(10, (cui_date){1980, 2, 1}));
+    click(ui, cui_bounds(ui, cui_calendar_day_id(10, (cui_date){1980, 2, 29})));
+    result = calendar_scene(ui, &theme, &state, &selected, o);
+    assert(result.changed && result.activated &&
+           !cui_date_compare(selected.start, (cui_date){1980, 2, 29}));
+    key(ui, CUI_KEY_PAGEUP, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.cursor.month == 1);
+    key(ui, CUI_KEY_PAGEDOWN, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.cursor.month == 2);
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    unsigned prior = state.year_cursor;
+    key(ui, CUI_KEY_RIGHT, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_cursor == prior + 1);
+    key(ui, CUI_KEY_DOWN, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_cursor == prior + 5);
+    key(ui, CUI_KEY_PAGEUP, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_cursor == prior - 15);
+    key(ui, CUI_KEY_HOME, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_cursor == state.year_page);
+    key(ui, CUI_KEY_END, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_cursor == state.year_page + 19);
+    key(ui, CUI_KEY_ESCAPE, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_DAYS);
+    o.minimum = (cui_date){1980, 2, 10};
+    o.maximum = (cui_date){1980, 2, 20};
+    o.is_disabled = weekends;
+    assert(cui_calendar_year_enabled(1980, o) && !cui_calendar_year_enabled(1979, o));
+    assert(cui_calendar_month_enabled(1980, 2, o) && !cui_calendar_month_enabled(1980, 1, o));
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    click(ui, cui_bounds(ui, cui_calendar_year_id(10, 1979)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_YEARS);
+    click(ui, cui_bounds(ui, cui_calendar_year_id(10, 1980)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_MONTHS && state.month_cursor == 2);
+    click(ui, cui_bounds(ui, cui_calendar_month_id(10, 1)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_MONTHS);
+    click(ui, cui_bounds(ui, cui_calendar_month_id(10, 2)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.cursor.day == 11);
+    o.range = true;
+    click(ui, cui_bounds(ui, cui_calendar_day_id(10, (cui_date){1980, 2, 12})));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.selecting_end);
+    click(ui, cui_bounds(ui, cui_calendar_day_id(10, (cui_date){1980, 2, 19})));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(selected.start.day == 12 && selected.end.day == 19 && !state.selecting_end);
+    o.disabled = true;
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_DAYS);
+    o = (cui_calendar_options){0};
+    cui_calendar_init(&state, (cui_date){9999, 12, 1});
+    calendar_scene(ui, &theme, &state, &selected, o);
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_page == 9981 && state.year_cursor == 9999);
+    key(ui, CUI_KEY_RIGHT, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_cursor == 9999);
+    cui_calendar_init(&state, (cui_date){1, 1, 1});
+    calendar_scene(ui, &theme, &state, &selected, o);
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, o);
+    key(ui, CUI_KEY_LEFT, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.year_page == 1 && state.year_cursor == 1);
+    key(ui, CUI_KEY_RIGHT, 0);
+    key(ui, CUI_KEY_ENTER, 0);
+    calendar_scene(ui, &theme, &state, &selected, o);
+    assert(state.view == CUI_CALENDAR_MONTHS && state.month.year == 2);
+    cui_destroy(ui);
+}
 static void calendar_events(void) {
 #ifdef CUI_PICKER_BASE_ONLY
     cui_theme themes[4] = {0};
@@ -220,6 +384,37 @@ static void time_events(void) {
     cui_destroy(ui);
 }
 #ifndef CUI_PICKER_BASE_ONLY
+static void custom_locale_presentation(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_calendar_state state;
+    cui_calendar_init(&state, (cui_date){2024, 2, 1});
+    cui_date_selection selected = {.start = {2024, 2, 1}};
+    cui_date_locale custom = {.months = {[1] = "Second month"},
+                              .weekdays = {[0] = "First"},
+                              .choose_year = "Pick the year"};
+    cui_calendar_options options = {.locale = &custom};
+    assert(cui_begin_frame(ui, 600, 600, .016f));
+    cui_calendar(ui, 10, &theme, &state, &selected, options);
+    cui_draw_list list = cui_end_frame(ui);
+    unsigned labels = 0;
+    for (size_t i = 0; i < list.count; i++)
+        if (list.commands[i].type == CUI_DRAW_TEXT) {
+            cui_str text = list.commands[i].text;
+            if ((text.length == 12 && !memcmp(text.data, "Second month", 12)) ||
+                (text.length == 5 && !memcmp(text.data, "First", 5)))
+                labels++;
+        }
+    assert(labels == 2 && named(ui, "Pick the year") == cui_calendar_navigation_id(10, 5));
+    click(ui, cui_bounds(ui, cui_calendar_navigation_id(10, 5)));
+    calendar_scene(ui, &theme, &state, &selected, options);
+    click(ui, cui_bounds(ui, cui_calendar_year_id(10, 2024)));
+    calendar_scene(ui, &theme, &state, &selected, options);
+    assert(named(ui, "Second month") == cui_calendar_month_id(10, 2));
+    assert(named(ui, "January") == cui_calendar_month_id(10, 1));
+    cui_destroy(ui);
+}
 static void calendar_presentation(void) {
     cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
     cui_theme theme = cui_theme_light();
@@ -286,6 +481,44 @@ static void date_picker_presentation(void) {
     cui_destroy(ui);
 }
 
+static void picker_year_escape(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_date_picker_state state;
+    cui_date_picker_init(&state, 21, (cui_date){2024, 2, 1});
+    cui_date_selection selected = {.start = {2024, 2, 1}};
+    for (unsigned step = 0; step < 9; step++) {
+        if (step == 1)
+            click(ui, cui_bounds(ui, 20));
+        if (step == 2)
+            click(ui, cui_bounds(ui, named(ui, "Choose year")));
+        if (step == 3 || step == 4)
+            key(ui, CUI_KEY_ESCAPE, 0);
+        if (step == 5 || step == 8)
+            click(ui, cui_bounds(ui, 20));
+        if (step == 6)
+            click(ui, cui_bounds(ui, named(ui, "Choose year")));
+        if (step == 7)
+            click(ui, (cui_rect){500, 500, 10, 10});
+        assert(cui_begin_frame(ui, 600, 600, .016f));
+        cui_date_picker(ui, 20, &theme, cui_string("Date"), &state, &selected,
+                        (cui_date_picker_options){.viewport = {0, 0, 600, 600}});
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        if (step == 2)
+            assert(state.calendar.view == CUI_CALENDAR_YEARS);
+        if (step == 3)
+            assert(state.overlay.open && state.calendar.view == CUI_CALENDAR_DAYS);
+        if (step == 4)
+            assert(!state.overlay.open && cui_focused(ui) == 20);
+        if (step == 7)
+            assert(!state.overlay.open && state.calendar.view == CUI_CALENDAR_YEARS);
+        if (step == 8)
+            assert(state.overlay.open && cui_focused(ui) == named(ui, "2024"));
+    }
+    cui_destroy(ui);
+}
 static bool picker_scene(cui_context *ui, cui_date_picker_state *state,
                          cui_date_selection *selection, bool disabled) {
     cui_theme theme = cui_theme_light();
@@ -461,10 +694,14 @@ int main(void) {
     color_models();
     color_events();
     models();
+    locale_models();
+    calendar_year_grid();
     calendar_events();
     time_events();
 #ifndef CUI_PICKER_BASE_ONLY
+    picker_year_escape();
     picker_events();
+    custom_locale_presentation();
     calendar_presentation();
     date_picker_presentation();
 #endif

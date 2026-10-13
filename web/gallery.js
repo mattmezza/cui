@@ -300,6 +300,7 @@ function render(){
  wasm.gallery_otp_options(Number($('otp-groups').value),Number($('otp-mask').checked));
  wasm.gallery_group_mode(Number($('group-mode').value));
  wasm.gallery_form_mode(Number($('form-mode').value));
+ wasm.gallery_date_locale(Number($('date-locale').value));
  wasm.gallery_density(Number($('density').value));
  wasm.gallery_selection_mode(Number($('selection-mode').value));
  const frameReducedMotion=reducedMotion.matches;
@@ -541,6 +542,7 @@ function selectComponent(){
  for(const id of ['status-right-control','status-custom-control'])$(id).hidden=selected.name!=='StatusBar';
  $('status-right').checked=true;$('status-custom').checked=false;
  for(const id of ['resizable-vertical-control','resizable-disabled-control'])$(id).hidden=selected.name!=='Resizable';
+ $('date-locale').hidden=!['Calendar','DatePicker'].includes(selected.name);$('date-locale').value='-1';
  $('resizable-vertical').checked=false;$('resizable-disabled').checked=false;
  for(const id of ['icon-choice','icon-size','icon-rotate-control','icon-color-control'])$(id).hidden=selected.name!=='Icon';
  $('icon-choice').value='0';$('icon-size').value='3';$('icon-rotate').checked=false;$('icon-color').checked=false;
@@ -753,7 +755,7 @@ $('table-pin').addEventListener('change',requestFrame);
  $('table-mode').addEventListener('change',requestFrame);
  $('table-selection').addEventListener('change',requestFrame);
 $('surface-variant').addEventListener('change',requestFrame);
-$('density').addEventListener('change',requestFrame);
+$('date-locale').addEventListener('change',requestFrame);$('density').addEventListener('change',requestFrame);
 $('disabled').addEventListener('change',()=>{cancelScreenColor();requestFrame();});$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
 try{
  const [response,data,docs,presets]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json()),fetch('./docs.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch documentation');return r.json();}),fetch('./themes.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch themes');return r.json();})]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;documents=docs;themes=presets;

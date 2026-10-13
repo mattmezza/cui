@@ -1138,6 +1138,7 @@ static bool dock_disabled;
 static unsigned dock_refreshes[12];
 static cui_date date = {2026, 10, 12};
 static cui_calendar_state calendar;
+static int date_locale = -1;
 static cui_date_selection date_selection = {{2026, 10, 12}, {0}};
 static cui_date_picker_state date_picker;
 static cui_time time_value = {9, 30, 0};
@@ -3865,6 +3866,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 29: {
         cui_calendar(ui, cui_id_from(ui, "calendar"), &t, &calendar, &date_selection,
                      (cui_calendar_options){.disabled = disabled,
+                                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale),
                                             .first_weekday = 1,
                                             .cell_size = width > 360 ? 32 : 28});
         char text[64];
@@ -4347,7 +4349,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 40:
         cui_date_picker(ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
                         &date_selection,
-                        (cui_date_picker_options){.calendar = {.first_weekday = 1, .cell_size = 28},
+                        (cui_date_picker_options){.calendar = {.first_weekday = 1, .cell_size = 28,
+                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale)},
                                                   .viewport = {0, 0, width, height},
                                                   .disabled = disabled,
                                                   .width = width > 360 ? 280 : width - 48});
@@ -4480,6 +4483,12 @@ void gallery_description_options(int columns, int vertical, int plain, int size)
 void gallery_status_options(int right, int custom) {
     status_right = right != 0;
     status_custom = custom != 0;
+}
+void gallery_date_locale(int locale) {
+    date_locale = locale >= -1 && locale <= CUI_DATE_LOCALE_JA ? locale : -1;
+}
+unsigned gallery_date_value(void) {
+    return (unsigned)(date_selection.start.year * 10000 + date_selection.start.month * 100 + date_selection.start.day);
 }
 void gallery_resizable_options(int vertical, int disabled) {
     if (resizable_vertical != (vertical != 0))

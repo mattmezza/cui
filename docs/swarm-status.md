@@ -2,11 +2,11 @@
 
 ## Current priorities — 13 October
 
-Published99ea53f passes all six framework CI jobs and Pages; all369 public files match the artifact and Attachment62/62 passes. No user dependency installation is required.
+Publishedbadef388 passes all6 framework CI jobs and Pages; initial Pages Chromium startup SIGSEGV is preserved, unchanged-source retry passes. All379 HTTPS files match artifact and public Attachment62/62 passes. No user dependency installation required.
 
-Frozen Next26 production4cf83db passes native125/125, sanitizer120/120 and WASI101/101, complete78-story browser coverage and78 compiled snippets. Targeted Attachment62/62, touch/pinch, expanded sizes, Checkbox34/34, current-frame Chart/Plot/Core paint, explicit pointer presence, Theme host events and owner motion pass. Controlled Chart exit initially failed a physical wait; bounded frame-clock completion passes with production unchanged. Native includes the five GPU/Sokol/accessibility tests absent from this sanitizer configuration. See validation/gallery-next26.txt for exact evidence and limits.
+Frozen Next27 production6e36b5a passes native127/127, sanitizer122/122, WASI103/103, corrected complete browser78/78 and78 snippets. Native includes5optional GPU/Sokol/accessibility tests absent from sanitizer. Expanded sizes, Attachment62/62, Chart real/controlled clocks, source point-axis pixels, Tabs nested scroll ownership, touch/pinch and IME pass. New Input example passes desktop/mobile predicate and IME behavior. Initial documentation, proxy-focus and obsolete Skeleton continuous-redraw assertions are preserved and corrected without changing frozen production. See validation/gallery-next27.txt.
 
-The ledger records281 tested subsets,4 implemented and44 not_started (329 total);76 tested families,2 implemented and0 fully verified. Only root integrates. Isolated workers implement bounded opt-in point-axis layout, Input CR/LF normalization and Tabs scroll consumption. Their audits remain explicit about unverified devices and incomplete full-family behavior. Next26 publication awaits its own CI and artifact verification.
+Ledger:332features,284tested subsets,4implemented,44not_started;76tested families,2implemented,0fullyverified. Only root integrates. Next28 isolated integration has scoped Radar source-title behavior; workers implement copied typed-tooltip staging and inert Button activation blockers, and refine complete password presentation/host/failure staging. Full goal remains active; Next27 publication awaits its own CI/artifact proof.
 
 ## Historical checkpoints
 

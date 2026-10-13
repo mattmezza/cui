@@ -1393,7 +1393,8 @@ void cui_table_begin_row_ex(cui_context *ui, cui_id id, const cui_theme *t,
                   (cui_box){.height = o.height,
                             .row = true,
                             .background = o.custom_background ? o.background
-                                          : o.header ? t->background : t->surface});
+                                          : o.header          ? t->background
+                                                              : t->surface});
 }
 void cui_table_begin_cell(cui_context *ui, cui_id id, float width, float height,
                           cui_table_align a) {

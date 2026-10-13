@@ -279,9 +279,10 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options
         (o.visible && !*o.visible))
         return false;
     float scale = cui_content_positive(o.scale, 1);
-    cui_color accent = o.kind == CUI_ALERT_ERROR ? t->danger
+    cui_color accent = o.kind == CUI_ALERT_ERROR     ? t->danger
                        : o.kind == CUI_ALERT_SUCCESS ? t->success
-                       : o.kind == CUI_ALERT_WARNING ? t->warning : t->info;
+                       : o.kind == CUI_ALERT_WARNING ? t->warning
+                                                     : t->info;
     const char *kind = o.kind == CUI_ALERT_SUCCESS   ? "Success"
                        : o.kind == CUI_ALERT_WARNING ? "Warning"
                        : o.kind == CUI_ALERT_ERROR   ? "Error"
@@ -300,14 +301,16 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options
     if (o.icon.length)
         cui_text(ui, o.icon, t->font_size * .8f * scale, accent);
     else {
-        const char *name = o.kind == CUI_ALERT_SUCCESS ? "circle-check"
+        const char *name = o.kind == CUI_ALERT_SUCCESS   ? "circle-check"
                            : o.kind == CUI_ALERT_WARNING ? "triangle-alert"
-                           : o.kind == CUI_ALERT_ERROR ? "circle-alert" : "info";
+                           : o.kind == CUI_ALERT_ERROR   ? "circle-alert"
+                                                         : "info";
         cui_icon_named(ui, cui_content_child(id, 3), t,
                        o.icon_name.length ? o.icon_name : cui_string(name),
                        (cui_icon_options){.size = CUI_ICON_CUSTOM,
                                           .custom_size = t->font_size * scale,
-                                          .custom_color = true, .color = accent});
+                                          .custom_color = true,
+                                          .color = accent});
     }
     cui_text(ui, cui_string(kind), t->font_size * .8f * scale, accent);
     cui_end_box(ui);
@@ -357,12 +360,12 @@ void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble
     else if (v == CUI_BUBBLE_DESTRUCTIVE)
         bg = cui_content_blend(t->surface, t->danger, .15f);
     else if (v >= CUI_BUBBLE_INFO && v <= CUI_BUBBLE_ERROR) {
-        cui_color accent = v == CUI_BUBBLE_SUCCESS ? t->success
+        cui_color accent = v == CUI_BUBBLE_SUCCESS   ? t->success
                            : v == CUI_BUBBLE_WARNING ? t->warning
-                           : v == CUI_BUBBLE_ERROR ? t->danger : t->info;
+                           : v == CUI_BUBBLE_ERROR   ? t->danger
+                                                     : t->info;
         bg = cui_content_blend(t->surface, accent, .15f);
-    }
-    else if (v == CUI_BUBBLE_GHOST || v == CUI_BUBBLE_OUTLINE)
+    } else if (v == CUI_BUBBLE_GHOST || v == CUI_BUBBLE_OUTLINE)
         bg.a = 0;
     cui_begin_box(ui, id,
                   (cui_box){.width = width > 0 ? width : 0,

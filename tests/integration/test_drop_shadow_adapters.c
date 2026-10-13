@@ -155,6 +155,20 @@ static cui_draw_list masked(cui_draw_command out[6], float width, float height) 
     out[5] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
     return (cui_draw_list){out, 6, width, height};
 }
+static cui_draw_command covered_collapse(void) {
+    return (cui_draw_command){.type = CUI_DRAW_DROP_SHADOW,
+                              .shadow = {.caster = {20.25f, 20.25f, 1, 1},
+                                         .layer = {.spread = -.6f, .color = {0, 0, 0, 255}}}};
+}
+static void collapse_pixel(const unsigned char *p, size_t pitch, unsigned channels, unsigned height,
+                           bool upside, unsigned scale) {
+    unsigned x = scale == 1 ? 20 : 41, y = x;
+    unsigned row = upside ? height - 1 - y : y;
+    const unsigned char *a = p + row * pitch + x * channels;
+    const unsigned char *b = a + channels;
+    assert(a[0] == 0 && a[1] == 0 && a[2] == 0);
+    assert(b[0] == 255 && b[1] == 255 && b[2] == 255);
+}
 static void sdl_renderer(void) {
     cui_sdl3 *r = cui_sdl3_create("shadow SDL readback", 128, 128, NULL);
     assert(r);
@@ -192,6 +206,16 @@ static void sdl_renderer(void) {
                        128 * 4);
             check(crop, 128, 128, 4, false);
         }
+        SDL_DestroySurface(rgba);
+        SDL_DestroySurface(surface);
+        cui_draw_command collapse = covered_collapse();
+        cui_draw_list one = {&collapse, 1, list.width, list.height};
+        assert(cui_sdl3_render(r, &one, (cui_color){255, 255, 255, 255}));
+        surface = last_completed(renderer);
+        assert(surface);
+        rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+        assert(rgba);
+        collapse_pixel(rgba->pixels, (size_t)rgba->pitch, 4, (unsigned)rgba->h, false, scale);
         SDL_DestroySurface(rgba);
         SDL_DestroySurface(surface);
     }
@@ -292,6 +316,18 @@ static void gpu(void) {
             check(crop, 128, 128, 3, false);
         }
         free(p);
+        cui_draw_command collapse = covered_collapse();
+        cui_draw_list one = {&collapse, 1, list.width, list.height};
+        assert(cui_sdl_gpu_render(r, &one, (cui_color){255, 255, 255, 255}));
+        assert(cui_sdl_gpu_save_ppm(r, "shadow-collapse-gpu.ppm"));
+        f = fopen("shadow-collapse-gpu.ppm", "rb");
+        assert(f);
+        assert(fscanf(f, "%2s %u %u %u", magic, &width, &height, &max) == 4 && fgetc(f) == '\n');
+        p = malloc((size_t)width * height * 3);
+        assert(p && fread(p, 3, (size_t)width * height, f) == (size_t)width * height);
+        fclose(f);
+        collapse_pixel(p, (size_t)width * 3, 3, height, false, scale);
+        free(p);
     }
     cui_draw_command mask[6];
     cui_draw_list clipped = masked(mask, list.width, list.height);
@@ -364,6 +400,13 @@ static void sokol(void) {
             check(crop, 64, 64, 4, true);
         } else
             check(pixels, 128, 128, 4, true);
+        cui_draw_command collapse = covered_collapse();
+        cui_draw_list one = {&collapse, 1, list.width, list.height};
+        assert(cui_sokol_render(r, &one, (cui_color){255, 255, 255, 255}));
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glReadPixels(0, 0, 128, 128, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        assert(glGetError() == GL_NO_ERROR);
+        collapse_pixel(pixels, 128 * 4, 4, 128, true, scale);
     }
     cui_draw_command mask[6];
     cui_draw_list clipped = masked(mask, 64, 64);

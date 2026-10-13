@@ -12,10 +12,10 @@ typedef struct {
     size_t bytes;
 } cui_drop_shadow_raster;
 /* Uniform physical transform: device = logical*scale + origin. Query validates
- * all input before publishing. Empty collapsed spread has zero dimensions.
- * Scale [1/65536,64]; positive physical sigma below 4*sqrt(FLT_MIN)
- * is rejected atomically (source f32 division would underflow).
- * Max 16384 per side, 16M pixels. Raster storage is caller owned. */
+ * all input before publishing. Physical covering, after materializing logical bounds, determines
+ * empty paint. Scale [1/65536,64]; positive physical sigma below 4*sqrt(FLT_MIN) is rejected
+ * atomically (source f32 division would underflow). Max 16384 per side, 16M pixels. Raster storage
+ * is caller owned. */
 bool cui_effect_drop_shadow_query(cui_drop_shadow_paint, float scale, float origin_x,
                                   float origin_y, cui_drop_shadow_raster *out);
 /* Caller-owned writable straight-alpha RGBA8 storage; size includes padding. */

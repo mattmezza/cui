@@ -323,7 +323,8 @@ typedef struct {
     cui_corner_radii radii; /* Clamped to original caster, never to spread bounds. */
     cui_drop_shadow layer;
 } cui_drop_shadow_paint;
-/* Invalid input leaves output untouched. Collapsed spread is an empty extent. */
+/* Invalid input leaves output untouched. Logical support is metadata; checked physical covering
+ * determines empty paint. */
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint, cui_rect *out);
 typedef struct {
     float left, right, top, bottom;

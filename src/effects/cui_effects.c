@@ -165,16 +165,13 @@ static bool shadow_geometry(cui_drop_shadow_paint p, float scale, float ox, floa
     *radii = (cui_corner_radii){
         fminf(limit, p.radii.top_left) * scale, fminf(limit, p.radii.top_right) * scale,
         fminf(limit, p.radii.bottom_left) * scale, fminf(limit, p.radii.bottom_right) * scale};
-    float x = (p.caster.x + p.layer.offset_x - p.layer.spread) * scale + ox;
-    float y = (p.caster.y + p.layer.offset_y - p.layer.spread) * scale + oy;
-    float w = p.caster.w + 2 * p.layer.spread, h = p.caster.h + 2 * p.layer.spread;
-    if (w <= 0 || h <= 0 || p.caster.w == 0 || p.caster.h == 0) {
-        *bounds = (cui_rect){0};
-        return true;
-    }
-    float far_x = (p.caster.x + p.layer.offset_x + p.caster.w + p.layer.spread) * scale + ox;
-    float far_y = (p.caster.y + p.layer.offset_y + p.caster.h + p.layer.spread) * scale + oy;
-    *bounds = (cui_rect){floorf(x), floorf(y), ceilf(far_x) - floorf(x), ceilf(far_y) - floorf(y)};
+    cui_rect logical = cui_drop_shadow_logical_bounds(p);
+    float x = logical.x * scale + ox, y = logical.y * scale + oy;
+    float far_x = (logical.x + logical.w) * scale + ox;
+    float far_y = (logical.y + logical.h) * scale + oy;
+    float near_x = floorf(x), near_y = floorf(y);
+    *bounds = (cui_rect){near_x, near_y, fmaxf(ceilf(far_x), near_x) - near_x,
+                         fmaxf(ceilf(far_y), near_y) - near_y};
     return isfinite(bounds->w) && isfinite(bounds->h);
 }
 bool cui_effect_drop_shadow_query(cui_drop_shadow_paint p, float scale, float ox, float oy,

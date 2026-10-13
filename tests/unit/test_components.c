@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
+#include "cui/cui_textarea.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -909,7 +910,133 @@ static void test_progress_motion(void) {
     assert(count == 1 && !sem[0].details.busy && sem[0].value == 1);
     cui_destroy(ui);
 }
+static void design_scale(void) {
+    assert(cui_space(1) == 4 && cui_space(1.5f) == 6 && cui_space(-2) == -8);
+    assert(cui_space(NAN) == 0 && cui_space(INFINITY) == 0);
+    assert(cui_radius(CUI_RADIUS_NONE, 1) == 0);
+    assert(cui_radius(CUI_RADIUS_LG, 1) == 8);
+    assert(cui_radius(CUI_RADIUS_3XL, 2) == 48);
+    assert(cui_radius(CUI_RADIUS_FULL, 1) == 9999);
+    cui_design_metrics untouched = {1, 2, 3, 4, 5, 6, 7}, invalid = untouched;
+    assert(!cui_design_measure(CUI_DESIGN_INHERIT, 1, &invalid));
+    assert(!cui_design_measure((cui_design_size)-1, 1, &invalid));
+    assert(!cui_design_measure(CUI_DESIGN_XL, NAN, &invalid));
+    assert(!memcmp(&invalid, &untouched, sizeof(invalid)));
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    for (size_t theme_index = 0; theme_index < 4; theme_index++) {
+        cui_theme theme = themes[theme_index];
+        float previous_height = 0;
+        for (int scale = CUI_DESIGN_XS; scale <= CUI_DESIGN_9XL; scale++) {
+            cui_design_metrics metrics;
+            assert(cui_design_measure((cui_design_size)scale, theme.font_size / 16, &metrics));
+            assert(metrics.control_height >= previous_height);
+            assert(metrics.line_height >= metrics.font_size);
+            assert(metrics.line_height + 2 * metrics.padding_y == metrics.control_height);
+            previous_height = metrics.control_height;
+            cui_context *ui = cui_create((cui_config){.width = 1200, .height = 2000});
+            assert(ui);
+            char buffer[32] = "Hello";
+            cui_edit *edit =
+                cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof(buffer)});
+            assert(edit);
+            char multiline_buffer[32] = "Alpha\nBeta";
+            cui_edit *multiline =
+                cui_edit_create((cui_edit_config){.buffer = multiline_buffer,
+                                                  .capacity = sizeof(multiline_buffer),
+                                                  .multiline = true});
+            assert(multiline);
+            cui_textarea_line lines[8];
+            cui_textarea_state textarea;
+            assert(cui_textarea_state_init(&textarea, lines, 8));
+            cui_input_state input = {0};
+            cui_check_state checked = CUI_CHECK_UNCHECKED;
+            int selected = 0;
+            bool enabled = false, toggled = false;
+            for (unsigned frame = 0; frame < 3; frame++) {
+                assert(cui_begin_frame(ui, 1200, 2000, .016f));
+                cui_begin_box(ui, 100, (cui_box){.width = 1200, .height = 2000, .gap = 4});
+                cui_button_ex(
+                    ui, 1, &theme, cui_string("Save"),
+                    (cui_button_options){.width = 800, .design_size = (cui_design_size)scale});
+                cui_button_ex(ui, 2, &theme, cui_string("Close"),
+                              (cui_button_options){.icon = cui_string("close"),
+                                                   .icon_only = true,
+                                                   .design_size = (cui_design_size)scale});
+                cui_checkbox_ex(ui, 3, &theme, cui_string("Updates"), &checked,
+                                (cui_checkbox_options){.design_size = (cui_design_size)scale});
+                cui_radio_ex(ui, 4, &theme, cui_string("Priority"), &selected, 1,
+                             (cui_radio_options){.design_size = (cui_design_size)scale});
+                cui_switch_ex(ui, 5, &theme, cui_string("Enabled"), &enabled, NULL,
+                              (cui_switch_options){.design_size = (cui_design_size)scale});
+                cui_toggle_ex(ui, 6, &theme, cui_string("Bold"), &toggled, NULL,
+                              (cui_toggle_options){.design_size = (cui_design_size)scale});
+                cui_input_ex(
+                    ui, 7, &theme, cui_string("Name"), edit, &input,
+                    (cui_input_options){.width = 800, .design_size = (cui_design_size)scale});
+                cui_textarea_result area = cui_textarea(
+                    ui, 8, &theme, cui_string("Notes"), multiline, &textarea,
+                    (cui_textarea_options){
+                        .width = 800, .rows = 2, .design_size = (cui_design_size)scale});
+                assert(area.error == CUI_TEXTAREA_OK);
+                cui_end_box(ui);
+                cui_draw_list draw = cui_end_frame(ui);
+                assert(cui_last_error(ui) == CUI_OK);
+                assert(cui_bounds(ui, 1).h == metrics.control_height);
+                assert(cui_bounds(ui, 2).w == metrics.control_height &&
+                       cui_bounds(ui, 2).h == metrics.control_height);
+                assert(cui_bounds(ui, 6).h == metrics.control_height);
+                assert(cui_bounds(ui, 7).h == metrics.control_height);
+                assert(cui_bounds(ui, 8).h == 2 * metrics.line_height + 2 * metrics.padding_y + 2);
+                assert(textarea.font_size == metrics.font_size &&
+                       textarea.line_height == metrics.line_height && textarea.count == 2);
+                bool save_text = false, close_icon = false;
+                cui_rect button = cui_bounds(ui, 1);
+                for (size_t j = 0; j < draw.count; j++) {
+                    cui_draw_command command = draw.commands[j];
+                    if (command.type == CUI_DRAW_TEXT && command.text.length == 4 &&
+                        !memcmp(command.text.data, "Save", 4)) {
+                        save_text = true;
+                        assert(command.font_size == metrics.font_size);
+                        assert(fabsf(command.bounds.y +
+                                     cui_measure_text(ui, command.text, command.font_size).height *
+                                         .5f -
+                                     (button.y + button.h * .5f)) < .1f);
+                    }
+                    cui_rect icon_button = cui_bounds(ui, 2);
+                    if (command.type == CUI_DRAW_IMAGE && command.bounds.x >= icon_button.x - 1 &&
+                        command.bounds.y >= icon_button.y - 1 &&
+                        command.bounds.x + command.bounds.w <= icon_button.x + icon_button.w + 1 &&
+                        command.bounds.y + command.bounds.h <= icon_button.y + icon_button.h + 1 &&
+                        fabsf(command.bounds.w - metrics.indicator_size) < 1 &&
+                        fabsf(command.bounds.h - metrics.indicator_size) < 1)
+                        close_icon = true;
+                }
+                assert(save_text && close_icon);
+                if (frame == 0) {
+                    cui_focus(ui, 3);
+                    assert(cui_queue_event(
+                        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_SPACE}));
+                    assert(cui_queue_event(
+                        ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+                }
+                if (frame == 1)
+                    assert(checked == CUI_CHECK_CHECKED);
+            }
+            cui_input_metrics input_metrics;
+            assert(cui_input_measure((cui_input_options){.design_size = (cui_design_size)scale},
+                                     theme.font_size, &input_metrics));
+            assert(input_metrics.height == metrics.control_height &&
+                   input_metrics.font_size == metrics.font_size &&
+                   input_metrics.line_height == metrics.line_height);
+            cui_edit_destroy(multiline);
+            cui_edit_destroy(edit);
+            cui_destroy(ui);
+        }
+    }
+}
 int main(void) {
+    design_scale();
     test_progress_motion();
     test_button_hover_and_disabled_paint();
     test_button_paint_composition();

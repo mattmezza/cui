@@ -59,7 +59,8 @@ typedef struct {
     bool icon_only;                /* Keep name for accessibility; render a square icon button. */
     cui_button_content_fn content; /* Optional arbitrary child content instead of label. */
     void *content_user;
-    bool outline; /* Orthogonal colored outline; selected is presentation only. */
+    bool outline;                /* Orthogonal colored outline; selected is presentation only. */
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
@@ -73,6 +74,7 @@ typedef struct {
     cui_str accessibility_label;
     cui_button_content_fn content;
     void *content_user;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_checkbox_options;
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
@@ -95,6 +97,7 @@ typedef struct {
     void *change_user;
     double now_seconds;
     cui_hover_options tooltip_options;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_switch_options;
 cui_switch_options cui_switch_options_default(void);
 cui_id cui_switch_track_id(cui_id);
@@ -119,6 +122,7 @@ typedef struct {
     cui_border_edges border_edges;
     bool custom_corners, custom_border_edges;
     cui_hover_options tooltip_options;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_toggle_options;
 cui_toggle_options cui_toggle_options_default(void);
 /* Paint only; compose with independently registered headless toggle behavior.
@@ -144,6 +148,7 @@ typedef struct {
     /* Required with on_change; borrowed synchronous request scratch, separate from values. */
     bool *requested_values;
     size_t requested_capacity;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_toggle_group_style_options;
 bool cui_toggle_group_ex(cui_context *, cui_id, const cui_theme *, const cui_toggle_item *,
                          bool *values, size_t count, cui_toggle_group_style_options);
@@ -181,7 +186,8 @@ typedef struct {
     float padding_x, padding_y;
     bool no_appearance, no_border, hide_focus_ring;
     cui_align text_align;
-    bool delegate_up_down; /* Composite owns list navigation instead of caret movement. */
+    bool delegate_up_down;       /* Composite owns list navigation instead of caret movement. */
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
@@ -339,6 +345,14 @@ void cui_separator(cui_context *, cui_id, const cui_theme *, float width);
 
 
 #include <math.h>
+static bool cui_components_design(const cui_theme *theme, cui_design_size size,
+                                  cui_design_metrics *metrics) {
+    if (size == CUI_DESIGN_INHERIT) {
+        *metrics = (cui_design_metrics){0};
+        return true;
+    }
+    return theme && cui_design_measure(size, theme->font_size / 16, metrics);
+}
 static cui_box cui_components_control(const cui_theme *t, bool disabled, bool selected) {
     return (cui_box){.height = t->control_height,
                      .padding = t->padding,
@@ -357,7 +371,8 @@ static void cui_components_focus(cui_context *ui, cui_id id, const cui_theme *t,
 }
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options options, cui_interaction state) {
-    if (!ui || !t)
+    cui_design_metrics design;
+    if (!ui || !t || !cui_components_design(t, options.design_size, &design))
         return;
     bool disabled = options.disabled || options.loading;
     cui_box b = cui_components_control(t, disabled, false);
@@ -375,6 +390,11 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
                 : options.size == CUI_CONTROL_SMALL ? 24
                                                     : 32) *
                density;
+    if (options.design_size != CUI_DESIGN_INHERIT) {
+        font = design.font_size;
+        horizontal_padding = design.padding_x;
+        b.height = design.control_height;
+    }
     b.padding = 0;
     b.gap = 0;
     b.width = isfinite(options.width) ? options.width : 0;
@@ -429,32 +449,38 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     cui_begin_box(ui, id, b);
     cui_begin_box(ui, 0, (cui_box){.width = horizontal_padding, .height = 1});
     cui_end_box(ui);
-    cui_begin_box(
-        ui, 0,
-        (cui_box){
-            .row = true,
-            .align_x = CUI_ALIGN_CENTER,
-            .align_y = CUI_ALIGN_CENTER,
-            .gap =
-                (options.size == CUI_CONTROL_XSMALL || options.size == CUI_CONTROL_SMALL ? 4 : 8) *
-                density});
+    cui_begin_box(ui, 0,
+                  (cui_box){.row = true,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .gap = options.design_size != CUI_DESIGN_INHERIT
+                                       ? design.gap
+                                       : (options.size == CUI_CONTROL_XSMALL ||
+                                                  options.size == CUI_CONTROL_SMALL
+                                              ? 4
+                                              : 8) *
+                                             density});
     foreground = disabled ? t->muted : foreground;
     if (options.loading)
         (void)cui_icon_spinner(
             ui, id ^ UINT64_C(0x7185e28e9fb974db), t,
-            (cui_icon_options){.size = options.size == CUI_CONTROL_XSMALL  ? CUI_ICON_XSMALL
-                                       : options.size == CUI_CONTROL_SMALL ? CUI_ICON_SMALL
-                                       : options.size == CUI_CONTROL_LARGE ? CUI_ICON_LARGE
-                                                                           : CUI_ICON_MEDIUM,
+            (cui_icon_options){.custom_size = design.indicator_size,
+                               .size = options.design_size != CUI_DESIGN_INHERIT ? CUI_ICON_CUSTOM
+                                       : options.size == CUI_CONTROL_XSMALL      ? CUI_ICON_XSMALL
+                                       : options.size == CUI_CONTROL_SMALL       ? CUI_ICON_SMALL
+                                       : options.size == CUI_CONTROL_LARGE       ? CUI_ICON_LARGE
+                                                                                 : CUI_ICON_MEDIUM,
                                .custom_color = true,
                                .color = foreground});
     else if (options.icon.length)
         (void)cui_icon_named(
             ui, id ^ UINT64_C(0x7185e28e9fb974db), t, options.icon,
-            (cui_icon_options){.size = options.size == CUI_CONTROL_XSMALL  ? CUI_ICON_XSMALL
-                                       : options.size == CUI_CONTROL_SMALL ? CUI_ICON_SMALL
-                                       : options.size == CUI_CONTROL_LARGE ? CUI_ICON_LARGE
-                                                                           : CUI_ICON_MEDIUM,
+            (cui_icon_options){.custom_size = design.indicator_size,
+                               .size = options.design_size != CUI_DESIGN_INHERIT ? CUI_ICON_CUSTOM
+                                       : options.size == CUI_CONTROL_XSMALL      ? CUI_ICON_XSMALL
+                                       : options.size == CUI_CONTROL_SMALL       ? CUI_ICON_SMALL
+                                       : options.size == CUI_CONTROL_LARGE       ? CUI_ICON_LARGE
+                                                                                 : CUI_ICON_MEDIUM,
                                .custom_color = true,
                                .color = foreground});
     else if (options.leading.length)
@@ -482,7 +508,8 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
 }
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_button_options options) {
-    if (!ui || !t)
+    cui_design_metrics design;
+    if (!ui || !t || !cui_components_design(t, options.design_size, &design))
         return false;
     cui_interaction state = cui_base_button(ui, id, name, options.disabled || options.loading);
     if (options.variant == CUI_BUTTON_LINK)
@@ -566,7 +593,8 @@ void cui_checkmark(cui_context *ui, float size, cui_color color) {
 }
 bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
                      cui_check_state *value, cui_checkbox_options options) {
-    if (!ui || !t || !value)
+    cui_design_metrics design;
+    if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
     cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
     bool changed = cui_base_check(ui, id, name, value, options.disabled);
@@ -583,6 +611,10 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
                   : options.size == CUI_CONTROL_LARGE ? 16
                                                       : 14) *
                  density;
+    if (options.design_size != CUI_DESIGN_INHERIT) {
+        size = design.indicator_size;
+        font = design.font_size;
+    }
     bool selected = *value != CUI_CHECK_UNCHECKED;
     cui_color border = options.invalid ? t->danger : selected ? t->primary : t->input;
     cui_color background = selected ? t->primary : t->input_background;
@@ -716,6 +748,11 @@ static void cui_components_switch_label(cui_context *ui, const cui_theme *t, cui
         float line_height = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL ? 16
                             : o.size == CUI_CONTROL_LARGE                               ? 24
                                                                                         : 20;
+        if (o.design_size != CUI_DESIGN_INHERIT) {
+            cui_design_metrics design;
+            if (cui_components_design(t, o.design_size, &design))
+                line_height = design.line_height;
+        }
         cui_text_with_line_height(ui, label, font, o.disabled ? t->muted : t->text, line_height);
     }
     cui_end_box(ui);
@@ -723,9 +760,11 @@ static void cui_components_switch_label(cui_context *ui, const cui_theme *t, cui
 
 bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
                    cui_switch_state *state, cui_switch_options o) {
-    if (!ui || !id || !t || !value || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
-        !isfinite(o.width) || !isfinite(o.now_seconds) || o.now_seconds < 0 ||
-        !isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0 ||
+    cui_design_metrics design;
+    if (!ui || !id || !t || !value || !cui_components_design(t, o.design_size, &design) ||
+        o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL || !isfinite(o.width) ||
+        !isfinite(o.now_seconds) || o.now_seconds < 0 || !isfinite(t->font_size) ||
+        t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0 ||
         !isfinite(t->spring_move.response) || t->spring_move.response < 0 ||
         !isfinite(t->spring_move.damping) || t->spring_move.damping < 0 ||
         !isfinite(t->spring_move.epsilon) || t->spring_move.epsilon <= 0 ||
@@ -747,11 +786,16 @@ bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label
     bool small = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL;
     float width = small ? 28 : o.size == CUI_CONTROL_LARGE ? 44 : 36;
     float height = small ? 16 : o.size == CUI_CONTROL_LARGE ? 24 : 20;
-    float thumb = height - 4, target = *value ? width - thumb - 4 : 0;
     float font = (o.size == CUI_CONTROL_XSMALL  ? 12
                   : o.size == CUI_CONTROL_LARGE ? 16
                                                 : 14) *
                  t->font_size / 16;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        height = design.indicator_size + 4;
+        width = height * 1.8f;
+        font = design.font_size;
+    }
+    float thumb = height - 4, target = *value ? width - thumb - 4 : 0;
     float radius = t->radius >= 4 ? height : t->radius;
     if (state)
         cui_components_spring_step(state, target, t->spring_move, o.now_seconds, o.reduced_motion);
@@ -761,7 +805,8 @@ bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label
                   (cui_box){.width = o.width,
                             .row = true,
                             .gap = label_present ? 8 : 0,
-                            .align_y = CUI_ALIGN_START});
+                            .align_y = o.design_size == CUI_DESIGN_INHERIT ? CUI_ALIGN_START
+                                                                           : CUI_ALIGN_CENTER});
     if (o.label_left && label_present)
         cui_components_switch_label(ui, t, label, o, font);
     cui_color background = *value ? (o.custom_color ? o.color : t->primary) : t->switch_background;
@@ -830,6 +875,7 @@ static bool cui_components_toggle_valid(cui_str label, cui_toggle_options o) {
             return false;
     }
     return o.size >= CUI_CONTROL_MEDIUM && o.size <= CUI_CONTROL_XSMALL &&
+           o.design_size >= CUI_DESIGN_INHERIT && o.design_size <= CUI_DESIGN_9XL &&
            o.variant >= CUI_TOGGLE_GHOST && o.variant <= CUI_TOGGLE_OUTLINE && isfinite(o.width) &&
            (!label.length || label.data) &&
            (!o.accessibility_label.length || o.accessibility_label.data) &&
@@ -838,8 +884,10 @@ static bool cui_components_toggle_valid(cui_str label, cui_toggle_options o) {
 
 void cui_toggle_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool value,
                       cui_toggle_options o) {
-    if (!ui || !id || !t || !cui_components_toggle_valid(label, o) || !isfinite(t->font_size) ||
-        t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
+    cui_design_metrics design;
+    if (!ui || !id || !t || !cui_components_design(t, o.design_size, &design) ||
+        !cui_components_toggle_valid(label, o) || !isfinite(t->font_size) || t->font_size <= 0 ||
+        !isfinite(t->radius) || t->radius < 0)
         return;
     bool accent = value || (!o.disabled && cui_hovered(ui, id));
     float side = o.size == CUI_CONTROL_XSMALL  ? 20
@@ -854,6 +902,11 @@ void cui_toggle_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str la
                   : o.size == CUI_CONTROL_LARGE ? 16
                                                 : 14) *
                  t->font_size / 16;
+    if (o.design_size != CUI_DESIGN_INHERIT) {
+        side = design.control_height;
+        padding = design.padding_x;
+        font = design.font_size;
+    }
     cui_box box = {.width = o.width,
                    .height = side,
                    .radius = t->radius,
@@ -883,7 +936,8 @@ void cui_toggle_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str la
         o.content(ui, o.content_user);
     else if (label.length)
         cui_text_with_line_height(ui, label, font, accent ? t->accent_foreground : t->text,
-                                  font * 1.25f);
+                                  o.design_size == CUI_DESIGN_INHERIT ? font * 1.25f
+                                                                      : design.line_height);
     cui_begin_box(ui, 0, (cui_box){.width = padding, .height = 0, .fixed_height = true});
     cui_end_box(ui);
     cui_end_box(ui);
@@ -891,8 +945,10 @@ void cui_toggle_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str la
 }
 bool cui_toggle_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
                    cui_hover_state *tooltip_state, cui_toggle_options o) {
-    if (!ui || !id || !t || !value || !cui_components_toggle_valid(label, o) ||
-        !isfinite(t->font_size) || t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0)
+    cui_design_metrics design;
+    if (!ui || !id || !t || !value || !cui_components_design(t, o.design_size, &design) ||
+        !cui_components_toggle_valid(label, o) || !isfinite(t->font_size) || t->font_size <= 0 ||
+        !isfinite(t->radius) || t->radius < 0)
         return false;
     cui_str name = o.accessibility_label.length ? o.accessibility_label
                    : o.tooltip.length           ? o.tooltip
@@ -935,7 +991,9 @@ static void cui_components_toggle_group_request(void *user, bool requested) {
 bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
                          const cui_toggle_item *items, bool *values, size_t count,
                          cui_toggle_group_style_options o) {
-    if (!ui || !id || !t || (count && (!items || !values)) || o.size < CUI_CONTROL_MEDIUM ||
+    cui_design_metrics design;
+    if (!ui || !id || !t || !cui_components_design(t, o.design_size, &design) ||
+        (count && (!items || !values)) || o.size < CUI_CONTROL_MEDIUM ||
         o.size > CUI_CONTROL_XSMALL || o.variant < CUI_TOGGLE_GHOST ||
         o.variant > CUI_TOGGLE_OUTLINE || !isfinite(o.gap) || o.gap < 0 ||
         (o.accessibility_label.length && !o.accessibility_label.data) ||
@@ -972,6 +1030,8 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
     for (size_t i = 0; i < count; i++) {
         cui_toggle_options child = items[i].options;
         child.size = o.size;
+        if (o.design_size != CUI_DESIGN_INHERIT)
+            child.design_size = o.design_size;
         child.variant = o.variant;
         child.disabled |= o.disabled;
         child.on_change = NULL;
@@ -1001,7 +1061,8 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
 
 bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
                   int option, cui_radio_options options) {
-    if (!ui || !t || !value)
+    cui_design_metrics design;
+    if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
     cui_str accessible = options.accessibility_label.length ? options.accessibility_label : name;
     bool changed = cui_base_radio(ui, id, accessible, value, option, options.disabled);
@@ -1018,6 +1079,10 @@ bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, 
                   : options.size == CUI_CONTROL_LARGE ? 16
                                                       : 14) *
                  density;
+    if (options.design_size != CUI_DESIGN_INHERIT) {
+        size = design.indicator_size;
+        font = design.font_size;
+    }
     bool selected = *value == option;
     cui_color ink = options.invalid ? t->danger : selected ? t->primary : t->input;
     cui_color dot = t->on_primary;
@@ -1158,7 +1223,7 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
         return false;
     float d = options.density > 0 ? options.density : root_font_size / 16;
     float h = 32, font = 14, px = 10, py = 8, gap = 6;
-    switch (options.size) {
+    switch (options.design_size == CUI_DESIGN_INHERIT ? options.size : CUI_INPUT_MEDIUM) {
     case CUI_INPUT_XSMALL:
         h = 20;
         font = 12;
@@ -1190,10 +1255,22 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
     default:
         break;
     }
+    float line_height = 20 * d;
+    if (options.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics design;
+        if (!cui_design_measure(options.design_size, d, &design))
+            return false;
+        h = design.control_height / d;
+        font = design.font_size / d;
+        px = design.padding_x / d;
+        py = design.padding_y / d;
+        gap = design.gap / d;
+        line_height = design.line_height;
+    }
     *metrics =
         (cui_input_metrics){options.custom_height || options.height > 0 ? options.height : h * d,
                             font * d,
-                            20 * d,
+                            line_height,
                             options.custom_padding ? options.padding_x : px * d,
                             options.custom_padding ? options.padding_y : py * d,
                             gap * d};

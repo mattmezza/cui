@@ -741,6 +741,9 @@ static void gallery_carousel_pagination(cui_context *context, const cui_theme *t
     cui_carousel_pagination_end(context);
 }
 static cui_check_state check_state;
+static cui_design_size design_size;
+static int design_radius = -1;
+static float design_spacing = -1;
 static int control_size, choice_required, choice_invalid, choice_skip_tab;
 static int gallery_xsmall_second_size(void) {
     return control_size == 1 ? 2 : control_size == 2 ? 3 : control_size == 3 ? 1 : 0;
@@ -1749,6 +1752,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         t.padding *= .7f;
         t.gap *= .75f;
     }
+    if (design_radius >= CUI_RADIUS_NONE && design_radius <= CUI_RADIUS_FULL)
+        t.radius = t.radius_lg = cui_radius((cui_radius_size)design_radius, 1);
+    if (design_spacing >= 0)
+        t.gap = cui_space(design_spacing);
     if (previous_story != story) {
         if (previous_story == 78)
             (void)cui_speech_cancel(&speech_state);
@@ -1782,7 +1789,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                       (cui_box){.width = width,
                                 .height = height,
                                 .padding = 24,
-                                .gap = 16,
+                                .gap = design_spacing >= 0 ? t.gap : 16,
                                 .background = t.background});
     switch (story) {
     case 64: {
@@ -1984,6 +1991,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             ui, cui_id_from(ui, "textarea-preview"), &t, cui_string("Project notes"), textarea_edit,
             &textarea_state,
             (cui_textarea_options){.size = (cui_textarea_size)gallery_xsmall_second_size(),
+                                   .design_size = design_size,
                                    .width = width > 430 ? 380 : width - 48,
                                    .rows = (size_t)textarea_rows,
                                    .auto_grow = textarea_auto_grow != 0,
@@ -2358,24 +2366,29 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 0: {
         char label[64];
-        if (cui_button_ex(
-                ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
-                (cui_button_options){.size = (cui_control_size)control_size, .disabled = disabled}))
+        if (cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                          (cui_button_options){.size = (cui_control_size)control_size,
+                                               .design_size = design_size,
+                                               .disabled = disabled}))
             clicks++;
         snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
-        for (int row = 0; row < 2; row++) {
-            cui_begin_box(ui, cui_id_from(ui, row ? "variant-row-2" : "variant-row-1"),
-                          (cui_box){.row = true, .gap = 8});
+        int columns = design_size == CUI_DESIGN_INHERIT ? 3 : width < 600 ? 1 : 2;
+        for (int row = 0; row < (6 + columns - 1) / columns; row++) {
+            cui_begin_box(ui, cui_id_from(ui, "variant-row") ^ (cui_id)(row + 1),
+                          (cui_box){.row = true, .gap = design_spacing >= 0 ? t.gap : 8});
             const char *names[6] = {"Secondary", "Outline", "Ghost", "Danger", "Link", "Loading"};
             cui_button_variant variants[6] = {CUI_BUTTON_SECONDARY, CUI_BUTTON_OUTLINE,
                                               CUI_BUTTON_GHOST,     CUI_BUTTON_DANGER,
                                               CUI_BUTTON_LINK,      CUI_BUTTON_PRIMARY};
-            for (int column = 0; column < 3; column++) {
-                int v = row * 3 + column;
+            for (int column = 0; column < columns; column++) {
+                int v = row * columns + column;
+                if (v >= 6)
+                    break;
                 cui_button_ex(ui, cui_id_from(ui, names[v]), &t, cui_string(names[v]),
                               (cui_button_options){.variant = variants[v],
                                                    .size = CUI_CONTROL_SMALL,
+                                                   .design_size = design_size,
                                                    .disabled = disabled || v == 2,
                                                    .loading = v == 5});
             }
@@ -2387,6 +2400,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_checkbox_ex(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"),
                         &check_state,
                         (cui_checkbox_options){.size = (cui_control_size)control_size,
+                                               .design_size = design_size,
                                                .disabled = disabled,
                                                .required = choice_required != 0,
                                                .invalid = choice_invalid != 0,
@@ -2395,6 +2409,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 2: {
         cui_switch_options options = cui_switch_options_default();
         options.size = (cui_control_size)control_size;
+        options.design_size = design_size;
         options.disabled = disabled;
         options.label_left = switch_label_left != 0;
         options.custom_color = switch_custom_color != 0;
@@ -2409,6 +2424,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 3: {
         cui_toggle_options standalone = cui_toggle_options_default();
         standalone.size = (cui_control_size)control_size;
+        standalone.design_size = design_size;
         standalone.variant = (cui_toggle_variant)toggle_variant;
         standalone.disabled = disabled;
         standalone.focus_ring = true;
@@ -2419,6 +2435,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {.id = cui_id_from(ui, "toggle-italic"), .label = cui_string("Italic")},
             {.id = cui_id_from(ui, "toggle-underline"), .label = cui_string("Underline")}};
         cui_toggle_group_style_options group = {.size = (cui_control_size)control_size,
+                                                .design_size = design_size,
                                                 .variant = (cui_toggle_variant)toggle_variant,
                                                 .disabled = disabled,
                                                 .segmented = toggle_segmented != 0,
@@ -2433,6 +2450,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 4: {
         cui_radio_options options = {.size = (cui_control_size)control_size,
+                                     .design_size = design_size,
                                      .disabled = disabled,
                                      .required = choice_required != 0,
                                      .invalid = choice_invalid != 0,
@@ -2455,6 +2473,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                          .required = input_mode == 2,
                                          .invalid = input_mode == 2,
                                          .size = (cui_input_size)control_size,
+                                         .design_size = design_size,
                                          .width = width > 360 ? 280 : width - 48});
         break;
     case 60: {
@@ -3507,13 +3526,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                             .viewport = {0, 0, width, height},
                                             .width = width > 360 ? 280 : width - 48,
                                             .size = (cui_list_size)control_size,
+                                            .design_size = design_size,
                                             .dt = host_dt};
         if (story == 30 && multiple_mode)
             cui_list_multi(ui, cui_id_from(ui, "list"), &t, items, 3, multi_selected, &list_state,
-                           (cui_list_options){.disabled = disabled, .dt = host_dt});
+                           (cui_list_options){
+                               .disabled = disabled, .dt = host_dt, .design_size = design_size});
         else if (story == 30)
             cui_list(ui, cui_id_from(ui, "list"), &t, items, 3, &list_selection, &list_state,
-                     (cui_list_options){.disabled = disabled, .dt = host_dt});
+                     (cui_list_options){
+                         .disabled = disabled, .dt = host_dt, .design_size = design_size});
         else if (story == 31 && multiple_mode)
             cui_select_multi(ui, cui_id_from(ui, "select"), &t, cui_string("Delivery"),
                              cui_string("Select services"), items, 3, multi_selected, &select_popup,
@@ -3581,6 +3603,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                             .viewport = {0, 0, width, height},
                                             .width = width > 360 ? 280 : width - 48,
                                             .size = (cui_list_size)control_size,
+                                            .design_size = design_size,
                                             .dt = host_dt};
         if (multiple_mode) {
             bool filtered_selected[4];
@@ -4375,6 +4398,12 @@ int gallery_checkbox_state(int state) {
     if (state >= CUI_CHECK_UNCHECKED && state <= CUI_CHECK_MIXED)
         check_state = (cui_check_state)state;
     return check_state;
+}
+void gallery_design_options(int size, int radius, float spacing) {
+    design_size = size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL ? (cui_design_size)size
+                                                                       : CUI_DESIGN_INHERIT;
+    design_radius = radius >= CUI_RADIUS_NONE && radius <= CUI_RADIUS_FULL ? radius : -1;
+    design_spacing = isfinite(spacing) && spacing >= 0 && spacing <= 16 ? spacing : -1;
 }
 void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
                              int custom_color, int variant, int segmented, int multiple) {

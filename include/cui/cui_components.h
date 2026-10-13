@@ -58,7 +58,8 @@ typedef struct {
     bool icon_only;                /* Keep name for accessibility; render a square icon button. */
     cui_button_content_fn content; /* Optional arbitrary child content instead of label. */
     void *content_user;
-    bool outline; /* Orthogonal colored outline; selected is presentation only. */
+    bool outline;                /* Orthogonal colored outline; selected is presentation only. */
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
@@ -72,6 +73,7 @@ typedef struct {
     cui_str accessibility_label;
     cui_button_content_fn content;
     void *content_user;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_checkbox_options;
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
@@ -94,6 +96,7 @@ typedef struct {
     void *change_user;
     double now_seconds;
     cui_hover_options tooltip_options;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_switch_options;
 cui_switch_options cui_switch_options_default(void);
 cui_id cui_switch_track_id(cui_id);
@@ -118,6 +121,7 @@ typedef struct {
     cui_border_edges border_edges;
     bool custom_corners, custom_border_edges;
     cui_hover_options tooltip_options;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_toggle_options;
 cui_toggle_options cui_toggle_options_default(void);
 /* Paint only; compose with independently registered headless toggle behavior.
@@ -143,6 +147,7 @@ typedef struct {
     /* Required with on_change; borrowed synchronous request scratch, separate from values. */
     bool *requested_values;
     size_t requested_capacity;
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_toggle_group_style_options;
 bool cui_toggle_group_ex(cui_context *, cui_id, const cui_theme *, const cui_toggle_item *,
                          bool *values, size_t count, cui_toggle_group_style_options);
@@ -180,7 +185,8 @@ typedef struct {
     float padding_x, padding_y;
     bool no_appearance, no_border, hide_focus_ring;
     cui_align text_align;
-    bool delegate_up_down; /* Composite owns list navigation instead of caret movement. */
+    bool delegate_up_down;       /* Composite owns list navigation instead of caret movement. */
+    cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);

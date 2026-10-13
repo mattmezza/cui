@@ -166,6 +166,7 @@ typedef struct {
     bool track_secondary;             /* highlight secondary presses without confirming */
     float density; /* zero derives theme.font_size/16; ordinary List has no size variant */
     float height;  /* positive fixed row override; zero uses source natural text plus padding */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_list_options;
 typedef struct {
     cui_overlay overlay;
@@ -184,10 +185,11 @@ typedef struct {
     void *render_user;
     bool align_end; /* align popup right edge with anchor right edge */
     cui_list_size size;
-    float custom_size; /* CUI_LIST_CUSTOM logical font basis; font = size*0.875 */
-    float density;     /* zero derives theme.font_size/16 */
-    float row_height;  /* positive fixed row override; zero uses source natural height */
-    float max_height;  /* positive popup cap; default source 20rem = 320*density */
+    float custom_size;           /* CUI_LIST_CUSTOM logical font basis; font = size*0.875 */
+    float density;               /* zero derives theme.font_size/16 */
+    float row_height;            /* positive fixed row override; zero uses source natural height */
+    float max_height;            /* positive popup cap; default source 20rem = 320*density */
+    cui_design_size design_size; /* Trigger, query and popup rows share this scale. */
 } cui_choice_popup_options;
 void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 /* Apply dismissal and trigger activation before submitting the open popup. */

@@ -19,6 +19,43 @@ typedef enum {
     CUI_THEME_BUTTON_INFO,
     CUI_THEME_BUTTON_COUNT
 } cui_theme_button_kind;
+/* Explicit design scale; INHERIT keeps a component's frozen legacy size. */
+typedef enum {
+    CUI_DESIGN_INHERIT,
+    CUI_DESIGN_XS,
+    CUI_DESIGN_SM,
+    CUI_DESIGN_BASE,
+    CUI_DESIGN_MD,
+    CUI_DESIGN_LG,
+    CUI_DESIGN_XL,
+    CUI_DESIGN_2XL,
+    CUI_DESIGN_3XL,
+    CUI_DESIGN_4XL,
+    CUI_DESIGN_5XL,
+    CUI_DESIGN_6XL,
+    CUI_DESIGN_7XL,
+    CUI_DESIGN_8XL,
+    CUI_DESIGN_9XL
+} cui_design_size;
+typedef struct {
+    float font_size, line_height, control_height, padding_x, padding_y, gap, indicator_size;
+} cui_design_metrics;
+/* Invalid size/density leaves output untouched. BASE and MD share the default metrics. */
+bool cui_design_measure(cui_design_size, float density, cui_design_metrics *);
+/* Four logical pixels per unit; negative units are useful for offsets, not padding. */
+float cui_space(float units);
+typedef enum {
+    CUI_RADIUS_NONE,
+    CUI_RADIUS_XS,
+    CUI_RADIUS_SM,
+    CUI_RADIUS_MD,
+    CUI_RADIUS_LG,
+    CUI_RADIUS_XL,
+    CUI_RADIUS_2XL,
+    CUI_RADIUS_3XL,
+    CUI_RADIUS_FULL
+} cui_radius_size;
+float cui_radius(cui_radius_size, float density);
 typedef struct {
     cui_color normal, hover, active, foreground;
     cui_color outline_normal, outline_hover, outline_active, border, outline_border,
@@ -82,7 +119,36 @@ bool cui_theme_preset_get(size_t index, cui_theme *output);
 /* src/theme/cui_theme.c */
 /* SPDX-License-Identifier: MIT */
 
+#include <math.h>
 #include <string.h>
+bool cui_design_measure(cui_design_size size, float density, cui_design_metrics *output) {
+    if (!output || size <= CUI_DESIGN_INHERIT || size > CUI_DESIGN_9XL || !isfinite(density) ||
+        density <= 0 || density > 32)
+        return false;
+    static const float font[] = {0, 12, 14, 16, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128};
+    static const float line[] = {0, 16, 20, 24, 24, 28, 28, 32, 36, 40, 48, 60, 72, 96, 128};
+    static const float height[] = {0, 20, 24, 32, 32, 40, 48, 56, 64, 80, 104, 128, 152, 200, 264};
+    static const float padding[] = {0, 4, 8, 10, 10, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
+    static const float gap[] = {0, 4, 4, 6, 6, 8, 8, 12, 12, 16, 20, 24, 28, 32, 40};
+    *output = (cui_design_metrics){.font_size = font[size] * density,
+                                   .line_height = line[size] * density,
+                                   .control_height = height[size] * density,
+                                   .padding_x = padding[size] * density,
+                                   .padding_y = (height[size] - line[size]) * .5f * density,
+                                   .gap = gap[size] * density,
+                                   .indicator_size = font[size] * density};
+    return true;
+}
+float cui_space(float units) {
+    return isfinite(units) && fabsf(units) <= 250000 ? units * 4 : 0;
+}
+float cui_radius(cui_radius_size size, float density) {
+    static const float radii[] = {0, 2, 4, 6, 8, 12, 16, 24, 9999};
+    return size >= CUI_RADIUS_NONE && size <= CUI_RADIUS_FULL && isfinite(density) && density > 0 &&
+                   density <= 32
+               ? radii[size] * density
+               : 0;
+}
 #define CUI_THEME_RGB(r, g, b) {r, g, b, 255}
 static cui_color cui_theme_scale(cui_color c, float factor) {
     c.r = (uint8_t)(c.r * factor);

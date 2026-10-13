@@ -47,6 +47,7 @@ typedef struct {
     cui_role role;
     cui_str placeholder;
     const cui_platform *clipboard;
+    cui_design_size design_size; /* Styled control only; base uses supplied metrics. */
 } cui_textarea_options;
 typedef struct {
     float font_size, line_height, padding_x, padding_y;

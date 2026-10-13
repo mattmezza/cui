@@ -262,6 +262,34 @@ def main():
                     assert geometry['ink'] > 4 and abs(geometry['center']) < 2, (theme,size,geometry)
                 page.screenshot(path=f'/tmp/cui-web-buttons-{"light" if theme == "0" else "dark"}.png')
             control_change('control-size', '0')
+            for theme in ('0', '1'):
+                control_change('theme', theme)
+                for size, height, font in ((1,20,12),(2,24,14),(3,32,16),(4,32,16),
+                                           (5,40,18),(6,48,20),(7,56,24),(8,64,30),(9,80,36)):
+                    control_change('design-size', size)
+                    geometry = button_text_geometry()
+                    assert geometry and abs(geometry['height']-height) < .3, (theme,size,geometry)
+                    assert abs(geometry['font']-font) < .1, (theme,size,geometry)
+                    assert geometry['ink'] > 4 and abs(geometry['center']) < 2.5, (theme,size,geometry)
+                    assert page.locator('#control-size').is_disabled()
+            control_change('design-size', '0')
+            assert page.locator('#control-size').is_enabled()
+            for radius, expected in ((0,0),(4,8),(6,16)):
+                control_change('design-radius', radius)
+                actual = page.evaluate("""()=>{const e=cuiGallery.exports,b=[1,2,3,4].map(f=>e.gallery_semantic(0,f));
+                    const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===0&&Math.abs(e.gallery_command(i,1)-b[0])<.1&&Math.abs(e.gallery_command(i,2)-b[1])<.1&&Math.abs(e.gallery_command(i,3)-b[2])<.1&&Math.abs(e.gallery_command(i,4)-b[3])<.1);return i===undefined?null:e.gallery_command(i,9);}""")
+                assert actual == expected, (radius,actual)
+            control_change('design-radius', '-1')
+            for spacing in (0,2,6):
+                control_change('design-spacing', spacing)
+                gap = page.evaluate("""()=>{const e=cuiGallery.exports;
+                    const texts=Array.from({length:e.gallery_count()},(_,i)=>i).filter(i=>e.gallery_command(i,0)===2);
+                    const label=texts.find(i=>new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i))).startsWith('Clicked '));
+                    const font=e.gallery_command(label,11),natural=font*1.25;
+                    return e.gallery_command(label,2)-(e.gallery_semantic(0,2)+e.gallery_semantic(0,4));}""")
+                # Label uses natural line height; the root gap separates it from the button.
+                assert abs(gap-spacing*4)<.5, (spacing,gap)
+            control_change('design-spacing', '-1')
             assert page.locator('#features tr').count() > 0
             assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
             control_change('theme', '1')

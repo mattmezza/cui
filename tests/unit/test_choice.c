@@ -4184,7 +4184,56 @@ static void test_menu_popup_paint_composition(void) {
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+static void test_design_scale_rows_and_triggers(void) {
+    cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
+                          cui_theme_terminal()};
+    const cui_choice_item entries[] = {{8101, {"One", 3}, false}, {8102, {"Two", 3}, false}};
+    for (size_t t = 0; t < 4; t++) {
+        for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; size++) {
+            cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1600});
+            assert(ui);
+            cui_design_metrics m;
+            assert(cui_design_measure((cui_design_size)size, themes[t].font_size / 16, &m));
+            cui_id value = 8101;
+            cui_choice_popup popup;
+            cui_choice_popup_init(&popup, 8100);
+            for (unsigned frame = 0; frame < 3; frame++) {
+                assert(cui_begin_frame(ui, 1800, 1600, .016f));
+                cui_select(ui, 8200, &themes[t], cui_string("Scale"), cui_string("Choose"), entries,
+                           2, &value, &popup,
+                           (cui_choice_popup_options){.viewport = {0, 0, 1800, 1600},
+                                                      .width = 1500,
+                                                      .max_height = 1400,
+                                                      .design_size = (cui_design_size)size});
+                cui_draw_list draw = cui_end_frame(ui);
+                assert(cui_last_error(ui) == CUI_OK);
+                assert(cui_bounds(ui, 8200).h == m.control_height);
+                if (frame) {
+                    assert(popup.overlay.open);
+                    cui_rect first = cui_bounds(ui, 8101), second = cui_bounds(ui, 8102);
+                    assert(fabsf(first.h - m.control_height) < .1f);
+                    assert(fabsf(second.y - first.y - m.control_height) < .1f);
+                    assert(first.w > 1400);
+                    bool found = false;
+                    for (size_t j = 0; j < draw.count; j++) {
+                        cui_draw_command command = draw.commands[j];
+                        if (command.type == CUI_DRAW_TEXT && command.text.length == 3 &&
+                            !memcmp(command.text.data, "One", 3)) {
+                            assert(command.font_size == m.font_size);
+                            found = true;
+                        }
+                    }
+                    assert(found);
+                } else {
+                    click(ui, 8200);
+                }
+            }
+            cui_destroy(ui);
+        }
+    }
+}
 int main(void) {
+    test_design_scale_rows_and_triggers();
     test_menu_popup_paint_composition();
     test_dropdown_real_artwork();
     test_tabs_toolbar_consumption();

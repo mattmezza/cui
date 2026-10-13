@@ -48,6 +48,7 @@ typedef struct {
     cui_role role;
     cui_str placeholder;
     const cui_platform *clipboard;
+    cui_design_size design_size; /* Styled control only; base uses supplied metrics. */
 } cui_textarea_options;
 typedef struct {
     float font_size, line_height, padding_x, padding_y;
@@ -564,6 +565,13 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         options.rows > 65536 || options.min_rows > 65536 || options.max_rows > 65536 ||
         (options.placeholder.length && !options.placeholder.data))
         return result;
+    if (options.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics design;
+        if (!cui_design_measure(options.design_size, theme->font_size / 16, &design))
+            return result;
+        metrics = (cui_textarea_metrics){design.font_size, design.line_height, design.padding_x,
+                                         design.padding_y};
+    }
     float border = !options.no_appearance && !options.no_border ? 1 : 0;
     float px = metrics.padding_x + border, py = metrics.padding_y + border;
     float width = options.width > 0       ? options.width - 2 * px

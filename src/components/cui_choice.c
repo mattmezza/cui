@@ -770,9 +770,35 @@ cui_list_metrics cui_searchable_list_size_metrics(cui_list_size size, float cust
                               .check_width = 12 * density,
                               .density = density};
 }
+static bool cui_choice_design_theme(const cui_theme *theme, cui_design_size size, cui_theme *out) {
+    *out = *theme;
+    if (size == CUI_DESIGN_INHERIT)
+        return true;
+    cui_design_metrics m;
+    if (!cui_design_measure(size, theme->font_size / 16, &m))
+        return false;
+    out->control_height = m.control_height;
+    out->font_size = m.font_size;
+    out->padding = m.padding_x;
+    out->gap = m.gap;
+    return true;
+}
+static void cui_choice_design_rows(cui_list_metrics *metrics, cui_design_size size) {
+    cui_design_metrics m;
+    if (size != CUI_DESIGN_INHERIT && cui_design_measure(size, metrics->density, &m)) {
+        metrics->height = m.control_height;
+        metrics->font_size = m.font_size;
+        metrics->line_height = m.line_height;
+        metrics->padding_x = m.padding_x;
+        metrics->padding_y = m.padding_y;
+        metrics->gap = m.gap;
+        metrics->check_size = metrics->check_width = m.indicator_size;
+    }
+}
 static cui_list_metrics cui_choice_list_metrics(const cui_theme *theme, cui_list_options options) {
     cui_list_metrics metrics = cui_list_default_metrics(
         isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16);
+    cui_choice_design_rows(&metrics, options.design_size);
     if (isfinite(options.height) && options.height > 0)
         metrics.height = options.height;
     return metrics;
@@ -782,6 +808,7 @@ static cui_list_metrics cui_choice_search_metrics(const cui_theme *theme,
     cui_list_metrics metrics = cui_searchable_list_size_metrics(
         options.size, options.custom_size,
         isfinite(options.density) && options.density > 0 ? options.density : theme->font_size / 16);
+    cui_choice_design_rows(&metrics, options.design_size);
     if (isfinite(options.row_height) && options.row_height > 0)
         metrics.height = options.row_height;
     return metrics;
@@ -891,6 +918,9 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
               cui_list_options options) {
     if (!theme || (!items && count) || !selected || !state)
         return false;
+    cui_theme validation_theme;
+    if (!cui_choice_design_theme(theme, options.design_size, &validation_theme))
+        return false;
     cui_list_metrics metrics = cui_choice_list_metrics(theme, options);
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;
@@ -910,6 +940,9 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
         options.viewport.h <= 0 || !isfinite(theme->control_height) || theme->control_height <= 0 ||
         !isfinite(theme->padding) || theme->padding < 0 || theme->padding > options.viewport.h / 2)
         return false;
+    cui_theme trigger_theme;
+    if (!cui_choice_design_theme(theme, options.design_size, &trigger_theme))
+        return false;
     cui_base_choice_popup_trigger(ui, trigger, name, options.disabled, items, count, *selected,
                                   state);
     cui_str display = menu ? name : placeholder;
@@ -922,7 +955,7 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                                     .controls = state->overlay.id,
                                                     .description = display});
     cui_choice_item trigger_item = {trigger, display, options.disabled};
-    cui_choice_draw(ui, &trigger_item, theme, false, options.disabled, CUI_TAB_DEFAULT);
+    cui_choice_draw(ui, &trigger_item, &trigger_theme, false, options.disabled, CUI_TAB_DEFAULT);
     if (!state->overlay.open)
         return false;
     cui_list_metrics metrics = cui_choice_search_metrics(theme, options);
@@ -1015,11 +1048,14 @@ bool cui_menu(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str n
 
 static void cui_choice_paint_query(cui_context *ui, cui_id input, const cui_theme *theme,
                                    cui_str name, cui_edit *query, cui_choice_popup *state,
-                                   bool disabled, cui_edit_result error) {
+                                   bool disabled, cui_edit_result error,
+                                   cui_design_size design_size) {
     cui_input_state paint_state = {.behavior = state->query_behavior,
                                    .scroll_x = state->query_scroll_x};
     cui_input_paint(ui, input, theme, name, query, &paint_state,
-                    (cui_input_options){.disabled = disabled, .invalid = error != CUI_EDIT_OK});
+                    (cui_input_options){.disabled = disabled,
+                                        .invalid = error != CUI_EDIT_OK,
+                                        .design_size = design_size});
     state->query_scroll_x = paint_state.scroll_x;
 }
 cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme *theme,
@@ -1040,14 +1076,16 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     }
     state->query_viewport = cui_bounds(ui, cui_input_viewport_id(input));
     cui_input_metrics input_metrics;
-    if (!cui_input_measure((cui_input_options){0}, theme->font_size, &input_metrics)) {
+    if (!cui_input_measure((cui_input_options){.design_size = options.design_size},
+                           theme->font_size, &input_metrics)) {
         result.error = CUI_EDIT_INVALID_ARGUMENT;
         return result;
     }
     state->query_font_size = input_metrics.font_size;
     result = cui_base_combobox(ui, input, name, query, items, count, filtered, capacity, selected,
                                state, options.disabled);
-    cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error);
+    cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error,
+                           options.design_size);
     cui_str text = cui_edit_get_text(query);
     if (!state->overlay.open)
         return result;
@@ -1128,6 +1166,9 @@ bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
                     cui_list_state *state, cui_list_options options) {
     if (!theme || !items || !selected || !state)
         return false;
+    cui_theme validation_theme;
+    if (!cui_choice_design_theme(theme, options.design_size, &validation_theme))
+        return false;
     cui_list_metrics metrics = cui_choice_list_metrics(theme, options);
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;
@@ -1174,13 +1215,16 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
                 preferred = items[i].id;
             selected_count++;
         }
+    cui_theme trigger_theme;
+    if (!cui_choice_design_theme(theme, options.design_size, &trigger_theme))
+        return false;
     cui_base_choice_popup_trigger(ui, trigger, name, options.disabled, items, count, preferred,
                                   state);
     cui_begin_box(ui, trigger ^ UINT64_C(0x471d50d3bf973ac9), (cui_box){.gap = theme->gap});
     cui_choice_item trigger_item = {trigger, placeholder, options.disabled};
     if (selected_count)
         trigger_item.label = cui_string("Selected options");
-    cui_choice_draw(ui, &trigger_item, theme, false, options.disabled, CUI_TAB_DEFAULT);
+    cui_choice_draw(ui, &trigger_item, &trigger_theme, false, options.disabled, CUI_TAB_DEFAULT);
     bool changed = false;
     if (selected_count)
         changed |= cui_choice_chips(ui, trigger, theme, items, count, selected, options.disabled);
@@ -1270,7 +1314,8 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     }
     state->query_viewport = cui_bounds(ui, cui_input_viewport_id(input));
     cui_input_metrics input_metrics;
-    if (!cui_input_measure((cui_input_options){0}, theme->font_size, &input_metrics)) {
+    if (!cui_input_measure((cui_input_options){.design_size = options.design_size},
+                           theme->font_size, &input_metrics)) {
         result.error = CUI_EDIT_INVALID_ARGUMENT;
         return result;
     }
@@ -1278,7 +1323,8 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     result =
         cui_base_combobox_multi(ui, input, name, query, items, count, filtered, filtered_selected,
                                 capacity, selected, state, options.disabled);
-    cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error);
+    cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error,
+                           options.design_size);
     result.changed |= cui_choice_chips(ui, input, theme, items, count, selected, options.disabled);
     if (!state->overlay.open)
         return result;

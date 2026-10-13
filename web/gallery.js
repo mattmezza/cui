@@ -251,7 +251,8 @@ function requestFrame(){if(framePending||!wasm)return;framePending=true;requestA
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || !(selected.name in stories))return;
- const width=canvas.clientWidth,height=selected.name==='Plot'?440:selected.name==='Dock'?400:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?660:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const designScale=Number($('design-size').value),designHeights=[0,20,24,32,32,40,48,56,64,80];
+ const width=canvas.clientWidth,height=selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+100):selected.name==='Plot'?440:selected.name==='Dock'?400:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?660:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?360:selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -277,6 +278,7 @@ function render(){
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
+ wasm.gallery_design_options(Number($('design-size').value),Number($('design-radius').value),Number($('design-spacing').value));
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
  wasm.gallery_dropdown_options(...['variant','size','halves','action','anchor'].map(k=>Number($('dropdown-'+k).value)),Number($('dropdown-outline').checked),Number($('dropdown-selected').checked));
@@ -503,6 +505,10 @@ function selectComponent(){
  for(const id of ['command-modal-control','command-loading-control','command-filterable-control'])$(id).hidden=selected.name!=='Command';
  $('control-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment','Select','Combobox','Textarea','Input','NumberInput'].includes(selected.name);
  $('control-size').value='0';
+ $('control-size').disabled=false;
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea'].includes(selected.name);$('design-size').value='0';
+ for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
+ $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
  for(const id of ['switch-side-control','switch-color-control'])$(id).hidden=selected.name!=='Switch';
  for(const id of ['toggle-variant','toggle-segmented-control','toggle-selection'])$(id).hidden=selected.name!=='Toggle';
@@ -632,6 +638,7 @@ for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEven
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);
 for(const id of ['questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
 for(const id of ['control-size','choice-required','choice-invalid','choice-skip-tab','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
+for(const id of ['design-size','design-radius','design-spacing'])$(id).addEventListener('change',()=>{$('control-size').disabled=Number($('design-size').value)>0;requestFrame();});
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);

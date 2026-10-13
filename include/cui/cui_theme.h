@@ -18,6 +18,43 @@ typedef enum {
     CUI_THEME_BUTTON_INFO,
     CUI_THEME_BUTTON_COUNT
 } cui_theme_button_kind;
+/* Explicit design scale; INHERIT keeps a component's frozen legacy size. */
+typedef enum {
+    CUI_DESIGN_INHERIT,
+    CUI_DESIGN_XS,
+    CUI_DESIGN_SM,
+    CUI_DESIGN_BASE,
+    CUI_DESIGN_MD,
+    CUI_DESIGN_LG,
+    CUI_DESIGN_XL,
+    CUI_DESIGN_2XL,
+    CUI_DESIGN_3XL,
+    CUI_DESIGN_4XL,
+    CUI_DESIGN_5XL,
+    CUI_DESIGN_6XL,
+    CUI_DESIGN_7XL,
+    CUI_DESIGN_8XL,
+    CUI_DESIGN_9XL
+} cui_design_size;
+typedef struct {
+    float font_size, line_height, control_height, padding_x, padding_y, gap, indicator_size;
+} cui_design_metrics;
+/* Invalid size/density leaves output untouched. BASE and MD share the default metrics. */
+bool cui_design_measure(cui_design_size, float density, cui_design_metrics *);
+/* Four logical pixels per unit; negative units are useful for offsets, not padding. */
+float cui_space(float units);
+typedef enum {
+    CUI_RADIUS_NONE,
+    CUI_RADIUS_XS,
+    CUI_RADIUS_SM,
+    CUI_RADIUS_MD,
+    CUI_RADIUS_LG,
+    CUI_RADIUS_XL,
+    CUI_RADIUS_2XL,
+    CUI_RADIUS_3XL,
+    CUI_RADIUS_FULL
+} cui_radius_size;
+float cui_radius(cui_radius_size, float density);
 typedef struct {
     cui_color normal, hover, active, foreground;
     cui_color outline_normal, outline_hover, outline_active, border, outline_border,

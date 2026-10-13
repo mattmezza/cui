@@ -32,8 +32,9 @@ bool cui_font_draw(cui_font *font, cui_str text, float size, float x, float y, c
                    void *user);
 bool cui_font_draw_styled(cui_font *font, cui_str text, float size, cui_text_style style, float x,
                           float y, cui_glyph_fn emit, void *user);
-/* Optional bidi/shaping layout (CUI_TEXT_BIDI). Existing measurement/drawing
- * keep their behavior. No platform or shaping-engine types are public. */
+/* Optional bidi/shaping layout (CUI_TEXT_BIDI). When enabled, ordinary
+ * measurement/drawing also use paragraph/script analysis and hard-line layout.
+ * Disabled builds retain legacy drawing. No platform/shaping types are public. */
 typedef struct cui_text_layout cui_text_layout;
 typedef struct {
     uint32_t glyph_id;
@@ -60,7 +61,8 @@ typedef enum {
     CUI_TEXT_LAYOUT_UNAVAILABLE
 } cui_text_layout_status;
 /* Analyze a full paragraph, shape one caller-selected scalar line. SIZE_MAX
- * length means through paragraph end. Choose complete grapheme/shaping cluster
+ * length means through paragraph end. Empty ranges return paragraph metrics.
+ * Choose complete grapheme/shaping cluster
  * boundaries. Language is a BCP47 tag or NULL for "und". Layout owns glyph/run
  * data and copies all needed text; input may be reused after return. Font and
  * selected style face must remain alive and registered until layout destruction.

@@ -163,6 +163,102 @@ static void emit(void *user, int x, int y, int w, int h, int pitch, const unsign
         for (int col = 0; col < w; ++col)
             r->hash = r->hash * 31 + pixels[row * pitch + col];
 }
+static raster original_raster(FT_Face face, hb_font_t *font, cui_str text, float size, float x,
+                              float y, cui_size *bounds) {
+    raster pixels = {0};
+    assert(!FT_Set_Char_Size(face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72));
+    hb_ft_font_changed(font);
+    hb_buffer_t *buffer = hb_buffer_create();
+    hb_buffer_add_utf8(buffer, text.data, (int)text.length, 0, (int)text.length);
+    hb_buffer_guess_segment_properties(buffer);
+    hb_shape(font, buffer, NULL, 0);
+    unsigned count;
+    hb_glyph_info_t *infos = hb_buffer_get_glyph_infos(buffer, &count);
+    hb_glyph_position_t *positions = hb_buffer_get_glyph_positions(buffer, NULL);
+    bounds->width = 0;
+    bounds->height = (float)face->size->metrics.height / 64;
+    float baseline = y + (float)face->size->metrics.ascender / 64;
+    for (unsigned i = 0; i < count; ++i) {
+        assert(!FT_Load_Glyph(face, infos[i].codepoint, FT_LOAD_DEFAULT));
+        assert(!FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL));
+        FT_GlyphSlot slot = face->glyph;
+        emit(&pixels, (int)lroundf(x + (float)positions[i].x_offset / 64) + slot->bitmap_left,
+             (int)lroundf(baseline - (float)positions[i].y_offset / 64) - slot->bitmap_top,
+             (int)slot->bitmap.width, (int)slot->bitmap.rows, slot->bitmap.pitch,
+             slot->bitmap.buffer);
+        x += (float)positions[i].x_advance / 64;
+        baseline -= (float)positions[i].y_advance / 64;
+        bounds->width += (float)positions[i].x_advance / 64;
+    }
+    bounds->width = fabsf(bounds->width);
+    hb_buffer_destroy(buffer);
+    return pixels;
+}
+static void ordinary_lines(cui_font *font, FT_Face face, hb_font_t *hb) {
+    static const char *ascii[] = {"WiiW", "ffi office", "AV 123 (abc)", "á"};
+    for (size_t i = 0; i < sizeof ascii / sizeof ascii[0]; ++i) {
+        cui_size expected;
+        raster source = original_raster(face, hb, string(ascii[i]), 24, 3, 5, &expected),
+               actual = {0};
+        cui_size bounds = cui_font_measure(font, string(ascii[i]), 24);
+        close_float(bounds.width, expected.width);
+        close_float(bounds.height, expected.height);
+        assert(cui_font_draw(font, string(ascii[i]), 24, 3, 5, emit, &actual));
+        assert(actual.count == source.count && actual.hash == source.hash);
+    }
+    cui_str paragraph = string("אבג ab (123)");
+    reference(font, face, hb, paragraph, CUI_BIDI_AUTO_LTR, 0, 6);
+    reference(font, face, hb, paragraph, CUI_BIDI_AUTO_LTR, 7, SIZE_MAX);
+    cui_text_layout *layouts[5] = {NULL};
+    cui_text_layout_view views[5];
+    assert(cui_font_layout_line(font, paragraph, 24, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 0, 6,
+                                NULL, &layouts[0]) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_font_layout_line(font, paragraph, 24, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 7,
+                                SIZE_MAX, NULL, &layouts[1]) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_font_layout_line(font, string("abc العربية"), 24, (cui_text_style){0},
+                                CUI_BIDI_AUTO_LTR, 0, SIZE_MAX, NULL,
+                                &layouts[2]) == CUI_TEXT_LAYOUT_OK);
+    for (size_t i = 3; i < 5; ++i)
+        assert(cui_font_layout_line(font, string(""), 24, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 0,
+                                    SIZE_MAX, NULL, &layouts[i]) == CUI_TEXT_LAYOUT_OK);
+    raster expected = {0}, actual = {0};
+    float width = 0, height = 0;
+    for (size_t i = 0; i < 5; ++i) {
+        assert(cui_text_layout_get(layouts[i], &views[i]));
+        if (views[i].width > width)
+            width = views[i].width;
+        assert(cui_text_layout_draw(layouts[i], 3, 5 + height, emit, &expected));
+        height += views[i].height;
+    }
+    assert(views[0].paragraph_level == 1 && views[1].paragraph_level == 1 &&
+           views[2].paragraph_level == 0);
+    cui_str all = string("אבג ab (123)\nabc العربية\r\n\n");
+    cui_size bounds = cui_font_measure(font, all, 24);
+    close_float(bounds.width, width);
+    close_float(bounds.height, height);
+    assert(cui_font_draw(font, all, 24, 3, 5, emit, &actual));
+    assert(actual.count == expected.count && actual.hash == expected.hash);
+    for (size_t i = 0; i < 5; ++i)
+        cui_text_layout_destroy(layouts[i]);
+    /* Every P1 paragraph separator starts a new baseline; CRLF is one break. */
+    static const char *breaks[] = {"\n",   "\r",       "\r\n",         "\x1c",        "\x1d",
+                                   "\x1e", "\xc2\x85", "\xe2\x80\xa9", "\xe2\x80\xa8"};
+    cui_font_metrics metrics;
+    assert(cui_font_get_metrics(font, 24, (cui_text_style){0}, &metrics));
+    for (size_t i = 0; i < sizeof breaks / sizeof breaks[0]; ++i) {
+        bounds = cui_font_measure(font, string(breaks[i]), 24);
+        close_float(bounds.width, 0);
+        close_float(bounds.height, 2 * metrics.line_height);
+        raster blank = {0};
+        assert(cui_font_draw(font, string(breaks[i]), 24, 0, 0, emit, &blank) && blank.count == 0);
+    }
+    raster invalid = {0};
+    assert(!cui_font_draw(font, string("abc\n\xc0\xaf"), 24, 0, 0, emit, &invalid) &&
+           invalid.count == 0);
+    bounds = cui_font_measure(font, string("abc\n\xc0\xaf"), 24);
+    assert(bounds.width == 0 && bounds.height == 0);
+}
+
 static void arabic_clusters(void) {
     const char *const paths[] = {"/usr/share/fonts/noto/NotoSansArabic-Regular.ttf",
                                  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -207,6 +303,12 @@ static void arabic_clusters(void) {
     raster pixels = {0};
     assert(cui_text_layout_draw(layout, 0, 0, emit, &pixels));
     assert(pixels.count == view.glyph_count);
+    raster ordinary = {0};
+    assert(cui_font_draw(font, text, 24, 0, 0, emit, &ordinary));
+    assert(ordinary.hash == pixels.hash && ordinary.count == pixels.count);
+    cui_size ordinary_size = cui_font_measure(font, text, 24);
+    close_float(ordinary_size.width, view.width);
+    close_float(ordinary_size.height, view.height);
     cui_text_layout_destroy(layout);
     /* Selected-face style layouts shape with the actual registered face. */
     cui_font *root = cui_font_open(path);
@@ -294,6 +396,7 @@ int main(void) {
            view.paragraph_level == 1);
     cui_text_layout_destroy(layout);
     cui_text_layout_destroy(NULL);
+    ordinary_lines(font, face, hb);
     hb_font_destroy(hb);
     FT_Done_Face(face);
     FT_Done_FreeType(library);

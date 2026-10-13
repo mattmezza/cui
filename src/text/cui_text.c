@@ -133,6 +133,17 @@ bool cui_font_register_style(cui_font *font, cui_text_style style, const char *p
     *owned = true;
     return true;
 }
+#ifdef CUI_TEXT_BIDI
+typedef struct text_lines {
+    cui_text_layout *layout;
+    struct text_lines *next;
+    float y;
+} text_lines;
+static void text_lines_destroy(text_lines *lines);
+static bool text_lines_create(cui_font *font, cui_str text, float size, cui_text_style style,
+                              text_lines **out, cui_size *bounds);
+#endif
+#ifndef CUI_TEXT_BIDI
 static hb_buffer_t *shape(cui_font *f, cui_str s, float size) {
     if (!f || !isfinite(size) || size <= 0 || size > 4096 || s.length > INT_MAX ||
         (!s.data && s.length))
@@ -146,6 +157,7 @@ static hb_buffer_t *shape(cui_font *f, cui_str s, float size) {
     hb_shape(f->shaper, b, NULL, 0);
     return b;
 }
+#endif
 bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font_metrics *out) {
     cui_font *f = selected(font, style);
     if (!f || !out || !isfinite(size) || size <= 0 || size > 4096 ||
@@ -162,6 +174,13 @@ bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font
 }
 cui_size cui_font_measure_styled(void *font, cui_str s, float size, cui_text_style style) {
     cui_size result = {0, 0};
+#ifdef CUI_TEXT_BIDI
+    text_lines *lines = NULL;
+    if (!text_lines_create(font, s, size, style, &lines, &result))
+        return (cui_size){0, 0};
+    text_lines_destroy(lines);
+    return result;
+#else
     cui_font *f = selected(font, style);
     hb_buffer_t *b = shape(f, s, size);
     if (!b)
@@ -174,6 +193,7 @@ cui_size cui_font_measure_styled(void *font, cui_str s, float size, cui_text_sty
     result.height = (float)f->face->size->metrics.height / 64;
     hb_buffer_destroy(b);
     return result;
+#endif
 }
 cui_size cui_font_measure(void *font, cui_str s, float size) {
     return cui_font_measure_styled(font, s, size, (cui_text_style){0});
@@ -182,6 +202,18 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
                           float y, cui_glyph_fn emit, void *user) {
     if (!isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f)
         return false;
+#ifdef CUI_TEXT_BIDI
+    text_lines *lines = NULL;
+    cui_size bounds;
+    if (!emit || !text_lines_create(font, s, size, style, &lines, &bounds))
+        return false;
+    bool result = true;
+    for (text_lines *line = lines; line; line = line->next)
+        if (!cui_text_layout_draw(line->layout, x, y + line->y, emit, user))
+            result = false;
+    text_lines_destroy(lines);
+    return result;
+#else
     cui_font *f = selected(font, style);
     hb_buffer_t *b = shape(f, s, size);
     if (!b || !emit) {
@@ -214,6 +246,7 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
     }
     hb_buffer_destroy(b);
     return ok;
+#endif
 }
 bool cui_font_draw(cui_font *f, cui_str s, float size, float x, float y, cui_glyph_fn emit,
                    void *user) {
@@ -303,7 +336,7 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     }
     if (length == SIZE_MAX)
         length = analysis.scalar_count - start;
-    if (length > analysis.scalar_count - start || (!length && analysis.scalar_count)) {
+    if (length > analysis.scalar_count - start) {
         status = CUI_TEXT_LAYOUT_INVALID;
         goto done;
     }
@@ -501,3 +534,122 @@ bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_f
     }
     return ok;
 }
+
+#ifdef CUI_TEXT_BIDI
+/* Strict scanning is necessary before recognizing separators: malformed bytes
+ * must not become boundaries that hide invalid text from paragraph validation. */
+static bool text_next(cui_str text, size_t *index, uint32_t *cp) {
+    size_t i = *index, more = 0;
+    uint32_t value = (unsigned char)text.data[i++], minimum = 0;
+    if (value < 0x80) {
+    } else if (value >= 0xc2 && value <= 0xdf) {
+        value &= 31;
+        more = 1;
+        minimum = 0x80;
+    } else if (value >= 0xe0 && value <= 0xef) {
+        value &= 15;
+        more = 2;
+        minimum = 0x800;
+    } else if (value >= 0xf0 && value <= 0xf4) {
+        value &= 7;
+        more = 3;
+        minimum = 0x10000;
+    } else
+        return false;
+    if (more > text.length - i)
+        return false;
+    while (more--) {
+        uint32_t b = (unsigned char)text.data[i++];
+        if ((b & 0xc0) != 0x80)
+            return false;
+        value = (value << 6) | (b & 63);
+    }
+    if (value < minimum || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff))
+        return false;
+    *index = i;
+    *cp = value;
+    return true;
+}
+static bool paragraph_separator(uint32_t cp) {
+    return cp == 0xa || cp == 0xd || cp == 0x1c || cp == 0x1d || cp == 0x1e || cp == 0x85 ||
+           cp == 0x2029;
+}
+static void text_lines_destroy(text_lines *lines) {
+    while (lines) {
+        text_lines *next = lines->next;
+        cui_text_layout_destroy(lines->layout);
+        free(lines);
+        lines = next;
+    }
+}
+static bool text_line_append(cui_font *font, cui_str paragraph, float size, cui_text_style style,
+                             size_t start, size_t length, text_lines ***tail, cui_size *bounds) {
+    text_lines *node = calloc(1, sizeof *node);
+    cui_text_layout_view view;
+    if (!node)
+        return false;
+    if (cui_font_layout_line(font, paragraph, size, style, CUI_BIDI_AUTO_LTR, start, length, NULL,
+                             &node->layout) != CUI_TEXT_LAYOUT_OK) {
+        free(node);
+        return false;
+    }
+    (void)cui_text_layout_get(node->layout, &view);
+    node->y = bounds->height;
+    bounds->height += view.height;
+    if (view.width > bounds->width)
+        bounds->width = view.width;
+    **tail = node;
+    *tail = &node->next;
+    return true;
+}
+static bool text_paragraph_append(cui_font *font, cui_str paragraph, float size,
+                                  cui_text_style style, text_lines ***tail, cui_size *bounds) {
+    size_t index = 0, scalar = 0, start = 0;
+    while (index < paragraph.length) {
+        uint32_t cp;
+        if (!text_next(paragraph, &index, &cp))
+            return false;
+        if (cp == 0x2028) {
+            if (!text_line_append(font, paragraph, size, style, start, scalar - start, tail,
+                                  bounds))
+                return false;
+            start = scalar + 1;
+        }
+        ++scalar;
+    }
+    return text_line_append(font, paragraph, size, style, start, scalar - start, tail, bounds);
+}
+static bool text_lines_create(cui_font *font, cui_str text, float size, cui_text_style style,
+                              text_lines **out, cui_size *bounds) {
+    text_lines *head = NULL, **tail = &head;
+    cui_size measure = {0, 0};
+    size_t index = 0, start = 0;
+    if (text.length > INT_MAX || (text.length && !text.data))
+        return false;
+    while (index < text.length) {
+        size_t before = index;
+        uint32_t cp;
+        if (!text_next(text, &index, &cp))
+            goto failed;
+        if (paragraph_separator(cp)) {
+            cui_str paragraph = {text.data + start, before - start};
+            if (!text_paragraph_append(font, paragraph, size, style, &tail, &measure))
+                goto failed;
+            if (cp == 0xd && index < text.length && text.data[index] == '\n')
+                ++index;
+            start = index;
+        }
+    }
+    {
+        cui_str paragraph = {text.data ? text.data + start : NULL, text.length - start};
+        if (!text_paragraph_append(font, paragraph, size, style, &tail, &measure))
+            goto failed;
+    }
+    *out = head;
+    *bounds = measure;
+    return true;
+failed:
+    text_lines_destroy(head);
+    return false;
+}
+#endif

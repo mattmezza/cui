@@ -1,8 +1,9 @@
 # Optional bidirectional glyph layout
 
 `cui_font_layout_line` adds an explicit bidirectional shaping path alongside the
-existing `cui_font_measure*` and `cui_font_draw*` functions. Existing calls keep
-their behavior. The new path returns an owned `cui_text_layout`, a borrowed view
+existing `cui_font_measure*` and `cui_font_draw*` functions. When enabled, those
+ordinary calls also use this shaping path with automatic paragraph direction.
+The explicit line API returns an owned `cui_text_layout`, a borrowed view
 of visual glyphs and runs, and `cui_text_layout_draw` to rasterize that positioned
 layout. Public types contain only portable CUI and C types.
 
@@ -84,9 +85,43 @@ itemization is basic and is not a full cluster-aware script resolver. Existing
 style registration chooses one face for the complete line; missing glyphs remain
 missing, with no per-script or OS font fallback. There is no language detection,
 vertical layout, justification, caret mapping, selection or hit testing. Core,
-widgets and backend draw commands do not automatically use this new layout path.
+widgets and backend commands using the native text adapter benefit from the
+enabled ordinary-call routing. No other Core/widget behavior is changed.
 
 The shaping contracts follow the primary
 [HarfBuzz buffer documentation](https://harfbuzz.github.io/harfbuzz-hb-buffer.html)
 and [cluster documentation](https://harfbuzz.github.io/working-with-harfbuzz-clusters.html);
 paragraph/run rules follow [Unicode 17 UAX #9](https://www.unicode.org/reports/tr9/tr9-51.html).
+
+## Ordinary text and hard lines
+
+With `CUI_TEXT_BIDI` enabled, ordinary styled/unstyled measure and draw calls
+analyze each P1 paragraph with auto-LTR fallback, use script/direction shaping,
+and paint its visual glyph stream. These calls support every Unicode B paragraph
+separator (LF, CR, U+001C/U+001D/U+001E, NEL and U+2029). CRLF is one break.
+U+2028 creates a hard line inside the same paragraph, preserving the complete
+paragraph direction/isolate/embedding context across that break. Separators
+produce no glyphs. Empty and trailing lines still occupy one face line height.
+
+Measurement returns maximum line advance width and the sum of line heights.
+Drawing resets horizontal origin to the caller's x for each line and advances
+the top/baseline by that face's line height. Empty text occupies one empty line,
+as in the existing measurement interface. Every line is fully laid out before
+any raster callback: malformed UTF-8 or allocation failure emits nothing and
+returns false; measurement returns {0,0}. Raster failures can still be partial.
+The explicit glyph-layout API permits an empty scalar range and retains that
+paragraph's base and metrics, allowing empty U+2028 continuation lines.
+
+Tests independently reproduce the original FreeType/HarfBuzz ASCII shaping and
+raster loop to compare legacy single-line glyph pixels, metrics and baselines,
+including ligatures/kerning. Ordinary mixed RTL/multiline rendering is compared
+against explicitly selected paragraph-line layouts, whose run/glyph data is
+checked against the upstream references. Tests cover all B separators, CRLF,
+U+2028 context, empty/trailing lines, baseline progression and invalid input
+following a valid line. Real Arabic joining/mark raster checks also call the
+ordinary adapter APIs. Disabled builds retain the original adapter path.
+
+This is hard-line processing, not automatic word wrapping or a caret system.
+The simple script itemization/fallback limitations above still apply. Each
+explicit U+2028 line currently reanalyzes its paragraph; large numbers of such
+lines may warrant caching reusable analysis in a future text-layout object.

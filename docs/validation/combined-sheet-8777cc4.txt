@@ -1,0 +1,5 @@
+Combined source 8777cc4
+Native77, ASan/UBSan75, WASI67, strict WASM build, Chromium78 and quality: PASS.
+Includes Sheet enter/exit motion and the prior scrolling/color/theme/TextView fixes.
+Worker native geometry regression fails against the old base.
+This verifies the checkpoint; it does not certify full 78-family parity.

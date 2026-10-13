@@ -1,16 +1,14 @@
 # Current report — 13 October 2026
 
-The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Release `f6c8cf8` passed library CI and Pages; direct HTTPS78 and twenty-file artifact verification is recorded in [published-f6c8cf8.txt](validation/published-f6c8cf8.txt). Full feature parity remains incomplete: 78 manifest entries, 5 implemented, 73 tested and 0 verified.
+The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Verified release `a136c07` passes library CI, Pages, actual HTTPS78 and thirty-two artifact file comparisons. See [published-a136c07.txt](validation/published-a136c07.txt). Full parity remains incomplete: 78 entries, 5 implemented, 73 tested and 0 verified.
 
-Published fixes include graphical Radio/Rating, real Image/Attachment media, Avatar/Tooltip/Pagination/Marker alignment, word/vertical input navigation, Stepper selection, Calendar/DatePicker SVG and centering, choice/Command widths, InputGroup inline sizing, clean Message preview and centered alerts. CI exposed a wide-font alert overflow that made the second confirmation miss; a native failing-before regression and constrained body width repair are included in the public release.
+Published fixes cover alignment and SVG choices/icons, real image media, input navigation, Stepper, choice widths, InputGroup, alerts, table sorting, animated Progress, composed Resizable/Dock, scrolling VirtualList, Plot pan/zoom, chart strokes, textarea viewport painting, moving sidebar content and precise browser wheels. Browser screen picking now has explicit availability/cancellation; native adapters still require an application-supplied picker. Theme tokens are explained and TextView code is visible initially.
 
-Combined checkpoint `8e4e15b` passes native77, sanitizer75, WASI67, Chromium78, targeted visual checks and quality. It adds actual gallery table sorting/SVG arrows, indeterminate Progress with reduced motion, a visibly resizing workspace, bounded scrolling of 100,000 virtual rows, visible Dock panes with tab/split/reset interactions and continuous configurable chart strokes. These changes await the next publication. Plot projection controls are integrated and pass the final combined Chromium78 rerun; portable source is unchanged from this checkpoint.
+Integrated Sheet motion `8777cc4` passes native77, sanitizer75, WASI67, Chromium78 and quality. It animates all four edges, reverses an exit and respects reduced motion; focus/results/close callbacks wait for exit. The website sharing/media work is in an isolated branch and is not yet published.
 
-The complete feedback remains tracked in [website-feedback.md](website-feedback.md). Full family behavior, the remaining design-system, documentation, bindings, motion and publishing requests remain unfinished. No dependency installation is needed from the user. Earlier worker work and the separate Questionnaire event-order experiment remain preserved.
+The remaining feedback is tracked in [website-feedback.md](website-feedback.md). Design-system expansion, composed apps, bindings, deeper docs and full family parity remain unfinished. No dependency installation is needed from the user. Preserved worker work and the Questionnaire event-order experiment remain intact.
 
-Build with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. Build the real browser gallery with `python scripts/build_web.py`; see [WEB_GALLERY.md](WEB_GALLERY.md). The browser canvas consumes real CUI WASM draw lists. Browser checks do not certify native GPU or accessibility integration on every platform.
-
-## Historical report (superseded status and counts)
+Build with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. The browser renders real CUI WASM draw lists; browser checks do not certify native GPU or accessibility support across all platforms.
 
 # Nightly report — live development checkpoint
 

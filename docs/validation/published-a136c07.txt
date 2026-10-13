@@ -1,0 +1,7 @@
+Published source a136c076889ef4b326f2f5d5dec53b29e4553f22
+Library CI 38328857946 and Pages 38328858010: SUCCESS.
+Actual HTTPS full Chromium78 gallery interactions and excerpts: PASS.
+Thirty-two files byte-match Pages artifact, including the new picker/theme/TextView docs.
+Verified browser EyeDropper provider integration and clearer real Theme/TextView examples.
+Headless picking tests stub the OS provider; they do not certify screen capture.
+Full 78-family GPUI parity remains unfinished.

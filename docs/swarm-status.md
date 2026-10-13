@@ -2,13 +2,11 @@
 
 ## Current priorities — 13 October
 
-The verified public release is `f6c8cf8`: library CI, Pages, the full actual HTTPS78 browser suite and twenty artifact byte comparisons pass. See [published-f6c8cf8.txt](validation/published-f6c8cf8.txt). All 78 entries remain: 5 implemented, 73 tested, 0 verified; full GPUI Kit feature parity is unfinished.
+Verified public release `a136c07` passes library CI, Pages, actual HTTPS78 and thirty-two artifact file comparisons. See [published-a136c07.txt](validation/published-a136c07.txt). All 78 manifest entries remain: 5 implemented, 73 tested, 0 verified. Full GPUI Kit parity is unfinished.
 
-The complete user feedback is tracked in [website-feedback.md](website-feedback.md). Published component fixes cover alignment, real media, graphical choices, input navigation, Stepper, calendar icons, choice/Command widths, InputGroup, Message cleanup and alerts. A real CI overflow was reproduced with wide headless text metrics and repaired so both alert confirmation clicks stay inside the body clip.
+[website-feedback.md](website-feedback.md) records published component repairs, controlled browser screen picking, clearer themes and visible Markdown code. Integrated Sheet motion `8777cc4` passes native77, ASan75, WASI67, Chromium78 and quality. The isolated website sharing branch generates canonical component/docs pages and original product media; it is still under validation.
 
-The next combined batch `8e4e15b` passes native77, sanitizer75, WASI67, Chromium78, visual and quality checks. It includes sorting/SVG headers, animated Progress, visible Resizable/Dock examples, scrolling VirtualList and thicker chart strokes. Plot zoom/pan is integrated; its final combined Chromium78 run passes. Portable library source after Plot integration matches checkpoint8e4e15b. Publication remains pending for these changes.
-
-Only root integrates; workers reached their model usage limits, so root continues independently. Isolated worker branches and the uncommitted Questionnaire event-order experiment remain preserved. No dependency installation is needed from the user. Impeccable metadata is removed.
+Only root integrates. Earlier workers reached model usage limits, so root continues independently. Their branches and the Questionnaire event-order experiment remain preserved. No user dependency installation is required. Impeccable metadata is removed.
 
 ## Historical checkpoints
 

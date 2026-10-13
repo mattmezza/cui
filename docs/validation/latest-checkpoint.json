@@ -1,55 +1,48 @@
 {
-  "source": "dc12d14",
-  "published_source": "917f17d25a8a12a39bbd481f816ffae2341dd651",
+  "source": "8777cc4",
+  "published_source": "a136c076889ef4b326f2f5d5dec53b29e4553f22",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Published scrolling fixes pass HTTPS78 and thirty artifact byte comparisons. The next eyedropper/Theme/TextView batch is integrated and its combined browser check is in progress. Full 78-family parity and the remaining feedback are unfinished.",
+  "summary": "Published eyedropper/Theme/TextView and earlier fixes pass HTTPS78 plus thirty-two file comparisons. Integrated Sheet motion passes native77, ASan75, WASI67, Chromium78 and quality. Full 78-family parity and remaining feedback are unfinished.",
   "checks": [
     {
       "name": "native",
-      "source": "917f17d",
+      "source": "8777cc4",
       "passed": 77,
       "total": 77,
-      "log": "combined-scroll-917f17d.txt"
+      "log": "combined-sheet-8777cc4.txt"
     },
     {
       "name": "sanitizers",
-      "source": "917f17d",
+      "source": "8777cc4",
       "passed": 75,
       "total": 75,
-      "log": "combined-scroll-917f17d.txt"
+      "log": "combined-sheet-8777cc4.txt"
     },
     {
       "name": "WASI",
-      "source": "917f17d",
+      "source": "8777cc4",
       "passed": 67,
       "total": 67,
-      "log": "combined-scroll-917f17d.txt"
+      "log": "combined-sheet-8777cc4.txt"
     },
     {
       "name": "browser",
-      "source": "917f17d",
+      "source": "8777cc4",
       "passed": 78,
       "total": 78,
-      "log": "combined-scroll-917f17d.txt"
-    },
-    {
-      "name": "docs",
-      "source": "917f17d",
-      "passed": 3,
-      "total": 3,
-      "log": "combined-scroll-917f17d.txt"
+      "log": "combined-sheet-8777cc4.txt"
     }
   ],
   "visual_regressions": "visual-cf11f39.txt",
   "failing_before": "alert-failing-before-593bbb1.txt",
   "quality": "quality-cf11f39.txt",
-  "published_evidence": "published-917f17d.txt",
+  "published_evidence": "published-a136c07.txt",
   "latest_deployment": {
-    "source": "917f17d25a8a12a39bbd481f816ffae2341dd651",
+    "source": "a136c076889ef4b326f2f5d5dec53b29e4553f22",
     "status": "success",
-    "pages_run": 38327988056,
-    "ci_run": 38327988079,
-    "direct_https_verification": "Chromium78 and thirty files pass"
+    "pages_run": 38328858010,
+    "ci_run": 38328857946,
+    "direct_https_verification": "Chromium78 and thirty-two files pass"
   },
   "feedback_audit": "../website-feedback.md"
 }

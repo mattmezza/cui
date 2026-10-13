@@ -501,6 +501,21 @@ static void general_labels(cui_context *ui) {
                                   &required) == CUI_PLOT_OK);
     assert(strcmp(output, "xx\xe2\x80\xa6") == 0);
 }
+static void test_sankey_raster(void) {
+    cui_plot_sankey_ribbon link = {2, 14, 8, 8, 4, 8};
+    cui_plot_path_command path[5];
+    size_t required;
+    assert(cui_plot_sankey_link_path(&link, 0, (cui_plot_point){0, 0}, path, 5, &required) ==
+           CUI_PLOT_OK);
+    cui_plot_shape shape = {.commands = path, .count = required, .fill = {20, 200, 50, 255}};
+    uint8_t pixels[16 * 16 * 4];
+    assert(cui_plot_raster(pixels, 16, 16, 64, sizeof pixels, &shape, 1, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(pixels[(8 * 16 + 8) * 4 + 1] == 200);
+    assert(pixels[(5 * 16 + 3) * 4 + 3] == 0);
+    assert(pixels[(5 * 16 + 13) * 4 + 3] == 255);
+    assert(pixels[(3 * 16 + 13) * 4 + 3] == 0);
+}
 static void test_rounded_bar_raster(void) {
     cui_plot_path_command path[10];
     double radii[] = {4, 0, 0, 0};
@@ -517,6 +532,7 @@ static void test_rounded_bar_raster(void) {
     assert(pixels[(6 * 16 + 6) * 4] == 200);
 }
 int main(void) {
+    test_sankey_raster();
     test_rounded_bar_raster();
 #ifdef CUI_HAS_TEXT
     native_labels();

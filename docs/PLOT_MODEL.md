@@ -454,7 +454,8 @@ linear/sqrt value scale and relaxation iterations. See
 [`CHART.md`](CHART.md) for the current Chart implementation and limits.
 Those APIs belong to the Chart layer and depend on its data/options contracts;
 the pure `cui_plot.h` module does not duplicate them or claim a standalone
-Sankey topology/path generator. Adding another solver here would require a
+Sankey topology generator. The pure `cui_plot_sankey_link_path` now supplies the
+source ribbon path separately (see below). Adding another solver here would require a
 separate ownership/API decision rather than counting the existing Chart solver
 as full Plot parity.
 
@@ -589,7 +590,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; no cache/Background |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
-| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | No independent pure Plot graph/topology reuse or `sankey_link_path` command builder; Chart-specific options/data contracts are not automatically Plot parity |
+| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | Pure `cui_plot_sankey_link_path` tapered ribbon builder available; no independent pure Plot graph/topology solver; Chart-specific options/data contracts are not automatically Plot parity |
 | `PlotAxis`, `AxisText`, `AxisLabelSide`, `AXIS_GAP`, `axis_gutter` | Axis defaults/layout/paint/ticks/gutter | Line visibility, default offsets/alignment/theme paint covered; font-scaled nondefault offsets differ; alpha-zero fallback differs from explicit source colors; dynamic Backgrounds absent |
 | `AxisLabelPlacement::{Outside,Inside}` | Application places labels/reserves gutters; Chart has its own layer | No standalone Plot placement enum or automatic gutter allocation; source PlotAxis itself only records position/side |
 | `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
@@ -773,3 +774,47 @@ while its progress fades. This sequence represents actual source cursor/state
 behavior without adding generic Plot callbacks, a tooltip renderer, an implicit
 retained scope or the source's prepaint/paint child tree. Application hit testing,
 occlusion, overlay content and paint order remain explicit.
+
+## Source Sankey ribbon paths
+
+The frozen `sankey_link_path` connects the source node's right edge to the target
+node's left edge using a closed ribbon. `cui_plot_sankey_ribbon` holds those x
+coordinates, each end's center y and independent widths. The pure
+`cui_plot_sankey_link_path` generates the same five command roles: Move to the
+source upper edge, Cubic to the target upper edge, Line to its lower edge,
+reverse Cubic to the source lower edge, Close. Both cubics use the midpoint of
+source and target x for their controls. Each end independently uses
+`max(end_width,min_width)/2`; the nominal global link width is not substituted.
+Origin offsets apply to every endpoint/control point. Reversed x directions
+are supported; no flow-direction assumption or rerouting is added.
+
+Pass existing `cui_chart_sankey_node.x1/x0` and
+`cui_chart_sankey_link_geometry.source_y/target_y/source_width/target_width`
+into this structure to render Chart-computed layouts through the bounded Plot
+rasterizer or a custom path renderer. This keeps the pure model independent
+of Chart headers and avoids claiming that Chart topology equals full Plot
+Sankey parity. Graph construction, errors, layering, relaxation, layout_from,
+value scaling and alignment still belong to the Chart route.
+
+The path uses finite doubles, finite origin and nonnegative end/min widths;
+invalid inputs and unrepresentable translated geometry preserve output and
+required. A capacity query reports five, and insufficient storage preserves
+commands. Zero widths still produce a closed degenerate contour. Input geometry
+may alias command storage because the complete path is prepared before copying.
+The existing rasterizer uses sixteen chords per cubic, pixel-center sampling
+and no antialiasing; renderer-specific tessellation/cache and general Background
+styling remain unsupported.
+
+```c
+#include <assert.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    cui_plot_sankey_ribbon link={10,90,30,50,8,16};
+    cui_plot_path_command commands[5];
+    size_t required;
+    assert(cui_plot_sankey_link_path(&link,1,(cui_plot_point){0,0},
+                                    commands,5,&required)==CUI_PLOT_OK);
+    assert(required==5 && commands[4].kind==CUI_PLOT_PATH_CLOSE);
+    return 0;
+}
+```

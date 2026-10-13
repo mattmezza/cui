@@ -688,6 +688,54 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_sankey_ribbon(void) {
+    cui_plot_sankey_ribbon link = {10, 50, 20, 30, 4, 12};
+    cui_plot_path_command path[5], old[5];
+    memset(path, 0x5a, sizeof path);
+    memcpy(old, path, sizeof path);
+    size_t required;
+    assert(cui_plot_sankey_link_path(&link, 8, (cui_plot_point){2, 3}, NULL, 0, &required) ==
+               CUI_PLOT_CAPACITY &&
+           required == 5);
+    assert(cui_plot_sankey_link_path(&link, 8, (cui_plot_point){2, 3}, path, 4, &required) ==
+           CUI_PLOT_CAPACITY);
+    assert(memcmp(path, old, sizeof path) == 0);
+    assert(cui_plot_sankey_link_path(&link, 8, (cui_plot_point){2, 3}, path, 5, &required) ==
+           CUI_PLOT_OK);
+    assert(path[0].point.x == 12 && path[0].point.y == 19);
+    assert(path[1].point.x == 52 && path[1].point.y == 27);
+    assert(path[1].control1.x == 32 && path[1].control1.y == 19);
+    assert(path[1].control2.x == 32 && path[1].control2.y == 27);
+    assert(path[2].point.x == 52 && path[2].point.y == 39);
+    assert(path[3].point.x == 12 && path[3].point.y == 27);
+    assert(path[3].control1.x == 32 && path[3].control1.y == 39);
+    assert(path[3].control2.x == 32 && path[3].control2.y == 27);
+    assert(path[4].kind == CUI_PLOT_PATH_CLOSE);
+    link.source_x = 50;
+    link.target_x = 10;
+    assert(cui_plot_sankey_link_path(&link, 0, (cui_plot_point){0, 0}, path, 5, &required) ==
+           CUI_PLOT_OK);
+    assert(path[0].point.x == 50 && path[1].point.x == 10 && path[1].control1.x == 30);
+    memcpy(old, path, sizeof path);
+    required = 99;
+    link.source_width = -1;
+    assert(cui_plot_sankey_link_path(&link, 0, (cui_plot_point){0, 0}, path, 5, &required) ==
+           CUI_PLOT_INVALID);
+    assert(required == 99 && memcmp(path, old, sizeof path) == 0);
+    link.source_width = 0;
+    link.target_width = 0;
+    assert(cui_plot_sankey_link_path(&link, 0, (cui_plot_point){0, 0}, path, 5, &required) ==
+           CUI_PLOT_OK);
+    assert(path[0].point.y == path[3].point.y && path[1].point.y == path[2].point.y);
+    memcpy(old, path, sizeof path);
+    required = 99;
+    link.source_x = DBL_MAX;
+    assert(cui_plot_sankey_link_path(&link, 0, (cui_plot_point){DBL_MAX, 0}, path, 5, &required) ==
+           CUI_PLOT_OVERFLOW);
+    assert(required == 99 && memcmp(path, old, sizeof path) == 0);
+    assert(cui_plot_sankey_link_path(NULL, 0, (cui_plot_point){0, 0}, path, 5, &required) ==
+           CUI_PLOT_INVALID);
+}
 static void test_tooltip_cursor(void) {
     cui_plot_rect bounds = {10, 20, 110, 120};
     cui_plot_cursor_memory memory = {0};
@@ -937,6 +985,7 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
 int main(void) {
+    test_sankey_ribbon();
     test_tooltip_cursor();
     test_source_arc_padding();
     test_rounded_bar_path();

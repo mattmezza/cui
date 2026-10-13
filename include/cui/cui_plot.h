@@ -300,6 +300,19 @@ cui_plot_result cui_plot_project_line(const cui_plot_scale *x, const cui_plot_sc
 cui_plot_result cui_plot_project_bar(const cui_plot_scale *x, const cui_plot_scale *y,
                                      double center, double width_pixels, double value,
                                      double baseline, cui_plot_rect viewport, cui_plot_rect *out);
+/* Geometry consumed by the frozen sankey_link_path function. source_x is the
+ * source node's right edge, target_x the target node's left edge. End widths
+ * are independent (tapered ribbons); y coordinates are their centerlines. */
+typedef struct {
+    double source_x, target_x, source_y, target_y, source_width, target_width;
+} cui_plot_sankey_ribbon;
+/* Move/Cubic/Line/Cubic/Close, midpoint-X controls, explicit origin offset.
+ * Each end width=max(width,min_width), all widths finite/nonnegative. Zero
+ * widths still emit a closed degenerate contour. Exactly5 commands; errors
+ * preserve output, capacity queries report5. No topology/layout solver. */
+cui_plot_result cui_plot_sankey_link_path(const cui_plot_sankey_ribbon *, double min_width,
+                                          cui_plot_point origin, cui_plot_path_command *,
+                                          size_t capacity, size_t *required);
 /* PlotElement's cursor visibility gate, separated from platform event routing.
  * Zero initialize. Global positions are finite; bounds are a positive finite
  * rectangle. Application supplies occlusion-aware hovered/default-prevented

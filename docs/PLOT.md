@@ -404,3 +404,9 @@ hit/occlusion decision; use `update.changed` to invalidate from mouse-move event
 Long-press detection and capture stay in the adapter/application. Resolve the
 live cursor, suppress during appearance, then update hover memory; this does not
 automatically make the bitmap view interactive or render an overlay.
+
+Use the pure `cui_plot_sankey_link_path` to draw a tapered ribbon from existing
+Chart node/link geometry through `cui_plot_raster`. It preserves independent end
+widths, minimum painted width and source midpoint-X cubic controls. See the
+[source ribbon contract](PLOT_MODEL.md#source-sankey-ribbon-paths); this adds a
+path builder without a second graph/layout solver or renderer cache.

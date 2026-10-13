@@ -1374,3 +1374,47 @@ cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *memory, cu
     *resolved = visible;
     return CUI_PLOT_OK;
 }
+
+cui_plot_result cui_plot_sankey_link_path(const cui_plot_sankey_ribbon *link, double min_width,
+                                          cui_plot_point origin, cui_plot_path_command *out,
+                                          size_t capacity, size_t *required) {
+    if (!link || !required || (!out && capacity) || !isfinite(min_width) || min_width < 0 ||
+        !isfinite(origin.x) || !isfinite(origin.y) || !isfinite(link->source_x) ||
+        !isfinite(link->target_x) || !isfinite(link->source_y) || !isfinite(link->target_y) ||
+        !isfinite(link->source_width) || !isfinite(link->target_width) || link->source_width < 0 ||
+        link->target_width < 0)
+        return CUI_PLOT_INVALID;
+    long double sx = link->source_x, tx = link->target_x, mx = sx / 2 + tx / 2;
+    long double sh = fmax(link->source_width, min_width) / 2;
+    long double th = fmax(link->target_width, min_width) / 2;
+    long double xs[] = {sx, tx, mx};
+    long double ys[] = {link->source_y - sh, link->target_y - th, link->source_y + sh,
+                        link->target_y + th};
+    double x[3], y[4];
+    for (size_t i = 0; i < 3; ++i) {
+        cui_plot_result result = cui_plot_number(xs[i] + origin.x, x + i);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    for (size_t i = 0; i < 4; ++i) {
+        cui_plot_result result = cui_plot_number(ys[i] + origin.y, y + i);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    cui_plot_path_command path[5] = {{.kind = CUI_PLOT_PATH_MOVE, .point = {x[0], y[0]}},
+                                     {.kind = CUI_PLOT_PATH_CUBIC,
+                                      .point = {x[1], y[1]},
+                                      .control1 = {x[2], y[0]},
+                                      .control2 = {x[2], y[1]}},
+                                     {.kind = CUI_PLOT_PATH_LINE, .point = {x[1], y[3]}},
+                                     {.kind = CUI_PLOT_PATH_CUBIC,
+                                      .point = {x[0], y[2]},
+                                      .control1 = {x[2], y[3]},
+                                      .control2 = {x[2], y[2]}},
+                                     {.kind = CUI_PLOT_PATH_CLOSE}};
+    *required = 5;
+    if (capacity < 5)
+        return CUI_PLOT_CAPACITY;
+    memcpy(out, path, sizeof path);
+    return CUI_PLOT_OK;
+}

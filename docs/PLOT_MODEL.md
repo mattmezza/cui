@@ -342,8 +342,116 @@ finite with `0 <= inner <= outer` (stricter than source radius clamping).
 Query errors preserve output. Arc `value` and `index` are payload metadata,
 not inputs to centroid/hit arithmetic.
 
-Arc tessellation, padded arc paths, annular rendering, rounded corners, radial
-lines, Sankey, bar orientations/labels, path caches, axis/grid labels and full
-styled Plot composition remain separate work. Existing projected vertical bars
-still use explicit pixel width, clipping and baseline. Pure commands and math
-queries do not establish complete GPUI Plot parity.
+Arc paths, tessellation and radial geometry are described below. Rounded
+corners, bar orientations/labels, path caches, axis/grid labels and full styled
+Plot composition remain separate work. Existing projected vertical bars still
+use explicit pixel width, clipping and baseline. Pure commands and math queries
+do not establish complete GPUI Plot parity.
+
+
+## Arc paths and bounded tessellation
+
+`cui_plot_arc_path` produces a closed circular/annular sector relative to
+`(0,0)`. `CUI_PLOT_PATH_ARC` appends an endpoint-arc command to the existing
+Move/Line/Cubic/Close vocabulary. Its `point` is the endpoint, `radius` is both
+circular radii, `clockwise` selects the screen sweep direction, and `large_arc`
+selects the sweep greater than pi. There is no ellipse rotation. Unused fields
+are zero. The renderer starts at the previous command's endpoint. Commands
+now have appended radius/flag members; rebuild consumers against the current
+header instead of assuming the old structure's byte size.
+
+A normal annular sector emits Move, clockwise outer Arc, Line to the inner
+endpoint, counterclockwise inner Arc, Close. Solid sectors use Line to the
+center instead of the inner Arc. Full turns use two semicircles per rim so
+coincident start/end points never collapse into an empty endpoint arc. At most
+seven commands are needed. Unlike the frozen implementation's artificial
+`0.0001` angular seam, full turns have no seam and ignore padding. Spans within
+`1e-12` radians of one turn normalize to exactly one turn.
+
+Finite radii satisfy `0 <= inner <= outer`; negative/reversed radii are errors,
+not source-style clamped radii. Positive spans must be at most one turn (apart
+from the tolerance above); greater spans are INVALID. Reversed/zero spans,
+zero outer radius, and sectors consumed by padding succeed with zero commands.
+For smaller sectors, outer angular inset is half `pad_angle`. For a nonzero
+inner radius the inner inset is half
+`min(outer / inner * pad_angle, span * 0.8)`. This follows the frozen padding
+width policy, but retains user padding for spans above pi instead of the
+source's `0.0001` override. Tiny nonzero radii/spans are accepted rather than
+applying the source's f32 epsilon cutoff. Angles reduce modulo one turn before
+coordinate arithmetic; finite large angle offsets can still lose a small
+configured span in the input double representation.
+
+`cui_plot_arc_flatten` constructs the same sector with Move/Line/Close only.
+Pass `segments_per_turn` from 4 to 1024. Each rim uses
+`ceil(rim_span * segments_per_turn / (2*pi))` equal angular chords, at least
+one for a nonempty rim. Maximum radial sagitta per chord is
+`radius * (1 - cos(pi / segments_per_turn))`, apart from floating-point rounding.
+The outer rim is traversed clockwise, the inner rim in reverse; a solid sector
+adds the center. At most 2051 commands are needed. This is bounded polygonal
+approximation, not a triangle mesh, anti-aliasing or GPU tessellation API.
+The application applies center translation, clipping, fill rule and styling.
+Both builders share capacity-query and no-partial-write contracts above.
+
+## Radial lines and areas
+
+`cui_plot_radial_path` uses `cui_plot_radial_sample` with angle, `radius0`,
+`radius1`, and defined status. Angles follow the pie convention; vertices are
+relative to `(0,0)`. Defined radii are finite/nonnegative, stricter than the
+frozen RadialLine's unchecked radius accessor. Lines use only `radius1` and
+ignore `radius0`. SKIP bridges missing samples, matching frozen GPUI; SPLIT
+starts separate contiguous runs. Input order controls polygon order.
+
+Open strokes emit Move/Line. A closed stroke adds Close only for runs of at
+least three vertices. Fill paths always close and omit runs with fewer than
+three vertices, matching frozen RadialLine; request fill and stroke separately
+if both are needed. `area=true` instead follows `radius1`, reverses all
+`radius0` vertices, and closes each run, including degenerate singleton runs.
+It ignores closed/fill flags. Radial area is a CUI extension: the frozen source
+contains RadialLine but no separate RadialArea generator. There are no natural
+radial curves, angular sorting, radius interpolation, dots or paint callbacks.
+The fixed scratch index array has the same 4096-sample bound as Cartesian paths.
+
+This standalone example builds a solid pie sector and a closed radar polygon:
+
+```c
+#include <assert.h>
+#include <math.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    const double pi = acos(-1.);
+    const cui_plot_arc quarter = {0,1,0,pi/2,0};
+    cui_plot_path_command commands[32];
+    size_t count = 0;
+    assert(cui_plot_arc_path(&quarter,0,20,commands,32,&count) == CUI_PLOT_OK);
+    assert(count == 4 && commands[1].kind == CUI_PLOT_PATH_ARC);
+    assert(cui_plot_arc_flatten(&quarter,0,20,16,commands,32,&count) == CUI_PLOT_OK);
+    assert(count == 7 && commands[6].kind == CUI_PLOT_PATH_CLOSE);
+    const cui_plot_radial_sample radar[] = {
+        {0,0,10,true}, {pi/2,0,20,true}, {pi,0,15,true}, {1.5*pi,0,12,true}
+    };
+    assert(cui_plot_radial_path(radar,4,CUI_PLOT_GAPS_SKIP,true,false,false,
+                                commands,32,&count) == CUI_PLOT_OK);
+    assert(count == 5 && commands[4].kind == CUI_PLOT_PATH_CLOSE);
+    return 0;
+}
+```
+
+Compile with the standalone C11 command above (`-UNDEBUG` for assertions).
+Tests cover quadrant coordinates, radius boundaries, arc direction/large flags,
+full turns, hollow/solid shapes, padding exhaustion and inner-pad clamping,
+tiny/extreme radii, flatten counts, missing radial runs and transactional errors.
+
+## Reusing existing Sankey geometry
+
+The frozen Plot exports a real Sankey shape/layout solver (`shape/sankey.rs`),
+including topology, alignment, value scaling and link paths. CUI already
+exposes caller-owned Sankey node/link geometry via
+`cui_chart_sankey_layout` and `cui_chart_sankey_link_bounds` in
+[`cui_chart.h`](../include/cui/cui_chart.h), with Chart options for alignment,
+linear/sqrt value scale and relaxation iterations. See
+[`CHART.md`](CHART.md) for the current Chart implementation and limits.
+Those APIs belong to the Chart layer and depend on its data/options contracts;
+the pure `cui_plot.h` module does not duplicate them or claim a standalone
+Sankey topology/path generator. Adding another solver here would require a
+separate ownership/API decision rather than counting the existing Chart solver
+as full Plot parity.

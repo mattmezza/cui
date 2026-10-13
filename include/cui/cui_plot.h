@@ -112,11 +112,14 @@ typedef enum {
     CUI_PLOT_PATH_MOVE,
     CUI_PLOT_PATH_LINE,
     CUI_PLOT_PATH_CUBIC,
-    CUI_PLOT_PATH_CLOSE
+    CUI_PLOT_PATH_CLOSE,
+    CUI_PLOT_PATH_ARC
 } cui_plot_path_kind;
 typedef struct {
     cui_plot_path_kind kind;
     cui_plot_point point, control1, control2;
+    double radius; /* ARC: circular endpoint arc, no axis rotation */
+    bool large_arc, clockwise;
 } cui_plot_path_command;
 /* Line uses y1. Area follows y1 then reverses y0 and closes each run.
  * Undefined samples' numbers are ignored. SKIP bridges them (frozen GPUI
@@ -156,6 +159,31 @@ cui_plot_result cui_plot_arc_centroid(const cui_plot_arc *, double inner_radius,
 cui_plot_result cui_plot_arc_contains(const cui_plot_arc *, double inner_radius,
                                       double outer_radius, cui_plot_point relative_position,
                                       bool *contains);
+/* Closed annular sector, centered at (0,0). Positive spans up to 2pi only;
+ * reversed/zero/fully padded spans produce an empty successful path.
+ * Full turns use two semicircles without the source's artificial seam.
+ * Smaller sectors use source pad-width policy; pad is disabled for full turns.
+ * Geometry errors/capacity are transactional; buffers must be disjoint. */
+cui_plot_result cui_plot_arc_path(const cui_plot_arc *, double inner_radius, double outer_radius,
+                                  cui_plot_path_command *, size_t capacity, size_t *required);
+/* Polygonal tessellation of the same sector, with outer+reversed inner rim.
+ * segments_per_turn: 4..1024; each rim uses ceil(span*segments/2pi) chords.
+ * Returns Move/Line/Close only. Maximum sagitta is r*(1-cos(pi/segments)). */
+cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *, double inner_radius, double outer_radius,
+                                     size_t segments_per_turn, cui_plot_path_command *,
+                                     size_t capacity, size_t *required);
+typedef struct {
+    double angle, radius0, radius1;
+    bool defined;
+} cui_plot_radial_sample;
+/* Linear radial polygon relative to (0,0). Undefined samples are skipped or
+ * split. closed stroke requires >=3 points; fill requires >=3 and always
+ * closes (frozen RadialLine). area follows radius1 then reverse radius0;
+ * radial area is a CUI extension, not a frozen GPUI RadialArea API.
+ * Radii must be finite/nonnegative. area ignores closed/fill. */
+cui_plot_result cui_plot_radial_path(const cui_plot_radial_sample *, size_t count,
+                                     cui_plot_gap_policy, bool closed, bool fill, bool area,
+                                     cui_plot_path_command *, size_t capacity, size_t *required);
 /* Domain must ascend; pixel ranges may reverse. All endpoints finite. */
 cui_plot_result cui_plot_validate(const cui_plot_scale *);
 cui_plot_result cui_plot_map(const cui_plot_scale *, double value, double *pixel);

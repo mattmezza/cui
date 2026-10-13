@@ -739,3 +739,199 @@ cui_plot_result cui_plot_arc_contains(const cui_plot_arc *arc, double inner, dou
         radius >= inner && radius <= outer && angle >= arc->start_angle && angle < arc->end_angle;
     return CUI_PLOT_OK;
 }
+
+typedef struct {
+    long double outer0, outer1, inner0, inner1;
+    bool empty, full;
+} cui_plot_arc_angles;
+static cui_plot_result cui_plot_arc_angles_get(const cui_plot_arc *arc, double inner, double outer,
+                                               cui_plot_arc_angles *angles) {
+    if (!cui_plot_arc_valid(arc, inner, outer))
+        return CUI_PLOT_INVALID;
+    const long double pi = acosl(-1.L), tau = 2 * pi;
+    long double span = (long double)arc->end_angle - arc->start_angle;
+    if (span > tau + 1e-12L)
+        return CUI_PLOT_INVALID;
+    *angles = (cui_plot_arc_angles){0};
+    if (outer == 0 || span <= 0) {
+        angles->empty = true;
+        return CUI_PLOT_OK;
+    }
+    angles->full = fabsl(span - tau) <= 1e-12L;
+    if (angles->full)
+        span = tau;
+    long double pad = angles->full ? 0 : arc->pad_angle;
+    long double inner_pad =
+        inner > 0 && pad > 0 ? fminl((outer / (long double)inner) * pad, span * .8L) : pad;
+    /* Reduce before adding offsets to preserve geometry for large angles. */
+    long double start = fmodl(arc->start_angle, tau) - pi / 2;
+    angles->outer0 = start + pad / 2;
+    angles->outer1 = start + span - pad / 2;
+    angles->inner0 = start + inner_pad / 2;
+    angles->inner1 = start + span - inner_pad / 2;
+    angles->empty = angles->outer1 <= angles->outer0;
+    return CUI_PLOT_OK;
+}
+static cui_plot_point cui_plot_polar(double radius, long double angle) {
+    return (cui_plot_point){(double)(radius * cosl(angle)), (double)(radius * sinl(angle))};
+}
+static void cui_plot_circular_command(cui_plot_path_command *commands, size_t *used, double radius,
+                                      long double a0, long double a1, bool clockwise) {
+    cui_plot_path_command command = {0};
+    command.kind = CUI_PLOT_PATH_ARC;
+    command.point = cui_plot_polar(radius, a1);
+    command.radius = radius;
+    command.large_arc = fabsl(a1 - a0) > acosl(-1.L);
+    command.clockwise = clockwise;
+    commands[(*used)++] = command;
+}
+cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double outer,
+                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+    if (!required || (!out && capacity))
+        return CUI_PLOT_INVALID;
+    cui_plot_arc_angles angles;
+    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, &angles);
+    if (result != CUI_PLOT_OK)
+        return result;
+    cui_plot_path_command commands[8] = {{0}};
+    size_t used = 0;
+    if (!angles.empty) {
+        commands[used].kind = CUI_PLOT_PATH_MOVE;
+        commands[used++].point = cui_plot_polar(outer, angles.outer0);
+        if (angles.full) {
+            long double middle = (angles.outer0 + angles.outer1) / 2;
+            cui_plot_circular_command(commands, &used, outer, angles.outer0, middle, true);
+            commands[used - 1].large_arc = false;
+            cui_plot_circular_command(commands, &used, outer, middle, angles.outer1, true);
+            commands[used - 1].large_arc = false;
+        } else
+            cui_plot_circular_command(commands, &used, outer, angles.outer0, angles.outer1, true);
+        commands[used].kind = CUI_PLOT_PATH_LINE;
+        commands[used++].point =
+            inner > 0 ? cui_plot_polar(inner, angles.inner1) : (cui_plot_point){0, 0};
+        if (inner > 0) {
+            if (angles.full) {
+                long double middle = (angles.inner0 + angles.inner1) / 2;
+                cui_plot_circular_command(commands, &used, inner, angles.inner1, middle, false);
+                commands[used - 1].large_arc = false;
+                cui_plot_circular_command(commands, &used, inner, middle, angles.inner0, false);
+                commands[used - 1].large_arc = false;
+            } else
+                cui_plot_circular_command(commands, &used, inner, angles.inner1, angles.inner0,
+                                          false);
+        }
+        commands[used++].kind = CUI_PLOT_PATH_CLOSE;
+    }
+    *required = used;
+    if (capacity < used)
+        return CUI_PLOT_CAPACITY;
+    if (used)
+        memcpy(out, commands, used * sizeof *out);
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, double outer,
+                                     size_t segments, cui_plot_path_command *out, size_t capacity,
+                                     size_t *required) {
+    if (!required || (!out && capacity) || segments < 4 || segments > 1024)
+        return CUI_PLOT_INVALID;
+    cui_plot_arc_angles angles;
+    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, &angles);
+    if (result != CUI_PLOT_OK)
+        return result;
+    const long double tau = 2 * acosl(-1.L);
+    size_t outer_steps =
+        angles.empty ? 0 : (size_t)ceill((angles.outer1 - angles.outer0) * segments / tau);
+    size_t inner_steps = angles.empty || inner == 0
+                             ? 0
+                             : (size_t)ceill((angles.inner1 - angles.inner0) * segments / tau);
+    if (!angles.empty && !outer_steps)
+        outer_steps = 1;
+    if (!angles.empty && inner > 0 && !inner_steps)
+        inner_steps = 1;
+    size_t needed = angles.empty ? 0 : outer_steps + inner_steps + 3;
+    *required = needed;
+    if (capacity < needed)
+        return CUI_PLOT_CAPACITY;
+    if (angles.empty)
+        return CUI_PLOT_OK;
+    size_t used = 0;
+    for (size_t i = 0; i <= outer_steps; ++i) {
+        cui_plot_path_command command = {0};
+        command.kind = i ? CUI_PLOT_PATH_LINE : CUI_PLOT_PATH_MOVE;
+        command.point = cui_plot_polar(
+            outer, cui_plot_lerp(angles.outer0, angles.outer1, (long double)i / outer_steps));
+        out[used++] = command;
+    }
+    for (size_t i = 0; i <= inner_steps; ++i) {
+        cui_plot_path_command command = {0};
+        command.kind = CUI_PLOT_PATH_LINE;
+        command.point = inner > 0
+                            ? cui_plot_polar(inner, cui_plot_lerp(angles.inner1, angles.inner0,
+                                                                  (long double)i / inner_steps))
+                            : (cui_plot_point){0, 0};
+        out[used++] = command;
+    }
+    out[used] = (cui_plot_path_command){0};
+    out[used].kind = CUI_PLOT_PATH_CLOSE;
+    return CUI_PLOT_OK;
+}
+static cui_plot_result cui_plot_radial_pass(const cui_plot_radial_sample *samples, size_t count,
+                                            cui_plot_gap_policy gaps, bool closed, bool fill,
+                                            bool area, cui_plot_path_command *out, size_t *used) {
+    size_t indices[CUI_PLOT_CATEGORY_LIMIT], run = 0;
+    *used = 0;
+    for (size_t i = 0; i <= count; ++i) {
+        if (i < count && samples[i].defined) {
+            indices[run++] = i;
+            continue;
+        }
+        if (!run || (i < count && gaps == CUI_PLOT_GAPS_SKIP))
+            continue;
+        if (!fill || area || run >= 3) {
+            for (size_t j = 0; j < run; ++j) {
+                cui_plot_radial_sample sample = samples[indices[j]];
+                cui_plot_path_command command = {0};
+                command.kind = j ? CUI_PLOT_PATH_LINE : CUI_PLOT_PATH_MOVE;
+                command.point = cui_plot_polar(
+                    sample.radius1, fmodl(sample.angle, 2 * acosl(-1.L)) - acosl(-1.L) / 2);
+                cui_plot_path_emit(out, used, command);
+            }
+            if (area)
+                for (size_t j = run; j > 0; --j) {
+                    cui_plot_radial_sample sample = samples[indices[j - 1]];
+                    cui_plot_path_command command = {0};
+                    command.kind = CUI_PLOT_PATH_LINE;
+                    command.point = cui_plot_polar(
+                        sample.radius0, fmodl(sample.angle, 2 * acosl(-1.L)) - acosl(-1.L) / 2);
+                    cui_plot_path_emit(out, used, command);
+                }
+            if (area || ((closed || fill) && run >= 3)) {
+                cui_plot_path_command command = {0};
+                command.kind = CUI_PLOT_PATH_CLOSE;
+                cui_plot_path_emit(out, used, command);
+            }
+        }
+        run = 0;
+    }
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_radial_path(const cui_plot_radial_sample *samples, size_t count,
+                                     cui_plot_gap_policy gaps, bool closed, bool fill, bool area,
+                                     cui_plot_path_command *out, size_t capacity,
+                                     size_t *required) {
+    if (!required || (!out && capacity) || count > CUI_PLOT_CATEGORY_LIMIT || (count && !samples) ||
+        gaps < CUI_PLOT_GAPS_SKIP || gaps > CUI_PLOT_GAPS_SPLIT)
+        return CUI_PLOT_INVALID;
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].defined &&
+            (!isfinite(samples[i].angle) || !isfinite(samples[i].radius1) ||
+             samples[i].radius1 < 0 ||
+             (area && (!isfinite(samples[i].radius0) || samples[i].radius0 < 0))))
+            return CUI_PLOT_INVALID;
+    size_t needed;
+    cui_plot_radial_pass(samples, count, gaps, closed, fill, area, NULL, &needed);
+    *required = needed;
+    if (capacity < needed)
+        return CUI_PLOT_CAPACITY;
+    return cui_plot_radial_pass(samples, count, gaps, closed, fill, area, out, &needed);
+}

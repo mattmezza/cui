@@ -364,9 +364,133 @@ static void pie_geometry(void) {
     assert(cui_plot_arc_contains(&half, 10, 40, (cui_plot_point){30, 0}, &inside) == CUI_PLOT_OK &&
            !inside);
 }
+static void arc_and_radial_paths(void) {
+    const double pi = acos(-1.);
+    cui_plot_arc arc = {0, 1, 0, pi / 2, 0};
+    cui_plot_path_command path[2053], saved[8];
+    memset(path, 0x5a, sizeof path);
+    memcpy(saved, path, sizeof saved);
+    size_t needed = 99;
+    assert(cui_plot_arc_path(&arc, 10, 20, NULL, 0, &needed) == CUI_PLOT_CAPACITY && needed == 5);
+    assert(cui_plot_arc_path(&arc, 10, 20, path, 4, &needed) == CUI_PLOT_CAPACITY);
+    assert(memcmp(path, saved, sizeof saved) == 0);
+    assert(cui_plot_arc_path(&arc, 10, 20, path, 8, &needed) == CUI_PLOT_OK);
+    assert(path[0].kind == CUI_PLOT_PATH_MOVE && close(path[0].point.x, 0) &&
+           close(path[0].point.y, -20));
+    assert(path[1].kind == CUI_PLOT_PATH_ARC && path[1].clockwise && !path[1].large_arc &&
+           path[1].radius == 20 && close(path[1].point.x, 20) && close(path[1].point.y, 0));
+    assert(path[2].kind == CUI_PLOT_PATH_LINE && close(path[2].point.x, 10));
+    assert(path[3].kind == CUI_PLOT_PATH_ARC && !path[3].clockwise && path[3].radius == 10 &&
+           path[4].kind == CUI_PLOT_PATH_CLOSE);
+    arc.end_angle = 1.5 * pi;
+    assert(cui_plot_arc_path(&arc, 10, 20, path, 8, &needed) == CUI_PLOT_OK && path[1].large_arc &&
+           path[3].large_arc);
+    arc.end_angle = 2 * pi;
+    arc.pad_angle = .5;
+    assert(cui_plot_arc_path(&arc, 10, 20, path, 8, &needed) == CUI_PLOT_OK && needed == 7);
+    assert(path[1].kind == CUI_PLOT_PATH_ARC && path[2].kind == CUI_PLOT_PATH_ARC &&
+           path[4].kind == CUI_PLOT_PATH_ARC && path[5].kind == CUI_PLOT_PATH_ARC &&
+           !path[4].clockwise && close(path[0].point.y, -20) && close(path[2].point.y, -20));
+    assert(!path[1].large_arc && !path[2].large_arc && !path[4].large_arc && !path[5].large_arc);
+    assert(cui_plot_arc_flatten(&arc, 10, 20, 8, path, 2053, &needed) == CUI_PLOT_OK &&
+           needed == 19);
+    assert(path[0].kind == CUI_PLOT_PATH_MOVE && path[18].kind == CUI_PLOT_PATH_CLOSE);
+    for (size_t i = 0; i < 9; ++i)
+        assert(close(hypot(path[i].point.x, path[i].point.y), 20));
+    for (size_t i = 9; i < 18; ++i)
+        assert(close(hypot(path[i].point.x, path[i].point.y), 10));
+    assert(close(path[2].point.x, 20) && close(path[2].point.y, 0));
+    const double midpoint_radius =
+        hypot((path[0].point.x + path[1].point.x) / 2, (path[0].point.y + path[1].point.y) / 2);
+    assert(close(20 - midpoint_radius, 20 * (1 - cos(pi / 8))));
+
+    assert(cui_plot_arc_flatten(&arc, 10, 20, 1024, NULL, 0, &needed) == CUI_PLOT_CAPACITY &&
+           needed == 2051);
+    arc.end_angle = pi / 2;
+    arc.pad_angle = .2;
+    assert(cui_plot_arc_path(&arc, 5, 20, path, 8, &needed) == CUI_PLOT_OK);
+    assert(close(path[0].point.x, 20 * sin(.1)) && close(path[0].point.y, -20 * cos(.1)));
+    assert(close(path[2].point.x, 5 * cos(.4)) && close(path[2].point.y, -5 * sin(.4)));
+    arc.pad_angle = 1;
+    assert(cui_plot_arc_path(&arc, 1, 20, path, 8, &needed) == CUI_PLOT_OK);
+    assert(close(path[2].point.x, cos(pi * .2)) && close(path[2].point.y, -sin(pi * .2)));
+    arc.pad_angle = 2;
+    assert(cui_plot_arc_path(&arc, 0, 20, NULL, 0, &needed) == CUI_PLOT_OK && needed == 0);
+    assert(cui_plot_arc_flatten(&arc, 0, 20, 8, NULL, 0, &needed) == CUI_PLOT_OK && needed == 0);
+    arc.pad_angle = 0;
+    assert(cui_plot_arc_path(&arc, 0, 20, path, 8, &needed) == CUI_PLOT_OK && needed == 4 &&
+           path[2].point.x == 0 && path[2].point.y == 0);
+    assert(cui_plot_arc_flatten(&arc, 0, 20, 8, path, 2053, &needed) == CUI_PLOT_OK && needed == 5);
+    assert(cui_plot_arc_path(&arc, 0, 0, NULL, 0, &needed) == CUI_PLOT_OK && needed == 0);
+    arc.end_angle = -1;
+    assert(cui_plot_arc_path(&arc, 0, 20, NULL, 0, &needed) == CUI_PLOT_OK && needed == 0);
+    arc.end_angle = 3 * pi;
+    needed = 99;
+    memcpy(saved, path, sizeof saved);
+    assert(cui_plot_arc_path(&arc, 0, 20, path, 8, &needed) == CUI_PLOT_INVALID && needed == 99);
+    assert(memcmp(saved, path, sizeof saved) == 0);
+    assert(cui_plot_arc_flatten(&arc, 0, 20, 8, path, 8, &needed) == CUI_PLOT_INVALID);
+    arc.end_angle = pi / 2;
+    assert(cui_plot_arc_path(&arc, 20, 10, path, 8, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_arc_path(NULL, 0, 20, path, 8, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_arc_flatten(&arc, 0, 20, 3, path, 8, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_arc_flatten(&arc, 0, 20, 1025, path, 8, &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_arc_flatten(&arc, 0, 20, 8, path, 1, &needed) == CUI_PLOT_CAPACITY &&
+           memcmp(saved, path, sizeof saved) == 0);
+    assert(cui_plot_arc_path(&arc, DBL_TRUE_MIN, DBL_MAX, path, 8, &needed) == CUI_PLOT_OK);
+    assert(isfinite(path[3].point.x) && path[3].point.y == -DBL_TRUE_MIN);
+    cui_plot_radial_sample samples[] = {{0, 5, 10, true},
+                                        {pi / 2, 5, 10, true},
+                                        {NAN, NAN, NAN, false},
+                                        {pi, 5, 10, true},
+                                        {1.5 * pi, 5, 10, true}};
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SKIP, false, false, false, path, 8,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 4);
+    assert(close(path[0].point.y, -10) && close(path[1].point.x, 10) &&
+           close(path[2].point.y, 10) && close(path[3].point.x, -10));
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SKIP, true, false, false, path, 8,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 5 && path[4].kind == CUI_PLOT_PATH_CLOSE);
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SKIP, false, true, false, path, 8,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 5);
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SPLIT, true, false, false, path, 8,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 4 && path[2].kind == CUI_PLOT_PATH_MOVE);
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SPLIT, false, true, false, NULL, 0,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 0);
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SPLIT, false, false, true, path, 16,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 10);
+    assert(path[4].kind == CUI_PLOT_PATH_CLOSE && path[9].kind == CUI_PLOT_PATH_CLOSE &&
+           close(path[2].point.x, 5));
+    assert(cui_plot_radial_path(samples, 1, CUI_PLOT_GAPS_SKIP, true, false, false, path, 8,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 1);
+    memcpy(saved, path, sizeof saved);
+    needed = 99;
+    samples[4].radius1 = -1;
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SKIP, false, false, false, path, 8,
+                                &needed) == CUI_PLOT_INVALID &&
+           needed == 99);
+    assert(memcmp(saved, path, sizeof saved) == 0);
+    samples[4].radius1 = 10;
+    samples[0].radius0 = NAN;
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SKIP, false, false, false, NULL, 0,
+                                &needed) == CUI_PLOT_CAPACITY &&
+           needed == 4);
+    assert(cui_plot_radial_path(samples, 5, CUI_PLOT_GAPS_SKIP, false, false, true, path, 16,
+                                &needed) == CUI_PLOT_INVALID);
+    assert(cui_plot_radial_path(NULL, 0, CUI_PLOT_GAPS_SKIP, false, false, false, NULL, 0,
+                                &needed) == CUI_PLOT_OK &&
+           needed == 0);
+}
 int main(void) {
     shape_geometry();
     pie_geometry();
+    arc_and_radial_paths();
     band_scales();
     point_scales();
     ordinal_scales();

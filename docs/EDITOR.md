@@ -354,3 +354,14 @@ and scroll to the start. These programmatic operations ignore view readonly and
 disabled options; host UI must enforce its editing policy. They remain case-sensitive;
 the frozen source's ASCII-insensitive retained matcher, automatic next-current-match
 tracking, and built-in replacement panel are not implemented by these APIs.
+
+`cui_editor_matcher` retains a borrowed immutable query and caller-owned match
+ranges. Set-query activates it; close retains query/ranges but deactivates it.
+Synchronization rebuilds after document revisions and resets current index to zero.
+Next increments before selecting and wraps; Previous decrements and wraps. ASCII
+case-insensitive matching folds only A-Z, preserving distinct non-ASCII case forms,
+matching the frozen Aho-Corasick configuration. Queries must not borrow mutable
+edit storage. Capacity rejection preserves session/range storage. Retained current
+replacement preflights candidate match capacity, commits one edit, and keeps the
+logical index (last replacement wraps to zero). No hidden allocation or callback
+is involved. The existing literal APIs and find-bar retain their prior contracts.

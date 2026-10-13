@@ -633,7 +633,74 @@ static void replace_workflow(void) {
     assert(count == 3 && !strcmp(buffer, "  \xc3\xa9"));
     cui_edit_destroy(edit);
 }
+static void retained_matcher(void) {
+    char buffer[128] = "foo FOO foo \xc3\x89 \xc3\xa9";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 2048,
+                                                       .max_history_steps = 16});
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    assert(edit && cui_editor_state_init(&editor, edit, lines, 32));
+    cui_editor_match ranges[8];
+    cui_editor_matcher matcher;
+    assert(cui_editor_matcher_init(&matcher, ranges, 8));
+    assert(cui_editor_matcher_set_query(&editor, &matcher, cui_string("foo"), true) == CUI_EDIT_OK);
+    assert(matcher.count == 3 && matcher.current == 0 && ranges[1].start == 4);
+    assert(cui_editor_matcher_navigate(&editor, &matcher, false) == CUI_EDIT_OK);
+    assert(matcher.current == 1 && cui_edit_get_state(edit).anchor == 4 &&
+           cui_edit_get_state(edit).cursor == 7);
+    assert(cui_editor_matcher_navigate(&editor, &matcher, true) == CUI_EDIT_OK &&
+           matcher.current == 0);
+    assert(cui_editor_matcher_navigate(&editor, &matcher, true) == CUI_EDIT_OK &&
+           matcher.current == 2);
+    assert(cui_editor_matcher_navigate(&editor, &matcher, false) == CUI_EDIT_OK &&
+           matcher.current == 0);
+    assert(cui_editor_matcher_anchor(&editor, &matcher, 7) == CUI_EDIT_OK && matcher.current == 1);
+    char scratch[256];
+    assert(cui_editor_matcher_replace_current(&editor, &matcher, cui_string("bar"), scratch,
+                                              sizeof scratch) == CUI_EDIT_OK);
+    assert(!strcmp(buffer, "foo bar foo \xc3\x89 \xc3\xa9") && matcher.count == 2 &&
+           matcher.current == 1);
+    assert(cui_editor_matcher_replace_current(&editor, &matcher, cui_string("bar"), scratch,
+                                              sizeof scratch) == CUI_EDIT_OK);
+    assert(matcher.count == 1 && matcher.current == 0);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(cui_editor_matcher_sync(&editor, &matcher) == CUI_EDIT_OK && matcher.count == 2 &&
+           matcher.current == 0);
+    cui_editor_match saved[8];
+    memcpy(saved, ranges, sizeof ranges);
+    cui_editor_matcher snapshot = matcher;
+    assert(cui_editor_matcher_replace_current(&editor, &matcher,
+                                              cui_string("foo foo foo foo foo foo foo foo foo"),
+                                              scratch, sizeof scratch) == CUI_EDIT_CAPACITY);
+    assert(!memcmp(saved, ranges, sizeof ranges) && !memcmp(&snapshot, &matcher, sizeof matcher));
+    assert(cui_editor_matcher_set_query(&editor, &matcher, cui_string("foo"), false) ==
+               CUI_EDIT_OK &&
+           matcher.count == 2);
+    assert(cui_editor_matcher_set_query(&editor, &matcher, cui_string("\xc3\xa9"), true) ==
+               CUI_EDIT_OK &&
+           matcher.count == 1);
+    cui_editor_matcher_close(&matcher);
+    assert(!matcher.active);
+    assert(cui_editor_matcher_sync(&editor, &matcher) == CUI_EDIT_OK && !matcher.active);
+    assert(cui_editor_matcher_set_query(&editor, &matcher, cui_string(""), true) == CUI_EDIT_OK &&
+           !matcher.count);
+    assert(cui_editor_matcher_navigate(&editor, &matcher, false) == CUI_EDIT_BOUNDARY);
+    assert(cui_editor_matcher_set_query(&editor, &matcher, cui_edit_get_text(edit), true) ==
+           CUI_EDIT_INVALID_ARGUMENT);
+    cui_editor_matcher small;
+    cui_editor_match one[1];
+    assert(cui_editor_matcher_init(&small, one, 1));
+    snapshot = small;
+    assert(cui_editor_matcher_set_query(&editor, &small, cui_string("foo"), false) ==
+           CUI_EDIT_CAPACITY);
+    assert(!memcmp(&snapshot, &small, sizeof small));
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    retained_matcher();
     replace_workflow();
     inline_tokens_reject_code_mode();
     completion_model();

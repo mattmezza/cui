@@ -69,6 +69,38 @@ cui_edit_result cui_editor_replace_current(cui_editor_state *, cui_str query, cu
 cui_edit_result cui_editor_replace_all(cui_editor_state *, cui_str query, cui_str replacement,
                                        char *scratch, size_t capacity, size_t *count);
 typedef struct {
+    size_t start, end;
+} cui_editor_match;
+/* Initialize with caller-owned range storage. Query bytes are borrowed, immutable
+ * until the next set_query; range storage must not overlap document/query bytes.
+ * Keep public fields unchanged except through these functions. */
+typedef struct {
+    cui_editor_match *matches;
+    size_t capacity, count, current;
+    cui_str query;
+    cui_edit *document;
+    uint64_t revision, query_hash;
+    bool case_insensitive, active, initialized;
+} cui_editor_matcher;
+bool cui_editor_matcher_init(cui_editor_matcher *, cui_editor_match *, size_t capacity);
+/* Empty query is valid and clears matches. ASCII-insensitive matches fold A-Z
+ * only, matching the frozen source. Failure preserves session and range storage. */
+cui_edit_result cui_editor_matcher_set_query(cui_editor_state *, cui_editor_matcher *,
+                                             cui_str query, bool case_insensitive);
+cui_edit_result cui_editor_matcher_sync(cui_editor_state *, cui_editor_matcher *);
+void cui_editor_matcher_close(cui_editor_matcher *);
+/* Next increments current before selecting, previous decrements; both wrap.
+ * A fresh nonempty query starts at current0, so Next first selects index1. */
+cui_edit_result cui_editor_matcher_navigate(cui_editor_state *, cui_editor_matcher *, bool reverse);
+/* Choose first match containing or ending at/after offset, else last match. */
+cui_edit_result cui_editor_matcher_anchor(cui_editor_state *, cui_editor_matcher *, size_t offset);
+/* Replace retained current match and preserve its logical index after rescanning;
+ * replacing the last match wraps index0. Scratch rules match replace_all above.
+ * Replacement plus rescan is transactional; count/output unchanged on failure. */
+cui_edit_result cui_editor_matcher_replace_current(cui_editor_state *, cui_editor_matcher *,
+                                                   cui_str replacement, char *scratch,
+                                                   size_t capacity);
+typedef struct {
     cui_edit *query; /* Borrowed single-line model. */
     cui_input_behavior_state input;
     float scroll_x;

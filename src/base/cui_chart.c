@@ -1175,6 +1175,17 @@ static void cui_chart_radar(cui_chart_state *s, const cui_chart_options *o) {
 }
 /* Chart preserves its public defaults/raw throughput; shared Base owns all
  * topology, relaxation and link-breadth math. */
+/* Geometry is invariant under uniform value scaling. Keep raw throughput below,
+ * but avoid relying on long double having a wider exponent range for layer sums
+ * and value-weighted pixel coordinates in the shared solver. */
+static double cui_chart_sankey_normalizer(const cui_chart_options *o) {
+    if (o->sankey_value_scale != CUI_CHART_SANKEY_LINEAR)
+        return 1;
+    double maximum = 0;
+    for (size_t i = 0; i < o->link_count; ++i)
+        maximum = fmax(maximum, o->links[i].value);
+    return maximum > DBL_MAX / (1024.0 * 4096.0) ? maximum : 1;
+}
 cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sankey_node *out,
                                         size_t capacity) {
     if (!o || o->kind != CUI_CHART_SANKEY || !o->data || !o->count || o->count > 256 ||
@@ -1191,6 +1202,7 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
     if (capacity < o->count)
         return CUI_PLOT_CAPACITY;
 
+    double normalizer = cui_chart_sankey_normalizer(o);
     cui_plot_sankey_link input[1024];
     long double incoming[256] = {0}, outgoing[256] = {0};
     for (size_t i = 0; i < o->link_count; ++i) {
@@ -1198,7 +1210,7 @@ cui_plot_result cui_chart_sankey_layout(const cui_chart_options *o, cui_chart_sa
         if (link->source >= o->count || link->target >= o->count || link->source == link->target ||
             !isfinite(link->value) || link->value < 0)
             return CUI_PLOT_INVALID;
-        input[i] = (cui_plot_sankey_link){link->source, link->target, link->value};
+        input[i] = (cui_plot_sankey_link){link->source, link->target, link->value / normalizer};
         incoming[link->target] += link->value;
         outgoing[link->source] += link->value;
     }
@@ -1246,6 +1258,7 @@ cui_plot_result cui_chart_sankey_link_bounds(const cui_chart_options *o,
         return CUI_PLOT_INVALID;
     if (capacity < o->link_count)
         return CUI_PLOT_CAPACITY;
+    double normalizer = cui_chart_sankey_normalizer(o);
     cui_plot_sankey_node base_nodes[256] = {{0}};
     cui_plot_sankey_link_layout base_links[1024];
     for (size_t i = 0; i < o->count; ++i) {
@@ -1259,11 +1272,11 @@ cui_plot_result cui_chart_sankey_link_bounds(const cui_chart_options *o,
         if (link->source >= o->count || link->target >= o->count || !isfinite(link->value) ||
             link->value < 0)
             return CUI_PLOT_INVALID;
-        base_links[i] =
-            (cui_plot_sankey_link_layout){.index = i,
-                                          .source = link->source,
-                                          .target = link->target,
-                                          .value = cui_chart_sankey_scaled(o, link->value)};
+        base_links[i] = (cui_plot_sankey_link_layout){
+            .index = i,
+            .source = link->source,
+            .target = link->target,
+            .value = cui_chart_sankey_scaled(o, link->value) / normalizer};
     }
     cui_plot_sankey_graph graph = {base_nodes, base_links, o->count, o->link_count, 256, 1024};
     cui_plot_result result = cui_plot_sankey_link_breadths(&graph);

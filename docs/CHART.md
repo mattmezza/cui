@@ -55,3 +55,10 @@ neighbor-y ordering with input-index ties. The shared Base helper validates
 finite ordered y coordinates and endpoint/value data without requiring graph
 ranks. No second Chart solver remains. Builds compiling Chart Base directly
 must also link `src/base/cui_plot.c`; public Chart types and defaults are unchanged.
+
+Exceptionally large linear Sankey link values are uniformly normalized only for
+shared-solver geometry, including endpoint breadths. This preserves finite raw
+node throughput and layout ratios without requiring `long double` to have a
+wider exponent range than `double`. Raw node sums beyond `DBL_MAX` still fail;
+the pure Plot solver retains its strict overflow policy. Ratios too small to
+represent after normalization may vanish in geometry.

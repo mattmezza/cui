@@ -1,0 +1,7 @@
+Published source44819c1c3d045ef32c21c19a61c756dc649b842e.
+Framework CI38392924078 all six jobs PASS. Pages38392924160 build/deploy PASS.
+Actual HTTPS292/292 artifact files SHA256 matched. Full78-story Chromium+78compiled usage excerpts PASS.
+Public actual CDP page navigation19/19 PASS; public Numeric/OTP/Combobox composition PASS.
+Local source2d291fe evidence95native/95sanitizer/79WASI in fallback-ime-touch-next17.txt.
+Logs:/home/matteo/.cache/cui-validation/published-44819c1-{files,browser,touch-page,ime-additional}.log.
+Full family parity0/78. Physicaldevice/platform/accessibility/internationalediting acceptance remain unfinished.

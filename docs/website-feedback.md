@@ -75,3 +75,13 @@ These changes and the composed overview wrapping correction are in `1f9ddda`.
 See [local regression checks](validation/website-feedback-new.txt) and
 [successful deployment and direct HTTPS checks](validation/published-1f9ddda.txt).
 The overall component parity scope remains in progress.
+
+## New feedback — native starter and remaining controls
+
+- [x] Native starter source and website guide: dependencies, C11 compiler, CMake, Make, pkg-config static linker flags, actual native window, sidebar pages and bottom account menu. Integrated next18; deployment verification pending.
+- [ ] Resizable at wide desktop widths: both demo panes reach hard maxima, preventing drag; isolated fix verified before integration.
+- [ ] Center Pagination compact counter (`x / y`) alongside button labels; previous button-label check did not cover counter. A new headless regression fails before the root fix and passes afterward.
+- [ ] Apply xs/sm/base/md/lg/xl/2xl and larger design sizes to all remaining legacy four-size controls; dropdown, badge and other legacy selector families need coverage.
+- [ ] DatePicker localized month/weekday labels, formatting and a clickable header year grid for quick selection of historical dates such as1980.
+
+These points remain tracked until integrated and deployed verification, alongside the complete component manifest.

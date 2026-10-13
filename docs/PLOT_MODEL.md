@@ -67,7 +67,9 @@ when off-domain geometry should intersect the viewport naturally.
 
 Pure path commands, stacking and pie/arc queries are described below. No axis
 labels, retained series storage, hover composition, legends, accessibility chart
-description, animated transitions, or rendering adapters are supplied.
+description or animated transitions are supplied by the math module.
+The optional [styled Plot layer](PLOT.md) adds themed axes and bounded software
+path/bitmap composition without changing this standalone module.
 
 `test_plot` checks 1500 deterministic forward/inverse and zoom-anchor cases,
 linear/log ticks, reversed ranges, transactional failures, subnormal domains,

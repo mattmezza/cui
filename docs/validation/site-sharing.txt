@@ -1,0 +1,13 @@
+Original product media and static sharing pages
+Parent dc12d14; portable library source unchanged.
+Native CTest75, strict C11 WASM build, full Chromium78 and quality PASS.
+Static sharing tests3 PASS: home + all78 components + all68 docs =147 pages,
+unique canonical/title/description/OpenGraph/large-image metadata before JavaScript,
+1200x630 PNG, complete sitemap, deterministic regeneration and rejected invalid URLs.
+Chromium tests direct component/doc visits and reloads under /cui/, correct WASM
+asset root and canonical tags, plus real fallback component/doc content with JS disabled.
+Targeted visual regression suite PASS; homepage390px and light/dark checks PASS.
+Product captures come from CUI's actual WASM Resizable composition; original social
+card uses that capture. Pinned media generator and provenance are in the repository.
+Provider caching/display on external sharing sites is not asserted by these tests.
+Full component parity, richer composed apps and remaining design/docs scope are open.

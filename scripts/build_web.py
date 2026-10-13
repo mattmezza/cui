@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ['src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
@@ -71,6 +72,7 @@ def main():
     notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\nNanoSVG\n=======\n' + (ROOT / 'third_party/nanosvg/LICENSE').read_text(encoding='utf-8') + '\n\nGPUI Kit icons\n==============\n' + (ROOT / 'third_party/gpui_icons/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
     notices += '\n\nGPUI Kit theme presets\n======================\n' + (ROOT / 'third_party/gpui_themes/LICENSE').read_text(encoding='utf-8')
     (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
+    subprocess.run([sys.executable, str(ROOT / 'scripts/build_sharing.py'), '--output', str(out)], check=True)
     (out / '.nojekyll').touch()
     print(f'Gallery built at {out}; serve over HTTP, e.g. python -m http.server -d {out}')
 

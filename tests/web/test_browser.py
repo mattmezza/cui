@@ -2648,6 +2648,30 @@ def main():
             page.wait_for_timeout(60)
             assert page.locator('#name').inner_text() == 'Button'
             assert not errors, errors
+            # Direct project-Pages URLs must initialize CUI, survive reloads and
+            # expose accurate share metadata without relying on fragment rendering.
+            shared = browser.new_page(viewport={'width':1280,'height':900})
+            for path, name in [('components/checkbox/','Checkbox'),('components/root-view/','Root View')]:
+                shared.goto(f'http://127.0.0.1:{server.server_port}/cui/{path}')
+                shared.wait_for_function('name=>window.cuiGallery?.renderedComponent===name', arg=name)
+                assert shared.locator('meta[property="og:title"]').get_attribute('content') == name+' · CUI'
+                assert shared.locator('link[rel=canonical]').get_attribute('href').endswith('/cui/'+path)
+                assert shared.evaluate("new URL('gallery.wasm',document.baseURI).pathname") == '/cui/gallery.wasm'
+                shared.reload()
+                shared.wait_for_function('name=>window.cuiGallery?.renderedComponent===name', arg=name)
+            shared.goto(f'http://127.0.0.1:{server.server_port}/cui/docs/start-here/')
+            shared.wait_for_function("document.querySelector('#docs-page').hidden===false && window.cuiGallery")
+            assert shared.locator('link[rel=canonical]').get_attribute('href').endswith('/cui/docs/start-here/')
+            shared.close()
+            static_context = browser.new_context(java_script_enabled=False)
+            static = static_context.new_page()
+            static.goto(f'http://127.0.0.1:{server.server_port}/cui/components/checkbox/')
+            assert static.locator('meta[property="og:title"]').get_attribute('content') == 'Checkbox · CUI'
+            assert static.locator('noscript').get_by_role('heading', name='Checkbox', exact=True).is_visible()
+            assert static.locator('noscript a[href$="/components/radio/"]').count() == 1
+            static.goto(f'http://127.0.0.1:{server.server_port}/cui/docs/start-here/')
+            assert static.locator('noscript pre code').count() > 0
+            static_context.close()
             browser.close()
             print('PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting')
     finally:

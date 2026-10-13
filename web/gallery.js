@@ -1,5 +1,18 @@
 /* SPDX-License-Identifier: MIT */
 const $ = id => document.getElementById(id);
+// Freeze the asset root before shareable paths change the current document URL.
+const siteAssetRoot=new URL('.',document.baseURI);
+const siteBaseElement=document.querySelector('base')||document.head.appendChild(document.createElement('base'));
+siteBaseElement.href=siteAssetRoot.href;
+function componentSlug(name){return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+function shareRoute(path,raw,title,description){
+ document.body.dataset.route=raw;
+ const address=new URL(path,siteAssetRoot);address.hash=raw;
+ if(location.href!==address.href)history.replaceState(null,'',address.href);
+ const canonical=new URL(path,document.body.dataset.siteUrl||'https://matteo.merola.co/cui/').href;
+ document.querySelector('link[rel=canonical]')?.setAttribute('href',canonical);
+ for(const [selector,value] of [['meta[name=description]',description],['meta[property="og:title"]',title],['meta[property="og:description"]',description],['meta[property="og:url"]',canonical],['meta[name="twitter:title"]',title],['meta[name="twitter:description"]',description]])document.querySelector(selector)?.setAttribute('content',value);
+}
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const decoder = new TextDecoder(), encoder = new TextEncoder();
 const textBaselineOffsets=new Map();
@@ -407,10 +420,10 @@ function docsNavigation(active){
  }
 }
 function route(){
- const raw=location.hash.slice(1);
+ const raw=location.hash.slice(1)||document.body.dataset.route||'home';
  if(!raw||raw==='home'){
   selected=null;$('home-page').hidden=false;$('docs-page').hidden=true;$('gallery-page').hidden=true;$('catalog').hidden=false;$('docs-nav').hidden=true;
-  document.title='CUI · Portable C11 UI';navigation();document.body.classList.remove('menu-open');return;
+  document.title='CUI · Portable C11 UI';shareRoute('', 'home',document.title,'Build portable C11 interfaces with CUI: themed components, explicit state, composable behavior, live WebAssembly examples and browsable documentation.');navigation();document.body.classList.remove('menu-open');return;
  }
  if(raw.startsWith('docs/')){
   const parts=raw.slice(5).split('/');let slug,anchor;
@@ -422,7 +435,7 @@ function route(){
    const button=document.createElement('button');button.type='button';button.className='docs-copy';button.textContent='Copy';button.setAttribute('aria-label','Copy code block');
    button.addEventListener('click',()=>copyCode(button,code.textContent));code.parentElement.classList.add('copyable');code.parentElement.prepend(button);
   }
-  document.title=`${doc.title} · CUI`;docsNavigation(doc.slug);document.body.classList.remove('menu-open');
+  document.title=`${doc.title} · CUI`;shareRoute(`docs/${doc.slug}/`,raw,document.title,($('docs-content').querySelector('p')?.textContent||doc.title).trim().slice(0,180));docsNavigation(doc.slug);document.body.classList.remove('menu-open');
   if(anchor)requestAnimationFrame(()=>document.getElementById(`doc-${anchor}`)?.scrollIntoView());else requestAnimationFrame(()=>window.scrollTo(0,0));
   return;
  }
@@ -456,8 +469,8 @@ async function pickScreenColor(){
 function cancelScreenColor(){if(screenColorRequest){const request=screenColorRequest;screenColorRequest=null;request.abort();}screenColorControls();}
 $('screen-color').addEventListener('click',pickScreenColor);
 function selectComponent(){
- let name='Button';try{name=decodeURIComponent(location.hash.slice(1))||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
- document.title=`${selected.name} · CUI`; $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
+ let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
+ document.title=`${selected.name} · CUI`;shareRoute(`components/${componentSlug(selected.name)}/`,encodeURIComponent(selected.name),document.title,`Explore CUI ${selected.name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. GPUI Kit parity remains in progress.`); $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
  const live=selected.name in stories;
  window.cuiGallery.renderedComponent=live?'':selected.name;
  if(modelStories.has(selected.name))$('status').textContent+=' / base model'; $('preview-card').hidden=!live; $('pending').hidden=live;
@@ -586,7 +599,7 @@ canvas.addEventListener('compositionend',e=>{
 });
 reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if(themeChoice==='system')syncTheme();});
-$('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});
+$('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});window.addEventListener('popstate',()=>{if(catalog&&documents)route();});
 window.addEventListener('keydown',event=>{
  const editing=event.target instanceof HTMLElement&&(event.target.matches('input,textarea,select')||event.target.isContentEditable);
  if(event.key==='/'&&!editing&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();document.body.classList.add('menu-open');$('catalog').hidden=false;$('docs-nav').hidden=true;$('search').focus();$('search').select();}

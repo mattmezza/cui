@@ -1,0 +1,16 @@
+Published source: 0b667d07b258cbcb74cc8c279328027c1b69f71c
+Framework CI: 38408908126, all six jobs successful.
+Pages build and deploy: 38408907669, successful.
+Direct HTTPS SHA256 comparison: 325/325 artifact files matched.
+Actual public Chromium passed Marker, centered Pagination/Stepper/Select, Rating,
+Image, Shift-wheel Tabs, pixel DataTable wheel and preserved navigation scroll.
+Public Python and Node guides and both real Copy-button clipboard recipes passed.
+Additional actual public checks pass all14 design sizes across12 legacy families,
+both Tabs overflow axes, intrinsic HoverCard, simulated TitleBar actions and
+functional Toolbar Find, plus actual Sidebar image clipping.
+Prior release 6ef61af deployed successfully and matched 325 files, but its
+distribution/style job failed formatting; 0b667d0 incorporates the correction.
+Formatter source 072899d passed native97/97 and WASI80/80 after correction.
+Evidence: published-0b667d0-{files,visual,python-node}.log under
+/home/matteo/.cache/cui-validation.
+This proves the listed checks and deployment, not full 78-family parity.

@@ -1,9 +1,9 @@
 {
   "source": "bc9d062",
   "compiled_source": "bc9d062",
-  "published_source": "cdf5199cb1b7f01cc5baecb637c5b4f09d2af8a5",
+  "published_source": "0b667d07b258cbcb74cc8c279328027c1b69f71c",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Next20 integrates locale/year grids, 14-size legacy controls, sidebar clipping, Plot gestures, semantic content colors, Notification spacing, intrinsic HoverCard and functional Toolbar/TitleBar demos; Python and Node native examples pass. Native97, sanitizer97, WASI80, full browser78, date28, Plot17, Resize24, touch42+16+19 and IME checks pass. Publication pending. Published cdf5199 passed six CI jobs, Pages,303 exact HTTPS files, visual interactions and24 public resize cases. Full family verification remains0/78; scrollbar, avatar/message and ecosystem work remains active.",
+  "summary": "Published next20 passes six CI jobs, Pages, all325 HTTPS file hashes and actual public alignment/scrolling/Python/Node clipboard checks. Next21 integrates avatar image stacks, compact message examples and optional relocatable accessibility packaging; warning native101/101 pass. Shared scrollbar appearance and RadioGroup validation are active. Complete family verification remains0/78.",
   "checks": [
     {
       "name": "native",

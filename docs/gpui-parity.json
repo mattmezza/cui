@@ -661,8 +661,15 @@
       "features": [
         {
           "name": "unchecked/checked/mixed state",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_base.c: mixed Space -> checked -> unchecked",
+            "tests/unit/test_components.c:test_checkbox_geometry"
+          ],
+          "limitations": [
+            "CUI_CHECK_* model and mixed semantic value; mixed mark is a static dash, not reference spring animation."
+          ]
         },
         {
           "name": "controlled value and activation",
@@ -673,8 +680,15 @@
         },
         {
           "name": "disabled/keyboard/semantic state",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_components.c:test_checkbox_geometry",
+            "tests/unit/test_base.c"
+          ],
+          "limitations": [
+            "Disabled and required/invalid snapshots, Enter and Space are covered. OS accessibility bridge is not implied."
+          ]
         }
       ],
       "upstream_doc": {
@@ -717,25 +731,46 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "SDL native/dummy roundtrip and optional capability adapter tested; core input paste/cut integration pending."
+        "SDL clipboard roundtrip and Input mock-host cut/paste/undo, readonly and capability failures are tested. A reusable dynamic-value Clipboard widget with copied callback and timed Copy/Check icon remains absent; browser examples are application composition."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "OS read/write adapter",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_sdl3.c:main",
+            "include/cui/cui_sdl3.h:cui_sdl3_clipboard_interface"
+          ],
+          "limitations": [
+            "SDL service test performs UTF8 roundtrip and embedded-NUL rejection. Runtime here is configured test adapter, not proof of macOS/Windows/Wayland clipboard behavior."
+          ]
         },
         {
           "name": "capability failure handling",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_input.c:clipboard_and_readonly",
+            "tests/web/test_touch_more.py:clipboard (existing coverage, not rerun)"
+          ],
+          "limitations": [
+            "Rejected copy preserves cut source and returns CUI_EDIT_CLIPBOARD_UNAVAILABLE; invalid pasted UTF8 rejected. Not every SDL OS failure is injected."
+          ]
         },
         {
           "name": "headless adapter tests",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_input.c:clipboard_and_readonly",
+            "tests/unit/test_sdl3.c:main"
+          ],
+          "limitations": [
+            "Mock-host cut/paste/undo/readonly and SDL service roundtrip run. No reusable reference Clipboard copy widget/value_fn/on_copied/timed icon state API exists."
+          ]
         }
       ],
       "upstream_doc": {
@@ -977,18 +1012,39 @@
       "features": [
         {
           "name": "tab and reverse cycling",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_core.c:test_focus_scopes",
+            "tests/unit/test_overlay.c:main"
+          ],
+          "limitations": [
+            "Modal scope forward/reverse wrap is asserted; nonmodal scope does not promise trap confinement."
+          ]
         },
         {
           "name": "nested scope and restore",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_core.c:test_focus_scopes",
+            "tests/unit/test_overlay.c:main"
+          ],
+          "limitations": [
+            "Inner modal capture, Escape dismissal, outer focus and trigger restoration are covered."
+          ]
         },
         {
           "name": "disabled/removed target cleanup",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_core.c:test_focus_scopes",
+            "tests/unit/test_overlay.c:main"
+          ],
+          "limitations": [
+            "Disabled restored target and removed trigger result in focus0. Does not establish OS accessibility modal relationships."
+          ]
         }
       ],
       "upstream_doc": {
@@ -1395,8 +1451,15 @@
       "features": [
         {
           "name": "UTF-8 text and theme size",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_control_family_audit.c:main",
+            "src/components/cui_components.c:cui_label"
+          ],
+          "limitations": [
+            "New test directly checks UTF8 bytes, theme font and color across four themes. Underlying Core handles text layout; no Label-specific secondary/masked/highlight API."
+          ]
         },
         {
           "name": "control association",
@@ -1933,13 +1996,27 @@
         },
         {
           "name": "controlled selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_components.c:test_radio_geometry,test_radio_shared_redraw",
+            "tests/unit/test_base.c"
+          ],
+          "limitations": [
+            "Shared caller integer changes on Enter/Space; selected activation is a no-op; sibling snapshot converges on redraw, not same-frame reconciliation."
+          ]
         },
         {
           "name": "disabled/keyboard semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_components.c:test_radio_geometry",
+            "tests/unit/test_base.c"
+          ],
+          "limitations": [
+            "Disabled selected radio styling and keyboard selection tested; group-level disabled/roving semantics remain absent."
+          ]
         }
       ],
       "upstream_doc": {
@@ -2342,7 +2419,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Controlled activation tested; native switch geometry, theme variants and touch pending."
+        "Native track/thumb, controlled callbacks, keyboard/pointer/disabled state, label focus/wrapping, reversible spring deadlines and reduced motion are tested. Tooltip, custom slots, left labels and custom colors need complete styling assertions; full reference behavior and rendering remain unverified."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2356,13 +2433,25 @@
         },
         {
           "name": "keyboard/pointer/disabled behavior",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_components.c:test_switch"
+          ],
+          "limitations": [
+            "Label click focuses/toggles; Space toggles; Enter invokes controlled request; disabled suppresses callback and skip_tab excludes control. Physical device coverage not asserted."
+          ]
         },
         {
           "name": "semantic checked state and theme",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "docs/validation/control-family-audit-next21.json",
+            "tests/unit/test_components.c:test_switch"
+          ],
+          "limitations": [
+            "Four themes x four sizes x enabled/on states assert role, checked, disabled, track/thumb geometry/colors; retained spring, interruption, deadlines and reduced motion also tested."
+          ]
         }
       ],
       "upstream_doc": {

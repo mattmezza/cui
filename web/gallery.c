@@ -3151,8 +3151,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.alignment = (cui_message_alignment)message_alignment;
         options.role = CUI_ROLE_LISTITEM;
         options.name = cui_string("Workspace conversation");
-        options.avatar = (cui_message_slot){
-            .present = message_avatar, .width = 32, .height = 32, .render = message_avatar ? gallery_message_avatar : NULL};
+        options.avatar =
+            (cui_message_slot){.present = message_avatar,
+                               .width = 32,
+                               .height = 32,
+                               .render = message_avatar ? gallery_message_avatar : NULL};
         options.header = (cui_message_slot){
             .present = true, .render = message_header, .inset = (cui_message_inset)message_inset};
         options.footer = (cui_message_slot){

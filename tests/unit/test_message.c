@@ -312,8 +312,9 @@ static void interactions(void) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
     result = scene(ui, s, o, &r);
     assert(result.view.scroll == 0 && result.view.scrolled_up);
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 100, .y = 100,
-                                        .dy = 3.5f, .scroll_precise = true}));
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 100, .y = 100, .dy = 3.5f, .scroll_precise = true}));
     result = scene(ui, s, o, &r);
     assert(result.view.scroll == 0 && !cui_event_consumed(ui, 0));
     cui_focus(ui, cui_message_scroller_jump_id(22));

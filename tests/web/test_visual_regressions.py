@@ -82,6 +82,21 @@ def main():
                 const pixel=new Uint8Array(e.memory.buffer,e.gallery_bitmap_pixels(i),e.gallery_bitmap(i,2)*e.gallery_bitmap(i,1));
                 const colors=new Set();for(let j=0;j<pixel.length;j+=4)colors.add(`${pixel[j]},${pixel[j+1]},${pixel[j+2]}`);
                 return colors.size>1000;}''')
+            story('Command')
+            page.check('#command-modal')
+            page.wait_for_timeout(100)
+            page.locator('canvas').scroll_into_view_if_needed()
+            def semantic_nodes():
+                return page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.from({length:e.gallery_semantic_count()},(_,i)=>({role:e.gallery_semantic(i,0),name:d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i))),x:e.gallery_semantic(i,1),y:e.gallery_semantic(i,2),w:e.gallery_semantic(i,3),h:e.gallery_semantic(i,4)}));}''')
+            trigger=next(s for s in semantic_nodes() if s['name']=='Open command palette')
+            canvas=page.locator('canvas').bounding_box()
+            page.mouse.click(canvas['x']+trigger['x']+trigger['w']/2,canvas['y']+trigger['y']+trigger['h']/2)
+            page.wait_for_timeout(150)
+            nodes=semantic_nodes()
+            panel=next(s for s in nodes if s['role']==17)
+            results=next(s for s in nodes if s['role']==9 and s['name']=='Command palette')
+            assert abs(results['x']-panel['x']-10)<1 and abs(results['w']-panel['w']+20)<1, (panel,results)
+            page.keyboard.press('Escape')
             # Real browser wheel events must retain pixel magnitude. Shift maps
             # a vertical mouse wheel to horizontal bounded Tabs scrolling.
             def scroll_regions():

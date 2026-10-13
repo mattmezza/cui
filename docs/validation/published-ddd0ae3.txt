@@ -1,0 +1,12 @@
+Published source: ddd0ae3ad5e151893abf236616d74cada362358a
+Framework CI: 38395549501, all six jobs successful.
+Pages build and deploy: 38395549505, successful.
+Downloaded github-pages artifact: release-ddd0ae3-artifact/artifact.tar.
+Direct HTTPS SHA256 comparison: 301/301 artifact files matched.
+Public Chromium native starter guide: route resolves, three actual screenshots
+decode with nonzero dimensions, Copy button places static pkg-config linker
+recipe in the actual browser clipboard.
+Evidence logs: published-ddd0ae3-files.log and published-ddd0ae3-starter.log in
+/home/matteo/.cache/cui-validation.
+This establishes publication of the starter guide and existing compiled site;
+it does not certify complete component parity or the newer unreleased polish.

@@ -99,10 +99,12 @@ The following remain open until release and direct website verification:
 Focused local checks are evidence for individual fixes, not full parity.
 ## New feedback — native starter and remaining controls
 
-- [x] Native starter source and website guide: dependencies, C11 compiler, CMake, Make, pkg-config static linker flags, actual native window, sidebar pages and bottom account menu. Integrated next18; deployment verification pending.
+- [x] Native starter source and website guide: dependencies, C11 compiler, CMake, Make, pkg-config static linker flags, actual native window, sidebar pages and bottom account menu. Published ddd0ae3; direct public screenshots and copied linker recipe verified.
 - [ ] Resizable at wide desktop widths: both demo panes reach hard maxima, preventing drag; isolated fix verified before integration.
 - [ ] Center Pagination compact counter (`x / y`) alongside button labels; previous button-label check did not cover counter. A new headless regression fails before the root fix and passes afterward.
 - [ ] Apply xs/sm/base/md/lg/xl/2xl and larger design sizes to all remaining legacy four-size controls; dropdown, badge and other legacy selector families need coverage.
 - [ ] DatePicker localized month/weekday labels, formatting and a clickable header year grid for quick selection of historical dates such as1980.
 
 These points remain tracked until integrated and deployed verification, alongside the complete component manifest.
+
+Additional open feedback: Alert/Bubble semantic styles; intrinsic HoverCard; reusable Message conversation; Notification action/close separation; shared optional scrollbar appearance/auto-hide across families; Python native example and clearly documented Node JavaScript/TypeScript startup.

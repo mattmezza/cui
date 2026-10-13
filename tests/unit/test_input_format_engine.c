@@ -4,7 +4,7 @@
 #include <string.h>
 
 static cui_edit_format pattern(const char *p) {
-    return (cui_edit_format){CUI_EDIT_FORMAT_PATTERN, cui_string(p)};
+    return (cui_edit_format){.kind = CUI_EDIT_FORMAT_PATTERN, .pattern = cui_string(p)};
 }
 static void formatted(const char *p, const char *value, const char *expected, bool valid) {
     char output[128], original[128];

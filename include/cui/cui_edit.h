@@ -82,10 +82,18 @@ typedef struct {
 /* Formatting changes stored text; it is independent of password display masks.
  * Tokens: 9 ASCII digit, A ASCII letter, # ASCII alphanumeric, * UTF-8 scalar;
  * all other scalars are literals. Empty pattern behaves as NONE. */
-typedef enum { CUI_EDIT_FORMAT_NONE = 0, CUI_EDIT_FORMAT_PATTERN } cui_edit_format_kind;
+typedef enum {
+    CUI_EDIT_FORMAT_NONE = 0,
+    CUI_EDIT_FORMAT_PATTERN,
+    CUI_EDIT_FORMAT_NUMBER
+} cui_edit_format_kind;
 typedef struct {
     cui_edit_format_kind kind;
     cui_str pattern; /* Immutable, borrowed only during a synchronous request. */
+    bool has_separator; /* NUMBER: true uses a non-NUL Unicode scalar separator. */
+    uint32_t separator;
+    bool fraction_limited;
+    size_t fraction_digits; /* NUMBER: truncates only when has_separator is true. */
 } cui_edit_format;
 /* Pure helpers: all input/destination/output extents must be disjoint. Outputs
  * are unchanged on malformed UTF-8, alias or capacity failure. Text helpers
@@ -104,6 +112,14 @@ typedef enum {
     CUI_EDIT_REQUEST_COMPOSITION,
     CUI_EDIT_REQUEST_PRESENT /* Nonmutating initial/current presentation; see below. */
 } cui_edit_request_kind;
+/* Pure numeric insertion normalization (fullwidth digits/signs/dot/comma,
+ * U+2212 minus and U+3002 dot), then the requested CR/LF policy. Endpoint is
+ * an original UTF-8 scalar boundary; mapped output is a normalized byte offset.
+ * Disjoint outputs and source; failures leave outputs unchanged. */
+cui_edit_result cui_edit_normalize_number_text(cui_str, cui_edit_normalization, char *destination,
+                                               size_t capacity, cui_str *normalized);
+cui_edit_result cui_edit_number_offset(cui_str, cui_edit_normalization, size_t source_byte,
+                                       size_t *normalized_byte);
 typedef struct {
     cui_edit_request_kind kind;
     cui_event event;
@@ -147,7 +163,7 @@ typedef struct {
  * says prepare returned OK (even if later guard/predicate fails); applied says
  * the checked operation adopted that candidate. Completion is outside engine
  * rollback; no callbacks/foreign pointers are retained after the request. */
-/* Nonempty PATTERN is single-line/single-selection only; inline tokens are
+/* Nonempty PATTERN and NUMBER are single-line/single-selection only; inline tokens are
  * unsupported. Normalize then validate the unformatted whole candidate (custom
  * predicate before token validity); old-invalid healing is preserved. Committed
  * text is formatted once before mutation, with final resource prepare preceding

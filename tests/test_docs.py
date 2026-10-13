@@ -17,6 +17,21 @@ SPEC.loader.exec_module(DOCS)
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_title_is_owned_by_shell_and_source_anchors_survive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'README.md').write_text('# Start\n\n[Title](#start)\n\n# Start\n\n## Details\n\nBody.\n')
+            page = DOCS.build(root, root / 'output')[0]
+            self.assertEqual(page['title'], 'Start')
+            self.assertNotIn('<h1', page['html'])
+            self.assertIn('<span id="doc-start"></span>', page['html'])
+            self.assertIn('href="#docs/getting-started/start"', page['html'])
+            self.assertIn('<h2 id="doc-start-1">Start</h2>', page['html'])
+            self.assertIn('<h2 id="doc-details">Details</h2>', page['html'])
+            self.assertIn('Body.', page['html'])
+            # Agent-facing Markdown remains an exact source-title document.
+            self.assertTrue((root / 'output/markdown/README.md').read_text().startswith('# Start\n'))
+
     def test_website_wording_preserves_heading_links(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

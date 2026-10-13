@@ -59,6 +59,8 @@ def main():
                     assert sizes[1]==sizes[2] and sizes[0]!=sizes[1],sizes
             audit.page.locator('#component-guides').get_by_role('link',name='Opt-in Chart tooltip appearance').click()
             audit.page.locator('#docs-title').filter(has_text='Opt-in Chart tooltip appearance').wait_for(state='visible')
+            assert audit.page.get_by_role('heading',name='Opt-in Chart tooltip appearance',exact=True).count()==1
+            assert audit.page.locator('#doc-opt-in-chart-tooltip-appearance').count()==1
             assert not audit.errors,audit.errors
             browser.close()
         print('PASS gallery classic/popover/bare typography and placement, automatic/copied rows, desktop/390px and linked guide')

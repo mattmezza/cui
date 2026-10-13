@@ -12,6 +12,7 @@ import shutil
 from urllib.parse import quote, unquote, urlsplit
 
 from markdown_it import MarkdownIt
+from markdown_it.token import Token
 
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'https://github.com/mattmezza/cui/blob/main/'
@@ -87,6 +88,7 @@ def render_document(path, root, slugs, output):
     headings = {}
     title = path.stem.replace('_', ' ').title()
     have_title = False
+    title_index = None
     for index, token in enumerate(tokens):
         if token.type != 'heading_open':
             continue
@@ -98,6 +100,16 @@ def render_document(path, root, slugs, output):
         token.attrSet('id', 'doc-' + anchor)
         if not have_title and token.tag == 'h1':
             title, have_title = website_text(content), True
+            title_index = index
+        elif token.tag == 'h1':
+            # The document shell owns the page's main heading.
+            token.tag = tokens[index + 2].tag = 'h2'
+
+    if title_index is not None:
+        # Keep source fragment links without repeating the shell's visible title.
+        anchor = Token('html_block', '', 0)
+        anchor.content = '<span id="' + tokens[title_index].attrGet('id') + '"></span>\n'
+        tokens[title_index:title_index + 3] = [anchor]
 
     def rewrite(value, image=False):
         url = urlsplit(value)

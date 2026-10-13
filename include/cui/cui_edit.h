@@ -38,7 +38,9 @@ typedef enum {
     CUI_EDIT_WORD_PREVIOUS,
     CUI_EDIT_WORD_NEXT,
     CUI_EDIT_LINE_PREVIOUS,
-    CUI_EDIT_LINE_NEXT
+    CUI_EDIT_LINE_NEXT,
+    CUI_EDIT_GRAPHEME_PREVIOUS,
+    CUI_EDIT_GRAPHEME_NEXT
 } cui_edit_motion;
 /* The application owns the NUL-terminated buffer. Only this model may mutate
    it while attached. Capacity includes NUL; offsets are UTF-8 byte offsets. */
@@ -47,6 +49,26 @@ void cui_edit_destroy(cui_edit *edit);
 cui_edit_state cui_edit_get_state(const cui_edit *edit);
 cui_str cui_edit_get_text(const cui_edit *edit);
 bool cui_edit_valid_utf8(cui_str text);
+#define CUI_GRAPHEME_UNICODE_VERSION "17.0.0"
+/* Default extended grapheme clusters (UAX #29). Length-bounded UTF-8 may contain
+ * NUL. Invalid text, non-scalar offsets or offsets beyond length return SIZE_MAX
+ * (boundary returns false). Next/previous are strict, clamped at either end.
+ * Allocation-free full scans; offsets remain UTF-8 bytes. */
+size_t cui_grapheme_next(cui_str text, size_t offset);
+size_t cui_grapheme_previous(cui_str text, size_t offset);
+bool cui_grapheme_boundary(cui_str text, size_t offset);
+/* Forward iterator validates once, then visits clusters in linear total time.
+ * Keep the borrowed text unchanged. For already validated text, an aggregate
+ * initializer {text, known_grapheme_boundary} may seed traversal without a scan.
+ * Other offsets must only be changed by next.
+ * Next returns the new byte offset, clamped at length; invalid UTF-8 or an
+ * invalid scalar offset encountered during traversal returns SIZE_MAX. */
+typedef struct {
+    cui_str text;
+    size_t offset;
+} cui_grapheme_iterator;
+bool cui_grapheme_iterator_init(cui_grapheme_iterator *iterator, cui_str text);
+size_t cui_grapheme_iterator_next(cui_grapheme_iterator *iterator);
 cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
 /* Word motions skip punctuation/space and move between word starts. Letters,
  * digits, underscores and common Unicode letter/combining ranges form words.
@@ -64,9 +86,16 @@ cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui
 cui_edit_result cui_edit_indent(cui_edit *, bool outdent, size_t tab_size, bool hard_tabs);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
+/* Grapheme erasure expands partial cluster selections outward. At an interior
+ * scalar offset it removes the containing cluster. Scalar erasure APIs above
+ * retain their original behavior. Undo restores the original byte selection. */
+cui_edit_result cui_edit_backspace_grapheme(cui_edit *edit);
+cui_edit_result cui_edit_delete_grapheme(cui_edit *edit);
 cui_edit_result cui_edit_undo(cui_edit *edit);
 cui_edit_result cui_edit_redo(cui_edit *edit);
-/* Apply one event in caller-defined order. Pointer events are ignored. */
+/* Apply one event in caller-defined order. Ordinary Left/Right and erasure use
+ * graphemes; word/vertical motions retain their existing contracts. Pointer
+ * events are ignored. */
 cui_edit_result cui_edit_apply_event(cui_edit *, cui_event);
 /* Applies events already routed to id; returns the first rejected edit while
    continuing independent later events. Disabled input is ignored. */

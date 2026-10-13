@@ -367,7 +367,111 @@ static void test_word_and_vertical_navigation(void) {
     cui_edit_destroy(edit);
 }
 
+#include "cui_edit_grapheme_tests.inc"
+static void test_grapheme_conformance(void) {
+    for (size_t i = 0; i < sizeof grapheme_cases / sizeof grapheme_cases[0]; i++) {
+        cui_str text = {grapheme_cases[i].text, grapheme_cases[i].length};
+        size_t count = grapheme_cases[i].count;
+        cui_grapheme_iterator iterator;
+        assert(cui_grapheme_iterator_init(&iterator, text));
+        for (size_t j = 1; j < count; j++)
+            assert(cui_grapheme_iterator_next(&iterator) == grapheme_cases[i].offsets[j]);
+        assert(cui_grapheme_iterator_next(&iterator) == text.length);
+        for (size_t j = 0; j < count; j++) {
+            size_t at = grapheme_cases[i].offsets[j];
+            assert(cui_grapheme_boundary(text, at));
+            /* Seeding at any proven boundary has the same cluster suffix. */
+            iterator = (cui_grapheme_iterator){text, at};
+            assert(cui_grapheme_iterator_next(&iterator) ==
+                   grapheme_cases[i].offsets[j + (j + 1 < count)]);
+            assert(cui_grapheme_next(text, at) == grapheme_cases[i].offsets[j + (j + 1 < count)]);
+            assert(cui_grapheme_previous(text, at) == grapheme_cases[i].offsets[j - (j > 0)]);
+        }
+        for (size_t at = 0; at <= text.length; at++) {
+            bool expected = false;
+            for (size_t j = 0; j < count; j++)
+                expected |= grapheme_cases[i].offsets[j] == at;
+            assert(cui_grapheme_boundary(text, at) == expected);
+        }
+    }
+    assert(cui_grapheme_next((cui_str){0}, 0) == 0);
+    assert(cui_grapheme_previous((cui_str){0}, 0) == 0);
+    assert(cui_grapheme_boundary((cui_str){0}, 0));
+    const cui_str invalid[] = {
+        {NULL, 1}, {"\xc0\x80", 2}, {"\xed\xa0\x80", 3}, {"a\xf4\x90\x80\x80", 5}, {"a\xc2", 2}};
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
+        assert(cui_grapheme_next(invalid[i], 0) == SIZE_MAX);
+        assert(cui_grapheme_previous(invalid[i], 0) == SIZE_MAX);
+        assert(!cui_grapheme_boundary(invalid[i], 0));
+    }
+    cui_str text = (cui_str){"é", 2};
+    assert(cui_grapheme_next(text, 1) == SIZE_MAX);
+    assert(cui_grapheme_previous(text, 1) == SIZE_MAX);
+    assert(cui_grapheme_next(text, 3) == SIZE_MAX);
+}
+static void test_grapheme_editing(void) {
+    const char *clusters[] = {"é", "👩🏽‍💻", "🇨🇭", "क्‍ष", "\r\n", "각"};
+    for (size_t i = 0; i < sizeof clusters / sizeof clusters[0]; i++) {
+        char b[128];
+        snprintf(b, sizeof b, "A%sZ", clusters[i]);
+        size_t end = 1 + strlen(clusters[i]);
+        cui_edit *e = make(b, sizeof b, true, 10);
+        assert(cui_edit_select(e, 1, 1) == CUI_EDIT_OK);
+        assert(cui_edit_apply_event(e, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_RIGHT,
+                                                   .modifiers = CUI_MOD_SHIFT}) == CUI_EDIT_OK);
+        cui_edit_state state = cui_edit_get_state(e);
+        assert(state.cursor == end && state.anchor == 1);
+        assert(cui_edit_apply_event(e, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                                   .key = CUI_KEY_BACKSPACE}) == CUI_EDIT_OK);
+        assert(strcmp(b, "AZ") == 0);
+        assert(cui_edit_undo(e) == CUI_EDIT_OK);
+        state = cui_edit_get_state(e);
+        assert(state.cursor == end && state.anchor == 1);
+        assert(cui_edit_select(e, end, end) == CUI_EDIT_OK);
+        assert(cui_edit_backspace_grapheme(e) == CUI_EDIT_OK);
+        assert(strcmp(b, "AZ") == 0);
+        assert(cui_edit_undo(e) == CUI_EDIT_OK);
+        assert(cui_edit_select(e, 1, 1) == CUI_EDIT_OK);
+        assert(cui_edit_delete_grapheme(e) == CUI_EDIT_OK);
+        assert(strcmp(b, "AZ") == 0);
+        cui_edit_destroy(e);
+    }
+    char b[64] = "AéZ";
+    cui_edit *e = make(b, sizeof b, false, 10);
+    assert(cui_edit_select(e, 2, 2) == CUI_EDIT_OK);
+    assert(cui_edit_move(e, CUI_EDIT_GRAPHEME_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(e).cursor == 4);
+    assert(cui_edit_move(e, CUI_EDIT_GRAPHEME_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(e).cursor == 1);
+    /* Scalar APIs deliberately remain available. */
+    assert(cui_edit_move(e, CUI_EDIT_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(e).cursor == 2);
+    assert(cui_edit_select(e, 2, 4) == CUI_EDIT_OK);
+    assert(cui_edit_backspace_grapheme(e) == CUI_EDIT_OK);
+    assert(strcmp(b, "AZ") == 0);
+    assert(cui_edit_undo(e) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(e).anchor == 2 && cui_edit_get_state(e).cursor == 4);
+    assert(cui_edit_select(e, 2, 2) == CUI_EDIT_OK);
+    assert(cui_edit_delete_grapheme(e) == CUI_EDIT_OK);
+    assert(strcmp(b, "AZ") == 0);
+    assert(cui_edit_undo(e) == CUI_EDIT_OK);
+    assert(cui_edit_select(e, 2, 3) == CUI_EDIT_BOUNDARY);
+    assert(strcmp(b, "AéZ") == 0);
+    assert(cui_edit_select(e, 4, 4) == CUI_EDIT_OK);
+    assert(cui_edit_backspace(e) == CUI_EDIT_OK);
+    assert(strcmp(b, "AeZ") == 0);
+    assert(cui_edit_undo(e) == CUI_EDIT_OK);
+    assert(cui_edit_select(e, 2, 2) == CUI_EDIT_OK);
+    assert(cui_edit_backspace_grapheme(e) == CUI_EDIT_OK);
+    assert(strcmp(b, "AZ") == 0);
+    assert(cui_edit_delete_grapheme(NULL) == CUI_EDIT_INVALID_ARGUMENT);
+    cui_edit_destroy(e);
+}
+
 int main(void) {
+    test_grapheme_conformance();
+    test_grapheme_editing();
     test_composition_keys();
     test_word_and_vertical_navigation();
     test_atomic_range();

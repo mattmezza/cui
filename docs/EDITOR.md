@@ -50,8 +50,8 @@ undo, readonly input, line-number output, colored syntax text, invalid-hook
 fallback, invalid dimensions, and caret reveal. Frozen GPUI Editor has much
 broader display maps, diagnostics, completion, language services, and
 search features; those are not implemented here. This is a usable adapter, not
-full Editor parity. Navigation follows the existing UTF-8 scalar model rather
-than extended grapheme clusters; visual bidirectional navigation is unsupported.
+full Editor parity. Ordinary keyboard navigation and erasure use Unicode extended grapheme
+clusters; visual bidirectional navigation is unsupported.
 Editor defaults select the portable monospace style. Set
 `options.textarea.text_style` to choose the registered font family, weight,
 italic style, and monospace flag; an all-zero style explicitly selects the
@@ -102,9 +102,7 @@ avoids applying stale line indices after arbitrary edits. It differs from
 GPUI's incremental parser/candidate remapping. No fold discovery, automatic
 indent/syntax folding, fold-all command, hidden-text placeholder, or parser-owned
 persistent range tracking is supplied. Array memory stays caller-owned and must
-remain alive and unmodified except for `collapsed` until detached. Selection
-motion remains scalar-based, and styled syntax callbacks receive original byte
-ranges of visible document rows.
+remain alive and unmodified except for `collapsed` until detached. Styled syntax callbacks receive original byte ranges of visible document rows.
 
 
 Host completions
@@ -150,3 +148,42 @@ Up/Down wrap, keyboard and actual pointer acceptance, Escape, readonly behavior,
 invalid sizing, and queued typing followed by Enter. The frozen reference also
 supports asynchronous provider resolution, richer completion documentation,
 snippets, additional edits, and inline suggestions; these are not implemented.
+
+Unicode grapheme editing
+-----------------------
+
+Ordinary Left/Right (including Shift selection), Backspace, and Delete now follow
+Unicode 17.0.0 default extended grapheme clusters (UAX #29 revision 47). This
+matches the Unicode version used by the frozen GPUI reference's pinned
+`unicode-segmentation` 1.13.3. Combining marks, emoji modifiers/ZWJ sequences,
+regional-indicator flags, Hangul, and Indic conjuncts remain whole. Textarea wrap
+boundaries, pointer hit testing, and preferred-x visual row movement use the
+same clusters. A cluster wider than the viewport occupies one overflowing row
+and is clipped by the existing viewport; it is never split into scalar rows.
+
+Offsets remain UTF-8 bytes. Explicit `CUI_EDIT_PREVIOUS`/`NEXT`, `cui_edit_select`,
+`cui_edit_replace_range`, `cui_edit_backspace`/`delete`, and direct logical vertical
+motions retain their scalar contracts. Hosts can opt into
+`CUI_EDIT_GRAPHEME_PREVIOUS`/`NEXT` and `cui_edit_backspace_grapheme`/
+`cui_edit_delete_grapheme`. Grapheme erasure expands partial cluster selections
+outward; a collapsed scalar cursor inside a cluster removes that whole cluster.
+Undo restores the original byte selection. Search/completion replacement ranges
+and host syntax token ranges remain scalar byte boundaries, so host-controlled
+operations can intentionally target part of a cluster.
+
+`cui_grapheme_next`/`previous`/`boundary` validate complete length-bounded UTF-8,
+including embedded NUL (which the edit buffer itself continues to reject).
+Invalid UTF-8, continuation-byte offsets, and out-of-bounds offsets are rejected.
+They allocate nothing and scan the supplied text. The forward iterator validates
+once and traverses clusters in linear total time; its borrowed text must remain
+unchanged. Textarea seeds this iterator at established row boundaries to avoid
+rescanning the document for every wrap measurement.
+
+Pinned property files, conformance data, SHA-256 checksums, and Unicode License
+V3 are in `third_party/unicode/17.0.0`. Run
+`python3 scripts/generate_grapheme.py --check` to verify generated properties and
+embedded test fixtures. Headless tests cover all 766 official Unicode conformance
+cases, iterator suffixes, keyboard selection/erasure/undo, scalar compatibility,
+invalid inputs, and whole-cluster wrapping/hit geometry. This does not add
+Unicode word segmentation, bidirectional visual navigation, language services,
+or font shaping; those remain separate host/backend responsibilities.

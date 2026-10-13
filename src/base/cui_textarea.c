@@ -2,21 +2,26 @@
 #include "cui/cui_textarea.h"
 #include <math.h>
 #include <string.h>
+/* The edit model guarantees stable valid UTF-8 and row starts are cluster
+ * boundaries. Seed an iterator here without rescanning the remaining document. */
 static size_t cui_textarea_next(cui_str text, size_t at) {
-    if (at >= text.length)
-        return text.length;
-    do {
-        at++;
-    } while (at < text.length && ((unsigned char)text.data[at] & 0xc0) == 0x80);
-    return at;
+    cui_grapheme_iterator iterator = {text, at};
+    return cui_grapheme_iterator_next(&iterator);
 }
-static size_t cui_textarea_previous(cui_str text, size_t at) {
-    if (!at)
-        return 0;
-    do {
-        at--;
-    } while (at && ((unsigned char)text.data[at] & 0xc0) == 0x80);
-    return at;
+static size_t cui_textarea_boundary_after(cui_str text, size_t start, size_t at) {
+    cui_grapheme_iterator iterator = {text, start};
+    while (iterator.offset < at)
+        cui_grapheme_iterator_next(&iterator);
+    return iterator.offset;
+}
+static size_t cui_textarea_boundary_before(cui_str text, size_t start, size_t at, bool strict) {
+    cui_grapheme_iterator iterator = {text, start};
+    size_t previous = start;
+    while (iterator.offset < at) {
+        previous = iterator.offset;
+        cui_grapheme_iterator_next(&iterator);
+    }
+    return !strict && iterator.offset == at ? at : previous;
 }
 static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, size_t end, float font,
                                 cui_text_style style) {
@@ -27,25 +32,22 @@ static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, siz
 static size_t cui_textarea_fit(cui_context *ui, cui_str text, size_t start, size_t end, float font,
                                float width, cui_text_style style) {
     size_t low = start, high = end - start > 64 ? start + 64 : end;
-    while (high < end && ((unsigned char)text.data[high] & 0xc0) == 0x80)
-        high++;
+    high = cui_textarea_boundary_after(text, start, high);
     while (cui_textarea_width(ui, text, start, high, font, style) <= width) {
         low = high;
         if (high == end)
             return end;
         size_t span = high - start;
         high = span > (end - start) / 2 ? end : start + span * 2;
-        while (high < end && ((unsigned char)text.data[high] & 0xc0) == 0x80)
-            high++;
+        high = cui_textarea_boundary_after(text, start, high);
     }
     while (low < high) {
         size_t middle = low + (high - low + 1) / 2;
-        while (middle < high && ((unsigned char)text.data[middle] & 0xc0) == 0x80)
-            middle++;
+        middle = cui_textarea_boundary_after(text, low, middle);
         if (cui_textarea_width(ui, text, start, middle, font, style) <= width)
             low = middle;
         else
-            high = cui_textarea_previous(text, middle);
+            high = cui_textarea_boundary_before(text, low, middle, true);
     }
     return low;
 }
@@ -225,6 +227,7 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
                 size_t word = finish;
                 while (word > start && text.data[word - 1] != ' ' && text.data[word - 1] != '\t')
                     word--;
+                word = cui_textarea_boundary_before(text, start, word, false);
                 if (word > start)
                     finish = word;
                 next = finish;

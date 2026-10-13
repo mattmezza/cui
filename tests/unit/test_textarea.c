@@ -518,7 +518,72 @@ static void test_fold_projection(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_grapheme_geometry(void) {
+    styled_probe probe = {.width = 5};
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
+    const char *clusters[] = {"é", "👩🏽‍💻", "🇨🇭", "क्‍ष", "각", " ́"};
+    for (size_t i = 0; i < sizeof clusters / sizeof clusters[0]; i++) {
+        char buffer[128] = "A";
+        strcat(buffer, clusters[i]);
+        strcat(buffer, "Z");
+        cui_edit *edit = editor(buffer, sizeof buffer);
+        cui_textarea_line lines[32];
+        cui_textarea_state state;
+        assert(cui_textarea_state_init(&state, lines, 32));
+        state.viewport = (cui_rect){0, 0, 100, 100};
+        cui_textarea_metrics metrics = {14, 20, 0, 0};
+        /* A cluster wider than the viewport occupies an overflowing row as a
+         * whole; neither wrapping nor pointer hit testing splits it. */
+        assert(cui_textarea_layout_ex(ui, edit, &state, metrics, 5, true, (cui_text_style){0}) ==
+               CUI_TEXTAREA_OK);
+        assert(state.count == 3);
+        assert(lines[0].end == 1 && lines[1].start == 1);
+        assert(lines[1].end == 1 + strlen(clusters[i]));
+        for (size_t row = 0; row < state.count; row++) {
+            assert(cui_grapheme_boundary(cui_edit_get_text(edit), lines[row].start));
+            assert(cui_grapheme_boundary(cui_edit_get_text(edit), lines[row].end));
+            for (int x = 0; x < 100; x++)
+                assert(cui_grapheme_boundary(
+                    cui_edit_get_text(edit),
+                    cui_textarea_hit_test(ui, edit, &state, (float)x, row * 20.f + 1)));
+        }
+        assert(cui_textarea_layout_ex(ui, edit, &state, metrics, 100, false, (cui_text_style){0}) ==
+               CUI_TEXTAREA_OK);
+        for (int x = 0; x < 100; x++)
+            assert(cui_grapheme_boundary(cui_edit_get_text(edit),
+                                         cui_textarea_hit_test(ui, edit, &state, (float)x, 1)));
+        cui_edit_destroy(edit);
+    }
+    char buffer[128] = "AéZ\nA👩🏽‍💻Z";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_options options = {.width = 220, .height = 100, .no_wrap = true};
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+    cui_focus(ui, 10);
+    key(ui, CUI_KEY_RIGHT, 0);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(cui_edit_get_state(edit).cursor == 4);
+    key(ui, CUI_KEY_DOWN, 0);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(cui_grapheme_boundary(cui_edit_get_text(edit), cui_edit_get_state(edit).cursor));
+    size_t emoji_end = strlen(buffer) - 1;
+    assert(cui_edit_select(edit, emoji_end, emoji_end) == CUI_EDIT_OK);
+    key(ui, CUI_KEY_LEFT, CUI_MOD_SHIFT);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(cui_edit_get_state(edit).cursor == 7);
+    assert(cui_edit_get_state(edit).anchor == emoji_end);
+    key(ui, CUI_KEY_DELETE, 0);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(strcmp(buffer, "AéZ\nAZ") == 0);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_grapheme_geometry();
     test_fold_projection();
     test_complete_text_style();
     test_repeated_down_visible_rows();

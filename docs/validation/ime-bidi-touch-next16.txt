@@ -1,0 +1,17 @@
+Integrated compiled source: 57f8066bf5e4bcc39b2e2867be4eda673c996607.
+Portable source SHA256:3695831d48b6f04349ebeaf22dcb5ea6ebe5020048a9e8a5a60ed8f5642a5e11.
+Native warning build and CTest93/93 PASS; regenerated embedding distributions PASS.
+ASan/UBSan93/93 PASS. Driver-lifetime leak detection disabled; no leak-detector coverage claim.
+WASI77/77 PASS at finite40B per-suite fuel, same frozen fingerprint and clean tracked source.
+Unicode bidi conformance861948 cases PASS in native/sanitizer tests; wrapped line differential checks PASS. WASI bidi checks are separate, without fixture filesystem access.
+Optional headless bidi-OFF warning build/CTest85/85 PASS. Native text bidi-OFF warning targets and text_shaping/text_families/render3/3 PASS, including explicit UNAVAILABLE layout behavior.
+Installed static cui-text/pkg-config consumer: actual Hebrew glyphs and RTL layout PASS.
+Real Chromium native composition:Input/Textarea/Editor/Questionnaire preedit, commit, cancel, read-only/disabled and one-stepUndo PASS.
+Actual CDP touch follow-up16/16 PASS including clipboard content and corrected controlled ToggleGroup.
+Actual CDP touch catalog audit42/42 PASS with all78 stories rendered, after waiting for each keyboard-created editor fixture edit to reach the model. The initial frozen audit41/42 failure is preserved in next16-57-touch-components.log; it measured before pending keyboard edits completed. Pixel-pan assertions are unchanged.
+Full browser suite PASS:78 stories,78 compiled excerpts, components, callbacks, themes, search, docs, mobile and /cui/ path.
+Browser extensions PASS:78 usage guides, real paint pixels, typography/design scales, motion, composed app and mobile.
+Docs5/5, usage5/5, sharing3/3, pinned licenses/hashes, manifest78 and format/distribution checks PASS.
+Later eed8bcd changes documentation/manifest subset status and browser fixture waiting only, with unchanged portable source; docs5/5 and usage5/5 rerunPASS.
+Logs:/home/matteo/.cache/cui-validation/next16-57-{asan-test,wasi,browser,extensions,ime,touch,touch-more,sharing}.log; next16-settled-touch-components.log; next16-freeze-{build,test}.log.
+Full family verification remains0/78. Physical-device/native candidate-window acceptance, remaining editable IME consumers, bidi caret/automatic wrapping, fallback, accessibility and full ecosystem parity remain unfinished. Font fallback is separate next17 work, not this checkpoint.

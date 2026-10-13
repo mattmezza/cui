@@ -67,6 +67,10 @@ owner; this audit does not claim a fix or claim that all controlled groups behav
 this way. A fix must make rendered and semantic states agree after the callback
 without requiring a later unrelated input event.
 
+## Integrated correction
+
+The integrator fixes controlled sibling semantics and requests repaint without replaying callbacks (`2ad721c`). The integrated Chromium follow-up passes all 16 assertions at source `57f8066`; the original baseline defect above remains historical evidence.
+
 ## IME scope and remaining work
 
 The separate [IME documentation](IME.md) and `test_ime.py` explicitly cover four

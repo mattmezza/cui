@@ -333,7 +333,34 @@ static void test_split_layout(void) {
     assert(!memcmp(&before, &split, sizeof split));
     cui_dock_destroy(d);
 }
+static void test_move_split_transaction(void) {
+    cui_dock *d = make();
+    cui_dock_node left = cui_dock_root(d), right, moved = 999;
+    assert(cui_dock_insert(d, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(d, left, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_split(d, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &right) == CUI_DOCK_OK);
+    assert(cui_dock_set_minimum(d, left, 123, 45) == CUI_DOCK_OK);
+    char before[8192], after[8192];
+    serialize(d, before, sizeof before);
+    assert(cui_dock_move_split(d, 1, right, CUI_DOCK_TABS, .5, false, &moved) == CUI_DOCK_INVALID);
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after) && moved == 999);
+    assert(cui_dock_move_split(d, 1, right, CUI_DOCK_SPLIT_VERTICAL, .5, true, &moved) ==
+           CUI_DOCK_OK);
+    cui_dock_node_info info;
+    assert(cui_dock_node_get(d, moved, &info) && info.active_panel == 1);
+    near((float)info.min_width, 123);
+    near((float)info.min_height, 45);
+    serialize(d, before, sizeof before);
+    assert(cui_dock_move_split(d, 1, moved, CUI_DOCK_SPLIT_VERTICAL, .5, false, NULL) !=
+           CUI_DOCK_OK);
+    serialize(d, after, sizeof after);
+    assert(!strcmp(before, after));
+    assert(cui_dock_node_get(d, moved, &info)); /* Rejected transaction preserves generations. */
+    cui_dock_destroy(d);
+}
 int main(void) {
+    test_move_split_transaction();
     test_split_layout();
     test_nested_geometry_move();
     test_serialization_rejection();

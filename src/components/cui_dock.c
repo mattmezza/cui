@@ -20,6 +20,9 @@ struct cui_dock_view {
     uint64_t *keys;
     const cui_dock *model;
     cui_id id;
+    bool dragging, crossed;
+    uint64_t drag_key;
+    float drag_x, drag_y;
 };
 typedef struct dock_scene dock_scene;
 struct dock_scene {
@@ -35,7 +38,91 @@ struct dock_scene {
     bool pending_close, pending_reorder;
     uint64_t close_key, reorder_key;
     size_t reorder_index;
+    bool pending_drop, edge_before;
+    cui_dock_node destination;
+    cui_dock_kind edge_axis;
 };
+static bool contains(cui_rect b, float x, float y) {
+    return b.w > 0 && b.h > 0 && x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h;
+}
+static void drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(s->dock, node, &info))
+        return;
+    if (info.kind != CUI_DOCK_TABS) {
+        drop_target(s, info.first, x, y);
+        drop_target(s, info.second, x, y);
+        return;
+    }
+    cui_rect b = cui_bounds(s->ui, cui_dock_group_id(s->id, node));
+    if (!contains(b, x, y))
+        return;
+    cui_dock_node source;
+    if (!cui_dock_panel_find(s->dock, s->view->drag_key, &source, NULL))
+        return;
+    float dx = fminf(32, b.w * .2f), dy = fminf(32, b.h * .2f);
+    bool edge = false;
+    if (y >= b.y + s->options.tab_height) {
+        if (x < b.x + dx || x > b.x + b.w - dx) {
+            edge = true;
+            s->edge_axis = CUI_DOCK_SPLIT_HORIZONTAL;
+            s->edge_before = x < b.x + dx;
+        } else if (y < b.y + s->options.tab_height + dy || y > b.y + b.h - dy) {
+            edge = true;
+            s->edge_axis = CUI_DOCK_SPLIT_VERTICAL;
+            s->edge_before = y < b.y + s->options.tab_height + dy;
+        }
+    }
+    if (source != node || edge) {
+        s->pending_drop = true;
+        s->destination = node;
+        if (!edge)
+            s->edge_axis = CUI_DOCK_TABS;
+    }
+}
+static void drag_events(dock_scene *s) {
+    cui_dock_view *v = s->view;
+    if (s->options.disabled || !s->options.allow_reorder) {
+        v->dragging = false;
+        return;
+    }
+    size_t count;
+    const cui_event *events = cui_frame_events(s->ui, &count);
+    for (size_t e = 0; e < count; ++e) {
+        cui_event event = events[e];
+        if (event.type == CUI_EVENT_CANCEL ||
+            (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ESCAPE)) {
+            v->dragging = false;
+            for (size_t i = 0; i < v->count; ++i)
+                memset(&v->cache[i].drag, 0, sizeof v->cache[i].drag);
+        } else if (event.type == CUI_EVENT_POINTER_DOWN &&
+                   event.pointer_button == CUI_POINTER_PRIMARY) {
+            for (size_t i = 0; i < s->panel_count; ++i) {
+                const cui_dock_panel *panel = &s->panels[i];
+                if (!panel->disabled && cui_dock_panel_find(s->dock, panel->key, NULL, NULL) &&
+                    contains(cui_bounds(s->ui, cui_dock_tab_id(s->id, panel->key)), event.x,
+                             event.y) &&
+                    !contains(cui_bounds(s->ui, cui_dock_close_id(s->id, panel->key)), event.x,
+                              event.y)) {
+                    v->dragging = true;
+                    v->crossed = false;
+                    v->drag_key = panel->key;
+                    v->drag_x = event.x;
+                    v->drag_y = event.y;
+                    break;
+                }
+            }
+        } else if (v->dragging && event.type == CUI_EVENT_POINTER_MOVE) {
+            if (hypotf(event.x - v->drag_x, event.y - v->drag_y) >= 6)
+                v->crossed = true;
+        } else if (v->dragging && event.type == CUI_EVENT_POINTER_UP &&
+                   event.pointer_button == CUI_POINTER_PRIMARY) {
+            if (v->crossed)
+                drop_target(s, cui_dock_root(s->dock), event.x, event.y);
+            v->dragging = false;
+        }
+    }
+}
 static bool first_active(const cui_dock *model, cui_dock_node node, uint64_t *key) {
     cui_dock_node_info info;
     if (!cui_dock_node_get(model, node, &info))
@@ -107,6 +194,8 @@ void cui_dock_view_reset(cui_dock_view *view) {
         return;
     memset(view->cache, 0, view->node_capacity * sizeof *view->cache);
     view->count = 0;
+    view->dragging = false;
+    view->crossed = false;
     view->model = NULL;
     view->id = 0;
 }
@@ -428,6 +517,7 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                         .panel_count = count,
                         .options = options,
                         .result = {.error = CUI_DOCK_OK, .fit_minimum = true}};
+    drag_events(&scene);
     size_t leaves = 0;
     bool fit = true;
     error = cui_dock_layout(model, (cui_rect){0, 0, options.width, options.height}, 0, NULL, 0,
@@ -458,6 +548,26 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
                 cui_focus(ui, cui_dock_tab_id(id, survivor));
             cui_invalidate(ui);
         }
+    } else if (scene.pending_drop) {
+        cui_dock_node destination = scene.destination;
+        cui_dock_result drop;
+        if (scene.edge_axis == CUI_DOCK_TABS)
+            drop = cui_dock_move(model, view->drag_key, destination, SIZE_MAX);
+        else if (nodes + 2 > view->node_capacity)
+            drop = CUI_DOCK_CAPACITY;
+        else
+            drop = cui_dock_move_split(model, view->drag_key, destination, scene.edge_axis, .5,
+                                       scene.edge_before, &destination);
+        if (drop == CUI_DOCK_OK) {
+            scene.result.moved = true;
+            scene.result.split = scene.edge_axis != CUI_DOCK_TABS;
+            scene.result.moved_panel = view->drag_key;
+            emit(&scene, scene.result.split ? CUI_DOCK_SPLIT : CUI_DOCK_MOVED, view->drag_key,
+                 destination);
+            cui_focus(ui, cui_dock_tab_id(id, view->drag_key));
+            cui_invalidate(ui);
+        } else
+            scene.result.error = drop;
     } else if (scene.pending_reorder) {
         cui_dock_node node;
         if (cui_dock_panel_find(model, scene.reorder_key, &node, NULL) &&

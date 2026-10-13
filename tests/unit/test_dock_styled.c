@@ -11,7 +11,9 @@ static cui_dock_view *view;
 static const cui_id workspace = 500;
 static cui_dock_panel panels[5];
 static unsigned rendered[5], selected_events, closed_events, reordered_events, resized_events;
+static unsigned moved_events, split_events;
 static cui_dock_view_result result;
+static cui_dock_result expected_error;
 static cui_dock_view_options options;
 static void content(cui_context *ctx, uint64_t key, void *user) {
     (void)user;
@@ -34,13 +36,17 @@ static void event(void *user, cui_dock_event kind, uint64_t key, cui_dock_node n
         ++reordered_events;
     else if (kind == CUI_DOCK_RESIZED)
         ++resized_events;
+    else if (kind == CUI_DOCK_MOVED)
+        ++moved_events;
+    else if (kind == CUI_DOCK_SPLIT)
+        ++split_events;
 }
 static void frame(void) {
     cui_theme theme = cui_theme_light();
     assert(cui_begin_frame(ui, 640, 480, .016f));
     result = cui_dock_view_render(ui, workspace, &theme, model, view, panels, 5, options);
     cui_draw_list commands = cui_end_frame(ui);
-    assert(result.error == CUI_DOCK_OK && cui_last_error(ui) == CUI_OK && commands.count > 0);
+    assert(result.error == expected_error && cui_last_error(ui) == CUI_OK && commands.count > 0);
     for (size_t i = 0; i < commands.count; ++i) {
         cui_rect b = commands.commands[i].bounds;
         assert(isfinite(b.x) && isfinite(b.y) && isfinite(b.w) && isfinite(b.h));
@@ -65,6 +71,118 @@ static uint64_t active(cui_dock_node node) {
     cui_dock_node_info info;
     assert(cui_dock_node_get(model, node, &info) && info.has_active);
     return info.active_panel;
+}
+static void gesture(uint64_t key, cui_dock_node target, unsigned edge, cui_event_type cancel) {
+    frame();
+    frame();
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(workspace, key));
+    cui_rect group = cui_bounds(ui, cui_dock_group_id(workspace, target));
+    assert(tab.w > 0 && group.w > 0);
+    float x = group.x + group.w / 2, y = group.y + group.h / 2;
+    if (edge == 1)
+        x = group.x + 2;
+    if (edge == 2)
+        x = group.x + group.w - 2;
+    if (edge == 3)
+        y = group.y + options.tab_height + 2;
+    if (edge == 4)
+        y = group.y + group.h - 2;
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, x, y);
+    frame();
+    if (cancel == CUI_EVENT_CANCEL) {
+        pointer(CUI_EVENT_CANCEL, x, y);
+        frame();
+    }
+    if (cancel == CUI_EVENT_KEY_DOWN) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+        frame();
+    }
+    pointer(CUI_EVENT_POINTER_UP, x, y);
+    frame();
+}
+static void test_cross_group(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    assert(model);
+    cui_dock_node left = cui_dock_root(model), right, found;
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, left, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &right) ==
+           CUI_DOCK_OK);
+    gesture(1, right, 0, CUI_EVENT_CANCEL);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    gesture(1, right, 0, CUI_EVENT_KEY_DOWN);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    panels[1].disabled = true;
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    panels[1].disabled = false;
+    options.allow_reorder = false;
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    options.allow_reorder = true;
+    options.disabled = true;
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == left);
+    options.disabled = false;
+    gesture(1, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(result.moved && !result.split && active(right) == 1 && moved_events == 1);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found == right);
+    gesture(1, left, 1, CUI_EVENT_POINTER_MOVE);
+    assert(result.moved && result.split && split_events == 1);
+    assert(cui_dock_panel_find(model, 1, &found, NULL) && found != left);
+    cui_dock_node_info info;
+    assert(cui_dock_node_get(model, cui_dock_root(model), &info));
+    assert(cui_focused(ui) == cui_dock_tab_id(workspace, 1));
+    /* Dropping outside the workspace cancels, with no structural change. */
+    frame();
+    cui_rect outside_tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    pointer(CUI_EVENT_POINTER_DOWN, outside_tab.x + 8, outside_tab.y + outside_tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, 900, 900);
+    frame();
+    pointer(CUI_EVENT_POINTER_UP, 900, 900);
+    frame();
+    assert(!result.moved && cui_dock_panel_find(model, 1, &found, NULL) && found != left);
+    /* All four edge orientations, including splitting within the same group. */
+    for (unsigned edge = 2; edge <= 4; ++edge) {
+        assert(cui_dock_move(model, 1, left, SIZE_MAX) == CUI_DOCK_OK);
+        gesture(1, left, edge, CUI_EVENT_POINTER_MOVE);
+        assert(result.split && cui_dock_panel_find(model, 1, &found, NULL) && found != left);
+    }
+    /* A full three-node model rejects split creation without changing serialization. */
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){.node_capacity = 3, .panel_capacity = 3});
+    left = cui_dock_root(model);
+    assert(cui_dock_insert(model, left, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(model, left, 1, 1) == CUI_DOCK_OK);
+    assert(cui_dock_split(model, left, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, &right) ==
+           CUI_DOCK_OK);
+    char before[4096], after[4096];
+    size_t length;
+    frame();
+    /* Pointer down selects the dragged tab; compare after that intentional selection. */
+    assert(cui_dock_activate(model, 1) == CUI_DOCK_OK);
+    assert(cui_dock_serialize(model, before, sizeof before, &length) == CUI_DOCK_OK);
+    /* Only release can reject; prior frames remain successful. */
+    expected_error = CUI_DOCK_OK;
+    frame();
+    frame();
+    cui_rect tab = cui_bounds(ui, cui_dock_tab_id(workspace, 1));
+    cui_rect group = cui_bounds(ui, cui_dock_group_id(workspace, right));
+    pointer(CUI_EVENT_POINTER_DOWN, tab.x + 8, tab.y + tab.h / 2);
+    frame();
+    pointer(CUI_EVENT_POINTER_MOVE, group.x + 2, group.y + group.h / 2);
+    frame();
+    expected_error = CUI_DOCK_CAPACITY;
+    pointer(CUI_EVENT_POINTER_UP, group.x + 2, group.y + group.h / 2);
+    frame();
+    expected_error = CUI_DOCK_OK;
+    assert(!result.moved);
+    assert(cui_dock_serialize(model, after, sizeof after, &length) == CUI_DOCK_OK);
+    assert(!strcmp(before, after));
 }
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
@@ -187,6 +305,7 @@ int main(void) {
            CUI_DOCK_CAPACITY);
     cui_end_frame(ui);
     cui_dock_view_destroy(small);
+    test_cross_group();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

@@ -49,6 +49,11 @@ cui_dock_result cui_dock_split(cui_dock *dock, cui_dock_node tab, cui_dock_kind 
                                uint64_t new_panel, bool before, cui_dock_node *new_tab);
 cui_dock_result cui_dock_move(cui_dock *dock, uint64_t panel, cui_dock_node destination,
                               size_t index);
+/* Atomically move an existing panel into a new split beside destination.
+ * Rejection preserves the model and output. A sole panel cannot split itself. */
+cui_dock_result cui_dock_move_split(cui_dock *, uint64_t panel, cui_dock_node destination,
+                                    cui_dock_kind axis, double ratio, bool before,
+                                    cui_dock_node *new_tab);
 cui_dock_result cui_dock_reorder(cui_dock *dock, uint64_t panel, size_t index);
 cui_dock_result cui_dock_remove(cui_dock *dock, uint64_t panel);
 cui_dock_result cui_dock_activate(cui_dock *dock, uint64_t panel);
@@ -88,7 +93,9 @@ typedef enum {
     CUI_DOCK_SELECTED,
     CUI_DOCK_CLOSED,
     CUI_DOCK_REORDERED,
-    CUI_DOCK_RESIZED
+    CUI_DOCK_RESIZED,
+    CUI_DOCK_MOVED,
+    CUI_DOCK_SPLIT
 } cui_dock_event;
 typedef struct {
     float width, height, tab_height, key_step;
@@ -100,6 +107,8 @@ typedef struct {
 typedef struct {
     cui_dock_result error;
     bool selected, closed, reordered, resized, fit_minimum;
+    bool moved, split;
+    uint64_t moved_panel;
     uint64_t selected_panel, closed_panel, reordered_panel;
 } cui_dock_view_result;
 /* Bounded retained interaction storage, no per-frame allocation. Defaults 128/256. */

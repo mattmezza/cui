@@ -327,6 +327,36 @@ cui_dock_result cui_dock_move(cui_dock *d, uint64_t key, cui_dock_node id, size_
         cui_dock_private_collapse(&d->state, old);
     return CUI_DOCK_OK;
 }
+cui_dock_result cui_dock_move_split(cui_dock *d, uint64_t key, cui_dock_node destination,
+                                    cui_dock_kind axis, double ratio, bool before,
+                                    cui_dock_node *out) {
+    if (!d)
+        return CUI_DOCK_INVALID;
+    cui_dock_node source;
+    cui_dock_node_info source_info;
+    if (!cui_dock_panel_find(d, key, &source, NULL) || !cui_dock_node_get(d, source, &source_info))
+        return CUI_DOCK_NOT_FOUND;
+    cui_dock trial = *d;
+    trial.state = d->scratch;
+    trial.state.root = d->state.root;
+    memcpy(trial.state.nodes, d->state.nodes, d->config.node_capacity * sizeof(*d->state.nodes));
+    memcpy(trial.state.panels, d->state.panels,
+           d->config.panel_capacity * sizeof(*d->state.panels));
+    cui_dock_result result = cui_dock_remove(&trial, key);
+    cui_dock_node node;
+    if (result == CUI_DOCK_OK)
+        result = cui_dock_split(&trial, destination, axis, ratio, key, before, &node);
+    if (result != CUI_DOCK_OK)
+        return result;
+    cui_dock_set_minimum(&trial, node, source_info.min_width, source_info.min_height);
+    cui_dock_private_state old = d->state;
+    d->state = trial.state;
+    d->scratch = old;
+    d->generation = trial.generation;
+    if (out)
+        *out = node;
+    return CUI_DOCK_OK;
+}
 cui_dock_result cui_dock_reorder(cui_dock *d, uint64_t key, size_t index) {
     cui_dock_node n;
     if (!cui_dock_panel_find(d, key, &n, NULL))

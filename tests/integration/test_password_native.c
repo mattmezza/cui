@@ -91,8 +91,11 @@ static void glyph(void *p, int x, int y, int w, int h, int pitch, const unsigned
             r->pixels += value != 0;
         }
 }
-int main(void) {
-    cui_font *font = cui_font_open("/usr/share/fonts/noto/NotoSans-Regular.ttf");
+int main(int argc, char **argv) {
+    const char *font_path = argc > 1 ? argv[1] : getenv("CUI_TEST_FONT");
+    if (!font_path || !font_path[0])
+        return 77;
+    cui_font *font = cui_font_open(font_path);
     if (!font)
         return 77;
     host h = {.font = font};

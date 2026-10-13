@@ -163,7 +163,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; no dynamic visibility predicate, automatic added/removed/active lifecycle hook or panel-specific dump callback. |
 | `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. No named factory registry or automatic panel construction from payload JSON. |
 | `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
-| Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Per-title chrome colors, Auto-vs-TabBar mode and `title_bar`/`inner_padding` overrides remain gaps. |
+| Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Per-title chrome colors remain a gap. |
 | Component `ToggleZoom`, `ClosePanel` | Real controls and close shortcut with focus/policy gates; user zoom is withheld when controls are None, and restore stays reachable. No Rust action dispatch registration. |
 
 Native floating is not exported or described as a Dock feature in the frozen modules/docs. The occurrences of detach refer to panel removal/reinsertion or detached asynchronous tasks, not native window creation. A future CUI multiwindow host example is an optional extension and cannot stand in for the source gaps above.
@@ -204,4 +204,22 @@ panel.title_width = 140;
 panel.user = &theme;
 ```
 
-Headless tests verify real custom text/clip commands, unchanged semantic names, active-only suffix ownership and immediate selection routing, clickable suffix controls, disabled/collapsed gates, 160px pane allocation/hit isolation, stable key behavior after restore and atomic descriptor rejection. Per-title chrome colors, automatic simple-title mode and title-bar/content-padding overrides remain separate audited work.
+Headless tests verify real custom text/clip commands, unchanged semantic names, active-only suffix ownership and immediate selection routing, clickable suffix controls, disabled/collapsed gates, 160px pane allocation/hit isolation, stable key behavior after restore and atomic descriptor rejection. Per-title chrome colors remain separate audited work; modes and padding are described below.
+
+## Auto title mode and panel-owned chrome
+
+Set `view_options.panel_style = CUI_DOCK_PANEL_AUTO` to choose a 30 logical-pixel simple title when a group contains one panel. It retains the panel's semantic name, stable title key, focus/drag source, custom title/suffix callbacks and SVG close control. When groups merge to hold multiple panels they automatically return to real tabs. `CUI_DOCK_PANEL_TAB_BAR` (zero) preserves the original always-tabs presentation. A simple title clips long content; it does not replace it with a synthesized shortened semantic name.
+
+In Auto single-panel mode, `panel.hide_title_bar = true` lets a self-chromed panel use the whole allocated pane: no title, close/menu or ordinary toolbar row is submitted. Multiple-panel groups still show tabs so every panel remains reachable; collapsed groups still show their reopening strip. An already maximized panel always retains its restore control even if it hides its own title bar. This is view presentation only; serialization and the panel key are unchanged.
+
+Frozen `TabGroupSkin::panel_frame` applies its `inner_padding` hook as an 8px **top** spacer only in groups with more than one panel. Set `view_options.inner_padding = true` for that behavior; `panel.omit_inner_padding = true` removes it for the active panel. Single-panel content receives no spacer, regardless of title mode. Defaults preserve the original CUI zero-padding behavior. Choose Auto and inner_padding explicitly when adopting the frozen presentation defaults:
+
+```c
+options.panel_style = CUI_DOCK_PANEL_AUTO;
+options.inner_padding = true;
+/* A panel that paints its own header can use: */
+panel.hide_title_bar = true;
+panel.omit_inner_padding = true;
+```
+
+Headless tests assert simple-label versus tab semantics, exact content-origin changes for title hiding and top spacing, active-panel padding override, collapsed reachability, custom-title/suffix invocation in Auto mode, close-policy veto and real cross-group dragging from a simple title. Mode validation rejects invalid enum values before callbacks or scene submission.

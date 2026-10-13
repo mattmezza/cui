@@ -1186,6 +1186,126 @@ static void test_title_composition(void) {
     }
     frame();
 }
+static cui_role semantic_role(cui_id id) {
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (semantics[i].id == id)
+            return semantics[i].role;
+    return CUI_ROLE_NONE;
+}
+static void test_title_modes_padding(void) {
+    cui_dock_destroy(model);
+    model = cui_dock_create((cui_dock_config){0});
+    assert(model);
+    options.panel_style = CUI_DOCK_PANEL_AUTO;
+    options.hide_menu = true;
+    panels[0].zoomable = false;
+    panels[0].hide_title_bar = true;
+    assert(cui_dock_insert(model, cui_dock_root(model), 0, SIZE_MAX) == CUI_DOCK_OK);
+    frame();
+    frame();
+    cui_id title = cui_dock_tab_id(workspace, 0);
+    assert(cui_bounds(ui, title).w == 0);
+    float content_origin = cui_bounds(ui, 800).y;
+    assert(cui_bounds(ui, cui_dock_menu_id(workspace, 0)).w == 0);
+    panels[0].hide_title_bar = false;
+    frame();
+    frame();
+    assert(semantic_role(title) == CUI_ROLE_LABEL && cui_bounds(ui, title).h == 30);
+    assert(cui_bounds(ui, 800).y == content_origin + 30 &&
+           cui_bounds(ui, cui_dock_close_id(workspace, 0)).w > 0);
+    panels[0].title_render = custom_title;
+    panels[0].title_width = 60;
+    panels[0].title_suffix = custom_suffix;
+    panels[0].title_suffix_width = 64;
+    panels[0].user = &title_calls;
+    unsigned title_before = title_calls[0], suffix_before = suffix_calls[0];
+    frame();
+    assert(title_calls[0] > title_before && suffix_calls[0] > suffix_before);
+    assert(cui_bounds(ui, 950).h <= 30);
+    panels[0].title_render = panels[0].title_suffix = NULL;
+    panels[0].title_width = panels[0].title_suffix_width = 0;
+    panels[0].user = NULL;
+    assert(cui_dock_insert(model, cui_dock_root(model), 1, SIZE_MAX) == CUI_DOCK_OK);
+    panels[0].hide_title_bar = true;
+    frame();
+    frame();
+    assert(semantic_role(title) == CUI_ROLE_TAB &&
+           cui_bounds(ui, 800).y == content_origin + options.tab_height);
+    options.inner_padding = true;
+    frame();
+    frame();
+    assert(cui_bounds(ui, 800).y == content_origin + options.tab_height + 8);
+    panels[0].omit_inner_padding = true;
+    frame();
+    frame();
+    assert(cui_bounds(ui, 800).y == content_origin + options.tab_height);
+    click(cui_dock_tab_id(workspace, 1));
+    frame();
+    assert(cui_bounds(ui, 801).y == content_origin + options.tab_height + 8);
+    assert(cui_dock_remove(model, 1) == CUI_DOCK_OK);
+    panels[0].hide_title_bar = false;
+    frame();
+    frame();
+    assert(cui_bounds(ui, 800).y ==
+           content_origin + 30); /* Source padding applies only to multiple panels. */
+    /* A collapsed group remains a reachable strip even for self-chromed Auto panels. */
+    panels[0].hide_title_bar = true;
+    options.collapsed = true;
+    unsigned previous = rendered[0];
+    frame();
+    assert(semantic_role(title) == CUI_ROLE_TAB && rendered[0] == previous);
+    options.collapsed = false;
+    /* Programmatic zoom cannot strand a panel that hides its title bar. */
+    panels[0].zoomable = true;
+    assert(cui_dock_view_set_zoom(view, model, 0, true));
+    frame();
+    assert(cui_bounds(ui, cui_dock_zoom_id(workspace, 0)).w > 0);
+    click(cui_dock_zoom_id(workspace, 0));
+    assert(result.restored);
+    frame();
+    assert(cui_bounds(ui, title).w == 0 && cui_bounds(ui, 800).y == content_origin);
+    /* Always-tabs overrides the Auto-only title-bar opt-out. */
+    panels[0].zoomable = false;
+    options.panel_style = CUI_DOCK_PANEL_TAB_BAR;
+    frame();
+    assert(semantic_role(title) == CUI_ROLE_TAB);
+    options.panel_style = (cui_dock_panel_style)99;
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    assert(cui_dock_view_render(ui, workspace, &theme, model, view, panels, 5, options).error ==
+           CUI_DOCK_INVALID);
+    assert(!cui_end_frame(ui).count);
+    options.panel_style = CUI_DOCK_PANEL_AUTO;
+    panels[0].hide_title_bar = false;
+    frame();
+    frame();
+    options.allow_operation = policy;
+    options.policy_user = &policy_calls;
+    deny_operation = CUI_DOCK_CLOSED;
+    cui_focus(ui, title);
+    key(CUI_KEY_W, CUI_MOD_CTRL);
+    assert(result.denied && cui_dock_panel_find(model, 0, NULL, NULL));
+    options.allow_operation = NULL;
+    options.policy_user = NULL;
+    click(cui_dock_close_id(workspace, 0));
+    assert(result.closed && !cui_dock_panel_find(model, 0, NULL, NULL));
+    frame();
+    /* Simple titles remain actual cross-group drag sources, not decorative labels. */
+    assert(cui_dock_insert(model, cui_dock_root(model), 0, 0) == CUI_DOCK_OK);
+    cui_dock_node right, found;
+    assert(cui_dock_split(model, cui_dock_root(model), CUI_DOCK_SPLIT_HORIZONTAL, .5, 1, false,
+                          &right) == CUI_DOCK_OK);
+    gesture(0, right, 0, CUI_EVENT_POINTER_MOVE);
+    assert(result.moved && cui_dock_panel_find(model, 0, &found, NULL) && found == right);
+    frame();
+    assert(semantic_role(title) == CUI_ROLE_TAB); /* Merged group returns to real tabs. */
+    options.panel_style = CUI_DOCK_PANEL_TAB_BAR;
+    options.inner_padding = false;
+    options.hide_menu = false;
+    panels[0].omit_inner_padding = false;
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
@@ -1315,6 +1435,7 @@ int main(void) {
     test_oversized_content();
     test_panel_menus();
     test_title_composition();
+    test_title_modes_padding();
     /* Invalid registries submit nothing; missing metadata remains a safe placeholder. */
     assert(cui_begin_frame(ui, 640, 480, .016f));
     cui_dock_panel duplicate[2] = {panels[0], panels[0]};

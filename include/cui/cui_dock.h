@@ -106,6 +106,7 @@ typedef enum {
     CUI_DOCK_ZOOM_TOOLBAR,
     CUI_DOCK_ZOOM_NONE
 } cui_dock_zoom_control;
+typedef enum { CUI_DOCK_PANEL_TAB_BAR, CUI_DOCK_PANEL_AUTO } cui_dock_panel_style;
 typedef struct {
     uint64_t key;
     cui_str title;
@@ -123,6 +124,8 @@ typedef struct {
     void (*title_render)(cui_context *, uint64_t panel, void *user);
     void (*title_suffix)(cui_context *, uint64_t panel, void *user);
     float title_width, title_suffix_width;
+    bool hide_title_bar; /* Auto single-panel mode; multiple/collapsed tabs remain reachable. */
+    bool omit_inner_padding;
 } cui_dock_panel;
 typedef enum {
     CUI_DOCK_SELECTED,
@@ -158,7 +161,9 @@ typedef struct {
     cui_dock_drag_palette drag_palette;
     float toolbar_height; /* Zero defaults to 32 when a toolbar/control is present. */
     bool hide_menu;
-    bool collapsed; /* Tab strip only: no close/zoom/content or drag actions. */
+    bool collapsed;                   /* Tab strip only: no close/zoom/content or drag actions. */
+    cui_dock_panel_style panel_style; /* Zero preserves the original always-tabs presentation. */
+    bool inner_padding; /* Source 8px top spacing in multi-panel groups; panel may omit it. */
 } cui_dock_view_options;
 typedef struct {
     cui_dock_result error;

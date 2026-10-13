@@ -10,8 +10,11 @@ typedef enum {
     CUI_ALERT_INFO,
     CUI_ALERT_SUCCESS,
     CUI_ALERT_WARNING,
-    CUI_ALERT_ERROR
+    CUI_ALERT_ERROR,
+    CUI_ALERT_DEFAULT
 } cui_alert_kind;
+typedef void (*cui_content_slot_fn)(cui_context *, const cui_theme *, cui_color foreground,
+                                    void *user);
 typedef struct {
     cui_alert_kind kind;
     cui_str title, message, icon;
@@ -22,6 +25,9 @@ typedef struct {
     bool dismissible;
     /* Named SVG; empty selects the kind's default. Legacy icon text overrides it. */
     cui_str icon_name;
+    cui_content_slot_fn title_content, content, action;
+    void *user;
+    cui_str accessible_name; /* Required for custom content without message text. */
 } cui_alert_options;
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options);
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
@@ -84,6 +90,38 @@ typedef enum {
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *theme,
                       cui_bubble_variant variant, float width);
 void cui_end_bubble(cui_context *ui);
+/* Slot foreground is semantic; custom children choose their own paint explicitly. */
+cui_color cui_bubble_foreground(const cui_theme *, cui_bubble_variant);
+typedef enum { CUI_BUBBLE_INCOMING, CUI_BUBBLE_OUTGOING } cui_bubble_alignment;
+typedef enum { CUI_BUBBLE_REACTIONS_BOTTOM, CUI_BUBBLE_REACTIONS_TOP } cui_bubble_reaction_side;
+typedef enum {
+    CUI_BUBBLE_ANNOUNCE_NONE,
+    CUI_BUBBLE_ANNOUNCE_POLITE,
+    CUI_BUBBLE_ANNOUNCE_ASSERTIVE
+} cui_bubble_announcement;
+/* Optional caller-owned measurement cache; zero initialize, never share between IDs. */
+typedef struct {
+    cui_rect surface, reactions, row;
+    bool measured;
+    uint64_t revision;
+    float width, font_size, padding;
+    unsigned configuration;
+} cui_bubble_state;
+typedef struct {
+    cui_bubble_variant variant;
+    cui_bubble_alignment alignment;
+    cui_bubble_reaction_side reaction_side;
+    cui_bubble_alignment reaction_alignment;
+    cui_bubble_announcement announcement;
+    float width; /* Row width; surface is capped at 80%, ghost at 100%. */
+    cui_str message, accessible_name;
+    cui_content_slot_fn content, reactions;
+    void *user;
+    cui_bubble_state *state;   /* NULL retains normal-flow reactions. */
+    uint64_t content_revision; /* Increment when custom slot geometry changes. */
+} cui_bubble_options;
+/* Synchronous borrowed slots. Reaction controls retain their base button semantics. */
+void cui_bubble(cui_context *, cui_id, const cui_theme *, cui_bubble_options);
 void cui_empty(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,
                cui_str description, float width);
 void cui_begin_group_box(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,

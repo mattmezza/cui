@@ -1108,6 +1108,21 @@ static void gallery_radio_change(void *user, cui_id selected) {
 unsigned gallery_radio_stat(unsigned field) {
     return field == 0 ? radio_requests : 0;
 }
+static cui_bubble_state gallery_bubble_states[4];
+typedef struct { const char *key; bool liked, disabled; } gallery_bubble_reaction_data;
+static gallery_bubble_reaction_data gallery_bubble_reactions[4];
+static void gallery_bubble_reaction(cui_context *context, const cui_theme *theme,
+                                    cui_color foreground, void *user) {
+    gallery_bubble_reaction_data *data = user;
+    cui_push_id(context, data->key);
+    if (cui_button(context, cui_id_from(context, "reaction"), theme,
+                   cui_string(data->liked ? "Liked · 3" : "Liked · 2"), data->disabled)) {
+        data->liked = !data->liked;
+        cui_invalidate(context);
+    }
+    cui_pop_id(context);
+    (void)foreground;
+}
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
 static bool dropdown_outline, dropdown_selected;
@@ -3803,10 +3818,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             "Info: a new version is available.", "Success: your changes are saved.",
             "Warning: storage is almost full.", "Error: upload failed. Please retry."};
         for (unsigned kind = 0; kind < 4; kind++) {
-            cui_begin_bubble(ui, cui_id_from(ui, messages[kind]), &t,
-                             (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), width - 48);
-            cui_label(ui, &t, cui_string(messages[kind]));
-            cui_end_bubble(ui);
+            gallery_bubble_reactions[kind].key = messages[kind];
+            gallery_bubble_reactions[kind].disabled = disabled != 0;
+            cui_bubble(ui, cui_id_from(ui, messages[kind]), &t,
+                       (cui_bubble_options){.variant = (cui_bubble_variant)(CUI_BUBBLE_INFO + kind),
+                                            .alignment = kind % 2 ? CUI_BUBBLE_OUTGOING : CUI_BUBBLE_INCOMING,
+                                            .reaction_alignment = kind % 2 ? CUI_BUBBLE_OUTGOING : CUI_BUBBLE_INCOMING,
+                                            .reaction_side = kind == 0 ? CUI_BUBBLE_REACTIONS_TOP : CUI_BUBBLE_REACTIONS_BOTTOM,
+                                            .width = width - 48, .message = cui_string(messages[kind]),
+                                            .reactions = gallery_bubble_reaction,
+                                            .state = &gallery_bubble_states[kind],
+                                            .user = &gallery_bubble_reactions[kind]});
         }
         break;
     }

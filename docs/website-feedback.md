@@ -110,3 +110,5 @@ These points remain tracked until integrated and deployed verification, alongsid
 Additional open feedback: Alert/Bubble semantic styles; intrinsic HoverCard; reusable Message conversation; Notification action/close separation; shared optional scrollbar appearance/auto-hide across families; Python native example and clearly documented Node JavaScript/TypeScript startup.
 
 Python and Node JavaScript/TypeScript startup examples are now published and verified, including both actual Copy-button recipes; native pointer callbacks are documented in validation/python-node-native.txt. This is a small example host ABI, not complete cross-language component bindings.
+
+- [ ] Attachment design sizes: horizontal base-height cards clip subtitle/action content; card and auto group heights must fit contents across all14 sizes and both densities. Screenshot reproduced13October; isolated correction in progress.

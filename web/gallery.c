@@ -3143,7 +3143,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_radio_group_item items[] = {
             {cui_id_from(ui, "radio-a"), cui_string("Standard"), false},
             {cui_id_from(ui, "radio-b"), cui_string("Priority"), false},
-            {cui_id_from(ui, "radio-c"), cui_string("Express (unavailable)"), true}};
+            {cui_id_from(ui, "radio-c"), cui_string("Express unavailable"), true}};
         if (!radio_selected)
             radio_selected = items[0].id;
         cui_radio_group(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,

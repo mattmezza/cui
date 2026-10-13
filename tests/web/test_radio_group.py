@@ -37,10 +37,10 @@ def main():
                 group=a.target('Delivery options',42)
                 assert group['f'][16]==2 # Vertical orientation.
                 selected('Standard')
-                for i,name in enumerate(['Standard','Priority','Express (unavailable)']):
+                for i,name in enumerate(['Standard','Priority','Express unavailable']):
                     node=a.target(name,4)
                     assert node['f'][31]==i+1 and node['f'][32]==3
-                assert a.target('Express (unavailable)',4)['f'][5]
+                assert a.target('Express unavailable',4)['f'][5]
             a.case('Radio','named collection, set positions and disabled item',collection)
             def pointer():
                 count=a.page.evaluate('cuiGallery.exports.gallery_radio_stat(0)')

@@ -1122,7 +1122,7 @@ static cui_color plot_cached_primary, plot_cached_surface;
 static unsigned plot_cached_width;
 static int plot_mode, plot_cached_mode = -1;
 void gallery_plot_mode(int mode) {
-    plot_mode = mode >= 0 && mode <= 3 ? mode : 0;
+    plot_mode = mode >= 0 && mode <= 6 ? mode : 0;
 }
 static cui_overlay trap;
 static int clipboard_request;
@@ -3634,12 +3634,43 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     commands[i].point.x += plot_width / 2;
                     commands[i].point.y += 77;
                 }
+            } else if (plot_mode == 5 || plot_mode == 6) {
+                /* The same projected samples feed source rounded bars/dot geometry.
+                 * Every eighth sample keeps the small software preview inexpensive. */
+                result = CUI_PLOT_OK;
+                for (size_t i = 0; i < 33 && result == CUI_PLOT_OK; i += 8) {
+                    double cross = samples[i].x - 4, baseline = samples[i].y0;
+                    double value = samples[i].y1, band = 8;
+                    double radii[4] = {3, 3, 0, 0};
+                    if (plot_mode == 6) {
+                        cui_plot_dot_geometry dot;
+                        result = cui_plot_dot_layout((cui_plot_point){samples[i].x, samples[i].y1},
+                                                     8, &dot);
+                        if (result != CUI_PLOT_OK)
+                            break;
+                        cross = dot.frame.x_min;
+                        baseline = dot.frame.y_max;
+                        value = dot.frame.y_min;
+                        band = dot.frame.x_max - dot.frame.x_min;
+                        for (size_t corner = 0; corner < 4; corner++)
+                            radii[corner] = dot.radius;
+                    }
+                    size_t written = 0;
+                    result =
+                        cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, cross, band, baseline, value, radii,
+                                          commands + command_count, 256 - command_count, &written);
+                    if (result == CUI_PLOT_OK)
+                        command_count += written;
+                }
             } else
-                result = cui_plot_path(
-                    samples, 33, plot_mode == 2 ? CUI_PLOT_CURVE_STEP_AFTER : CUI_PLOT_CURVE_LINEAR,
-                    CUI_PLOT_GAPS_SKIP, plot_mode == 1, commands, 256, &command_count);
+                result = cui_plot_path(samples, 33,
+                                       plot_mode == 2   ? CUI_PLOT_CURVE_STEP_AFTER
+                                       : plot_mode == 4 ? CUI_PLOT_CURVE_NATURAL
+                                                        : CUI_PLOT_CURVE_LINEAR,
+                                       CUI_PLOT_GAPS_SKIP, plot_mode == 1, commands, 256,
+                                       &command_count);
             cui_color fill = t.primary;
-            fill.a = (plot_mode == 1 || plot_mode == 3) ? 70 : 0;
+            fill.a = plot_mode >= 5 ? 255 : (plot_mode == 1 || plot_mode == 3) ? 70 : 0;
             cui_plot_shape shape = {.commands = commands,
                                     .count = command_count,
                                     .fill = fill,

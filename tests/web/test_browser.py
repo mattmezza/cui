@@ -652,9 +652,15 @@ def main():
             page.wait_for_function('(before)=>(%s)()!==before' % plot_probe, arg=zoomed_plot)
             click_semantic('Reset', 1)
             page.wait_for_function('(initial)=>(%s)()===initial' % plot_probe, arg=initial_plot)
-            for mode in ['1', '2', '3']:
+            plot_hashes = {initial_plot}
+            for mode in ['1', '2', '3', '4', '5', '6']:
+                previous = page.evaluate(plot_probe)
                 control_change('plot-mode', mode)
-                page.wait_for_function('(initial)=>(%s)()!==initial' % plot_probe, arg=initial_plot)
+                page.wait_for_function('(previous)=>(%s)()!==previous' % plot_probe, arg=previous)
+                painted = page.evaluate(plot_probe)
+                assert painted not in plot_hashes, f'Plot mode {mode} reused another shape'
+                plot_hashes.add(painted)
+            assert len(plot_hashes) == 7
             control_change('plot-mode', '0')
             page.wait_for_function('(initial)=>(%s)()===initial' % plot_probe, arg=initial_plot)
             page.screenshot(path='/tmp/cui-web-plot.png')

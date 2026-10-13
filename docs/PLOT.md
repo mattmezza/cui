@@ -466,3 +466,5 @@ seconds and a policy from `cui_plot_spring_defaults`. Pass hover memory's
 advance toward the previous target before retargeting. Schedule while
 `request_frame` is true. Use independent states for each coordinate. This is an
 explicit host seam, not automatic scoped renderer state or theme projection.
+
+The gallery shape selector exposes linear, natural cubic, step-after, area, radial, rounded-bar and dot previews. All use the same projected samples, scale and native C geometry; bars/dots sample every eighth point to bound software preview work. Zoom/pan resamples the function through the current scale. These previews do not imply automatic shape hit testing, animation clocks or renderer path caching.

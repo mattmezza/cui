@@ -63,6 +63,29 @@ typedef enum {
     CUI_BUTTON_ROUNDED_CUSTOM
 } cui_button_rounding;
 typedef void (*cui_button_click_fn)(void *user);
+typedef enum {
+    CUI_BUTTON_CLICK_POINTER,
+    CUI_BUTTON_CLICK_KEYBOARD,
+    CUI_BUTTON_CLICK_ACCESSIBILITY
+} cui_button_click_origin;
+/* Pointer-free accepted-event snapshot; copyable beyond callback/frame lifetime.
+ * Pointer fields describe release, not a fabricated down event. */
+typedef struct {
+    cui_button_click_origin origin;
+    cui_id target;
+    uint64_t frame_sequence;
+    size_t event_index;
+    cui_event_type event_type;
+    cui_key key;
+    unsigned modifiers;
+    bool repeat, has_position;
+    float x, y;
+    cui_pointer_type pointer_type;
+    cui_pointer_button pointer_button;
+    uint64_t pointer_id, pointer_device;
+    unsigned click_count; /* Pointer zero normalizes to one; nonpointer is zero. */
+} cui_button_click_event;
+typedef void (*cui_button_click_event_fn)(void *user, const cui_button_click_event *event);
 typedef void (*cui_button_hover_fn)(void *user, bool hovered);
 /* Optional bounded storage, one state per stable Button ID; retain through end_frame.
  * No allocation/cleanup. Hover callbacks and tooltip require this state. */
@@ -113,6 +136,7 @@ typedef struct {
     bool allow_content_overflow;   /* Explicit legacy overflow/wrapping opt-out; default clips. */
     float pixel_size; /* 0: legacy/design sizing; finite (0,4096]: numeric source sizing. */
     bool open; /* Active presentation only; independent of selected/checked/menu lifecycle. */
+    cui_button_click_event_fn on_click_event; /* After legacy on_click, per accepted event. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
@@ -305,6 +329,7 @@ typedef struct {
     cui_input_mask_allocator mask_allocator;
     cui_edit_format format;
     cui_edit_workspace format_workspace; /* Caller-owned final formatted value + NUL. */
+    cui_text_match matcher; /* Optional synchronous whole-value regex/provider policy. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
@@ -1144,6 +1169,32 @@ static void cui_button_tooltip(cui_context *ui, cui_id id, const cui_theme *t,
     } else if (o.state)
         o.state->tooltip = (cui_hover_state){0};
 }
+static cui_button_click_event cui_button_click_snapshot(cui_context *ui, cui_id id, size_t index,
+                                                        const cui_event *event) {
+    cui_button_click_event result = {.target = id,
+                                     .frame_sequence = cui_frame_sequence(ui),
+                                     .event_index = index,
+                                     .event_type = event->type,
+                                     .modifiers = event->modifiers,
+                                     .repeat = event->repeat};
+    if (event->type == CUI_EVENT_POINTER_UP) {
+        result.origin = CUI_BUTTON_CLICK_POINTER;
+        result.has_position = true;
+        result.x = event->x;
+        result.y = event->y;
+        result.pointer_type = event->pointer_type;
+        result.pointer_button = event->pointer_button;
+        result.pointer_id = event->pointer_id;
+        result.pointer_device = event->pointer_device;
+        result.click_count = event->click_count ? event->click_count : 1;
+    } else if (event->type == CUI_EVENT_ACCESSIBILITY_ACTION)
+        result.origin = CUI_BUTTON_CLICK_ACCESSIBILITY;
+    else {
+        result.origin = CUI_BUTTON_CLICK_KEYBOARD;
+        result.key = event->key;
+    }
+    return result;
+}
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_button_options o) {
     cui_design_metrics design;
@@ -1167,16 +1218,29 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     cui_button_metadata(ui, id, t, name, o, interaction);
     bool activated = false;
     size_t count = 0;
-    cui_frame_events(ui, &count);
+    const cui_event *events = cui_frame_events(ui, &count);
     for (size_t e = 0; e < count; e++)
         if (cui_event_accepted_activation(ui, e) == id) {
             activated = true;
+            cui_button_click_event event = cui_button_click_snapshot(ui, id, e, &events[e]);
             if (o.on_click)
                 o.on_click(o.action_user);
+            if (o.on_click_event)
+                o.on_click_event(o.action_user, &event);
         }
     cui_button_paint_state(ui, id, t, name, o, interaction);
     cui_button_tooltip(ui, id, t, o);
     return activated;
+}
+static void cui_button_group_click_event(void *user, cui_context *ui, size_t index) {
+    const cui_button_group_styled_item *child = user;
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    /* Base dispatch already validated acceptance before the legacy callback. */
+    if (index >= count)
+        return;
+    cui_button_click_event event = cui_button_click_snapshot(ui, child->id, index, &events[index]);
+    child->options.on_click_event(child->options.action_user, &event);
 }
 static bool cui_button_group_style_valid(cui_button_options o) {
     cui_str strings[] = {o.leading,       o.trailing,     o.icon,
@@ -1253,7 +1317,9 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
             .cursor = o->cursor,
             .role = o->variant == CUI_BUTTON_LINK ? CUI_ROLE_LINK : CUI_ROLE_BUTTON,
             .on_click = o->on_click,
-            .action_user = o->action_user};
+            .action_user = o->action_user,
+            .on_click_event = o->on_click_event ? cui_button_group_click_event : NULL,
+            .event_user = &w->items[i]};
     }
     w->composing = true;
     bool passive = !cui_frame_sequence(ui) || options.box.inert || options.box.layout_only;
@@ -2986,6 +3052,7 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
             .normalization = options.normalization,
             .format = options.format,
             .format_workspace = options.format_workspace,
+            .matcher = options.matcher,
             .masked = options.masked,
             .content_type = options.content_type,
             .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},

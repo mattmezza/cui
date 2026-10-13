@@ -22,6 +22,16 @@ jobs:
           python -m pip install uv==0.10.8 ziglang==0.16.0
           python -c 'import os, pathlib, ziglang; pathlib.Path(os.environ["GITHUB_PATH"]).open("a").write(str(pathlib.Path(ziglang.__file__).parent) + "\n")'
           uv run --with playwright==1.58.0 playwright install --with-deps chromium
+      - name: Prepare checksum-verified private optional regex toolchain
+        run: python scripts/prepare_regex_toolchain.py --cache build/regex-toolchain
+      - name: Build pinned WASI regex provider and actual Input fixture
+        run: |
+          python scripts/build_regex.py --cache build/regex-wasi --toolchain build/regex-toolchain/rust-1.85.1 --target wasm32-wasip1
+          python tests/web/build_regex_fixture.py --library build/regex-wasi/target/wasm32-wasip1/release/libcui_regex.a --output build/regex-fixture
+      - name: Actual initialized regex Input reactor and browser IME
+        run: |
+          uv run --with wasmtime==49.0.0 python tests/integration/test_regex_wasi.py build/regex-fixture/regex.wasm
+          uv run tests/web/test_input_regex.py --fixture build/regex-fixture
       - name: Build actual CUI WebAssembly gallery
         run: python scripts/build_web.py --zig "$(python -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).parent / "zig")')"
       - name: Verify complete static sharing metadata
@@ -100,6 +110,8 @@ jobs:
         run: uv run tests/web/test_button_passive_lifecycle.py
       - name: Verify numeric Button metrics open presentation and caret tint
         run: uv run tests/web/test_button_numeric.py
+      - name: Copied button click events
+        run: uv run tests/web/test_button_click_event.py
       - name: Verify Button callbacks slots focus and painted states
         run: uv run tests/web/test_button_behavior.py
       - name: Verify Table sizing and selection-only DataTable actions

@@ -32,7 +32,7 @@ if (cui_regex_compile(cui_string("^[0-9]*$"), (cui_regex_options){0}, &compiled)
 (void)cui_regex_destroy(&compiled);
 ```
 
-Build the optional archive with `scripts/build_regex.py` and the pinned private toolchain/cache as described in `backends/regex/README.md`. Its `pin.json` and lock preserve exact source archive/patch/toolchain provenance. No Rust dependency is introduced into default builds. Default-OFF CMake/package integration and global header/notice/amalgamation registration are Root-owned follow-up work, not implicitly implemented by this backend.
+Build the optional archive with `scripts/build_regex.py` and the pinned private toolchain/cache as described in `backends/regex/README.md`. Its `pin.json` and lock preserve exact source archive/patch/toolchain provenance. No Rust dependency is introduced into default builds. Default-OFF native Linux CMake/package integration, generated declarations and dependency notices are registered separately from the optional compiled archive.
 
 Measured provider proof uses its actual exported compile/session/begin/match/end API against source Regex1.13.1 across385 successful config/pattern combinations,63 equivalent compile rejections and58,520 matches. Every match makes zero allocator calls, including first use; all eight session allocation positions are forced to fail and restore tracked heap. Source captured-NFA admission limit rejection is explicitly retained even when reduced runtime could fit. Tests preserve the custom line-terminator LookMatcher configuration required for source semantics. Production code never logs text; test failure assertions use synthetic public fixtures.
 
@@ -40,6 +40,34 @@ Native strict C tests cover 1,000 lifecycle loops, leased BUSY, atomic failed re
 
 `tests/web/build_regex_fixture.py` builds a real Core/Base/Components Input plus the optional Rust archive into a Zig0.16 WASI **reactor**; global gallery files are untouched. `test_regex_wasi.py` executes the composed C test entrypoint in Wasmtime49 after `_initialize`, with no `_start`. The same module runs in actual Chromium1208 (Playwright1.58). Its existing reusable secure proxy reads finalized Core owner/type/purpose/generation, and CDP `Input.imeSetComposition`/`Input.insertText` exercise real DOM composition through Core events to the CUI Input and provider. Browser assertions cover rejected candidate/provisional view preservation, commit exactly once, rejected host-end cancellation and following typing, Undo/Redo, masking, readonly proxy removal, and Greek Unicode matching. JavaScript performs no regex acceptance.
 
-Reproduce browser proof with `python3 tests/web/build_regex_fixture.py --library WASI_ARCHIVE --output FIXTURE`, then `uv run --offline tests/web/test_input_regex.py --fixture FIXTURE` and `uv run --offline tests/integration/test_regex_wasi.py FIXTURE/regex.wasm`. Provider oracle: use task-local cargo `test --offline --locked --release --manifest-path CACHE/source/Cargo.toml -- --nocapture --test-threads=1` after the build script. Native harness: configure `backends/regex` with `CUI_REGEX_LIBRARY` and `CUI_REGEX_CORE_LIBRARY`, build, run CTest. Root registration needed for optional provider/native/browser tests and `cui_regex.h`; no production gallery story is added here.
+Reproduce browser proof with `python3 tests/web/build_regex_fixture.py --library WASI_ARCHIVE --output FIXTURE`, then `uv run --offline tests/web/test_input_regex.py --fixture FIXTURE` and `uv run --offline tests/integration/test_regex_wasi.py FIXTURE/regex.wasm`. Provider oracle: use task-local cargo `test --offline --locked --release --manifest-path CACHE/source/Cargo.toml -- --nocapture --test-threads=1` after the build script. Native harness: configure `backends/regex` with `CUI_REGEX_LIBRARY` and `CUI_REGEX_CORE_LIBRARY`, build, run CTest. Optional provider/native/package/browser tests and both public headers are registered; the isolated browser fixture is separate from the production gallery story.
 
 PikeVM's prepared memory is bounded; execution is not deadline-bounded and may be slower than the source facade's adaptive engines for large/dense patterns. Pattern/NFA/cache/text limits control memory and accepted input size, not a guaranteed UI latency. The oracle/fault tests establish this boolean/resource slice; remaining Input contracts and other native platforms are separate work.
+
+## Build and link the optional native provider
+
+Ordinary CUI builds require no Rust toolchain. The portable caller-provided matcher is available in the default C11 library. Enable the regex backend only when you need its Unicode regular-expression implementation.
+
+For the currently verified native Linux target, use an official Rust 1.85.1 prefix and build the separately pinned archive into a private cache:
+
+```sh
+python scripts/prepare_regex_toolchain.py --cache build/regex-toolchain
+python scripts/build_regex.py --cache build/regex-cache --toolchain build/regex-toolchain/rust-1.85.1
+cmake -S . -B build -G Ninja -DCUI_BUILD_REGEX=ON \
+  -DCUI_REGEX_LIBRARY="$PWD/build/regex-cache/target/release/libcui_regex.a"
+cmake --build build
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix "$PWD/install"
+```
+
+The private preparation script verifies the pinned official manifest and both toolchain archives before extraction and installs into the specified cache with ldconfig disabled. The archive build script checks the compiler version and commit, archive checksums, lock and private cache patch before building offline. It does not install Rust or change global Cargo/rustup configuration. Obtain and verify the official toolchain against `backends/regex/pin.json`; the supplied installed prefix is caller-owned tooling. Compiler/target std must match. Native Windows/macOS package acceptance remains unfinished.
+
+Within this source build, link a CMake target against `cui::regex`. Installed consumers use `find_package(CUIRegex CONFIG REQUIRED)` and `target_link_libraries(app PRIVATE CUI::cui_regex)`, with `CMAKE_PREFIX_PATH` pointing to the installed prefix. The package carries the Core dependency and the Linux archive's system link dependencies. For a direct compiler invocation:
+
+```sh
+PKG_CONFIG_PATH="$PWD/install/lib/pkgconfig" \
+  cc -std=c11 -Wall -Wextra -Wpedantic app.c -o app \
+  $(PKG_CONFIG_PATH="$PWD/install/lib/pkgconfig" pkg-config --static --cflags --libs cui-regex)
+```
+
+Include `cui/cui_regex.h`. Generated distribution headers also contain the matcher and regex declarations, but the optional compiled Rust archive remains a separate link dependency. Defining a distribution implementation macro does not generate the regex engine.

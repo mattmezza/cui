@@ -115,6 +115,7 @@ typedef struct {
     void *presentation_user;
     cui_edit_format format;
     cui_edit_workspace format_workspace; /* Caller-owned final formatted value + NUL. */
+    cui_text_match matcher; /* Optional synchronous whole-value regex/provider policy. */
 } cui_base_input_options;
 /* Reduce one frame event in queue order after registering the textbox with
  * cui_interact. Does not submit/paint semantics or replay other events. The
@@ -493,6 +494,7 @@ static cui_edit_result cui_input_checked(cui_edit *edit, cui_edit_request reques
     request.normalization = options.normalization;
     request.format = options.format;
     request.format_workspace = options.format_workspace;
+    request.matcher = options.matcher;
     request.presentation = options.presentation;
     request.masked_words = options.masked;
     cui_edit_checked_result result = cui_edit_apply_checked(

@@ -4520,7 +4520,8 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     if (!length && start == end && !cui_edit_private_format_enabled(e->format))
         return CUI_EDIT_OK;
     if (strip || (e->presentation.prepare && !e->presentation_skip) ||
-        ((e->acceptance.validate || e->matcher.ops.begin) && !e->config.multiline && !e->acceptance_skip) ||
+        ((e->acceptance.validate || e->matcher.ops.begin) && !e->config.multiline &&
+         !e->acceptance_skip) ||
         cui_edit_private_format_enabled(e->format)) {
         /* The opaque engine knows its entire workspace extent. */
         uintptr_t source = (uintptr_t)text.data, work = (uintptr_t)e->scratch;
@@ -5998,7 +5999,8 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
                                            (cui_str){c->buffer, c->length});
     cui_edit_result finished = cui_edit_private_match_end(
         e, e->acceptance_rejected ? CUI_EDIT_INVALID_ARGUMENT : CUI_EDIT_OK);
-    if (finished != CUI_EDIT_OK) return finished;
+    if (finished != CUI_EDIT_OK)
+        return finished;
     if (commit) {
         e->format_ready = cui_edit_private_format_enabled(e->format);
         e->format_length = final.length;
@@ -6405,8 +6407,8 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
                                          .presentation_prepared = prepared,
                                          .presentation_applied = prepared && result == CUI_EDIT_OK};
     }
-    if ((!acceptance.validate && !request.matcher.ops.begin && !request.presentation.prepare && !request.masked_words &&
-         !cui_edit_private_format_enabled(request.format) &&
+    if ((!acceptance.validate && !request.matcher.ops.begin && !request.presentation.prepare &&
+         !request.masked_words && !cui_edit_private_format_enabled(request.format) &&
          request.normalization == CUI_EDIT_NORMALIZE_NONE) ||
         e->config.multiline) {
         cui_edit_result legacy;

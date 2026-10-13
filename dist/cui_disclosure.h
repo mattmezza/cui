@@ -240,6 +240,7 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
                    .padding = theme->padding,
                    .gap = theme->gap,
                    .row = true,
+                   .align_y = CUI_ALIGN_CENTER,
                    .radius = theme->radius,
                    .background = theme->surface,
                    .border = theme->border,
@@ -266,8 +267,8 @@ static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *
                                    .custom_color = true,
                                    .color = theme->muted,
                                    .custom_transform = true,
-                                   .transform =
-                                       cui_icon_rotation(open ? 3.14159265358979323846f : 0)});
+                                   .transform = open ? (cui_icon_transform){-1, 0, 0, -1, 0, 0}
+                                                     : cui_icon_identity()});
         }
     }
     cui_end_box(ui);

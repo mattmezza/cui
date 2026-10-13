@@ -9,3 +9,13 @@ Prompt: “A polished editorial landscape image of a serene alpine lake in Switz
 ## CUI website product media
 
 `cui-workspace-light.png` and `cui-workspace-dark.png` are original screenshots of this repository's actual C → WASM Resizable composition, captured at device scale 2. `cui-social.png` is an original 1200×630 layout composed from the light screenshot, text and a generated gradient; it contains no upstream screenshot or branding. Regenerate with `uv run scripts/generate_site_media.py --directory build/web --chromium /path/to/chrome`. The script pins Playwright 1.58.0 and Pillow 11.3.0. Text is rasterized with Noto Sans, supplied by the developer's installed font; no font file is distributed. These images illustrate the current working composition and do not certify complete native-platform or GPUI parity.
+
+## Current README capture
+
+`../../docs/screenshots/readme-workspace.png` was captured on 2026-10-13 from the
+actual Northstar composed C/WASM application, using the Aurora Light preset and
+Chromium at device scale 2. It shows real CUI navigation, account controls,
+buttons and cards. Regenerate with `uv run scripts/capture_readme.py --directory
+build/web --chromium /path/to/chrome` after building the current web gallery.
+The script pins Playwright 1.58.0. This browser-adapter capture does not certify
+complete component or native-platform parity.

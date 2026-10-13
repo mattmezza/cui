@@ -2,11 +2,13 @@
 
 An experimental C11 native UI framework: Clay layout, unstyled interaction primitives, themed controls, and independent renderer adapters. Embed it in an existing host or run the SDL3 workbench. No browser engine, JavaScript VM, Rust runtime, or platform types in the public core API.
 
-**Development snapshot, not production-ready or full GPUI Kit parity.** The complete 78-family target is tracked in [the feature manifest](docs/gpui-parity.json). Working partial controls include buttons, checked/pressed selection, sliders and a UTF-8 scalar Input preview. Core focus/capture, semantic snapshots, bounded undo/redo, modal scopes, popup reducers, Gregorian geometry and keyed variable-height virtualization and a retained docking tree have behavioral tests. Native accessibility bridges, complete text editing/IME/bidi/fallback, full compound widgets and other platform runtimes remain pending.
+**Development snapshot; full component parity remains unfinished.** All 78 component families have real C/WASM gallery stories and explicit [feature status](docs/gpui-parity.json). The library includes themed controls, Unicode editing, retained docking and virtual lists, charts, Markdown and composed application examples. Native accessibility, full language services/IME/bidi and exact platform behavior remain in progress; a tested subset does not verify a whole family.
 
 [**Open the browser component gallery**](https://matteo.merola.co/cui/) — all 78 catalog entries, with interactive stories compiled from the same C11 implementation to WebAssembly. The HTML/Canvas browser host is an optional gallery adapter; native applications do not depend on it. See [browser build and validation](docs/WEB_GALLERY.md).
 
-![Actual CUI software-rendered workbench](docs/screenshots/gallery-light.png)
+![CUI workspace composed from real components and rendered from C in WebAssembly](docs/screenshots/readme-workspace.png)
+
+The current [composed application](docs/COMPOSED_APPS.md) uses CUI navigation, account menus, cards, forms and pricing actions. This capture shows the real C/WASM draw list rendered by the browser adapter; it is not a mockup.
 
 ## Build and run
 

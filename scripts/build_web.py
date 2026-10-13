@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Build the static browser gallery with pinned Zig 0.16.0. No Node build toolchain."""
+from site_language import website_data
 import argparse
 import hashlib
 import json
@@ -67,7 +68,7 @@ def main():
     (out / 'gallery.js').write_text(javascript, encoding='utf-8', newline='\n')
     shutil.copyfile(ROOT / 'third_party/gpui_themes/presets.json', out / 'themes.json')
     subprocess.run(['uv', 'run', str(ROOT / 'scripts/build_docs.py'), '--output', str(out)], check=True)
-    manifest = json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8'))
+    manifest = website_data(json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8')))
     usage = json.loads((ROOT / 'docs/component-usage.json').read_text(encoding='utf-8'))['components']
     if [c['name'] for c in usage] != [c['name'] for c in manifest['components']]:
         raise ValueError('Component usage must match all 78 manifest families')

@@ -79,7 +79,7 @@ def build(output, site_url=DEFAULT_SITE):
     page('', 'CUI · Portable C11 UI', description, 'home', '<h1>CUI: portable C11 interfaces</h1><p>'+escape(description)+'</p>')
     for component, slug in zip(components, slugs):
         name = component['name']
-        description = f'Explore CUI {name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. GPUI Kit parity remains in progress.'
+        description = f'Explore CUI {name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. Complete component coverage remains in progress.'
         fallback = '<h1>'+escape(name)+'</h1><p>'+escape(description)+'</p><ul>' + ''.join('<li>'+escape(limit)+'</li>' for limit in component.get('limitations', [])) + '</ul>'
         page('components/'+slug+'/', name+' · CUI', description, name, fallback)
     page('examples/northstar/', 'Northstar workspace · CUI',

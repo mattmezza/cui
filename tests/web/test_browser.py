@@ -131,6 +131,8 @@ def main():
             }''')
             assert key_delivery == [62,62,36], key_delivery
             def control_change(control, value):
+                if control == "control-size" and not page.locator("#design-size").is_hidden():
+                    control, value = "design-size", {0:3,1:2,2:5,3:1}[int(value)]
                 before = page.evaluate('({control,value})=>{const node=document.getElementById(control);if(node.type==="checkbox")node.checked=value;else node.value=String(value);node.dispatchEvent(new Event("change",{bubbles:true}));return cuiGallery.frame;}', {'control':control,'value':value})
                 page.wait_for_function('(before)=>cuiGallery.frame>before', arg=before)
             assert page.locator('#theme').input_value() == '3'
@@ -209,7 +211,7 @@ def main():
             assert page.locator('#name').inner_text() == 'Button'
             assert page.locator('#accessible [role=link][aria-label="Link"]').count() == 1
             assert page.get_by_role('link', name='View source').count() == 1
-            assert page.get_by_role('link', name='GPUI Kit 0.7.1 reference').count() == 1
+            assert page.locator('#reference').count() == 0
             page.locator('canvas').focus()
             page.keyboard.press('/')
             page.wait_for_function('document.activeElement===document.querySelector("#search")')
@@ -258,16 +260,6 @@ def main():
                 }''')
             for theme in ('0', '1'):
                 control_change('theme', theme)
-                for size, expected_height, expected_font in ((3,20,12),(1,24,14),(0,32,14),(2,32,16)):
-                    control_change('control-size', size)
-                    geometry = button_text_geometry()
-                    assert geometry and abs(geometry['height']-expected_height) < 0.3, (theme,size,geometry)
-                    assert abs(geometry['font']-expected_font) < 0.1, (theme,size,geometry)
-                    assert geometry['ink'] > 4 and abs(geometry['center']) < 2, (theme,size,geometry)
-                page.screenshot(path=f'/tmp/cui-web-buttons-{"light" if theme == "0" else "dark"}.png')
-            control_change('control-size', '0')
-            for theme in ('0', '1'):
-                control_change('theme', theme)
                 for size, height, font in ((1,20,12),(2,24,14),(3,32,16),(4,32,16),
                                            (5,40,18),(6,48,20),(7,56,24),(8,64,30),(9,80,36)):
                     control_change('design-size', size)
@@ -275,9 +267,9 @@ def main():
                     assert geometry and abs(geometry['height']-height) < .3, (theme,size,geometry)
                     assert abs(geometry['font']-font) < .1, (theme,size,geometry)
                     assert geometry['ink'] > 4 and abs(geometry['center']) < 2.5, (theme,size,geometry)
-                    assert page.locator('#control-size').is_disabled()
-            control_change('design-size', '0')
-            assert page.locator('#control-size').is_enabled()
+                    assert page.locator('#control-size').is_hidden()
+            control_change('design-size', '3')
+            assert page.locator('#control-size').is_hidden()
             for radius, expected in ((0,0),(4,8),(6,16)):
                 control_change('design-radius', radius)
                 actual = page.evaluate("""()=>{const e=cuiGallery.exports,b=[1,2,3,4].map(f=>e.gallery_semantic(0,f));
@@ -295,7 +287,9 @@ def main():
                 assert abs(gap-spacing*4)<.5, (spacing,gap)
             control_change('design-spacing', '-1')
             assert page.locator('#features tr').count() > 0
-            assert page.locator('#reference').get_attribute('href').startswith('https://gpui-kit.com/')
+            assert page.locator('#reference').count() == 0
+            assert 'gpui' not in page.locator('body').inner_text().lower()
+            assert page.locator('#design-size option[value="0"]').count() == 0
             control_change('theme', '1')
             assert page.locator('body.dark').count() == 1
             page.evaluate('''()=>{window.styledTextFonts={};window.styledTextPaint={};const original=CanvasRenderingContext2D.prototype.fillText;window.restoreFillText=()=>{CanvasRenderingContext2D.prototype.fillText=original};CanvasRenderingContext2D.prototype.fillText=function(value,...args){if(['Semibold heading','Italic emphasis','Monospace code'].includes(value)){window.styledTextFonts[value]=this.font;window.styledTextPaint[value]={y:args[1],baseline:this.textBaseline};}return original.call(this,value,...args)}}''')
@@ -1076,9 +1070,9 @@ def main():
             for name, accessible_name in (('Input','Display name'),('NumberInput','Quantity')):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
-                assert page.locator('#control-size').is_visible(), name
+                assert page.locator('#control-size').is_visible() or page.locator('#design-size').is_visible(), name
                 measured=[]
-                for size, height in ((3,20),(1,24),(0,32),(2,44)):
+                for size, height in ((3,20),(1,24),(0,32),(2,40)):
                     control_change('control-size', size)
                     index=semantic_index(accessible_name)
                     assert index is not None, (name,size)
@@ -1101,7 +1095,7 @@ def main():
             for name in ('Checkbox','Radio','Switch','Toggle','Form','Input Group','OtpInput','Tag','Attachment'):
                 page.evaluate('(name)=>location.hash=name', name)
                 page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
-                assert page.locator('#control-size').is_visible(), name
+                assert page.locator('#control-size').is_visible() or page.locator('#design-size').is_visible(), name
                 layouts = []
                 for size in (3,1,0,2):
                     control_change('control-size', size)
@@ -1682,11 +1676,11 @@ def main():
                 return page.evaluate('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>i).filter(i=>{const e=cuiGallery.exports;return e.gallery_command(i,0)===0&&e.gallery_command(i,3)===32&&e.gallery_command(i,4)===32;}).map(i=>cuiGallery.exports.gallery_command(i,1))')
             cells = otp_cells()
             assert len(cells) == 6, cells
-            assert [round(cells[i+1]-cells[i]) for i in range(5)] == [36,36,52,36,36]
+            assert [round(cells[i+1]-cells[i]) for i in range(5)] == [38,38,50,38,38]
             control_change('otp-groups', '3')
             page.wait_for_timeout(40)
             cells = otp_cells()
-            assert [round(cells[i+1]-cells[i]) for i in range(5)] == [36,52,36,52,36]
+            assert [round(cells[i+1]-cells[i]) for i in range(5)] == [38,50,38,50,38]
             click_semantic('Verification code', 6)
             page.wait_for_function('cuiGallery.exports.gallery_next_wake()>0')
             page.wait_for_timeout(80)

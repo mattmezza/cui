@@ -90,6 +90,11 @@ void cui_alert_dialog(cui_context *ui, const cui_theme *t, cui_surface_state *s,
                       cui_str description, cui_str confirm, cui_str cancel, cui_surface_options o) {
     if (!s || s->kind != CUI_SURFACE_ALERT)
         return;
+    /* An unspecified height follows measured wrapped title, description and
+     * actions; explicit heights retain the viewport/scroll contract. */
+    if (t && isfinite(o.height) && o.height <= 0 && isfinite(s->body_content.h) &&
+        s->body_content.h > 0)
+        o.height = s->body_content.h + 2 * fmaxf(0, t->padding);
     if (!cui_surface_begin(ui, t, s, title, description, o))
         return;
     cui_begin_box(ui, 0,

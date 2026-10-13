@@ -19,3 +19,10 @@ For a child such as a command palette that handles Escape first, set `no_escape_
 Set `options.sheet_animation_seconds = 0.22f` to slide a sheet in and out from its configured edge. The default zero keeps immediate behavior. Motion reads `cui_frame_time(ui)`, which advances from the delta passed to `cui_begin_frame`; continue scheduling invalidated frames. `cui_surface_current_geometry` reports the moving bounds. Resize controls appear once entry completes.
 
 With animation enabled, closing keeps the modal mounted during its exit and consumes input events. Focus returns to the trigger, `on_close` fires, and a result becomes available only when the exit completes. `state.sheet_closing` exposes this phase to application composition. Calling open during exit reverses toward the open position. Pass `options.reduced_motion = true` to snap directly to the destination; changing it during exit completes the close in the next submitted frame. Duration is finite, positive and capped at ten seconds; invalid values disable animation. Dialog/AlertDialog/Popover behavior remains immediate.
+
+AlertDialog with unspecified/nonpositive finite height fits its measured title,
+wrapped description and action row plus theme padding. The first frame measures
+content; the next invalidated frame settles its height. Viewport margins still
+cap the dialog, and overflowing content remains scrollable. Explicit positive
+heights retain the fixed viewport contract. Resize, font or content changes can
+require another measured frame.

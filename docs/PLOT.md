@@ -330,3 +330,10 @@ radii, consumed directly by `cui_plot_raster`. See
 [PLOT_MODEL.md](PLOT_MODEL.md#rounded-bar-paths-for-custom-renderers) for its
 capacity contract and explicit cubic approximation limits. The styled driver
 continues to use Core rounded quads; it does not route through this rasterizer.
+
+For source-style Pie/Arc seams, choose `CUI_PLOT_ARC_SOURCE_PADDING` with
+`cui_plot_arc_flatten_ex` before rasterizing. It reproduces the source's .0001
+radian override for spans at least π and its radius/span epsilon rules. Existing
+flatten calls retain seamless full turns. See the
+[Arc policy contract](PLOT_MODEL.md#explicit-frozen-arc-padding-policy); hover hit
+testing still ignores visual padding, matching the frozen source.

@@ -204,6 +204,19 @@ cui_plot_result cui_plot_arc_path(const cui_plot_arc *, double inner_radius, dou
 cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *, double inner_radius, double outer_radius,
                                      size_t segments_per_turn, cui_plot_path_command *,
                                      size_t capacity, size_t *required);
+/* Explicit frozen Arc padding mode. SOURCE_PADDING overrides metadata pad to
+ * .0001 radians whenever positive span>=pi, including full circles; its single
+ * endpoint arc leaves the source seam. Also suppresses radius/span below1e-12.
+ * Legacy functions use SEAMLESS. Finite ordered radii and span<=2pi remain CUI
+ * bounds; this does not reproduce source f32 rounding or renderer tessellation. */
+typedef enum { CUI_PLOT_ARC_SEAMLESS, CUI_PLOT_ARC_SOURCE_PADDING } cui_plot_arc_policy;
+cui_plot_result cui_plot_arc_path_ex(const cui_plot_arc *, double inner_radius, double outer_radius,
+                                     cui_plot_arc_policy, cui_plot_path_command *, size_t capacity,
+                                     size_t *required);
+cui_plot_result cui_plot_arc_flatten_ex(const cui_plot_arc *, double inner_radius,
+                                        double outer_radius, size_t segments_per_turn,
+                                        cui_plot_arc_policy, cui_plot_path_command *,
+                                        size_t capacity, size_t *required);
 typedef struct {
     double angle, radius0, radius1;
     bool defined;

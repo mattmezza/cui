@@ -745,22 +745,29 @@ typedef struct {
     bool empty, full;
 } cui_plot_arc_angles;
 static cui_plot_result cui_plot_arc_angles_get(const cui_plot_arc *arc, double inner, double outer,
+                                               cui_plot_arc_policy policy,
                                                cui_plot_arc_angles *angles) {
-    if (!cui_plot_arc_valid(arc, inner, outer))
+    if ((policy != CUI_PLOT_ARC_SEAMLESS && policy != CUI_PLOT_ARC_SOURCE_PADDING) ||
+        !cui_plot_arc_valid(arc, inner, outer))
         return CUI_PLOT_INVALID;
     const long double pi = acosl(-1.L), tau = 2 * pi;
     long double span = (long double)arc->end_angle - arc->start_angle;
     if (span > tau + 1e-12L)
         return CUI_PLOT_INVALID;
     *angles = (cui_plot_arc_angles){0};
-    if (outer == 0 || span <= 0) {
+    if (outer == 0 || span <= 0 ||
+        (policy == CUI_PLOT_ARC_SOURCE_PADDING && (outer < 1e-12 || span < 1e-12L))) {
         angles->empty = true;
         return CUI_PLOT_OK;
     }
-    angles->full = fabsl(span - tau) <= 1e-12L;
+    angles->full = policy == CUI_PLOT_ARC_SEAMLESS && fabsl(span - tau) <= 1e-12L;
     if (angles->full)
         span = tau;
     long double pad = angles->full ? 0 : arc->pad_angle;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && span >= (double)pi)
+        pad = .0001L;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && inner <= 1e-12)
+        inner = 0;
     long double inner_pad =
         inner > 0 && pad > 0 ? fminl((outer / (long double)inner) * pad, span * .8L) : pad;
     /* Reduce before adding offsets to preserve geometry for large angles. */
@@ -785,14 +792,17 @@ static void cui_plot_circular_command(cui_plot_path_command *commands, size_t *u
     command.clockwise = clockwise;
     commands[(*used)++] = command;
 }
-cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double outer,
-                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+cui_plot_result cui_plot_arc_path_ex(const cui_plot_arc *arc, double inner, double outer,
+                                     cui_plot_arc_policy policy, cui_plot_path_command *out,
+                                     size_t capacity, size_t *required) {
     if (!required || (!out && capacity))
         return CUI_PLOT_INVALID;
     cui_plot_arc_angles angles;
-    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, &angles);
+    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, policy, &angles);
     if (result != CUI_PLOT_OK)
         return result;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && inner <= 1e-12)
+        inner = 0;
     cui_plot_path_command commands[8] = {{0}};
     size_t used = 0;
     if (!angles.empty) {
@@ -829,15 +839,18 @@ cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double 
         memcpy(out, commands, used * sizeof *out);
     return CUI_PLOT_OK;
 }
-cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, double outer,
-                                     size_t segments, cui_plot_path_command *out, size_t capacity,
-                                     size_t *required) {
+cui_plot_result cui_plot_arc_flatten_ex(const cui_plot_arc *arc, double inner, double outer,
+                                        size_t segments, cui_plot_arc_policy policy,
+                                        cui_plot_path_command *out, size_t capacity,
+                                        size_t *required) {
     if (!required || (!out && capacity) || segments < 4 || segments > 1024)
         return CUI_PLOT_INVALID;
     cui_plot_arc_angles angles;
-    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, &angles);
+    cui_plot_result result = cui_plot_arc_angles_get(arc, inner, outer, policy, &angles);
     if (result != CUI_PLOT_OK)
         return result;
+    if (policy == CUI_PLOT_ARC_SOURCE_PADDING && inner <= 1e-12)
+        inner = 0;
     const long double tau = 2 * acosl(-1.L);
     size_t outer_steps =
         angles.empty ? 0 : (size_t)ceill((angles.outer1 - angles.outer0) * segments / tau);
@@ -1266,4 +1279,15 @@ cui_plot_result cui_plot_bar_path(cui_plot_bar_alignment alignment, double cross
                                       {.kind = CUI_PLOT_PATH_CLOSE}};
     memcpy(out, path, sizeof path);
     return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_arc_path(const cui_plot_arc *arc, double inner, double outer,
+                                  cui_plot_path_command *out, size_t capacity, size_t *required) {
+    return cui_plot_arc_path_ex(arc, inner, outer, CUI_PLOT_ARC_SEAMLESS, out, capacity, required);
+}
+cui_plot_result cui_plot_arc_flatten(const cui_plot_arc *arc, double inner, double outer,
+                                     size_t segments, cui_plot_path_command *out, size_t capacity,
+                                     size_t *required) {
+    return cui_plot_arc_flatten_ex(arc, inner, outer, segments, CUI_PLOT_ARC_SEAMLESS, out,
+                                   capacity, required);
 }

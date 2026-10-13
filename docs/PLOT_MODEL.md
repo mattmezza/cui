@@ -586,7 +586,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `Area` data/X/Y1, optional Y0, fill plus separate 1px upper stroke, curves, paint/cache | `cui_plot_area_paths` separate contours; two raster shapes | Source accessor callbacks/cache/backgrounds absent; open/singleton GPUI tessellator result not reproduced; extended per-point closed areas remain separate |
 | `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; pure independently rounded-bar paths available; no generic label callback or arbitrary gradient renderer; negative width is rejected |
 | `Pie` positive-value arcs/index/padding and angular limits | `cui_plot_pie` | No accessor callback/borrowed arbitrary datum payload; stable normalized double summation replaces unchecked f32 sums; pad is metadata |
-| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; full-turn seam removed; user pad retained above pi rather than source0.0001 override; tiny values accepted; spans above one turn rejected; no cache/Background |
+| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; no cache/Background |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
 | `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | No independent pure Plot graph/topology reuse or `sankey_link_path` command builder; Chart-specific options/data contracts are not automatically Plot parity |
@@ -711,3 +711,29 @@ ten; insufficient capacity preserves every output command. Invalid geometry or
 radii preserve both commands and required count. Caller radii may alias output:
 they are copied before any command is written. No gradient, labels, clipping,
 retained shape or renderer cache is introduced.
+
+## Explicit frozen Arc padding policy
+
+`cui_plot_arc_path_ex` and `cui_plot_arc_flatten_ex` accept
+`CUI_PLOT_ARC_SOURCE_PADDING` to select the frozen Arc's padding/default rules.
+For every positive span at least π, the source overrides `ArcData.pad_angle`
+with .0001 radians. This applies to half circles, large sectors and full circles,
+not just the full-circle seam. Smaller sectors keep the supplied padding.
+Annular inner padding retains the source's outer-radius pad-width conversion
+and cap at 80 percent of the unpadded span. Inner radii at or below 1e-12 use a
+center wedge; outer radii or positive spans below 1e-12 produce no path.
+
+The source policy uses a single endpoint arc on each rim, leaving the intentional
+seam even for a full turn. Flatten uses these same padded endpoints. It is an
+explicit alternative to `CUI_PLOT_ARC_SEAMLESS`, the unchanged policy of legacy
+`cui_plot_arc_path` and `cui_plot_arc_flatten`: legacy full turns ignore padding
+and use two semicircles. The source's source-comment says full circle, but the
+actual conditional is `da >= PI`; this API follows that wider condition.
+
+Both policies retain CUI's finite nonnegative ordered-radius and at-most-one-turn
+bounds. The source separately clamps negative radii and permits unordered radii;
+those are not exposed here. Coordinates use checked doubles and a double π
+threshold, not identical source f32 rounding. Paths close explicitly; no cached
+GPUI renderer path or exact tessellation claim follows. Centroid and contains
+remain independent of either paint policy, and contains deliberately ignores
+padding as the source does. Capacity/invalid errors preserve command buffers.

@@ -688,6 +688,58 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_source_arc_padding(void) {
+    const double pi = acos(-1.0);
+    cui_plot_arc arc = {.start_angle = 0, .end_angle = 2 * pi, .pad_angle = .3};
+    cui_plot_path_command path[32] = {{0}}, flat[32], old[32];
+    size_t count, n;
+    assert(cui_plot_arc_path_ex(&arc, 10, 20, CUI_PLOT_ARC_SOURCE_PADDING, path, 32, &count) ==
+               CUI_PLOT_OK &&
+           count == 5);
+    assert(path[1].kind == CUI_PLOT_PATH_ARC && path[1].large_arc && path[1].clockwise);
+    assert(path[3].kind == CUI_PLOT_PATH_ARC && path[3].large_arc && !path[3].clockwise);
+    assert(close(path[0].point.x, 20 * sin(.00005)));
+    assert(close(path[2].point.x, -10 * sin(.0001)));
+    assert(cui_plot_arc_flatten_ex(&arc, 10, 20, 8, CUI_PLOT_ARC_SOURCE_PADDING, flat, 32, &n) ==
+               CUI_PLOT_OK &&
+           n == 19);
+    assert(close(flat[0].point.x, path[0].point.x));
+    assert(close(flat[8].point.x, path[1].point.x));
+    assert(cui_plot_arc_path(&arc, 10, 20, path, 32, &count) == CUI_PLOT_OK && count == 7);
+    assert(close(path[0].point.x, 0));
+    arc.end_angle = pi;
+    assert(cui_plot_arc_path_ex(&arc, 0, 20, CUI_PLOT_ARC_SOURCE_PADDING, path, 32, &count) ==
+               CUI_PLOT_OK &&
+           count == 4);
+    assert(close(path[0].point.x, 20 * sin(.00005)) && !path[1].large_arc);
+    arc.end_angle = pi / 2;
+    assert(cui_plot_arc_path_ex(&arc, 0, 20, CUI_PLOT_ARC_SOURCE_PADDING, path, 32, &count) ==
+           CUI_PLOT_OK);
+    assert(close(path[0].point.x, 20 * sin(.15)));
+    arc.pad_angle = 0;
+    assert(cui_plot_arc_path_ex(&arc, 1e-13, 20, CUI_PLOT_ARC_SOURCE_PADDING, path, 32, &count) ==
+               CUI_PLOT_OK &&
+           count == 4);
+    assert(path[2].point.x == 0 && path[2].point.y == 0);
+    memcpy(old, path, sizeof path);
+    count = 99;
+    assert(cui_plot_arc_path_ex(&arc, 0, 20, (cui_plot_arc_policy)99, path, 32, &count) ==
+               CUI_PLOT_INVALID &&
+           count == 99);
+    assert(memcmp(path, old, sizeof path) == 0);
+    assert(cui_plot_arc_path_ex(&arc, 0, 20, CUI_PLOT_ARC_SOURCE_PADDING, path, 1, &count) ==
+               CUI_PLOT_CAPACITY &&
+           count == 4);
+    assert(memcmp(path, old, sizeof path) == 0);
+    arc.end_angle = 1e-13;
+    assert(cui_plot_arc_path_ex(&arc, 0, 20, CUI_PLOT_ARC_SOURCE_PADDING, path, 32, &count) ==
+               CUI_PLOT_OK &&
+           count == 0);
+    arc.end_angle = pi / 2;
+    assert(cui_plot_arc_flatten_ex(&arc, 0, 1e-13, 8, CUI_PLOT_ARC_SOURCE_PADDING, path, 32,
+                                   &count) == CUI_PLOT_OK &&
+           count == 0);
+}
 static void test_rounded_bar_path(void) {
     double radii[] = {4, 0, 2, 99};
     cui_plot_path_command path[10], old[10];
@@ -804,6 +856,7 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
 int main(void) {
+    test_source_arc_padding();
     test_rounded_bar_path();
     test_linear_extent();
     test_lifecycle();

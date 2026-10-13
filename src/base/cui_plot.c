@@ -26,6 +26,84 @@ static cui_plot_result cui_plot_untransform(cui_plot_scale_kind kind, long doubl
     }
     return cui_plot_number(value, out);
 }
+cui_plot_viewport_options cui_plot_viewport_defaults(void) {
+    return (cui_plot_viewport_options){
+        .enabled = true, .pan_x = true, .pan_y = true, .zoom_x = true, .zoom_y = true};
+}
+cui_plot_result cui_plot_viewport_init(cui_plot_viewport *v, cui_plot_scale x, cui_plot_scale y) {
+    if (!v || cui_plot_validate(&x) != CUI_PLOT_OK || cui_plot_validate(&y) != CUI_PLOT_OK)
+        return CUI_PLOT_INVALID;
+    *v = (cui_plot_viewport){.x = x, .y = y, .initial_x = x, .initial_y = y, .initialized = true};
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_viewport_reset(cui_plot_viewport *v) {
+    if (!v || !v->initialized)
+        return CUI_PLOT_INVALID;
+    cui_plot_scale x = v->initial_x, y = v->initial_y;
+    x.range_start = v->x.range_start;
+    x.range_end = v->x.range_end;
+    y.range_start = v->y.range_start;
+    y.range_end = v->y.range_end;
+    return cui_plot_viewport_init(v, x, y);
+}
+static cui_plot_result viewport_axis(cui_plot_scale *s, cui_plot_viewport_limit limit, double delta,
+                                     double factor, double anchor) {
+    if (!isfinite(limit.min_span) || !isfinite(limit.max_span) || limit.min_span < 0 ||
+        limit.max_span < 0 || (limit.max_span && limit.max_span < limit.min_span) ||
+        (limit.bounded &&
+         (!isfinite(limit.minimum) || !isfinite(limit.maximum) || limit.minimum >= limit.maximum ||
+          (long double)limit.min_span > (long double)limit.maximum - limit.minimum)))
+        return CUI_PLOT_INVALID;
+    long double lo = cui_plot_transform(s->kind, s->domain_min);
+    long double hi = cui_plot_transform(s->kind, s->domain_max), span = hi - lo;
+    long double range = (long double)s->range_end - s->range_start;
+    long double fraction = ((long double)anchor - s->range_start) / range;
+    long double center = lo - (long double)delta / range * span + fraction * span;
+    long double next_span = span / factor;
+    if (limit.min_span)
+        next_span = fmaxl(next_span, limit.min_span);
+    if (limit.max_span)
+        next_span = fminl(next_span, limit.max_span);
+    if (limit.bounded)
+        next_span = fminl(next_span, (long double)limit.maximum - limit.minimum);
+    lo = center - fraction * next_span;
+    hi = lo + next_span;
+    if (limit.bounded) {
+        if (lo < limit.minimum) {
+            hi += limit.minimum - lo;
+            lo = limit.minimum;
+        }
+        if (hi > limit.maximum) {
+            lo -= hi - limit.maximum;
+            hi = limit.maximum;
+        }
+    }
+    cui_plot_result result = cui_plot_untransform(s->kind, lo, &s->domain_min);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_untransform(s->kind, hi, &s->domain_max);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_validate(s);
+    return result;
+}
+cui_plot_result cui_plot_viewport_transform(cui_plot_viewport *v, cui_plot_viewport_options o,
+                                            double dx, double dy, double factor,
+                                            cui_plot_point anchor) {
+    if (!v || !v->initialized || !isfinite(dx) || !isfinite(dy) || !isfinite(factor) ||
+        factor <= 0 || !isfinite(anchor.x) || !isfinite(anchor.y) ||
+        cui_plot_validate(&v->x) != CUI_PLOT_OK || cui_plot_validate(&v->y) != CUI_PLOT_OK)
+        return CUI_PLOT_INVALID;
+    if (!o.enabled || o.disabled)
+        return CUI_PLOT_OK;
+    cui_plot_viewport next = *v;
+    cui_plot_result result =
+        viewport_axis(&next.x, o.x_limit, o.pan_x ? dx : 0, o.zoom_x ? factor : 1, anchor.x);
+    if (result == CUI_PLOT_OK)
+        result =
+            viewport_axis(&next.y, o.y_limit, o.pan_y ? dy : 0, o.zoom_y ? factor : 1, anchor.y);
+    if (result == CUI_PLOT_OK)
+        *v = next;
+    return result;
+}
 static long double cui_plot_fraction(long double value, long double a, long double b) {
     long double span = b - a;
     if (!isfinite(span) || !isfinite(value - a))

@@ -1210,12 +1210,12 @@ static cui_time_state time_state;
 static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
-static cui_plot_scale plot_scale = {CUI_PLOT_LINEAR, 0, 100, 0, 300, false};
+static cui_plot_viewport plot_viewport;
 static unsigned char plot_pixels[640 * 180 * 4];
 static cui_plot_numeric_tick plot_x_ticks[16], plot_y_ticks[16];
 static cui_plot_axis_text plot_x_labels[16], plot_y_labels[16];
 static uint64_t plot_revision;
-static cui_plot_scale plot_cached_scale;
+static cui_plot_scale plot_cached_scale, plot_cached_y;
 static cui_color plot_cached_primary, plot_cached_surface;
 static unsigned plot_cached_width;
 static int plot_mode, plot_cached_mode = -1;
@@ -3842,48 +3842,59 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 28: {
         float plot_width = fminf(640, fmaxf(80, width - 48));
-        plot_scale.range_start = 28;
-        plot_scale.range_end = plot_width - 12;
+        if (!plot_viewport.initialized)
+            cui_plot_viewport_init(
+                &plot_viewport,
+                (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 28, plot_width - 12, false},
+                (cui_plot_scale){CUI_PLOT_LINEAR, -1.2, 1.2, 142, 12, false});
+        plot_viewport.x.range_start = 28;
+        plot_viewport.x.range_end = plot_width - 12;
         cui_id plot_id = cui_id_from(ui, "plot-wave");
-        cui_rect plot_bounds = cui_bounds(ui, plot_id);
-        size_t touch_count;
-        const cui_event *touch_events = cui_frame_events(ui, &touch_count);
-        for (size_t i = 0; i < touch_count && !disabled; i++)
-            if (touch_events[i].type == CUI_EVENT_GESTURE && cui_event_target(ui, i) == plot_id &&
-                !cui_event_consumed(ui, i)) {
-                cui_plot_pan(&plot_scale, touch_events[i].dx);
-                cui_plot_zoom(&plot_scale, touch_events[i].gesture_scale,
-                              touch_events[i].x - plot_bounds.x);
-                cui_consume_event(ui, i);
-            }
-        float plot_anchor = (float)(plot_scale.range_start + plot_scale.range_end) / 2;
-        cui_text(ui, cui_string("sin(x / 12), sampled through the CUI plot scale"), 14, t.text);
+        cui_plot_viewport_options navigation = cui_plot_viewport_defaults();
+        navigation.disabled = disabled != 0;
+        navigation.x_limit = (cui_plot_viewport_limit){
+            .bounded = true, .minimum = -100, .maximum = 200, .min_span = 10, .max_span = 300};
+        navigation.y_limit = (cui_plot_viewport_limit){
+            .bounded = true, .minimum = -5, .maximum = 5, .min_span = .1, .max_span = 10};
+        cui_plot_viewport_reduce(ui, plot_id, &plot_viewport, navigation);
+        float plot_anchor = (float)(plot_viewport.x.range_start + plot_viewport.x.range_end) / 2;
+        cui_text(ui,
+                 cui_string("Shift-drag to pan; Ctrl-wheel or pinch to zoom; touch-drag to pan"),
+                 14, t.text);
         cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
         if (cui_button(ui, cui_id_from(ui, "plot-zoom"), &t, cui_string("Zoom in"), disabled))
-            cui_plot_zoom(&plot_scale, 1.5, plot_anchor);
+            cui_plot_viewport_transform(&plot_viewport, navigation, 0, 0, 1.5,
+                                        (cui_plot_point){plot_anchor, 77});
         if (cui_button(ui, cui_id_from(ui, "plot-zoom-out"), &t, cui_string("Zoom out"), disabled))
-            cui_plot_zoom(&plot_scale, 1 / 1.5, plot_anchor);
+            cui_plot_viewport_transform(&plot_viewport, navigation, 0, 0, 1 / 1.5,
+                                        (cui_plot_point){plot_anchor, 77});
         if (cui_button(ui, cui_id_from(ui, "plot-reset"), &t, cui_string("Reset"), disabled))
-            plot_scale = (cui_plot_scale){CUI_PLOT_LINEAR, 0, 100, 28, plot_width - 12, false};
+            cui_plot_viewport_reset(&plot_viewport);
         cui_end_box(ui);
         cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 8});
         if (cui_button(ui, cui_id_from(ui, "plot-left"), &t, cui_string("Pan left"), disabled))
-            cui_plot_pan(&plot_scale, plot_width * .15);
+            cui_plot_viewport_transform(&plot_viewport, navigation, plot_width * .15, 0, 1,
+                                        (cui_plot_point){plot_anchor, 77});
         if (cui_button(ui, cui_id_from(ui, "plot-right"), &t, cui_string("Pan right"), disabled))
-            cui_plot_pan(&plot_scale, -plot_width * .15);
+            cui_plot_viewport_transform(&plot_viewport, navigation, -plot_width * .15, 0, 1,
+                                        (cui_plot_point){plot_anchor, 77});
         cui_end_box(ui);
         unsigned pw = (unsigned)plot_width;
-        bool pixels_changed = !plot_revision || plot_cached_width != pw ||
-                              plot_cached_mode != plot_mode ||
-                              memcmp(&plot_cached_scale, &plot_scale, sizeof(plot_scale)) ||
-                              memcmp(&plot_cached_primary, &t.primary, sizeof(t.primary)) ||
-                              memcmp(&plot_cached_surface, &t.surface, sizeof(t.surface));
+        bool pixels_changed =
+            !plot_revision || plot_cached_width != pw || plot_cached_mode != plot_mode ||
+            memcmp(&plot_cached_scale, &plot_viewport.x, sizeof(plot_viewport.x)) ||
+            memcmp(&plot_cached_y, &plot_viewport.y, sizeof(plot_viewport.y)) ||
+            memcmp(&plot_cached_primary, &t.primary, sizeof(t.primary)) ||
+            memcmp(&plot_cached_surface, &t.surface, sizeof(t.surface));
         if (pixels_changed) {
             cui_plot_sample samples[33];
             for (size_t i = 0; i < 33; i++) {
                 double x = 28 + (plot_width - 40) * i / 32, value;
-                cui_plot_inverse(&plot_scale, x, &value);
-                samples[i] = (cui_plot_sample){x, 142, 77 - sin(value / 12) * 54, true};
+                cui_plot_inverse(&plot_viewport.x, x, &value);
+                double y, baseline;
+                cui_plot_map(&plot_viewport.y, sin(value / 12), &y);
+                cui_plot_map(&plot_viewport.y, 0, &baseline);
+                samples[i] = (cui_plot_sample){x, baseline, y, true};
             }
             cui_plot_path_command commands[256];
             size_t command_count = 0;
@@ -3896,8 +3907,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 result = cui_plot_radial_path(radial, 12, CUI_PLOT_GAPS_SKIP, true, true, false,
                                               commands, 256, &command_count);
                 for (size_t i = 0; i < command_count; i++) {
-                    commands[i].point.x += plot_width / 2;
-                    commands[i].point.y += 77;
+                    double data_x, data_y;
+                    cui_plot_scale initial_x = plot_viewport.initial_x;
+                    initial_x.range_start = plot_viewport.x.range_start;
+                    initial_x.range_end = plot_viewport.x.range_end;
+                    cui_plot_inverse(&initial_x, commands[i].point.x + plot_width / 2, &data_x);
+                    cui_plot_inverse(&plot_viewport.initial_y, commands[i].point.y + 77, &data_y);
+                    cui_plot_map(&plot_viewport.x, data_x, &commands[i].point.x);
+                    cui_plot_map(&plot_viewport.y, data_y, &commands[i].point.y);
                 }
             } else if (plot_mode == 5 || plot_mode == 6) {
                 /* The same projected samples feed source rounded bars/dot geometry.
@@ -3924,6 +3941,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     result =
                         cui_plot_bar_path(CUI_PLOT_BAR_BOTTOM, cross, band, baseline, value, radii,
                                           commands + command_count, 256 - command_count, &written);
+                    /* Zero-valued bars have no geometry, not a failed frame. */
+                    if (result == CUI_PLOT_EMPTY)
+                        result = CUI_PLOT_OK;
                     if (result == CUI_PLOT_OK)
                         command_count += written;
                 }
@@ -3945,7 +3965,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 cui_plot_raster(plot_pixels, pw, 180, pw * 4, sizeof(plot_pixels), &shape, 1,
                                 t.surface) == CUI_PLOT_OK) {
                 plot_cached_width = pw;
-                plot_cached_scale = plot_scale;
+                plot_cached_scale = plot_viewport.x;
+                plot_cached_y = plot_viewport.y;
                 plot_cached_mode = plot_mode;
                 plot_cached_primary = t.primary;
                 plot_cached_surface = t.surface;
@@ -3953,8 +3974,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             }
         }
         size_t nx = 0, ny = 0;
-        cui_plot_axis_ticks(&plot_scale, 5, plot_x_ticks, 16, &nx);
-        cui_plot_scale y_scale = {CUI_PLOT_LINEAR, -1.2, 1.2, 142, 12, false};
+        cui_plot_axis_ticks(&plot_viewport.x, 5, plot_x_ticks, 16, &nx);
+        cui_plot_scale y_scale = plot_viewport.y;
         cui_plot_axis_ticks(&y_scale, 5, plot_y_ticks, 16, &ny);
         for (size_t i = 0; i < nx; i++)
             plot_x_labels[i] = plot_x_ticks[i].label;
@@ -3976,14 +3997,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                       .name = cui_string("Projected sine wave"),
                                       .disabled = disabled != 0};
         cui_plot_view(ui, plot_id, &t, &view);
-        cui_set_gestures(ui, plot_id, true, true);
-        cui_set_cursor(ui, plot_id, CUI_CURSOR_GRAB);
+        cui_plot_viewport_bind(ui, plot_id, &plot_viewport, navigation);
         double ticks[32];
         size_t count = 0;
-        cui_plot_ticks(&plot_scale, 5, ticks, 32, &count);
+        cui_plot_ticks(&plot_viewport.x, 5, ticks, 32, &count);
         char text[128];
-        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; %zu scale ticks", plot_scale.domain_min,
-                 plot_scale.domain_max, count);
+        snprintf(text, sizeof(text), "Domain: %.2f .. %.2f; %zu scale ticks",
+                 plot_viewport.x.domain_min, plot_viewport.x.domain_max, count);
         cui_text(ui, cui_string(text), 14, t.muted);
         break;
     }
@@ -5337,4 +5357,20 @@ double gallery_conversation(unsigned field) {
     default:
         return 0;
     }
+}
+
+/* Host wheel claim is Plot-only. Core performs the authoritative hit/consumption
+ * during dispatch; the browser preflight follows the topmost semantic surface. */
+void gallery_plot_wheel(float x, float y, float delta) {
+    if (ui)
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                        .x = x,
+                                        .y = y,
+                                        .dy = -delta,
+                                        .scroll_precise = true,
+                                        .modifiers = CUI_MOD_CTRL});
+}
+double gallery_plot_domain(int axis, int end) {
+    const cui_plot_scale *s = axis ? &plot_viewport.y : &plot_viewport.x;
+    return end ? s->domain_max : s->domain_min;
 }

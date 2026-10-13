@@ -110,6 +110,8 @@ typedef struct {
     cui_corner_radii corner_radii;
     cui_border_edges border_edges; /* Finite nonnegative logical widths. */
     bool allow_content_overflow;   /* Explicit legacy overflow/wrapping opt-out; default clips. */
+    float pixel_size; /* 0: legacy/design sizing; finite (0,4096]: numeric source sizing. */
+    bool open; /* Active presentation only; independent of selected/checked/menu lifecycle. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);

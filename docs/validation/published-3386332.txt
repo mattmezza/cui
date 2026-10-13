@@ -1,0 +1,11 @@
+Published source: 3386332a6e91a8057d37246abc65196024c8f9c4
+Framework CI: https://github.com/mattmezza/cui/actions/runs/38373581116 — all six jobs PASS.
+Pages: https://github.com/mattmezza/cui/actions/runs/38373581238 — build/deploy PASS.
+Actual HTTPS gallery: https://matteo.merola.co/cui/
+270/270 public files byte-match the uploaded Pages artifact.
+Complete public browser suite PASS:78 catalog families,78 C/WASM stories,78 compiled excerpts, input/component interactions, mobile geometry, themes/search/docs/shared routes.
+Public extensions suite PASS:all78 usage guides, real pixel effects, typography/scales/motion, composed app actions/themes/mobile.
+Preserved logs: /home/matteo/.cache/cui-validation/published-3386332-{hashes,browser,extensions}.log
+Artifact: /home/matteo/.cache/cui-validation/release-3386332-artifact/artifact.tar
+
+Full family verification remains0/78. General touch and native mesh follow-up branches are not in this published release.

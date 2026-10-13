@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_effects.h"
+#include "../core/cui_drop_shadow_bounds_internal.h"
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -155,7 +156,7 @@ static float shadow_clamp(float v, float lo, float hi) {
 static bool shadow_geometry(cui_drop_shadow_paint p, float scale, float ox, float oy,
                             cui_rect *bounds, cui_corner_radii *radii) {
     cui_rect unused;
-    if (!cui_drop_shadow_bounds(p, &unused) || !isfinite(scale) || scale <= 0 || scale > 64 ||
+    if (!cui_drop_shadow_bounds_checked(p, &unused) || !isfinite(scale) || scale <= 0 || scale > 64 ||
         scale < 1.0f / 65536 || (p.layer.sigma > 0 && p.layer.sigma * scale < 4 * sqrtf(FLT_MIN)) ||
         !isfinite(ox) || !isfinite(oy) || fabsf(ox) > 1048576 || fabsf(oy) > 1048576)
         return false;

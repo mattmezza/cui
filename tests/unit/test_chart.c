@@ -460,7 +460,123 @@ static void test_reusable_chart_hover(void) {
     assert(cui_chart_update_hover(&hover, &o, 63, 20).hovered == 1);
     assert(!cui_chart_update_hover(&hover, &o, 32, 39).valid); /* Category gutter. */
 }
+#ifndef CUI_CHART_BASE_ONLY
+static bool hover_gate_popup(cui_draw_list draw) {
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_TEXT &&
+            draw.commands[i].text_style.weight == CUI_TEXT_WEIGHT_SEMIBOLD &&
+            draw.commands[i].text.length == 8 &&
+            memcmp(draw.commands[i].text.data, "Gate row", 8) == 0)
+            return true;
+    return false;
+}
+static void test_appearance_hover_gate(void) {
+    unsigned char pixels[128 * 96 * 4];
+    cui_chart_datum data[] = {{.label = {"Gate row", 8}, .value = 20},
+                              {.label = {"Second", 6}, .value = 40}};
+    cui_chart_options o = cui_chart_theme((cui_chart_options){.kind = CUI_CHART_LINE,
+                                                              .data = data,
+                                                              .count = 2,
+                                                              .width = 128,
+                                                              .height = 96,
+                                                              .appear_key = 1},
+                                          &(cui_theme){.background = {255, 255, 255, 255},
+                                                       .text = {0, 0, 0, 255},
+                                                       .chart_2 = {0, 100, 240, 255}});
+    cui_chart_state state = {.pixels = pixels, .byte_capacity = sizeof pixels, .hovered = SIZE_MAX};
+    cui_context *ui = cui_create((cui_config){.width = 256, .height = 256});
+    assert(ui && cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    (void)cui_end_frame(ui);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = state.bounds.x + 30,
+                                           .y = state.bounds.y + 30}));
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(state.rendered_reveal_progress > 0 && state.rendered_reveal_progress < 1);
+    assert(state.hovered == SIZE_MAX && !hover_gate_popup(draw));
+    /* The quartic float sample can round to1 before LINEAR time completes. */
+    assert(cui_begin_frame(ui, 256, 256, .499f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    draw = cui_end_frame(ui);
+    assert(state.rendered_reveal_progress == 1 && state.hovered == SIZE_MAX &&
+           !hover_gate_popup(draw));
+    /* A stationary pointer becomes eligible when appearance completes. */
+    assert(cui_begin_frame(ui, 256, 256, .002f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    draw = cui_end_frame(ui);
+    assert(state.rendered_reveal_progress == 1 && state.hovered == 0 && hover_gate_popup(draw));
+    /* Restart feeds no live datum, while the existing tooltip fades out. */
+    o.appear_key++;
+    float focus = state.tooltip_focus;
+    assert(cui_begin_frame(ui, 256, 256, .01f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    draw = cui_end_frame(ui);
+    assert(state.hovered == SIZE_MAX && state.appear_hover_pending && state.tooltip_focus > 0 &&
+           state.tooltip_focus < focus && hover_gate_popup(draw));
+    /* Moving outside cancels pending hover; completion must not resurrect it. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 240, .y = 240}));
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    draw = cui_end_frame(ui);
+    assert(!state.appear_hover_pending && !hover_gate_popup(draw));
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    draw = cui_end_frame(ui);
+    assert(state.hovered == SIZE_MAX && !hover_gate_popup(draw));
+    assert(!cui_needs_redraw(ui));
+    /* Noninteractive still animates, but neither resolves nor retains pending input. */
+    o.appear_key++;
+    o.noninteractive = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 30, .y = 30}));
+    assert(cui_begin_frame(ui, 256, 256, 0));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    (void)cui_end_frame(ui);
+    assert(state.rendered_reveal_progress == 0 && !state.appear_hover_pending);
+    assert(cui_begin_frame(ui, 256, 256, .5f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    (void)cui_end_frame(ui);
+    assert(state.rendered_reveal_progress > 0 && state.rendered_reveal_progress < 1);
+    /* Instant/reduced restart is immediately eligible, including owner option. */
+    o.noninteractive = false;
+    for (int instant = 0; instant < 3; instant++) {
+        o.appear_key++;
+        o.disable_appear = instant == 0;
+        o.reduced_motion = instant == 1;
+        cui_set_reduced_motion(ui, instant == 2);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 30, .y = 30}));
+        assert(cui_begin_frame(ui, 256, 256, .12f));
+        assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+        draw = cui_end_frame(ui);
+        assert(state.rendered_reveal_progress == 1 && state.hovered == 0 &&
+               !state.appear_hover_pending && hover_gate_popup(draw));
+    }
+    /* Explicit progress retains its existing caller-controlled completion contract. */
+    cui_set_reduced_motion(ui, false);
+    o.disable_appear = false;
+    o.reduced_motion = false;
+    o.reveal_enabled = true;
+    o.reveal_progress = .4f;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, .01f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    (void)cui_end_frame(ui);
+    assert(state.hovered == SIZE_MAX && state.appear_hover_pending);
+    o.reveal_progress = 1;
+    assert(cui_chart_render(&state, &o) == CUI_PLOT_OK);
+    assert(cui_begin_frame(ui, 256, 256, .12f));
+    assert(cui_chart(ui, 991, &state, &o, (cui_str){"Gate chart", 10}));
+    draw = cui_end_frame(ui);
+    assert(state.hovered == 0 && hover_gate_popup(draw));
+    cui_destroy(ui);
+}
+
+#endif
 int main(void) {
+#ifndef CUI_CHART_BASE_ONLY
+    test_appearance_hover_gate();
+#endif
     test_reusable_chart_hover();
     shared_sankey_adapter();
     continuous_curve_stroke();
@@ -2548,6 +2664,7 @@ int main(void) {
     assert(state.hovered < options.count && right_popup_x < state.bounds.x + 180 &&
            bottom_popup_y < state.bounds.y + 70);
     cui_set_reduced_motion(ui, false);
+    options.disable_appear = true; /* This section isolates hover easing after reveal. */
     state.tooltip_phase = state.tooltip_focus = 0;
     state.tooltip_active = state.tooltip_started = false;
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,

@@ -1530,6 +1530,7 @@ cui_plot_result cui_chart_render(cui_chart_state *s, const cui_chart_options *o)
         s->emphasis_started = false;
         s->emphasis_visual_index = SIZE_MAX;
         s->tooltip_cursor_valid = false;
+        s->appear_hover_pending = false;
         s->tooltip_phase = s->tooltip_focus = 0;
         s->tooltip_from = 0;
         s->tooltip_active = s->tooltip_started = false;
@@ -1694,6 +1695,8 @@ cui_chart_hit cui_chart_update_hover(cui_chart_state *state, const cui_chart_opt
     hit = cui_chart_hit_test(options, x, y);
     state->hovered = hit.valid ? hit.hovered : SIZE_MAX;
     state->hovered_value = hit.valid ? hit.value : 0;
+    if (!hit.valid)
+        state->appear_hover_pending = false;
     if (hit.valid) {
         state->tooltip_cursor_x = x;
         state->tooltip_cursor_y = y;

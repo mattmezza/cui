@@ -273,6 +273,7 @@ typedef struct {
     size_t tooltip_visual_index; /* retained while fading out */
     double tooltip_visual_value;
     cui_rect bounds; /* retained logical bounds for pointer interaction */
+    bool appear_hover_pending; /* private valid cursor deferred until reveal completes */
 } cui_chart_state;
 typedef struct {
     bool valid;

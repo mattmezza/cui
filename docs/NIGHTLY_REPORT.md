@@ -1,5 +1,7 @@
 # Nightly report — live development checkpoint
 
+Next31 frozen production `4241a56` passes strict native162/162, ASan/UBSan154/154 and pinned WASI129/129. Attachment62/62 passes after correcting exact-fit Button rounding. Source-pattern and number formatting, current-frame bounded Button labels, selected copyable usage examples and secure touch/IME corrections are integrated. The complete49-command browser matrix passes with corrected hosta32343d, including all78 stories/78 snippets; this batch is not yet published. See [Next31 evidence](validation/gallery-next31.txt). No full family is verified.
+
 Frozen Next30 production `0f4bead` passes native151/151, sanitizer143/143 and WASI121/121. Secure password Inputs, controlled joined Button collections and bounded layered shadows are integrated into the actual gallery. Final password/button/IME tests and Attachment62/62 pass. Source-pattern formatting, inset shadows and other audited family contracts remain incomplete; all78 stories,78 compiled snippets and eight layered-shadow pixel/preclear cases pass. See [Next30 evidence](validation/gallery-next30.txt).
 
 Published `5474ec7` fixes the native SDL GPU assertion: acquired swapchain command buffers are submitted safely, and resource preparation occurs before acquisition. All six CI jobs and Pages pass; all411 public artifact files match. MAIN strict native CTest132/132 passes. The same actual Vulkan fault fixture reproduces the previous assertion and passes on the fix. See [publication evidence](validation/published-5474ec7.txt) and [renderer regression details](validation/sdl-gpu-lifecycle-hotfix.txt).
@@ -10,7 +12,7 @@ Frozen Next27 production `6e36b5a` passes native127/127, sanitizer122/122, WASI1
 
 Line/Area point-axis layout and single-line CR/LF normalization are explicit opt-ins. Whole-value validation examples and guide links are live in the compiled next gallery. Applied Tabs scroll deltas now consume their events; refused deltas defer to eligible ancestors. Source-complete chart content/styles/long-press, masked Input/regex/content types, ButtonGroup and several Button contracts remain incomplete. Subsequent isolated workers address these concrete audited gaps.
 
-The ledger records291 tested subsets,4 implemented and44 not_started (339 total), with **0 fully verified families**. These evidence counts are not a completion percentage. No user dependency installation is required.
+The ledger records294 tested subsets,4 implemented and44 not_started (342 total), with **0 fully verified families**. These evidence counts are not a completion percentage. No user dependency installation is required.
 
 Frozen Next28 portable source `8e701b3` passes native132/132, sanitizer127/127 and WASI108/108. Native includes five GPU/Sokol/accessibility tests absent from this sanitizer configuration. The actual gallery passes all78 stories and78 snippet compilations, plus copied custom Chart tooltip rows on desktop/390px, runtime opt-out, canvas pixels and clipboard code. Radar titles and disabled/loading Button activation barriers have separate actual WASM tests; overlapping disabled siblings preserve wheel/touch scroll scope queries. These are tested subsets: source-complete tooltip appearance, shadows and other remaining family contracts are still pending. See [Next28 integration evidence](validation/gallery-next28.txt).
 

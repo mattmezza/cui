@@ -2965,6 +2965,79 @@ bool cui_dock_area_regions(cui_dock_area *area, cui_dock_region_content out[4]) 
                                            .panel_count = area->descriptor_count};
     return true;
 }
+bool cui_dock_area_has_dock(const cui_dock_area *area, cui_dock_region region) {
+    return area && region >= CUI_DOCK_LEFT && region <= CUI_DOCK_BOTTOM &&
+           area->workspace->schema_present[region - 1];
+}
+bool cui_dock_area_dock_open(const cui_dock_area *area, cui_dock_region region) {
+    return cui_dock_area_has_dock(area, region) && area->workspace->snapshot.open[region - 1];
+}
+bool cui_dock_area_dock_collapsible(const cui_dock_area *area, cui_dock_region region) {
+    return cui_dock_area_has_dock(area, region) &&
+           !area->workspace->snapshot.noncollapsible[region - 1];
+}
+bool cui_dock_area_dock_size(const cui_dock_area *area, cui_dock_region region, float *size) {
+    if (!size || !cui_dock_area_has_dock(area, region))
+        return false;
+    *size = area->workspace->snapshot.size[region - 1];
+    return true;
+}
+cui_dock_result cui_dock_area_toggle_dock(cui_dock_area *area, cui_dock_region region) {
+    if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM)
+        return CUI_DOCK_INVALID;
+    if (!cui_dock_area_has_dock(area, region))
+        return CUI_DOCK_NOT_FOUND;
+    size_t edge = region - 1;
+    bool open = area->workspace->snapshot.open[edge];
+    if (open && area->workspace->snapshot.noncollapsible[edge])
+        return CUI_DOCK_OK;
+    if (!cui_dock_workspace_set_edge(area->workspace, region, !open,
+                                     area->workspace->snapshot.size[edge]))
+        return CUI_DOCK_INVALID;
+    return cui_dock_area_reconcile(area);
+}
+cui_dock_result cui_dock_area_set_dock_collapsible(cui_dock_area *area,
+                                                    cui_dock_region region, bool collapsible) {
+    if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM)
+        return CUI_DOCK_INVALID;
+    if (!cui_dock_area_has_dock(area, region))
+        return CUI_DOCK_NOT_FOUND;
+    return cui_dock_workspace_set_collapsible(area->workspace, region, collapsible)
+               ? CUI_DOCK_OK : CUI_DOCK_INVALID;
+}
+cui_dock_result cui_dock_area_set_dock_size(cui_dock_area *area, cui_dock_region region,
+                                             float size) {
+    if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM ||
+        !isfinite(size) || size <= 0 || size > 1e9f)
+        return CUI_DOCK_INVALID;
+    if (!cui_dock_area_has_dock(area, region))
+        return CUI_DOCK_NOT_FOUND;
+    return cui_dock_workspace_set_edge(area->workspace, region,
+                                        area->workspace->snapshot.open[region - 1], size)
+               ? CUI_DOCK_OK : CUI_DOCK_INVALID;
+}
+cui_dock_result cui_dock_area_remove_dock(cui_dock_area *area, cui_dock_region region) {
+    if (!area || area->delivering || region < CUI_DOCK_LEFT || region > CUI_DOCK_BOTTOM)
+        return CUI_DOCK_INVALID;
+    if (!cui_dock_area_has_dock(area, region))
+        return CUI_DOCK_OK;
+    uint64_t zoom_key = 0;
+    bool zoomed = cui_dock_view_zoomed(area->views[region], &zoom_key);
+    size_t zoom_descriptor = zoomed ? dock_area_descriptor(area, zoom_key) : SIZE_MAX;
+    if (zoom_descriptor != SIZE_MAX && area->zoom_count == area->zoom_capacity)
+        return CUI_DOCK_CAPACITY;
+    cui_dock_schema_node empty = {.kind = CUI_DOCK_SCHEMA_TABS};
+    cui_dock_result result = cui_dock_schema_import(area->models[region], &empty, NULL, NULL);
+    if (result != CUI_DOCK_OK)
+        return result;
+    if (zoom_descriptor != SIZE_MAX)
+        area->zoom_events[area->zoom_count++] =
+            (dock_area_zoom_event){zoom_descriptor, false};
+    cui_dock_view_reset(area->views[region]);
+    area->workspace->schema_present[region - 1] = false;
+    area->workspace->snapshot.open[region - 1] = false;
+    return cui_dock_area_reconcile(area);
+}
 cui_dock_result cui_dock_area_register(cui_dock_area *area, cui_dock_area_panel descriptor) {
     if (!area || area->delivering ||
         (descriptor.retain == NULL) != (descriptor.release == NULL) ||

@@ -505,6 +505,14 @@ cui_dock *cui_dock_area_model(cui_dock_area *, cui_dock_region);
 cui_dock_view *cui_dock_area_view(cui_dock_area *, cui_dock_region);
 cui_dock_workspace *cui_dock_area_workspace(cui_dock_area *);
 bool cui_dock_area_regions(cui_dock_area *, cui_dock_region_content out[4]);
+bool cui_dock_area_has_dock(const cui_dock_area *, cui_dock_region);
+bool cui_dock_area_dock_open(const cui_dock_area *, cui_dock_region);
+bool cui_dock_area_dock_collapsible(const cui_dock_area *, cui_dock_region);
+bool cui_dock_area_dock_size(const cui_dock_area *, cui_dock_region, float *size);
+cui_dock_result cui_dock_area_toggle_dock(cui_dock_area *, cui_dock_region);
+cui_dock_result cui_dock_area_set_dock_collapsible(cui_dock_area *, cui_dock_region, bool);
+cui_dock_result cui_dock_area_set_dock_size(cui_dock_area *, cui_dock_region, float);
+cui_dock_result cui_dock_area_remove_dock(cui_dock_area *, cui_dock_region);
 cui_dock_result cui_dock_area_register(cui_dock_area *, cui_dock_area_panel);
 cui_dock_result cui_dock_area_reconcile(cui_dock_area *);
 cui_dock_result cui_dock_area_insert(cui_dock_area *, cui_dock_region, cui_dock_node tab,

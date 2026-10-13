@@ -330,6 +330,27 @@ typedef struct {
 } cui_box_shadow;
 enum { CUI_BOX_SHADOW_MAX = CUI_DROP_SHADOW_MAX };
 typedef cui_drop_shadow_paint cui_inset_shadow_paint;
+/* Source named DROP lists; default/none means no layers, never an implicit shadow. */
+typedef enum {
+    CUI_SHADOW_NONE = 0,
+    CUI_SHADOW_2XS,
+    CUI_SHADOW_XS,
+    CUI_SHADOW_SM,
+    CUI_SHADOW_MD,
+    CUI_SHADOW_LG,
+    CUI_SHADOW_XL,
+    CUI_SHADOW_2XL
+} cui_shadow_preset;
+enum { CUI_SHADOW_PRESET_MAX = 2 };
+/* Checked source constructor: DROP, sigma/spread zero, explicit color.
+ * Finite offsets must lie in [-4096,4096]; invalid input leaves output untouched. */
+bool cui_box_shadow_init(float offset_x, float offset_y, cui_color, cui_box_shadow *out);
+/* Copy ordered layers (black alpha13/26/64). Output count must not overlap the
+ * written layer span. Invalid enum, capacity/overflow or pointers leave all outputs
+ * untouched. NONE writes count0 only; its layer buffer may be NULL. */
+bool cui_shadow_preset_layers(cui_shadow_preset, cui_drop_shadow *out, size_t capacity,
+                              size_t *count);
+
 /* Invalid input leaves output untouched. Logical support is metadata; checked physical covering
  * determines empty paint. */
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint, cui_rect *out);
@@ -556,6 +577,8 @@ bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
 /* Replaces the copied complete mixed list, at most eight total layers. */
 bool cui_set_box_shadows(cui_context *, const cui_box_shadow *, size_t count, cui_corner_radii);
 bool cui_set_drop_shadows(cui_context *, const cui_drop_shadow *, size_t count, cui_corner_radii);
+/* Replaces the whole mixed list. NONE clears DROP and INSET; no buffer is retained. */
+bool cui_set_shadow_preset(cui_context *, cui_shadow_preset, cui_corner_radii);
 
 typedef struct {
     cui_rect bounds;

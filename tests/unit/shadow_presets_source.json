@@ -1,0 +1,31 @@
+{
+  "upstream_component_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "dependency": "gpui-pre-macros0.3.8",
+  "file": "src/styles.rs",
+  "sha256": "5fbd5dac9b7cdc954860a018f6b6925e49c82b4dcfe29424ecea828d47a3ff40",
+  "lines": [
+    384,
+    490
+  ],
+  "alpha_quantization": {
+    ".05": 13,
+    ".1": 26,
+    ".25": 64
+  },
+  "preset_tuples": [
+    "NONE empty",
+    "2XS (1,0,0,.05)",
+    "XS (1,2,0,.05)",
+    "SM (1,3,0,.1),(1,2,-1,.1)",
+    "MD (4,6,-1,.1),(2,4,-2,.1)",
+    "LG (10,15,-3,.1),(4,6,-4,.1)",
+    "XL (20,25,-5,.1),(8,10,-6,.1)",
+    "2XL (25,50,-12,.25)"
+  ],
+  "boundaries": [
+    "public macro presets only",
+    "no implicit default layer",
+    "no native GPUI image/color identity claim",
+    "private consumer appearances separate"
+  ]
+}

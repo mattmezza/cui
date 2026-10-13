@@ -33,14 +33,15 @@ or skip source bytes; they are not scalar indices or one-to-one caret positions.
 Run byte ranges use the same source coordinates. Glyph `x/y` are final origins
 relative to the line baseline, with y increasing downward; advances use that same
 coordinate convention. Width is the sum of absolute horizontal subrun advances,
-not an ink bounding box. Height/ascent come from the selected face metrics. View
+not an ink bounding box. Height/ascent come from the primary and used fallback face metrics. View
 arrays remain valid until layout destruction.
 
 Creation owns all glyph/run storage and releases transient paragraph/shaper
 buffers before return. Input text may be reused immediately. Allocation and
-validation failures preserve the caller's layout output pointer. The selected
-font/style face is borrowed: keep it alive and registered through layout use and
-destruction. Fonts are UI-thread confined, as in the existing text adapter. Draw
+validation failures preserve the caller's layout output pointer. The layout retains its selected and fallback faces independently of caller
+references: closing fonts or replacing registrations does not invalidate it.
+Borrowed fallback/style registrations still require their source handles to stay
+alive for future layout creation until the registration is cleared. Fonts are UI-thread confined, as in the existing text adapter. Draw
 coordinates refer to the line top-left; partial raster failure can already have
 emitted glyph callbacks. The renderer can instead consume the portable glyph
 view. Drawing another glyph size between layout creation and drawing is safe:
@@ -82,8 +83,9 @@ The caller chooses line breaks at complete grapheme/shaping-cluster boundaries;
 this API accepts scalar ranges and does not enforce cluster-safe boundaries,
 compute wrapping widths, or expose unsafe-to-break glyph flags. Script/directional
 itemization is basic and is not a full cluster-aware script resolver. Existing
-style registration chooses one face for the complete line; missing glyphs remain
-missing, with no per-script or OS font fallback. There is no language detection,
+style registration selects the primary face; an explicit caller chain can
+supply complete script/directional subruns. There is no OS font discovery or
+per-grapheme mixed-face fallback inside a subrun. There is no language detection,
 vertical layout, justification, caret mapping, selection or hit testing. Core,
 widgets and backend commands using the native text adapter benefit from the
 enabled ordinary-call routing. No other Core/widget behavior is changed.
@@ -125,3 +127,66 @@ This is hard-line processing, not automatic word wrapping or a caret system.
 The simple script itemization/fallback limitations above still apply. Each
 explicit U+2028 line currently reanalyzes its paragraph; large numbers of such
 lines may warrant caching reusable analysis in a future text-layout object.
+
+## Explicit caller-registered font fallback
+
+`cui_font_set_fallbacks` installs an ordered borrowed chain of actual CUI font
+handles; `cui_font_register_fallbacks` opens and owns an ordered list of file
+paths. Both replace the complete chain transactionally, accept zero entries to
+clear, and reject counts above `CUI_FONT_FALLBACK_MAX` (32), NULL entries,
+duplicates/self handles for the borrowed setter, and failing paths. A failed
+call leaves the old chain working and releases partially opened owned faces.
+Current owned entries cannot be reborrowed into the replacing chain.
+
+The chain belongs to the root handle passed to layout/measurement/drawing, not
+to a style variant. Existing style-selection rules are applied to the primary
+and each direct fallback entry. Chains are not recursively traversed. Borrowed
+fallback and style handles must remain alive while registered for future calls.
+Owned entries are released on replacement/owner close. Font close releases a
+reference, and layouts retain each actual candidate face independently: a layout
+can still be painted after chain/style replacement or caller font close. Its
+view exposes borrowed retained CUI handles in `faces`; never close those view
+handles. `run.face_index` identifies the face whose glyph IDs the run contains.
+All font/registration operations remain confined to the UI thread.
+
+Coverage is chosen for each entire script/directional subrun. The first face
+that shapes the complete subrun without glyph zero is selected. This keeps
+joining Arabic letters and their marks together and never switches faces inside
+a HarfBuzz output cluster. HarfBuzz's REMOVE_DEFAULT_IGNORABLES flag lets joining controls, CGJ,
+variation selectors and tags affect shaping without requiring standalone cmap
+entries. Coverage uses actual shaped output, not nominal cmap checks: valid
+normalization/composition can cover combining sequences even when a standalone
+mark has no cmap entry. Every visible shaped glyph must be nonzero.
+No complete covering face, or any shaped glyph zero, yields explicit
+`CUI_TEXT_LAYOUT_MISSING_GLYPH` and preserves the output pointer. Ordinary draw
+returns false with no callbacks if layout/coverage fails; ordinary measure returns
+{0,0}. Missing-glyph tofu is not reported as a successful fallback layout.
+
+Runs use their selected faces for both HarfBuzz shaping and FreeType rasterization.
+All glyph origins share one baseline. If fallback is actually used, ascent and
+descent are maxima across the primary and used faces, and line height is the
+maximum of all used native line heights and combined ascent/descent. No-fallback
+lines preserve the existing primary face height exactly, including rounded metric
+conventions. Unused registered fallback faces do not enlarge the line. Hard-line
+baseline progression uses each computed line height. `cui_font_get_metrics` remains
+the selected primary face's generic metrics, since it has no text argument;
+text-specific fallback extents are available from layout/measurement.
+
+Tests verify a Noto Latin primary actually lacks Arabic/Hebrew, then compare
+successful fallback glyph IDs, marks, advances and pixels with direct HarfBuzz/
+FreeType shaping on the registered script faces. They verify original source
+clusters, script run order, mixed baseline maxima, Arabic joiners/marks/VS/CGJ,
+missing coverage failures, first-fit selection, invalid/capacity registration,
+partial owned-open cleanup, style-face selection, and retained raster stability
+after owned/borrowed chain replacement and root/variant font close. ASCII metrics
+and raster regressions remain unchanged. Font lookup also accepts portable
+DejaVu faces and explicit `CUI_TEST_FONT`, `CUI_TEST_ARABIC_FONT` and
+`CUI_TEST_HEBREW_FONT`; cases already covered by the primary are explicitly logged
+as untested missing-primary cases rather than inventing missing-glyph evidence.
+
+Without bidi enabled, chain registration/lifetime APIs still work and are tested,
+but the existing legacy ordinary shaping path does not consult the chain; explicit
+layout creation remains UNAVAILABLE. There is no automatic system font discovery,
+color-emoji rendering, per-grapheme mixed-face segmentation, automatic word
+wrapping, or caret/selection/hit-test implementation. Whole-run coverage may fail
+when separate fonts collectively cover a run but no one font covers it completely.

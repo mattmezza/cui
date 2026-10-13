@@ -19,6 +19,10 @@ struct cui_font {
     hb_font_t *shaper;
     cui_font_family default_family;
     cui_font_family *families;
+    size_t references;
+    struct cui_font **fallbacks;
+    size_t fallback_count;
+    bool owns_fallbacks;
 };
 static bool valid_style(cui_text_style style) {
     return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
@@ -57,6 +61,7 @@ cui_font *cui_font_open(const char *path) {
     cui_font *f = calloc(1, sizeof(*f));
     if (!f)
         return NULL;
+    f->references = 1;
     if (!path || FT_Init_FreeType(&f->library) || FT_New_Face(f->library, path, 0, &f->face)) {
         cui_font_close(f);
         return NULL;
@@ -69,8 +74,12 @@ cui_font *cui_font_open(const char *path) {
     return f;
 }
 void cui_font_close(cui_font *f) {
-    if (!f)
+    if (!f || --f->references)
         return;
+    if (f->owns_fallbacks)
+        for (size_t i = 0; i < f->fallback_count; ++i)
+            cui_font_close(f->fallbacks[i]);
+    free(f->fallbacks);
     cui_font_family *family = &f->default_family;
     while (family) {
         for (size_t weight = 0; weight < 4; weight++)
@@ -131,6 +140,61 @@ bool cui_font_register_style(cui_font *font, cui_text_style style, const char *p
         cui_font_close(*slot);
     *slot = variant;
     *owned = true;
+    return true;
+}
+static void replace_fallbacks(cui_font *font, cui_font **entries, size_t count, bool owned) {
+    cui_font **old = font->fallbacks;
+    size_t old_count = font->fallback_count;
+    bool old_owned = font->owns_fallbacks;
+    font->fallbacks = entries;
+    font->fallback_count = count;
+    font->owns_fallbacks = owned;
+    if (old_owned)
+        for (size_t i = 0; i < old_count; ++i)
+            cui_font_close(old[i]);
+    free(old);
+}
+bool cui_font_set_fallbacks(cui_font *font, cui_font *const *entries, size_t count) {
+    if (!font || count > CUI_FONT_FALLBACK_MAX || (count && !entries))
+        return false;
+    for (size_t i = 0; i < count; ++i) {
+        if (!entries[i] || entries[i] == font)
+            return false;
+        for (size_t j = 0; j < i; ++j)
+            if (entries[j] == entries[i])
+                return false;
+        /* Owned entries cannot be reborrowed from this chain: replacement would
+         * otherwise destroy the very handles being installed. */
+        if (font->owns_fallbacks)
+            for (size_t j = 0; j < font->fallback_count; ++j)
+                if (entries[i] == font->fallbacks[j])
+                    return false;
+    }
+    cui_font **copy = NULL;
+    if (count) {
+        copy = malloc(count * sizeof *copy);
+        if (!copy)
+            return false;
+        for (size_t i = 0; i < count; ++i)
+            copy[i] = entries[i];
+    }
+    replace_fallbacks(font, copy, count, false);
+    return true;
+}
+bool cui_font_register_fallbacks(cui_font *font, const char *const *paths, size_t count) {
+    if (!font || count > CUI_FONT_FALLBACK_MAX || (count && !paths))
+        return false;
+    cui_font **copy = count ? calloc(count, sizeof *copy) : NULL;
+    if (count && !copy)
+        return false;
+    for (size_t i = 0; i < count; ++i)
+        if (!paths[i] || !(copy[i] = cui_font_open(paths[i]))) {
+            for (size_t j = 0; j < i; ++j)
+                cui_font_close(copy[j]);
+            free(copy);
+            return false;
+        }
+    replace_fallbacks(font, copy, count, true);
     return true;
 }
 #ifdef CUI_TEXT_BIDI
@@ -257,7 +321,7 @@ struct cui_text_layout {
     cui_text_layout_view view;
     cui_text_glyph *glyphs;
     cui_text_run *runs;
-    cui_font *face;
+    cui_font **faces;
     float size;
 };
 void cui_text_layout_destroy(cui_text_layout *layout) {
@@ -265,6 +329,9 @@ void cui_text_layout_destroy(cui_text_layout *layout) {
         return;
     free(layout->glyphs);
     free(layout->runs);
+    for (size_t i = 0; i < layout->view.face_count; ++i)
+        cui_font_close(layout->faces[i]);
+    free(layout->faces);
     free(layout);
 }
 bool cui_text_layout_get(const cui_text_layout *layout, cui_text_layout_view *out) {
@@ -281,6 +348,7 @@ typedef struct {
     hb_script_t script;
     uint8_t level;
     hb_buffer_t *buffer;
+    size_t face_index;
 } layout_segment;
 static bool weak_script(hb_script_t script) {
     return script == HB_SCRIPT_COMMON || script == HB_SCRIPT_INHERITED ||
@@ -302,6 +370,7 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     cui_bidi_run *bidi_runs = NULL;
     layout_segment *segments = NULL;
     size_t segment_count = 0, glyph_count = 0;
+    bool uses_fallback = false;
     cui_text_layout_status status = CUI_TEXT_LAYOUT_MEMORY;
     if (!out || !face || !isfinite(size) || size <= 0 || size > 4096 || text.length > INT_MAX ||
         (text.length && !text.data) || (unsigned)direction > CUI_BIDI_RTL)
@@ -348,8 +417,25 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     layout = calloc(1, sizeof *layout);
     if (!layout)
         goto done;
-    layout->face = face;
     layout->size = size;
+    layout->faces = calloc(font->fallback_count + 1, sizeof *layout->faces);
+    if (!layout->faces)
+        goto done;
+    layout->faces[0] = face;
+    ++face->references;
+    layout->view.face_count = 1;
+    for (size_t i = 0; i < font->fallback_count; ++i) {
+        cui_font *fallback = selected(font->fallbacks[i], style);
+        bool duplicate = false;
+        for (size_t j = 0; j < layout->view.face_count; ++j)
+            if (layout->faces[j] == fallback)
+                duplicate = true;
+        if (!duplicate) {
+            layout->faces[layout->view.face_count++] = fallback;
+            ++fallback->references;
+        }
+    }
+    layout->view.faces = layout->faces;
     if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72)) {
         status = CUI_TEXT_LAYOUT_INVALID;
         goto done;
@@ -358,6 +444,7 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     layout->view.height = (float)face->face->size->metrics.height / 64;
     layout->view.ascent = (float)face->face->size->metrics.ascender / 64;
     layout->view.paragraph_level = analysis.paragraph_level;
+    float descent = -(float)face->face->size->metrics.descender / 64;
     if (!length) {
         *out = layout;
         layout = NULL;
@@ -394,7 +481,7 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
             while (limit < end && scripts[limit] == scripts[i])
                 ++limit;
             segments[segment_count++] =
-                (layout_segment){i, limit, scripts[i], bidi_runs[r].level, NULL};
+                (layout_segment){i, limit, scripts[i], bidi_runs[r].level, NULL, 0};
             i = limit;
         }
         /* Directional runs arrive in visual order. RTL script subruns also need
@@ -408,25 +495,71 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     }
     for (size_t i = 0; i < segment_count; ++i) {
         layout_segment *seg = &segments[i];
-        hb_buffer_t *buffer = hb_buffer_create();
-        seg->buffer = buffer;
-        hb_buffer_set_direction(buffer, (seg->level & 1) ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
-        hb_buffer_set_script(buffer, seg->script);
-        hb_buffer_set_language(buffer, hb_language_from_string(language ? language : "und", -1));
-        hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
-        hb_buffer_flags_t flags = HB_BUFFER_FLAG_REMOVE_DEFAULT_IGNORABLES;
-        if (seg->start == start)
-            flags |= HB_BUFFER_FLAG_BOT;
-        if (seg->end == start + length)
-            flags |= HB_BUFFER_FLAG_EOT;
-        hb_buffer_set_flags(buffer, flags);
-        hb_buffer_add_utf8(buffer, text.data + bytes[start],
-                           (int)(bytes[start + length] - bytes[start]),
-                           (unsigned)(bytes[seg->start] - bytes[start]),
-                           (int)(bytes[seg->end] - bytes[seg->start]));
-        hb_shape(face->shaper, buffer, NULL, 0);
-        if (!hb_buffer_allocation_successful(buffer))
+        bool covered = false;
+        /* Actual shaping is the coverage test. Nominal cmap checks alone can
+         * reject valid composed marks/variation sequences, or accept a face
+         * whose shaping substitutions still produce missing glyphs. */
+        for (size_t f = 0; f < layout->view.face_count; ++f) {
+            cui_font *candidate = layout->faces[f];
+            if (FT_Set_Char_Size(candidate->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72)) {
+                status = CUI_TEXT_LAYOUT_INVALID;
+                goto done;
+            }
+            hb_ft_font_changed(candidate->shaper);
+            hb_buffer_t *attempt = hb_buffer_create();
+            seg->buffer = attempt;
+            hb_buffer_set_direction(attempt,
+                                    (seg->level & 1) ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
+            hb_buffer_set_script(attempt, seg->script);
+            hb_buffer_set_language(attempt,
+                                   hb_language_from_string(language ? language : "und", -1));
+            hb_buffer_set_cluster_level(attempt, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
+            hb_buffer_flags_t flags = HB_BUFFER_FLAG_REMOVE_DEFAULT_IGNORABLES;
+            if (seg->start == start)
+                flags |= HB_BUFFER_FLAG_BOT;
+            if (seg->end == start + length)
+                flags |= HB_BUFFER_FLAG_EOT;
+            hb_buffer_set_flags(attempt, flags);
+            hb_buffer_add_utf8(attempt, text.data + bytes[start],
+                               (int)(bytes[start + length] - bytes[start]),
+                               (unsigned)(bytes[seg->start] - bytes[start]),
+                               (int)(bytes[seg->end] - bytes[seg->start]));
+            hb_shape(candidate->shaper, attempt, NULL, 0);
+            if (!hb_buffer_allocation_successful(attempt))
+                goto done;
+            unsigned count;
+            hb_glyph_info_t *shaped = hb_buffer_get_glyph_infos(attempt, &count);
+            bool complete = true;
+            for (unsigned j = 0; j < count; ++j)
+                if (!shaped[j].codepoint) {
+                    complete = false;
+                    break;
+                }
+            if (complete) {
+                seg->face_index = f;
+                covered = true;
+                break;
+            }
+            hb_buffer_destroy(attempt);
+            seg->buffer = NULL;
+        }
+        if (!covered) {
+            status = CUI_TEXT_LAYOUT_MISSING_GLYPH;
             goto done;
+        }
+        cui_font *run_face = layout->faces[seg->face_index];
+        if (seg->face_index)
+            uses_fallback = true;
+        float run_ascent = (float)run_face->face->size->metrics.ascender / 64;
+        float run_descent = -(float)run_face->face->size->metrics.descender / 64;
+        float run_height = (float)run_face->face->size->metrics.height / 64;
+        if (run_ascent > layout->view.ascent)
+            layout->view.ascent = run_ascent;
+        if (run_descent > descent)
+            descent = run_descent;
+        if (run_height > layout->view.height)
+            layout->view.height = run_height;
+        hb_buffer_t *buffer = seg->buffer;
         size_t added = hb_buffer_get_length(buffer);
         if (added > SIZE_MAX - glyph_count)
             goto done;
@@ -454,7 +587,8 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
                                          glyph,
                                          count,
                                          (uint32_t)hb_script_to_iso15924_tag(seg->script),
-                                         seg->level};
+                                         seg->level,
+                                         seg->face_index};
         for (unsigned j = 0; j < count; ++j) {
             layout->glyphs[glyph++] = (cui_text_glyph){infos[j].codepoint,
                                                        infos[j].cluster + bytes[start],
@@ -467,6 +601,8 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
         }
         pen += fabsf(advance);
     }
+    if (uses_fallback && layout->view.ascent + descent > layout->view.height)
+        layout->view.height = layout->view.ascent + descent;
     layout->view.glyphs = layout->glyphs;
     layout->view.runs = layout->runs;
     layout->view.glyph_count = glyph_count;
@@ -513,11 +649,19 @@ bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_f
                           void *user) {
     if (!layout || !emit || !isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f)
         return false;
-    cui_font *face = layout->face;
-    if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * 64), 72, 72))
-        return false;
     bool ok = true;
+    size_t run = 0;
+    cui_font *face = NULL;
     for (size_t i = 0; i < layout->view.glyph_count; ++i) {
+        while (run + 1 < layout->view.run_count &&
+               i >= layout->runs[run].glyph_start + layout->runs[run].glyph_count)
+            ++run;
+        cui_font *selected_face = layout->faces[layout->runs[run].face_index];
+        if (selected_face != face) {
+            face = selected_face;
+            if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * 64), 72, 72))
+                return false;
+        }
         const cui_text_glyph *g = &layout->glyphs[i];
         float px = x + g->x, py = y + layout->view.ascent + g->y;
         if (!isfinite(px) || !isfinite(py) || fabsf(px) > 1e7f || fabsf(py) > 1e7f)

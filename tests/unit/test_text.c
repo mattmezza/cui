@@ -2,12 +2,42 @@
 #include "cui/cui_text.h"
 #ifndef CUI_TEXT_BIDI
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 int main(void) {
     cui_text_layout *sentinel = (cui_text_layout *)(void *)&sentinel;
     cui_text_layout *before = sentinel;
     assert(cui_font_layout_line(NULL, (cui_str){0}, 0, (cui_text_style){0}, CUI_BIDI_AUTO_LTR, 0, 0,
                                 NULL, &sentinel) == CUI_TEXT_LAYOUT_UNAVAILABLE);
     assert(sentinel == before);
+    const char *requested = getenv("CUI_TEST_FONT");
+    const char *const paths[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
+                                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                 "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                                 "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"};
+    const char *path = requested;
+    cui_font *root = requested ? cui_font_open(requested) : NULL;
+    if (requested)
+        assert(root);
+    for (size_t i = 0; !root && i < sizeof paths / sizeof paths[0]; ++i) {
+        root = cui_font_open(paths[i]);
+        if (root)
+            path = paths[i];
+    }
+    if (root) {
+        cui_font *fallback = cui_font_open(path);
+        assert(fallback);
+        cui_font *chain[] = {fallback};
+        assert(cui_font_set_fallbacks(root, chain, 1));
+        assert(!cui_font_set_fallbacks(root, chain, 33));
+        const char *owned[] = {path};
+        assert(cui_font_register_fallbacks(root, owned, 1));
+        assert(!cui_font_register_fallbacks(root, NULL, 1));
+        assert(cui_font_set_fallbacks(root, NULL, 0));
+        cui_font_close(root);
+        cui_font_close(fallback);
+    } else
+        puts("BIDI-off fallback registration font lifetime check untested: set CUI_TEST_FONT");
     return 0;
 }
 #else
@@ -38,6 +68,13 @@ static const char *font_path(const char *env, const char *const *paths, size_t c
     }
     return NULL;
 }
+typedef struct {
+    cui_font *font;
+    FT_Face face;
+    hb_font_t *hb;
+} reference_font;
+static reference_font fallback_references[8];
+static size_t fallback_reference_count;
 static cui_str string(const char *s) {
     return (cui_str){s, strlen(s)};
 }
@@ -52,8 +89,16 @@ static size_t byte_at(cui_str text, size_t scalar) {
     return text.length;
 }
 static void close_float(float a, float b) {
-    assert(fabsf(a - b) < 0.001f);
+    if (fabsf(a - b) >= 0.001f) {
+        fprintf(stderr, "float mismatch %g expected %g\n", (double)a, (double)b);
+        abort();
+    }
 }
+typedef struct {
+    uint64_t hash;
+    size_t count;
+} raster;
+static void emit(void *user, int x, int y, int w, int h, int pitch, const unsigned char *pixels);
 static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
                       cui_bidi_direction direction, size_t first, size_t length) {
     cui_text_layout *layout = NULL;
@@ -76,6 +121,11 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
     hb_ft_font_changed(hb);
     size_t run = 0, glyph = 0;
     float pen = 0;
+    raster expected_pixels = {0}, actual_pixels = {0};
+    float expected_ascent = (float)face->size->metrics.ascender / 64;
+    float expected_descent = -(float)face->size->metrics.descender / 64;
+    float expected_height = (float)face->size->metrics.height / 64;
+    bool used_fallback = false;
     for (size_t r = 0; r < SBLineGetRunCount(line); ++r) {
         const SBRun *bidi = &SBLineGetRunsPtr(line)[r];
         size_t covered = 0,
@@ -94,6 +144,32 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
             }
             covered += actual->byte_length;
             assert(covered <= bidi->length);
+            FT_Face run_face = face;
+            hb_font_t *run_hb = hb;
+            if (actual->face_index) {
+                bool found = false;
+                for (size_t f = 0; f < fallback_reference_count; ++f)
+                    if (fallback_references[f].font == view.faces[actual->face_index]) {
+                        run_face = fallback_references[f].face;
+                        run_hb = fallback_references[f].hb;
+                        found = true;
+                        break;
+                    }
+                assert(found);
+                assert(!FT_Set_Char_Size(run_face, 0, 24 * 64, 72, 72));
+                hb_ft_font_changed(run_hb);
+            }
+            if (actual->face_index)
+                used_fallback = true;
+            float ascent = (float)run_face->size->metrics.ascender / 64;
+            float descent = -(float)run_face->size->metrics.descender / 64;
+            float height = (float)run_face->size->metrics.height / 64;
+            if (ascent > expected_ascent)
+                expected_ascent = ascent;
+            if (descent > expected_descent)
+                expected_descent = descent;
+            if (height > expected_height)
+                expected_height = height;
             hb_buffer_t *buffer = hb_buffer_create();
             hb_buffer_set_direction(buffer,
                                     (actual->level & 1) ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
@@ -109,7 +185,7 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
             hb_buffer_add_utf8(buffer, text.data + byte_start, (int)(byte_end - byte_start),
                                (unsigned)(actual->byte_start - byte_start),
                                (int)actual->byte_length);
-            hb_shape(hb, buffer, NULL, 0);
+            hb_shape(run_hb, buffer, NULL, 0);
             assert(hb_buffer_allocation_successful(buffer));
             unsigned count;
             hb_glyph_info_t *infos = hb_buffer_get_glyph_infos(buffer, &count);
@@ -121,6 +197,7 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
             float x = pen + (advance < 0 ? -advance : 0), y = 0;
             for (unsigned i = 0; i < count; ++i) {
                 const cui_text_glyph *g = &view.glyphs[glyph++];
+                assert(g->glyph_id != 0);
                 assert(g->glyph_id == infos[i].codepoint &&
                        g->cluster_byte == infos[i].cluster + byte_start);
                 assert(g->cluster_byte >= actual->byte_start &&
@@ -129,6 +206,12 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
                 close_float(g->y, y - (float)positions[i].y_offset / 64);
                 close_float(g->x_advance, (float)positions[i].x_advance / 64);
                 close_float(g->y_advance, -(float)positions[i].y_advance / 64);
+                assert(!FT_Load_Glyph(run_face, infos[i].codepoint, FT_LOAD_DEFAULT));
+                assert(!FT_Render_Glyph(run_face->glyph, FT_RENDER_MODE_NORMAL));
+                FT_GlyphSlot slot = run_face->glyph;
+                emit(&expected_pixels, (int)lroundf(g->x) + slot->bitmap_left,
+                     (int)lroundf(view.ascent + g->y) - slot->bitmap_top, (int)slot->bitmap.width,
+                     (int)slot->bitmap.rows, slot->bitmap.pitch, slot->bitmap.buffer);
                 if (i) {
                     if (actual->level & 1)
                         assert(view.glyphs[glyph - 2].cluster_byte >= g->cluster_byte);
@@ -144,16 +227,18 @@ static void reference(cui_font *font, FT_Face face, hb_font_t *hb, cui_str text,
     }
     assert(run == view.run_count && glyph == view.glyph_count);
     close_float(pen, view.width);
-    close_float(view.height, (float)face->size->metrics.height / 64);
+    if (used_fallback && expected_ascent + expected_descent > expected_height)
+        expected_height = expected_ascent + expected_descent;
+    close_float(view.ascent, expected_ascent);
+    close_float(view.height, expected_height);
+    assert(cui_text_layout_draw(layout, 0, 0, emit, &actual_pixels));
+    assert(expected_pixels.hash == actual_pixels.hash &&
+           expected_pixels.count == actual_pixels.count);
     cui_text_layout_destroy(layout);
     SBLineRelease(line);
     SBParagraphRelease(paragraph);
     SBAlgorithmRelease(algorithm);
 }
-typedef struct {
-    uint64_t hash;
-    size_t count;
-} raster;
 static void emit(void *user, int x, int y, int w, int h, int pitch, const unsigned char *pixels) {
     raster *r = user;
     r->count++;
@@ -259,6 +344,130 @@ static void ordinary_lines(cui_font *font, FT_Face face, hb_font_t *hb) {
     assert(bounds.width == 0 && bounds.height == 0);
 }
 
+static void fallback_contracts(const char *primary_path, cui_font *const *fallbacks, size_t count,
+                               const char *arabic_path) {
+    FT_Library probe_library;
+    FT_Face probe;
+    assert(!FT_Init_FreeType(&probe_library));
+    assert(!FT_New_Face(probe_library, primary_path, 0, &probe));
+    bool needs_arabic = !FT_Get_Char_Index(probe, 0x627);
+    FT_Done_Face(probe);
+    FT_Done_FreeType(probe_library);
+    cui_font *root = cui_font_open(primary_path);
+    assert(root);
+    cui_text_layout *layout = NULL, *sentinel = NULL;
+    cui_text_layout_view view;
+    assert(cui_font_set_fallbacks(root, fallbacks, count));
+    assert(!cui_font_set_fallbacks(root, fallbacks, 33));
+    cui_font *bad[] = {root};
+    assert(!cui_font_set_fallbacks(root, bad, 1));
+    cui_font *duplicates[] = {fallbacks[0], fallbacks[0]};
+    assert(!cui_font_set_fallbacks(root, duplicates, 2));
+    assert(!cui_font_set_fallbacks(root, NULL, 1));
+    assert(cui_font_layout_line(root, string("abc אבג السَّلَامُ"), 24, (cui_text_style){0},
+                                CUI_BIDI_AUTO_LTR, 0, SIZE_MAX, NULL,
+                                &layout) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_get(layout, &view));
+    for (size_t i = 0; i < view.glyph_count; ++i)
+        assert(view.glyphs[i].glyph_id);
+    for (size_t r = 0; r < view.run_count; ++r)
+        assert(view.runs[r].face_index < view.face_count);
+    raster before = {0}, after = {0};
+    assert(cui_text_layout_draw(layout, 3, 5, emit, &before));
+    /* A failed owned registration must retain the working borrowed chain. */
+    const char *invalid_paths[] = {arabic_path, "/cui-test-nonexistent-font.ttf"};
+    assert(!cui_font_register_fallbacks(root, invalid_paths, 2));
+    assert(cui_font_layout_line(root, string("abc אבג السَّلَامُ"), 24, (cui_text_style){0},
+                                CUI_BIDI_AUTO_LTR, 0, SIZE_MAX, NULL,
+                                &sentinel) == CUI_TEXT_LAYOUT_OK);
+    cui_text_layout_destroy(sentinel);
+    assert(cui_font_set_fallbacks(root, NULL, 0));
+    cui_font_close(root);
+    assert(cui_text_layout_draw(layout, 3, 5, emit, &after));
+    assert(before.hash == after.hash && before.count == after.count);
+    cui_text_layout_destroy(layout);
+    /* Owned fallback replacement/root close cannot invalidate the retained face. */
+    root = cui_font_open(primary_path);
+    assert(root);
+    const char *owned[] = {arabic_path};
+    assert(cui_font_register_fallbacks(root, owned, 1));
+    assert(cui_font_layout_line(root, string("السَّلَامُ"), 24, (cui_text_style){0}, CUI_BIDI_RTL, 0,
+                                SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_get(layout, &view));
+    before = (raster){0};
+    after = (raster){0};
+    assert(cui_text_layout_draw(layout, 0, 0, emit, &before));
+    assert(cui_font_register_fallbacks(root, NULL, 0));
+    cui_font_close(root);
+    assert(cui_text_layout_draw(layout, 0, 0, emit, &after));
+    assert(before.hash == after.hash && before.count == after.count);
+    cui_text_layout_destroy(layout);
+    /* Default-ignorables need no standalone glyph, and remain in HB input to
+     * affect Arabic joining/marks/variation-selector cluster formation. */
+    root = cui_font_open(primary_path);
+    assert(root);
+    assert(cui_font_set_fallbacks(root, fallbacks, count));
+    assert(cui_font_layout_line(root, string("ل‍ا‌مَ️͏"), 24, (cui_text_style){0},
+                                CUI_BIDI_RTL, 0, SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+    assert(cui_text_layout_get(layout, &view));
+    for (size_t i = 0; i < view.glyph_count; ++i)
+        assert(view.glyphs[i].glyph_id);
+    cui_text_layout_destroy(layout);
+    assert(cui_font_layout_line(root, string("A️"), 24, (cui_text_style){0}, CUI_BIDI_LTR, 0,
+                                SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+    sentinel = layout;
+    assert(cui_font_layout_line(root, string("\xf4\x8f\xbf\xbf"), 24, (cui_text_style){0},
+                                CUI_BIDI_AUTO_LTR, 0, SIZE_MAX, NULL,
+                                &sentinel) == CUI_TEXT_LAYOUT_MISSING_GLYPH &&
+           sentinel == layout);
+    raster missing = {0};
+    assert(!cui_font_draw(root, string("abc\n\xf4\x8f\xbf\xbf"), 24, 0, 0, emit, &missing) &&
+           missing.count == 0);
+    cui_size bounds = cui_font_measure(root, string("\xf4\x8f\xbf\xbf"), 24);
+    assert(bounds.width == 0 && bounds.height == 0);
+    cui_text_layout_destroy(layout);
+    cui_font_close(root);
+    /* Fallback style registration selects a whole actual bold face; layouts
+     * retain it even when the style is removed and source fonts are closed. */
+    if (needs_arabic) {
+        root = cui_font_open(primary_path);
+        cui_font *arabic = cui_font_open(arabic_path), *bold = cui_font_open(arabic_path);
+        assert(root && arabic && bold);
+        cui_font *ordered[] = {arabic, bold};
+        assert(cui_font_set_fallbacks(root, ordered, 2));
+        assert(cui_font_layout_line(root, string("العربية"), 24, (cui_text_style){0}, CUI_BIDI_RTL,
+                                    0, SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+        assert(cui_text_layout_get(layout, &view));
+        assert(view.faces[view.runs[0].face_index] == arabic);
+        cui_text_layout_destroy(layout);
+        ordered[0] = bold;
+        ordered[1] = arabic;
+        assert(cui_font_set_fallbacks(root, ordered, 2));
+        assert(cui_font_layout_line(root, string("العربية"), 24, (cui_text_style){0}, CUI_BIDI_RTL,
+                                    0, SIZE_MAX, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+        assert(cui_text_layout_get(layout, &view));
+        assert(view.faces[view.runs[0].face_index] == bold);
+        cui_text_layout_destroy(layout);
+        cui_text_style style = {.weight = CUI_TEXT_WEIGHT_BOLD};
+        assert(cui_font_set_style(arabic, style, bold));
+        cui_font *chain[] = {arabic};
+        assert(cui_font_set_fallbacks(root, chain, 1));
+        assert(cui_font_layout_line(root, string("السَّلَامُ"), 24, style, CUI_BIDI_RTL, 0, SIZE_MAX,
+                                    NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+        assert(cui_text_layout_get(layout, &view));
+        assert(view.faces[view.runs[0].face_index] == bold);
+        assert(cui_font_set_style(arabic, style, NULL));
+        assert(cui_font_set_fallbacks(root, NULL, 0));
+        cui_font_close(root);
+        cui_font_close(arabic);
+        cui_font_close(bold);
+        after = (raster){0};
+        assert(cui_text_layout_draw(layout, 0, 0, emit, &after) && after.count == view.glyph_count);
+        cui_text_layout_destroy(layout);
+    } else
+        puts("primary covers Arabic; fallback first-fit/style-face case untested");
+}
+
 static void arabic_clusters(void) {
     const char *const paths[] = {"/usr/share/fonts/noto/NotoSansArabic-Regular.ttf",
                                  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -347,7 +556,83 @@ int main(void) {
     assert(!FT_Init_FreeType(&library));
     assert(!FT_New_Face(library, path, 0, &face));
     hb_font_t *hb = hb_ft_font_create_referenced(face);
+    const char *const arabic_paths[] = {"/usr/share/fonts/noto/NotoSansArabic-Regular.ttf",
+                                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                        "/usr/share/fonts/TTF/DejaVuSans.ttf"};
+    const char *const hebrew_paths[] = {"/usr/share/fonts/noto/NotoSansHebrew-Regular.ttf",
+                                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                                        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                                        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"};
+    const char *fallback_paths[2] = {font_path("CUI_TEST_ARABIC_FONT", arabic_paths, 3),
+                                     font_path("CUI_TEST_HEBREW_FONT", hebrew_paths, 4)};
+    cui_font *fallbacks[2] = {NULL};
+    for (size_t i = 0; i < 2; ++i)
+        if (fallback_paths[i]) {
+            cui_font *fallback = cui_font_open(fallback_paths[i]);
+            assert(fallback);
+            fallbacks[fallback_reference_count] = fallback;
+            reference_font *ref = &fallback_references[fallback_reference_count++];
+            ref->font = fallback;
+            assert(!FT_New_Face(library, fallback_paths[i], 0, &ref->face));
+            ref->hb = hb_ft_font_create_referenced(ref->face);
+        }
+    if (!fallback_paths[0] || !fallback_paths[1]) {
+        puts("mixed-script font coverage untested: set CUI_TEST_ARABIC_FONT and "
+             "CUI_TEST_HEBREW_FONT");
+        for (size_t i = 0; i < fallback_reference_count; ++i) {
+            hb_font_destroy(fallback_references[i].hb);
+            FT_Done_Face(fallback_references[i].face);
+            cui_font_close(fallbacks[i]);
+        }
+        hb_font_destroy(hb);
+        FT_Done_Face(face);
+        FT_Done_FreeType(library);
+        cui_font_close(font);
+        return 77;
+    }
+    assert(cui_font_set_fallbacks(font, fallbacks, fallback_reference_count));
+    fallback_contracts(path, fallbacks, fallback_reference_count, fallback_paths[0]);
+    if (!FT_Get_Char_Index(face, 0x627)) {
+        cui_font *without = cui_font_open(path);
+        cui_text_layout *missing = NULL;
+        assert(without);
+        assert(cui_font_layout_line(without, string("العربية"), 24, (cui_text_style){0},
+                                    CUI_BIDI_RTL, 0, SIZE_MAX, NULL,
+                                    &missing) == CUI_TEXT_LAYOUT_MISSING_GLYPH &&
+               !missing);
+        assert(cui_font_set_fallbacks(without, fallbacks, fallback_reference_count));
+        assert(cui_font_layout_line(without, string("العربية"), 24, (cui_text_style){0},
+                                    CUI_BIDI_RTL, 0, SIZE_MAX, NULL,
+                                    &missing) == CUI_TEXT_LAYOUT_OK);
+        cui_text_layout_view restored;
+        assert(cui_text_layout_get(missing, &restored));
+        assert(restored.runs[0].face_index > 0);
+        cui_text_layout_destroy(missing);
+        cui_font_close(without);
+        puts("primary missing Arabic verified; explicit fallback restores supported glyphs");
+    } else
+        puts("primary already covers Arabic; missing-primary Arabic case untested");
+    if (!FT_Get_Char_Index(face, 0x5d0)) {
+        cui_font *without = cui_font_open(path);
+        cui_text_layout *missing = NULL;
+        assert(without);
+        assert(cui_font_layout_line(without, string("שָׁלוֹם"), 24, (cui_text_style){0}, CUI_BIDI_RTL,
+                                    0, SIZE_MAX, NULL, &missing) == CUI_TEXT_LAYOUT_MISSING_GLYPH &&
+               !missing);
+        assert(cui_font_set_fallbacks(without, fallbacks, fallback_reference_count));
+        assert(cui_font_layout_line(without, string("שָׁלוֹם"), 24, (cui_text_style){0}, CUI_BIDI_RTL,
+                                    0, SIZE_MAX, NULL, &missing) == CUI_TEXT_LAYOUT_OK);
+        cui_text_layout_view restored;
+        assert(cui_text_layout_get(missing, &restored));
+        assert(restored.runs[0].face_index > 0);
+        cui_text_layout_destroy(missing);
+        cui_font_close(without);
+        puts("primary missing Hebrew verified; explicit fallback restores supported marks/glyphs");
+    } else
+        puts("primary already covers Hebrew; missing-primary Hebrew case untested");
     reference(font, face, hb, string("abc אבג العربية 123 (xy)"), CUI_BIDI_AUTO_LTR, 0, SIZE_MAX);
+    reference(font, face, hb, string("abc שָׁלוֹם 123 السَّلَامُ"), CUI_BIDI_AUTO_LTR, 0, SIZE_MAX);
+    reference(font, face, hb, string("ל‍ا‌مَ️͏"), CUI_BIDI_RTL, 0, SIZE_MAX);
     reference(font, face, hb, string("אבג العربية"), CUI_BIDI_RTL, 0, SIZE_MAX);
     reference(font, face, hb, string("abc ⁧العربية 12 אבג⁩ (xy)"), CUI_BIDI_AUTO_LTR,
               0, SIZE_MAX);
@@ -397,6 +682,13 @@ int main(void) {
     cui_text_layout_destroy(layout);
     cui_text_layout_destroy(NULL);
     ordinary_lines(font, face, hb);
+    assert(cui_font_set_fallbacks(font, NULL, 0));
+    for (size_t i = 0; i < fallback_reference_count; ++i) {
+        hb_font_destroy(fallback_references[i].hb);
+        FT_Done_Face(fallback_references[i].face);
+        cui_font_close(fallbacks[i]);
+    }
+    fallback_reference_count = 0;
     hb_font_destroy(hb);
     FT_Done_Face(face);
     FT_Done_FreeType(library);

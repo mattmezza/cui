@@ -12,6 +12,8 @@ typedef void (*cui_glyph_fn)(void *user, int x, int y, int width, int height, in
 /* The font file remains caller-owned. Face operations are UI-thread confined.
  */
 cui_font *cui_font_open(const char *path);
+/* Release the caller/owner reference; live layouts may retain the actual face.
+ * A closed caller handle must not be used again. NULL is accepted. */
 void cui_font_close(cui_font *font);
 /* Borrow an actual face opened by the caller; pass NULL to remove a variant.
  * Keep variants alive through measurement/drawing. Registrations are keyed by
@@ -24,6 +26,16 @@ bool cui_font_set_style(cui_font *font, cui_text_style style, cui_font *variant)
 /* Convenience path registration owns the opened face. Failure preserves the
  * previous registration; replacement and font_close release owned faces. */
 bool cui_font_register_style(cui_font *font, cui_text_style style, const char *path);
+enum { CUI_FONT_FALLBACK_MAX = 32 };
+/* Explicit, ordered, nonrecursive fallback chain; at most 32 entries.
+ * Borrowed fonts must remain alive until chain replacement/clear or owner close.
+ * No NULL/self/duplicate entries. Failure preserves the complete previous chain.
+ * A zero count clears it. Each entry uses existing style selection rules.
+ * Current owned chain entries cannot be reinstalled as borrowed entries. */
+bool cui_font_set_fallbacks(cui_font *font, cui_font *const *fallbacks, size_t count);
+/* Opens and owns every path transactionally. Replacement/close release owned
+ * references, while existing layouts retain their actual faces independently. */
+bool cui_font_register_fallbacks(cui_font *font, const char *const *paths, size_t count);
 /* Selected-face metrics suitable for cui_config.font_metrics. Failure preserves out. */
 bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font_metrics *out);
 cui_size cui_font_measure(void *font, cui_str text, float size);
@@ -46,6 +58,7 @@ typedef struct {
     size_t byte_start, byte_length, glyph_start, glyph_count;
     uint32_t script; /* ISO 15924 four-byte tag, most significant byte first. */
     uint8_t level;
+    size_t face_index; /* Index in view.faces; glyph IDs belong to this face. */
 } cui_text_run;
 typedef struct {
     const cui_text_glyph *glyphs;
@@ -53,19 +66,24 @@ typedef struct {
     size_t glyph_count, run_count;
     float width, height, ascent;
     uint8_t paragraph_level;
+    cui_font *const *faces; /* Borrowed layout-retained handles; do not close them. */
+    size_t face_count;
 } cui_text_layout_view;
 typedef enum {
     CUI_TEXT_LAYOUT_OK,
     CUI_TEXT_LAYOUT_INVALID,
     CUI_TEXT_LAYOUT_MEMORY,
-    CUI_TEXT_LAYOUT_UNAVAILABLE
+    CUI_TEXT_LAYOUT_UNAVAILABLE,
+    CUI_TEXT_LAYOUT_MISSING_GLYPH
 } cui_text_layout_status;
 /* Analyze a full paragraph, shape one caller-selected scalar line. SIZE_MAX
  * length means through paragraph end. Empty ranges return paragraph metrics.
  * Choose complete grapheme/shaping cluster
  * boundaries. Language is a BCP47 tag or NULL for "und". Layout owns glyph/run
- * data and copies all needed text; input may be reused after return. Font and
- * selected style face must remain alive and registered until layout destruction.
+ * data and retains face references; input may be reused after return. Closing
+ * fonts or replacing style/fallback registrations does not invalidate a layout.
+ * Fallback chooses a complete script/directional subrun; absent coverage returns
+ * MISSING_GLYPH, including shaped glyph zero, without publishing a layout.
  * Operations involving fonts are UI-thread confined. Failure preserves *out. */
 cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str paragraph, float size,
                                             cui_text_style style, cui_bidi_direction direction,
@@ -74,7 +92,7 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str paragraph, f
 /* View remains valid until destroy; invalid arguments preserve output. */
 bool cui_text_layout_get(const cui_text_layout *layout, cui_text_layout_view *out);
 void cui_text_layout_destroy(cui_text_layout *layout);
-/* Paint the positioned glyphs using the selected face and saved size. Coordinates
+/* Paint positioned glyphs with their selected run faces and saved size. Coordinates
  * specify the line's top-left; partial raster failure may already have emitted. */
 bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_fn emit, void *user);
 #ifdef __cplusplus

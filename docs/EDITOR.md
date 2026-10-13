@@ -424,8 +424,9 @@ Escape keeps only the active range. Each cursor has a measured visual column,
 including short rows, soft-wrap affinity, and folded-row projection. All carets
 and selections paint using the complete configured text style. A hidden selection
 endpoint reveals its fold before layout. Style, font size, and document changes
-reset preferred columns; reinitialize anchors after changing a host measurement
-provider. Preferred columns are view metadata and do not round-trip through Undo.
+reset preferred columns. Call `cui_text_metrics_changed` after changing a host
+measurement provider to invalidate anchors and measured rows. Preferred columns
+are view metadata and do not round-trip through Undo.
 
 Typing and Enter repeat text at every range in one document/history transaction.
 Backspace/Delete use extended grapheme boundaries; Ctrl/Meta/Alt deletion and
@@ -502,13 +503,28 @@ display order, and hidden fold interiors cannot be endpoints. Grapheme endpoints
 clip left, an intentional CUI extension to the upstream byte-column behavior.
 Selection changes create no document Undo step; a later edit restores the block
 through Undo. Block geometry depends on the current text measurement provider;
-reinitialize Editor state after changing that provider.
+call `cui_text_metrics_changed` after changing that provider.
 
 Textarea and Editor accept documents beyond 64 KiB when the caller supplies
 enough visual rows. A headless test exercises selection, scrolling, and editing
-near the end of 200,000 LF rows. Layout still scans and stores the complete
-display-row set each frame; this is functional large-document support, with no
-viewport virtualization or 60 Hz performance claim.
+near the end of 200,000 LF rows. Layout stores the complete display-row set,
+then reuses measured rows while document revision, style, width, wrap mode,
+and font metrics remain unchanged. Caret lookup uses binary search. Edits
+still rebuild all rows, and attached folds or inline tokens disable this
+fast path. There is no 60 Hz performance claim for edited frames.
+
+The reproducible headless benchmark is `tests/bench_editor_200k.c`. Build the
+portable library with CMake at `-O2`, then compile the benchmark with
+`cc -std=c11 -O2 -UNDEBUG -Iinclude tests/bench_editor_200k.c build/libcui.a
+build/libcui_software.a -lm -o bench_editor_200k`. It prints process CPU time,
+text measurement calls, and draw commands for cold, unchanged, tail-caret, and
+tail-edit frames. On an Intel Core Ultra 5 235U, Linux x86_64, GCC 16.2.1,
+headless software command generation, one release run measured 18.3 ms cold
+with 400,003 measurements, 0.030 ms unchanged with zero measurements, 0.025 ms
+for a tail-caret move with two measurements, and 15.6 ms after a one-byte tail
+edit with 400,007 measurements. The caller-owned row array occupied 6,400,032
+bytes, plus 400,000 document bytes. These are single-run CPU measurements; host font
+providers, document content, and load change the results.
 
 This slice does not implement typing-history coalescing or multiple IME
 composition ranges. Preferred columns remain view metadata rather

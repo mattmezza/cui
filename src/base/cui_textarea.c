@@ -142,15 +142,20 @@ bool cui_textarea_measure(cui_textarea_options options, float root, cui_textarea
 }
 static size_t cui_textarea_cursor_line_ex(const cui_textarea_state *state, size_t cursor,
                                           bool upstream_affinity) {
-    for (size_t i = 0; i < state->count; i++) {
-        cui_textarea_line line = state->lines[i];
-        if (cursor < line.end ||
-            (cursor == line.end &&
-             (line.hard_break || upstream_affinity || i + 1 == state->count)) ||
-            cursor < line.next)
-            return i;
+    size_t low = 0, high = state->count;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        cui_textarea_line line = state->lines[middle];
+        bool contains = cursor < line.end ||
+                        (cursor == line.end &&
+                         (line.hard_break || upstream_affinity || middle + 1 == state->count)) ||
+                        cursor < line.next;
+        if (contains)
+            high = middle;
+        else
+            low = middle + 1;
     }
-    return state->count ? state->count - 1 : 0;
+    return low < state->count ? low : state->count ? state->count - 1 : 0;
 }
 static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t cursor) {
     return cui_textarea_cursor_line_ex(state, cursor, state->upstream_affinity);
@@ -158,9 +163,16 @@ static size_t cui_textarea_cursor_line(const cui_textarea_state *state, size_t c
 /* A point just outside a selection can land in a folded gap even though both
  * selection endpoints are visible. Clamp it in the movement direction. */
 static size_t cui_textarea_visible_offset(const cui_textarea_state *state, size_t offset, bool up) {
-    for (size_t i = 0; i + 1 < state->count; ++i)
-        if (offset >= state->lines[i].next && offset < state->lines[i + 1].start)
-            return up ? state->lines[i].end : state->lines[i + 1].start;
+    size_t low = 0, high = state->count;
+    while (low < high) {
+        size_t middle = low + (high - low) / 2;
+        if (state->lines[middle].next <= offset)
+            low = middle + 1;
+        else
+            high = middle;
+    }
+    if (low && low < state->count && offset < state->lines[low].start)
+        return up ? state->lines[low - 1].end : state->lines[low].start;
     return offset;
 }
 cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
@@ -180,6 +192,27 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         return state->error = CUI_TEXTAREA_INVALID;
     cui_str text = content.text;
     cui_edit_state selection = cui_edit_get_state(edit);
+    if (state->initialized && state->error == CUI_TEXTAREA_OK && !state->fold_count &&
+        !content.token_count && !state->layout_fold_count && !state->layout_token_count &&
+        state->lines == state->layout_lines && state->capacity == state->layout_capacity &&
+        state->text_metrics_revision == cui_text_metrics_revision(ui) &&
+        state->revision == selection.revision &&
+        state->font_size == metrics.font_size && state->line_height == metrics.line_height &&
+        state->wrap_width == width && state->layout_wrap == wrap &&
+        state->text_style.family == style.family && state->text_style.weight == style.weight &&
+        state->text_style.italic == style.italic &&
+        state->text_style.monospace == style.monospace) {
+        state->caret_line = cui_textarea_cursor_line(state, selection.cursor);
+        state->cursor = selection.cursor;
+        state->anchor = selection.anchor;
+        state->maximum_y =
+            fmaxf(0, state->count * metrics.line_height - fmaxf(0, state->viewport.h));
+        state->scroll_y =
+            isfinite(state->scroll_y) ? fminf(state->maximum_y, fmaxf(0, state->scroll_y)) : 0;
+        state->scroll_x =
+            isfinite(state->scroll_x) ? fminf(state->maximum_x, fmaxf(0, state->scroll_x)) : 0;
+        return CUI_TEXTAREA_OK;
+    }
     if (state->fold_count && state->fold_revision != selection.revision) {
         state->folds = NULL;
         state->fold_count = 0;
@@ -212,6 +245,12 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
     state->font_size = metrics.font_size;
     state->line_height = metrics.line_height;
     state->wrap_width = width;
+    state->layout_wrap = wrap;
+    state->layout_fold_count = state->fold_count;
+    state->layout_token_count = content.token_count;
+    state->layout_lines = state->lines;
+    state->layout_capacity = state->capacity;
+    state->text_metrics_revision = cui_text_metrics_revision(ui);
     size_t start = 0, logical_line = 0, fold_index = 0, hidden_until = 0;
     float maximum = 0;
     for (;;) {

@@ -908,6 +908,7 @@ static void test_atomic_inline_tokens(void) {
 }
 static void test_large_document_viewport(void) {
     const size_t rows = 200000, bytes = rows * 2;
+    styled_probe probe = {.width = 5};
     char *buffer = malloc(bytes + 64);
     cui_textarea_line *lines = malloc((rows + 1) * sizeof(*lines));
     assert(buffer && lines);
@@ -919,15 +920,33 @@ static void test_large_document_viewport(void) {
     cui_edit *edit = editor(buffer, bytes + 64);
     cui_textarea_state state;
     assert(cui_textarea_state_init(&state, lines, rows + 1));
-    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_context *ui = cui_create((cui_config){.width = 400,
+                                               .height = 300,
+                                               .measure_styled = styled_measure,
+                                               .measure_user = &probe});
     assert(ui);
     cui_focus(ui, 10);
     cui_textarea_options options = {.width = 180, .height = 80};
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(state.count == rows + 1 && state.maximum_y > 1000000);
+    unsigned initial_calls = probe.calls;
+    assert(initial_calls >= rows);
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(probe.calls - initial_calls < 1000);
+    float earlier_maximum = state.maximum_y;
+    options.height = 120;
+    initial_calls = probe.calls;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.maximum_y < earlier_maximum && probe.calls - initial_calls < 1000);
+    initial_calls = probe.calls;
     assert(cui_edit_select(edit, bytes - 2, bytes - 2) == CUI_EDIT_OK);
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(state.scroll_y > 0 && state.caret_line == rows - 1);
+    assert(probe.calls - initial_calls < 1000);
+    cui_text_metrics_changed(ui);
+    initial_calls = probe.calls;
+    assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(probe.calls - initial_calls >= rows);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
     assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
     assert(buffer[bytes - 2] == 'z' && buffer[bytes - 1] == 'a');

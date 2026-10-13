@@ -34,11 +34,16 @@ typedef struct {
     float scroll_x, scroll_y, maximum_x, maximum_y;
     float font_size, line_height, wrap_width, preferred_x;
     uint64_t revision;
+    uint64_t text_metrics_revision;
     size_t cursor, anchor;
     bool dragging, preferred_valid, upstream_affinity, initialized, focused;
     double blink_started;
     cui_textarea_error error;
     cui_text_style text_style; /* Style of measured visual rows. */
+    bool layout_wrap; /* Last successful visual-row layout mode. */
+    size_t layout_fold_count, layout_token_count;
+    cui_textarea_line *layout_lines;
+    size_t layout_capacity;
     cui_textarea_fold *folds;
     size_t fold_count;
     uint64_t fold_revision;

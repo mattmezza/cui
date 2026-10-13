@@ -1,0 +1,13 @@
+Compiled source: 2d291fe9741addc322a6e107e15d03bf97e0d650.
+Portable source SHA256:998041535fb5a2f65d2ee6016d2cd180037d64476f753f5c8df2f1b17f406864.
+Warning-enabled native CTest95/95 PASS after formatting/regenerating distributions.
+ASan/UBSan95/95 PASS; driver-lifetime leak detection disabled. No leak-detector claim. Formatting afterward is cosmetic; warning build/CTest repeated on frozen source.
+WASI79/79 PASS, frozen fingerprint unchanged, finite40B per-suite fuel.
+Full78-story Chromium/78compiled usage excerpts PASS, extensions PASS, visual regressions PASS.
+Actual Chromium CDP Input/Textarea/Editor/Questionnaire composition PASS; additional Numeric/OTP/Combobox composition PASS. Native composition OS candidate windows/mobile keyboards remain unverified.
+Actual CDP touch catalog42/42 and follow-up16/16 PASS; page navigation19/19 PASS including capture loss, modal/protected drag/pinch ownership, boundary handoff and ghost suppression.
+New headless touch_page_host and controlled_siblings tests registered in CMake/WASI; ListMulti callback owner fix validated. Separate --radio audit deliberately retains known earlier-sibling same-frame semantic defect.
+Explicit native font fallback and strengthened RTL raster/source tests PASS. No OS font discovery, color emoji or per-grapheme mixed-face guarantee.
+Docs5/5, usage5/5, sharing3/3, pinned license/hash, format, embedding distribution and manifest78 checks PASS.
+Logs:/home/matteo/.cache/cui-validation/next17-{freeze,format}-{build,test}.log; next17-final-asan-{build,test}.log; next17-{wasi,browser,extensions,ime,ime-additional,touch,touch-components,touch-more,touch-page,visual,docs,usage,sharing,licenses,manifest}.log.
+No physical-device/all-family/full-parity claim. None of78 families is fully verified. Native accessibility bridge, bidi editing/automatic-wrap integration and broader platform/API/ecosystem work remain active.

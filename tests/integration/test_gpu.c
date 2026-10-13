@@ -2,6 +2,7 @@
 #include "cui/cui_sdl_gpu.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 static void pixel(const unsigned char *pixels, unsigned w, unsigned h, float x, float y, int red,
@@ -53,6 +54,111 @@ static void bitmap_pixels(cui_sdl_gpu *gpu) {
     pixel(p, w, h, 20.5f / 200, 10.5f / 200, 91, 91, 91);
     free(p);
 }
+static void mesh_pixels(cui_sdl_gpu *gpu) {
+    const cui_mesh_vertex vertices[] = {{0, 0, 0, 1}, {80, 0, 0, 1}, {0, 80, 0, 1}};
+    cui_draw_command c = {.type = CUI_DRAW_MESH,
+                          .bounds = {20, 20, 80, 80},
+                          .mesh = {.vertices = vertices,
+                                   .vertex_count = 3,
+                                   .origin_x = 20,
+                                   .origin_y = 20,
+                                   .scale = 1,
+                                   .color = {0.10702057f, 0.10702057f, 0.10702057f, 0.5f}}};
+    cui_draw_command overlap[] = {c, c};
+    cui_draw_list list = {overlap, 2, 200, 200};
+    assert(cui_sdl_gpu_interface(gpu).capabilities & CUI_RENDER_MESH);
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    unsigned w, h;
+    unsigned char *p = capture(gpu, &w, &h);
+    pixel(p, w, h, .15f, .15f, 96, 96, 96);
+    pixel(p, w, h, .05f, .15f, 0, 0, 0);
+    free(p);
+    cui_draw_command mixed[] = {
+        {.type = CUI_DRAW_RECT, .bounds = {0, 0, 200, 200}, .color = {0, 0, 255, 255}},
+        c,
+        {.type = CUI_DRAW_RECT, .bounds = {20, 20, 10, 80}, .color = {255, 0, 0, 255}},
+        c};
+    list = (cui_draw_list){mixed, 4, 200, 200};
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0}));
+    p = capture(gpu, &w, &h);
+    pixel(p, w, h, .125f, .125f, 191, 64, 64);
+    pixel(p, w, h, .2f, .15f, 96, 96, 160);
+    free(p);
+    cui_draw_command clips[] = {
+        {.type = CUI_DRAW_CLIP_PUSH, .bounds = {30, 20, 10, 40}}, c, {.type = CUI_DRAW_CLIP_POP}};
+    list = (cui_draw_list){clips, 3, 100, 100};
+    clips[1].mesh.scale = .5f;
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    p = capture(gpu, &w, &h);
+    pixel(p, w, h, .35f, .25f, 64, 64, 64);
+    pixel(p, w, h, .29f, .25f, 0, 0, 0);
+    pixel(p, w, h, .41f, .25f, 0, 0, 0);
+    free(p);
+    const cui_mesh_vertex curve[] = {{20, 20, 0, 0}, {44, 20, .5f, 0}, {44, 44, 1, 1}};
+    c.mesh =
+        (cui_mesh_paint){.vertices = curve, .vertex_count = 3, .scale = 1, .color = {1, 1, 1, 1}};
+    list = (cui_draw_list){&c, 1, 200, 200};
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    p = capture(gpu, &w, &h);
+    unsigned partial = 0, opaque = 0;
+    for (size_t i = 0; i < (size_t)w * h; i++) {
+        partial += p[i * 3] > 0 && p[i * 3] < 255;
+        opaque += p[i * 3] == 255;
+    }
+    assert(partial > 0 && opaque > 0);
+    for (unsigned y = 0; y < h; y++)
+        for (unsigned x = 0; x < w; x++) {
+            float lx = (x + .5f) * 200 / w, ly = (y + .5f) * 200 / h;
+            if (lx <= 21 || lx >= 43 || ly <= 21 || ly >= lx - 1)
+                continue;
+            float st = ((lx - 20) + (ly - 20)) / 48, t = (ly - 20) / 24;
+            float gradient = hypotf(st / 24 * 200 / w, (st - 1) / 24 * 200 / h);
+            float coverage = fminf(1, fmaxf(0, .5f - (st * st - t) / gradient));
+            assert(abs((int)p[((size_t)y * w + x) * 3] - (int)lroundf(coverage * 255)) <= 2);
+        }
+    free(p);
+    const cui_mesh_vertex vertical[] = {{20, 20, 0, 0}, {44, 32, .5f, 0}, {20, 44, 1, 1}};
+    c.mesh.vertices = vertical;
+    assert(cui_sdl_gpu_render(gpu, &list, (cui_color){0, 0, 0, 255}));
+    p = capture(gpu, &w, &h);
+    partial = 0;
+    for (unsigned y = 0; y < h; y++)
+        for (unsigned x = 0; x < w; x++) {
+            float lx = (x + .5f) * 200 / w, ly = (y + .5f) * 200 / h;
+            if (lx <= 21 || ly <= 21 || ly >= 43 || lx - 20 >= 2 * fminf(ly - 20, 44 - ly) - 1)
+                continue;
+            float st = (ly - 20) / 24, t = st - (lx - 20) / 48;
+            float gradient = hypotf(200.f / (48 * w), (2 * st - 1) * 200 / (24 * h));
+            float coverage = fminf(1, fmaxf(0, .5f - (st * st - t) / gradient));
+            int value = p[((size_t)y * w + x) * 3];
+            assert(abs(value - (int)lroundf(coverage * 255)) <= 2);
+            partial += value > 0 && value < 255;
+        }
+    assert(partial > 0);
+    free(p);
+    c.mesh.vertex_count = 2;
+    assert(!cui_sdl_gpu_render(gpu, &list, (cui_color){255, 0, 0, 255}));
+    p = capture(gpu, &w, &h);
+    pixel(p, w, h, .01f, .01f, 0, 0, 0);
+    free(p);
+    size_t count = 32768u * 6u + 3u;
+    cui_mesh_vertex *large = calloc(count, sizeof(*large));
+    assert(large);
+    for (size_t i = 0; i < count; i++)
+        large[i] = vertices[i % 3];
+    c.mesh.vertices = large;
+    c.mesh.vertex_count = count;
+    assert(!cui_sdl_gpu_render(gpu, &list, (cui_color){255, 0, 0, 255}));
+    free(large);
+    c.type = (cui_draw_type)999;
+    c.mesh.vertex_count = 3;
+    c.mesh.vertices = vertices;
+    assert(!cui_sdl_gpu_render(gpu, &list, (cui_color){255, 0, 0, 255}));
+    p = capture(gpu, &w, &h);
+    pixel(p, w, h, .01f, .01f, 0, 0, 0);
+    free(p);
+    assert(vertices[1].x == 80 && vertices[1].s == 0);
+}
 static void shapes(cui_sdl_gpu *gpu) {
     cui_draw_command c = {.type = CUI_DRAW_RECT,
                           .bounds = {8, 8, 48, 48},
@@ -97,6 +203,7 @@ int main(void) {
     assert(SDL_ClaimWindowForGPUDevice(device, window));
     cui_sdl_gpu *gpu = cui_sdl_gpu_create(device, window, NULL);
     assert(gpu);
+    mesh_pixels(gpu);
     cui_draw_command commands[] = {
         {.type = CUI_DRAW_RECT, .bounds = {0, 0, 200, 200}, .color = {200, 20, 20, 255}},
         {.type = CUI_DRAW_CLIP_PUSH, .bounds = {40, 40, 120, 120}},

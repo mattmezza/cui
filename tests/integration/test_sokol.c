@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 static unsigned char pixels[64 * 64 * 4];
 static const unsigned char *pixel(int x, int y) {
     return pixels + ((63 - y) * 64 + x) * 4;
@@ -40,6 +41,108 @@ static void bitmap_pixels(cui_sokol *r) {
     assert(cui_sokol_render(r, &list, (cui_color){0, 0, 0, 255}));
     readback();
     assert(pixel(0, 0)[0] == 0 && abs(pixel(20, 10)[0] - 91) <= 1);
+}
+static void mesh_pixels(cui_sokol *r) {
+    const cui_mesh_vertex vertices[] = {{0, 0, 0, 1}, {24, 0, 0, 1}, {0, 24, 0, 1}};
+    cui_draw_command c = {.type = CUI_DRAW_MESH,
+                          .bounds = {8, 8, 24, 24},
+                          .mesh = {.vertices = vertices,
+                                   .vertex_count = 3,
+                                   .origin_x = 8,
+                                   .origin_y = 8,
+                                   .scale = 1,
+                                   .color = {0.10702057f, 0.10702057f, 0.10702057f, 0.5f}}};
+    cui_draw_list list = {&c, 1, 64, 64};
+    assert(cui_sokol_interface(r).capabilities & CUI_RENDER_MESH);
+    assert(cui_sokol_render(r, &list, (cui_color){0, 0, 0, 255}));
+    readback();
+    assert(abs(pixel(10, 10)[0] - 64) <= 1 && pixel(7, 10)[0] == 0);
+    cui_draw_command overlap[] = {c, c};
+    list = (cui_draw_list){overlap, 2, 64, 64};
+    assert(cui_sokol_render(r, &list, (cui_color){0, 0, 0, 255}));
+    readback();
+    assert(abs(pixel(10, 10)[0] - 96) <= 1);
+    cui_draw_command mixed[] = {
+        {.type = CUI_DRAW_RECT, .bounds = {0, 0, 64, 64}, .color = {0, 0, 255, 255}},
+        c,
+        {.type = CUI_DRAW_RECT, .bounds = {8, 8, 6, 20}, .color = {255, 0, 0, 255}},
+        c};
+    list = (cui_draw_list){mixed, 4, 64, 64};
+    assert(cui_sokol_render(r, &list, (cui_color){0}));
+    readback();
+    assert(abs(pixel(10, 10)[0] - 191) <= 1 && abs(pixel(10, 10)[1] - 64) <= 1);
+    assert(abs(pixel(22, 10)[0] - 96) <= 1 && abs(pixel(22, 10)[2] - 160) <= 1);
+    cui_draw_command clipped[] = {
+        {.type = CUI_DRAW_CLIP_PUSH, .bounds = {6, 4, 2, 8}}, c, {.type = CUI_DRAW_CLIP_POP}};
+    clipped[1].mesh.origin_x = 4;
+    clipped[1].mesh.origin_y = 4;
+    clipped[1].mesh.scale = 0.5f;
+    list = (cui_draw_list){clipped, 3, 32, 32};
+    assert(cui_sokol_render(r, &list, (cui_color){0, 0, 0, 255}));
+    readback();
+    assert(pixel(11, 10)[0] == 0 && abs(pixel(12, 10)[0] - 64) <= 1 && pixel(16, 10)[0] == 0);
+    const cui_mesh_vertex curve[] = {{8, 8, 0, 0}, {32, 8, .5f, 0}, {32, 32, 1, 1}};
+    c.mesh =
+        (cui_mesh_paint){.vertices = curve, .vertex_count = 3, .scale = 1, .color = {1, 1, 1, 1}};
+    c.bounds = (cui_rect){8, 8, 24, 24};
+    list = (cui_draw_list){&c, 1, 64, 64};
+    assert(cui_sokol_render(r, &list, (cui_color){0}));
+    readback();
+    unsigned partial = 0, opaque = 0;
+    for (int y = 8; y < 32; y++)
+        for (int x = 8; x < 32; x++) {
+            partial += pixel(x, y)[3] > 0 && pixel(x, y)[3] < 255;
+            opaque += pixel(x, y)[3] == 255;
+        }
+    assert(partial > 0 && opaque > 0);
+    /* Interior fragments follow the analytic ST derivative equation. */
+    for (int y = 9; y < 31; y++)
+        for (int x = y + 1; x < 31; x++) {
+            float st = ((x + .5f - 8) + (y + .5f - 8)) / 48;
+            float t = (y + .5f - 8) / 24;
+            float gradient = hypotf(st / 24, (st - 1) / 24);
+            float coverage = fminf(1, fmaxf(0, .5f - (st * st - t) / gradient));
+            assert(abs((int)pixel(x, y)[3] - (int)lroundf(coverage * 255)) <= 2);
+        }
+    const cui_mesh_vertex vertical[] = {{8, 8, 0, 0}, {32, 20, .5f, 0}, {8, 32, 1, 1}};
+    c.mesh.vertices = vertical;
+    assert(cui_sokol_render(r, &list, (cui_color){0}));
+    readback();
+    partial = 0;
+    for (int y = 9; y < 31; y++)
+        for (int x = 9; x < 31; x++) {
+            float px = x + .5f, py = y + .5f;
+            if (px - 8 >= 2 * fminf(py - 8, 32 - py) - 1)
+                continue;
+            float st = (py - 8) / 24, t = st - (px - 8) / 48;
+            float coverage =
+                fminf(1, fmaxf(0, .5f - (st * st - t) / hypotf(1.f / 48, (2 * st - 1) / 24)));
+            assert(abs((int)pixel(x, y)[3] - (int)lroundf(coverage * 255)) <= 2);
+            partial += pixel(x, y)[3] > 0 && pixel(x, y)[3] < 255;
+        }
+    assert(partial > 0);
+    c.mesh.vertex_count = 2;
+    assert(!cui_sokol_render(r, &list, (cui_color){255, 0, 0, 255}));
+    readback();
+    assert(partial > 0 && pixel(0, 0)[0] == 0);
+    c.mesh.vertex_count = 3;
+    c.type = (cui_draw_type)999;
+    assert(!cui_sokol_render(r, &list, (cui_color){255, 0, 0, 255}));
+    readback();
+    assert(pixel(0, 0)[0] == 0);
+    cui_mesh_vertex large[9];
+    for (unsigned i = 0; i < 9; i++)
+        large[i] = vertices[i % 3];
+    cui_sokol *small = cui_sokol_create(
+        (cui_sokol_config){.max_quads = 1, .target = {0, 64, 64}, .borrow_runtime = true});
+    assert(small);
+    c.type = CUI_DRAW_MESH;
+    c.mesh.vertices = large;
+    c.mesh.vertex_count = 9;
+    assert(!cui_sokol_render(small, &list, (cui_color){255, 0, 0, 255}));
+    assert(strstr(cui_sokol_error(small), "capacity"));
+    cui_sokol_destroy(small);
+    assert(vertices[1].x == 24 && vertices[1].s == 0);
 }
 static cui_font *find_font(void) {
 #ifdef CUI_HAS_TEXT
@@ -87,6 +190,7 @@ int main(void) {
     cui_sokol *r = cui_sokol_create(
         (cui_sokol_config){.font = font, .max_quads = 1024, .target = {fbo, 64, 64}});
     assert(r);
+    mesh_pixels(r);
     cui_draw_command commands[] = {
         {.type = CUI_DRAW_RECT, .bounds = {0, 0, 64, 64}, .color = {255, 0, 0, 128}},
         {.type = CUI_DRAW_CLIP_PUSH, .bounds = {10, 10, 30, 30}},

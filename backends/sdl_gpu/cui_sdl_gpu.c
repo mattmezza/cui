@@ -11,6 +11,7 @@
 #define GLYPHS 4096
 #define DRAWS 32768
 #define CLIPS 256
+#define MESH_VERTICES (DRAWS * 6u)
 typedef struct {
     float bounds[4], viewport[4], color[4], shape[4], atlas[4], radii[4], edges[4];
 } gpu_params;
@@ -18,6 +19,7 @@ typedef struct {
     gpu_params params;
     SDL_Rect clip;
     SDL_GPUTexture *texture;
+    Uint32 mesh_first, mesh_count;
 } gpu_draw;
 typedef struct {
     uint64_t hash;
@@ -34,7 +36,11 @@ struct cui_sdl_gpu {
     SDL_GPUDevice *device;
     SDL_Window *window;
     cui_font *font;
-    SDL_GPUGraphicsPipeline *pipeline;
+    SDL_GPUGraphicsPipeline *pipeline, *mesh_pipeline;
+    SDL_GPUBuffer *mesh_buffer;
+    SDL_GPUTransferBuffer *mesh_upload;
+    cui_mesh_vertex *mesh_vertices;
+    size_t mesh_count;
     SDL_GPUTexture *atlas, *surface;
     SDL_GPUSampler *sampler;
     SDL_GPUTransferBuffer *upload;
@@ -53,14 +59,16 @@ struct cui_sdl_gpu {
     cui_color ink;
     float logical_w, logical_h;
 };
-static SDL_GPUShader *shader(SDL_GPUDevice *d, bool fragment) {
+static SDL_GPUShader *shader(SDL_GPUDevice *d, bool fragment, bool mesh) {
     SDL_GPUShaderCreateInfo info = {
-        .code_size = fragment ? sizeof(cui_gpu_frag) : sizeof(cui_gpu_vert),
-        .code = fragment ? cui_gpu_frag : cui_gpu_vert,
+        .code_size = mesh ? (fragment ? sizeof(cui_gpu_mesh_frag) : sizeof(cui_gpu_mesh_vert))
+                          : (fragment ? sizeof(cui_gpu_frag) : sizeof(cui_gpu_vert)),
+        .code = mesh ? (fragment ? cui_gpu_mesh_frag : cui_gpu_mesh_vert)
+                     : (fragment ? cui_gpu_frag : cui_gpu_vert),
         .entrypoint = "main",
         .format = SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = fragment ? SDL_GPU_SHADERSTAGE_FRAGMENT : SDL_GPU_SHADERSTAGE_VERTEX,
-        .num_samplers = fragment ? 1 : 0,
+        .num_samplers = fragment && !mesh ? 1 : 0,
         .num_uniform_buffers = 1};
     return SDL_CreateGPUShader(d, &info);
 }
@@ -79,7 +87,7 @@ cui_sdl_gpu *cui_sdl_gpu_create(void *device, void *window, cui_font *font) {
     r->font = font;
     r->pixels = calloc(ATLAS, ATLAS);
     r->draws = calloc(DRAWS, sizeof(*r->draws));
-    SDL_GPUShader *v = shader(device, false), *f = shader(device, true);
+    SDL_GPUShader *v = shader(device, false, false), *f = shader(device, true, false);
     SDL_GPUColorTargetDescription color = {
         .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
         .blend_state = {.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA,
@@ -104,6 +112,46 @@ cui_sdl_gpu *cui_sdl_gpu_create(void *device, void *window, cui_font *font) {
         SDL_ReleaseGPUShader(device, v);
     if (f)
         SDL_ReleaseGPUShader(device, f);
+    v = shader(device, false, true);
+    f = shader(device, true, true);
+    color.blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    SDL_GPUVertexBufferDescription mesh_buffer = {
+        .slot = 0, .pitch = sizeof(cui_mesh_vertex), .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX};
+    SDL_GPUVertexAttribute mesh_attrs[2] = {{.location = 0,
+                                             .buffer_slot = 0,
+                                             .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+                                             .offset = 0},
+                                            {.location = 1,
+                                             .buffer_slot = 0,
+                                             .format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2,
+                                             .offset = 2 * sizeof(float)}};
+    if (v && f)
+        r->mesh_pipeline = SDL_CreateGPUGraphicsPipeline(
+            device,
+            &(SDL_GPUGraphicsPipelineCreateInfo){
+                .vertex_shader = v,
+                .fragment_shader = f,
+                .vertex_input_state = {.vertex_buffer_descriptions = &mesh_buffer,
+                                       .num_vertex_buffers = 1,
+                                       .vertex_attributes = mesh_attrs,
+                                       .num_vertex_attributes = 2},
+                .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+                .rasterizer_state = {.fill_mode = SDL_GPU_FILLMODE_FILL,
+                                     .cull_mode = SDL_GPU_CULLMODE_NONE},
+                .multisample_state = {.sample_count = SDL_GPU_SAMPLECOUNT_1},
+                .target_info = {.color_target_descriptions = &color, .num_color_targets = 1}});
+    if (v)
+        SDL_ReleaseGPUShader(device, v);
+    if (f)
+        SDL_ReleaseGPUShader(device, f);
+    r->mesh_vertices = calloc(MESH_VERTICES, sizeof(cui_mesh_vertex));
+    r->mesh_buffer = SDL_CreateGPUBuffer(
+        device, &(SDL_GPUBufferCreateInfo){.usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+                                           .size = MESH_VERTICES * sizeof(cui_mesh_vertex)});
+    r->mesh_upload = SDL_CreateGPUTransferBuffer(
+        device,
+        &(SDL_GPUTransferBufferCreateInfo){.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+                                           .size = MESH_VERTICES * sizeof(cui_mesh_vertex)});
     r->atlas = SDL_CreateGPUTexture(
         device, &(SDL_GPUTextureCreateInfo){.type = SDL_GPU_TEXTURETYPE_2D,
                                             .format = SDL_GPU_TEXTUREFORMAT_R8_UNORM,
@@ -126,7 +174,8 @@ cui_sdl_gpu *cui_sdl_gpu_create(void *device, void *window, cui_font *font) {
     r->shelf_x = 1;
     r->shelf_y = 1;
     r->dirty = true;
-    if (!r->pixels || !r->draws || !r->pipeline || !r->atlas || !r->sampler || !r->upload) {
+    if (!r->mesh_vertices || !r->mesh_buffer || !r->mesh_upload || !r->mesh_pipeline ||
+        !r->pixels || !r->draws || !r->pipeline || !r->atlas || !r->sampler || !r->upload) {
         cui_sdl_gpu_destroy(r);
         return NULL;
     }
@@ -135,6 +184,13 @@ cui_sdl_gpu *cui_sdl_gpu_create(void *device, void *window, cui_font *font) {
 void cui_sdl_gpu_destroy(cui_sdl_gpu *r) {
     if (!r)
         return;
+    if (r->mesh_pipeline)
+        SDL_ReleaseGPUGraphicsPipeline(r->device, r->mesh_pipeline);
+    if (r->mesh_buffer)
+        SDL_ReleaseGPUBuffer(r->device, r->mesh_buffer);
+    if (r->mesh_upload)
+        SDL_ReleaseGPUTransferBuffer(r->device, r->mesh_upload);
+    free(r->mesh_vertices);
     if (r->pipeline)
         SDL_ReleaseGPUGraphicsPipeline(r->device, r->pipeline);
     for (size_t i = 0; i < BITMAPS; i++)
@@ -315,6 +371,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
     SDL_Rect stack[CLIPS];
     size_t depth = 0;
     r->draw_count = 0;
+    r->mesh_count = 0;
     r->frame++;
     r->failed = false;
     r->logical_w = list->width;
@@ -331,6 +388,26 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
             return false;
         }
         switch (c->type) {
+        case CUI_DRAW_MESH: {
+            cui_mesh_paint m = c->mesh;
+            if (!cui_mesh_valid(m) || m.vertex_count > MESH_VERTICES - r->mesh_count) {
+                SDL_SetError("CUI GPU invalid mesh or mesh capacity exceeded");
+                return false;
+            }
+            gpu_draw *d = append(r, c->bounds, (cui_color){0}, 0, 0);
+            if (!d)
+                return false;
+            d->mesh_first = (Uint32)r->mesh_count;
+            d->mesh_count = (Uint32)m.vertex_count;
+            memcpy(d->params.color, (float[]){m.color.r, m.color.g, m.color.b, m.color.a}, 16);
+            for (size_t j = 0; j < m.vertex_count; j++) {
+                cui_mesh_vertex v = m.vertices[j];
+                v.x = m.origin_x + v.x * m.scale;
+                v.y = m.origin_y + v.y * m.scale;
+                r->mesh_vertices[r->mesh_count++] = v;
+            }
+            break;
+        }
         case CUI_DRAW_IMAGE: {
             if (c->bounds.w <= 0 || c->bounds.h <= 0)
                 break;
@@ -375,6 +452,7 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
             r->clip = stack[--depth];
             break;
         default:
+            SDL_SetError("Unknown CUI GPU draw command");
             return false;
         }
         if (r->failed)
@@ -437,6 +515,21 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
         SDL_EndGPUCopyPass(cp);
         r->dirty = false;
     }
+    if (r->mesh_count) {
+        void *mapped = SDL_MapGPUTransferBuffer(r->device, r->mesh_upload, true);
+        if (!mapped) {
+            SDL_CancelGPUCommandBuffer(cb);
+            return false;
+        }
+        Uint32 bytes = (Uint32)(r->mesh_count * sizeof(cui_mesh_vertex));
+        memcpy(mapped, r->mesh_vertices, bytes);
+        SDL_UnmapGPUTransferBuffer(r->device, r->mesh_upload);
+        SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cb);
+        SDL_UploadToGPUBuffer(
+            copy, &(SDL_GPUTransferBufferLocation){.transfer_buffer = r->mesh_upload},
+            &(SDL_GPUBufferRegion){.buffer = r->mesh_buffer, .size = bytes}, true);
+        SDL_EndGPUCopyPass(copy);
+    }
     SDL_GPUColorTargetInfo target = {
         .texture = r->surface,
         .clear_color = {clear.r / 255.f, clear.g / 255.f, clear.b / 255.f, clear.a / 255.f},
@@ -452,13 +545,17 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
         float sx = w / list->width, sy = h / list->height;
         SDL_Rect clip = {(int)floorf(d->clip.x * sx), (int)floorf(d->clip.y * sy),
                          (int)ceilf(d->clip.w * sx), (int)ceilf(d->clip.h * sy)};
-        SDL_BindGPUFragmentSamplers(
-            pass, 0,
-            &(SDL_GPUTextureSamplerBinding){d->texture ? d->texture : r->atlas, r->sampler}, 1);
+        SDL_BindGPUGraphicsPipeline(pass, d->mesh_count ? r->mesh_pipeline : r->pipeline);
+        if (d->mesh_count)
+            SDL_BindGPUVertexBuffers(pass, 0, &(SDL_GPUBufferBinding){.buffer = r->mesh_buffer}, 1);
+        else
+            SDL_BindGPUFragmentSamplers(
+                pass, 0,
+                &(SDL_GPUTextureSamplerBinding){d->texture ? d->texture : r->atlas, r->sampler}, 1);
         SDL_SetGPUScissor(pass, &clip);
         SDL_PushGPUVertexUniformData(cb, 0, &d->params, sizeof(d->params));
         SDL_PushGPUFragmentUniformData(cb, 0, &d->params, sizeof(d->params));
-        SDL_DrawGPUPrimitives(pass, 6, 1, 0, 0);
+        SDL_DrawGPUPrimitives(pass, d->mesh_count ? d->mesh_count : 6, 1, d->mesh_first, 0);
     }
     SDL_EndGPURenderPass(pass);
     SDL_BlitGPUTexture(cb, &(SDL_GPUBlitInfo){.source = {.texture = r->surface, .w = w, .h = h},
@@ -521,6 +618,6 @@ static void destroy(void *r) {
 cui_renderer cui_sdl_gpu_interface(cui_sdl_gpu *r) {
     return (cui_renderer){r, cui_sdl_gpu_driver(r),
                           (r && r->font ? CUI_RENDER_TEXT : 0) | CUI_RENDER_ROUNDED |
-                              CUI_RENDER_CLIP,
+                              CUI_RENDER_CLIP | CUI_RENDER_MESH,
                           render, destroy};
 }

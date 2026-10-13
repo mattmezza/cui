@@ -60,8 +60,9 @@ CPU frame staging and the GPU vertex buffer are bounded by `max_quads` (default
 8192, maximum 100000). Malformed draw commands, unbalanced clipping, excessive
 geometry or glyph capacity are rejected before a render pass starts. Shader and
 resource creation states are checked. Underlying Sokol fatal allocation or GL
-assertion failures are not a device-loss recovery path. No image commands,
-gradients, shadows, transforms or non-GL Sokol backend support are claimed.
+assertion failures are not a device-loss recovery path. Bitmap image commands
+use the existing bounded RGBA cache. Gradient mesh paint, shadows, general
+transforms and non-GL Sokol backends remain unsupported.
 
 The unmodified upstream pin and license are in `third_party/sokol/PIN.md`.
 Build this source with `include/`, a SYSTEM include for `third_party/sokol`, and
@@ -81,3 +82,19 @@ geometric adapter compiles and runs without FreeType/HarfBuzz. Other operating
 systems, Wayland, GLES, Metal, Vulkan, D3D11 and WebGPU are unverified or not
 implemented by this adapter. Software OpenGL drivers may run the same GLCORE
 API; the API name alone does not prove hardware execution.
+
+Native mesh commands upload borrowed XY/ST triangles to the bounded vertex stream.
+A separate premultiplied pipeline computes the pinned quadratic source coverage
+from screen-space derivatives; meshes do not use the bitmap cache. The existing
+RGBA8 target stores byte-domain sRGB-like values. Mesh linear premultiplied paint
+is unpremultiplied, sRGB encoded, then premultiplied by alpha and coverage before
+blending. This preserves primitive appearance but does not claim linear-light
+framebuffer compositing. Mesh capacity consumes one quad slot per six vertices
+(or one final three-vertex slot); overflow rejects the frame before its GPU pass.
+
+The coverage equation follows `gpui-pre-wgpu 0.3.8`, pinned by the frozen GPUI
+Kit lockfile: `src/shaders.wgsl::fs_path_rasterization`. The solid fast path tests
+the norm of both S derivatives against0.001; this matters for vertical curves.
+Real Intel/Mesa GL readback tests check numeric coverage in both orientations,
+encoded half-alpha overlaps, mixed primitive/mesh ordering, translated DPI
+clips, borrowed vertices, capacity failure and unknown-command rejection.

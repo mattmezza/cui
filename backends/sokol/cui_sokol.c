@@ -27,6 +27,8 @@ typedef struct {
 typedef struct {
     sg_view texture;
     cui_rect clip;
+    bool mesh;
+    unsigned count;
 } draw;
 typedef struct {
     sg_image image;
@@ -50,7 +52,7 @@ struct cui_sokol {
     size_t quads;
     sg_buffer buffer;
     sg_shader shader;
-    sg_pipeline pipeline;
+    sg_pipeline pipeline, mesh_pipeline;
     sg_sampler sampler;
     sg_image white;
     sg_view white_view;
@@ -126,7 +128,15 @@ static const char *fragment_source =
     "    }\n"
     "    return alpha;\n"
     "}\n"
-    "void main(){if(v_kind>2.5){frag_color=texture(glyph,v_uv)*v_color;return;}float "
+    "vec3 encodeSRGB(vec3 v){return "
+    "mix(12.92*v,1.055*pow(v,vec3(1.0/2.4))-0.055,greaterThan(v,vec3(0.0031308)));}\n"
+    "void main(){if(v_kind>3.5){vec2 ds=vec2(dFdx(v_uv.x),dFdy(v_uv.x));"
+    "vec2 dt=vec2(dFdx(v_uv.y),dFdy(v_uv.y));float a=1.0;"
+    "if(length(ds)>=0.001){float f=v_uv.x*v_uv.x-v_uv.y;"
+    "a=clamp(0.5-f/length(2.0*v_uv.x*ds-dt),0.0,1.0);}"
+    "vec3 rgb=v_color.a>0.0?encodeSRGB(clamp(v_color.rgb/v_color.a,0.0,1.0)):vec3(0);"
+    "a*=v_color.a;frag_color=vec4(rgb*a,a);return;}if(v_kind>2.5){frag_color=texture(glyph,v_uv)*v_"
+    "color;return;}float "
     "coverage=v_kind>1.5?texture(glyph,v_uv).a:shapeCoverage(v_uv*v_shape.xy,v_shape.xy,v_radii,v_"
     "edges,v_kind);frag_color=vec4(v_color.rgb,v_color.a*coverage);}\n";
 static bool valid_target(cui_sokol_target t) {
@@ -221,6 +231,10 @@ cui_sokol *cui_sokol_create(cui_sokol_config config) {
                                 .dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA}},
         .sample_count = 1,
         .label = "CUI alpha pipeline"});
+    sg_pipeline_desc mesh_desc = sg_query_pipeline_desc(r->pipeline);
+    mesh_desc.colors[0].blend.src_factor_rgb = SG_BLENDFACTOR_ONE;
+    mesh_desc.label = "CUI analytic premultiplied mesh pipeline";
+    r->mesh_pipeline = sg_make_pipeline(&mesh_desc);
     r->buffer =
         sg_make_buffer(&(sg_buffer_desc){.size = config.max_quads * 6 * sizeof(vertex),
                                          .usage = {.vertex_buffer = true, .write_transient = true},
@@ -237,6 +251,7 @@ cui_sokol *cui_sokol_create(cui_sokol_config config) {
     r->white_view = sg_make_view(&(sg_view_desc){.texture.image = r->white});
     if (!r->ok || sg_query_shader_state(r->shader) != SG_RESOURCESTATE_VALID ||
         sg_query_pipeline_state(r->pipeline) != SG_RESOURCESTATE_VALID ||
+        sg_query_pipeline_state(r->mesh_pipeline) != SG_RESOURCESTATE_VALID ||
         sg_query_buffer_state(r->buffer) != SG_RESOURCESTATE_VALID ||
         sg_query_sampler_state(r->sampler) != SG_RESOURCESTATE_VALID ||
         sg_query_image_state(r->white) != SG_RESOURCESTATE_VALID ||
@@ -276,6 +291,7 @@ void cui_sokol_destroy(cui_sokol *r) {
         sg_destroy_sampler(r->sampler);
         sg_destroy_buffer(r->buffer);
         sg_destroy_pipeline(r->pipeline);
+        sg_destroy_pipeline(r->mesh_pipeline);
         sg_destroy_shader(r->shader);
         if (r->owns_runtime)
             sg_shutdown();
@@ -316,7 +332,30 @@ static bool quad(cui_sokol *r, cui_rect bounds, cui_color color, float radius, f
             .radii = {radius, radius, radius, radius},
             .edges = {stroke, stroke, stroke, stroke}};
     }
-    r->draws[r->quads++] = (draw){texture, r->clip};
+    r->draws[r->quads++] = (draw){.texture = texture, .clip = r->clip, .count = 6};
+    return true;
+}
+static bool mesh(cui_sokol *r, cui_mesh_paint paint) {
+    if (!cui_mesh_valid(paint))
+        return fail(r, "Invalid CUI Sokol mesh");
+    size_t chunks = paint.vertex_count / 6 + (paint.vertex_count % 6 != 0);
+    if (chunks > r->config.max_quads - r->quads)
+        return fail(r, "CUI Sokol mesh capacity exceeded");
+    for (size_t start = 0; start < paint.vertex_count; start += 6) {
+        unsigned count = paint.vertex_count - start >= 6 ? 6 : 3;
+        size_t slot = r->quads++;
+        for (unsigned j = 0; j < count; j++) {
+            cui_mesh_vertex v = paint.vertices[start + j];
+            r->vertices[slot * 6 + j] =
+                (vertex){.position = {paint.origin_x + v.x * paint.scale,
+                                      paint.origin_y + v.y * paint.scale},
+                         .uv = {v.s, v.t},
+                         .color = {paint.color.r, paint.color.g, paint.color.b, paint.color.a},
+                         .kind = 4};
+        }
+        r->draws[slot] =
+            (draw){.texture = r->white_view, .clip = r->clip, .mesh = true, .count = count};
+    }
     return true;
 }
 #ifdef CUI_HAS_TEXT
@@ -521,6 +560,10 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
             return fail(r, "Invalid CUI Sokol geometry");
         size_t before = r->quads;
         switch (c->type) {
+        case CUI_DRAW_MESH:
+            if (!mesh(r, c->mesh))
+                return false;
+            break;
         case CUI_DRAW_IMAGE:
             if (c->bounds.w > 0 && c->bounds.h > 0) {
                 sg_view view = bitmap_view(r, c);
@@ -592,9 +635,7 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
                                  .depth_format = SG_PIXELFORMAT_NONE,
                                  .gl.framebuffer = t.framebuffer}});
     if (r->quads) {
-        sg_apply_pipeline(r->pipeline);
         float canvas[2] = {list->width, list->height};
-        sg_apply_uniforms(0, &(sg_range){canvas, sizeof(canvas)});
         float sx = t.width / list->width, sy = t.height / list->height;
         for (size_t i = 0; i < r->quads; i++) {
             cui_rect c = r->draws[i].clip;
@@ -603,11 +644,13 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
                 bottom = (int)ceilf(fminf(list->height, c.y + c.h) * sy);
             if (right <= x || bottom <= y)
                 continue;
+            sg_apply_pipeline(r->draws[i].mesh ? r->mesh_pipeline : r->pipeline);
+            sg_apply_uniforms(0, &(sg_range){canvas, sizeof(canvas)});
             sg_apply_scissor_rect(x, y, right - x, bottom - y, true);
             sg_apply_bindings(&(sg_bindings){.vertex_buffers[0] = r->buffer,
                                              .views[0] = r->draws[i].texture,
                                              .samplers[0] = r->sampler});
-            sg_draw((int)i * 6, 6, 1);
+            sg_draw((int)i * 6, (int)r->draws[i].count, 1);
         }
     }
     sg_end_pass();
@@ -640,8 +683,8 @@ static void destroy(void *r) {
     cui_sokol_destroy(r);
 }
 cui_renderer cui_sokol_interface(cui_sokol *r) {
-    unsigned capabilities =
-        CUI_RENDER_ACCELERATED | CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE;
+    unsigned capabilities = CUI_RENDER_ACCELERATED | CUI_RENDER_ROUNDED | CUI_RENDER_CLIP |
+                            CUI_RENDER_IMAGE | CUI_RENDER_MESH;
 #ifdef CUI_HAS_TEXT
     if (r && r->config.font)
         capabilities |= CUI_RENDER_TEXT;

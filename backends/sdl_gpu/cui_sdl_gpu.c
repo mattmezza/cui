@@ -474,82 +474,138 @@ static bool collect(cui_sdl_gpu *r, const cui_draw_list *list) {
     }
     return !depth;
 }
+/* An acquired swapchain buffer cannot be cancelled. On a late failure retain
+ * the previous completed offscreen pixels when available, then legally submit. */
+static bool failed_acquired(cui_sdl_gpu *r, SDL_GPUCommandBuffer *cb, SDL_GPUTexture *swap,
+                            Uint32 w, Uint32 h) {
+    if (r->surface)
+        SDL_BlitGPUTexture(
+            cb, &(SDL_GPUBlitInfo){.source = {.texture = r->surface, .w = r->width, .h = r->height},
+                                   .destination = {.texture = swap, .w = w, .h = h},
+                                   .load_op = SDL_GPU_LOADOP_DONT_CARE,
+                                   .filter = SDL_GPU_FILTER_NEAREST});
+    if (SDL_SubmitGPUCommandBuffer(cb))
+        r->dirty = false;
+    return false;
+}
+static SDL_GPUTexture *frame_surface(cui_sdl_gpu *r, Uint32 w, Uint32 h) {
+    return SDL_CreateGPUTexture(
+        r->device, &(SDL_GPUTextureCreateInfo){.type = SDL_GPU_TEXTURETYPE_2D,
+                                               .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+                                               .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET |
+                                                        SDL_GPU_TEXTUREUSAGE_SAMPLER,
+                                               .width = w,
+                                               .height = h,
+                                               .layer_count_or_depth = 1,
+                                               .num_levels = 1});
+}
 bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list || !isfinite(list->width) || !isfinite(list->height) || list->width <= 0 ||
         list->height <= 0 || list->width > 32768 || list->height > 32768 ||
         (!list->commands && list->count) || !collect(r, list))
         return false;
-    SDL_GPUCommandBuffer *cb = SDL_AcquireGPUCommandBuffer(r->device);
-    if (!cb)
+    int physical_w, physical_h;
+    if (!SDL_GetWindowSizeInPixels(r->window, &physical_w, &physical_h) || physical_w <= 0 ||
+        physical_h <= 0)
         return false;
+    Uint32 w = (Uint32)physical_w, h = (Uint32)physical_h;
+    SDL_GPUTexture *candidate = NULL;
+    if (!r->surface || w != r->width || h != r->height) {
+        candidate = frame_surface(r, w, h);
+        if (!candidate)
+            return false;
+    }
+    if (r->dirty) {
+        void *mapped = SDL_MapGPUTransferBuffer(r->device, r->upload, true);
+        if (!mapped) {
+            if (candidate)
+                SDL_ReleaseGPUTexture(r->device, candidate);
+            return false;
+        }
+        memcpy(mapped, r->pixels, ATLAS * ATLAS);
+        SDL_UnmapGPUTransferBuffer(r->device, r->upload);
+    }
+    if (r->mesh_count) {
+        void *mapped = SDL_MapGPUTransferBuffer(r->device, r->mesh_upload, true);
+        if (!mapped) {
+            if (candidate)
+                SDL_ReleaseGPUTexture(r->device, candidate);
+            return false;
+        }
+        memcpy(mapped, r->mesh_vertices, r->mesh_count * sizeof(cui_mesh_vertex));
+        SDL_UnmapGPUTransferBuffer(r->device, r->mesh_upload);
+    }
+    SDL_GPUCommandBuffer *cb = SDL_AcquireGPUCommandBuffer(r->device);
+    if (!cb) {
+        if (candidate)
+            SDL_ReleaseGPUTexture(r->device, candidate);
+        return false;
+    }
+    if (r->dirty || r->mesh_count) {
+        SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cb);
+        if (!copy) {
+            SDL_CancelGPUCommandBuffer(cb);
+            if (candidate)
+                SDL_ReleaseGPUTexture(r->device, candidate);
+            return false;
+        }
+        if (r->dirty)
+            SDL_UploadToGPUTexture(
+                copy,
+                &(SDL_GPUTextureTransferInfo){
+                    .transfer_buffer = r->upload, .pixels_per_row = ATLAS, .rows_per_layer = ATLAS},
+                &(SDL_GPUTextureRegion){.texture = r->atlas, .w = ATLAS, .h = ATLAS, .d = 1},
+                false);
+        if (r->mesh_count)
+            SDL_UploadToGPUBuffer(
+                copy, &(SDL_GPUTransferBufferLocation){.transfer_buffer = r->mesh_upload},
+                &(SDL_GPUBufferRegion){.buffer = r->mesh_buffer,
+                                       .size = (Uint32)(r->mesh_count * sizeof(cui_mesh_vertex))},
+                true);
+        SDL_EndGPUCopyPass(copy);
+    }
     SDL_GPUTexture *swap = NULL;
-    Uint32 w, h;
     if (!SDL_WaitAndAcquireGPUSwapchainTexture(cb, r->window, &swap, &w, &h)) {
+        if (candidate)
+            SDL_ReleaseGPUTexture(r->device, candidate);
+        if (swap)
+            return failed_acquired(r, cb, swap, w, h);
         SDL_CancelGPUCommandBuffer(cb);
         return false;
     }
     if (!swap) {
         SDL_CancelGPUCommandBuffer(cb);
+        if (candidate)
+            SDL_ReleaseGPUTexture(r->device, candidate);
         return true;
     }
-    if (!r->surface || w != r->width || h != r->height) {
-        SDL_GPUTexture *surface = SDL_CreateGPUTexture(
-            r->device, &(SDL_GPUTextureCreateInfo){.type = SDL_GPU_TEXTURETYPE_2D,
-                                                   .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-                                                   .usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET |
-                                                            SDL_GPU_TEXTUREUSAGE_SAMPLER,
-                                                   .width = w,
-                                                   .height = h,
-                                                   .layer_count_or_depth = 1,
-                                                   .num_levels = 1});
-        if (!surface) {
-            SDL_CancelGPUCommandBuffer(cb);
-            return false;
-        }
-        if (r->surface)
-            SDL_ReleaseGPUTexture(r->device, r->surface);
-        r->surface = surface;
-        r->width = w;
-        r->height = h;
+    /* Drawable size can change between preflight and acquisition. */
+    if (w != (Uint32)physical_w || h != (Uint32)physical_h) {
+        if (candidate)
+            SDL_ReleaseGPUTexture(r->device, candidate);
+        candidate = frame_surface(r, w, h);
+        if (!candidate)
+            return failed_acquired(r, cb, swap, w, h);
     }
-    if (r->dirty) {
-        void *p = SDL_MapGPUTransferBuffer(r->device, r->upload, true);
-        if (!p) {
-            SDL_CancelGPUCommandBuffer(cb);
-            return false;
-        }
-        memcpy(p, r->pixels, ATLAS * ATLAS);
-        SDL_UnmapGPUTransferBuffer(r->device, r->upload);
-        SDL_GPUCopyPass *cp = SDL_BeginGPUCopyPass(cb);
-        SDL_UploadToGPUTexture(
-            cp,
-            &(SDL_GPUTextureTransferInfo){
-                .transfer_buffer = r->upload, .pixels_per_row = ATLAS, .rows_per_layer = ATLAS},
-            &(SDL_GPUTextureRegion){.texture = r->atlas, .w = ATLAS, .h = ATLAS, .d = 1}, false);
-        SDL_EndGPUCopyPass(cp);
-        r->dirty = false;
-    }
-    if (r->mesh_count) {
-        void *mapped = SDL_MapGPUTransferBuffer(r->device, r->mesh_upload, true);
-        if (!mapped) {
-            SDL_CancelGPUCommandBuffer(cb);
-            return false;
-        }
-        Uint32 bytes = (Uint32)(r->mesh_count * sizeof(cui_mesh_vertex));
-        memcpy(mapped, r->mesh_vertices, bytes);
-        SDL_UnmapGPUTransferBuffer(r->device, r->mesh_upload);
-        SDL_GPUCopyPass *copy = SDL_BeginGPUCopyPass(cb);
-        SDL_UploadToGPUBuffer(
-            copy, &(SDL_GPUTransferBufferLocation){.transfer_buffer = r->mesh_upload},
-            &(SDL_GPUBufferRegion){.buffer = r->mesh_buffer, .size = bytes}, true);
-        SDL_EndGPUCopyPass(copy);
-    }
+    SDL_GPUTexture *surface = candidate ? candidate : r->surface;
     SDL_GPUColorTargetInfo target = {
-        .texture = r->surface,
+        .texture = surface,
         .clear_color = {clear.r / 255.f, clear.g / 255.f, clear.b / 255.f, clear.a / 255.f},
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE};
     SDL_GPURenderPass *pass = SDL_BeginGPURenderPass(cb, &target, 1, NULL);
+    if (!pass) {
+        if (candidate)
+            SDL_ReleaseGPUTexture(r->device, candidate);
+        return failed_acquired(r, cb, swap, w, h);
+    }
+    if (candidate) {
+        if (r->surface)
+            SDL_ReleaseGPUTexture(r->device, r->surface);
+        r->surface = candidate;
+        r->width = w;
+        r->height = h;
+    }
     SDL_BindGPUGraphicsPipeline(pass, r->pipeline);
     SDL_BindGPUFragmentSamplers(pass, 0, &(SDL_GPUTextureSamplerBinding){r->atlas, r->sampler}, 1);
     for (size_t i = 0; i < r->draw_count; i++) {
@@ -576,7 +632,10 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
                                               .destination = {.texture = swap, .w = w, .h = h},
                                               .load_op = SDL_GPU_LOADOP_DONT_CARE,
                                               .filter = SDL_GPU_FILTER_NEAREST});
-    return SDL_SubmitGPUCommandBuffer(cb);
+    bool submitted = SDL_SubmitGPUCommandBuffer(cb);
+    if (submitted)
+        r->dirty = false;
+    return submitted;
 }
 bool cui_sdl_gpu_save_ppm(cui_sdl_gpu *r, const char *path) {
     if (!r || !r->surface || !path || r->width > UINT32_MAX / 4 / r->height)

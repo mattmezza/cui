@@ -3,6 +3,53 @@
 #include "cui/cui_components.h"
 #include "cui/cui_scroll.h"
 #include <math.h>
+bool cui_popover_style_resolve(const cui_theme *t, cui_popover_appearance appearance,
+                               cui_popover_refinement r, cui_popover_style *out) {
+    if (!t || !out || !cui_popover_refinement_valid(appearance, r))
+        return false;
+    cui_popover_style next = {.foreground = t->text};
+    if (appearance == CUI_POPOVER_APPEARANCE_LEGACY)
+        next = (cui_popover_style){.background = t->surface,
+                                   .foreground = t->text,
+                                   .border = t->border,
+                                   .border_width = 1,
+                                   .radius = t->radius,
+                                   .padding = t->padding};
+    else if (appearance == CUI_POPOVER_APPEARANCE_SOURCE) {
+        next = (cui_popover_style){.background = t->popover,
+                                   .foreground = t->popover_foreground,
+                                   .radius = t->radius,
+                                   .padding = 12,
+                                   .shadow_count = 3};
+        cui_drop_shadow layers[3];
+        if (!cui_theme_popover_shadows(t, 1, layers))
+            return false;
+        for (size_t i = 0; i < 3; ++i)
+            next.shadows[i] = (cui_box_shadow){.layer = layers[i]};
+    }
+    if (r.flags & CUI_POPOVER_REFINE_BACKGROUND)
+        next.background = r.background;
+    if (r.flags & CUI_POPOVER_REFINE_FOREGROUND)
+        next.foreground = r.foreground;
+    if (r.flags & CUI_POPOVER_REFINE_RADIUS)
+        next.radius = r.radius;
+    if (r.flags & CUI_POPOVER_REFINE_PADDING)
+        next.padding = r.padding;
+    if (r.flags & CUI_POPOVER_REFINE_BORDER) {
+        next.border = r.border;
+        next.border_width = r.border_width;
+    }
+    if (r.flags & CUI_POPOVER_REFINE_SHADOWS) {
+        next.shadow_count = r.shadow_count;
+        for (size_t i = 0; i < r.shadow_count; ++i)
+            next.shadows[i] = r.shadows[i];
+    }
+    if (!isfinite(next.padding) || next.padding < 0 || next.padding > 4096 ||
+        !isfinite(next.radius) || next.radius < 0 || next.radius > 4096)
+        return false;
+    *out = next;
+    return true;
+}
 #define CUI_SURFACE_SKIN_OWNER UINT64_C(0x1a45de91b7956712)
 #define CUI_SURFACE_SKIN_NAMESPACE UINT64_C(0xac3286f910fdcc31)
 typedef struct {
@@ -64,6 +111,15 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_rect bounds = s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
     if (!t || bounds.w <= 0 || bounds.h <= 0)
         return false;
+    cui_popover_style style = {.background = t->surface,
+                               .foreground = t->text,
+                               .border = t->border,
+                               .border_width = 1,
+                               .radius = t->radius,
+                               .padding = t->padding};
+    if (s->kind == CUI_SURFACE_POPOVER &&
+        !cui_popover_style_resolve(t, o.popover_appearance, o.popover_refinement, &style))
+        return false;
     const cui_scrollbar_style *skin = o.scrollbar_style ? o.scrollbar_style : &t->scrollbar;
     bool active =
         skin->visibility == CUI_SCROLLBAR_VISIBLE || skin->visibility == CUI_SCROLLBAR_AUTO_HIDE;
@@ -97,20 +153,24 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
         cui_end_box(ui);
     }
     cui_begin_portal(ui, s->overlay.id,
-                     (cui_box){.padding = t->padding,
+                     (cui_box){.padding = style.padding,
                                .gap = t->gap,
-                               .radius = t->radius,
-                               .background = t->surface,
-                               .border = t->border,
-                               .border_width = 1},
+                               .radius = style.radius,
+                               .background = style.background,
+                               .border = style.border,
+                               .border_width = style.border_width},
                      bounds, (int16_t)(layer + 1));
+    if (style.shadow_count)
+        cui_set_box_shadows(
+            ui, style.shadows, style.shadow_count,
+            (cui_corner_radii){style.radius, style.radius, style.radius, style.radius});
     bool centered = s->kind == CUI_SURFACE_ALERT;
-    float body_width = fmaxf(0, bounds.w - 2 * fmaxf(0, t->padding));
+    float body_width = fmaxf(0, bounds.w - 2 * fmaxf(0, style.padding));
     if (centered)
         cui_surface_body_begin(ui, t, s, true, body_width);
     cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = t->gap});
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 4), (cui_box){.width = -1});
-    cui_text(ui, title, t->font_size * 1.1f, t->text);
+    cui_text(ui, title, t->font_size * 1.1f, style.foreground);
     cui_end_box(ui);
     if (!o.hide_close && (s->kind != CUI_SURFACE_ALERT || o.show_alert_close))
         cui_button_ex(ui, cui_surface_part_id(s->overlay.id, 1), t, cui_string("Close"),

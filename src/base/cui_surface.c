@@ -1,6 +1,37 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_surface.h"
 #include <math.h>
+bool cui_popover_refinement_valid(cui_popover_appearance appearance, cui_popover_refinement r) {
+    if (appearance < CUI_POPOVER_APPEARANCE_LEGACY || appearance > CUI_POPOVER_APPEARANCE_NONE ||
+        (r.flags & ~63u) || r.shadow_count > CUI_BOX_SHADOW_MAX)
+        return false;
+    if (((r.flags & CUI_POPOVER_REFINE_RADIUS) &&
+         (!isfinite(r.radius) || r.radius < 0 || r.radius > 4096)) ||
+        ((r.flags & CUI_POPOVER_REFINE_PADDING) &&
+         (!isfinite(r.padding) || r.padding < 0 || r.padding > 4096)) ||
+        ((r.flags & CUI_POPOVER_REFINE_BORDER) &&
+         (!isfinite(r.border_width) || r.border_width < 0 || r.border_width > 4096)))
+        return false;
+    if (r.flags & CUI_POPOVER_REFINE_SHADOWS) {
+        float radius = r.flags & CUI_POPOVER_REFINE_RADIUS ? r.radius : 0;
+        cui_corner_radii radii = {radius, radius, radius, radius};
+        for (size_t i = 0; i < r.shadow_count; ++i) {
+            cui_rect bounds;
+            if ((r.shadows[i].kind != CUI_BOX_SHADOW_DROP &&
+                 r.shadows[i].kind != CUI_BOX_SHADOW_INSET) ||
+                !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                                .radii = radii,
+                                                                .layer = r.shadows[i].layer},
+                                        &bounds))
+                return false;
+        }
+    }
+    return true;
+}
+static bool cui_surface_popover_valid(const cui_surface_state *s, cui_surface_options o) {
+    return s->kind != CUI_SURFACE_POPOVER ||
+           cui_popover_refinement_valid(o.popover_appearance, o.popover_refinement);
+}
 static float cui_surface_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
 }
@@ -199,7 +230,7 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
     }
 }
 bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
-    if (!ui || !s)
+    if (!ui || !s || !cui_surface_popover_valid(s, o))
         return false;
     s->sheet_animation_seconds =
         isfinite(o.sheet_animation_seconds) && o.sheet_animation_seconds > 0
@@ -299,7 +330,7 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
 }
 bool cui_base_surface_begin(cui_context *ui, cui_surface_state *s, cui_str title,
                             cui_str description, cui_surface_options o) {
-    if (!ui || !s)
+    if (!ui || !s || !cui_surface_popover_valid(s, o))
         return false;
     cui_base_surface_update(ui, s, o);
     if (!s->overlay.open || !cui_overlay_begin(ui, &s->overlay))

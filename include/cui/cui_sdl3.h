@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_SDL3_H
 #define CUI_SDL3_H
-#include "cui_platform.h"
 #include "cui_accessibility.h"
+#include "cui_platform.h"
 #include "cui_renderer.h"
 #include "cui_text.h"
 #ifdef __cplusplus

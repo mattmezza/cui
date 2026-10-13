@@ -1436,8 +1436,7 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                 n.on_action(n.user, n.id);
             /* Keep action content clear of the independent close hit target.
              * Reserve this lane even when Close is hidden to avoid hover reflow. */
-            cui_begin_box(ui, cui_status_child_id(card, 316),
-                          (cui_box){.width = 24, .height = 1});
+            cui_begin_box(ui, cui_status_child_id(card, 316), (cui_box){.width = 24, .height = 1});
             cui_end_box(ui);
             cui_end_box(ui);
             cui_status_spacer(ui, cui_status_child_id(card, 312), 2);

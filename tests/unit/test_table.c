@@ -882,10 +882,12 @@ static void custom_row_backgrounds(void) {
         cui_begin_frame(ui, 400, 200, .016f);
         cui_table_begin(ui, 1, &themes[theme], 360);
         for (unsigned row = 0; row < 5; row++) {
-            cui_table_begin_row_ex(ui, 10 + row, &themes[theme],
-                                   (cui_table_row_options){.height = 30, .header = row == 0,
-                                      .custom_background = true,
-                                      .background = colors[row == 0 ? 0 : 1 + (row % 2)]});
+            cui_table_begin_row_ex(
+                ui, 10 + row, &themes[theme],
+                (cui_table_row_options){.height = 30,
+                                        .header = row == 0,
+                                        .custom_background = true,
+                                        .background = colors[row == 0 ? 0 : 1 + (row % 2)]});
             cui_table_begin_cell(ui, 100 + row, 360, 30, CUI_TABLE_ALIGN_LEFT);
             cui_text(ui, cui_string(row == 0 ? "Header" : "Body"), 16, themes[theme].text);
             cui_table_end(ui);

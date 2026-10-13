@@ -725,10 +725,11 @@ static unsigned title_actions[7], title_closed;
 static cui_title_bar_state title_state;
 static cui_window_info title_query(void *user) {
     (void)user;
-    return (cui_window_info){.decoration = (cui_window_decoration)title_decoration,
-                             .actions = title_decoration != CUI_WINDOW_BROWSER && !title_fullscreen ? 127 : 0,
-                             .maximized = title_maximized,
-                             .fullscreen = title_fullscreen != 0};
+    return (cui_window_info){
+        .decoration = (cui_window_decoration)title_decoration,
+        .actions = title_decoration != CUI_WINDOW_BROWSER && !title_fullscreen ? 127 : 0,
+        .maximized = title_maximized,
+        .fullscreen = title_fullscreen != 0};
 }
 static bool title_perform(void *user, cui_window_action action, float x, float y) {
     (void)user;
@@ -756,12 +757,13 @@ static void toolbar_activate(void *user) {
 static void toolbar_query_render(cui_context *context, const cui_theme *theme,
                                  const cui_toolbar_presentation *presentation, void *user) {
     (void)user;
-    cui_input_result result = cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme,
-                                           cui_string("Find"), toolbar_query, &toolbar_query_state,
-                                           (cui_input_options){.width = 112,
-                                                               .design_size = presentation->metrics.design_size,
-                                                               .placeholder = cui_string("Find"),
-                                                               .disabled = toolbar_disabled});
+    cui_input_result result =
+        cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme, cui_string("Find"),
+                     toolbar_query, &toolbar_query_state,
+                     (cui_input_options){.width = 112,
+                                         .design_size = presentation->metrics.design_size,
+                                         .placeholder = cui_string("Find"),
+                                         .disabled = toolbar_disabled});
     if (result.changed)
         toolbar_query_changes++;
 }
@@ -3592,10 +3594,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 12: {
         static const char *const titles[] = {"Workspace update", "Your changes are saved",
-                                            "Storage is almost full", "Upload failed"};
-        static const char *const messages[] = {"A new version is available.", "You can keep working.",
-                                               "Archive unused projects to free space.",
-                                               "Check your connection and try again."};
+                                             "Storage is almost full", "Upload failed"};
+        static const char *const messages[] = {
+            "A new version is available.", "You can keep working.",
+            "Archive unused projects to free space.", "Check your connection and try again."};
         for (unsigned kind = 0; kind < 4; kind++)
             cui_alert(ui, cui_id_from(ui, titles[kind]), &t,
                       (cui_alert_options){.kind = (cui_alert_kind)kind,
@@ -3647,13 +3649,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 14: {
-        static const char *const messages[] = {"Info: a new version is available.",
-                                               "Success: your changes are saved.",
-                                               "Warning: storage is almost full.",
-                                               "Error: upload failed. Please retry."};
+        static const char *const messages[] = {
+            "Info: a new version is available.", "Success: your changes are saved.",
+            "Warning: storage is almost full.", "Error: upload failed. Please retry."};
         for (unsigned kind = 0; kind < 4; kind++) {
             cui_begin_bubble(ui, cui_id_from(ui, messages[kind]), &t,
-                              (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), width - 48);
+                             (cui_bubble_variant)(CUI_BUBBLE_INFO + kind), width - 48);
             cui_label(ui, &t, cui_string(messages[kind]));
             cui_end_bubble(ui);
         }
@@ -4139,10 +4140,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 29: {
         cui_calendar(ui, cui_id_from(ui, "calendar"), &t, &calendar, &date_selection,
-                     (cui_calendar_options){.disabled = disabled,
-                                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale),
-                                            .first_weekday = 1,
-                                            .cell_size = width > 360 ? 32 : 28});
+                     (cui_calendar_options){
+                         .disabled = disabled,
+                         .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale),
+                         .first_weekday = 1,
+                         .cell_size = width > 360 ? 32 : 28});
         char text[64];
         snprintf(text, sizeof(text), "Selected: %04d-%02d-%02d", date_selection.start.year,
                  date_selection.start.month, date_selection.start.day);
@@ -4233,9 +4235,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             }
             cui_id row_id = table_id + r + 1;
             cui_table_begin_row_ex(ui, row_id, &t,
-                                   (cui_table_row_options){.height = 40, .header = r == 0,
-                                      .custom_background = true,
-                                      .background = r == 0 ? t.accent : r % 2 ? t.surface : t.background});
+                                   (cui_table_row_options){.height = 40,
+                                                           .header = r == 0,
+                                                           .custom_background = true,
+                                                           .background = r == 0  ? t.accent
+                                                                         : r % 2 ? t.surface
+                                                                                 : t.background});
             cui_set_semantic_details(ui, row_id, (cui_semantic_details){.parent = section_id});
             for (size_t c = 0; c < 3; c++) {
                 cui_id cell_id = table_id + 100 + r * 3 + c;
@@ -4625,13 +4630,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 40:
-        cui_date_picker(ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
-                        &date_selection,
-                        (cui_date_picker_options){.calendar = {.first_weekday = 1, .cell_size = 28,
-                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale)},
-                                                  .viewport = {0, 0, width, height},
-                                                  .disabled = disabled,
-                                                  .width = width > 360 ? 280 : width - 48});
+        cui_date_picker(
+            ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
+            &date_selection,
+            (cui_date_picker_options){
+                .calendar = {.first_weekday = 1,
+                             .cell_size = 28,
+                             .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale)},
+                .viewport = {0, 0, width, height},
+                .disabled = disabled,
+                .width = width > 360 ? 280 : width - 48});
         break;
     case 41: {
         cui_time_field(ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_state,
@@ -4766,7 +4774,8 @@ void gallery_date_locale(int locale) {
     date_locale = locale >= -1 && locale <= CUI_DATE_LOCALE_JA ? locale : -1;
 }
 unsigned gallery_date_value(void) {
-    return (unsigned)(date_selection.start.year * 10000 + date_selection.start.month * 100 + date_selection.start.day);
+    return (unsigned)(date_selection.start.year * 10000 + date_selection.start.month * 100 +
+                      date_selection.start.day);
 }
 void gallery_resizable_options(int vertical, int disabled) {
     if (resizable_vertical != (vertical != 0))

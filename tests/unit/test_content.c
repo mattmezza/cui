@@ -249,13 +249,14 @@ static void semantic_colors(void) {
         cui_color bubble_colors[4];
         for (unsigned kind = 0; kind < 4; kind++) {
             cui_begin_frame(ui, 500, 300, .016f);
-            cui_alert(ui, 100, t, (cui_alert_options){.kind = (cui_alert_kind)kind,
-                                                    .message = cui_string("Status"), .width = 400});
+            cui_alert(ui, 100, t,
+                      (cui_alert_options){.kind = (cui_alert_kind)kind,
+                                          .message = cui_string("Status"),
+                                          .width = 400});
             cui_draw_list draw = cui_end_frame(ui);
             bool border = false, svg = false;
             for (size_t i = 0; i < draw.count; i++) {
-                if (draw.commands[i].type == CUI_DRAW_BORDER &&
-                    draw.commands[i].bounds.w == 400) {
+                if (draw.commands[i].type == CUI_DRAW_BORDER && draw.commands[i].bounds.w == 400) {
                     assert(!memcmp(&draw.commands[i].color, &accents[kind], sizeof(cui_color)));
                     border = true;
                 }

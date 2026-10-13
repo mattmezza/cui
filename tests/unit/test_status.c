@@ -768,8 +768,8 @@ static void notification_separate_actions(void) {
         notification_frame(ui, &state, .4);
         notification_frame(ui, &state, .5);
         cui_rect card = entries[0].bounds;
-        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
-                                               .x = card.x + 30, .y = card.y + 30}));
+        assert(cui_queue_event(
+            ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = card.x + 30, .y = card.y + 30}));
         notification_frame(ui, &state, .6);
         notification_frame(ui, &state, .7);
         size_t count;

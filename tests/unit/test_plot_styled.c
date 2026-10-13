@@ -124,6 +124,19 @@ static void raster(void) {
     assert(cui_plot_raster(pixels, 64, 64, 256, sizeof pixels, &shape, 1, (cui_color){0}) ==
            CUI_PLOT_OK);
     assert(pixels[(30 * 64 + 30) * 4 + 1] == 255 && pixels[(5 * 64 + 30) * 4 + 3] == 0);
+    /* Frozen Area strokes only the upper line, never the closing baseline. */
+    cui_plot_area_sample source_samples[] = {{8, 10, true, true}, {50, 20, true, true}};
+    cui_plot_path_command source_fill[16], source_stroke[16];
+    cui_plot_area_buffers source_buffers = {
+        .fill = source_fill, .stroke = source_stroke, .fill_capacity = 16, .stroke_capacity = 16};
+    assert(cui_plot_area_paths(source_samples, 2, CUI_PLOT_CURVE_LINEAR, true, 50,
+                               &source_buffers) == CUI_PLOT_OK);
+    cui_plot_shape source_shapes[] = {{source_fill, source_buffers.fill_count, green, {0}, 0},
+                                      {source_stroke, source_buffers.stroke_count, {0}, blue, 3}};
+    assert(cui_plot_raster(pixels, 64, 64, 256, sizeof pixels, source_shapes, 2, (cui_color){0}) ==
+           CUI_PLOT_OK);
+    assert(pixels[(49 * 64 + 30) * 4 + 1] == 255 && pixels[(49 * 64 + 30) * 4 + 2] == 0);
+    assert(pixels[(15 * 64 + 30) * 4 + 2] == 255);
     /* Projected bar uses the same polygon renderer. */
     cui_plot_scale xs = {CUI_PLOT_LINEAR, 0, 10, 0, 64, false},
                    ys = {CUI_PLOT_LINEAR, 0, 10, 64, 0, false};

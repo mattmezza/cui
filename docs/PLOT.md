@@ -197,3 +197,24 @@ for `cui_plot_raster`. Core element/command budgets still apply to a large style
 grid; check `cui_last_error` after `cui_end_frame`. The 1px quads are centered on
 coordinates, matching frozen Grid and the corrected styled axis stroke placement.
 Software tests verify both dash pixels and gaps using pixel-center coverage.
+
+## Source Area rendering and remaining Plot scope
+
+For frozen-style areas use `cui_plot_area_paths` rather than applying both fill
+and stroke to a single closed generic area path. Submit its fill contour with
+fill only, then its upper stroke contour with stroke only (1px reproduces the
+source default). Software tests verify that the closing baseline stays filled
+without being stroked. The builder also preserves independent X/Y missingness,
+original endpoint closure and the singleton early return. Open contours need an
+adapter's implicit-fill policy or an explicit Close appended by the caller;
+the bounded rasterizer intentionally fills only explicitly closed runs.
+
+The [complete frozen export audit](PLOT_MODEL.md#complete-frozen-plot-export-audit)
+lists exact supported routes and remaining differences. In particular this
+styled layer does not yet implement generic dots/rounded-bar styling,
+PlotLabel truncation/content collections, tessellation caches, hover/tooltip
+state and exit motion, appear-generation/scope tracking, or the PlotElement
+prepaint lifecycle. Chart-specific versions of some features do not automatically
+satisfy standalone Plot parity. Axis default positions and centered strokes are
+covered, while nondefault font scaling and theme fallback are deliberate CUI
+policies rather than byte-for-byte source behavior.

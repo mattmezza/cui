@@ -578,11 +578,103 @@ static void bar_and_grid_geometry(void) {
     o.y_count = 1;
     assert(cui_plot_grid_layout(&o, quads, 16, &required) == CUI_PLOT_INVALID);
 }
+static void source_area_paths(void) {
+    cui_plot_area_sample samples[] = {
+        {0, 1, true, true}, {1, 3, true, true}, {2, NAN, true, false}, {3, 2, true, true}};
+    cui_plot_path_command fill[32], stroke[32], saved_fill[32], saved_stroke[32];
+    memset(fill, 0x5a, sizeof fill);
+    memset(stroke, 0x5a, sizeof stroke);
+    memcpy(saved_fill, fill, sizeof fill);
+    memcpy(saved_stroke, stroke, sizeof stroke);
+    cui_plot_area_buffers buffers = {.fill = fill,
+                                     .stroke = stroke,
+                                     .fill_capacity = 2,
+                                     .stroke_capacity = 32,
+                                     .fill_count = 99,
+                                     .stroke_count = 99};
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, 5, &buffers) ==
+               CUI_PLOT_CAPACITY &&
+           buffers.fill_count == 6 && buffers.stroke_count == 3);
+    assert(memcmp(saved_fill, fill, sizeof fill) == 0 &&
+           memcmp(saved_stroke, stroke, sizeof stroke) == 0);
+    buffers.fill_capacity = 32;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, 5, &buffers) ==
+           CUI_PLOT_OK);
+    assert(fill[0].kind == CUI_PLOT_PATH_MOVE && fill[1].point.x == 1 && fill[2].point.x == 3 &&
+           fill[3].point.x == 3 && fill[3].point.y == 5 && fill[4].point.x == 0 &&
+           fill[5].kind == CUI_PLOT_PATH_CLOSE);
+    assert(stroke[2].kind == CUI_PLOT_PATH_LINE && stroke[2].point.x == 3);
+    assert(memcmp(fill, stroke, 3 * sizeof *fill) == 0);
+    /* The source closes against original endpoint x even if its y is missing. */
+    samples[0].has_y = false;
+    samples[3].has_y = false;
+    samples[2].has_y = true;
+    samples[2].y = 2;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, 5, &buffers) ==
+               CUI_PLOT_OK &&
+           buffers.fill_count == 5 && buffers.stroke_count == 2);
+    assert(fill[0].point.x == 1 && fill[1].point.x == 2 && fill[2].point.x == 3 &&
+           fill[3].point.x == 0);
+    samples[0].has_x = false;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, 5, &buffers) ==
+               CUI_PLOT_OK &&
+           buffers.fill_count == 2 && buffers.stroke_count == 2);
+    assert(fill[1].kind == CUI_PLOT_PATH_LINE); /* Open fill contour. */
+    samples[0].has_x = true;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, false, NAN, &buffers) ==
+               CUI_PLOT_OK &&
+           buffers.fill_count == 2);
+    samples[2].has_y = false;
+    assert(
+        cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_NATURAL, true, 5, &buffers) == CUI_PLOT_OK &&
+        buffers.fill_count == 1 && buffers.stroke_count == 1 && fill[0].kind == CUI_PLOT_PATH_MOVE);
+    samples[0].has_y = true;
+    samples[2].has_y = true;
+    samples[3].has_y = true;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_NATURAL, true, 5, &buffers) ==
+               CUI_PLOT_OK &&
+           stroke[1].kind == CUI_PLOT_PATH_CUBIC);
+    assert(close(stroke[1].control1.x, 1. / 6) && close(stroke[1].control1.y, 1 + 2. / 6));
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_STEP_AFTER, true, 5, &buffers) ==
+               CUI_PLOT_OK &&
+           buffers.stroke_count == 6 && buffers.fill_count == 9);
+    assert(stroke[5].point.x == 3 && stroke[5].point.y == 2 && fill[6].point.y == 5);
+    memcpy(saved_fill, fill, sizeof fill);
+    memcpy(saved_stroke, stroke, sizeof stroke);
+    buffers.fill_count = buffers.stroke_count = 99;
+    samples[3].y = NAN;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, 5, &buffers) ==
+               CUI_PLOT_INVALID &&
+           buffers.fill_count == 99 && buffers.stroke_count == 99);
+    assert(memcmp(saved_fill, fill, sizeof fill) == 0 &&
+           memcmp(saved_stroke, stroke, sizeof stroke) == 0);
+    samples[3].y = 2;
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, NAN, &buffers) ==
+           CUI_PLOT_INVALID);
+    assert(cui_plot_area_paths(NULL, 1, CUI_PLOT_CURVE_LINEAR, false, 0, &buffers) ==
+           CUI_PLOT_INVALID);
+    assert(cui_plot_area_paths(samples, 4, (cui_plot_curve)99, false, 0, &buffers) ==
+           CUI_PLOT_INVALID);
+    cui_plot_area_buffers query = {0};
+    assert(cui_plot_area_paths(samples, 4, CUI_PLOT_CURVE_LINEAR, true, 5, &query) ==
+               CUI_PLOT_CAPACITY &&
+           query.fill_count == 7 && query.stroke_count == 4);
+    assert(cui_plot_area_paths(NULL, 0, CUI_PLOT_CURVE_LINEAR, false, 0, &query) == CUI_PLOT_OK &&
+           query.fill_count == 0 && query.stroke_count == 0);
+    cui_plot_area_sample extreme[] = {
+        {-DBL_MAX, 0, true, true}, {DBL_MAX, 0, true, true}, {DBL_MAX, 0, true, true}};
+    assert(cui_plot_area_paths(extreme, 3, CUI_PLOT_CURVE_NATURAL, true, 5, &buffers) ==
+               CUI_PLOT_OVERFLOW &&
+           buffers.fill_count == 99 && buffers.stroke_count == 99);
+    assert(memcmp(saved_fill, fill, sizeof fill) == 0 &&
+           memcmp(saved_stroke, stroke, sizeof stroke) == 0);
+}
 int main(void) {
     shape_geometry();
     pie_geometry();
     arc_and_radial_paths();
     bar_and_grid_geometry();
+    source_area_paths();
     band_scales();
     point_scales();
     ordinal_scales();

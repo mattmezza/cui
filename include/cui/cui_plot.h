@@ -128,6 +128,26 @@ typedef struct {
 cui_plot_result cui_plot_path(const cui_plot_sample *, size_t count, cui_plot_curve,
                               cui_plot_gap_policy, bool area, cui_plot_path_command *,
                               size_t capacity, size_t *required);
+/* Frozen Area's independent accessor missingness and optional constant
+ * baseline. This is distinct from the extended closed per-point area path. */
+typedef struct {
+    double x, y;
+    bool has_x, has_y;
+} cui_plot_area_sample;
+typedef struct {
+    cui_plot_path_command *fill, *stroke;
+    size_t fill_capacity, stroke_capacity, fill_count, stroke_count;
+} cui_plot_area_buffers;
+/* SKIP missing x/y pairs. Fill and stroke share the upper curve. Fill closes
+ * only when >1 pair remains, baseline is present, and original first/last x
+ * exist; closure uses those original x values even if their y is absent.
+ * Singleton emits Move only, ignoring baseline (source early return).
+ * Without closure the fill path is open; renderer fill semantics decide its
+ * implicit closure. INVALID/OVERFLOW preserve counts and both command buffers;
+ * CAPACITY publishes both counts without partial output. All buffers disjoint
+ * and stable; count <=4096. Baseline is ignored when has_baseline=false. */
+cui_plot_result cui_plot_area_paths(const cui_plot_area_sample *, size_t count, cui_plot_curve,
+                                    bool has_baseline, double baseline, cui_plot_area_buffers *);
 typedef struct {
     double value;
     bool defined;

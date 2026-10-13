@@ -507,3 +507,102 @@ StepAfter Cartesian curves. There is no frozen StepBefore curve or Step scale
 being omitted under another name. Decimal value support, retained paint caches,
 custom label/content callbacks and renderer-specific styling are separate from
 these original C geometry APIs.
+
+## Frozen Area fill/stroke paths
+
+`cui_plot_area_paths` complements the extended `cui_plot_path(...,area=true)`
+API. It models frozen `shape/area.rs` command construction explicitly: each
+`cui_plot_area_sample` has independent X/Y availability, and the optional
+baseline is one constant. Missing X/Y pairs are skipped and neighbors connect.
+When a baseline is supplied, the fill closes only if at least two valid pairs
+remain and both original endpoint X values exist. Those original X values are
+used for closure even if their Y values are absent. A missing original endpoint
+X leaves the fill open. Without a baseline the fill stays open. A singleton
+returns a Move-only fill and stroke, reproducing the source's early return.
+
+Fill and stroke have identical upper curves (Linear/Natural/StepAfter), then
+only fill appends its baseline segments and Close. This keeps closing edges
+out of the visible stroke, unlike painting a closed area with both fill/stroke
+colors on one command array. Source constructors/accessors are represented by
+caller-materialized samples rather than callbacks; accessor side effects are
+not reproduced. Available X and paired Y coordinates must be finite; unused
+Y values and absent baseline numeric fields are ignored. Curved-control overflow
+is checked before either output is written.
+
+`cui_plot_area_buffers` supplies separate stable/disjoint fill/stroke arrays and
+capacities. CAPACITY publishes both required counts without touching either
+array. INVALID/OVERFLOW preserve both counts and arrays. Count is bounded to
+4096 samples. The implementation uses approximately 160 KiB of fixed sample/
+index scratch storage on a typical 64-bit host and no allocations. Array contents
+must remain stable during preflight and emission. Both arrays may be NULL with
+zero capacities for a query. Returned counts describe commands, not whether a
+renderer produces a nonempty tessellation from them.
+
+The open fill path retains source command construction without claiming exact
+GPUI tessellation. CUI's bounded rasterizer fills only explicitly closed runs;
+append a Close command in separate renderer-owned storage if an open contour
+should be implicitly filled. Native adapters can use their own implicit-fill
+rules. Pass fill and stroke as separate `cui_plot_shape` objects:
+
+```c
+#include <assert.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    const cui_plot_area_sample points[] = {
+        {0,2,true,true}, {1,4,true,true}, {2,0,true,false}, {3,3,true,true}
+    };
+    cui_plot_path_command fill[32], stroke[32];
+    cui_plot_area_buffers output = {.fill=fill,.stroke=stroke,
+                                    .fill_capacity=32,.stroke_capacity=32};
+    assert(cui_plot_area_paths(points,4,CUI_PLOT_CURVE_LINEAR,true,0,
+                               &output) == CUI_PLOT_OK);
+    assert(output.stroke_count == 3 && output.fill_count == 6);
+    assert(fill[5].kind == CUI_PLOT_PATH_CLOSE);
+    assert(stroke[2].kind == CUI_PLOT_PATH_LINE);
+    return 0;
+}
+```
+
+Compile with the standalone command above (`-UNDEBUG` for assertions).
+
+## Complete frozen Plot export audit
+
+This is a feature audit of the pinned **base Plot module**, not a declaration
+of complete parity. It covers every exported family from `plot/mod.rs`,
+`scale.rs`, `shape.rs`, and public `label.rs`; private implementation behavior
+was inspected where it changes the public result. Evidence is in
+`test_plot.c`/`test_plot_styled.c` and the contracts above. A successful geometry
+case does not validate all paint styles, lifecycle behavior or f32 corner cases.
+
+| Frozen export/features | Current CUI route | Exact gaps or deliberate differences |
+|---|---|---|
+| `Scale`, `PlotValue`; f32/f64/feature-gated Decimal; tick and default nearest=0 | Explicit C double scale/category functions | No generic trait, Decimal arithmetic or named continuous nearest-index query; discrete nearest available |
+| `ScaleLinear::new` from unordered domain extent; extrapolating tick; reversed/equal pixel range | `cui_plot_scale`, map/inverse/ticks/nice/pan/zoom | Caller supplies ascending endpoints; empty/equal domains rejected; **equal pixel ranges are rejected**, while frozen Linear maps them to the same pixel; CUI log/ticks/clamp/navigation are extensions |
+| `ScaleBand` dedup, leading reserved bands, width cap, inner/outer padding, step, nearest | Band init/layout/map/at/nearest | Uint64 application keys and bounded copied domain; stricter finite/padding/cap validation; no hash-generic domain or source unchecked negative widths |
+| `ScalePoint` owned domain, duplicate-first map, tick-at, nearest | Point init/map/at/nearest | Uint64 keys, borrowed arrays, bounded finite validation rather than owned generic Vec |
+| `ScaleOrdinal` domain/range replacement, unknown, first duplicate, cycling cloned output | Ordinal init/map; reinitialize to replace arrays | Byte copies preserve C value representations but do not deep-clone arbitrary payloads; pointers remain caller-owned; finite capacity bounds |
+| `Curve::{Natural,Linear,StepAfter}` | Cartesian path and source Area builders | Source Catmull-Rom controls and omitted final StepAfter vertical reproduced; no additional upstream StepBefore/Step scale exists |
+| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | No accessor callbacks, dot generator/style family, arbitrary Background/gradient, or source path cache; numeric bounds/precision differ |
+| `Area` data/X/Y1, optional Y0, fill plus separate 1px upper stroke, curves, paint/cache | `cui_plot_area_paths` separate contours; two raster shapes | Source accessor callbacks/cache/backgrounds absent; open/singleton GPUI tessellator result not reproduced; extended per-point closed areas remain separate |
+| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors available; no reusable custom fill/label callback driver, arbitrary gradient renderer or per-corner bar path primitive; negative width is rejected |
+| `Pie` positive-value arcs/index/padding and angular limits | `cui_plot_pie` | No accessor callback/borrowed arbitrary datum payload; stable normalized double summation replaces unchecked f32 sums; pad is metadata |
+| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; full-turn seam removed; user pad retained above pi rather than source0.0001 override; tiny values accepted; spans above one turn rejected; no cache/Background |
+| `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | No accessor/dot style driver; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
+| `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
+| `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | No independent pure Plot graph/topology reuse or `sankey_link_path` command builder; Chart-specific options/data contracts are not automatically Plot parity |
+| `PlotAxis`, `AxisText`, `AxisLabelSide`, `AXIS_GAP`, `axis_gutter` | Axis defaults/layout/paint/ticks/gutter | Line visibility, default offsets/alignment/theme paint covered; font-scaled nondefault offsets differ; alpha-zero fallback differs from explicit source colors; dynamic Backgrounds absent |
+| `AxisLabelPlacement::{Outside,Inside}` | Application places labels/reserves gutters; Chart has its own layer | No standalone Plot placement enum or automatic gutter allocation; source PlotAxis itself only records position/side |
+| `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
+| `Text`, `PlotLabel`, text width/truncation helpers | Core measurement/text and explicit axis labels | No general PlotLabel collection, ellipsis helper or automatic content measurement/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
+| `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned commands/bitmap revision | No origin-translated tessellation cache, keyed state slots/pairs or source hash key contract; source `is_warm` means a key exists, including after an initial empty build |
+| `PlotMotion` pointer Spring, enter/exit/appear Transitions | Chart has specialized motion; standalone Plot view is immediate | No standalone projected motion policy/enter-exit spring lifecycle; generic Core/effects availability is not this Plot API |
+| `PlotAppear` complete/progress/is_appearing/staggered and `PlotAppearScope` | Application-owned state or Chart appearance | No Plot generation/scope persistence, first-paint appear tracking, per-mark stagger or scope retention; reduced-motion behavior must be explicit in application composition |
+| `TooltipState`, `PlotHover` state/progress/deprecated focus/is_hovered/is_entering/glide; scope helpers hover_progress/is_hover_entering/pointer_spring | Pure nearest/arc queries; Chart specialized hover; view activation callback | No standalone hovered-index/dots/crosshair object, lingering exit state, projected pointer spring or tooltip scope helper |
+| `Plot` trait prepaint/paint/id/interactive/appear_generation/appear/tooltip_state/hover/tooltip | `cui_plot_view` fixed bitmap+axes and activation | No generic prepaint children/tooltip overlay driver, identity-driven motion/cache contract or custom trait-equivalent lifecycle |
+| `PlotElement` full-size layout, element-state appear, current-bounds cursor, occlusion-aware mouse/touch tracking, tooltip prepaint/paint | Core layout/image semantic and validated click capture | Fixed bitmap extent, no full-size auto layout or tooltip pipeline; no source touch long-press/drag tooltip rules or animation scheduling |
+| `origin_point` translation utility | Caller adds relative offsets before raster; Core offsets styled children | No separate named pure translation helper; ordinary finite coordinate addition remains caller responsibility |
+
+Missing renderer/lifecycle rows are real remaining Plot scope. Similar Chart,
+Core, effects or text APIs can be reused in application composition, but their
+existence does not make the standalone Plot contract equivalent to the frozen
+module. No row above asserts full widget parity.

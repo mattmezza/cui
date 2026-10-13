@@ -1054,3 +1054,50 @@ cui_plot_result cui_plot_grid_layout(const cui_plot_grid_options *o, cui_plot_re
         return CUI_PLOT_CAPACITY;
     return cui_plot_grid_pass(o, out, &used);
 }
+
+cui_plot_result cui_plot_area_paths(const cui_plot_area_sample *samples, size_t count,
+                                    cui_plot_curve curve, bool has_baseline, double baseline,
+                                    cui_plot_area_buffers *buffers) {
+    if (!buffers || count > CUI_PLOT_CATEGORY_LIMIT || (count && !samples) ||
+        (!buffers->fill && buffers->fill_capacity) ||
+        (!buffers->stroke && buffers->stroke_capacity) || curve < CUI_PLOT_CURVE_LINEAR ||
+        curve > CUI_PLOT_CURVE_STEP_AFTER || (has_baseline && !isfinite(baseline)))
+        return CUI_PLOT_INVALID;
+    cui_plot_sample points[CUI_PLOT_CATEGORY_LIMIT];
+    size_t indices[CUI_PLOT_CATEGORY_LIMIT], valid = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if ((samples[i].has_x && !isfinite(samples[i].x)) ||
+            (samples[i].has_x && samples[i].has_y && !isfinite(samples[i].y)))
+            return CUI_PLOT_INVALID;
+        points[i] =
+            (cui_plot_sample){samples[i].x, 0, samples[i].y, samples[i].has_x && samples[i].has_y};
+        if (points[i].defined)
+            indices[valid++] = i;
+    }
+    size_t stroke_count = 0;
+    if (valid) {
+        cui_plot_result result =
+            cui_plot_path_run(points, indices, valid, curve, false, NULL, &stroke_count);
+        if (result != CUI_PLOT_OK)
+            return result;
+    }
+    bool close = valid > 1 && has_baseline && samples[0].has_x && samples[count - 1].has_x;
+    size_t fill_count = stroke_count + (close ? 3 : 0);
+    buffers->fill_count = fill_count;
+    buffers->stroke_count = stroke_count;
+    if (buffers->fill_capacity < fill_count || buffers->stroke_capacity < stroke_count)
+        return CUI_PLOT_CAPACITY;
+    if (valid) {
+        size_t used = 0;
+        (void)cui_plot_path_run(points, indices, valid, curve, false, buffers->stroke, &used);
+        memcpy(buffers->fill, buffers->stroke, stroke_count * sizeof *buffers->fill);
+        if (close) {
+            buffers->fill[used++] = (cui_plot_path_command){
+                .kind = CUI_PLOT_PATH_LINE, .point = {samples[count - 1].x, baseline}};
+            buffers->fill[used++] = (cui_plot_path_command){.kind = CUI_PLOT_PATH_LINE,
+                                                            .point = {samples[0].x, baseline}};
+            buffers->fill[used] = (cui_plot_path_command){.kind = CUI_PLOT_PATH_CLOSE};
+        }
+    }
+    return CUI_PLOT_OK;
+}

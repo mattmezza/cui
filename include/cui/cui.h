@@ -51,7 +51,11 @@ typedef enum {
     CUI_EVENT_COMPOSITION_UPDATE,
     CUI_EVENT_COMPOSITION_COMMIT,
     CUI_EVENT_COMPOSITION_CANCEL,
-    CUI_EVENT_ACCESSIBILITY_ACTION
+    CUI_EVENT_ACCESSIBILITY_ACTION,
+    /* Host-surface hover presence only; coordinates are ignored. ENTER never
+     * invents a position. LEAVE preserves position, capture, focus and contacts. */
+    CUI_EVENT_POINTER_ENTER,
+    CUI_EVENT_POINTER_LEAVE
 } cui_event_type;
 /* Targeted semantic actions, independent of pointer or keyboard input. */
 typedef enum { CUI_ACCESSIBILITY_FOCUS, CUI_ACCESSIBILITY_ACTIVATE } cui_accessibility_action;
@@ -519,6 +523,7 @@ typedef struct {
     float opacity;
     double frame_time;
     float frame_delta;
+    bool pointer_present; /* Host presence; pointer_valid additionally requires known position. */
 } cui_prepaint_info;
 typedef bool (*cui_prepaint_fn)(const cui_prepaint_info *, const void *, cui_prepaint_writer *);
 typedef struct {

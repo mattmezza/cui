@@ -1,0 +1,91 @@
+{
+  "cui_base": "da398d8aab60b67e4b6ca34c7603cb395a73ef29",
+  "reference_pin": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "scope": "read-only production audit; proposal only",
+  "findings": [
+    {
+      "feature": "acceptance",
+      "status": "implemented bounded subset",
+      "evidence": "base/src/input/base/state.rs:3534\u20133553,4109\u20134124,4265\u20134280",
+      "finding": "da398d8 checks candidate then old, empty always valid, history and multiline bypass; preedit checked. Explicit invalid/required are separate. CUI callback protects same-model mutation unlike source mutable App callback."
+    },
+    {
+      "feature": "normalization",
+      "status": "missing default source behavior",
+      "evidence": "base/src/input/base/state.rs:3520\u20133531,1241\u20131243,3996\u20134002,4243\u20134249",
+      "finding": "Single-line source removes both CR and LF before candidate validation and default-value setup. CUI returns LINE_BREAK for CR/LF. U+2028 is not removed by that source helper. Number-mask normalization is conditional, not generic."
+    },
+    {
+      "feature": "format masks",
+      "status": "missing opt-in feature",
+      "evidence": "base/src/input/base/mask_pattern.rs:100\u2013165,172\u2013245,283\u2013410; base/src/input/base/state.rs:4125\u20134160",
+      "finding": "9 ASCII digit, A ASCII letter, # ASCII alphanumeric, * any scalar, other scalars separators. Prefixes are valid; formatting adds/skips literals. Number variant supports separators/fraction formatting. Mask rewrites document, adjusts caret and records whole-document atomic history when changed. Not password hiding."
+    },
+    {
+      "feature": "regex",
+      "status": "missing opt-in feature",
+      "evidence": "base/src/input/base/state.rs:3534\u20133553,10539\u201310552",
+      "finding": "Source regex::Regex is_match is search matching unless expression anchors itself. Validator runs first, then mask, then regex; empty bypasses all. Existing CUI callback can host an application predicate but is not a portable regex implementation or regex source compatibility."
+    },
+    {
+      "feature": "password",
+      "status": "missing opt-in feature with mandatory security behavior when enabled",
+      "evidence": "base/src/input/base/element.rs:343\u2013362; base/src/input/base/selection.rs:24\u201335; base/src/input/base/mod.rs:105\u2013111; component/src/input/input.rs:89\u201396",
+      "finding": "Source displays MASK_CHAR once per Unicode scalar, maps byte ranges to display offsets, double-click selects all, disables Copy and Cut, withholds accessibility value. CUI styled Input has no masked option; current plaintext drawing/clipboard/semantics must not be relabeled password support."
+    },
+    {
+      "feature": "content type",
+      "status": "missing opt-in semantic and platform feature",
+      "evidence": "component/src/input/content_type.rs:7\u201398,157\u2013174; component/src/input/input.rs:27\u201396; base/src/input/base/native.rs:1\u2013108",
+      "finding": "Source has 45 enum variants including name/address/credit card/credentials/OTP/date/cellular metadata. Styled role maps telephone/email/URL/password/date types; password/new-password suppress value exposure independently of masked drawing. Native NSTexContent seam is macOS-only; nonmac sync is no-op. SDL/browser autofill and keyboard hints require separate host capabilities, not portable metadata alone."
+    },
+    {
+      "feature": "shortcuts",
+      "status": "portable common subset, platform gaps",
+      "evidence": "base/src/input/base/state.rs:135\u2013306; CUI src/base/cui_edit.c:5152\u20135223; src/base/cui_base.c:312\u2013329",
+      "finding": "Common clipboard/select-all/grapheme/word/history/home/end exists; single-line vertical no-op and popup delegation tested. CUI combines Ctrl/Alt word operations regardless of OS; source macOS Ctrl-Backspace is scalar/grapheme Backspace, Cmd-Backspace/Delete delete to line edge, Cmd-Left/Right home/end, Ctrl-A/E home/end. Source character palette, Escape/search/replace/context actions are not implemented in Input. Editor-only actions are not automatically single-line requirements."
+    },
+    {
+      "feature": "pointer selection",
+      "status": "partial composed path",
+      "evidence": "base/src/input/base/selection.rs:24\u201363; CUI src/base/cui_base.c:333\u2013353",
+      "finding": "CUI click/Shift click/drag hits byte geometry and snaps edit boundaries. Source double-click word and triple-click line are separate selection modes; no equivalent click-count reducer exists in styled Input. Masked double-click has special all-selection privacy policy."
+    },
+    {
+      "feature": "lifecycle",
+      "status": "state tracking subset, source event API missing",
+      "evidence": "base/src/input/mod.rs:125\u2013131; base/src/input/base/state.rs:3389\u20133418,4208\u20134209",
+      "finding": "Source Focus/Blur/Change/PressEnter events, cursor blink start/stop and context-menu blur exception are explicit. CUI result changed/submitted plus retained focus grouping cover part; no corresponding event callback stream or cursor blink timer. Existing immediate result callers can observe flags but must not claim source event ordering."
+    },
+    {
+      "feature": "platform paste",
+      "status": "bounded synchronous seam, source async gap",
+      "evidence": "base/src/input/base/state.rs:2681\u20132710",
+      "finding": "Source async permission-gated paste rechecks editability, focused handle, document revision and selections before applying late result. CUI platform clipboard API is synchronous borrowed text; arbitrary delayed completion needs an explicit generation/target transaction. Current web host composition bridge does not prove async clipboard equivalence."
+    }
+  ],
+  "proposal": "bounded opt-in single-line CR/LF normalization before acceptance",
+  "validation": {
+    "build": {
+      "status": "PASS",
+      "flags": "-Wall -Wextra -Wpedantic -Werror",
+      "commands": [
+        "cmake -S . -B build -G Ninja -DCMAKE_C_FLAGS=\"-Wall -Wextra -Wpedantic -Werror\"",
+        "cmake --build build -j6"
+      ]
+    },
+    "ctest": {
+      "passed": 111,
+      "total": 112,
+      "failed": [
+        "distribution"
+      ],
+      "failure_reason": "Generated dist/cui.h and dist/cui.c are stale after source-only Input work; integrator-owned regeneration excluded from audit scope.",
+      "command": "ctest --test-dir build --output-on-failure"
+    },
+    "logs": "/home/matteo/.cache/cui-validation/tmp-storage/input-audit-next27",
+    "new_acceptance_test_registered": false
+  },
+  "production_modified": false,
+  "full_parity_claim": false
+}

@@ -77,8 +77,14 @@ int main(void) {
     theme = cui_theme_light();
     cui_rect bounds = cui_bounds(ui, 11);
     assert(bounds.w >= 119 && bounds.h > theme.font_size * 2);
+    assert(!state.tooltip.open); /* No pointer event means no phantom origin hover. */
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h / 2}));
     cui_focus(ui, 11);
-    frame();
+    /* Let the existing 50ms open delay elapse after genuine hover/focus. */
+    for (unsigned i = 0; i < 5; i++)
+        frame();
     assert(state.tooltip.open);
     cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE});
     frame();

@@ -302,9 +302,8 @@ typedef struct {
  * implicit zoom/pan or per-shape hit testing. */
 cui_plot_result cui_plot_view(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_view_options *);
-/* Portable PlotElement composition seam. Host supplies CURRENT global bounds,
- * live pointer and occlusion-aware hover; Core has no prepaint/current-hitbox
- * query. Bounds must match this frame's plot layout and bitmap extent. */
+/* Portable PlotElement composition seam. Legacy hosts supply current global
+ * bounds/pointer/hover. Explicit current-frame paint uses Core after layout. */
 typedef struct {
     cui_id owner;
     cui_plot_cursor_memory cursor;
@@ -316,6 +315,7 @@ typedef struct {
     uint64_t generation, last_frame, scope_identity;
     cui_plot_appear_registry *scope;
     bool has_frame, has_generation;
+    cui_rect current_bounds; /* last successful current-frame paint; activation coordinates */
 } cui_plot_element_state;
 typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
                                                cui_plot_rect current_bounds,
@@ -323,6 +323,10 @@ typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
 typedef void (*cui_plot_compose_fn)(cui_context *, cui_id owner, const cui_theme *,
                                     const cui_plot_hover_memory *hover,
                                     cui_plot_rect current_bounds, void *user);
+/* Immutable current-frame geometry; writer is callback-local. No layout/input
+ * mutations. Return false to discard emitted output. User remains borrowed. */
+typedef bool (*cui_plot_paint_fn)(const cui_prepaint_info *, cui_prepaint_writer *,
+                                  const cui_theme *, const cui_plot_hover_memory *, void *user);
 typedef void (*cui_plot_appear_fn)(cui_id owner, const cui_plot_appear_value *, void *user);
 typedef struct {
     cui_plot_rect bounds;
@@ -345,6 +349,12 @@ typedef struct {
      * sampler pointers; use motion_appear_stagger with explicit policy later. */
     bool custom_motion;
     cui_plot_motion_policy motion; /* pointer policy is used by host marks via follow */
+    /* AUTO preserves explicit host geometry and layout callbacks. New paint-only
+     * zero-bounds options select Core. CURRENT_FRAME rejects layout callbacks and
+     * touch; legacy touch hosts retain their explicit cursor contract. */
+    cui_plot_interaction_mode interaction_mode;
+    cui_plot_paint_fn paint_marks, paint_tooltip;
+    size_t paint_command_budget; /* combined custom commands1..4096 when callbacks set */
 } cui_plot_element_options;
 /* Zero-init state. Owner change resets it. Resolver is synchronous preflight:
  * OK supplies relative datum/dots, EMPTY supplies none; it must not compose UI
@@ -363,7 +373,11 @@ typedef struct {
  * suppresses datum resolution while its LINEAR time<1 and combines redraw flags.
  * Generation/rekey/frame gap restarts; active scope remembers only completed
  * generations. Default appear duration0/reduced motion complete immediately.
- * No implicit prepaint/layout pass, native mesh cache or OS long-press detector. */
+ * CURRENT_FRAME borrows state/data/user until end_frame/renderer completion;
+ * paint callbacks run after layout with immutable occlusion/clip information.
+ * They emit local/deferred commands explicitly; apply hover.progress themselves.
+ * User side effects and bitmap mutations are outside output rollback. No native
+ * mesh cache or OS long-press detector. */
 cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
                                  const cui_plot_view_options *, cui_plot_element_state *,
                                  const cui_plot_element_options *);

@@ -52,7 +52,11 @@ typedef enum {
     CUI_EVENT_COMPOSITION_UPDATE,
     CUI_EVENT_COMPOSITION_COMMIT,
     CUI_EVENT_COMPOSITION_CANCEL,
-    CUI_EVENT_ACCESSIBILITY_ACTION
+    CUI_EVENT_ACCESSIBILITY_ACTION,
+    /* Host-surface hover presence only; coordinates are ignored. ENTER never
+     * invents a position. LEAVE preserves position, capture, focus and contacts. */
+    CUI_EVENT_POINTER_ENTER,
+    CUI_EVENT_POINTER_LEAVE
 } cui_event_type;
 /* Targeted semantic actions, independent of pointer or keyboard input. */
 typedef enum { CUI_ACCESSIBILITY_FOCUS, CUI_ACCESSIBILITY_ACTIVATE } cui_accessibility_action;
@@ -520,6 +524,7 @@ typedef struct {
     float opacity;
     double frame_time;
     float frame_delta;
+    bool pointer_present; /* Host presence; pointer_valid additionally requires known position. */
 } cui_prepaint_info;
 typedef bool (*cui_prepaint_fn)(const cui_prepaint_info *, const void *, cui_prepaint_writer *);
 typedef struct {
@@ -5920,7 +5925,7 @@ struct cui_context {
     size_t string_used;
     cui_id focus, capture, space_capture;
     float pointer_x, pointer_y, dt;
-    bool pointer_position_known;
+    bool pointer_position_known, pointer_present;
     struct {
         uint64_t id, device;
         float x, y, start_x, start_y;
@@ -5946,6 +5951,10 @@ static __declspec(thread) cui_context *cui_core_paint_context;
 #else
 static _Thread_local cui_context *cui_core_paint_context;
 #endif
+static bool cui_core_pointer_available(const cui_context *ui) {
+    return ui && ui->pointer_position_known && ui->pointer_present && isfinite(ui->pointer_x) &&
+           isfinite(ui->pointer_y);
+}
 static bool cui_core_layout_only(const cui_context *ui) {
     return ui && ui->in_frame && ui->depth && !ui->overflow_depth && ui->opened[ui->depth - 1] &&
            ui->nodes[ui->node_stack[ui->depth - 1]].layout_only;
@@ -6448,6 +6457,8 @@ cui_cursor cui_pointer_cursor(cui_context *ui) {
         return CUI_CURSOR_DEFAULT;
     cui_id id = ui->capture;
     if (!id) {
+        if (!cui_core_pointer_available(ui))
+            return CUI_CURSOR_DEFAULT;
         size_t hit = SIZE_MAX;
         for (size_t i = 0; i < ui->previous_count; i++) {
             const cui_semantic *s = &ui->previous[i];
@@ -6797,6 +6808,8 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
         return false;
     }
+    if (e.type == CUI_EVENT_POINTER_ENTER || e.type == CUI_EVENT_POINTER_LEAVE)
+        e = (cui_event){.type = e.type};
     if (e.type == CUI_EVENT_ACCESSIBILITY_ACTION) {
         if (!cui_core_accessibility_supported(ui, e.accessibility_target, e.accessibility_action)) {
             cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
@@ -6893,6 +6906,15 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     for (size_t i = 0; i < ui->event_count; i++) {
         cui_event e = ui->events[i];
         ui->event_previous_focus[i] = ui->focus;
+        if (e.type == CUI_EVENT_POINTER_ENTER || e.type == CUI_EVENT_POINTER_LEAVE) {
+            ui->pointer_present = e.type == CUI_EVENT_POINTER_ENTER;
+            ui->event_targets[i] = 0;
+            ui->event_touch_owners[i] = 0;
+            ui->event_activations[i] = 0;
+            ui->event_activation_slots[i] = SIZE_MAX;
+            ui->event_consumed[i] = true;
+            continue;
+        }
         if (e.pointer_type == CUI_POINTER_TOUCH &&
             (e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_MOVE ||
              e.type == CUI_EVENT_POINTER_UP) &&
@@ -6900,6 +6922,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
             ui->pointer_position_known = true;
+            ui->pointer_present = true;
         }
         cui_id gesture_target = 0;
         cui_id before_capture = ui->capture;
@@ -7025,6 +7048,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->pointer_x = e.x;
             ui->pointer_y = e.y;
             ui->pointer_position_known = true;
+            ui->pointer_present = true;
         }
         if (e.type == CUI_EVENT_POINTER_DOWN && e.pointer_button == CUI_POINTER_PRIMARY) {
             cui_id hit = cui_core_hit(ui, e.x, e.y), target = hit;
@@ -7778,7 +7802,8 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
     }
     cui_rect bounds = cui_bounds(ui, id);
     if (!disabled) {
-        out.hovered = cui_core_inside(bounds, ui->pointer_x, ui->pointer_y);
+        out.hovered =
+            cui_core_pointer_available(ui) && cui_core_inside(bounds, ui->pointer_x, ui->pointer_y);
         out.pressed = ui->capture == id || ui->space_capture == id;
         out.focused = ui->focus == id;
         out.focus_visible = out.focused && ui->focus_visible;
@@ -8108,7 +8133,7 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
             g->clip = cui_core_prepaint_intersection(g->clip, g->bounds);
         g->visible = cui_core_prepaint_intersection(g->bounds, g->clip);
         if (g->found && g->modal_allowed && !ui->nodes[i].layout_only &&
-            ui->nodes[i].hover_hitbox && ui->pointer_position_known &&
+            ui->nodes[i].hover_hitbox && cui_core_pointer_available(ui) &&
             cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
             cui_core_prepaint_above(ui, i, hit)) {
             hit = i;
@@ -8132,6 +8157,7 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
             continue;
         cui_core_geometry *g = &ui->geometry[n];
         if (g->found && !ui->nodes[n].inert && !ui->nodes[n].layout_only && g->modal_allowed &&
+            cui_core_pointer_available(ui) &&
             cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y) &&
             cui_core_prepaint_above(ui, n, hit)) {
             hit = n;
@@ -8142,24 +8168,24 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
         cui_core_prepaint *p = &ui->prepaints[i];
         cui_core_box_node *n = &ui->nodes[p->node];
         cui_core_geometry *g = &ui->geometry[p->node];
-        p->info = (cui_prepaint_info){
-            .owner = n->id,
-            .bounds = g->bounds,
-            .clip = g->clip,
-            .visible_bounds = g->visible,
-            .pointer_x = ui->pointer_x,
-            .pointer_y = ui->pointer_y,
-            .pointer_valid =
-                ui->pointer_position_known && isfinite(ui->pointer_x) && isfinite(ui->pointer_y),
-            .pointer_inside = ui->pointer_position_known && g->found &&
-                              cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y),
-            .modal_allowed = g->modal_allowed,
-            .inert = n->inert || !g->found,
-            .pointer_hit = hit_id,
-            .capture = ui->capture,
-            .opacity = n->opacity,
-            .frame_time = ui->frame_time,
-            .frame_delta = ui->dt};
+        p->info = (cui_prepaint_info){.owner = n->id,
+                                      .bounds = g->bounds,
+                                      .clip = g->clip,
+                                      .visible_bounds = g->visible,
+                                      .pointer_x = ui->pointer_x,
+                                      .pointer_y = ui->pointer_y,
+                                      .pointer_valid = cui_core_pointer_available(ui),
+                                      .pointer_inside =
+                                          cui_core_pointer_available(ui) && g->found &&
+                                          cui_core_inside(g->visible, ui->pointer_x, ui->pointer_y),
+                                      .modal_allowed = g->modal_allowed,
+                                      .inert = n->inert || !g->found,
+                                      .pointer_hit = hit_id,
+                                      .capture = ui->capture,
+                                      .opacity = n->opacity,
+                                      .frame_time = ui->frame_time,
+                                      .frame_delta = ui->dt,
+                                      .pointer_present = ui->pointer_present};
         p->info.pointer_visible =
             p->info.pointer_inside && p->info.modal_allowed && !p->info.inert && hit == p->node;
     }
@@ -9084,7 +9110,7 @@ bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
 }
 
 bool cui_hover_within(cui_context *ui, cui_id scope) {
-    if (!ui || !scope || cui_core_inert(ui))
+    if (!ui || !scope || cui_core_inert(ui) || !cui_core_pointer_available(ui))
         return false;
     for (size_t i = 0; i < ui->focus_scope_count; i++)
         if (ui->focus_scopes[i].id == scope && !ui->focus_scopes[i].active)
@@ -9225,7 +9251,7 @@ bool cui_pressed(cui_context *ui, cui_id id) {
 }
 
 bool cui_hovered(cui_context *ui, cui_id id) {
-    if (!ui || !id || cui_core_inert(ui))
+    if (!ui || !id || cui_core_inert(ui) || !cui_core_pointer_available(ui))
         return false;
     for (size_t i = 0; i < ui->previous_count; i++)
         if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i) &&

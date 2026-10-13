@@ -303,9 +303,8 @@ typedef struct {
  * implicit zoom/pan or per-shape hit testing. */
 cui_plot_result cui_plot_view(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_view_options *);
-/* Portable PlotElement composition seam. Host supplies CURRENT global bounds,
- * live pointer and occlusion-aware hover; Core has no prepaint/current-hitbox
- * query. Bounds must match this frame's plot layout and bitmap extent. */
+/* Portable PlotElement composition seam. Legacy hosts supply current global
+ * bounds/pointer/hover. Explicit current-frame paint uses Core after layout. */
 typedef struct {
     cui_id owner;
     cui_plot_cursor_memory cursor;
@@ -317,6 +316,7 @@ typedef struct {
     uint64_t generation, last_frame, scope_identity;
     cui_plot_appear_registry *scope;
     bool has_frame, has_generation;
+    cui_rect current_bounds; /* last successful current-frame paint; activation coordinates */
 } cui_plot_element_state;
 typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
                                                cui_plot_rect current_bounds,
@@ -324,6 +324,10 @@ typedef cui_plot_result (*cui_plot_resolve_fn)(cui_plot_point relative_cursor,
 typedef void (*cui_plot_compose_fn)(cui_context *, cui_id owner, const cui_theme *,
                                     const cui_plot_hover_memory *hover,
                                     cui_plot_rect current_bounds, void *user);
+/* Immutable current-frame geometry; writer is callback-local. No layout/input
+ * mutations. Return false to discard emitted output. User remains borrowed. */
+typedef bool (*cui_plot_paint_fn)(const cui_prepaint_info *, cui_prepaint_writer *,
+                                  const cui_theme *, const cui_plot_hover_memory *, void *user);
 typedef void (*cui_plot_appear_fn)(cui_id owner, const cui_plot_appear_value *, void *user);
 typedef struct {
     cui_plot_rect bounds;
@@ -346,6 +350,12 @@ typedef struct {
      * sampler pointers; use motion_appear_stagger with explicit policy later. */
     bool custom_motion;
     cui_plot_motion_policy motion; /* pointer policy is used by host marks via follow */
+    /* AUTO preserves explicit host geometry and layout callbacks. New paint-only
+     * zero-bounds options select Core. CURRENT_FRAME rejects layout callbacks and
+     * touch; legacy touch hosts retain their explicit cursor contract. */
+    cui_plot_interaction_mode interaction_mode;
+    cui_plot_paint_fn paint_marks, paint_tooltip;
+    size_t paint_command_budget; /* combined custom commands1..4096 when callbacks set */
 } cui_plot_element_options;
 /* Zero-init state. Owner change resets it. Resolver is synchronous preflight:
  * OK supplies relative datum/dots, EMPTY supplies none; it must not compose UI
@@ -364,7 +374,11 @@ typedef struct {
  * suppresses datum resolution while its LINEAR time<1 and combines redraw flags.
  * Generation/rekey/frame gap restarts; active scope remembers only completed
  * generations. Default appear duration0/reduced motion complete immediately.
- * No implicit prepaint/layout pass, native mesh cache or OS long-press detector. */
+ * CURRENT_FRAME borrows state/data/user until end_frame/renderer completion;
+ * paint callbacks run after layout with immutable occlusion/clip information.
+ * They emit local/deferred commands explicitly; apply hover.progress themselves.
+ * User side effects and bitmap mutations are outside output rollback. No native
+ * mesh cache or OS long-press detector. */
 cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
                                  const cui_plot_view_options *, cui_plot_element_state *,
                                  const cui_plot_element_options *);
@@ -999,7 +1013,8 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
     }
     return CUI_PLOT_OK;
 }
-static cui_plot_result element_appearance(cui_context *ui, cui_id id, cui_plot_element_state *next,
+static cui_plot_result element_appearance(double now, bool reduced, cui_id id,
+                                          cui_plot_element_state *next,
                                           const cui_plot_element_options *o) {
     next->appearance = (cui_plot_appear_value){.time = 1, .progress = 1};
     if (!o->has_appearance) {
@@ -1034,8 +1049,7 @@ static cui_plot_result element_appearance(cui_context *ui, cui_id id, cui_plot_e
         next->appearance = (cui_plot_appear_value){.time = 1, .progress = 1};
     else {
         cui_plot_result result =
-            cui_plot_appear_step(&next->appear_clock, cui_frame_time(ui), o->appear,
-                                 cui_reduced_motion(ui), &next->appearance);
+            cui_plot_appear_step(&next->appear_clock, now, o->appear, reduced, &next->appearance);
         if (result != CUI_PLOT_OK)
             return result;
     }
@@ -1048,7 +1062,7 @@ static cui_plot_result element_appearance(cui_context *ui, cui_id id, cui_plot_e
     }
     return CUI_PLOT_OK;
 }
-static cui_plot_result element_prepare(cui_context *ui, cui_id id,
+static cui_plot_result element_prepare(double now, bool reduced, cui_id id,
                                        const cui_plot_view_options *view,
                                        cui_plot_element_state *next,
                                        const cui_plot_element_options *o) {
@@ -1070,7 +1084,7 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
     }
     if (next->owner != id)
         *next = (cui_plot_element_state){.owner = id};
-    cui_plot_result result = element_appearance(ui, id, next, o);
+    cui_plot_result result = element_appearance(now, reduced, id, next, o);
     if (result != CUI_PLOT_OK)
         return result;
     if (o->on_appear)
@@ -1110,9 +1124,8 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
         has_live = result == CUI_PLOT_OK;
     }
     cui_plot_motion_value motion;
-    result =
-        cui_plot_transition_step(&next->transition, has_live ? 1 : 0, cui_frame_time(ui),
-                                 has_live ? o->enter : o->exit, cui_reduced_motion(ui), &motion);
+    result = cui_plot_transition_step(&next->transition, has_live ? 1 : 0, now,
+                                      has_live ? o->enter : o->exit, reduced, &motion);
     if (result != CUI_PLOT_OK)
         return result;
     next->request_frame |= motion.request_frame;
@@ -1121,6 +1134,53 @@ static cui_plot_result element_prepare(cui_context *ui, cui_id id,
                              o->custom_motion ? fmax(0, fmin(1, motion.value)) : motion.value);
     return result;
 }
+typedef struct {
+    cui_plot_view_options view;
+    cui_plot_element_options element;
+    cui_plot_element_state *state;
+    cui_theme theme;
+    bool reduced;
+} plot_prepaint_payload;
+static bool plot_prepaint(const cui_prepaint_info *info, const void *data,
+                          cui_prepaint_writer *writer) {
+    const plot_prepaint_payload *p = data;
+    cui_plot_element_options o = p->element;
+    o.bounds =
+        (cui_plot_rect){info->bounds.x, info->bounds.y, (double)info->bounds.x + info->bounds.w,
+                        (double)info->bounds.y + info->bounds.h};
+    o.pointer = info->pointer_valid ? (cui_plot_point){info->pointer_x, info->pointer_y}
+                                    : (cui_plot_point){info->bounds.x, info->bounds.y};
+    o.hovered = info->pointer_valid && info->pointer_visible;
+    cui_plot_element_state next = *p->state;
+    if (element_prepare(info->frame_time, p->reduced, info->owner, &p->view, &next, &o) !=
+        CUI_PLOT_OK)
+        return false;
+    cui_draw_command image = {.type = CUI_DRAW_IMAGE,
+                              .bounds = info->bounds,
+                              .bitmap = {.bitmap = p->view.bitmap, .opacity = 1}};
+    if (!cui_prepaint_emit(writer, &image, false))
+        return false;
+    const cui_plot_hover_memory *hover = next.hover.has_state ? &next.hover : NULL;
+    if (o.paint_marks && !o.paint_marks(info, writer, &p->theme, hover, o.user))
+        return false;
+    if (hover && o.paint_tooltip && info->modal_allowed && !info->inert &&
+        !o.paint_tooltip(info, writer, &p->theme, hover, o.user))
+        return false;
+    next.current_bounds = info->bounds;
+    *p->state = next;
+    if (o.has_appearance && o.appear_scope && next.appearance.time == 1)
+        (void)cui_plot_appear_registry_record(o.appear_scope, info->owner, o.generation, 1);
+    if (next.request_frame)
+        cui_prepaint_request_frame(writer);
+    return true;
+}
+static bool plot_current_frame(const cui_plot_element_options *o) {
+    return o && (o->interaction_mode == CUI_PLOT_INTERACTION_CURRENT_FRAME ||
+                 (o->interaction_mode == CUI_PLOT_INTERACTION_AUTO &&
+                  (o->paint_marks || o->paint_tooltip) && !o->marks && !o->children &&
+                  !o->tooltip && o->bounds.x_min == 0 && o->bounds.y_min == 0 &&
+                  o->bounds.x_max == 0 && o->bounds.y_max == 0));
+}
 static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_theme *theme,
                                       const cui_plot_view_options *o, cui_plot_element_state *state,
                                       const cui_plot_element_options *element) {
@@ -1128,6 +1188,16 @@ static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_them
         (element && element->custom_motion && !cui_plot_motion_valid(&element->motion)) ||
         (!o->name.data && o->name.length) || !cui_bitmap_valid(o->bitmap) ||
         o->bitmap.width > 16384 || o->bitmap.height > 16384)
+        return CUI_PLOT_INVALID;
+    bool current = plot_current_frame(element);
+    if (element &&
+        (element->interaction_mode < CUI_PLOT_INTERACTION_AUTO ||
+         element->interaction_mode > CUI_PLOT_INTERACTION_LEGACY ||
+         element->paint_command_budget > 4096 ||
+         ((element->paint_marks || element->paint_tooltip) && !element->paint_command_budget) ||
+         (current && (element->marks || element->children || element->tooltip || element->touch ||
+                      element->tooltip_layer < 0)) ||
+         (!current && (element->paint_marks || element->paint_tooltip))))
         return CUI_PLOT_INVALID;
     cui_plot_axis_label_geometry geometry[512];
     size_t labels = 0;
@@ -1143,12 +1213,30 @@ static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_them
         if (!state)
             return CUI_PLOT_INVALID;
         next = *state;
-        cui_plot_result result = element_prepare(ui, id, o, &next, element);
-        if (result != CUI_PLOT_OK)
-            return result;
+        if (current) {
+            cui_plot_element_options checked = *element;
+            checked.bounds = (cui_plot_rect){0, 0, o->bitmap.width, o->bitmap.height};
+            checked.pointer = (cui_plot_point){0};
+            checked.hovered = false;
+            checked.resolve = NULL;
+            checked.on_appear = NULL;
+            cui_plot_view_options passive = *o;
+            passive.interactive = false;
+            cui_plot_result result = element_prepare(cui_frame_time(ui), cui_reduced_motion(ui), id,
+                                                     &passive, &next, &checked);
+            if (result != CUI_PLOT_OK)
+                return result;
+        } else {
+            cui_plot_result result =
+                element_prepare(cui_frame_time(ui), cui_reduced_motion(ui), id, o, &next, element);
+            if (result != CUI_PLOT_OK)
+                return result;
+        }
     }
     cui_rect bounds = cui_bounds(ui, id);
-    if (element)
+    if (current)
+        bounds = state->current_bounds;
+    else if (element)
         bounds = (cui_rect){(float)element->bounds.x_min, (float)element->bounds.y_min,
                             (float)o->bitmap.width, (float)o->bitmap.height};
     cui_begin_box(ui, id,
@@ -1159,15 +1247,30 @@ static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_them
     (void)cui_interact(ui, id, CUI_ROLE_IMAGE, o->name, o->disabled, false, 0);
     cui_set_semantic_details(
         ui, id, (cui_semantic_details){.pointer_activatable = o->interactive, .no_focus = true});
-    bool painted = cui_paint_bitmap(ui, id ^ UINT64_C(0xe18a5902),
-                                    (cui_bitmap_paint){.bitmap = o->bitmap, .opacity = 1},
-                                    (cui_box){.width = (float)o->bitmap.width,
-                                              .height = (float)o->bitmap.height,
-                                              .fixed_width = true,
-                                              .fixed_height = true});
+    bool painted;
+    if (current) {
+        plot_prepaint_payload payload = {.view = *o,
+                                         .element = *element,
+                                         .state = state,
+                                         .theme = *theme,
+                                         .reduced = cui_reduced_motion(ui)};
+        painted = cui_set_prepaint(
+            ui, (cui_prepaint_options){.callback = plot_prepaint,
+                                       .payload = &payload,
+                                       .payload_bytes = sizeof payload,
+                                       .command_budget = element->paint_command_budget + 5,
+                                       .hover_hitbox = o->interactive && !o->disabled,
+                                       .deferred_layer = element->tooltip_layer});
+    } else
+        painted = cui_paint_bitmap(ui, id ^ UINT64_C(0xe18a5902),
+                                   (cui_bitmap_paint){.bitmap = o->bitmap, .opacity = 1},
+                                   (cui_box){.width = (float)o->bitmap.width,
+                                             .height = (float)o->bitmap.height,
+                                             .fixed_width = true,
+                                             .fixed_height = true});
     if (o->axis)
         axis_paint(ui, id, theme, o->axis, geometry, labels);
-    if (painted && element) {
+    if (painted && element && !current) {
         *state = next;
         if (element->has_appearance && element->appear_scope && state->appearance.time == 1)
             (void)cui_plot_appear_registry_record(element->appear_scope, id, element->generation,
@@ -1192,7 +1295,7 @@ static cui_plot_result plot_view_impl(cui_context *ui, cui_id id, const cui_them
                 (void)cui_consume_event(ui, i);
             }
     }
-    if (painted && element) {
+    if (painted && element && !current) {
         if (next.request_frame)
             cui_invalidate(ui);
         if (state->hover.has_state && element->tooltip) {

@@ -2,11 +2,11 @@
 
 ## Current priorities — 13 October
 
-Published source `3b28a2c` passes all six framework CI jobs and Pages; all355 HTTPS artifact files match. Actual published Attachment checks pass62/62 across all14 design sizes, both densities and orientations, mobile subtitle pixels and real touch access to offscreen actions.
+Published99ea53f passes all six framework CI jobs and Pages; all369 public files match the artifact and Attachment62/62 passes. No user dependency installation is required.
 
-Next24 compiled checkpoint6e0c4bf passes strict native122/122, sanitizer120/120 and WASI98/98. Native includes GPU/Sokol; sanitizer excludes them. All78 usage snippets compile. The initial broad run after Input changes failed an obsolete vertical-selection assertion; the corrected actual complete78-story run now passes. Attachment62/62, design sizes, Theme preference events, Core prepaint pixels and owner Plot/Chart motion pass. Chart real-time and controlled-clock hover checks pass after repairing early float completion. Mainb640ad6 all six CI jobs pass; Pages failed the now-reproduced Chart scheduling defect. Next24 pushed asf0217a0:5/6 frameworkjobsPASS, Windows privatealignment compilefailure; Pages obsoleteInputassertionfailure. Next25 alignment repair passesnative122/122; corrected broadbrowser78/78 PASS. Freshportable/Windows/publication retries pending. See validation/gallery-next24.txt for failures, repairs and boundaries.
+Frozen Next26 production4cf83db passes native125/125, sanitizer120/120 and WASI101/101, complete78-story browser coverage and78 compiled snippets. Targeted Attachment62/62, touch/pinch, expanded sizes, Checkbox34/34, current-frame Chart/Plot/Core paint, explicit pointer presence, Theme host events and owner motion pass. Controlled Chart exit initially failed a physical wait; bounded frame-clock completion passes with production unchanged. Native includes the five GPU/Sokol/accessibility tests absent from this sanitizer configuration. See validation/gallery-next26.txt for exact evidence and limits.
 
-The feature ledger records278 tested subsets, four implemented subsets and45 not started features (327 total); full family verification remains0/78. Current-frame Plot/Chart consumers, explicit pointer presence/host leave handling and safe whole-value Input edit acceptance continue in explicitly owned isolated worktrees. Only root integrates. No dependency installation is required from the user.
+The ledger records281 tested subsets,4 implemented and44 not_started (329 total);76 tested families,2 implemented and0 fully verified. Only root integrates. Isolated workers implement bounded opt-in point-axis layout, Input CR/LF normalization and Tabs scroll consumption. Their audits remain explicit about unverified devices and incomplete full-family behavior. Next26 publication awaits its own CI and artifact verification.
 
 ## Historical checkpoints
 

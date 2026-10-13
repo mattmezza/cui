@@ -71,24 +71,34 @@ cui_plot_transition_policy cui_plot_motion_transition_adapter(const cui_plot_mot
                                             (void *)p}
              : (cui_plot_transition_policy){0};
 }
-cui_plot_result cui_plot_motion_follow(cui_context *ui, cui_id owner,
-                                       cui_plot_motion_pointer_state *state,
-                                       cui_plot_spring_policy policy, double target, bool entering,
-                                       cui_plot_spring_value *out) {
+cui_plot_result cui_plot_motion_follow_at(cui_id owner, cui_plot_motion_pointer_state *state,
+                                          cui_plot_spring_policy policy, double target, double now,
+                                          bool reduced_motion, bool entering,
+                                          cui_plot_spring_value *out) {
     cui_plot_motion_policy checked = {.pointer = policy};
-    if (!ui || !owner || !state || !out || !cui_plot_motion_valid(&checked))
+    if (!owner || !state || !out || !cui_plot_motion_valid(&checked))
         return CUI_PLOT_INVALID;
     cui_plot_motion_pointer_state next = *state;
     if (next.owner != owner)
         next = (cui_plot_motion_pointer_state){.owner = owner};
     cui_plot_spring_value value;
-    cui_plot_result result = cui_plot_spring_step(&next.clock, target, cui_frame_time(ui), policy,
-                                                  cui_reduced_motion(ui), entering, &value);
+    cui_plot_result result =
+        cui_plot_spring_step(&next.clock, target, now, policy, reduced_motion, entering, &value);
     if (result != CUI_PLOT_OK)
         return result;
     *state = next;
     *out = value;
-    if (value.request_frame)
-        cui_invalidate(ui);
     return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_motion_follow(cui_context *ui, cui_id owner,
+                                       cui_plot_motion_pointer_state *state,
+                                       cui_plot_spring_policy policy, double target, bool entering,
+                                       cui_plot_spring_value *out) {
+    if (!ui)
+        return CUI_PLOT_INVALID;
+    cui_plot_result result = cui_plot_motion_follow_at(
+        owner, state, policy, target, cui_frame_time(ui), cui_reduced_motion(ui), entering, out);
+    if (result == CUI_PLOT_OK && out->request_frame)
+        cui_invalidate(ui);
+    return result;
 }

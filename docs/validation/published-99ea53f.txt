@@ -1,0 +1,10 @@
+Published source: 99ea53fd7b2e5f4702870481816f3519037796e8
+Gallery: https://matteo.merola.co/cui/
+Framework CI: https://github.com/mattmezza/cui/actions/runs/38445393017 (all six jobs successful)
+Pages: https://github.com/mattmezza/cui/actions/runs/38445393068 (build and deploy successful)
+Actual HTTPS artifact comparison: 369/369 files match SHA256.
+Actual published Chromium1208 Attachment: 62/62 cases pass, including all14 sizes, both densities/orientations, subtitle pixels, mobile geometry and actual touch pan/tap on an initially offscreen large-card Open action.
+Pinned Zig0.16.0 was already installed; Pages now places its package directory on PATH for standalone prepaint, owner motion and theme probes. No new user dependency installation is needed.
+Raw logs: /home/matteo/.cache/cui-validation/published-99ea53f-{files.log,attachment.log,attachment.json}
+Saved CI metadata: /home/matteo/.cache/cui-validation/{ci,pages}-99ea53f.json
+Physical mobile devices and full78-family parity remain unverified.

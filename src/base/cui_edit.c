@@ -2948,7 +2948,40 @@ struct cui_edit {
     cui_edit_column_anchor *columns;
     size_t column_capacity, column_count;
     cui_edit_column_snapshot *column_history;
+    cui_edit_acceptance acceptance;
+    bool callback_active, acceptance_violation, acceptance_rejected, acceptance_skip;
 };
+static bool cui_edit_private_callback_guard(const cui_edit *e) {
+    if (!e || !e->callback_active)
+        return false;
+    ((cui_edit *)e)->acceptance_violation = true;
+    return true;
+}
+static bool cui_edit_private_predicate(cui_edit *e, cui_str value) {
+    if (!value.length)
+        return true;
+    e->callback_active = true;
+    bool accepted = e->acceptance.validate(e->acceptance.user, value);
+    e->callback_active = false;
+    return accepted;
+}
+static cui_edit_result cui_edit_private_accept_value(cui_edit *e, cui_str candidate, cui_str old) {
+    if (!e->acceptance.validate || e->config.multiline || e->acceptance_skip)
+        return CUI_EDIT_OK;
+    bool accepted = cui_edit_private_predicate(e, candidate);
+    if (e->acceptance_violation)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!accepted) {
+        bool old_valid = cui_edit_private_predicate(e, old);
+        if (e->acceptance_violation)
+            return CUI_EDIT_INVALID_ARGUMENT;
+        if (old_valid) {
+            e->acceptance_rejected = true;
+            return CUI_EDIT_INVALID_ARGUMENT;
+        }
+    }
+    return CUI_EDIT_OK;
+}
 static bool cui_edit_private_decode(const unsigned char *s, size_t n, size_t *width) {
     if (!n)
         return false;
@@ -3460,6 +3493,8 @@ cui_edit_content cui_edit_get_content(const cui_edit *edit) {
 }
 cui_edit_result cui_edit_set_tokens(cui_edit *edit, const cui_edit_token_span *tokens,
                                     size_t count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || edit->selections ||
         !cui_edit_content_valid((cui_edit_content){cui_edit_get_text(edit), tokens, count}))
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -3570,6 +3605,8 @@ static void cui_edit_private_record(cui_edit *e) {
         e->coalesce_changes = 0;
 }
 void cui_edit_break_coalescing(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return;
     if (e) {
         e->coalesce_active = false;
         e->coalesce_pending = false;
@@ -3638,6 +3675,8 @@ cui_edit *cui_edit_create(cui_edit_config c) {
     return e;
 }
 void cui_edit_destroy(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return;
     if (e) {
         free(e->composition_view);
         free(e->scratch);
@@ -3664,6 +3703,8 @@ cui_str cui_edit_get_text(const cui_edit *e) {
     return e ? (cui_str){e->config.buffer, e->length} : (cui_str){0};
 }
 cui_edit_result cui_edit_select(cui_edit *e, size_t a, size_t p) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!cui_edit_private_boundary(e, a) || !cui_edit_private_boundary(e, p))
@@ -3677,6 +3718,8 @@ cui_edit_result cui_edit_select(cui_edit *e, size_t a, size_t p) {
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_select_atomic(cui_edit *edit, size_t anchor, size_t cursor) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     cui_edit_content content = cui_edit_get_content(edit);
@@ -3743,6 +3786,8 @@ static size_t cui_edit_private_line_end(cui_edit *e, size_t p) {
     return p;
 }
 cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e || m < CUI_EDIT_PREVIOUS || m > CUI_EDIT_UNICODE_WORD_NEXT)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (e->token_count && !cui_edit_content_valid(cui_edit_get_content(e)))
@@ -3877,6 +3922,21 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
         return CUI_EDIT_CAPACITY;
     if (!text.length && start == end)
         return CUI_EDIT_OK;
+    if (e->acceptance.validate && !e->config.multiline && !e->acceptance_skip) {
+        /* The opaque engine knows its entire workspace extent. */
+        uintptr_t source = (uintptr_t)text.data, work = (uintptr_t)e->scratch;
+        if (text.length &&
+            (source >= work ? source - work < e->config.capacity : work - source < text.length))
+            return CUI_EDIT_INVALID_ARGUMENT;
+        memcpy(e->scratch, e->config.buffer, start);
+        if (text.length)
+            memcpy(e->scratch + start, text.data, text.length);
+        memcpy(e->scratch + start + text.length, e->config.buffer + end, e->length - end + 1);
+        cui_edit_result accepted = cui_edit_private_accept_value(
+            e, (cui_str){e->scratch, remaining + text.length}, cui_edit_get_text(e));
+        if (accepted != CUI_EDIT_OK)
+            return accepted;
+    }
     e->preferred_column_valid = false;
     if (text.length == end - start &&
         (!text.length || !memcmp(e->config.buffer + start, text.data, text.length))) {
@@ -3904,6 +3964,8 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_replace_range(cui_edit *e, size_t start, size_t end, cui_str text) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (start > end || !cui_edit_private_boundary(e, start) || !cui_edit_private_boundary(e, end))
@@ -3918,7 +3980,7 @@ static bool cui_edit_private_token_alias(cui_edit *edit, cui_str text) {
                              : buffer - address < text.length;
 }
 static bool cui_edit_private_storage_overlap(const void *a, size_t an, const void *b, size_t bn) {
-    if (!an || !bn)
+    if (!a || !b || !an || !bn)
         return false;
     uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
     return x >= y ? x - y < bn : y - x < an;
@@ -3929,6 +3991,8 @@ size_t cui_edit_selection_history_slots(const cui_edit *edit) {
 cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *storage,
                                            size_t capacity, cui_edit_selection_snapshot *history,
                                            size_t history_slots) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->config.multiline || edit->token_count || edit->columns || !storage ||
         !capacity || capacity > CUI_EDIT_MAX_SELECTIONS || history_slots < edit->slots ||
         (edit->slots && !history) || history_slots > SIZE_MAX / sizeof(*history))
@@ -3954,6 +4018,8 @@ cui_edit_result cui_edit_attach_selections(cui_edit *edit, cui_edit_selection *s
     return CUI_EDIT_OK;
 }
 void cui_edit_detach_selections(cui_edit *edit) {
+    if (cui_edit_private_callback_guard(edit))
+        return;
     if (!edit)
         return;
     cui_edit_detach_columns(edit);
@@ -3963,6 +4029,8 @@ void cui_edit_detach_selections(cui_edit *edit) {
     edit->selection_count = edit->selection_capacity = 0;
 }
 void cui_edit_detach_columns(cui_edit *edit) {
+    if (cui_edit_private_callback_guard(edit))
+        return;
     if (!edit)
         return;
     edit->columns = NULL;
@@ -3977,6 +4045,8 @@ const cui_edit_column_anchor *cui_edit_get_columns(const cui_edit *edit, size_t 
 cui_edit_result cui_edit_attach_columns(cui_edit *edit, cui_edit_column_anchor *storage,
                                         size_t capacity, cui_edit_column_snapshot *history,
                                         size_t history_slots) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->columns || !storage ||
         capacity < edit->selection_capacity || capacity > CUI_EDIT_MAX_SELECTIONS ||
         history_slots < edit->slots || (edit->slots && !history) ||
@@ -4010,6 +4080,8 @@ cui_edit_result cui_edit_attach_columns(cui_edit *edit, cui_edit_column_anchor *
 }
 cui_edit_result cui_edit_set_columns(cui_edit *edit, const cui_edit_column_anchor *input,
                                      size_t count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->columns || !input || count != edit->selection_count ||
         count > edit->column_capacity)
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -4102,6 +4174,8 @@ static cui_edit_result cui_edit_private_normalize_selections(cui_str text,
 }
 cui_edit_result cui_edit_select_many(cui_edit *edit, const cui_edit_selection *input,
                                      size_t count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     cui_edit_selection next[CUI_EDIT_MAX_SELECTIONS];
@@ -4121,6 +4195,8 @@ cui_edit_result cui_edit_select_many(cui_edit *edit, const cui_edit_selection *i
 }
 cui_edit_result cui_edit_select_disjoint(cui_edit *edit, const cui_edit_selection *input,
                                          size_t count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->token_count || !input || !count ||
         count > CUI_EDIT_MAX_SELECTIONS)
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -4252,6 +4328,8 @@ static cui_edit_result cui_edit_private_replace_collection(cui_edit *edit, cui_s
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_replace_selections(cui_edit *edit, cui_str text) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit->coalesce_pending)
@@ -4260,6 +4338,8 @@ cui_edit_result cui_edit_replace_selections(cui_edit *edit, cui_str text) {
                                                false, NULL, true);
 }
 cui_edit_result cui_edit_type_selections(cui_edit *edit, cui_str text) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!text.length || (text.data && memchr(text.data, '\n', text.length)) ||
@@ -4274,12 +4354,16 @@ cui_edit_result cui_edit_type_selections(cui_edit *edit, cui_str text) {
     return result;
 }
 cui_edit_result cui_edit_can_replace_selections(cui_edit *edit, cui_str text) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     return cui_edit_private_replace_collection(edit, text, edit->selections, edit->selection_count,
                                                false, NULL, false);
 }
 cui_edit_result cui_edit_paste_selections(cui_edit *edit, cui_str text) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!cui_edit_valid_utf8(text))
@@ -4307,21 +4391,27 @@ cui_edit_result cui_edit_paste_selections(cui_edit *edit, cui_str text) {
                                                count > 1 && line_count == count ? lines : NULL,
                                                true);
 }
-static bool cui_edit_private_model_overlap(const cui_edit *edit, const void *p, size_t size) {
-    return cui_edit_private_storage_overlap(p, size, edit, sizeof(*edit)) ||
-           cui_edit_private_storage_overlap(p, size, edit->config.buffer, edit->config.capacity) ||
-           cui_edit_private_storage_overlap(p, size, edit->scratch, edit->config.capacity) ||
-           cui_edit_private_storage_overlap(p, size, edit->history,
-                                            edit->slots * edit->config.capacity) ||
-           cui_edit_private_storage_overlap(p, size, edit->states,
-                                            edit->slots * sizeof(*edit->states)) ||
-           cui_edit_private_storage_overlap(p, size, edit->selections,
-                                            edit->selection_capacity * sizeof(*edit->selections)) ||
-           cui_edit_private_storage_overlap(p, size, edit->selection_history,
-                                            edit->slots * sizeof(*edit->selection_history));
+static bool cui_edit_private_model_overlap(const cui_edit *e, const void *p, size_t n) {
+    return cui_edit_private_storage_overlap(p, n, e, sizeof *e) ||
+           cui_edit_private_storage_overlap(p, n, e->config.buffer, e->config.capacity) ||
+           cui_edit_private_storage_overlap(p, n, e->scratch, e->config.capacity) ||
+           cui_edit_private_storage_overlap(p, n, e->history, e->slots * e->config.capacity) ||
+           cui_edit_private_storage_overlap(p, n, e->states, e->slots * sizeof *e->states) ||
+           cui_edit_private_storage_overlap(p, n, e->composition_view,
+                                            e->composition_view_capacity) ||
+           cui_edit_private_storage_overlap(p, n, e->selections,
+                                            e->selection_capacity * sizeof *e->selections) ||
+           cui_edit_private_storage_overlap(p, n, e->selection_history,
+                                            e->slots * sizeof *e->selection_history) ||
+           cui_edit_private_storage_overlap(p, n, e->columns,
+                                            e->column_capacity * sizeof *e->columns) ||
+           cui_edit_private_storage_overlap(p, n, e->column_history,
+                                            e->slots * sizeof *e->column_history);
 }
 cui_edit_result cui_edit_copy_selections(const cui_edit *edit, char *buffer, size_t capacity,
                                          cui_str *output) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->token_count || !buffer || !capacity || !output ||
         cui_edit_private_model_overlap(edit, buffer, capacity) ||
         cui_edit_private_model_overlap(edit, output, sizeof(*output)) ||
@@ -4362,6 +4452,8 @@ size_t cui_edit_selection_capacity(const cui_edit *edit) {
 }
 cui_edit_result cui_edit_add_cursors(cui_edit *edit, const cui_edit_selection *input,
                                      size_t count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || (count && !input) || count > CUI_EDIT_MAX_SELECTIONS ||
         edit->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -4403,6 +4495,8 @@ cui_edit_result cui_edit_add_cursors(cui_edit *edit, const cui_edit_selection *i
 cui_edit_result cui_edit_selection_motion(const cui_edit *edit, cui_edit_selection selection,
                                           cui_edit_motion motion, bool extend,
                                           cui_edit_selection *output) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !output || edit->token_count ||
         cui_edit_private_storage_overlap(output, sizeof(*output), edit, sizeof(*edit)) ||
         cui_edit_private_storage_overlap(output, sizeof(*output), edit->config.buffer,
@@ -4429,6 +4523,8 @@ cui_edit_result cui_edit_selection_motion(const cui_edit *edit, cui_edit_selecti
     return result;
 }
 cui_edit_result cui_edit_move_selections(cui_edit *edit, cui_edit_motion motion, bool extend) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (motion == CUI_EDIT_START || motion == CUI_EDIT_END)
@@ -4443,6 +4539,8 @@ cui_edit_result cui_edit_move_selections(cui_edit *edit, cui_edit_motion motion,
     return cui_edit_select_many(edit, next, edit->selection_count);
 }
 cui_edit_result cui_edit_erase_selections(cui_edit *edit, bool backwards, bool by_word) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections || edit->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     cui_edit_selection ranges[CUI_EDIT_MAX_SELECTIONS];
@@ -4466,6 +4564,8 @@ cui_edit_result cui_edit_erase_selections(cui_edit *edit, bool backwards, bool b
 }
 cui_edit_result cui_edit_erase_selections_interactive(cui_edit *edit, bool backwards,
                                                       bool by_word) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || !edit->selections)
         return CUI_EDIT_INVALID_ARGUMENT;
     bool collapsed = !by_word;
@@ -4489,6 +4589,8 @@ cui_edit_result cui_edit_replace_range_with_token(cui_edit *edit, size_t start, 
                                                   cui_edit_inline_token token,
                                                   cui_edit_token_span *output, size_t capacity,
                                                   size_t *count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || edit->selections || !output || !count || capacity > SIZE_MAX / sizeof(*output) ||
         !cui_edit_content_valid(cui_edit_get_content(edit)) ||
         !cui_edit_private_token_string(token.id, true) ||
@@ -4596,6 +4698,8 @@ cui_edit_result cui_edit_replace_range_with_token(cui_edit *edit, size_t start, 
 cui_edit_result cui_edit_replace_with_token(cui_edit *edit, cui_edit_inline_token token,
                                             cui_edit_token_span *output, size_t capacity,
                                             size_t *count) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     return cui_edit_replace_range_with_token(
@@ -4603,6 +4707,8 @@ cui_edit_result cui_edit_replace_with_token(cui_edit *edit, cui_edit_inline_toke
         edit->anchor > edit->cursor ? edit->anchor : edit->cursor, token, output, capacity, count);
 }
 cui_edit_result cui_edit_set_content(cui_edit *edit, cui_edit_content content) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit || edit->selections || !cui_edit_content_valid(content))
         return CUI_EDIT_INVALID_ARGUMENT;
     bool changes = content.text.length != edit->length ||
@@ -4624,6 +4730,8 @@ cui_edit_result cui_edit_set_content(cui_edit *edit, cui_edit_content content) {
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!e->coalesce_pending)
@@ -4632,6 +4740,8 @@ cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
                                     e->cursor > e->anchor ? e->cursor : e->anchor);
 }
 cui_edit_result cui_edit_type(cui_edit *edit, cui_str text) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!edit)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!text.length || (text.data && memchr(text.data, '\n', text.length)) ||
@@ -4677,6 +4787,8 @@ static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t an
 }
 cui_edit_result cui_edit_indent_selections(cui_edit *e, bool outdent, bool block, size_t tab_size,
                                            bool hard_tabs) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e || !e->selections || !e->config.multiline || e->token_count || !tab_size ||
         tab_size > 4096)
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -4757,6 +4869,8 @@ cui_edit_result cui_edit_indent_selections(cui_edit *e, bool outdent, bool block
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_indent(cui_edit *e, bool outdent, size_t tab_size, bool hard_tabs) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e || !e->config.multiline || !tab_size || tab_size > 4096 || e->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     size_t unit = hard_tabs ? 1 : tab_size;
@@ -4833,6 +4947,8 @@ static cui_edit_result cui_edit_private_erase(cui_edit *e, bool backwards) {
     return cui_edit_private_replace(e, (cui_str){0}, start, end);
 }
 cui_edit_result cui_edit_backspace(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (e->anchor != e->cursor) {
@@ -4846,6 +4962,8 @@ cui_edit_result cui_edit_backspace(cui_edit *e) {
     return result;
 }
 cui_edit_result cui_edit_delete(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (e->anchor != e->cursor) {
@@ -4900,6 +5018,8 @@ static cui_edit_result cui_edit_private_erase_grapheme(cui_edit *e, bool backwar
     return cui_edit_private_replace(e, (cui_str){0}, start, end);
 }
 cui_edit_result cui_edit_backspace_grapheme(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (e->anchor != e->cursor) {
@@ -4913,6 +5033,8 @@ cui_edit_result cui_edit_backspace_grapheme(cui_edit *e) {
     return result;
 }
 cui_edit_result cui_edit_delete_grapheme(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (e->anchor != e->cursor) {
@@ -4941,9 +5063,13 @@ static cui_edit_result cui_edit_private_erase_word(cui_edit *edit, bool backward
     return cui_edit_private_replace(edit, (cui_str){0}, start, end);
 }
 cui_edit_result cui_edit_backspace_word(cui_edit *edit) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     return cui_edit_private_erase_word(edit, true);
 }
 cui_edit_result cui_edit_delete_word(cui_edit *edit) {
+    if (cui_edit_private_callback_guard(edit))
+        return CUI_EDIT_INVALID_ARGUMENT;
     return cui_edit_private_erase_word(edit, false);
 }
 static void cui_edit_private_restore(cui_edit *e) {
@@ -4972,6 +5098,8 @@ static void cui_edit_private_restore(cui_edit *e) {
     }
 }
 cui_edit_result cui_edit_undo(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!e->slots || !e->index)
@@ -4988,6 +5116,8 @@ cui_edit_result cui_edit_undo(cui_edit *e) {
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_redo(cui_edit *e) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (!e->slots || e->index + 1 >= e->count)
@@ -5004,6 +5134,8 @@ cui_edit_result cui_edit_redo(cui_edit *e) {
     return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (v.type == CUI_EVENT_KEY_DOWN && (v.ime_composing || v.prefer_character_input))
@@ -5093,6 +5225,8 @@ cui_edit_result cui_edit_apply_event(cui_edit *e, cui_event v) {
     return r;
 }
 cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, bool disabled) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e || !ui || !id)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (disabled)
@@ -5117,17 +5251,60 @@ cui_edit_result cui_edit_apply_events(cui_edit *e, cui_context *ui, cui_id id, b
     return first;
 }
 
+static void cui_edit_private_compose_candidate(cui_edit *e, char *work, size_t start, size_t end,
+                                               cui_str text) {
+    memcpy(work, e->config.buffer, start);
+    if (text.length)
+        memcpy(work + start, text.data, text.length);
+    memcpy(work + start + text.length, e->config.buffer + end, e->length - end + 1);
+}
+static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit_composition *c,
+                                                           cui_str text, size_t start, size_t end,
+                                                           char *work, size_t capacity,
+                                                           bool commit) {
+    if (!e->acceptance.validate || e->config.multiline)
+        return CUI_EDIT_OK;
+    size_t length = e->length - (end - start) + text.length;
+    if (!work || length >= capacity)
+        return CUI_EDIT_CAPACITY;
+    if (cui_edit_private_storage_overlap(text.data, text.length, work, capacity))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str old = cui_edit_composition_view(e, c);
+    bool rebuild_old = old.data == work && c->active;
+    cui_edit_private_compose_candidate(e, work, start, end, text);
+    bool accepted = cui_edit_private_predicate(e, (cui_str){work, length});
+    if (!accepted && !e->acceptance_violation) {
+        if (rebuild_old) {
+            cui_edit_private_compose_candidate(e, work, c->start, c->end,
+                                               (cui_str){c->buffer, c->length});
+            old = (cui_str){work, c->view_length};
+            if (c->grow_view)
+                old.length = e->composition_view_length;
+        }
+        bool old_valid = cui_edit_private_predicate(e, old);
+        if (old_valid && !e->acceptance_violation)
+            e->acceptance_rejected = true;
+    }
+    /* Defined previous view bytes are restored even when the predicate attempts
+     * forbidden same-model mutation. The eventual accepted operation rebuilds. */
+    if (rebuild_old)
+        cui_edit_private_compose_candidate(e, work, c->start, c->end,
+                                           (cui_str){c->buffer, c->length});
+    if (e->acceptance_violation || e->acceptance_rejected)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (commit)
+        e->acceptance_skip = true;
+    return CUI_EDIT_OK;
+}
 cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c, cui_event v,
                                            bool editable) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (e && c && cui_edit_private_model_overlap(e, c, sizeof *c))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e || !c || !c->buffer || !c->capacity ||
         (!c->grow_view && (!c->view_buffer || !c->view_capacity)))
         return CUI_EDIT_INVALID_ARGUMENT;
-    if (c->grow_view && c->active && e->composition_session != (uintptr_t)c) {
-        c->active = false;
-        c->length = 0;
-        c->view_valid = false;
-        c->buffer[0] = 0;
-    }
     if (cui_edit_private_storage_overlap(c->buffer, c->capacity, e->config.buffer,
                                          e->config.capacity) ||
         cui_edit_private_storage_overlap(c->buffer, c->capacity, c, sizeof(*c)) ||
@@ -5137,6 +5314,16 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
           cui_edit_private_storage_overlap(c->buffer, c->capacity, c->view_buffer,
                                            c->view_capacity))))
         return CUI_EDIT_INVALID_ARGUMENT;
+    if (cui_edit_private_model_overlap(e, c, sizeof *c) ||
+        cui_edit_private_model_overlap(e, c->buffer, c->capacity) ||
+        (c->view_buffer && cui_edit_private_model_overlap(e, c->view_buffer, c->view_capacity)))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (c->grow_view && c->active && e->composition_session != (uintptr_t)c) {
+        c->active = false;
+        c->length = 0;
+        c->view_valid = false;
+        c->buffer[0] = 0;
+    }
     cui_edit_state state = cui_edit_get_state(e);
     if (!editable || v.type == CUI_EVENT_CANCEL || v.type == CUI_EVENT_COMPOSITION_CANCEL ||
         (c->active && (c->revision != state.revision || c->document_anchor != state.anchor ||
@@ -5205,6 +5392,33 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
                 return CUI_EDIT_CAPACITY;
         }
     }
+    if (e->acceptance.validate && !state.multiline &&
+        (v.type == CUI_EVENT_COMPOSITION_UPDATE || v.type == CUI_EVENT_COMPOSITION_COMMIT)) {
+        bool commit = v.type == CUI_EVENT_COMPOSITION_COMMIT;
+        char *work = commit         ? e->scratch
+                     : grown        ? grown
+                     : c->grow_view ? e->composition_view
+                                    : c->view_buffer;
+        size_t capacity = commit         ? e->config.capacity
+                          : grown        ? grown_capacity
+                          : c->grow_view ? e->composition_view_capacity
+                                         : c->view_capacity;
+        size_t gate_start = start, gate_end = end;
+        if (commit && e->token_count) {
+            cui_edit_result normalized = cui_edit_normalize_token_range(
+                cui_edit_get_content(e), start, end, &gate_start, &gate_end);
+            if (normalized != CUI_EDIT_OK) {
+                free(grown);
+                return normalized;
+            }
+        }
+        cui_edit_result accepted = cui_edit_private_accept_composition(
+            e, c, text, gate_start, gate_end, work, capacity, commit);
+        if (accepted != CUI_EDIT_OK) {
+            free(grown);
+            return accepted;
+        }
+    }
     if (v.type == CUI_EVENT_COMPOSITION_COMMIT) {
         cui_edit_break_coalescing(e);
         cui_edit_result r = cui_edit_replace_range(e, start, end, text);
@@ -5249,6 +5463,8 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
 }
 cui_edit_result cui_edit_composition_text(const cui_edit *e, const cui_edit_composition *c,
                                           char *buffer, size_t capacity, cui_str *out) {
+    if (cui_edit_private_callback_guard(e))
+        return CUI_EDIT_INVALID_ARGUMENT;
     if (!e || !c || !buffer || !out)
         return CUI_EDIT_INVALID_ARGUMENT;
     if (cui_edit_private_storage_overlap(buffer, capacity, e->config.buffer, e->config.capacity) ||
@@ -5275,6 +5491,8 @@ cui_edit_result cui_edit_composition_text(const cui_edit *e, const cui_edit_comp
 }
 
 cui_str cui_edit_composition_view(const cui_edit *e, const cui_edit_composition *c) {
+    if (cui_edit_private_callback_guard(e))
+        return (cui_str){0};
     cui_str out = cui_edit_get_text(e);
     if (c && c->active && c->revision == cui_edit_get_state(e).revision) {
         if (c->grow_view) {
@@ -5297,4 +5515,66 @@ cui_edit_state cui_edit_composition_selection(const cui_edit *e, const cui_edit_
         s.anchor = c->start + c->anchor;
     }
     return s;
+}
+
+cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request request,
+                                               cui_edit_acceptance acceptance) {
+    if (!e || cui_edit_private_callback_guard(e) || request.kind < CUI_EDIT_REQUEST_EVENT ||
+        request.kind > CUI_EDIT_REQUEST_COMPOSITION)
+        return (cui_edit_checked_result){CUI_EDIT_INVALID_ARGUMENT, false};
+    if (!acceptance.validate || e->config.multiline) {
+        cui_edit_result legacy;
+        switch (request.kind) {
+        case CUI_EDIT_REQUEST_EVENT:
+            legacy = cui_edit_apply_event(e, request.event);
+            break;
+        case CUI_EDIT_REQUEST_INSERT:
+            legacy = cui_edit_insert(e, request.text);
+            break;
+        case CUI_EDIT_REQUEST_DELETE_SELECTION:
+            legacy = e->anchor == e->cursor ? CUI_EDIT_OK : cui_edit_delete(e);
+            break;
+        case CUI_EDIT_REQUEST_COMPOSITION:
+            legacy =
+                cui_edit_composition_event(e, request.composition, request.event, request.editable);
+            break;
+        default:
+            legacy = CUI_EDIT_INVALID_ARGUMENT;
+            break;
+        }
+        return (cui_edit_checked_result){legacy, false};
+    }
+    cui_edit saved = *e;
+    e->acceptance = acceptance;
+    e->acceptance_violation = e->acceptance_rejected = e->acceptance_skip = false;
+    cui_edit_result result;
+    switch (request.kind) {
+    case CUI_EDIT_REQUEST_EVENT:
+        result = cui_edit_apply_event(e, request.event);
+        break;
+    case CUI_EDIT_REQUEST_INSERT:
+        result = cui_edit_insert(e, request.text);
+        break;
+    case CUI_EDIT_REQUEST_DELETE_SELECTION:
+        result = e->anchor == e->cursor ? CUI_EDIT_OK : cui_edit_delete(e);
+        break;
+    case CUI_EDIT_REQUEST_COMPOSITION:
+        result =
+            cui_edit_composition_event(e, request.composition, request.event, request.editable);
+        break;
+    default:
+        result = CUI_EDIT_INVALID_ARGUMENT;
+        break;
+    }
+    bool rejected = e->acceptance_rejected, violation = e->acceptance_violation;
+    if (rejected || violation || result != CUI_EDIT_OK)
+        *e = saved;
+    else {
+        e->acceptance = saved.acceptance;
+        e->acceptance_violation = saved.acceptance_violation;
+        e->acceptance_rejected = saved.acceptance_rejected;
+        e->acceptance_skip = saved.acceptance_skip;
+    }
+    return (cui_edit_checked_result){rejected && !violation ? CUI_EDIT_OK : result,
+                                     rejected && !violation};
 }

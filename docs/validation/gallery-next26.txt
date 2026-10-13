@@ -1,0 +1,15 @@
+Compiled production source: 4cf83db0ef675a803ca05f9e5a27798b9518a24a
+Portable dist/cui.h SHA256: 3101296780f316d372e2b0f4f63d86f7acbef3e9b4676ee58ab3e3d1f7b263d0
+Warning-enabled native: 125/125 PASS. Includes actual GPU/Sokol and accessibility integrations.
+ASan/UBSan: 120/120 PASS. This configuration does not register GPU/Sokol or the three optional accessibility tests; native covers those five separately.
+WASI Preview1 Zig0.16.0/Wasmtime49.0.0: 101/101 PASS, assertions enabled, bounded80B instruction fuel per suite.
+Actual Chromium1208 full gallery: 78/78 stories PASS, 78/78 displayed snippets compile.
+Attachment: 62/62 PASS; all14 sizes, both densities/orientations, pixels, mobile and actual offscreen-action touch access.
+Actual browser: pointer presence/leave/capture/blur/next click PASS; Core clipping/passive/modal prepaint pixels PASS; current-frame Chart/Plot geometry+tooltip pixels PASS; independent owner motion PASS; Theme semantic import and matchMedia preference events PASS.
+Actual browser: touch scrolling/pinch PASS; all14 design sizes PASS; Checkbox34/34 PASS; Chart real-time hover PASS.
+Controlled Chart exit initially fails a fixed180ms wall-clock assertion. A diagnostic actual browser probe confirms finite exit. Controlled test now requires completion within300ms of its10ms-per-rendered-frame clock; corrected check PASS. Real-time180ms assertion is unchanged. Original failure logs retained; production remains unchanged during proof.
+Root Checkbox test now supplies an actual pointer before expecting hover Tooltip, then advances the existing50ms opening delay; unknown pointer no longer fabricates hover.
+Feature ledger: 329 subsets,281 tested,4 implemented,44 not_started;76 tested families,2 implemented,0 fully verified.
+Limitations: Chart explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks; Plot legacy/AUTO compatibility remains. Pure paint callbacks and tooltip geometry are bounded. Static axis/legend composition, source18px point-axis/default normalization, long-press lifecycle and full78-family parity remain incomplete. Input acceptance is single-line bounded callback behavior; mask/regex/content types/normalization remain separate gaps. Physical OS pointer/window lifecycle and physical mobile devices are unverified.
+Raw logs under /home/matteo/.cache/cui-validation: next26-combined-native-{build,test}.log; next26-asan-{build,test}.log; next26-frozen-{wasi,browser,attachment,chart-prepaint,core-prepaint,pointer-presence,owner-motion,theme}.log; next26-frozen-extra-{0-touch,1-design_sizes,2-checkbox_motion,3-chart_appearance_hover,4-chart_appearance_hover}.log; next26-controlled-{exit-probe,corrected}.log.
+Public publication before this integration:99ea53f, all369 files matched and Attachment62/62 PASS; see published-99ea53f.txt. This document does not claim Next26 is deployed.

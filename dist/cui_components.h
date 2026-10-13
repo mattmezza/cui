@@ -248,6 +248,8 @@ typedef struct {
     cui_align text_align;
     bool delegate_up_down;       /* Composite owns list navigation instead of caret movement. */
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
+    cui_edit_accept_fn validate;
+    void *validate_user; /* See cui_edit_apply_checked: synchronous, nonretaining. */
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
@@ -2248,6 +2250,8 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
                                  .required = options.required,
                                  .invalid = options.invalid,
                                  .clipboard = options.clipboard,
+                                 .validate = options.validate,
+                                 .validate_user = options.validate_user,
                                  .delegate_up_down = options.delegate_up_down,
                                  .hit_test = multiline ? NULL : cui_input_cached_hit_test,
                                  .hit_test_user = &cached_hit});

@@ -94,7 +94,7 @@ typedef struct {
     bool dropdown_caret;
     cui_button_content_fn leading_content, trailing_content, children;
     void *leading_user, *trailing_user, *children_user;
-    float label_width; /* Positive maximum; state enables bounded ellipsis. */
+    float label_width; /* Positive label maximum; constrained labels ellipsize automatically. */
     cui_button_state *state;
     cui_button_click_fn on_click; /* Called once on activation; bool result still reports it. */
     cui_button_hover_fn on_hover; /* Interactive hover edges, requires state. */
@@ -109,6 +109,7 @@ typedef struct {
     bool custom_corners, custom_border_edges;
     cui_corner_radii corner_radii;
     cui_border_edges border_edges; /* Finite nonnegative logical widths. */
+    bool allow_content_overflow;   /* Explicit legacy overflow/wrapping opt-out; default clips. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);

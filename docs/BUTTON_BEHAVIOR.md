@@ -96,3 +96,40 @@ clipped by the canvas. The
 browser uses Chromium CDP touch contacts and actual mouse/keyboard input,
 not direct reducer calls. Native headless tests do not constitute SDL window
 or physical touchscreen coverage.
+
+Constrained labels now use the current frame's laid-out label bounds. A positive
+Button width, a grow width, or a positive `label_width` produces one clipped,
+no-wrap label with a grapheme-boundary prefix and an ellipsis when it fits.
+The original full label remains the semantic name. Leading/trailing artwork,
+text, custom slots and the caret retain their own layout allocation; custom
+content callbacks remain responsible for their internal layout. The content
+clip also contains their paint. FIT buttons retain intrinsic sizing.
+`allow_content_overflow` is an explicit compatibility opt-out for the former
+wrapping/overflow behavior.
+
+Automatic label paint copies the full original bytes into the context's bounded
+frame arena, using `cui_set_prepaint_parts`; it introduces no heap allocation or
+new label-length limit. Borrowed slot resources retain their existing lifetime.
+The optional caller-owned `cui_button_state.label` remains a 256-byte diagnostic
+and compatibility buffer, so its truncated prefix keeps the previous bound.
+Without that state, prefixes are limited by available width and frame capacity.
+Prefixes preserve graphemes, while ellipsis fitting uses separately measured
+prefix and ellipsis widths; this does not claim contextual shaping across the
+join. Font shaping and glyph fallback remain adapter responsibilities.
+
+Arena, command and registration capacity errors remain observable through Core's
+error API and empty failed frame. Accepted callbacks occur during submission,
+before later paint allocation failures; paint failure does not roll back an
+already accepted action. Layout-only ancestry emits no label paint. Inert ancestry
+paints and clips the same content without changing the optional state buffer.
+
+`test_button_label_layout.c` covers fixed/grow current-frame resizing, all 18
+legacy/design sizes in both densities, full semantics, leading/trailing slots,
+caret, caller byte mutation, grapheme prefixes, malformed shapes, bounded arena
+failure/recovery, inert/layout-only behavior and the opt-out. The independent
+`test_button_label_font.c` repeats the matrix with a real caller-opened native
+FreeType/HarfBuzz font; the portable ZWJ case is separate from the native font's
+supported combining-mark case. `test_button_label_layout.py` compiles actual WASM,
+checks Canvas pixels, current-frame widths and ellipsis commands, and dispatches
+real Chromium mouse and CDP touch contacts. These tests close this label-layout
+slice; they do not certify the entire Button family or physical device behavior.

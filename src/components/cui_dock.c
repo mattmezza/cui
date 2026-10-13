@@ -53,7 +53,7 @@ static bool allowed(dock_scene *s, cui_dock_event operation, uint64_t panel,
     cui_dock_request request = {operation, panel, source, destination, index, axis, before};
     return s->options.allow_operation(s->options.policy_user, &request);
 }
-static bool contains(cui_rect b, float x, float y) {
+static bool dock_contains(cui_rect b, float x, float y) {
     return b.w > 0 && b.h > 0 && x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h;
 }
 static void drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
@@ -72,7 +72,7 @@ static void drop_target(dock_scene *s, cui_dock_node node, float x, float y) {
         return;
     }
     cui_rect b = cui_bounds(s->ui, cui_dock_group_id(s->id, node));
-    if (!contains(b, x, y))
+    if (!dock_contains(b, x, y))
         return;
     cui_dock_node source;
     if (!cui_dock_panel_find(s->dock, s->view->drag_key, &source, NULL))
@@ -133,9 +133,9 @@ static void drag_events(dock_scene *s) {
             for (size_t i = 0; i < s->panel_count; ++i) {
                 const cui_dock_panel *panel = &s->panels[i];
                 if (!panel->disabled && cui_dock_panel_find(s->dock, panel->key, NULL, NULL) &&
-                    contains(cui_bounds(s->ui, cui_dock_tab_id(s->id, panel->key)), event.x,
+                    dock_contains(cui_bounds(s->ui, cui_dock_tab_id(s->id, panel->key)), event.x,
                              event.y) &&
-                    !contains(cui_bounds(s->ui, cui_dock_close_id(s->id, panel->key)), event.x,
+                    !dock_contains(cui_bounds(s->ui, cui_dock_close_id(s->id, panel->key)), event.x,
                               event.y)) {
                     v->dragging = true;
                     v->crossed = false;

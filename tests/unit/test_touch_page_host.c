@@ -18,10 +18,15 @@ static void frame(cui_context *ui, cui_touch_page_host *host, scene s) {
         cui_begin_box(ui, 99, (cui_box){.width = 200, .height = 200});
     }
     cui_interact(ui, 10, s.role, cui_string("Control"), s.disabled, false, 0);
-    cui_set_semantic_details(ui, 10, (cui_semantic_details){.touch_drag_priority = s.drag,
-        .gesture_pan = s.viewport, .gesture_zoom = s.viewport, .scrollable = s.scroll,
-        .focusable = s.role == CUI_ROLE_SEPARATOR || s.role == CUI_ROLE_SCROLLBAR,
-        .scroll_y = s.offset, .scroll_max_y = s.scroll ? 100 : 0});
+    cui_set_semantic_details(ui, 10,
+                             (cui_semantic_details){.touch_drag_priority = s.drag,
+                                                    .gesture_pan = s.viewport,
+                                                    .gesture_zoom = s.viewport,
+                                                    .scrollable = s.scroll,
+                                                    .focusable = s.role == CUI_ROLE_SEPARATOR ||
+                                                                 s.role == CUI_ROLE_SCROLLBAR,
+                                                    .scroll_y = s.offset,
+                                                    .scroll_max_y = s.scroll ? 100 : 0});
     cui_begin_box(ui, 10, (cui_box){.width = 200, .height = 200});
     cui_end_box(ui);
     if (s.parent)
@@ -42,8 +47,12 @@ static void frame(cui_context *ui, cui_touch_page_host *host, scene s) {
     assert(cui_last_error(ui) == CUI_OK);
 }
 static void touch(cui_context *ui, cui_event_type type, unsigned id, float y) {
-    assert(cui_queue_event(ui, (cui_event){.type = type, .pointer_type = CUI_POINTER_TOUCH,
-        .pointer_id = id, .pointer_button = CUI_POINTER_PRIMARY, .x = 60, .y = y}));
+    assert(cui_queue_event(ui, (cui_event){.type = type,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = id,
+                                           .pointer_button = CUI_POINTER_PRIMARY,
+                                           .x = 60,
+                                           .y = y}));
 }
 static void check(scene s, bool available) {
     cui_context *ui = cui_create((cui_config){.width = 300, .height = 300});
@@ -56,7 +65,8 @@ static void check(scene s, bool available) {
     touch(ui, CUI_EVENT_POINTER_MOVE, 1, 70);
     frame(ui, &host, s);
     if (cui_touch_page_available(&host, 1) != available)
-        fprintf(stderr, "role=%d modal=%d disabled=%d scroll=%d offset=%g expected=%d\n", s.role,s.modal,s.disabled,s.scroll,s.offset,available);
+        fprintf(stderr, "role=%d modal=%d disabled=%d scroll=%d offset=%g expected=%d\n", s.role,
+                s.modal, s.disabled, s.scroll, s.offset, available);
     assert(cui_touch_page_available(&host, 1) == available);
     cui_touch_page_end(&host, 1);
     touch(ui, CUI_EVENT_CANCEL, 1, 0);

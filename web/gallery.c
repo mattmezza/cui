@@ -41,8 +41,8 @@ static unsigned page_touch_cancels;
 #include <stdlib.h>
 #include <string.h>
 #if defined(__wasm__)
-__attribute__((import_module("host"), import_name("measure"))) extern float
-host_measure(const char *, size_t, float);
+__attribute__((import_module("host"),
+               import_name("measure"))) extern float host_measure(const char *, size_t, float);
 __attribute__((import_module("host"), import_name("measure_styled"))) extern float
 host_measure_styled(const char *, size_t, float, int, int, int, uint32_t);
 __attribute__((import_module("host"), import_name("font_metrics"))) extern int
@@ -2102,7 +2102,9 @@ void gallery_event(int type, float x, float y, int key, unsigned mods, int repea
                                         .pointer_button = (cui_pointer_button)button,
                                         .click_count = click_count});
 }
-unsigned gallery_touch_page_cancels(void) { return page_touch_cancels; }
+unsigned gallery_touch_page_cancels(void) {
+    return page_touch_cancels;
+}
 int gallery_touch_page_available(unsigned pointer_id) {
     return cui_touch_page_available(&page_touch_host, pointer_id);
 }

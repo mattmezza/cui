@@ -11,7 +11,9 @@ typedef struct {
     cui_id target;
     bool active, blocked, move, refused, started;
 } cui_touch_page_contact;
-typedef struct { cui_touch_page_contact contacts[16]; } cui_touch_page_host;
+typedef struct {
+    cui_touch_page_contact contacts[16];
+} cui_touch_page_host;
 
 static inline void cui_touch_page_dispatch(cui_touch_page_host *host, cui_context *ui) {
     size_t count, semantic_count;
@@ -47,15 +49,18 @@ static inline void cui_touch_page_dispatch(cui_touch_page_host *host, cui_contex
                 bool protected = s->details.touch_drag_priority || s->details.gesture_pan ||
                                  s->details.gesture_zoom || s->role == CUI_ROLE_SLIDER ||
                                  s->role == CUI_ROLE_SCROLLBAR || s->role == CUI_ROLE_SEPARATOR;
-                if (protected && (cui_event_target(ui, e) == s->id ||
-                    cui_event_hit_within_scope(ui, e, s->id) ||
-                    ((s->details.gesture_pan || s->details.gesture_zoom) &&
-                     cui_hovered(ui, s->id))))
+                if (protected &&
+                    (cui_event_target(ui, e) == s->id || cui_event_hit_within_scope(ui, e, s->id) ||
+                     ((s->details.gesture_pan || s->details.gesture_zoom) &&
+                      cui_hovered(ui, s->id))))
                     blocked = true;
             }
             host->contacts[slot] = (cui_touch_page_contact){.id = events[e].pointer_id,
-                .device = events[e].pointer_device, .target = cui_event_target(ui, e),
-                .active = true, .blocked = blocked, .started = true};
+                                                            .device = events[e].pointer_device,
+                                                            .target = cui_event_target(ui, e),
+                                                            .active = true,
+                                                            .blocked = blocked,
+                                                            .started = true};
         } else if (slot != 16) {
             cui_touch_page_contact *contact = &host->contacts[slot];
             contact->blocked |= modal;
@@ -92,10 +97,11 @@ static inline void cui_touch_page_finish(cui_touch_page_host *host, cui_context 
         cui_id target = contact->target;
         for (size_t step = 0; target && step < count; step++) {
             for (size_t i = 0; i < count; i++)
-                if (semantics[i].id == target && (semantics[i].details.touch_drag_priority ||
-                    semantics[i].details.gesture_pan || semantics[i].details.gesture_zoom ||
-                    semantics[i].role == CUI_ROLE_SLIDER || semantics[i].role == CUI_ROLE_SCROLLBAR ||
-                    semantics[i].role == CUI_ROLE_SEPARATOR))
+                if (semantics[i].id == target &&
+                    (semantics[i].details.touch_drag_priority || semantics[i].details.gesture_pan ||
+                     semantics[i].details.gesture_zoom || semantics[i].role == CUI_ROLE_SLIDER ||
+                     semantics[i].role == CUI_ROLE_SCROLLBAR ||
+                     semantics[i].role == CUI_ROLE_SEPARATOR))
                     contact->blocked = true;
             target = cui_semantic_parent(ui, target);
         }

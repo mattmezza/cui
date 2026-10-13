@@ -535,8 +535,11 @@ static void full_touch_queue_handoff(void) {
     scene(ui, &theme, &state, options);
     size_t count;
     const cui_event *events = cui_frame_events(ui, &count);
-    assert(count == 257 && events[1].type == CUI_EVENT_SCROLL);
-    assert(events[2].type == CUI_EVENT_CANCEL && cui_event_target(ui, 2) == 101);
+    assert(count == 257 && events[1].type == CUI_EVENT_CANCEL);
+    assert(cui_event_target(ui, 1) == 101 && events[1].pointer_id == 17);
+    assert(events[2].type == CUI_EVENT_SCROLL &&
+           events[2].scroll_phase == CUI_SCROLL_PHASE_STARTED);
+    assert(events[2].dy == -30 && cui_event_target(ui, 2) == 1);
     assert(state.y == 30 && !cui_interaction_state(ui, 101).pressed);
     assert(cui_last_error(ui) == CUI_OK);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,

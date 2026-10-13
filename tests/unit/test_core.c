@@ -2725,6 +2725,46 @@ static void test_touch_lifecycle(void) {
     assert(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
+static void handoff_region(cui_context *ui) {
+    cui_interact(ui, 71, CUI_ROLE_REGION, cui_string("Touch handoff"), false, false, 0);
+    cui_set_semantic_details(
+        ui, 71, (cui_semantic_details){.focusable = true, .scrollable = true, .scroll_max_y = 200});
+    cui_begin_box(ui, 71, (cui_box){.width = 200, .height = 160});
+    cui_end_box(ui);
+}
+static void test_touch_handoff_order(void) {
+    cui_context *ui = make();
+    begin(ui);
+    handoff_region(ui);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_DOWN, 101, 20, 80);
+    begin(ui);
+    handoff_region(ui);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_MOVE, 101, 20, 50);
+    begin(ui);
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    assert(count == 2 && events[0].type == CUI_EVENT_CANCEL);
+    assert(events[0].pointer_type == CUI_POINTER_TOUCH && events[0].pointer_id == 101);
+    assert(cui_event_target(ui, 0) == 71 && !cui_event_consumed(ui, 0));
+    assert(events[1].type == CUI_EVENT_SCROLL &&
+           events[1].scroll_phase == CUI_SCROLL_PHASE_STARTED);
+    assert(events[1].dy == -30 && cui_event_target(ui, 1) == 71);
+    assert(!cui_event_consumed(ui, 1) && !cui_event_activation(ui, 0) &&
+           !cui_event_activation(ui, 1));
+    handoff_region(ui);
+    cui_end_frame(ui);
+    touch(ui, CUI_EVENT_POINTER_UP, 101, 20, 50);
+    begin(ui);
+    events = cui_frame_events(ui, &count);
+    assert(count == 1 && events[0].scroll_phase == CUI_SCROLL_PHASE_ENDED);
+    assert(cui_event_target(ui, 0) == 71 && !cui_event_activation(ui, 0));
+    handoff_region(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 static void test_touch_device_identity(void) {
     cui_context *ui = make();
     begin(ui);
@@ -2991,6 +3031,7 @@ int main(void) {
     test_semantic_parent_query();
     test_touch_extreme_coordinates();
     test_touch_device_identity();
+    test_touch_handoff_order();
     test_touch_modal();
     test_touch_lifecycle();
     test_touch_scroll_chain();

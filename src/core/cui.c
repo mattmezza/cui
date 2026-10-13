@@ -555,7 +555,11 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from,
         }
         if (!node->disabled && d.scrollable &&
             !(event.pointer_type == CUI_POINTER_TOUCH && d.touch_scroll_disabled) &&
-            (can_x || can_y) && ui->previous_layers[i] >= layer) {
+            (can_x || can_y ||
+             (i == touch_owner && event.scroll_precise &&
+              (event.scroll_phase == CUI_SCROLL_PHASE_ENDED ||
+               event.scroll_phase == CUI_SCROLL_PHASE_CANCELLED))) &&
+            ui->previous_layers[i] >= layer) {
             hit = node->id;
             layer = ui->previous_layers[i];
         }
@@ -1032,6 +1036,33 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
             ui->event_activation_slots[i] = ui->activation_count - 1;
         }
+    }
+    /* Routing completes before component reducers run. Present capture loss
+     * before the replacement scroll/gesture event, retaining every event's
+     * target, ownership and activation metadata. Cancelling after STARTED would
+     * otherwise clear the new owner's freshly created gesture state. */
+    for (size_t i = 1; i < ui->event_count; ++i) {
+        if (!touch_cancellations[i])
+            continue;
+        size_t previous = i - 1;
+        cui_event event = ui->events[previous];
+        ui->events[previous] = ui->events[i];
+        ui->events[i] = event;
+        cui_id target = ui->event_targets[previous];
+        ui->event_targets[previous] = ui->event_targets[i];
+        ui->event_targets[i] = target;
+        cui_id owner = ui->event_touch_owners[previous];
+        ui->event_touch_owners[previous] = ui->event_touch_owners[i];
+        ui->event_touch_owners[i] = owner;
+        cui_id activation = ui->event_activations[previous];
+        ui->event_activations[previous] = ui->event_activations[i];
+        ui->event_activations[i] = activation;
+        size_t slot = ui->event_activation_slots[previous];
+        ui->event_activation_slots[previous] = ui->event_activation_slots[i];
+        ui->event_activation_slots[i] = slot;
+        bool consumed = ui->event_consumed[previous];
+        ui->event_consumed[previous] = ui->event_consumed[i];
+        ui->event_consumed[i] = consumed;
     }
     ui->node_count = 0;
     ui->paint_root_count = 0;

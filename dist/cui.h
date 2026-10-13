@@ -40,7 +40,11 @@ typedef enum {
     CUI_EVENT_TEXT,
     CUI_EVENT_SCROLL,
     CUI_EVENT_CANCEL,
-    CUI_EVENT_GESTURE /* Opt-in viewport pan/pinch; scale is relative to previous event. */
+    CUI_EVENT_GESTURE, /* Opt-in viewport pan/pinch; scale is relative to previous event. */
+    CUI_EVENT_COMPOSITION_START,
+    CUI_EVENT_COMPOSITION_UPDATE,
+    CUI_EVENT_COMPOSITION_COMMIT,
+    CUI_EVENT_COMPOSITION_CANCEL
 } cui_event_type;
 typedef enum {
     CUI_KEY_NONE,
@@ -120,6 +124,11 @@ typedef struct {
     bool repeat;
     cui_pointer_button pointer_button; /* Zero preserves primary-button initializers. */
     char text[64];
+    /* Optional UTF-8 payload. Queue copies bytes; dispatched storage lives until
+     * next begin_frame. Selection offsets are UTF-8 bytes in preedit. */
+    const char *text_data;
+    size_t text_length, composition_anchor, composition_cursor;
+    cui_id composition_target; /* Optional originating focus; stale host updates are dropped. */
     /* Optional host gesture metadata. Zero preserves legacy wheel steps.
      * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
     bool scroll_precise;
@@ -394,6 +403,7 @@ typedef struct {
     /* Context resources: zero selects 128 slots and 1 MiB of payload storage.
      * Nested allocations owned by payloads require their own explicit limits. */
     size_t max_resources, resource_bytes;
+    size_t event_text_bytes;          /* Aggregate queued payload bound; zero = 65536. */
     cui_font_metrics_fn font_metrics; /* Optional; shares measure_user. */
 } cui_config;
 cui_str cui_string(const char *s);
@@ -557,6 +567,9 @@ void *cui_resource_get(cui_context *, cui_id owner, cui_id namespace_id, size_t 
                        cui_resource_fn collect, cui_resource_fn destroy);
 float cui_frame_delta(cui_context *);
 double cui_frame_time(cui_context *);
+/* Host candidate-window rectangle, logical pixels, last painted focused caret. */
+void cui_set_text_input_rect(cui_context *, cui_id, cui_rect);
+bool cui_text_input_rect(const cui_context *, cui_rect *);
 bool cui_reduced_motion(cui_context *);
 void cui_set_reduced_motion(cui_context *, bool);
 #ifdef __cplusplus
@@ -5725,6 +5738,8 @@ struct cui_context {
     size_t id_count, activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_DISPATCH_MAX];
     size_t queued_count, event_count;
+    char *queued_text[CUI_CORE_EVENT_MAX], *frame_text[CUI_CORE_EVENT_MAX];
+    size_t queued_text_bytes;
     bool event_consumed[CUI_CORE_DISPATCH_MAX];
     cui_id event_targets[CUI_CORE_DISPATCH_MAX], event_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_touch_owners[CUI_CORE_DISPATCH_MAX];
@@ -5744,6 +5759,8 @@ struct cui_context {
         bool active, primary, dragging, blocked;
     } contacts[16];
     double frame_time;
+    cui_id text_input_owner, composition_owner;
+    cui_rect text_input_bounds;
     bool reduced_motion;
     cui_core_resource *resources;
     size_t resource_bytes;
@@ -5919,6 +5936,8 @@ cui_context *cui_create(cui_config config) {
         free(ui);
         return NULL;
     }
+    if (!config.event_text_bytes)
+        config.event_text_bytes = 65536;
     ui->config = config;
     ui->text_metrics_revision = 1;
     ui->dirty = true;
@@ -5992,6 +6011,10 @@ void cui_destroy(cui_context *ui) {
                 r->destroy(r->payload);
             free(r->payload);
         }
+    for (size_t i = 0; i < CUI_CORE_EVENT_MAX; i++) {
+        free(ui->queued_text[i]);
+        free(ui->frame_text[i]);
+    }
     free(ui->scroll_gestures);
     free(ui->previous_scroll_gestures);
     free(ui->resources);
@@ -6172,7 +6195,11 @@ static cui_id cui_core_scroll_hit(cui_context *ui, cui_event event, size_t from,
         }
         if (!node->disabled && d.scrollable &&
             !(event.pointer_type == CUI_POINTER_TOUCH && d.touch_scroll_disabled) &&
-            (can_x || can_y) && ui->previous_layers[i] >= layer) {
+            (can_x || can_y ||
+             (i == touch_owner && event.scroll_precise &&
+              (event.scroll_phase == CUI_SCROLL_PHASE_ENDED ||
+               event.scroll_phase == CUI_SCROLL_PHASE_CANCELLED))) &&
+            ui->previous_layers[i] >= layer) {
             hit = node->id;
             layer = ui->previous_layers[i];
         }
@@ -6397,6 +6424,24 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
         return false;
     }
+    char *copy = NULL;
+    if (e.text_data || e.text_length) {
+        if (!e.text_data || e.text_length > ui->config.event_text_bytes - ui->queued_text_bytes) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            return false;
+        }
+        if (e.text_length) {
+            copy = malloc(e.text_length);
+            if (!copy) {
+                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                return false;
+            }
+            memcpy(copy, e.text_data, e.text_length);
+        }
+        e.text_data = copy;
+        ui->queued_text_bytes += e.text_length;
+    }
+    ui->queued_text[ui->queued_count] = copy;
     ui->queued[ui->queued_count++] = e;
     ui->dirty = true;
     return true;
@@ -6446,6 +6491,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
     }
     memset(ui->event_consumed, 0, sizeof ui->event_consumed);
+    for (size_t i = 0; i < CUI_CORE_EVENT_MAX; i++) {
+        free(ui->frame_text[i]);
+        ui->frame_text[i] = ui->queued_text[i];
+        ui->queued_text[i] = NULL;
+    }
+    ui->queued_text_bytes = 0;
     ui->event_count = ui->queued_count;
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
@@ -6522,6 +6573,22 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                     }
             ui->events[i] = e;
             ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false, touch_owner);
+        }
+        if (e.type >= CUI_EVENT_COMPOSITION_START && e.type <= CUI_EVENT_COMPOSITION_CANCEL &&
+            e.composition_target && e.composition_target != ui->focus) {
+            ui->event_consumed[i] = true;
+            ui->event_targets[i] = 0;
+            continue;
+        }
+        if (e.type == CUI_EVENT_COMPOSITION_START || e.type == CUI_EVENT_COMPOSITION_UPDATE)
+            ui->composition_owner = ui->focus;
+        else if (e.type == CUI_EVENT_COMPOSITION_COMMIT || e.type == CUI_EVENT_COMPOSITION_CANCEL ||
+                 e.type == CUI_EVENT_CANCEL || e.type == CUI_EVENT_POINTER_DOWN)
+            ui->composition_owner = 0;
+        if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) && ui->composition_owner &&
+            ui->composition_owner == ui->focus) {
+            e.ime_composing = true;
+            ui->events[i] = e;
         }
         if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) &&
             (e.ime_composing || e.prefer_character_input)) {
@@ -6609,6 +6676,33 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
             ui->event_activation_slots[i] = ui->activation_count - 1;
         }
+    }
+    /* Routing completes before component reducers run. Present capture loss
+     * before the replacement scroll/gesture event, retaining every event's
+     * target, ownership and activation metadata. Cancelling after STARTED would
+     * otherwise clear the new owner's freshly created gesture state. */
+    for (size_t i = 1; i < ui->event_count; ++i) {
+        if (!touch_cancellations[i])
+            continue;
+        size_t previous = i - 1;
+        cui_event event = ui->events[previous];
+        ui->events[previous] = ui->events[i];
+        ui->events[i] = event;
+        cui_id target = ui->event_targets[previous];
+        ui->event_targets[previous] = ui->event_targets[i];
+        ui->event_targets[i] = target;
+        cui_id owner = ui->event_touch_owners[previous];
+        ui->event_touch_owners[previous] = ui->event_touch_owners[i];
+        ui->event_touch_owners[i] = owner;
+        cui_id activation = ui->event_activations[previous];
+        ui->event_activations[previous] = ui->event_activations[i];
+        ui->event_activations[i] = activation;
+        size_t slot = ui->event_activation_slots[previous];
+        ui->event_activation_slots[previous] = ui->event_activation_slots[i];
+        ui->event_activation_slots[i] = slot;
+        bool consumed = ui->event_consumed[previous];
+        ui->event_consumed[previous] = ui->event_consumed[i];
+        ui->event_consumed[i] = consumed;
     }
     ui->node_count = 0;
     ui->paint_root_count = 0;
@@ -7492,6 +7586,8 @@ cui_core_commands_done:
            ui->semantic_count * sizeof(*ui->scroll_gestures));
     memcpy(ui->previous, ui->semantics, ui->semantic_count * sizeof(*ui->previous));
     ui->previous_count = ui->semantic_count;
+    if (ui->composition_owner != ui->focus)
+        ui->composition_owner = 0;
     ui->in_frame = false;
     return (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
 }
@@ -7533,6 +7629,8 @@ void cui_focus(cui_context *ui, cui_id id) {
                     if (ui->previous[i].id == id && ui->previous[i].details.no_focus)
                         return;
         }
+        if (ui->focus != id)
+            ui->composition_owner = 0;
         ui->focus = id;
         ui->focus_visible = true;
         ui->dirty = true;
@@ -8086,6 +8184,20 @@ bool cui_pointer_position(const cui_context *ui, float *x, float *y) {
         return false;
     *x = ui->pointer_x;
     *y = ui->pointer_y;
+    return true;
+}
+
+void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
+    if (!ui || !owner || !isfinite(bounds.x) || !isfinite(bounds.y) || !isfinite(bounds.w) ||
+        !isfinite(bounds.h) || bounds.w < 0 || bounds.h < 0)
+        return;
+    ui->text_input_owner = owner;
+    ui->text_input_bounds = bounds;
+}
+bool cui_text_input_rect(const cui_context *ui, cui_rect *out) {
+    if (!ui || !out || !ui->focus || ui->focus != ui->text_input_owner)
+        return false;
+    *out = ui->text_input_bounds;
     return true;
 }
 

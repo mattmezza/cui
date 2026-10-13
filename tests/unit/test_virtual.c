@@ -151,8 +151,49 @@ static void benchmark(void) {
     }
     assert(checksum > 0);
 }
+static void test_scroll_alignment(void) {
+    cui_virtual_list *v = cui_virtual_create((cui_virtual_config){8, 20});
+    uint64_t keys[] = {1, 2, 3, 4};
+    double heights[] = {20, 40, 80, 20};
+    assert(v && cui_virtual_rebuild(v, keys, heights, 4) == CUI_VIRTUAL_OK);
+    double out = -1;
+    assert(cui_virtual_scroll_to(v, 2, 40, 0, CUI_VIRTUAL_ALIGN_TOP, &out) == CUI_VIRTUAL_OK);
+    near(out, 60);
+    assert(cui_virtual_scroll_to(v, 2, 40, 0, CUI_VIRTUAL_ALIGN_CENTER, &out) == CUI_VIRTUAL_OK);
+    near(out, 80);
+    assert(cui_virtual_scroll_to(v, 2, 40, 0, CUI_VIRTUAL_ALIGN_BOTTOM, &out) == CUI_VIRTUAL_OK);
+    near(out, 100);
+    assert(cui_virtual_scroll_to(v, 1, 60, 0, CUI_VIRTUAL_ALIGN_NEAREST, &out) == CUI_VIRTUAL_OK);
+    near(out, 0);
+    assert(cui_virtual_scroll_to(v, 1, 40, 80, CUI_VIRTUAL_ALIGN_NEAREST, &out) == CUI_VIRTUAL_OK);
+    near(out, 20);
+    assert(cui_virtual_scroll_to(v, 3, 60, 0, CUI_VIRTUAL_ALIGN_NEAREST, &out) == CUI_VIRTUAL_OK);
+    near(out, 100);
+    assert(cui_virtual_scroll_to(v, 2, 40, 90, CUI_VIRTUAL_ALIGN_NEAREST, &out) == CUI_VIRTUAL_OK);
+    near(out, 60);
+    assert(cui_virtual_scroll_to(v, 3, 300, 0, CUI_VIRTUAL_ALIGN_TOP, &out) == CUI_VIRTUAL_OK);
+    near(out, 0);
+    out = 777;
+    assert(cui_virtual_scroll_to(v, 4, 40, 0, CUI_VIRTUAL_ALIGN_TOP, &out) ==
+               CUI_VIRTUAL_NOT_FOUND &&
+           out == 777);
+    assert(cui_virtual_scroll_to(v, 0, NAN, 0, CUI_VIRTUAL_ALIGN_TOP, &out) ==
+               CUI_VIRTUAL_INVALID &&
+           out == 777);
+    assert(cui_virtual_scroll_to(v, 0, 40, NAN, CUI_VIRTUAL_ALIGN_TOP, &out) ==
+               CUI_VIRTUAL_INVALID &&
+           out == 777);
+    assert(cui_virtual_scroll_to(v, 0, 40, 0, (cui_virtual_alignment)99, &out) ==
+               CUI_VIRTUAL_INVALID &&
+           out == 777);
+    assert(cui_virtual_item_id(10, 0) == cui_virtual_item_id(10, 0));
+    assert(cui_virtual_item_id(10, 0) != cui_virtual_item_id(10, 1));
+    assert(cui_virtual_item_id(10, 0) != cui_virtual_item_id(11, 0));
+    cui_virtual_destroy(v);
+}
 int main(int argc, char **argv) {
     (void)argv;
+    test_scroll_alignment();
     test_boundaries();
     test_random_reference();
     if (argc > 1)

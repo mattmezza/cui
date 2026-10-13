@@ -282,3 +282,33 @@ double cui_virtual_restore_anchor(const cui_virtual_list *v, cui_virtual_anchor 
         cui_virtual_offset(v, i) + fmin(cui_virtual_private_extent(a.within), v->heights[i]);
     return cui_virtual_private_clamp_scroll(v, scroll, viewport);
 }
+
+/* Main-axis alignment is independent from any context or renderer. */
+cui_virtual_result cui_virtual_scroll_to(const cui_virtual_list *v, size_t index, double viewport,
+                                         double current, cui_virtual_alignment align,
+                                         double *output) {
+    if (!v || !output || !isfinite(viewport) || viewport <= 0 || !isfinite(current) ||
+        align < CUI_VIRTUAL_ALIGN_TOP || align > CUI_VIRTUAL_ALIGN_NEAREST)
+        return CUI_VIRTUAL_INVALID;
+    if (index >= v->count)
+        return CUI_VIRTUAL_NOT_FOUND;
+    current = cui_virtual_private_clamp_scroll(v, current, viewport);
+    double top = cui_virtual_offset(v, index), height = v->heights[index];
+    double target = top;
+    if (align == CUI_VIRTUAL_ALIGN_CENTER)
+        target += (height - viewport) / 2;
+    else if (align == CUI_VIRTUAL_ALIGN_BOTTOM)
+        target += height - viewport;
+    else if (align == CUI_VIRTUAL_ALIGN_NEAREST) {
+        if (top >= current && top + height <= current + viewport)
+            target = current;
+        else if (height <= viewport && top >= current)
+            target += height - viewport;
+    }
+    *output = cui_virtual_private_clamp_scroll(v, target, viewport);
+    return CUI_VIRTUAL_OK;
+}
+uint64_t cui_virtual_item_id(uint64_t root, uint64_t key) {
+    uint64_t id = cui_virtual_private_mix(key ^ root ^ UINT64_C(0xa170952df38e2b65));
+    return id ? id : UINT64_C(0x7940e6872b01359a);
+}

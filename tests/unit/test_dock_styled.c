@@ -854,15 +854,30 @@ static void test_panel_menus(void) {
     assert(custom_menu_calls == 1);
     key(CUI_KEY_ESCAPE, 0);
     custom.disabled = false;
+    for (unsigned placement = CUI_DOCK_ZOOM_BOTH; placement <= CUI_DOCK_ZOOM_NONE; ++placement) {
+        panels[0].zoom_control = (cui_dock_zoom_control)placement;
+        frame();
+        assert((cui_bounds(ui, cui_dock_zoom_id(workspace, 0)).w > 0) ==
+               (placement == CUI_DOCK_ZOOM_BOTH || placement == CUI_DOCK_ZOOM_TOOLBAR));
+        click(cui_dock_menu_id(workspace, 0));
+        frame();
+        assert((cui_bounds(ui, cui_dock_menu_action_id(workspace, 0, CUI_DOCK_MENU_ZOOM)).w > 0) ==
+               (placement == CUI_DOCK_ZOOM_BOTH || placement == CUI_DOCK_ZOOM_MENU));
+        key(CUI_KEY_ESCAPE, 0);
+    }
+    panels[0].zoom_control = CUI_DOCK_ZOOM_MENU;
+    frame();
     menu_click(0, CUI_DOCK_MENU_ZOOM);
     assert(result.zoomed);
     frame();
     panels[0].zoomable = false;
+    panels[0].zoom_control = CUI_DOCK_ZOOM_NONE;
     options.disabled = true;
     frame();
     menu_click(0, CUI_DOCK_MENU_ZOOM);
     assert(result.restored);
     options.disabled = false;
+    panels[0].zoom_control = CUI_DOCK_ZOOM_BOTH;
     /* Bulk close veto rejects all eligible removals. Protected/disabled tabs survive. */
     options.allow_operation = close_last_veto;
     options.policy_user = &policy_calls;

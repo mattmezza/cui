@@ -432,6 +432,10 @@ static void dock_render_menu(dock_scene *s, dock_cache *cache, cui_dock_node_inf
     }
 
     for (unsigned i = 0; i < 7; ++i) {
+        if (i == CUI_DOCK_MENU_ZOOM && !s->view->zoomed &&
+            active->zoom_control != CUI_DOCK_ZOOM_BOTH &&
+            active->zoom_control != CUI_DOCK_ZOOM_MENU)
+            continue;
         bool unavailable = disabled;
         if (i == 0)
             unavailable |= !active->closable;
@@ -606,8 +610,11 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
             cui_consume_event(s->ui, i);
         }
     }
+    bool toolbar_zoom = active && active->zoomable &&
+                        (active->zoom_control == CUI_DOCK_ZOOM_BOTH ||
+                         active->zoom_control == CUI_DOCK_ZOOM_TOOLBAR);
     bool controls =
-        active && (active->toolbar || active->zoomable || s->view->zoomed || !s->options.hide_menu);
+        active && (active->toolbar || toolbar_zoom || s->view->zoomed || !s->options.hide_menu);
     float toolbar_height =
         controls ? fminf(s->options.toolbar_height, fmaxf(0, h - s->options.tab_height)) : 0;
     if (controls) {
@@ -628,7 +635,7 @@ static void dock_render_tabs(dock_scene *s, cui_dock_node_info info, dock_cache 
             active->toolbar(s->ui, active->key, active->user);
             cui_end_box(s->ui);
         }
-        if (active->zoomable || s->view->zoomed) {
+        if (toolbar_zoom || s->view->zoomed) {
             bool zoomed = s->view->zoomed;
             if (cui_button_ex(
                     s->ui, cui_dock_zoom_id(s->id, active->key), s->theme,
@@ -813,6 +820,9 @@ cui_dock_view_result cui_dock_view_render(cui_context *ui, cui_id id, const cui_
         size_t used = 0, total = 0;
         if (!dock_custom_menu_valid(id, panels[i].key, panels[i].menu_items, panels[i].menu_count,
                                     0, custom_ids, &used, &total))
+            return invalid;
+        if (panels[i].zoom_control < CUI_DOCK_ZOOM_BOTH ||
+            panels[i].zoom_control > CUI_DOCK_ZOOM_NONE)
             return invalid;
         if (panels[i].title.length && !panels[i].title.data)
             return invalid;
@@ -1511,6 +1521,9 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
         if (region->panel_count > CUI_DOCK_PANEL_LIMIT)
             return invalid;
         for (size_t p = 0; p < region->panel_count; ++p) {
+            if (region->panels[p].zoom_control < CUI_DOCK_ZOOM_BOTH ||
+                region->panels[p].zoom_control > CUI_DOCK_ZOOM_NONE)
+                return invalid;
             if (region->panels[p].title.length && !region->panels[p].title.data)
                 return invalid;
             cui_id menu_ids[CUI_DOCK_CUSTOM_MENU_LIMIT];

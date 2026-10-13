@@ -99,6 +99,13 @@ typedef enum {
     CUI_DOCK_MENU_SPLIT_VERTICAL,
     CUI_DOCK_MENU_BALANCE
 } cui_dock_menu_action;
+/* Zero preserves the original adapter's both-controls default. */
+typedef enum {
+    CUI_DOCK_ZOOM_BOTH,
+    CUI_DOCK_ZOOM_MENU,
+    CUI_DOCK_ZOOM_TOOLBAR,
+    CUI_DOCK_ZOOM_NONE
+} cui_dock_zoom_control;
 typedef struct {
     uint64_t key;
     cui_str title;
@@ -111,6 +118,7 @@ typedef struct {
     const struct cui_menu_entry *menu_items;
     size_t menu_count;
     void (*menu_action)(void *user, uint64_t panel, cui_id action);
+    cui_dock_zoom_control zoom_control;
 } cui_dock_panel;
 typedef enum {
     CUI_DOCK_SELECTED,

@@ -1323,6 +1323,31 @@ static void test_area_schema_scene(void) {
            !exported.edge_present[1]);
     cui_dock_workspace_set_version(edges, true, 0);
     assert(cui_dock_workspace_version(edges, &version) && version == 0);
+    cui_dock_schema_node split_children[] = {leaves[0], leaves[1]};
+    cui_dock_schema_node split = {.kind = CUI_DOCK_SCHEMA_STACK,
+                                  .children = split_children,
+                                  .child_count = 2};
+    area.center = split;
+    area.edge_present[0] = area.edge_present[1] = area.edge_present[2] = false;
+    assert(cui_dock_workspace_schema_import(edges, regions, &area, area_scene_key, NULL) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_workspace_schema_export(edges, regions, area_scene_dump, leaves, buffers,
+                                            &exported) == CUI_DOCK_OK);
+    assert(exported.center.kind == CUI_DOCK_SCHEMA_STACK && exported.center.size_count == 2 &&
+           exported.center.sizes[0] == 100 && exported.center.sizes[1] == 100);
+    edge_frame();
+    edge_frame();
+    assert(cui_dock_workspace_schema_export(edges, regions, area_scene_dump, leaves, buffers,
+                                            &exported) == CUI_DOCK_OK);
+    assert(exported.center.sizes[0] > 100 && exported.center.sizes[1] > 100);
+    double measured = exported.center.sizes[0] + exported.center.sizes[1];
+    assert(measured > 625 && measured < 645);
+    cui_dock_slot_size stale[] = {{true, 150}, {true, 150}};
+    assert(cui_dock_set_sizes(regions[0].model, cui_dock_root(regions[0].model), stale, 2) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_workspace_schema_export(edges, regions, area_scene_dump, leaves, buffers,
+                                            &exported) == CUI_DOCK_OK);
+    assert(exported.center.sizes[0] + exported.center.sizes[1] == measured);
     for (size_t i = 0; i < 4; i++) {
         cui_dock_view_destroy(regions[i].view);
         cui_dock_destroy(regions[i].model);

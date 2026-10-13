@@ -1603,6 +1603,44 @@ cui_dock_result cui_dock_workspace_schema_import(cui_dock_workspace *state,
             cui_dock_view_reset(regions[i].view);
     return CUI_DOCK_OK;
 }
+static void dock_schema_resolve_sizes(const cui_dock *model, const cui_dock_view *view,
+                                      cui_dock_node id, const cui_dock_schema_node *node,
+                                      cui_dock_schema_buffer *buffer) {
+    cui_dock_node_info info;
+    if (!cui_dock_node_get(model, id, &info) || info.kind == CUI_DOCK_TABS)
+        return;
+    const dock_cache *measured = NULL;
+    if (view && view->model == model)
+        for (size_t c = 0; c < view->count; c++) {
+            const dock_cache *candidate = &view->cache[c];
+            if (candidate->node != id || candidate->child_capacity != info.child_count ||
+                candidate->resize.count != info.child_count)
+                continue;
+            bool same_children = true;
+            for (size_t i = 0; i < info.child_count; i++) {
+                cui_dock_node child;
+                same_children &= cui_dock_child_at(model, id, i, &child, NULL) &&
+                                 candidate->child_geometry[i].node == child;
+            }
+            if (same_children)
+                measured = candidate;
+            break;
+        }
+    for (size_t i = 0; i < info.child_count; i++) {
+        cui_dock_node child;
+        if (!cui_dock_child_at(model, id, i, &child, NULL))
+            continue;
+        double size = node->sizes[i];
+        if (measured) {
+            double screen = measured->child_slots[i].size;
+            if (isfinite(screen) && screen > 0)
+                size = screen;
+        }
+        size_t slot = (size_t)(node->sizes - buffer->sizes) + i;
+        buffer->sizes[slot] = isfinite(size) && size > 0 ? size : 100.0;
+        dock_schema_resolve_sizes(model, view, child, &node->children[i], buffer);
+    }
+}
 cui_dock_result cui_dock_workspace_schema_export(const cui_dock_workspace *state,
                                                  const cui_dock_region_content regions[4],
                                                  cui_dock_schema_dump_fn dump, void *user,
@@ -1620,7 +1658,17 @@ cui_dock_result cui_dock_workspace_schema_export(const cui_dock_workspace *state
                                                    .size = state->snapshot.size[i],
                                                    .open = state->snapshot.open[i]};
     }
-    return cui_dock_schema_area_export_models(models, &metadata, dump, user, buffers, output);
+    cui_dock_result result =
+        cui_dock_schema_area_export_models(models, &metadata, dump, user, buffers, output);
+    if (result == CUI_DOCK_OK && buffers[0].nodes)
+        for (size_t i = 0; i < 4; i++) {
+            if (i && !metadata.edge_present[i - 1])
+                continue;
+            const cui_dock_schema_node *tree = i ? &output->edges[i - 1].panel : &output->center;
+            dock_schema_resolve_sizes(models[i], regions[i].view, cui_dock_root(models[i]), tree,
+                                      &buffers[i]);
+        }
+    return result;
 }
 cui_id cui_dock_region_id(cui_id workspace, cui_dock_region region) {
     if (region < CUI_DOCK_CENTER || region > CUI_DOCK_BOTTOM)

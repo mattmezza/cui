@@ -2166,6 +2166,20 @@ static cui_color cui_core_color(Clay_Color c) {
  * nearest clipping ancestor. That root is painted outside its parent's draw
  * stack, so restore the complete CUI clip ancestry before renderer conversion.
  * Detached portals have parent == SIZE_MAX and retain their escape semantics. */
+static bool cui_core_layout_only_clip(cui_context *ui, const Clay_RenderCommand *command) {
+    if (command->userData)
+        return command->userData == ui;
+    for (int32_t i = 0; i < ui->clay->layoutElementTreeRoots.length; i++) {
+        const Clay__LayoutElementTreeRoot *root =
+            &ui->clay->layoutElementTreeRoots.internalArray[i];
+        const Clay_LayoutElement *element =
+            &ui->clay->layoutElements.internalArray[root->layoutElementIndex];
+        if (root->clipElementId &&
+            Clay__HashNumber(element->id, element->children.length + 10).id == command->id)
+            return element->config.userData == ui;
+    }
+    return false;
+}
 static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderCommand *command,
                                         cui_rect bounds) {
     uint32_t clip_id = command->id;
@@ -2668,7 +2682,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         // nesting depth so layout-only descendants emit neither half of a clip.
         // Inert painted nodes retain ordinary clipping and their paint.
         if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
-            (layout_clip_depth || c->userData == ui)) {
+            (layout_clip_depth || cui_core_layout_only_clip(ui, c))) {
             layout_clip_depth++;
             continue;
         }

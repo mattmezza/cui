@@ -141,6 +141,38 @@ typedef struct {
     bool hide_title_bar; /* Auto single-panel mode; multiple/collapsed tabs remain reachable. */
     bool omit_inner_padding;
 } cui_dock_panel;
+/* Caller-owned reconstruction seam; strings/payloads are borrowed opaque bytes. */
+typedef struct {
+    uint64_t key;
+    cui_str name, payload;
+} cui_dock_panel_state;
+typedef struct {
+    const cui_dock *model;
+    cui_dock_node tab;
+    const cui_dock_panel_state *state;
+} cui_dock_panel_build_context;
+typedef struct cui_dock_panel_factory {
+    cui_str name;
+    void *user;
+    cui_dock_result (*build)(void *, const cui_dock_panel_build_context *, cui_dock_panel *);
+    void (*destroy)(void *, cui_dock_panel *);
+    cui_dock_result (*dump)(void *, const cui_dock_panel *, cui_str *payload);
+} cui_dock_panel_factory;
+typedef struct {
+    cui_dock_panel_state state;
+    cui_dock_panel panel;
+    const cui_dock_panel_factory *factory; /* NULL: unknown-name placeholder. */
+} cui_dock_panel_instance;
+/* Exact key coverage required. On failure output/model are unchanged and staged
+ * successful builds are destroyed. Output must not contain live instances. */
+cui_dock_result cui_dock_panels_reconstruct(const cui_dock *, const cui_dock_panel_state *,
+                                            size_t state_count, const cui_dock_panel_factory *,
+                                            size_t factory_count, cui_dock_panel_instance *,
+                                            size_t capacity);
+/* Dump borrows the factory payload; failure leaves output unchanged. */
+cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *, cui_dock_panel_state *);
+/* Calls factory destroy once, then clears instances. No lifecycle notification. */
+void cui_dock_panels_release(cui_dock_panel_instance *, size_t count);
 typedef enum {
     CUI_DOCK_SELECTED,
     CUI_DOCK_CLOSED,

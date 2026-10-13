@@ -2020,3 +2020,117 @@ cui_dock_workspace_result cui_dock_workspace_render(cui_context *ui, cui_id id,
     cui_end_focus_scope(ui);
     return scene.result;
 }
+
+static bool dock_state_string(cui_str value) {
+    return !value.length || value.data != NULL;
+}
+static bool dock_state_equal(cui_str a, cui_str b) {
+    return a.length == b.length && (!a.length || !memcmp(a.data, b.data, a.length));
+}
+void cui_dock_panels_release(cui_dock_panel_instance *instances, size_t count) {
+    if (!instances)
+        return;
+    for (size_t i = 0; i < count; i++) {
+        if (instances[i].factory && instances[i].factory->destroy)
+            instances[i].factory->destroy(instances[i].factory->user, &instances[i].panel);
+        instances[i] = (cui_dock_panel_instance){0};
+    }
+}
+cui_dock_result cui_dock_panels_reconstruct(const cui_dock *model,
+                                            const cui_dock_panel_state *states, size_t count,
+                                            const cui_dock_panel_factory *factories, size_t nf,
+                                            cui_dock_panel_instance *out, size_t capacity) {
+    if (!model || (count && (!states || !out)) || (nf && !factories) ||
+        count > CUI_DOCK_PANEL_LIMIT || nf > CUI_DOCK_PANEL_LIMIT)
+        return CUI_DOCK_INVALID;
+    if (capacity < count)
+        return CUI_DOCK_CAPACITY;
+    for (size_t i = 0; i < nf; i++) {
+        if (!dock_state_string(factories[i].name) || !factories[i].name.length ||
+            !factories[i].build || !factories[i].destroy)
+            return CUI_DOCK_INVALID;
+        for (size_t j = 0; j < i; j++)
+            if (dock_state_equal(factories[i].name, factories[j].name))
+                return CUI_DOCK_INVALID;
+    }
+    for (size_t i = 0; i < count; i++) {
+        if (!dock_state_string(states[i].name) || !states[i].name.length ||
+            !dock_state_string(states[i].payload))
+            return CUI_DOCK_INVALID;
+        if (!cui_dock_panel_find(model, states[i].key, NULL, NULL))
+            return CUI_DOCK_NOT_FOUND;
+        for (size_t j = 0; j < i; j++)
+            if (states[i].key == states[j].key)
+                return CUI_DOCK_DUPLICATE_PANEL;
+    }
+    size_t leaf_count = 0;
+    cui_dock_result result = cui_dock_layout(model, (cui_rect){0}, 0, NULL, 0, &leaf_count, NULL);
+    if (result != CUI_DOCK_OK)
+        return result;
+    cui_dock_geometry *leaves = calloc(leaf_count, sizeof(*leaves));
+    if (!leaves && leaf_count)
+        return CUI_DOCK_CAPACITY;
+    result = cui_dock_layout(model, (cui_rect){0}, 0, leaves, leaf_count, &leaf_count, NULL);
+    size_t actual = 0;
+    if (result == CUI_DOCK_OK)
+        for (size_t i = 0; i < leaf_count; i++)
+            actual += leaves[i].panel_count;
+    free(leaves);
+    if (result != CUI_DOCK_OK)
+        return result;
+    if (actual != count)
+        return CUI_DOCK_INVALID;
+    if (!count)
+        return CUI_DOCK_OK;
+    cui_dock_panel_instance *staged = calloc(count, sizeof(*staged));
+    if (!staged)
+        return CUI_DOCK_CAPACITY;
+    size_t built = 0;
+    for (; built < count; built++) {
+        staged[built].state = states[built];
+        staged[built].panel = (cui_dock_panel){
+            .key = states[built].key, .title = states[built].name, .closable = true};
+        const cui_dock_panel_factory *factory = NULL;
+        for (size_t j = 0; j < nf; j++)
+            if (dock_state_equal(states[built].name, factories[j].name)) {
+                factory = &factories[j];
+                break;
+            }
+        if (!factory)
+            continue;
+        cui_dock_node tab;
+        cui_dock_panel_find(model, states[built].key, &tab, NULL);
+        cui_dock_panel_build_context context = {model, tab, &states[built]};
+        result = factory->build(factory->user, &context, &staged[built].panel);
+        if (result != CUI_DOCK_OK)
+            break; /* Failed builder must release its own partial resources. */
+        staged[built].factory = factory;
+        if (staged[built].panel.key != states[built].key) {
+            result = CUI_DOCK_INVALID;
+            built++;
+            break;
+        }
+    }
+    if (result == CUI_DOCK_OK)
+        memcpy(out, staged, count * sizeof(*out));
+    else
+        cui_dock_panels_release(staged, built);
+    free(staged);
+    return result;
+}
+cui_dock_result cui_dock_panel_dump(const cui_dock_panel_instance *instance,
+                                    cui_dock_panel_state *out) {
+    if (!instance || !out)
+        return CUI_DOCK_INVALID;
+    cui_dock_panel_state state = instance->state;
+    if (instance->factory && instance->factory->dump) {
+        cui_dock_result result =
+            instance->factory->dump(instance->factory->user, &instance->panel, &state.payload);
+        if (result != CUI_DOCK_OK)
+            return result;
+        if (!dock_state_string(state.payload))
+            return CUI_DOCK_INVALID;
+    }
+    *out = state;
+    return CUI_DOCK_OK;
+}

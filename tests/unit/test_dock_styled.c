@@ -1650,10 +1650,104 @@ static void test_workspace_visibility(void) {
     cui_dock_workspace_destroy(edges);
     visibility_model = NULL;
 }
+static unsigned factory_builds, factory_destroys;
+static uint64_t factory_fail_key = UINT64_MAX;
+static bool factory_dump_fail, factory_wrong_key;
+static cui_dock_result factory_build(void *user, const cui_dock_panel_build_context *context,
+                                     cui_dock_panel *panel) {
+    assert(user == &factory_builds && context->model && context->tab);
+    ++factory_builds;
+    if (context->state->key == factory_fail_key)
+        return CUI_DOCK_CAPACITY;
+    assert(context->state->payload.length == 3 && context->state->payload.data[1] == 0);
+    *panel = (cui_dock_panel){.key = context->state->key,
+                              .title = cui_string("Restored"),
+                              .closable = true,
+                              .render = content};
+    if (factory_wrong_key)
+        panel->key = 888;
+    return CUI_DOCK_OK;
+}
+static void factory_destroy(void *user, cui_dock_panel *panel) {
+    assert(user == &factory_builds && panel->render == content);
+    ++factory_destroys;
+}
+static cui_dock_result factory_dump(void *user, const cui_dock_panel *panel, cui_str *payload) {
+    assert(user == &factory_builds && panel->render == content);
+    if (factory_dump_fail)
+        return CUI_DOCK_INVALID;
+    *payload = cui_string("updated payload");
+    return CUI_DOCK_OK;
+}
+static void test_factory_reconstruction(void) {
+    cui_dock *m = cui_dock_create((cui_dock_config){0});
+    cui_dock_node tab = cui_dock_root(m);
+    assert(cui_dock_insert(m, tab, 0, 0) == CUI_DOCK_OK);
+    assert(cui_dock_insert(m, tab, 1, 1) == CUI_DOCK_OK);
+    const char bytes[] = {'x', 0, 'y'};
+    cui_dock_panel_state states[2] = {{0, cui_string("Known"), {bytes, 3}},
+                                      {1, cui_string("Unknown"), {bytes, 3}}};
+    cui_dock_panel_factory factory = {cui_string("Known"), &factory_builds, factory_build,
+                                      factory_destroy, factory_dump};
+    cui_dock_panel_instance output[2] = {0};
+    output[0].panel.key = 777;
+    char before[4096], after[4096];
+    size_t n;
+    assert(cui_dock_serialize(m, before, sizeof before, &n) == CUI_DOCK_OK);
+    factory_builds = factory_destroys = 0;
+    assert(cui_dock_panels_reconstruct(m, states, 2, &factory, 1, output, 1) == CUI_DOCK_CAPACITY);
+    assert(factory_builds == 0 && output[0].panel.key == 777);
+    assert(cui_dock_panels_reconstruct(m, states, 1, &factory, 1, output, 2) == CUI_DOCK_INVALID);
+    states[1].key = 0;
+    assert(cui_dock_panels_reconstruct(m, states, 2, &factory, 1, output, 2) ==
+           CUI_DOCK_DUPLICATE_PANEL);
+    states[1].key = 1;
+    cui_dock_panel_factory duplicate[2] = {factory, factory};
+    assert(cui_dock_panels_reconstruct(m, states, 2, duplicate, 2, output, 2) == CUI_DOCK_INVALID);
+    assert(factory_builds == 0);
+    states[1].name = cui_string("Known");
+    factory_fail_key = 1;
+    assert(cui_dock_panels_reconstruct(m, states, 2, &factory, 1, output, 2) == CUI_DOCK_CAPACITY);
+    assert(factory_builds == 2 && factory_destroys == 1 && output[0].panel.key == 777);
+    states[1].name = cui_string("Unknown");
+    factory_fail_key = UINT64_MAX;
+    factory_wrong_key = true;
+    assert(cui_dock_panels_reconstruct(m, states, 2, &factory, 1, output, 2) == CUI_DOCK_INVALID);
+    assert(factory_destroys == 2 && output[0].panel.key == 777);
+    factory_wrong_key = false;
+    assert(cui_dock_panels_reconstruct(m, states, 2, &factory, 1, output, 2) == CUI_DOCK_OK);
+    assert(output[0].factory == &factory && !output[1].factory && !output[1].panel.render);
+    cui_dock_panel_state dumped = {.key = 999};
+    factory_dump_fail = true;
+    assert(cui_dock_panel_dump(&output[0], &dumped) == CUI_DOCK_INVALID && dumped.key == 999);
+    factory_dump_fail = false;
+    assert(cui_dock_panel_dump(&output[0], &dumped) == CUI_DOCK_OK && dumped.key == 0);
+    assert(dumped.payload.length == 15 && !memcmp(dumped.payload.data, "updated payload", 15));
+    assert(cui_dock_panel_dump(&output[1], &dumped) == CUI_DOCK_OK && dumped.key == 1);
+    assert(dumped.payload.length == 3 && !memcmp(dumped.payload.data, bytes, 3));
+    cui_dock_panel descriptors[2] = {output[0].panel, output[1].panel};
+    cui_theme theme = cui_theme_light();
+    cui_dock_view *v = cui_dock_view_create(0, 0);
+    unsigned old_rendered = rendered[0];
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    assert(cui_dock_view_render(ui, 9500, &theme, m, v, descriptors, 2,
+                                (cui_dock_view_options){.width = 640, .height = 480})
+               .error == CUI_DOCK_OK);
+    assert(cui_end_frame(ui).count > 0 && rendered[0] == old_rendered + 1);
+    cui_dock_view_destroy(v);
+    assert(cui_dock_serialize(m, after, sizeof after, &n) == CUI_DOCK_OK && !strcmp(before, after));
+    cui_dock_panels_release(output, 2);
+    assert(factory_destroys == 3 && !output[0].factory && !output[0].panel.render);
+    cui_dock_panels_release(output, 2);
+    assert(factory_destroys == 3);
+    cui_dock_destroy(m);
+}
 int main(void) {
     ui = cui_create((cui_config){.width = 640, .height = 480});
     model = cui_dock_create((cui_dock_config){0});
     view = cui_dock_view_create(16, 16);
+    test_factory_reconstruction();
+    memset(rendered, 0, sizeof rendered);
     assert(ui && model && view);
     options = cui_dock_view_options_default();
     options.on_event = event;

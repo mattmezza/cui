@@ -161,7 +161,7 @@ This audit uses the frozen commit above, both Dock `mod.rs` export lists, `websi
 | `TabGroup`, `TabGroupConstraints`, `TabGroupContext`, `TabGroupEvent`, `TabGroupRenderer` | Active selection, close/zoom, focus, drag eligibility, policy vetoes and preview paint. The view has a collapsed-strip mode. Sealed/in-split constructors and a pure per-node constraint callback cover lock, close permission, last-panel preservation and collapse. These optional policies differ from global disabled state, which also blocks ordinary controls. |
 | `AnyDrag`, `DragPanel`, `DropIndicator`, `DropPlaceholderBounds`, `DropTarget`, `DragPanelPreview` | Portable queued tab gestures, cross-group/region transfer, content-edge splits, accepted/rejected target indications and previews. No GPUI entity drag payload or opaque host drag union is needed for CUI events. |
 | Base `Panel`, `PanelView`, `PanelEvent` (component aliases `BasePanel`, `BasePanelView`) | Stable metadata, render callback, closable/zoomable/disabled state, focus target and edit events. Hosts retain user data; dynamic visibility predicate; no automatic added/removed/active lifecycle hook or panel-specific dump callback. |
-| `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. No named factory registry or automatic panel construction from payload JSON. |
+| `PanelRegistry`, `PanelBuildContext`, `register_panel`, `PanelBuilder`, `PanelSource` | Host-supplied borrowed descriptor registry and placeholder for absent keys. Model serialization and edge snapshot are available; host reconstructs content and separately persists panel payloads/schema versions. Named caller-owned factories reconstruct live descriptors and preserve unknown payloads; no automatic JSON schema/parser or Rust state-schema import. |
 | `DockAreaState`, `DockState`, `PanelInfo`, `PanelState` | Portable model text plus validated edge snapshot. Not a compatible encoding of frozen serde states; callback data and focus are transient. |
 | Component `Panel`, `PanelView`, `PanelControl`, `PanelStyle`, `TitleStyle`, `panel_handle`, `DockSkin` | Themed title strings, tabs, toolbar callback, custom Menu trees, SVG controls, four zoom placements and portable scene composition. Title and active title-suffix callbacks compose ordinary CUI controls. Auto/TabBar modes, single-panel title-bar opt-out and multi-panel top-padding override are supported. Per-title chrome colors remain a gap. |
 | Component `ToggleZoom`, `ClosePanel` | Real controls and close shortcut with focus/policy gates; user zoom is withheld when controls are None, and restore stays reachable. No Rust action dispatch registration. |
@@ -289,3 +289,43 @@ cui_dock_result result = cui_dock_set_slot_sizes(model, split, sizes, 3, 4);
 ```
 
 At the measured extent `sum(sizes) + (count - 1) * gap`, layout reproduces the requested sizes unless minima constrain them. At other extents the existing binary ratios govern resizing; use the same gap and adopt new measured sizes when appropriate. This is not absolute-size storage, optional unknown-size distribution or a true n-ary tree. Persisted ratios round-trip through the existing v1 format and older layouts still restore unchanged. Headless tests cover three slots with an opposite-axis subtree, gap geometry, minima precedence, query output on insufficient capacity, invalid-vector rollback and persistence.
+
+
+### Caller-owned panel reconstruction and payloads
+
+The frozen `registry.rs` registry is keyed by persisted panel name, and returns a rich panel view whose `dump` can write updated payloads. An unknown name must retain its original state across load/save. CUI's `cui_dock_panel_factory` provides this seam without a global registry or platform types.
+
+A `cui_dock_panel_state` carries a stable key, factory name and opaque payload bytes. Pass records plus a borrowed factory array to `cui_dock_panels_reconstruct`. Records must cover every model key exactly once; duplicate keys/names, missing keys, incomplete coverage and insufficient output capacity reject before invoking builders. A builder receives the owning model, current tab ID and record, and fills a live `cui_dock_panel` with the same key. Copy each successful instance's `panel` into the contiguous descriptor array passed to `cui_dock_view_render`.
+
+```c
+/* build_editor/destroy_editor/dump_editor use the factory signatures above. */
+cui_dock_panel_factory factories[] = {
+    {cui_string("Editor"), host, build_editor, destroy_editor, dump_editor}
+};
+cui_dock_panel_state records[] = {
+    {42, cui_string("Editor"), cui_string("{\"document\":7}")}
+};
+cui_dock_panel_instance instances[1] = {0};
+cui_dock_result result = cui_dock_panels_reconstruct(
+    model, records, 1, factories, 1, instances, 1);
+if (result == CUI_DOCK_OK) {
+    cui_dock_panel descriptor = instances[0].panel;
+    /* Render with &descriptor/count=1 while all borrowed data stays alive. */
+    (void)descriptor;
+    cui_dock_panel_state saved;
+    if (cui_dock_panel_dump(&instances[0], &saved) == CUI_DOCK_OK) {
+        /* Copy saved.name/payload into the host's persistence envelope. */
+    }
+    cui_dock_panels_release(instances, 1);
+}
+```
+
+Factories supply `build`, `destroy` and optional `dump`. Successful instances retain a borrowed factory pointer. Unknown names produce a descriptor with the original key/title and no content callback, while retaining the exact name/payload bytes, including embedded NULs. A dump callback returns borrowed updated payload bytes; without one, `cui_dock_panel_dump` returns the original payload. A failed dump leaves output untouched. The factory name and key remain the original identity.
+
+Reconstruction stages descriptors before publishing output. On a failed builder or mismatched returned key, successful staged instances are destroyed and output/model remain unchanged. A builder that returns failure must clean up its own partial resources. Builders, destroy and dump callbacks must not mutate the model, registry, records or output arrays, or recursively invoke reconstruction on the same storage. Arbitrary external callback side effects cannot be rolled back.
+
+The caller owns instance storage, descriptors, registry, payload bytes and all factory-created user data. Keep borrowed registry/strings alive until `cui_dock_panels_release`; that function destroys each successful known instance once and clears the array. Do not overwrite live instances with reconstruction. Release descriptors only after the UI no longer references them. Dump payloads remain valid according to the factory's documented lifetime and should be copied into host persistence before it expires.
+
+The v1 layout remains unchanged. Restore the layout first, reconstruct its records into new storage, then publish the model and descriptors together; preserve the old model/instances until both steps succeed. Hosts can wrap the layout, panel records and application schema version in their own JSON or other format. This seam does not parse JSON, import the frozen Rust `PanelState` tree schema, manage application schema migration, or deliver lifecycle notifications.
+
+Headless tests reconstruct and render a real control, dump updated known payloads, retain byte-exact unknown payloads, reject invalid coverage/duplicate registry names before callbacks, roll back a later failed builder and wrong-key builder, preserve serialized layout, and verify destruction occurs once.

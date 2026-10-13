@@ -1,0 +1,27 @@
+{
+  "baseline": "ee9947b4",
+  "source": {"component_commit": "87d10ae5e1299d1be18670a37570c5402f952e34", "dependency": "gpui-pre=0.3.8"},
+  "audit_only": true,
+  "source_runtime_findings": {
+    "mouse": "per-listener down latch; capture cleanup and bubble notification with down/up",
+    "keyboard": "unmodified Enter/Space key-up with focus-generation guard; no stored activation key",
+    "tab": "signed lexicographic group paths, insertion ties, independent tab stop",
+    "touch": "declared TouchClickEvent is not constructed by inspected runtime; taps synthesize MouseDown/Up at release position",
+    "long_press": "separate LongPressEvent runtime path, not proven primary Button click",
+    "first_mouse": "authoritative AppKit accepts_first_mouse state, not Core focus inference",
+    "propagation": "per-raw-event forward capture/reverse bubble listener order"
+  },
+  "recommended_next_slice": "bounded read-only accepted activation snapshot",
+  "proposed_snapshot_slots": 256,
+  "measured_64bit_snapshot_size": 152,
+  "measured_64bit_pointer_sample_size": 48,
+  "measured_64bit_snapshot_storage_bytes": 38912,
+  "measured_wasm32_snapshot_size": 152,
+  "measured_wasm32_pointer_sample_size": 48,
+  "measured_wasm32_snapshot_storage_bytes": 38912,
+  "later_slices": ["opt-in source keyboard policy", "signed tab-group ordering", "opt-in precompose primary activation transaction"],
+  "unchanged_defaults": ["legacy Enter-down", "legacy modifier acceptance", "tab-stop marker", "immediate Button callbacks", "raw single-target activation", "pointer presence and capture", "wheel and touch panning"],
+  "proposal_runtime_verified": false,
+  "physical_device_verified": false,
+  "full_parity": false
+}

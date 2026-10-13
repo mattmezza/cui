@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_bidi.h"
+#include <SheenBidi/SheenBidi.h>
 #include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -210,7 +211,117 @@ static size_t property_conformance(const char *path) {
     return tested;
 }
 
+static void wrapped_lines(void) {
+    /* Mixed Hebrew/Arabic, numbers, paired brackets and an isolate spanning
+     * caller-selected wraps; explicit embedding makes trailing-space L1 visible. */
+    static const uint32_t cps[] = {0x5d0, 0x20,   0x61,  0x62,  0x20, 0x31,  0x32,
+                                   0x28,  0x2067, 0x627, 0x660, 0x20, 0x5d1, 0x2069,
+                                   0x29,  0x202a, 0x63,  0x64,  0x20, 0x20,  0x202c};
+    static const size_t ends[] = {2, 5, 9, 12, 16, 20, 21};
+    char utf8[MAX];
+    size_t n = 0, start = 0;
+    cui_bidi_paragraph *p = NULL, *sentinel;
+    cui_bidi_result result;
+    uint8_t paragraph_levels[MAX];
+    SBCodepointSequence sequence = {SBStringEncodingUTF32, cps, sizeof cps / sizeof cps[0]};
+    SBAlgorithmRef algorithm = SBAlgorithmCreate(&sequence);
+    SBParagraphRef source =
+        SBAlgorithmCreateParagraph(algorithm, 0, sequence.stringLength, SBLevelDefaultLTR);
+    assert(source);
+    for (size_t i = 0; i < sequence.stringLength; ++i)
+        n += encode(cps[i], utf8 + n);
+    assert(cui_bidi_paragraph_create(utf8, n, CUI_BIDI_AUTO_LTR, work, MAX, &p) == CUI_BIDI_OK);
+    /* The reusable object owns text; corrupt both caller buffers after creation. */
+    memset(work, 0, sizeof work);
+    memset(utf8, 0, sizeof utf8);
+    assert(cui_bidi_paragraph_levels(p, paragraph_levels, MAX, &result) == CUI_BIDI_OK);
+    assert(result.scalar_count == sequence.stringLength && result.paragraph_level == 1 &&
+           result.run_count == 0);
+    assert(memcmp(paragraph_levels, SBParagraphGetLevelsPtr(source), sequence.stringLength) == 0);
+    for (size_t l = 0; l < sizeof ends / sizeof ends[0]; ++l) {
+        size_t length = ends[l] - start, visual = 0;
+        SBLineRef line = SBParagraphCreateLine(source, start, length);
+        assert(line);
+        assert(cui_bidi_paragraph_line(p, start, length, levels, map, mirrors, runs, MAX,
+                                       &result) == CUI_BIDI_OK);
+        assert(result.paragraph_level == 1 && result.scalar_count == length &&
+               result.run_count == SBLineGetRunCount(line));
+        for (size_t r = 0; r < result.run_count; ++r) {
+            const SBRun *expected = &SBLineGetRunsPtr(line)[r];
+            assert(runs[r].logical_start == expected->offset &&
+                   runs[r].length == expected->length && runs[r].level == expected->level);
+            for (size_t j = 0; j < expected->length; ++j) {
+                size_t index =
+                    expected->offset + ((expected->level & 1) ? expected->length - 1 - j : j);
+                uint32_t mirror = (expected->level & 1) ? SBCodepointGetMirror(cps[index]) : 0;
+                assert(map[visual] == index && levels[index - start] == expected->level &&
+                       mirrors[visual] == (mirror ? mirror : cps[index]));
+                ++visual;
+            }
+        }
+        assert(visual == length);
+        SBLineRelease(line);
+        start = ends[l];
+    }
+    assert(cui_bidi_paragraph_line(p, 16, 4, levels, map, mirrors, runs, MAX, &result) ==
+           CUI_BIDI_OK);
+    assert(paragraph_levels[18] == 2 && levels[2] == 1 && levels[3] == 1);
+    /* Resolving the Latin continuation as a fresh paragraph changes the base. */
+    assert(cui_bidi_resolve("ab ", 3, CUI_BIDI_AUTO_LTR, work, MAX, levels, map, mirrors, runs, MAX,
+                            &result) == CUI_BIDI_OK &&
+           result.paragraph_level == 0);
+    assert(cui_bidi_paragraph_line(p, 2, 3, levels, map, mirrors, runs, MAX, &result) ==
+               CUI_BIDI_OK &&
+           result.paragraph_level == 1 && levels[2] == 1);
+    {
+        uint8_t before_levels[MAX];
+        size_t before_map[MAX];
+        uint32_t before_mirrors[MAX];
+        cui_bidi_run before_runs[MAX];
+        cui_bidi_result before = result;
+        memcpy(before_levels, levels, sizeof levels);
+        memcpy(before_map, map, sizeof map);
+        memcpy(before_mirrors, mirrors, sizeof mirrors);
+        memcpy(before_runs, runs, sizeof runs);
+        assert(cui_bidi_paragraph_line(p, 2, 3, levels, map, mirrors, runs, 2, &result) ==
+               CUI_BIDI_CAPACITY);
+        assert(cui_bidi_paragraph_line(p, SIZE_MAX, 3, levels, map, mirrors, runs, MAX, &result) ==
+               CUI_BIDI_INVALID);
+        assert(cui_bidi_paragraph_line(p, 0, 0, levels, map, mirrors, runs, MAX, &result) ==
+               CUI_BIDI_INVALID);
+        assert(memcmp(before_levels, levels, sizeof levels) == 0 &&
+               memcmp(before_map, map, sizeof map) == 0 &&
+               memcmp(before_mirrors, mirrors, sizeof mirrors) == 0 &&
+               memcmp(before_runs, runs, sizeof runs) == 0 &&
+               before.scalar_count == result.scalar_count && before.run_count == result.run_count &&
+               before.paragraph_level == result.paragraph_level);
+        assert(cui_bidi_paragraph_levels(p, levels, 0, &result) == CUI_BIDI_CAPACITY);
+        assert(memcmp(before_levels, levels, sizeof levels) == 0 &&
+               before.scalar_count == result.scalar_count && before.run_count == result.run_count &&
+               before.paragraph_level == result.paragraph_level);
+    }
+    sentinel = p;
+    assert(cui_bidi_paragraph_create("a\nb", 3, CUI_BIDI_AUTO_LTR, work, MAX, &sentinel) ==
+               CUI_BIDI_INVALID &&
+           sentinel == p);
+    assert(cui_bidi_paragraph_create("\xed\xa0\x80", 3, CUI_BIDI_AUTO_LTR, work, MAX, &sentinel) ==
+               CUI_BIDI_INVALID &&
+           sentinel == p);
+    assert(cui_bidi_paragraph_create("abc", 3, CUI_BIDI_AUTO_LTR, work, 2, &sentinel) ==
+               CUI_BIDI_CAPACITY &&
+           sentinel == p);
+    cui_bidi_paragraph_destroy(p);
+    cui_bidi_paragraph_destroy(NULL);
+    assert(cui_bidi_paragraph_create(NULL, 0, CUI_BIDI_AUTO_RTL, NULL, 0, &p) == CUI_BIDI_OK);
+    assert(cui_bidi_paragraph_levels(p, NULL, 0, &result) == CUI_BIDI_OK &&
+           result.scalar_count == 0 && result.paragraph_level == 1);
+    cui_bidi_paragraph_destroy(p);
+    SBParagraphRelease(source);
+    SBAlgorithmRelease(algorithm);
+}
+
 int main(int argc, char **argv) {
+    wrapped_lines();
     cui_bidi_result result = {17, 19, 23};
     memset(levels, 42, sizeof levels);
     assert(cui_bidi_resolve("abc", 3, CUI_BIDI_LTR, work, 2, levels, map, mirrors, runs, MAX,

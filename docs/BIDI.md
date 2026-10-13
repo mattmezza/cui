@@ -46,7 +46,7 @@ nesting. Additional checks cover malformed UTF-8, conservative capacities,
 atomic failure, paragraph rejection, empty input and mirroring.
 
 This API does not yet connect to rendering, font fallback, shaping, grapheme
-cluster ordering (L3), wrapped line layout, caret navigation, hit testing, or
+cluster ordering (L3), wrap-position selection, caret navigation, hit testing, or
 selection. In particular, reversing scalar indices in a run is not sufficient
 to render a cluster correctly: shaping and cluster handling must follow. No
 claim of complete international-text rendering parity is made.
@@ -59,3 +59,43 @@ backend objects, so consumers do not need a separate SheenBidi library.
 For manual integration compile `Source/SheenBidi.c` with `SB_CONFIG_UNITY` and private
 include paths `third_party/sheenbidi/Headers` and `third_party/sheenbidi/Source`.
 Only the CUI header is public. Preserve upstream notices and LICENSE in bundles.
+
+## Reusable paragraph and wrapped-line analysis
+
+`cui_bidi_paragraph_create` analyzes the complete paragraph through I2 once,
+copying decoded scalars into an owned immutable object. The caller can reuse both
+input and decoding workspace immediately. `cui_bidi_paragraph_destroy` releases
+the object and backend references; NULL destruction is accepted. No vendor type
+appears in the CUI public API. Creation leaves the output pointer unchanged on
+invalid UTF-8, insufficient workspace, multiple paragraphs, or allocation failure.
+
+`cui_bidi_paragraph_levels` returns the paragraph levels before L1, scalar count,
+and paragraph base. `cui_bidi_paragraph_line` takes a nonempty scalar range inside
+that paragraph and applies L1/L2 to that line using the original paragraph
+analysis. The caller chooses ranges after determining wrap positions. A Latin
+continuation of a Hebrew paragraph consequently retains the Hebrew base;
+resolving the continuation alone with auto direction would change that base.
+Explicit embeddings and isolates crossing a wrap retain their paragraph context.
+Line-local trailing whitespace resets to the paragraph base under L1.
+
+Line output levels use indices relative to the requested range. Mapping entries
+and run logical starts remain absolute paragraph scalar indices. Result scalar
+count is the requested line length. Output capacity needs only that scalar
+length, and every output and result remains unchanged on any failure. Paragraph
+level output capacity needs the paragraph scalar count. Empty paragraphs are
+valid objects but have no nonempty line range. Neither function mutates the
+paragraph, so independent output buffers can be used concurrently, provided
+no thread destroys the object or changes the backend global allocator.
+
+Tests compare paragraph levels and every wrapped-line run, level, mirror and
+visual scalar position with the pinned upstream paragraph/line API, across
+Hebrew, Arabic, numbers, paired brackets, an isolate spanning wraps and explicit
+embeddings. They also verify the L1 trailing-space reset, retained RTL base,
+caller-buffer independence, bounds including SIZE_MAX, insufficient capacities,
+empty objects and atomic preservation of every output buffer.
+
+This adds wrapped-line bidi analysis, not a complete wrapping or shaping system.
+Offsets are scalars, and callers must choose boundaries between whole grapheme
+and shaping clusters. The API does not enforce those boundaries or apply L3.
+Shaping, font fallback, painting, caret/selection and hit testing remain separate
+integration work; no rendering parity is claimed.

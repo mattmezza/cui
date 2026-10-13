@@ -17,3 +17,5 @@ Raw logs/artifacts: /home/matteo/.cache/cui-validation/next24-frozen-{native,asa
 Remaining gaps: automatic Chart/Plot consumers, arbitrary custom tooltip layout, pointer presence after host leave, whole-value Input validation, physical/native platform acceptance and full-family scope. No feature or family marked fully verified.
 
 Frameworkf0217a0 run38442384364:5/6PASS, Windowscompile fails MSVC-C missingmax_align_t; Pages38442384466 fails obsolete single-line vertical selection test. Initial broad-pass claim was incorrect for finalInput source; corrected here and in live reports.
+
+Corrected complete actual browser rerun exit0: all78 stories and all78 compile excerpts PASS against frozen6e0c4bf WASM. Only source-single-line vertical assertions migrated; they now assert identical selection aftercompletedrealkeyboardframes. Raw next24-input-corrected-browser.log.

@@ -2318,6 +2318,90 @@ static void scrollbar_tabs_scene(cui_context *ui, cui_tab_scroll_state *scroll, 
     dropdown_draw = cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
 }
+/* A nested real styled Tab viewport must own only deltas it applies. */
+static void nested_tabs_scene(cui_context *ui, cui_tab_scroll_state *tabs, cui_scroll_state *parent,
+                              bool vertical, bool disabled, bool preconsume) {
+    cui_theme theme = cui_theme_light();
+    const cui_choice_item entries[] = {{10, {"First long tab", 14}, false},
+                                       {20, {"Second long tab", 15}, false},
+                                       {30, {"Third long tab", 14}, false}};
+    cui_id value = 10;
+    cui_scroll_options outer = {.width = 320,
+                                .height = 180,
+                                .content_width = 800,
+                                .content_height = 800,
+                                .horizontal = !vertical,
+                                .vertical = vertical,
+                                .hide_scrollbars = true};
+    assert(cui_begin_frame(ui, 640, 480, .016f));
+    if (preconsume)
+        assert(cui_consume_event(ui, 0));
+    assert(cui_scrollable_begin(ui, 700, &theme, parent, outer));
+    cui_tabs(ui, 1, &theme, entries, 3, &value,
+             (cui_tabs_options){.vertical = vertical,
+                                .disabled = disabled,
+                                .max_width = 100,
+                                .scroll = tabs,
+                                .bar_extent = vertical ? 48 : 110},
+             NULL, NULL);
+    cui_scrollable_end_ex(ui, 700, &theme, parent, outer);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && value == 10);
+}
+static void test_tabs_nested_scroll_consumption(void) {
+    for (int vertical = 0; vertical < 2; vertical++) {
+        for (int precise = 0; precise < 2; precise++) {
+            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            assert(ui);
+            cui_tab_scroll_state tabs = {0};
+            cui_scroll_state parent = {0};
+            for (int frame = 0; frame < 3; frame++)
+                nested_tabs_scene(ui, &tabs, &parent, vertical != 0, false, false);
+            cui_rect bounds = cui_bounds(ui, tabs.receiving_id);
+            cui_event event = {.type = CUI_EVENT_SCROLL,
+                               .x = bounds.x + 2,
+                               .y = bounds.y + 2,
+                               .dx = vertical ? 0 : -1,
+                               .dy = vertical ? -1 : 0,
+                               .scroll_precise = precise != 0};
+            assert(cui_queue_event(ui, event));
+            nested_tabs_scene(ui, &tabs, &parent, vertical != 0, false, false);
+            assert(tabs.offset == (precise ? 1 : 32));
+            assert(cui_event_consumed(ui, 0) && parent.x == 0 && parent.y == 0);
+            float before = tabs.offset;
+            assert(cui_queue_event(ui, event));
+            nested_tabs_scene(ui, &tabs, &parent, vertical != 0, false, true);
+            assert(tabs.offset == before && parent.x == 0 && parent.y == 0);
+            /* Both events route using the old non-boundary snapshot. The second
+             * needs explicit deferral after the first reaches the live edge. */
+            if (vertical)
+                event.dy = -10000;
+            else
+                event.dx = -10000;
+            assert(cui_queue_event(ui, event));
+            event.dx = vertical ? 0 : -1;
+            event.dy = vertical ? -1 : 0;
+            assert(cui_queue_event(ui, event));
+            nested_tabs_scene(ui, &tabs, &parent, vertical != 0, false, false);
+            assert(tabs.offset == tabs.maximum && cui_event_consumed(ui, 0));
+            assert(cui_event_consumed(ui, 1) && cui_event_target(ui, 1) == 700);
+            assert((vertical ? parent.y : parent.x) == (precise ? 1 : 48));
+            cui_destroy(ui);
+        }
+    }
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    assert(ui);
+    cui_tab_scroll_state tabs = {0};
+    cui_scroll_state parent = {0};
+    for (int frame = 0; frame < 3; frame++)
+        nested_tabs_scene(ui, &tabs, &parent, false, true, false);
+    cui_rect bounds = cui_bounds(ui, tabs.receiving_id);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = bounds.x + 2, .y = bounds.y + 2, .dx = -1}));
+    nested_tabs_scene(ui, &tabs, &parent, false, true, false);
+    assert(tabs.offset == 0 && parent.x == 48 && cui_event_consumed(ui, 0));
+    cui_destroy(ui);
+}
 static void test_tab_scrollbars(void) {
     for (int vertical = 0; vertical < 2; vertical++) {
         cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
@@ -4563,6 +4647,7 @@ int main(void) {
     test_dropdown_inner_button_presentation();
     test_tab_reveal_requests();
     test_tab_scrollbars();
+    test_tabs_nested_scroll_consumption();
     test_tab_scrollbar_skin();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);

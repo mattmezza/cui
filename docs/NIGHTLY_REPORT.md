@@ -1,18 +1,18 @@
 # Current report — 13 October 2026
 
-The 78-story C/WASM gallery is published at https://matteo.merola.co/cui/. Verified release `1dc98a9` passes library CI, Pages, actual HTTPS78 and 164 artifact file comparisons. See [published-1dc98a9.txt](validation/published-1dc98a9.txt). Full parity remains incomplete: 78 entries, 5 implemented, 73 tested and 0 verified.
+The [C/WASM gallery](https://matteo.merola.co/cui/) contains all 78 component families. Deployment check `54e3410` passes library CI, Pages and 188 actual HTTPS artifact comparisons; its asset-equivalent deployment passes the full browser and design/app suites. See [deployed proof](validation/published-54e3410.txt). The locally validated `160cee1` integration adds Unicode editing, completion examples, Badge variants and further Dock/Plot APIs: [integration proof](validation/unicode-badge-160cee1.txt).
 
-Published fixes cover alignment and SVG choices/icons, real image media, input navigation, Stepper, choice widths, InputGroup, alerts, table sorting, animated Progress, composed Resizable/Dock, scrolling VirtualList, Plot pan/zoom, chart strokes, textarea viewport painting, moving sidebar content and precise browser wheels. Browser screen picking now has explicit availability/cancellation; native adapters still require an application-supplied picker. Theme tokens are explained and TextView code is visible initially.
+Full family parity remains unfinished: **78 entries, 4 implemented, 74 tested, 0 verified**. “Tested” means a documented subset has behavioral evidence. The [manifest](gpui-parity.json) and source export audits identify remaining features; documentation or gallery presence alone does not verify a family.
 
-Integrated Sheet motion `8777cc4` passes native77, sanitizer75, WASI67, Chromium78 and quality. It animates all four edges, reverses an exit and respects reduced motion; focus/results/close callbacks wait for exit. Sharing/media is now public:147 static pages, complete crawler-visible metadata and original product captures.
+The website includes a marketing homepage, browsable documentation, per-component state/callback explanations, slash-key fuzzy search, copyable compiled C examples, system-first light/dark behavior and 38 named presets. Typography, extended control scales, spacing units, radii, backgrounds/gradients, opacity, blur and configurable/reduced motion have real C/WASM examples. Original media, native composed-app captures and metadata cover all shared routes. Go, Rust, Node and TypeScript examples use a narrow native C bridge; full language bindings remain unfinished.
 
-Integrated language examples `fc56f33` pass four headless clients, all four native-window pointer-click callback checks and combined native77/Chromium78. Go/cgo, Rust C ABI, Node N-API and TypeScript share an example C host; Linux/X11 is validated, and complete language bindings remain unfinished.
+Current integration checks pass 90 native tests, 88 sanitizer tests, all 75 pinned WASI runtime suites, both Chromium variants' complete 78-story checks, 78 compiled excerpts, usage/docs/sharing and format/license/distribution checks. Unicode editing passes all 766 grapheme and 1,944 word conformance cases. Editor completion is host-supplied and atomically undoable; grammar/LSP, replace/multicursor and bidi remain incomplete. Dock and Plot have substantive retained models and styled adapters, with precise remaining source distinctions in their guides.
 
-The remaining feedback is tracked in [website-feedback.md](website-feedback.md). Design-system expansion, composed apps, full bindings, deeper docs and full family parity remain unfinished. No dependency installation is needed from the user. Preserved worker work and the Questionnaire event-order experiment remain intact.
+The [website feedback tracker](website-feedback.md) remains active. Further full-family work is continuing; no dependency installation is needed from the user. Native GPU and accessibility adapter coverage remains platform-specific, as recorded in [PLATFORM_MATRIX.md](PLATFORM_MATRIX.md). Preserved worker work remains intact.
 
-Build with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. The browser renders real CUI WASM draw lists; browser checks do not certify native GPU or accessibility support across all platforms.
+Build with `cmake -S . -B build -G Ninja`, `cmake --build build`, and `ctest --test-dir build --output-on-failure`. The browser renders actual CUI WASM draw lists. Historical notes below preserve earlier evidence and are not current status.
 
-# Nightly report — live development checkpoint
+# Historical development log
 
 Repository: https://github.com/mattmezza/cui. Branch `main`. Evidence/source commit before this report update: `d6aa5bd`. See swarm-status.md for branch promotion and push/CI observations.
 

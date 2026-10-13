@@ -1,0 +1,25 @@
+Published source:54e341088cab288e78e387f56ec9a6f95b376650
+Library CI:https://github.com/mattmezza/cui/actions/runs/38344043504 (success)
+Pages:https://github.com/mattmezza/cui/actions/runs/38344043490 (success)
+The predecessor df6f05b failed macOS portable CTest at the fractional Point
+coordinate's exact equality.54e3410 uses the existing numeric tolerance for
+2/3 interpolation; source behavior is unchanged. Linux/macOS/Windows and
+Linux GCC/Clang jobs now pass.
+
+Actual HTTPS verification:188/188 inspected files byte-match the54e3410
+Pages artifact, including every159 shared route and runtime/docs/theme/indexing,
+original media and native screenshot files. The df6f05b and54e3410 artifacts
+have identical runtime/documentation/media payloads; only the workflow's
+browser-mobile.png capture differs (263 identical files).
+
+Actual HTTPS78-component full browser suite and the78-guide design/app
+extension suite passed on this asset-equivalent df6f05b deployment. They include
+real styled Editor/VirtualList/Dock/Plot interactions,390px layout, routes and
+reloads/no-JavaScript fallbacks, system and named themes, search/copy, graphics
+and composed-app callbacks. This is deployed behavior proof, not full parity.
+
+Reproduce by downloading Pages run38344043490 github-pages/artifact.tar,
+comparing routes.json and runtime/guide/media bytes against
+https://matteo.merola.co/cui/, and adapting the browser suites' HTTP setup to
+that HTTPS URL. Logs:published-54e3410-hashes.log,
+published-df6f05b-browser.log,published-df6f05b-extensions.log.

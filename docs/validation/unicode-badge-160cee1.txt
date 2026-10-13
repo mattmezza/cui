@@ -1,0 +1,36 @@
+Integration source: 160cee145ce0123583d2ac272dba5b36608efb5b
+Portable source SHA256:
+52b1c1114c583ea2bd2c07281a7a4554b73ca8fd7a147595e166063c9a68528b
+The WASI runner reported no tracked source modifications and confirmed the
+fingerprint stayed unchanged through all75 runtime suites. Browser word checks
+were updated afterward to assert the source-compatible word-end behavior and
+atomic modifier deletion; compiled source did not change.
+
+Warning-enabled native build/CTest:90/90.
+ASan/UBSan build/CTest:88/88 (optional GPU tests absent).
+Pinned Zig0.16.0/Wasmtime49.0.0 WASI Preview1:75/75.
+Unicode17:766 official grapheme cases and1,944 official word cases.
+Offline generators reproduce tables/fixtures, including under an ASCII locale
+with Python UTF-8 mode and locale coercion disabled.
+Manifest/license/format/distribution checks:PASS; all78 families retained.
+Usage metadata5/5; docs3/3; sharing3/3;78 displayed excerpts compile.
+
+Full78-story browser suite:PASS in Chromium1228 and CI headless-shell1228.
+New browser checks cover completion Down/Enter/atomic Undo/Escape; Badge count,
+overflow/dot/SVG icon/zero content/child actions and four sizes; Dock real panel
+menu close/reset; Ctrl-word end selection and atomic Ctrl-Delete/Backspace Undo.
+Existing themes/search/copy/routes/no-JavaScript/mobile/clipped-paint checks pass.
+The extension suite passes78 guides, gradient/blur/opacity/font/style/motion and
+composed-app account/CTA/edit/save/theme/mobile interaction checks.
+
+Integrated source-tested additions also include Dock menus/zoom placement,
+29px collapsed bottom resizing/reopening, per-edge collapsibility, custom
+panel titles/suffixes, Auto/TabBar modes and top-padding overrides; Plot dots,
+rounded bars/pure paths, hover/appear/stagger helpers, source-compatible Linear
+extent/tick and explicit source Arc padding/seam policy. They remain partial
+families, with full export audits and limitations in DOCK.md/PLOT_MODEL.md.
+
+Local logs:next-native-build7.log,next-native-test7.log,next-asan-build3.log,
+next-asan-test3.log,next2-wasi.log,next-browser5.log,next-browser-shell.log,
+next-extensions.log.80 documentation pages/160 shareable routes generated.
+No full parity claim:4 implemented,74 tested,0 verified families.

@@ -14,6 +14,7 @@ def main():
     tree=ast.parse((ROOT/'scripts/build_web.py').read_text())
     sources=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='SOURCES' for t in n.targets))
     sources=[s for s in sources if s not in ['web/gallery.c','examples/composed_apps/app.c']]+['tests/web/chart_tooltip_appearance_probe.c','web/modules/cui_shadow_bridge.c']
+    sources=list(dict.fromkeys(sources))
     assert subprocess.check_output(['zig','version'],text=True).strip()=='0.16.0'
     exports=['probe_init','probe_frame','probe_calls','probe_focus','probe_bounds','probe_count','probe_command','probe_text','probe_length','probe_pixels','probe_bitmap','probe_shadow','probe_shadow_coverage','cui_canvas_shadow_values','cui_canvas_shadow_query','cui_canvas_shadow_prepare','cui_canvas_shadow_width','cui_canvas_shadow_height','cui_canvas_shadow_layer_bound','cui_canvas_shadow_bound','cui_canvas_shadow_pixels'];wasm=out/'probe.wasm'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*[str(ROOT/s) for s in sources],'-lm','-Wl,-z,stack-size=8388608',*[f'-Wl,--export={s}' for s in exports],'-o',str(wasm)],check=True)

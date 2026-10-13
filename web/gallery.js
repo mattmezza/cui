@@ -816,7 +816,7 @@ function cancelPageTouches(){for(const [id,t] of pageTouches)if(!t.owned)wasm?.g
 window.addEventListener('blur',()=>{cancelPageTouches();pointerFocusLoss();secureInput.reset();imeTarget=null;composing=false;wasm?.gallery_focus(0xffffffff);requestFrame();});window.addEventListener('hashchange',cancelPageTouches);
 canvas.addEventListener('lostpointercapture',e=>{const t=pageTouches.get(e.pointerId);if(!t)return;pageTouches.delete(e.pointerId);if(!t.owned)wasm?.gallery_touch(7,0,0,e.pointerId,1);requestFrame();});
 canvas.addEventListener('pointercancel',e=>{const t=pageTouches.get(e.pointerId);pageTouches.delete(e.pointerId);if(!t?.owned)wasm?.gallery_touch(7,0,0,e.pointerId,e.pointerType==='touch'?1:2);requestFrame();});
-canvas.addEventListener('blur',e=>{if(e.relatedTarget===secureInput.element)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});
+canvas.addEventListener('blur',e=>{if(secureInput.element&&e.relatedTarget===secureInput.element)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});
 function handleCanvasKey(e,type){
  if(!wasm)return;const key=keyIdentity(e.key);
  if(e.key==='Tab'&&!composing&&!e.isComposing){

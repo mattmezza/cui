@@ -2,7 +2,7 @@
 
 The [C/WASM gallery](https://matteo.merola.co/cui/) contains all 78 component families. Published `4fa4dad` passes library CI, Pages, 195 actual HTTPS artifact comparisons and both complete browser suites: [deployed proof](validation/published-4fa4dad.txt). Its source Progress cycles/value transitions, token-aware Input/Textarea editing, Dock visibility/group policies/measured sizing/panel factories and Plot labels/truncation pass native90/90, sanitizer88/88, WASI75/75 and full browser validation: [integration proof](validation/progress-dock-plot-6747044.txt).
 
-The next integration adds ProgressCircle, fixes Slider's accidental Progress semantics, and continues Editor search/replace, Dock lifecycle/hidden geometry and Plot primitives. Combined validation is active.
+The next release adds ProgressCircle and its four sizes/center labels, fixes Slider's accidental Progress semantics, adds retained Editor search/replace, and advances Dock lifecycle/hidden geometry and shared Plot/Chart primitives. Combined validation passes: [proof](validation/circle-editor-dock-plot-ccbade3.txt). Publication checks are pending; further multicursor, n-ary Dock and Plot motion work continues.
 
 Full family parity remains unfinished: **78 entries, 2 implemented, 76 tested, 0 verified**. “Tested” means a documented subset has behavioral evidence. The [manifest](gpui-parity.json) and source export audits identify remaining features; documentation or gallery presence alone does not verify a family.
 

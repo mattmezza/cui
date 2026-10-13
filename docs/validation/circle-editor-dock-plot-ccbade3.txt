@@ -1,0 +1,15 @@
+Validated source: ccbade3
+Portable source SHA256:
+e34a75a7d04305e5e920e90a9801de0dbb55f04fc0bdcc3e2ab06912a7fe2073
+WASI fingerprint unchanged through 75/75 runtime suites; tracked source clean.
+Warning-enabled native CTest 90/90; ASan/UBSan 88/88.
+CI Chromium headless shell: all 78 C/WASM stories and 78 compiled excerpts.
+Full Chromium design/app extensions: pass.
+Usage 5/docs 3/sharing 3; manifest 78, dependency/licenses, format/amalgamation: pass.
+Circle source sizes and borrowed raster state, labels and reduced motion tested.
+Slider own track paint and numeric min/max semantics tested; no child Progress.
+Retained Editor case-mode/find/Replace All and atomic Undo tested in browser.
+Borrowed multi-selection model tested; Editor multicursor adapter not included.
+Dock lifecycle, all-hidden geometry and Plot tooltip/Axis/shared Sankey tested.
+PlotAppearScope and n-ary Dock worker slices are not included in this revision.
+Full-family parity unfinished: 2 implemented / 76 tested / 0 verified.

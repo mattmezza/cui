@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     cui_input_state state = {0};
     cui_input_options o = {.masked = true,
                            .content_type = CUI_TEXT_INPUT_PURPOSE_PASSWORD,
-                           .format = {CUI_EDIT_FORMAT_PATTERN, {"(99)-99", 7}},
+                           .format = {.kind = CUI_EDIT_FORMAT_PATTERN, .pattern = {"(99)-99", 7}},
                            .format_workspace = {work, sizeof work}};
     assert(frame(ui, edit, &state, o).error == CUI_EDIT_OK);
     cui_focus(ui, 10);

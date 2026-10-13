@@ -53,7 +53,7 @@ int main(void) {
     cui_input_state state = {0};
     cui_platform clipboard = {
         .capabilities = CUI_PLATFORM_CLIPBOARD, .clipboard_set = copy, .clipboard_get = paste};
-    cui_input_options o = {.format = {CUI_EDIT_FORMAT_PATTERN, {"99-99", 5}},
+    cui_input_options o = {.format = {.kind = CUI_EDIT_FORMAT_PATTERN, .pattern = {"99-99", 5}},
                            .format_workspace = {workspace, sizeof workspace},
                            .clipboard = &clipboard,
                            .validate = valid};

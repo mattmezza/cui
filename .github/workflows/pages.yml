@@ -94,6 +94,8 @@ jobs:
         run: |
           uv run tests/web/test_button_activation_blocker.py
           uv run tests/web/test_button_blocker_scroll_scope.py
+      - name: Verify current-frame Button label ellipsis and containment
+        run: uv run tests/web/test_button_label_layout.py
       - name: Verify Button callbacks slots focus and painted states
         run: uv run tests/web/test_button_behavior.py
       - name: Verify Table sizing and selection-only DataTable actions

@@ -1101,3 +1101,21 @@ cui_plot_result cui_plot_area_paths(const cui_plot_area_sample *samples, size_t 
     }
     return CUI_PLOT_OK;
 }
+
+cui_plot_result cui_plot_dot_layout(cui_plot_point center, double size,
+                                    cui_plot_dot_geometry *out) {
+    if (!out || !isfinite(center.x) || !isfinite(center.y) || !isfinite(size) || size < 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_dot_geometry geometry = {.radius = size / 2, .border_width = 1};
+    cui_plot_result result =
+        cui_plot_number((long double)center.x - size / 2, &geometry.frame.x_min);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)center.y - size / 2, &geometry.frame.y_min);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)center.x + size / 2, &geometry.frame.x_max);
+    if (result == CUI_PLOT_OK)
+        result = cui_plot_number((long double)center.y + size / 2, &geometry.frame.y_max);
+    if (result == CUI_PLOT_OK)
+        *out = geometry;
+    return result;
+}

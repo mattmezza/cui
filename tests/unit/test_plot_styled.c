@@ -106,6 +106,113 @@ static void grid_pixels(cui_context *ui) {
     assert(pixels[(19 * w + 2) * 4] == 255 && pixels[(19 * w + 5) * 4 + 3] == 0);
     cui_software_destroy(renderer);
 }
+typedef struct {
+    size_t calls, index;
+    cui_plot_rect frame;
+    cui_plot_bar_alignment alignment;
+} bar_calls;
+static cui_color bar_fill(const cui_plot_bar_sample *sample, size_t index, cui_plot_rect frame,
+                          cui_plot_bar_alignment alignment, void *user) {
+    assert(sample->has_cross && sample->has_value);
+    bar_calls *calls = user;
+    ++calls->calls;
+    calls->index = index;
+    calls->frame = frame;
+    calls->alignment = alignment;
+    return red;
+}
+static void marker_pixels(cui_context *ui) {
+    cui_theme theme = cui_theme_light();
+    theme.primary = green;
+    cui_plot_sample dots[] = {{20, NAN, 20, true}, {NAN, NAN, NAN, false}};
+    cui_plot_dot_options style = cui_plot_dot_defaults();
+    assert(style.size == 4 && style.use_theme_fill && !style.custom_stroke);
+    style.size = 12;
+    style.use_theme_fill = false;
+    style.fill = red;
+    style.stroke = blue;
+    style.custom_stroke = true;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_dots(ui, 101, &theme, (cui_size){40, 40}, dots, 2, style) == CUI_PLOT_OK);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    size_t semantic_count;
+    (void)cui_semantics(ui, &semantic_count);
+    assert(semantic_count == 0);
+    cui_software *renderer = cui_software_create(100, 100, NULL);
+    assert(renderer);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    unsigned w, h;
+    const unsigned char *pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(20 * w + 20) * 4] == 255 && pixels[(20 * w + 14) * 4 + 2] == 255 &&
+           pixels[(14 * w + 14) * 4 + 3] == 0);
+    style.use_theme_fill = true;
+    style.custom_stroke = false;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_dots(ui, 101, &theme, (cui_size){40, 40}, dots, 2, style) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(20 * w + 20) * 4 + 1] == 255 && pixels[(20 * w + 14) * 4 + 1] == 255);
+    const double pi = acos(-1.);
+    cui_plot_radial_sample radial[] = {
+        {0, 0, 10, true}, {pi / 2, 0, 10, true}, {NAN, NAN, NAN, false}};
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_radial_dots(ui, 102, &theme, (cui_size){40, 40}, radial, 3, style) ==
+           CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(10 * w + 20) * 4 + 1] == 255 && pixels[(20 * w + 30) * 4 + 1] == 255);
+    bar_calls calls = {0};
+    cui_plot_bar_sample bars[] = {
+        {8, 32, 8, true, true}, {NAN, NAN, NAN, false, true}, {30, 20, 20, true, true}};
+    cui_plot_bar_options bar = {.alignment = CUI_PLOT_BAR_BOTTOM,
+                                .band_width = 24,
+                                .fill_for = bar_fill,
+                                .user = &calls,
+                                .corners = {100, 0, 0, 0}};
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_bars(ui, 103, &theme, (cui_size){64, 64}, bars, 3, &bar) == CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(calls.calls == 2 && calls.index == 2 && calls.alignment == CUI_PLOT_BAR_BOTTOM &&
+           calls.frame.x_min == 30 && calls.frame.y_min == 20 && calls.frame.y_max == 20);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(8 * w + 8) * 4 + 3] == 0 && pixels[(8 * w + 31) * 4] == 255 &&
+           pixels[(31 * w + 8) * 4] == 255);
+    cui_plot_bar_options themed = cui_plot_bar_defaults();
+    themed.alignment = CUI_PLOT_BAR_LEFT;
+    themed.band_width = 12;
+    cui_plot_bar_sample horizontal_bar = {8, 8, 32, true, true};
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_bars(ui, 104, &theme, (cui_size){64, 64}, &horizontal_bar, 1, &themed) ==
+           CUI_PLOT_OK);
+    draw = cui_end_frame(ui);
+    assert(cui_software_render(renderer, &draw, (cui_color){0}));
+    pixels = cui_software_pixels(renderer, &w, &h);
+    assert(pixels[(12 * w + 18) * 4 + 1] == 255);
+    /* A late invalid sample must suppress even the earlier fill callback. */
+    bars[2].value = NAN;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_bars(ui, 103, &theme, (cui_size){64, 64}, bars, 3, &bar) == CUI_PLOT_INVALID &&
+           calls.calls == 2);
+    draw = cui_end_frame(ui);
+    assert(draw.count == 0 && cui_last_error(ui) == CUI_OK);
+    dots[0].y1 = NAN;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_dots(ui, 101, &theme, (cui_size){40, 40}, dots, 2, style) == CUI_PLOT_INVALID);
+    draw = cui_end_frame(ui);
+    assert(draw.count == 0 && cui_last_error(ui) == CUI_OK);
+    style.size = -1;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(cui_plot_radial_dots(ui, 102, &theme, (cui_size){40, 40}, radial, 3, style) ==
+           CUI_PLOT_INVALID);
+    draw = cui_end_frame(ui);
+    assert(draw.count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_software_destroy(renderer);
+}
 static void raster(void) {
     unsigned char pixels[64 * 64 * 4], saved[sizeof pixels];
     cui_plot_path_command commands[64];
@@ -309,6 +416,7 @@ int main(void) {
     assert(ui);
     axes(ui);
     grid_pixels(ui);
+    marker_pixels(ui);
     raster();
     unsigned char pixels[64 * 64 * 4];
     assert(cui_plot_raster(pixels, 64, 64, 256, sizeof pixels, NULL, 0, blue) == CUI_PLOT_OK);

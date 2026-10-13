@@ -204,6 +204,14 @@ typedef struct {
 cui_plot_result cui_plot_radial_path(const cui_plot_radial_sample *, size_t count,
                                      cui_plot_gap_policy, bool closed, bool fill, bool area,
                                      cui_plot_path_command *, size_t capacity, size_t *required);
+typedef struct {
+    cui_plot_rect frame;
+    double radius, border_width;
+} cui_plot_dot_geometry;
+/* Source Line/RadialLine marker: square centered at point, radius=size/2,
+ * one-pixel border. Finite nonnegative size; zero produces a valid degenerate
+ * marker. Errors preserve output; source unchecked negative size is rejected. */
+cui_plot_result cui_plot_dot_layout(cui_plot_point center, double size, cui_plot_dot_geometry *);
 typedef enum {
     CUI_PLOT_BAR_BOTTOM,
     CUI_PLOT_BAR_TOP,

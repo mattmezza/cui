@@ -348,3 +348,147 @@ cui_plot_result cui_plot_grid(cui_context *ui, cui_id id, const cui_theme *theme
     cui_end_box(ui);
     return CUI_PLOT_OK;
 }
+
+cui_plot_dot_options cui_plot_dot_defaults(void) {
+    return (cui_plot_dot_options){.size = 4, .use_theme_fill = true};
+}
+static bool mark_extent(cui_size extent) {
+    return isfinite(extent.width) && isfinite(extent.height) && extent.width > 0 &&
+           extent.height > 0 && extent.width <= 16384 && extent.height <= 16384;
+}
+static bool dot_options(cui_plot_dot_options o) {
+    return isfinite(o.size) && o.size >= 0 && o.size <= 1024;
+}
+static void dot_paint(cui_context *ui, cui_id id, const cui_theme *theme,
+                      cui_plot_dot_geometry geometry, cui_plot_dot_options o) {
+    cui_color fill = o.use_theme_fill ? theme->primary : o.fill;
+    cui_color border = o.custom_stroke ? o.stroke : fill;
+    cui_begin_absolute_box(ui, id,
+                           (cui_box){.background = fill,
+                                     .border = border,
+                                     .border_width = 1,
+                                     .radius = (float)geometry.radius},
+                           (cui_rect){(float)geometry.frame.x_min, (float)geometry.frame.y_min,
+                                      (float)o.size, (float)o.size});
+    cui_end_box(ui);
+}
+cui_plot_result cui_plot_dots(cui_context *ui, cui_id id, const cui_theme *theme, cui_size extent,
+                              const cui_plot_sample *samples, size_t count,
+                              cui_plot_dot_options o) {
+    if (!ui || !id || !theme || !mark_extent(extent) || !dot_options(o) || count > 4096 ||
+        (count && !samples))
+        return CUI_PLOT_INVALID;
+    cui_plot_dot_geometry geometry;
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].defined) {
+            if (!point_valid((cui_plot_point){samples[i].x, samples[i].y1}))
+                return CUI_PLOT_INVALID;
+            cui_plot_result result = cui_plot_dot_layout(
+                (cui_plot_point){samples[i].x, samples[i].y1}, o.size, &geometry);
+            if (result != CUI_PLOT_OK)
+                return result;
+        }
+    cui_begin_box(ui, id,
+                  (cui_box){.width = extent.width,
+                            .height = extent.height,
+                            .fixed_width = true,
+                            .fixed_height = true});
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].defined) {
+            (void)cui_plot_dot_layout((cui_plot_point){samples[i].x, samples[i].y1}, o.size,
+                                      &geometry);
+            dot_paint(ui, id ^ UINT64_C(0x721dd761552a0000) ^ (i + 1), theme, geometry, o);
+        }
+    cui_end_box(ui);
+    return CUI_PLOT_OK;
+}
+static cui_plot_point radial_dot(cui_plot_radial_sample sample, cui_size extent) {
+    double angle = fmod(sample.angle, 2 * acos(-1.));
+    return (cui_plot_point){extent.width / 2 + sample.radius1 * sin(angle),
+                            extent.height / 2 - sample.radius1 * cos(angle)};
+}
+cui_plot_result cui_plot_radial_dots(cui_context *ui, cui_id id, const cui_theme *theme,
+                                     cui_size extent, const cui_plot_radial_sample *samples,
+                                     size_t count, cui_plot_dot_options o) {
+    if (!ui || !id || !theme || !mark_extent(extent) || !dot_options(o) || count > 4096 ||
+        (count && !samples))
+        return CUI_PLOT_INVALID;
+    cui_plot_dot_geometry geometry;
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].defined) {
+            if (!isfinite(samples[i].angle) || !isfinite(samples[i].radius1) ||
+                samples[i].radius1 < 0)
+                return CUI_PLOT_INVALID;
+            cui_plot_point point = radial_dot(samples[i], extent);
+            if (!point_valid(point))
+                return CUI_PLOT_INVALID;
+            cui_plot_result result = cui_plot_dot_layout(point, o.size, &geometry);
+            if (result != CUI_PLOT_OK)
+                return result;
+        }
+    cui_begin_box(ui, id,
+                  (cui_box){.width = extent.width,
+                            .height = extent.height,
+                            .fixed_width = true,
+                            .fixed_height = true});
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].defined) {
+            (void)cui_plot_dot_layout(radial_dot(samples[i], extent), o.size, &geometry);
+            dot_paint(ui, id ^ UINT64_C(0x7397d895aac70000) ^ (i + 1), theme, geometry, o);
+        }
+    cui_end_box(ui);
+    return CUI_PLOT_OK;
+}
+cui_plot_bar_options cui_plot_bar_defaults(void) {
+    return (cui_plot_bar_options){.alignment = CUI_PLOT_BAR_BOTTOM, .use_theme_fill = true};
+}
+cui_plot_result cui_plot_bars(cui_context *ui, cui_id id, const cui_theme *theme, cui_size extent,
+                              const cui_plot_bar_sample *samples, size_t count,
+                              const cui_plot_bar_options *o) {
+    if (!ui || !id || !theme || !o || !mark_extent(extent) || count > 4096 || (count && !samples) ||
+        !isfinite(o->band_width) || o->band_width < 0 || o->band_width > 16384 ||
+        o->alignment < CUI_PLOT_BAR_BOTTOM || o->alignment > CUI_PLOT_BAR_RIGHT)
+        return CUI_PLOT_INVALID;
+    float corners[] = {o->corners.top_left, o->corners.top_right, o->corners.bottom_left,
+                       o->corners.bottom_right};
+    for (size_t i = 0; i < 4; ++i)
+        if (!isfinite(corners[i]) || corners[i] < 0 || corners[i] > 1024)
+            return CUI_PLOT_INVALID;
+    cui_plot_bar_geometry geometry;
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].has_cross && samples[i].has_value) {
+            if (!isfinite(samples[i].cross) || !isfinite(samples[i].baseline) ||
+                !isfinite(samples[i].value) || fabs(samples[i].cross) > 16384 ||
+                fabs(samples[i].baseline) > 16384 || fabs(samples[i].value) > 16384)
+                return CUI_PLOT_INVALID;
+            cui_plot_result result =
+                cui_plot_bar_layout(o->alignment, samples[i].cross, o->band_width,
+                                    samples[i].baseline, samples[i].value, &geometry);
+            if (result != CUI_PLOT_OK)
+                return result;
+            if (fabs(geometry.frame.x_max) > 16384 || fabs(geometry.frame.y_max) > 16384)
+                return CUI_PLOT_INVALID;
+        }
+    cui_begin_box(ui, id,
+                  (cui_box){.width = extent.width,
+                            .height = extent.height,
+                            .fixed_width = true,
+                            .fixed_height = true});
+    for (size_t i = 0; i < count; ++i)
+        if (samples[i].has_cross && samples[i].has_value) {
+            (void)cui_plot_bar_layout(o->alignment, samples[i].cross, o->band_width,
+                                      samples[i].baseline, samples[i].value, &geometry);
+            cui_color fill = o->use_theme_fill ? theme->primary : o->fill;
+            if (o->fill_for)
+                fill = o->fill_for(samples + i, i, geometry.frame, o->alignment, o->user);
+            cui_begin_absolute_box(
+                ui, id ^ UINT64_C(0x61498ec3a7980000) ^ (i + 1),
+                (cui_box){.background = fill, .corner_radii = o->corners, .custom_corners = true},
+                (cui_rect){(float)geometry.frame.x_min, (float)geometry.frame.y_min,
+                           (float)(geometry.frame.x_max - geometry.frame.x_min),
+                           (float)(geometry.frame.y_max - geometry.frame.y_min)});
+            cui_end_box(ui);
+        }
+    cui_end_box(ui);
+    return CUI_PLOT_OK;
+}

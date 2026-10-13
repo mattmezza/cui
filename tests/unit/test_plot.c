@@ -669,12 +669,31 @@ static void source_area_paths(void) {
     assert(memcmp(saved_fill, fill, sizeof fill) == 0 &&
            memcmp(saved_stroke, stroke, sizeof stroke) == 0);
 }
+static void dot_geometry(void) {
+    cui_plot_dot_geometry dot;
+    assert(cui_plot_dot_layout((cui_plot_point){10, 20}, 4, &dot) == CUI_PLOT_OK);
+    assert(dot.frame.x_min == 8 && dot.frame.x_max == 12 && dot.frame.y_min == 18 &&
+           dot.frame.y_max == 22 && dot.radius == 2 && dot.border_width == 1);
+    assert(cui_plot_dot_layout((cui_plot_point){-10, -20}, 8, &dot) == CUI_PLOT_OK &&
+           dot.frame.x_min == -14 && dot.frame.y_max == -16);
+    assert(cui_plot_dot_layout((cui_plot_point){1, 2}, 0, &dot) == CUI_PLOT_OK && dot.radius == 0 &&
+           dot.frame.x_min == dot.frame.x_max);
+    cui_plot_dot_geometry before = dot;
+    assert(cui_plot_dot_layout((cui_plot_point){DBL_MAX, 0}, DBL_MAX, &dot) == CUI_PLOT_OVERFLOW);
+    assert(memcmp(&before, &dot, sizeof dot) == 0);
+    assert(cui_plot_dot_layout((cui_plot_point){0, 0}, -1, &dot) == CUI_PLOT_INVALID);
+    assert(cui_plot_dot_layout((cui_plot_point){NAN, 0}, 4, &dot) == CUI_PLOT_INVALID);
+    assert(cui_plot_dot_layout((cui_plot_point){0, 0}, INFINITY, &dot) == CUI_PLOT_INVALID);
+    assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
+    assert(memcmp(&before, &dot, sizeof dot) == 0);
+}
 int main(void) {
     shape_geometry();
     pie_geometry();
     arc_and_radial_paths();
     bar_and_grid_geometry();
     source_area_paths();
+    dot_geometry();
     band_scales();
     point_scales();
     ordinal_scales();

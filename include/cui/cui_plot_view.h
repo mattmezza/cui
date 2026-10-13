@@ -71,6 +71,50 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
  * Alpha-zero stroke selects theme border. Preflight failures submit nothing. */
 cui_plot_result cui_plot_grid(cui_context *, cui_id, const cui_theme *,
                               const cui_plot_grid_options *, cui_color stroke);
+typedef struct {
+    double size;
+    cui_color fill, stroke;
+    bool use_theme_fill, custom_stroke;
+} cui_plot_dot_options;
+/* Styled default size4, theme primary fill; source base itself defaults to
+ * transparent fill. Without custom_stroke the border uses resolved solid fill. */
+cui_plot_dot_options cui_plot_dot_defaults(void);
+/* Fixed extent; skips undefined samples and paints markers after preflight.
+ * Cartesian uses x/y1. Radial uses angle/radius1 around extent center.
+ * <=4096 samples, size0..1024, coordinates within +/-16384. No dot semantics
+ * or hit model; stable borrowed arrays. Pure validation errors submit nothing. */
+cui_plot_result cui_plot_dots(cui_context *, cui_id, const cui_theme *, cui_size extent,
+                              const cui_plot_sample *, size_t count, cui_plot_dot_options);
+cui_plot_result cui_plot_radial_dots(cui_context *, cui_id, const cui_theme *, cui_size extent,
+                                     const cui_plot_radial_sample *, size_t count,
+                                     cui_plot_dot_options);
+typedef struct {
+    double cross, baseline, value;
+    bool has_cross, has_value;
+} cui_plot_bar_sample;
+typedef cui_color (*cui_plot_bar_fill_fn)(const cui_plot_bar_sample *, size_t index,
+                                          cui_plot_rect frame, cui_plot_bar_alignment, void *user);
+typedef struct {
+    cui_plot_bar_alignment alignment;
+    double band_width;
+    cui_color fill;
+    bool use_theme_fill;
+    cui_corner_radii corners;
+    cui_plot_bar_fill_fn fill_for;
+    void *user;
+} cui_plot_bar_options;
+/* Styled bottom/zero-width/themed solid fill defaults; caller sets width. */
+cui_plot_bar_options cui_plot_bar_defaults(void);
+/* Callback resolves a solid fill synchronously once per eligible datum, with
+ * source-relative frame and alignment. It must not submit UI or mutate borrowed
+ * samples/options; called during frame composition, not renderer execution.
+ * Per-corner rounding uses existing Core renderer clamping. No gradient or
+ * generic label-content driver. Missing cross/value skip callback and geometry.
+ * Fixed extent, <=4096 samples, band width0..16384, finite coordinates within
+ * +/-16384, corner sizes0..1024; preflight failures submit nothing/call nobody. */
+cui_plot_result cui_plot_bars(cui_context *, cui_id, const cui_theme *, cui_size extent,
+                              const cui_plot_bar_sample *, size_t count,
+                              const cui_plot_bar_options *);
 typedef void (*cui_plot_activate_fn)(cui_context *, cui_id, cui_plot_point bitmap_position,
                                      void *user);
 typedef struct {

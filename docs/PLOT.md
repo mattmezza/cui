@@ -211,10 +211,101 @@ the bounded rasterizer intentionally fills only explicitly closed runs.
 
 The [complete frozen export audit](PLOT_MODEL.md#complete-frozen-plot-export-audit)
 lists exact supported routes and remaining differences. In particular this
-styled layer does not yet implement generic dots/rounded-bar styling,
+styled layer does not yet implement arbitrary gradient backgrounds or label-content callbacks,
 PlotLabel truncation/content collections, tessellation caches, hover/tooltip
 state and exit motion, appear-generation/scope tracking, or the PlotElement
 prepaint lifecycle. Chart-specific versions of some features do not automatically
 satisfy standalone Plot parity. Axis default positions and centered strokes are
 covered, while nondefault font scaling and theme fallback are deliberate CUI
 policies rather than byte-for-byte source behavior.
+
+
+## Dot and rounded-bar composition
+
+`cui_plot_dots` accepts Cartesian samples (`x`/`y1`); `cui_plot_radial_dots`
+accepts radial samples and centers them at half the supplied surface extent,
+matching frozen RadialLine. Both produce source-style circular quads with a
+fixed 1px border, skipping undefined samples. Cartesian `y0` and radial `radius0`
+are ignored. `cui_plot_dot_defaults()` selects size 4 and theme `primary` fill.
+This is a styled default: frozen base dots use transparent fill. Set
+`use_theme_fill=false` for an explicit solid fill, including transparency.
+Without `custom_stroke`, the border uses the resolved fill color, matching the
+source's solid-fill fallback. With `custom_stroke=true`, the explicit stroke
+color is used unchanged, even if transparent. `size=0` remains zero rather than
+selecting a default. Negative radius/size is rejected instead of allowing the
+source's unchecked geometry.
+
+`cui_plot_bars` accepts materialized `cui_plot_bar_sample` data, orientation,
+constant band width and per-corner radii. Samples missing cross or value skip
+both geometry and the fill callback; their numeric fields are ignored. The
+source-relative frame comes from `cui_plot_bar_layout`. `cui_plot_bar_defaults()`
+selects Bottom, zero band width and theme `primary` fill. Frozen base instead
+defaults to black. Set `use_theme_fill=false` for explicit color; if `fill_for`
+is supplied its result overrides either default, including a transparent result.
+The callback receives the original sample pointer, original index, painted frame,
+and alignment, synchronously once per eligible sample—even a degenerate bar.
+It may update separate application bookkeeping, but must not submit UI or mutate
+borrowed samples/options. The callback runs during component composition, never
+inside software/native renderer execution. A late invalid sample prevents all
+callbacks and UI submission in that call.
+
+Per-corner radii map to Core's `cui_corner_radii` and existing rounded rectangles.
+The adapters clamp each corner to half the shorter side. Explicit zero corners
+stay square. This supports rounded bar tips in every orientation without another
+rasterizer. It is not a claim of byte-identical GPUI corner normalization. Solid
+color fills are supported; arbitrary GPUI Background/gradients and a generic
+bar label-content callback are not. `cui_plot_bar_geometry.label_origin` remains
+available for application label composition.
+
+Each driver creates a fixed-size decorative surface without datum semantics,
+hit testing or implicit event callbacks. Overlay it in an application absolute
+box when marks should share a bitmap/axis view; the bitmap view can own pointer
+activation. Surfaces are positive finite up to 16384 per dimension, at most 4096
+samples, dot sizes 0..1024, corner radii 0..1024, and projected Cartesian/bar
+coordinates within +/-16384. Bars have nonnegative band width up to 16384 and
+must keep their frame endpoints in that coordinate range. Radial values are
+finite/nonnegative and projected centers must fit that range. Geometry preflight
+errors submit nothing. Core element/command capacity and clipping still apply;
+check `cui_last_error` after ending the frame. Caller arrays stay stable during
+composition. The drivers allocate no private buffers or retained widget state.
+
+This complete geometry-only software example overlays outlined dots on rounded
+bar tips without a font dependency:
+
+```c
+#include <assert.h>
+#include "cui/cui_plot_view.h"
+#include "cui/cui_software.h"
+int main(void) {
+    cui_context *ui=cui_create((cui_config){.width=80,.height=80});
+    cui_software *renderer=cui_software_create(80,80,NULL);
+    assert(ui && renderer);
+    cui_theme theme=cui_theme_light();
+    cui_plot_bar_sample bars[]={{8,48,12,true,true},{36,48,28,true,true}};
+    cui_plot_bar_options style=cui_plot_bar_defaults();
+    style.band_width=20; style.corners=(cui_corner_radii){6,6,0,0};
+    cui_plot_sample points[]={{18,0,12,true},{46,0,28,true}};
+    cui_plot_dot_options dots=cui_plot_dot_defaults();
+    dots.size=8; dots.use_theme_fill=false; dots.fill=theme.surface;
+    dots.custom_stroke=true; dots.stroke=theme.primary;
+    assert(cui_begin_frame(ui,80,80,.016f));
+    cui_begin_box(ui,1,(cui_box){.width=64,.height=64,.fixed_width=true,.fixed_height=true});
+    cui_begin_absolute_box(ui,2,(cui_box){0},(cui_rect){0,0,64,64});
+    assert(cui_plot_bars(ui,3,&theme,(cui_size){64,64},bars,2,&style)==CUI_PLOT_OK);
+    cui_end_box(ui);
+    cui_begin_absolute_box(ui,4,(cui_box){0},(cui_rect){0,0,64,64});
+    assert(cui_plot_dots(ui,5,&theme,(cui_size){64,64},points,2,dots)==CUI_PLOT_OK);
+    cui_end_box(ui); cui_end_box(ui);
+    cui_draw_list draw=cui_end_frame(ui);
+    assert(cui_last_error(ui)==CUI_OK);
+    assert(cui_software_render(renderer,&draw,theme.background));
+    cui_software_destroy(renderer); cui_destroy(ui); return 0;
+}
+```
+
+For a geometry-only build, compile this example with `src/components/cui_plot.c`,
+`backends/software/cui_software.c`, `build/libcui.a` and `-lm`, using the same strict
+C11 flags above. Tests cover circular corner exclusion, custom/fallback border
+pixels, theme fills, radial centers, independent rounded/square bar corners,
+renderer clamping, fill callback inputs, missing/degenerate samples and invalid
+preflight suppression.

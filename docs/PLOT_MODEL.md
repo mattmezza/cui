@@ -582,12 +582,12 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `ScalePoint` owned domain, duplicate-first map, tick-at, nearest | Point init/map/at/nearest | Uint64 keys, borrowed arrays, bounded finite validation rather than owned generic Vec |
 | `ScaleOrdinal` domain/range replacement, unknown, first duplicate, cycling cloned output | Ordinal init/map; reinitialize to replace arrays | Byte copies preserve C value representations but do not deep-clone arbitrary payloads; pointers remain caller-owned; finite capacity bounds |
 | `Curve::{Natural,Linear,StepAfter}` | Cartesian path and source Area builders | Source Catmull-Rom controls and omitted final StepAfter vertical reproduced; no additional upstream StepBefore/Step scale exists |
-| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | No accessor callbacks, dot generator/style family, arbitrary Background/gradient, or source path cache; numeric bounds/precision differ |
+| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | Dot geometry/themed drivers now available; no accessor callbacks, arbitrary Background/gradient, or source path cache; numeric bounds/precision differ |
 | `Area` data/X/Y1, optional Y0, fill plus separate 1px upper stroke, curves, paint/cache | `cui_plot_area_paths` separate contours; two raster shapes | Source accessor callbacks/cache/backgrounds absent; open/singleton GPUI tessellator result not reproduced; extended per-point closed areas remain separate |
-| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors available; no reusable custom fill/label callback driver, arbitrary gradient renderer or per-corner bar path primitive; negative width is rejected |
+| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; no generic label callback, arbitrary gradient renderer or pure rounded-bar path primitive; negative width is rejected |
 | `Pie` positive-value arcs/index/padding and angular limits | `cui_plot_pie` | No accessor callback/borrowed arbitrary datum payload; stable normalized double summation replaces unchecked f32 sums; pad is metadata |
 | `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; full-turn seam removed; user pad retained above pi rather than source0.0001 override; tiny values accepted; spans above one turn rejected; no cache/Background |
-| `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | No accessor/dot style driver; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
+| `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
 | `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Existing Chart Sankey layout/link geometry | No independent pure Plot graph/topology reuse or `sankey_link_path` command builder; Chart-specific options/data contracts are not automatically Plot parity |
 | `PlotAxis`, `AxisText`, `AxisLabelSide`, `AXIS_GAP`, `axis_gutter` | Axis defaults/layout/paint/ticks/gutter | Line visibility, default offsets/alignment/theme paint covered; font-scaled nondefault offsets differ; alpha-zero fallback differs from explicit source colors; dynamic Backgrounds absent |
@@ -606,3 +606,22 @@ Missing renderer/lifecycle rows are real remaining Plot scope. Similar Chart,
 Core, effects or text APIs can be reused in application composition, but their
 existence does not make the standalone Plot contract equivalent to the frozen
 module. No row above asserts full widget parity.
+
+
+## Dot geometry and source-style marker drivers
+
+`cui_plot_dot_layout(center,size,output)` models the Line/RadialLine marker quad:
+a square centered at the point, uniform corner radius `size/2`, and a fixed 1px
+border. Zero size succeeds with degenerate geometry; negative/nonfinite size and
+nonfinite centers are INVALID. Finite bound overflow preserves the entire output.
+This is pure geometry without a Core/theme dependency. Input-coordinate precision
+and half-size rounding follow C double arithmetic, not the frozen f32 bit pattern.
+
+The optional styled layer supplies Cartesian/radial marker and rounded-bar
+composition in `cui_plot_view.h`, described in [PLOT.md](PLOT.md). These reuse
+Core's existing rounded-quad renderer; they do not turn the bounded path rasterizer
+into a gradient renderer or implement per-corner rounded-bar command geometry.
+The frozen dot stroke fallback is reproduced for supported solid colors: explicit
+stroke overrides fill, otherwise the 1px border uses the resolved fill color.
+Theme defaults are a deliberate styled-layer policy, while frozen base dots
+default to transparent fill and frozen base bars default to black.

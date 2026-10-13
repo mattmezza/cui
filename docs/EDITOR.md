@@ -187,3 +187,21 @@ cases, iterator suffixes, keyboard selection/erasure/undo, scalar compatibility,
 invalid inputs, and whole-cluster wrapping/hit geometry. This does not add
 Unicode word segmentation, bidirectional visual navigation, language services,
 or font shaping; those remain separate host/backend responsibilities.
+
+Vertical selection at document edges
+------------------------------------
+
+Shift+Up on the first visible row extends the cursor to byte 0; Shift+Down on
+the last visible row extends it to document end. The selection anchor stays
+fixed. Plain Up/Down retain the preferred horizontal position at those edges.
+This follows frozen Input `vertical_selection_target`, including soft-wrapped
+rows and the visible row projection after folding. Readonly text remains
+selectable; disabled or composition-owned key events remain ignored. Movement
+changes selection only, without adding an undo step or changing the document
+revision. Shift+PageUp/PageDown retain their existing CUI row-clamping behavior.
+
+This slice does not change plain Up/Down collapse of an existing selection: CUI
+still starts from the active cursor, while frozen `move_vertical` derives an
+effective point outside the directional selection edge. Ctrl word movement
+continues to use the documented existing heuristic rather than frozen Unicode
+word-boundary segmentation.

@@ -582,7 +582,83 @@ static void test_grapheme_geometry(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void test_vertical_selection_document_edges(void) {
+    styled_probe probe = {.width = 5};
+    cui_context *ui = cui_create((cui_config){
+        .width = 400, .height = 300, .measure_styled = styled_measure, .measure_user = &probe});
+    for (unsigned mode = 0; mode < 4; mode++) {
+        char buffer[128];
+        strcpy(buffer, mode == 0   ? "abcde\nfghij\nklmno"
+                       : mode == 1 ? "abcdefghijklmnopq"
+                       : mode == 2 ? "abcde\r\nfghij\r\nklmno"
+                                   : "abcdefghijklmnopq");
+        cui_edit *edit = editor(buffer, sizeof buffer);
+        cui_textarea_line lines[32];
+        cui_textarea_state state;
+        assert(cui_textarea_state_init(&state, lines, 32));
+        cui_textarea_options options = {
+            .width = 40, .height = 100, .no_wrap = mode != 1, .readonly = mode == 3};
+        assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+        uint64_t revision = cui_edit_get_state(edit).revision;
+        cui_focus(ui, 10);
+        assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+        key(ui, CUI_KEY_UP, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 1);
+        key(ui, CUI_KEY_UP, CUI_MOD_SHIFT);
+        assert(frame(ui, edit, &state, options).selection_changed);
+        assert(cui_edit_get_state(edit).cursor == 0 && cui_edit_get_state(edit).anchor == 1);
+        key(ui, CUI_KEY_UP, CUI_MOD_SHIFT);
+        assert(!frame(ui, edit, &state, options).selection_changed);
+        size_t last = state.lines[state.count - 1].start + 1;
+        assert(last < strlen(buffer));
+        assert(cui_edit_select(edit, last, last) == CUI_EDIT_OK);
+        key(ui, CUI_KEY_DOWN, 0);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == last);
+        key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
+        assert(frame(ui, edit, &state, options).selection_changed);
+        assert(cui_edit_get_state(edit).cursor == strlen(buffer));
+        assert(cui_edit_get_state(edit).anchor == last);
+        /* Selection orientation never changes the sticky anchor. */
+        assert(cui_edit_select(edit, 0, last) == CUI_EDIT_OK);
+        key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == strlen(buffer));
+        assert(cui_edit_get_state(edit).anchor == 0);
+        assert(cui_edit_get_state(edit).revision == revision);
+        assert(!cui_edit_get_state(edit).can_undo);
+        options.disabled = true;
+        assert(cui_edit_select(edit, 1, 1) == CUI_EDIT_OK);
+        key(ui, CUI_KEY_UP, CUI_MOD_SHIFT);
+        frame(ui, edit, &state, options);
+        assert(cui_edit_get_state(edit).cursor == 1 && cui_edit_get_state(edit).anchor == 1);
+        cui_edit_destroy(edit);
+    }
+    char buffer[128] = "abcde\nfghij\nklmno\npqrst\nuvwxy";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_textarea_fold fold = {0, 4, true};
+    assert(cui_textarea_set_folds(&state, edit, &fold, 1));
+    cui_textarea_options options = {.width = 100, .height = 80, .no_wrap = true};
+    frame(ui, edit, &state, options);
+    assert(state.count == 2);
+    cui_focus(ui, 10);
+    cui_edit_select(edit, 1, 1);
+    key(ui, CUI_KEY_UP, CUI_MOD_SHIFT);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == 0 && fold.collapsed);
+    cui_edit_select(edit, 25, 25);
+    key(ui, CUI_KEY_DOWN, CUI_MOD_SHIFT);
+    frame(ui, edit, &state, options);
+    assert(cui_edit_get_state(edit).cursor == strlen(buffer) && fold.collapsed);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_vertical_selection_document_edges();
     test_grapheme_geometry();
     test_fold_projection();
     test_complete_text_style();

@@ -431,12 +431,16 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                               ? (size_t)fmaxf(1, floorf(state->viewport.h / metrics.line_height))
                               : 1;
             bool up = event.key == CUI_KEY_UP || event.key == CUI_KEY_PAGEUP;
+            size_t previous_row = row;
             row = up ? (step > row ? 0 : row - step)
                      : (step >= state->count - row ? state->count - 1 : row + step);
-            size_t cursor =
-                cui_textarea_offset(ui, cui_edit_get_text(edit), state, row, state->preferred_x);
+            bool selection_edge = shift && row == previous_row &&
+                                  (event.key == CUI_KEY_UP || event.key == CUI_KEY_DOWN);
+            size_t cursor = selection_edge ? (up ? 0 : cui_edit_get_text(edit).length)
+                                           : cui_textarea_offset(ui, cui_edit_get_text(edit), state,
+                                                                 row, state->preferred_x);
             state->upstream_affinity =
-                cursor == state->lines[row].end && !state->lines[row].hard_break;
+                !selection_edge && cursor == state->lines[row].end && !state->lines[row].hard_break;
             error = cui_edit_select(edit, shift ? selection.anchor : cursor, cursor);
             move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN && !command &&

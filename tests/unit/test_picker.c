@@ -411,6 +411,21 @@ static void color_events(void) {
         cui_color_state state = {0};
         cui_color_picker_options options = {.alpha = true, .palette = palette, .palette_count = 2};
         color_scene(ui, &themes[i], &state, &color, options);
+        /* Async host screen samples replace RGB while preserving alpha. */
+        color.a = 73;
+        cui_color sample;
+        assert(cui_color_parse_hex(cui_string("#1A8F64"), &sample));
+        sample.a = color.a;
+        color = sample;
+        cui_invalidate(ui);
+        assert(!color_scene(ui, &themes[i], &state, &color, options));
+        assert(equal_color(color, sample) && equal_color(state.last_color, sample));
+        cui_hsv expected = cui_color_to_hsv(sample);
+        assert(fabsf(state.hsv.hue - expected.hue) < .001f &&
+               fabsf(state.hsv.saturation - expected.saturation) < .001f &&
+               fabsf(state.hsv.value - expected.value) < .001f);
+        color = (cui_color){255, 0, 0, 255};
+        color_scene(ui, &themes[i], &state, &color, options);
         cui_focus(ui, cui_color_part_id(50, 20));
         key(ui, CUI_KEY_DOWN, 0);
         assert(color_scene(ui, &themes[i], &state, &color, options) && color.r == 254);

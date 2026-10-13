@@ -3776,6 +3776,19 @@ float gallery_icon_stats(unsigned field) {
         return 0;
     }
 }
+/* A host picker supplies opaque sRGB bytes; the controlled model preserves alpha. */
+int gallery_screen_color(unsigned rgb) {
+    if (rgb > 0xffffffu)
+        return 0;
+    chosen_color.r = (uint8_t)(rgb >> 16);
+    chosen_color.g = (uint8_t)(rgb >> 8);
+    chosen_color.b = (uint8_t)rgb;
+    return 1;
+}
+unsigned gallery_color_rgba(void) {
+    return ((unsigned)chosen_color.r << 24) | ((unsigned)chosen_color.g << 16) |
+           ((unsigned)chosen_color.b << 8) | chosen_color.a;
+}
 void gallery_toolbar_options(int size, int grouped, int show_input) {
     toolbar_size =
         size >= CUI_TOOLBAR_SMALL && size <= CUI_TOOLBAR_CUSTOM ? size : CUI_TOOLBAR_MEDIUM;

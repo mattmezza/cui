@@ -1,0 +1,12 @@
+Browser EyeDropper host integration
+Parent: 9c87b99; portable library source unchanged, model regression added.
+Native CTest: 75/75 PASS; ASan/UBSan: 75/75 PASS; WASI runtime: 67/67 PASS.
+Strict C11 WASM gallery build and lint/format/distribution checks PASS.
+Full Chromium gallery: 78 stories and 78 compiled excerpts PASS.
+Browser host-provider stubs exercise selected sRGB transport into WASM/semantic RGB,
+alpha preservation, cancellation, invalid values, unavailable providers, disabled
+controls, cancellation/stale completion when disabled during an outstanding request.
+Native test replaces controlled RGBA and verifies retained HSV/model synchronization.
+Headless tests do not claim OS screen pixels were captured. The production button
+calls the real EyeDropper directly in its trusted click; support is feature-detected.
+Native adapters have no OS eyedropper; docs show application-owned host completion.

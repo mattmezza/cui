@@ -429,6 +429,32 @@ function route(){
  $('home-page').hidden=true;$('docs-page').hidden=true;$('gallery-page').hidden=false;$('catalog').hidden=false;$('docs-nav').hidden=true;
  selectComponent();requestAnimationFrame(()=>window.scrollTo(0,0));
 }
+let screenColorRequest=null;
+function screenColorControls(message=''){
+ const active=selected?.name==='ColorPicker',supported=isSecureContext&&typeof window.EyeDropper==='function';
+ $('screen-color').hidden=!active;$('screen-color-status').hidden=!active;
+ $('screen-color').disabled=!supported||$('disabled').checked||Boolean(screenColorRequest);
+ $('screen-color-status').textContent=message||(!supported?'Screen picking is unavailable in this browser.':screenColorRequest?'Choose a pixel; Escape cancels.':'');
+}
+async function pickScreenColor(){
+ if(selected?.name!=='ColorPicker'||$('screen-color').disabled)return;
+ const controller=new AbortController();screenColorRequest=controller;screenColorControls();
+ try{
+  // Call open inside this trusted click, before any await or C frame scheduling.
+  const result=await new window.EyeDropper().open({signal:controller.signal});
+  if(screenColorRequest!==controller)return;
+  if(!/^#[0-9a-f]{6}$/i.test(result?.sRGBHex||''))throw new Error('Invalid color');
+  if(selected?.name!=='ColorPicker'||$('disabled').checked)return;
+  wasm.gallery_screen_color(parseInt(result.sRGBHex.slice(1),16));requestFrame();
+  screenColorControls(`Selected ${result.sRGBHex.toUpperCase()}.`);
+ }catch(error){
+  if(screenColorRequest===controller)screenColorControls(error?.name==='AbortError'?'Color picking cancelled.':'Unable to pick a screen color.');
+ }finally{
+  if(screenColorRequest===controller){screenColorRequest=null;const message=$('screen-color-status').textContent;screenColorControls(message);}
+ }
+}
+function cancelScreenColor(){if(screenColorRequest){const request=screenColorRequest;screenColorRequest=null;request.abort();}screenColorControls();}
+$('screen-color').addEventListener('click',pickScreenColor);
 function selectComponent(){
  let name='Button';try{name=decodeURIComponent(location.hash.slice(1))||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
  document.title=`${selected.name} · CUI`; $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
@@ -491,6 +517,7 @@ function selectComponent(){
  for(const k of ['variant','size','halves','action','anchor'])$('dropdown-'+k).value='0';$('dropdown-outline').checked=false;$('dropdown-selected').checked=false;
  for(const id of ['tabs-mode','tabs-size','tabs-variant','tabs-manual-control'])$(id).hidden=selected.name!=='Tabs';
  $('tabs-mode').value='0';$('tabs-size').value='0';$('tabs-variant').value='1';$('tabs-manual').checked=false;
+ cancelScreenColor();
  $('progress-mode').hidden=selected.name!=='Progress';$('progress-mode').value='0';
  $('shimmer-mode').hidden=selected.name!=='Shimmer';$('shimmer-mode').value='0';
  for(const id of ['notification-anchor','notification-kind','notification-autohide-control'])$(id).hidden=selected.name!=='Notification';
@@ -606,7 +633,7 @@ $('table-pin').addEventListener('change',requestFrame);
  $('table-selection').addEventListener('change',requestFrame);
 $('surface-variant').addEventListener('change',requestFrame);
 $('density').addEventListener('change',requestFrame);
-$('disabled').addEventListener('change',requestFrame);$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
+$('disabled').addEventListener('change',()=>{cancelScreenColor();requestFrame();});$('menu').onclick=()=>document.body.classList.toggle('menu-open');new ResizeObserver(requestFrame).observe(canvas);
 try{
  const [response,data,docs,presets]=await Promise.all([fetch('./gallery.wasm?v=__CUI_WASM_VERSION__'),fetch('./catalog.json',{cache:'no-cache'}).then(r=>r.json()),fetch('./docs.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch documentation');return r.json();}),fetch('./themes.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Cannot fetch themes');return r.json();})]);if(!response.ok)throw Error('Cannot fetch WebAssembly module');catalog=data;documents=docs;themes=presets;
  const module=await WebAssembly.compile(await response.arrayBuffer());

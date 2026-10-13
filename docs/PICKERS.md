@@ -15,3 +15,22 @@ Meaningful tests exercise leap years and weekday grids over forty years, minimum
 ColorPicker includes a retained HSV model controlled by application RGBA bytes, a two-dimensional saturation/brightness surface, hue and alpha controls, numeric RGBA channel sliders and up to 64 palette swatches. Arrow/Home/End keys adjust named channel semantics. Pointer capture survives separate down/move/up frames and is cancelled explicitly. Readonly/disabled suppress changes. HSV conversion handles negative/wrapped hues and sanitizes nonfinite components; strict `#RRGGBB[AA]` parsing and formatting are allocation-free. A 12×8 common-rectangle grid approximates the SV gradient and shows a selected-cell outline; hue uses 24 bands and alpha uses 16 bands. Channels display their numeric values and horizontal ranges. Palette clicks and external replacements synchronize HSV; achromatic channel edits preserve hue. The current widget lacks editable hex/channel text, exact continuous shader gradients, a native eyedropper and upstream popup presentation/options. It is an inline, real interactive color control rather than a claim of complete ColorPicker parity.
 
 Color tests add 20,000 deterministic RGBA→HSV→RGBA and hex round trips, primary/wrapped-hue/nonfinite boundaries, channel/palette keyboard/pointer behavior, cross-frame captured SV release, readonly/disabled checks, semantic ranges, all themes and measured gradient geometry. The base-only flavor exercises the same color reducer without theme/components. Twelve-hour TimeField semantics expose the displayed 1..12 range; Home/End preserve AM/PM while choosing 1/12.
+
+## Picking a screen color
+
+The website's **Pick from screen** button uses the browser EyeDropper API. Select any screen pixel; Escape cancels without changing the controlled color. The chosen sRGB bytes replace RGB and preserve the current alpha. Unsupported browsers show an availability message. Navigation or disabling the component cancels an outstanding request. Screen access belongs to the host, so no browser or operating-system type enters CUI's public API.
+
+Native hosts can open their platform picker from a button callback, then assign the returned color to their application-owned `cui_color` and schedule a frame:
+
+```c
+/* Run after your host picker completes successfully, on the UI thread. */
+cui_color sampled;
+if (cui_color_parse_hex(cui_string("#1A8F64"), &sampled)) {
+    sampled.a = color.a; /* Optional: preserve the existing opacity. */
+    color = sampled;
+    cui_invalidate(ui);
+}
+/* The next cui_color_picker call synchronizes its retained HSV state. */
+```
+
+The browser requires a secure context and a user gesture; call `new EyeDropper().open()` directly in the click handler before awaiting anything or scheduling a C frame. A resolved `sRGBHex` can be parsed with `cui_color_parse_hex`; cancelled or rejected requests must leave the value unchanged. See the [Chrome EyeDropper guide](https://developer.chrome.com/docs/capabilities/web-apis/eyedropper) and [API specification](https://wicg.github.io/eyedropper-api/). CUI's native adapters currently do not implement an OS screen picker; applications provide that host capability.

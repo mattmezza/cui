@@ -210,11 +210,13 @@ typedef struct {
     cui_str icon, name;
     cui_color color;
     bool custom_color;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_badge_options;
 cui_badge_options cui_badge_defaults(void);
 /* Compose arbitrary content with a zero-flow corner indicator. Count zero hides
  * only the indicator; count overflow reads maximum+. Dot/icon always show.
- * Numbers use source size offsets and fixed10px text, dots6px, icon10/16/24px.
+ * INHERIT uses source offsets and fixed10px text, dots6px, icon10/16/24px.
+ * Explicit design_size scales indicator text, padding and artwork.
  * Content/name/icon bytes are borrowed for the call. Invalid options submit no
  * UI and invoke no callback. Legacy cui_badge remains a standalone text pill. */
 bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
@@ -222,7 +224,7 @@ bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
 typedef struct {
     bool indeterminate, reduced_motion;
     double now_seconds; /* Monotonic host clock; source cycle1s, legacy cycle1.6s. */
-    float height;       /* Zero selects the size-based4/6/8/10px track. */
+    float height;       /* Zero selects legacy4/6/8/10px, or design control_height/4. */
     cui_str name;       /* Zero selects "Progress". */
     cui_control_size size;
     cui_color color;
@@ -231,6 +233,7 @@ typedef struct {
     bool custom_corners;
     cui_progress_motion *motion; /* Optional caller-owned determinate transition. */
     float duration; /* Zero selects source180ms; explicit instant via reduced_motion. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_progress_options;
 cui_progress_options cui_progress_defaults(void);
 /* Returns true while indeterminate motion needs another frame. The application
@@ -244,7 +247,7 @@ typedef struct {
 } cui_progress_circle_state;
 typedef struct {
     cui_progress_options progress;
-    float diameter, raster_scale; /* Zero diameter uses8/12/16/20px by control size. */
+    float diameter, raster_scale; /* Zero uses legacy8/12/16/20px or design control_height. */
 } cui_progress_circle_options;
 cui_progress_circle_options cui_progress_circle_defaults(void);
 /* Caller owns pixel storage; no resource allocation. Returns animation demand.

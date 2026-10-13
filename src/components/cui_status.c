@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_status.h"
+#include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 static cui_color cui_status_alpha(cui_color c, float opacity) {
@@ -7,10 +8,10 @@ static cui_color cui_status_alpha(cui_color c, float opacity) {
     return c;
 }
 bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_tag_style *out) {
-    if (!t || !out || o.variant > CUI_TAG_PALETTE || o.variant < CUI_TAG_SECONDARY ||
-        o.size > CUI_STATUS_LARGE || o.size < CUI_STATUS_MEDIUM || !isfinite(o.radius) ||
-        o.radius < 0 || !isfinite(t->radius) || t->radius < 0 || !isfinite(t->font_size) ||
-        t->font_size <= 0)
+    if (!t || !out || !cui_design_valid(o.design_size) || o.variant > CUI_TAG_PALETTE ||
+        o.variant < CUI_TAG_SECONDARY || o.size > CUI_STATUS_LARGE || o.size < CUI_STATUS_MEDIUM ||
+        !isfinite(o.radius) || o.radius < 0 || !isfinite(t->radius) || t->radius < 0 ||
+        !isfinite(t->font_size) || t->font_size <= 0)
         return false;
     cui_color bg = t->secondary, fg = o.outline ? t->muted : t->secondary_foreground,
               border = t->border;
@@ -63,6 +64,14 @@ bool cui_tag_resolve(const cui_theme *t, cui_tag_options o, bool hovered, cui_ta
                                  : o.custom_radius ? o.radius
                                  : small           ? t->radius / 2
                                                    : t->radius};
+    if (o.design_size) {
+        cui_design_metrics d;
+        if (!cui_design_resolve(o.design_size, t->font_size / 16, &d))
+            return false;
+        s.font_size = d.font_size;
+        s.padding_y = d.padding_y;
+        s.padding_x = fmaxf(d.padding_x, d.padding_y);
+    }
     if (!isfinite(s.font_size) || !isfinite(s.radius))
         return false;
     if (hovered) {

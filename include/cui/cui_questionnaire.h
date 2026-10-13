@@ -156,7 +156,8 @@ typedef struct {
     size_t item, choice;
     cui_questionnaire_size size;
     bool multiple, selected, disabled, invalid, focused;
-    char shortcut; /* Zero when no default shortcut is available. */
+    char shortcut;               /* Zero when no default shortcut is available. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_questionnaire_choice_view;
 /* Render balanced child elements inside the slot. The snapshot is borrowed for
  * this call; do not mutate questionnaire state or end the enclosing slot.
@@ -174,6 +175,8 @@ typedef struct {
     void *render_user;
     /* Non-medium sizes override the root; use custom_size for explicit Medium. */
     bool custom_size;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
+    float density;               /* zero inherits root theme density, or1 for standalone parts. */
 } cui_questionnaire_options;
 /* Composable containers. Item/choices begin returns false for inactive, unknown
  * or disabled items and opens nothing. Call part_end only after a true result.

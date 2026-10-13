@@ -17,6 +17,7 @@ typedef struct {
     cui_toolbar_size size;
     float custom_size;
     float height, padding, gap, font_size, control_height;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_toolbar_metrics;
 /* Large resolves to Medium. Custom preserves its value for hosted controls,
  * but uses the source's Medium bar and Small wrapper height. */
@@ -39,7 +40,8 @@ typedef struct {
     bool disabled; /* Suppresses navigation only; owner disables child controls. */
     cui_str label;
     bool custom_box;
-    cui_box box; /* Complete layout/style replacement when custom_box is true. */
+    cui_box box;                 /* Complete layout/style replacement when custom_box is true. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_toolbar_options;
 cui_toolbar_options cui_toolbar_default(void);
 /* Sized-command renderer. Accessible name is independent of the visible label.

@@ -442,8 +442,8 @@ def main():
             assert semantic_index('Usage metrics', 2) is not None
             click_semantic('Usage metrics', 2)
             page.wait_for_function('cuiGallery.exports.gallery_settings_stats(5)===1')
-            for size in ('1', '2', '0', '3'):
-                control_change('settings-size', size)
+            for size in ('1', '2', '3', '5'):
+                control_change('design-size', size)
                 assert semantic_index('Usage metrics', 2) is not None
             for variant in ('1', '2', '0'):
                 control_change('settings-variant', variant)
@@ -597,7 +597,7 @@ def main():
             wait_semantic('Quiet', 1)
             click_semantic('Inbox', 1)
             wait_semantic('8', 19)
-            for size, extent in [('0', 16), ('1', 10), ('2', 24), ('3', 10)]:
+            for size, extent in [('0', 16), ('1', 14), ('2', 18), ('3', 12)]:
                 control_change('control-size', size)
                 page.wait_for_function('({i,extent})=>Math.abs(cuiGallery.exports.gallery_semantic(i,3)-extent)<0.01',
                                        arg={'i': semantic_index('Status',19), 'extent': extent})
@@ -879,7 +879,7 @@ def main():
             assert page.locator('#accessible [role=progressbar][aria-busy=true]').count() == 0
             page.emulate_media(reduced_motion='no-preference')
             control_change('progress-shape', '1')
-            for size, diameter in [('0',16),('1',12),('2',20),('3',8)]:
+            for size, diameter in [('0',32),('1',24),('2',40),('3',20)]:
                 control_change('control-size', size)
                 circle = page.evaluate('''diameter=>{const e=cuiGallery.exports;
                     const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>
@@ -891,6 +891,7 @@ def main():
                         painted:Array.from(pixels).filter((v,j)=>j%4===3&&v>0).length};
                 }''', diameter)
                 assert circle and circle['w']==diameter*2 and circle['center']==0 and circle['painted']>0
+            control_change('control-size','0')
             control_change('progress-shape', '2')
             assert page.evaluate('''()=>{const e=cuiGallery.exports;return Array.from({length:e.gallery_count()},(_,i)=>i).some(i=>
                 e.gallery_command(i,0)===5&&e.gallery_command(i,3)===64);}''')
@@ -942,10 +943,10 @@ def main():
             click_semantic('Report error', 1)
             page.wait_for_function('cuiGallery.exports.gallery_speech_stats(0)===0&&cuiGallery.exports.gallery_speech_stats(7)===1&&cuiGallery.exports.gallery_speech_stats(12)===4')
             speech_heights = []
-            for size in range(4):
-                control_change('speech-size', str(size))
+            for size in range(1, 6):
+                control_change('design-size', str(size))
                 speech_heights.append(page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,4)', semantic_index('Start dictation', 1)))
-            assert speech_heights[0] == speech_heights[2] and speech_heights[1] < speech_heights[0] and speech_heights[3] < speech_heights[1], speech_heights
+            assert speech_heights == [20, 24, 32, 32, 40], speech_heights
             control_change('speech-unavailable', True)
             assert semantic_index('Speech unavailable', 1) is not None
             assert page.evaluate('(index)=>cuiGallery.exports.gallery_semantic(index,5)', semantic_index('Speech unavailable', 1)) == 1
@@ -1133,7 +1134,7 @@ def main():
             control_change('description-vertical', True)
             page.wait_for_function('()=>{const e=cuiGallery.exports,items=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).filter(i=>e.gallery_semantic(i,0)===7);return e.gallery_semantic(items[1],2)>e.gallery_semantic(items[0],2);}')
             base_height = page.evaluate('cuiGallery.exports.gallery_semantic(0,4)')
-            control_change('description-size', '2')
+            control_change('design-size', '5')
             assert page.evaluate('cuiGallery.exports.gallery_semantic(0,4)') > base_height
             control_change('description-plain', True)
             assert page.evaluate('cuiGallery.exports.gallery_semantic(0,4)') > 0
@@ -1198,7 +1199,7 @@ def main():
             control_change('icon-choice', '1')
             assert page.evaluate('cuiGallery.exports.gallery_icon_stats(0)') == first_parse+1
             assert icon_bitmap() is not None
-            control_change('icon-size', '4')
+            control_change('design-size', '7')
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_command(i,3)', icon_bitmap()) >= 24
             control_change('icon-color', True)
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_bitmap(i,9)', icon_bitmap()) == 1
@@ -1214,7 +1215,7 @@ def main():
             assert page.locator('#accessible [role=group][aria-label="Formatting"]').count() == 1
             assert all(semantic_index(name, 1) is not None for name in ('Save', 'Undo', 'Bold', 'Italic'))
             bar = semantic_index('Editing toolbar', 39)
-            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', bar)-48) < 1
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', bar)-40) < 1
             saved = page.evaluate('cuiGallery.exports.gallery_toolbar_activations(0)')
             click_semantic('Save', 1)
             page.wait_for_function('(n)=>cuiGallery.exports.gallery_toolbar_activations(0)===n+1', arg=saved)
@@ -1228,13 +1229,13 @@ def main():
             control_change('toolbar-grouped', False)
             assert page.locator('#accessible [role=group][aria-label="Formatting"]').count() == 0
             assert semantic_index('Bold', 1) is not None
-            control_change('toolbar-size', '0')
-            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-32) < 1
-            control_change('toolbar-size', '1')
+            control_change('design-size', '2')
             assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-28) < 1
-            control_change('toolbar-size', '4')
-            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-48) < 1
-            control_change('toolbar-size', '2')
+            control_change('design-size', '1')
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-24) < 1
+            control_change('design-size', '5')
+            assert abs(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Editing toolbar', 39))-52) < 1
+            control_change('design-size', '3')
             control_change('toolbar-input', True)
             click_semantic('Find', 6)
             page.keyboard.press('Home')
@@ -2082,13 +2083,13 @@ def main():
                 page.keyboard.press('Escape')
                 page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
             heights = []
-            for size in ['3','1','0','2']:
+            for size in ['1','2','3','5']:
                 frame = page.evaluate('cuiGallery.frame')
-                dropdown_select('size', size)
+                control_change('design-size', size)
                 page.wait_for_function('(f)=>cuiGallery.frame>f', arg=frame)
                 heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Export workspace', 1)))
             assert heights == sorted(heights) and heights[0] < heights[-1], heights
-            dropdown_select('size', '0')
+            control_change('design-size', '3')
             def dropdown_label_alpha():
                 return page.evaluate('()=>{const e=cuiGallery.exports,i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==="Export workspace");return i===undefined?-1:e.gallery_command(i,8)}')
             normal_alpha = dropdown_label_alpha()
@@ -2516,14 +2517,14 @@ def main():
             for variant in ['0','1','2','3','4']:
                 control_change('tabs-variant', variant)
                 heights = []
-                for size in ['3','1','0','2']:
+                for size in ['1','2','3','5']:
                     frame = page.evaluate('cuiGallery.frame')
-                    control_change('tabs-size', size)
+                    control_change('design-size', size)
                     page.wait_for_function('(old)=>cuiGallery.frame>old', arg=frame)
                     heights.append(page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Overview', 8)))
                 assert heights == sorted(heights) and heights[0] < heights[-1], (variant, heights)
             control_change('tabs-variant', '1')
-            control_change('tabs-size', '0')
+            control_change('design-size', '3')
             for mode in ['1','2']:
                 control_change('tabs-mode', mode)
                 page.wait_for_function('cuiGallery.exports.gallery_tabs_scroll(1)>0')
@@ -2794,9 +2795,9 @@ def main():
             page.wait_for_function('Array.from({length:cuiGallery.exports.gallery_count()},(_,i)=>new TextDecoder().decode(new Uint8Array(cuiGallery.exports.memory.buffer,cuiGallery.exports.gallery_command_text(i),cuiGallery.exports.gallery_command_length(i)))).includes("Responses submitted")')
             click_semantic('Start over', 1)
             page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===0&&cuiGallery.exports.gallery_questionnaire_stats(1)===0')
-            control_change('questionnaire-size', '3')
+            control_change('design-size', '1')
             xs = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Explore components', 4))
-            control_change('questionnaire-size', '2')
+            control_change('design-size', '5')
             large = page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,4)', semantic_index('Explore components', 4))
             assert large > xs, (xs, large)
             control_change('questionnaire-numbers', True)

@@ -467,7 +467,7 @@ size_t cui_base_input_measured_hit_test(void *user, cui_str text, float x, float
 
 bool cui_progress_circle_measure(cui_progress_geometry progress, float diameter,
                                  cui_progress_circle_geometry *out) {
-    if (!out || !isfinite(diameter) || diameter < 1 || diameter > 256 ||
+    if (!out || !isfinite(diameter) || diameter < 1 || diameter > 4096 ||
         !isfinite(progress.start) || !isfinite(progress.length) || progress.start < 0 ||
         progress.length < 0 || progress.start + progress.length > 1)
         return false;
@@ -484,7 +484,7 @@ bool cui_progress_circle_raster(cui_progress_circle_geometry geometry, cui_color
                                 unsigned char *pixels, size_t capacity, cui_bitmap *out) {
     const float tau = 6.28318530718f;
     if (!out || !pixels || !isfinite(scale) || scale <= 0 || scale > 4 ||
-        !isfinite(geometry.diameter) || geometry.diameter < 1 || geometry.diameter > 256 ||
+        !isfinite(geometry.diameter) || geometry.diameter < 1 || geometry.diameter > 4096 ||
         !isfinite(geometry.inner_radius) || !isfinite(geometry.outer_radius) ||
         geometry.inner_radius < 0 || geometry.outer_radius > geometry.diameter * .5f ||
         geometry.outer_radius <= geometry.inner_radius || !isfinite(geometry.start_angle) ||
@@ -492,7 +492,7 @@ bool cui_progress_circle_raster(cui_progress_circle_geometry geometry, cui_color
         geometry.end_angle < geometry.start_angle || geometry.end_angle > tau)
         return false;
     unsigned extent = (unsigned)ceilf(geometry.diameter * scale);
-    if (extent > 512 || capacity < (size_t)extent * extent * 4)
+    if (extent > 16384 || extent > SIZE_MAX / extent / 4 || capacity < (size_t)extent * extent * 4)
         return false;
     float alpha = color.a / 255.f;
     float track = alpha * .2f;

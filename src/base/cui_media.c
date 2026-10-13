@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_media.h"
+#include "cui_design_metrics.h"
 #include <float.h>
 #include <math.h>
 #include <string.h>
@@ -190,6 +191,24 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
     cui_attachment_plan p = {0};
     if (!cui_attachment_metrics_resolve(m.size, m.root_font_size, m.custom_density, &p.metrics))
         return false;
+    if (!cui_design_valid(m.design_size))
+        return false;
+    if (m.design_size) {
+        cui_design_metrics d;
+        float density = m.size == CUI_MEDIA_CUSTOM ? m.custom_density : m.root_font_size / 16;
+        if (!cui_design_resolve(m.design_size, density, &d))
+            return false;
+        p.metrics = (cui_attachment_metrics){.height = d.control_height,
+                                             .chip_width = 8 * d.font_size,
+                                             .media = d.control_height,
+                                             .glyph = d.indicator_size,
+                                             .padding_start = d.padding_x,
+                                             .padding_end = d.padding_x,
+                                             .card_padding = d.padding_x,
+                                             .gap = d.gap,
+                                             .text = d.font_size,
+                                             .description = d.font_size * .875f};
+    }
     p.flush = m.vertical && !m.content;
     p.overhang = m.identified && m.remove ? 6 : 0;
     p.remove_visible = p.overhang && (m.touch || m.hovered);
@@ -220,7 +239,8 @@ bool cui_base_attachment(cui_attachment_model m, cui_attachment_plan *out) {
                                   p.metrics.padding_end;
         p.media_width = p.media_height = m.media ? p.metrics.media : 0;
     } else {
-        p.width = p.flush ? p.metrics.height : 7.5f * m.root_font_size;
+        p.width =
+            p.flush ? p.metrics.height : 7.5f * (m.design_size ? p.metrics.text : m.root_font_size);
         if (m.width)
             p.width = m.width;
         p.media_width = m.media ? p.width - (p.flush ? 2 : 2 * p.metrics.card_padding) : 0;

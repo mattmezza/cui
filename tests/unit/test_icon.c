@@ -397,13 +397,43 @@ static void test_context_convenience(void) {
     assert(ui && cui_begin_frame(ui, 100, 100, 0));
     assert(cui_icon_named(ui, 1, &theme, cui_string("check"), (cui_icon_options){0}) ==
            CUI_ICON_OK);
+    assert(cui_icon_named(ui, 2, &theme, cui_string("check"),
+                          (cui_icon_options){.design_size = (cui_design_size)99}) ==
+           CUI_ICON_INVALID);
+    assert(cui_last_error(ui) == CUI_OK);
     assert(cui_icon_named(ui, 2, &theme, cui_string("check"), (cui_icon_options){0}) !=
            CUI_ICON_OK);
     assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
     cui_end_frame(ui);
     cui_destroy(ui);
 }
+
+static void test_design_sizes(void) {
+    cui_theme theme = cui_theme_light();
+    cui_context *ui = cui_create((cui_config){.width = 512, .height = 512});
+    assert(ui);
+    for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+        cui_design_metrics m;
+        assert(cui_design_measure((cui_design_size)n, 1, &m));
+        cui_begin_frame(ui, 512, 512, 0);
+        assert(cui_icon_named(ui, 1, &theme, cui_string("chevron-down"),
+                              (cui_icon_options){.design_size = (cui_design_size)n}) ==
+               CUI_ICON_OK);
+        cui_bitmap image = first_image(cui_end_frame(ui));
+        assert(cui_bounds(ui, 1).w == m.indicator_size && cui_bounds(ui, 1).h == m.indicator_size);
+        assert(image.width == (uint32_t)m.indicator_size &&
+               image.height == (uint32_t)m.indicator_size);
+    }
+    cui_begin_frame(ui, 512, 512, 0);
+    assert(cui_icon_named(ui, 1, &theme, cui_string("chevron-down"),
+                          (cui_icon_options){.design_size = (cui_design_size)99}) ==
+           CUI_ICON_INVALID);
+    assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+
 int main(void) {
+    test_design_sizes();
     test_theme_artwork();
     test_context_convenience();
     test_assets();

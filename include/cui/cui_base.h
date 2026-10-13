@@ -34,8 +34,8 @@ typedef struct {
 } cui_progress_circle_geometry;
 bool cui_progress_circle_measure(cui_progress_geometry, float diameter,
                                  cui_progress_circle_geometry *);
-/* Allocation-free4x4 antialiased RGBA raster into caller storage. Diameter1..256,
- * scale(0,4], at most512px per side. Failure preserves pixels and output.
+/* Allocation-free4x4 antialiased RGBA raster into caller storage. Diameter1..4096,
+ * scale(0,4], at most16384px per side. Failure preserves pixels and output.
  * Pixels must remain alive and unmodified through renderer completion. */
 bool cui_progress_circle_raster(cui_progress_circle_geometry, cui_color, float scale,
                                 unsigned char *pixels, size_t capacity, cui_bitmap *);

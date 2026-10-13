@@ -176,7 +176,7 @@ int gallery_theme_channel(int field, int channel) {
 static bool redraw, reduced_motion, compact_density;
 static bool progress_indeterminate;
 static int progress_shape;
-static unsigned char progress_circle_pixels[128 * 128 * 4];
+static unsigned char progress_circle_pixels[1056 * 1056 * 4];
 static cui_progress_circle_state progress_circle_state = {progress_circle_pixels,
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
@@ -754,11 +754,11 @@ static void toolbar_activate(void *user) {
 }
 static void toolbar_query_render(cui_context *context, const cui_theme *theme,
                                  const cui_toolbar_presentation *presentation, void *user) {
-    (void)presentation;
     (void)user;
     cui_input_result result = cui_input_ex(context, cui_id_from(context, "toolbar-query"), theme,
                                            cui_string("Find"), toolbar_query, &toolbar_query_state,
                                            (cui_input_options){.width = 112,
+                                                               .design_size = presentation->metrics.design_size,
                                                                .placeholder = cui_string("Find"),
                                                                .disabled = toolbar_disabled});
     if (result.changed)
@@ -815,6 +815,7 @@ static void toolbar_group_render(cui_context *context, const cui_theme *theme,
                                   .user = &commands[1]}};
     cui_toolbar_group(context, cui_id_from(context, "toolbar-format-group"), theme, items, 2,
                       (cui_toolbar_options){.size = presentation->metrics.size,
+                                            .design_size = presentation->metrics.design_size,
                                             .label = cui_string("Formatting")});
 }
 static void resizable_content(cui_context *context, void *user) {
@@ -1012,7 +1013,8 @@ static void gallery_attachment_actions(cui_context *context, cui_id id, void *us
     (void)width;
     (void)height;
     if (cui_button_ex(context, id, &current_theme, cui_string("Open"),
-                      (cui_button_options){.size = CUI_CONTROL_XSMALL, .width = 64}))
+                      (cui_button_options){
+                          .size = CUI_CONTROL_XSMALL, .width = 64, .design_size = design_size}))
         attachment_actions++;
 }
 static void gallery_attachment_cards(cui_context *context, cui_id id, void *user, float width,
@@ -1034,6 +1036,7 @@ static void gallery_attachment_cards(cui_context *context, cui_id id, void *user
         options.model.status =
             index ? CUI_ATTACHMENT_COMPLETE : (cui_attachment_status)attachment_status;
         options.model.size = (cui_media_size)gallery_xsmall_second_size();
+        options.model.design_size = design_size;
         options.model.width = 260;
         options.model.vertical = attachment_vertical != 0;
         options.model.identified = true;
@@ -2349,6 +2352,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.size = (cui_description_size)description_size;
         options.width = width - 48;
         options.name = cui_string("Project details");
+        options.design_size = design_size;
         cui_description_list(ui, cui_id_from(ui, "description-list"), &t, items, 5, options);
         break;
     }
@@ -2419,7 +2423,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_icon_set_name(&icon_state, cui_string(names[icon_choice]), NULL, NULL);
             icon_loaded = icon_choice;
         }
-        cui_icon_options options = {.size = (cui_icon_size)icon_size};
+        cui_icon_options options = {.size = (cui_icon_size)icon_size, .design_size = design_size};
         if (icon_rotate) {
             options.custom_transform = true;
             options.transform = cui_icon_rotation(.785398163f);
@@ -2479,6 +2483,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             items[count++] = (cui_toolbar_item){.render = toolbar_query_render};
         cui_toolbar(ui, cui_id_from(ui, "toolbar-preview"), &t, items, count,
                     (cui_toolbar_options){.size = (cui_toolbar_size)toolbar_size,
+                                          .design_size = design_size,
                                           .custom_size = 20,
                                           .label = cui_string("Editing toolbar"),
                                           .disabled = disabled != 0});
@@ -2664,6 +2669,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.height = height - 48;
         options.sidebar_width = 220;
         options.size = (cui_settings_size)settings_size;
+        options.design_size = design_size;
         options.variant = (cui_settings_variant)settings_variant;
         settings_result = cui_settings(ui, cui_id_from(ui, "settings-preview"), &t, pages, 2,
                                        &settings_state, options);
@@ -2834,12 +2840,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string("Scripted provider demo — no microphone access"));
         (void)cui_speech_button(ui, cui_id_from(ui, "speech-toggle"), &t, &speech_state,
                                 (cui_speech_button_options){.size = (cui_speech_size)speech_size,
+                                                            .design_size = design_size,
                                                             .disabled = disabled != 0,
                                                             .show_when_unsupported = true},
                                 host_seconds);
         (void)cui_speech_waveform(
             ui, cui_id_from(ui, "speech-waveform"), &t, &speech_state,
             (cui_speech_waveform_options){.size = (cui_speech_size)speech_size,
+                                          .design_size = design_size,
                                           .width = 260,
                                           .reduced_motion = reduced_motion},
             host_seconds);
@@ -2891,6 +2899,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 79: {
         cui_questionnaire_options options = {.size = (cui_questionnaire_size)questionnaire_size,
+                                             .design_size = design_size,
                                              .width = width > 520 ? 480 : width - 40,
                                              .disabled = disabled,
                                              .numeric_shortcuts = questionnaire_numbers != 0};
@@ -3204,6 +3213,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 56: {
         cui_tag_options options = {.variant = (cui_tag_variant)tag_variant,
                                    .size = (cui_status_size)gallery_xsmall_second_size(),
+                                   .design_size = design_size,
                                    .outline = tag_outline,
                                    .pill = tag_pill,
                                    .background = {29, 100, 220, 255},
@@ -3214,7 +3224,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                               &options.palette);
         cui_tag(ui, cui_id_from(ui, "workspace-tag"), &t, cui_string("Workspace"), options);
         cui_tag(ui, cui_id_from(ui, "reviewed-tag"), &t, cui_string("Reviewed"),
-                (cui_tag_options){.variant = CUI_TAG_SUCCESS, .outline = true});
+                (cui_tag_options){
+                    .variant = CUI_TAG_SUCCESS, .outline = true, .design_size = design_size});
         cui_tag_style style;
         cui_id rich_id = cui_id_from(ui, "rich-tag");
         if (cui_begin_tag(ui, rich_id, &t, options, &style)) {
@@ -3392,6 +3403,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         for (unsigned i = 0; i < 5; i++) {
             cui_badge_options options = cui_badge_defaults();
             options.size = (cui_control_size)control_size;
+            options.design_size = design_size;
             options.count = i == 0 ? badge_count : i == 1 ? 125 : 0;
             options.variant = i == 2 ? CUI_BADGE_DOT : i == 3 ? CUI_BADGE_ICON : CUI_BADGE_COUNT;
             options.icon = cui_string("check");
@@ -3406,11 +3418,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.reduced_motion = reduced_motion;
         options.now_seconds = host_seconds;
         options.size = (cui_control_size)control_size;
+        options.design_size = design_size;
         options.motion = &progress_motion;
         if (progress_shape) {
             cui_progress_circle_options circle = cui_progress_circle_defaults();
             circle.progress = options;
             circle.diameter = progress_shape == 2 ? 64 : 0;
+            if (design_size && progress_shape == 2) {
+                cui_design_metrics metrics;
+                if (cui_design_measure(design_size, t.font_size / 16, &metrics))
+                    circle.diameter = 2 * metrics.control_height;
+            }
             cui_progress_circle(ui, cui_id_from(ui, "progress"), &t, slider / 100,
                                 &progress_circle_state, circle,
                                 progress_shape == 2 ? gallery_progress_content : NULL, &slider);
@@ -3653,6 +3671,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                  (cui_tabs_options){.disabled = disabled,
                                     .variant = (cui_tab_variant)tabs_variant,
                                     .size = (cui_tab_size)tabs_size,
+                                    .design_size = design_size,
                                     .vertical = tabs_mode == 2,
                                     .manual_activation = tabs_manual,
                                     .scroll = tabs_mode ? &tabs_scroll : NULL,
@@ -4305,6 +4324,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                               .variant =
                                                   (cui_dropdown_button_variant)dropdown_variant,
                                               .size = (cui_dropdown_button_size)dropdown_size,
+                                              .design_size = design_size,
                                               .outline = dropdown_outline,
                                               .selected = dropdown_selected,
                                               .action_disabled = dropdown_action == 1,
@@ -5166,7 +5186,11 @@ static void gallery_progress_content(cui_context *ui, void *user) {
     float value = *(float *)user;
     char text[16];
     snprintf(text, sizeof text, "%.0f%%", (double)value);
-    cui_text_with_line_height(ui, cui_string(text), 14, current_theme.text, 14);
+    float font = 14;
+    cui_design_metrics metrics;
+    if (design_size && cui_design_measure(design_size, current_theme.font_size / 16, &metrics))
+        font = metrics.font_size;
+    cui_text_with_line_height(ui, cui_string(text), font, current_theme.text, font);
 }
 void gallery_progress_shape(int shape) {
     progress_shape = shape >= 0 && shape <= 2 ? shape : 0;

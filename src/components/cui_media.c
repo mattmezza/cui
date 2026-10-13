@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_media.h"
+#include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 #include <stdio.h>
@@ -278,7 +279,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                 return r;
         }
     }
-    o.model.root_font_size = t->font_size / .875f;
+    o.model.root_font_size = o.model.design_size ? t->font_size : t->font_size / .875f;
     o.model.content = o.child_count > 0;
     o.model.actions = o.actions != NULL;
     o.model.image = o.image_state && o.image_loader;

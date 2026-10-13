@@ -297,6 +297,17 @@ static void styled(void) {
             icon |= draw.commands[i].type == CUI_DRAW_IMAGE;
         assert(icon);
     }
+
+    for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+        cui_design_metrics m;
+        assert(cui_design_measure((cui_design_size)n, 1, &m));
+        frame(ui, &f, (cui_speech_button_options){.design_size = (cui_design_size)n},
+              (cui_speech_waveform_options){.design_size = (cui_design_size)n});
+        assert(cui_bounds(ui, 2).h == m.control_height);
+        assert(cui_bounds(ui, 3).h == m.control_height);
+    }
+    frame(ui, &f, (cui_speech_button_options){.size = CUI_SPEECH_XSMALL},
+          (cui_speech_waveform_options){0});
     cui_rect r = cui_bounds(ui, 2);
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));

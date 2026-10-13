@@ -134,6 +134,7 @@ typedef struct {
     cui_speech_size size;
     bool disabled, show_when_unsupported;
     cui_str start_label, stop_label, unavailable_label; /* empty selects English defaults */
+    cui_design_size design_size;                        /* INHERIT preserves legacy metrics. */
 } cui_speech_button_options;
 bool cui_speech_button(cui_context *, cui_id, const cui_theme *, cui_speech_state *,
                        cui_speech_button_options, double now);
@@ -142,6 +143,7 @@ typedef struct {
     float width, height; /* zero selects 96 and the size-specific height */
     bool reduced_motion, custom_color;
     cui_color color;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_speech_waveform_options;
 /* Geometry in local coordinates; returns the required rectangle count. Invalid
  * geometry returns SIZE_MAX. Insufficient capacity leaves output untouched. */

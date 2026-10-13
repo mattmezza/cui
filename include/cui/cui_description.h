@@ -32,6 +32,7 @@ typedef struct {
     float width, label_width;
     bool custom_label_width, label_width_percent;
     cui_str name;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_description_options;
 cui_description_options cui_description_options_default(void);
 /* Columns clamp to 1..10 (zero chooses 3). Separators occupy isolated rows.

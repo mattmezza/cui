@@ -34,6 +34,7 @@ typedef struct {
     cui_settings_size size;
     cui_settings_variant variant;
     bool vertical, disabled;
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_settings_render_options;
 typedef void (*cui_setting_render_fn)(cui_context *, cui_id, const cui_theme *,
                                       cui_settings_render_options, void *);
@@ -125,6 +126,7 @@ typedef struct {
     cui_str search_placeholder, reset_label;
     size_t default_page, default_group;
     bool default_group_selected; /* Zero-init selects the page, not group zero. */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_settings_options;
 typedef struct {
     bool selection_changed, reset, resized, scrolled;

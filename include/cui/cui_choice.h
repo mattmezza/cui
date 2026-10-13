@@ -103,6 +103,7 @@ typedef struct {
     void *last_empty_space_user;
     float last_empty_space_width;       /* logical px; zero defaults to12 unless flag set */
     bool custom_last_empty_space_width; /* permits an explicit zero-width tail */
+    cui_design_size design_size;        /* INHERIT preserves legacy metrics. */
 } cui_tabs_options;
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
@@ -401,8 +402,9 @@ typedef struct {
     cui_str tooltip;
     cui_hover_state *tooltip_state;
     cui_hover_options tooltip_options;
-    float density; /* zero uses theme font_size/16 */
-    float height;  /* optional positive styled height override, including Link/Text */
+    float density;               /* zero uses theme font_size/16 */
+    float height;                /* optional positive styled height override, including Link/Text */
+    cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_dropdown_button_options;
 typedef struct {
     bool action_activated, menu_activated;

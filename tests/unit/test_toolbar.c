@@ -260,7 +260,44 @@ static void test_layout(void) {
     cui_destroy(ui);
 }
 #endif
+
+#ifndef CUI_TOOLBAR_BASE_ONLY
+static void test_design_sizes(void) {
+    const float densities[] = {1, .875f, 2};
+    for (size_t d = 0; d < 3; d++) {
+        cui_theme theme = cui_theme_light();
+        theme.font_size = 16 * densities[d];
+        cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1800});
+        assert(ui);
+        cui_toolbar_command command = {.id = 502, .label = {"Save", 4}};
+        for (int n = CUI_DESIGN_XS; n <= CUI_DESIGN_9XL; n++) {
+            cui_design_metrics m;
+            assert(cui_design_measure((cui_design_size)n, densities[d], &m));
+            cui_toolbar_options options = cui_toolbar_default();
+            options.design_size = (cui_design_size)n;
+            command_frame(ui, &theme, &command, options);
+            assert(cui_bounds(ui, 502).h == m.control_height);
+            assert(cui_bounds(ui, 500).h == m.control_height + 2 * m.padding_y);
+            assert(cui_last_error(ui) == CUI_OK);
+        }
+        cui_toolbar_item item = {
+            .id = 501, .sized = true, .render = cui_toolbar_command_render, .user = &command};
+        cui_begin_frame(ui, 1800, 1800, .016f);
+        assert(!cui_toolbar(ui, 500, &theme, &item, 1,
+                            (cui_toolbar_options){.design_size = (cui_design_size)99}));
+        cui_end_frame(ui);
+        size_t count;
+        cui_semantics(ui, &count);
+        assert(count == 0 && cui_last_error(ui) == CUI_OK);
+        cui_destroy(ui);
+    }
+}
+
+#endif
 int main(void) {
+#ifndef CUI_TOOLBAR_BASE_ONLY
+    test_design_sizes();
+#endif
     test_metrics();
     test_navigation();
     test_nested();

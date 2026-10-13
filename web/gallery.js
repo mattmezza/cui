@@ -252,10 +252,11 @@ function requestFrame(){if(framePending||!wasm)return;framePending=true;requestA
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || (!selected.example && !(selected.name in stories)))return;
- const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80];
- const gaps=[0,4,4,6,6,8,8,12,12,16];
+ const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
+ const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
  canvas.style.minWidth=selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth,height=selected.example?840:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+124):selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260,dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.example?840:selected.name==='Button'&&designScale>0?Math.max(260,(canvas.clientWidth<600?7:4)*designHeights[designScale]+124):selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?640:selected.name==='Image'?320:selected.name==='Attachment'?420:selected.name==='DescriptionList'?360:selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?340:['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
  wasm.gallery_table_pin(Number($('table-pin').value));
@@ -529,7 +530,7 @@ function selectComponent(){
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control'])$(id).hidden=selected.name!=='Theme';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
- $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
@@ -560,6 +561,7 @@ function selectComponent(){
  for(const k of ['variant','size','halves','action','anchor'])$('dropdown-'+k).value='0';$('dropdown-outline').checked=false;$('dropdown-selected').checked=false;
  for(const id of ['tabs-mode','tabs-size','tabs-variant','tabs-manual-control'])$(id).hidden=selected.name!=='Tabs';
  $('tabs-mode').value='0';$('tabs-size').value='0';$('tabs-variant').value='1';$('tabs-manual').checked=false;
+ for(const id of ['settings-size','tabs-size','description-size','icon-size','toolbar-size','questionnaire-size','speech-size','dropdown-size'])$(id).hidden=true;
  cancelScreenColor();
  for(const id of ['progress-mode','progress-shape']){$(id).hidden=selected.name!=='Progress';$(id).value='0';}
  $('shimmer-mode').hidden=selected.name!=='Shimmer';$('shimmer-mode').value='0';

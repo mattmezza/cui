@@ -142,6 +142,9 @@ struct cui_context {
     cui_id event_accepted_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_previous_focus[CUI_CORE_DISPATCH_MAX];
     size_t event_activation_slots[CUI_CORE_DISPATCH_MAX];
+    cui_activation_snapshot activation_snapshots[CUI_CORE_EVENT_MAX];
+    cui_pointer_activation_sample capture_start;
+    bool capture_start_valid;
     uint64_t scopes[CUI_CORE_STACK_MAX];
     size_t scope_count;
     bool opened[CUI_CORE_STACK_MAX];
@@ -204,6 +207,10 @@ static void cui_core_fail(cui_context *ui, cui_error e) {
 }
 static void cui_core_select_context(cui_context *ui) {
     Clay_SetCurrentContext(ui->clay);
+}
+static void cui_core_clear_capture(cui_context *ui) {
+    ui->capture = 0;
+    ui->capture_start_valid = false;
 }
 static bool cui_core_mutation(cui_context *ui) {
     if (cui_core_paint_context) {
@@ -866,7 +873,7 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
         ui->contacts[slot].dragging = false;
         ui->contacts[slot].blocked = false;
         if (count) {
-            ui->capture = 0;
+            cui_core_clear_capture(ui);
             for (size_t n = 0; n < 16; n++)
                 if (ui->contacts[n].active)
                     ui->contacts[n].blocked = true;
@@ -883,7 +890,7 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
         contact_y = ui->contacts[slot].y;
         e->x = contact_x;
         e->y = contact_y;
-        ui->capture = 0;
+        cui_core_clear_capture(ui);
     }
     float old_x = ui->contacts[slot].x, old_y = ui->contacts[slot].y;
     double dx = (double)e->x - old_x, dy = (double)e->y - old_y;
@@ -930,7 +937,7 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
                 ui->contacts[partner].dragging = true;
             }
             ui->contacts[slot].dragging = true;
-            ui->capture = 0;
+            cui_core_clear_capture(ui);
             e->type = CUI_EVENT_GESTURE;
             e->dx = pan && !ending ? cui_core_touch_float(dx) : 0;
             e->dy = pan && !ending ? cui_core_touch_float(dy) : 0;
@@ -948,7 +955,7 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
         if (ui->contacts[slot].owner &&
             (distance_x * distance_x + distance_y * distance_y >= 64 || !start)) {
             ui->contacts[slot].dragging = true;
-            ui->capture = 0;
+            cui_core_clear_capture(ui);
             e->type = CUI_EVENT_SCROLL;
             *scroll_owner = ui->contacts[slot].owner;
             e->dx = ending ? 0 : cui_core_touch_float(start ? distance_x : dx);
@@ -971,6 +978,40 @@ static bool cui_core_touch(cui_context *ui, cui_event *e, cui_id *target, cui_id
         ui->contacts[slot].active = false;
     }
     return suppress;
+}
+static cui_pointer_activation_sample cui_core_pointer_sample(cui_event e) {
+    return (cui_pointer_activation_sample){.x = e.x,
+                                           .y = e.y,
+                                           .modifiers = e.modifiers,
+                                           .click_count = e.click_count,
+                                           .type = e.pointer_type,
+                                           .button = e.pointer_button,
+                                           .contact = e.pointer_id,
+                                           .device = e.pointer_device};
+}
+static void cui_core_activation_evidence(cui_context *ui, size_t slot, cui_event e,
+                                         bool has_press) {
+    cui_activation_snapshot evidence = {
+        .event_type = e.type, .key = e.key, .modifiers = e.modifiers};
+    if (e.type == CUI_EVENT_POINTER_UP) {
+        evidence.has_release = true;
+        evidence.release = cui_core_pointer_sample(e);
+        evidence.has_press = has_press && ui->capture_start_valid &&
+                             ui->capture_start.type == e.pointer_type &&
+                             ui->capture_start.contact == e.pointer_id &&
+                             ui->capture_start.device == e.pointer_device &&
+                             ui->capture_start.button == e.pointer_button;
+        if (evidence.has_press)
+            evidence.press = ui->capture_start;
+    } else if (e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) {
+        for (size_t n = 0; n < ui->previous_count; ++n)
+            if (ui->previous[n].id == ui->activations[slot]) {
+                evidence.has_key_bounds = true;
+                evidence.key_bounds = ui->previous_hits[n];
+                break;
+            }
+    }
+    ui->activation_snapshots[slot] = evidence;
 }
 static void cui_core_activate(cui_context *ui, cui_id id) {
     if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
@@ -1179,6 +1220,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     ui->queued_count = 0;
     ui->activation_count = 0;
+    memset(ui->activation_snapshots, 0, sizeof ui->activation_snapshots);
     memset(ui->event_accepted_activations, 0, sizeof ui->event_accepted_activations);
     cui_id touch_cancellations[CUI_CORE_DISPATCH_MAX] = {0};
     for (size_t i = 0; i < ui->event_count; i++) {
@@ -1253,6 +1295,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 cui_core_activate(ui, e.accessibility_target);
                 ui->event_activations[i] = e.accessibility_target;
                 ui->event_activation_slots[i] = ui->activation_count - 1;
+                if (ui->activation_count > before_activation)
+                    cui_core_activation_evidence(ui, ui->activation_count - 1, e, false);
             }
             continue;
         }
@@ -1343,8 +1387,11 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 }
             if (blocked)
                 ui->event_consumed[i] = true;
-            else
+            else {
                 ui->capture = pointer_activation || target == hit ? hit : 0;
+                ui->capture_start_valid = ui->capture != 0;
+                ui->capture_start = cui_core_pointer_sample(e);
+            }
             if (!blocked && !pointer_only) {
                 if (hit || ui->previous_top_modal == SIZE_MAX)
                     ui->focus = target;
@@ -1360,9 +1407,11 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             cui_id hit = cui_core_hit(ui, e.x, e.y);
             if (!touch_drag && !cui_core_pointer_blocked(ui, hit) && ui->capture == hit)
                 cui_core_activate(ui, ui->capture);
-            ui->capture = 0;
+            if (ui->activation_count > before_activation)
+                cui_core_activation_evidence(ui, ui->activation_count - 1, e, true);
+            cui_core_clear_capture(ui);
         } else if (e.type == CUI_EVENT_CANCEL && !touch_cancellations[i]) {
-            ui->capture = 0;
+            cui_core_clear_capture(ui);
             ui->space_capture = 0;
         } else if (e.type == CUI_EVENT_KEY_DOWN && !e.repeat) {
             if (e.key == CUI_KEY_TAB) {
@@ -1382,7 +1431,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             else if (e.key == CUI_KEY_SPACE)
                 ui->space_capture = ui->focus;
             else if (e.key == CUI_KEY_ESCAPE) {
-                ui->capture = 0;
+                cui_core_clear_capture(ui);
                 ui->space_capture = 0;
             }
         } else if (e.type == CUI_EVENT_KEY_UP && e.key == CUI_KEY_SPACE) {
@@ -1391,6 +1440,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             ui->space_capture = 0;
         }
         if (ui->activation_count > before_activation) {
+            if (e.type != CUI_EVENT_POINTER_UP)
+                cui_core_activation_evidence(ui, ui->activation_count - 1, e, false);
             ui->event_activations[i] = ui->activations[ui->activation_count - 1];
             ui->event_activation_slots[i] = ui->activation_count - 1;
         }
@@ -2194,7 +2245,7 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
             ui->focus = restored;
         }
         if (ui->capture == id)
-            ui->capture = 0;
+            cui_core_clear_capture(ui);
         if (ui->space_capture == id)
             ui->space_capture = 0;
     }
@@ -3199,7 +3250,7 @@ cui_core_commands_done:
     for (size_t i = 0; i < ui->semantic_count; i++)
         ui->semantics[i].focused = ui->semantics[i].id == ui->focus && !ui->semantics[i].disabled;
     if (!captured)
-        ui->capture = 0;
+        cui_core_clear_capture(ui);
     if (!space)
         ui->space_capture = 0;
     memcpy(ui->previous_focus_scopes, ui->focus_scopes,
@@ -3446,6 +3497,22 @@ cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
                 return id;
     }
     return 0;
+}
+
+bool cui_event_activation_snapshot(const cui_context *ui, size_t index,
+                                   cui_activation_snapshot *out) {
+    cui_id target = cui_event_accepted_activation(ui, index);
+    if (!target || !out)
+        return false;
+    size_t slot = ui->event_activation_slots[index];
+    if (slot >= ui->activation_count || slot >= CUI_CORE_EVENT_MAX)
+        return false;
+    cui_activation_snapshot result = ui->activation_snapshots[slot];
+    result.target = target;
+    result.frame_sequence = ui->frame_sequence;
+    result.event_index = index;
+    *out = result;
+    return true;
 }
 
 bool cui_event_consumed(cui_context *ui, size_t index) {

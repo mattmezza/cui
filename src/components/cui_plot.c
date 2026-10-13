@@ -226,9 +226,80 @@ static void blend(unsigned char *p, cui_color c) {
     p[2] = (unsigned char)lround((c.b * a + p[2] * old * (1 - a)) / alpha);
     p[3] = (unsigned char)lround(alpha * 255);
 }
+static bool background_frame_valid(cui_plot_rect frame) {
+    return point_valid((cui_plot_point){frame.x_min, frame.y_min}) &&
+           point_valid((cui_plot_point){frame.x_max, frame.y_max}) && frame.x_min < frame.x_max &&
+           frame.y_min < frame.y_max;
+}
+static bool background_valid(const cui_plot_background *background) {
+    if (!background || background->kind < CUI_PLOT_BACKGROUND_SOLID ||
+        background->kind > CUI_PLOT_BACKGROUND_LINEAR)
+        return false;
+    return background->kind == CUI_PLOT_BACKGROUND_SOLID ||
+           (isfinite(background->angle) && isfinite(background->from.position) &&
+            isfinite(background->to.position) && background->from.position >= 0 &&
+            background->from.position <= 1 && background->to.position >= 0 &&
+            background->to.position <= 1);
+}
+cui_plot_background cui_plot_solid_background(cui_color color) {
+    return (cui_plot_background){.solid = color};
+}
+cui_plot_background cui_plot_linear_background(double angle, cui_plot_color_stop from,
+                                               cui_plot_color_stop to) {
+    return (cui_plot_background){
+        .kind = CUI_PLOT_BACKGROUND_LINEAR, .angle = angle, .from = from, .to = to};
+}
+typedef struct {
+    const cui_plot_background *background;
+    double center_x, center_y, x, y;
+} plot_background_sampler;
+static plot_background_sampler background_sampler(const cui_plot_background *background,
+                                                  cui_plot_rect frame) {
+    plot_background_sampler sample = {.background = background};
+    if (!background || background->kind == CUI_PLOT_BACKGROUND_SOLID)
+        return sample;
+    double angle = fmod(background->angle, 360) * (3.14159265358979323846 / 180);
+    double dx = sin(angle), dy = -cos(angle);
+    double length = fabs((frame.x_max - frame.x_min) * dx) + fabs((frame.y_max - frame.y_min) * dy);
+    sample.x = dx / length;
+    sample.y = dy / length;
+    sample.center_x = frame.x_min / 2 + frame.x_max / 2;
+    sample.center_y = frame.y_min / 2 + frame.y_max / 2;
+    return sample;
+}
+static cui_color background_color(plot_background_sampler sample, cui_plot_point point) {
+    const cui_plot_background *background = sample.background;
+    if (background->kind == CUI_PLOT_BACKGROUND_SOLID)
+        return background->solid;
+    double position =
+        .5 + (point.x - sample.center_x) * sample.x + (point.y - sample.center_y) * sample.y;
+    double interval = background->to.position - background->from.position;
+    double t = interval == 0 ? (position >= background->to.position ? 1 : 0)
+                             : (position - background->from.position) / interval;
+    t = fmax(0, fmin(1, t));
+    cui_color a = background->from.color, b = background->to.color;
+    return (cui_color){(unsigned char)lround(a.r * (1 - t) + b.r * t),
+                       (unsigned char)lround(a.g * (1 - t) + b.g * t),
+                       (unsigned char)lround(a.b * (1 - t) + b.b * t),
+                       (unsigned char)lround(a.a * (1 - t) + b.a * t)};
+}
+cui_plot_result cui_plot_background_sample(const cui_plot_background *background,
+                                           cui_plot_rect frame, cui_plot_point position,
+                                           cui_color *out) {
+    if (!out || !background_valid(background) || !background_frame_valid(frame) ||
+        !point_valid(position))
+        return CUI_PLOT_INVALID;
+    *out = background_color(background_sampler(background, frame), position);
+    return CUI_PLOT_OK;
+}
 static void raster_segments(unsigned char *pixels, unsigned width, unsigned height, size_t stride,
                             const plot_segment *lines, size_t used, cui_plot_point origin,
-                            cui_color fill, cui_color stroke, float stroke_width) {
+                            cui_color fill, cui_color stroke, float stroke_width,
+                            const cui_plot_background *fill_background,
+                            const cui_plot_background *stroke_background,
+                            cui_plot_rect background_frame) {
+    plot_background_sampler fill_sample = background_sampler(fill_background, background_frame);
+    plot_background_sampler stroke_sample = background_sampler(stroke_background, background_frame);
     for (unsigned y = 0; y < height; ++y)
         for (unsigned x = 0; x < width; ++x) {
             double px = x + .5, py = y + .5;
@@ -240,7 +311,7 @@ static void raster_segments(unsigned char *pixels, unsigned width, unsigned heig
                 if (lines[j].closed && ((a.y > py) != (b.y > py)) &&
                     px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
                     inside = !inside;
-                if (stroke.a && stroke_width > 0) {
+                if ((stroke_background || stroke.a) && stroke_width > 0) {
                     double dx = b.x - a.x, dy = b.y - a.y, length = dx * dx + dy * dy;
                     double t =
                         length ? fmax(0, fmin(1, ((px - a.x) * dx + (py - a.y) * dy) / length)) : 0;
@@ -248,11 +319,21 @@ static void raster_segments(unsigned char *pixels, unsigned width, unsigned heig
                         stroked = true;
                 }
             }
+            if (!inside && !stroked)
+                continue;
+            cui_plot_point relative = {px - origin.x, py - origin.y};
             unsigned char *p = pixels + y * stride + x * 4;
-            if (inside && fill.a)
-                blend(p, fill);
-            if (stroked)
-                blend(p, stroke);
+            if (inside) {
+                cui_color color = fill_background ? background_color(fill_sample, relative) : fill;
+                if (color.a)
+                    blend(p, color);
+            }
+            if (stroked) {
+                cui_color color =
+                    stroke_background ? background_color(stroke_sample, relative) : stroke;
+                if (color.a)
+                    blend(p, color);
+            }
         }
 }
 cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned height,
@@ -285,7 +366,8 @@ cui_plot_result cui_plot_raster(unsigned char *pixels, unsigned width, unsigned 
     for (size_t i = 0; i < count; ++i) {
         (void)segments(shapes + i, lines, &used);
         raster_segments(pixels, width, height, stride, lines, used, (cui_plot_point){0},
-                        shapes[i].fill, shapes[i].stroke, shapes[i].stroke_width);
+                        shapes[i].fill, shapes[i].stroke, shapes[i].stroke_width, NULL, NULL,
+                        (cui_plot_rect){0});
     }
     return CUI_PLOT_OK;
 }
@@ -906,6 +988,44 @@ cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, un
     for (size_t i = 0; i < count; ++i)
         raster_segments(pixels, width, height, stride, shapes[i].path.segments,
                         shapes[i].path.count, shapes[i].path.origin, shapes[i].fill,
-                        shapes[i].stroke, shapes[i].stroke_width);
+                        shapes[i].stroke, shapes[i].stroke_width, NULL, NULL, (cui_plot_rect){0});
+    return CUI_PLOT_OK;
+}
+
+cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned width, unsigned height,
+                                            size_t stride, size_t capacity_bytes,
+                                            const cui_plot_background_shape *shapes, size_t count,
+                                            cui_color clear) {
+    if (!pixels || !width || !height || width > 1024 || height > 1024 ||
+        stride < (size_t)width * 4 || stride > SIZE_MAX / height || count > 64 ||
+        (count && !shapes))
+        return CUI_PLOT_INVALID;
+    if (capacity_bytes < stride * height)
+        return CUI_PLOT_CAPACITY;
+    size_t total = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!cached_path_valid(shapes[i].path) ||
+            !background_frame_valid(shapes[i].background_frame) ||
+            !background_valid(&shapes[i].fill) || !background_valid(&shapes[i].stroke) ||
+            !isfinite(shapes[i].stroke_width) || shapes[i].stroke_width < 0 ||
+            shapes[i].stroke_width > 1024)
+            return CUI_PLOT_INVALID;
+        total += shapes[i].path.count;
+    }
+    if (total && (size_t)width * height > 64000000 / total)
+        return CUI_PLOT_CAPACITY;
+    for (unsigned y = 0; y < height; ++y)
+        for (unsigned x = 0; x < width; ++x) {
+            unsigned char *p = pixels + y * stride + x * 4;
+            p[0] = clear.r;
+            p[1] = clear.g;
+            p[2] = clear.b;
+            p[3] = clear.a;
+        }
+    for (size_t i = 0; i < count; ++i)
+        raster_segments(pixels, width, height, stride, shapes[i].path.segments,
+                        shapes[i].path.count, shapes[i].path.origin, (cui_color){0}, (cui_color){0},
+                        shapes[i].stroke_width, &shapes[i].fill, &shapes[i].stroke,
+                        shapes[i].background_frame);
     return CUI_PLOT_OK;
 }

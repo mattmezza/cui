@@ -559,3 +559,21 @@ plots and keeps ordinary children composed; hover is suppressed until linear
 time reaches one. Default policy is Base's zero duration, with product timing
 supplied by the host. See [channel binding](PLOT_MODEL.md#first-paint-appearance-channel-binding)
 for capacity failures and exact lifetime rules.
+
+## Software fill and stroke backgrounds
+
+Frozen shapes accept GPUI Background values verbatim. The portable software
+subset provides `cui_plot_solid_background`, `cui_plot_linear_background`,
+`cui_plot_background_sample` and `cui_plot_raster_backgrounds`. The raster route
+uses existing cached segments with an explicit relative background frame and
+independent fill/stroke colors or two-stop gradients. Angle0 points up,90 right;
+caller angles/stops are preserved and never automatically rotated for a bar.
+Reversed stop positions and transparent endpoints support source-style area
+fades. Origin translation reuses tessellation and carries the gradient frame
+with the geometry. Gradient coefficients are prepared once per shape.
+
+This route interpolates straight encoded-sRGB RGBA8, uses the existing bounded
+software fill/stroke sampling and preserves pixels on validation/capacity errors.
+It does not add Oklab, patterns, native GPU path meshes or gradient Core quads.
+Existing solid widget drivers remain separate. See the [Background audit](PLOT_MODEL.md#background-draw-routes-and-native-renderer-gap)
+for exact bounds, color differences and the remaining renderer prerequisite.

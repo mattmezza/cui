@@ -126,6 +126,42 @@ cui_plot_result cui_plot_raster_cached(unsigned char *pixels, unsigned width, un
                                        size_t stride, size_t capacity_bytes,
                                        const cui_plot_cached_shape *, size_t count,
                                        cui_color clear);
+/* Source Background subset for software paths: encoded-sRGB solid/two-stop
+ * gradients. No Oklab, slash/checkerboard patterns or native renderer triangles.
+ * Angle0 points up,90 right; caller angle is never changed for bar orientation. */
+typedef enum { CUI_PLOT_BACKGROUND_SOLID, CUI_PLOT_BACKGROUND_LINEAR } cui_plot_background_kind;
+typedef struct {
+    cui_color color;
+    double position;
+} cui_plot_color_stop;
+typedef struct {
+    cui_plot_background_kind kind;
+    cui_color solid;
+    double angle;
+    cui_plot_color_stop from, to;
+} cui_plot_background;
+cui_plot_background cui_plot_solid_background(cui_color);
+cui_plot_background cui_plot_linear_background(double angle, cui_plot_color_stop from,
+                                               cui_plot_color_stop to);
+/* Explicit positive finite relative frame/position within +/-16384. Stops0..1
+ * may be reversed; equal stops make a right-continuous hard edge. Projection
+ * clamps beyond stops. Channels interpolate straight encoded-sRGB RGBA8; this
+ * is not a claim of byte-identical GPUI shader/color-space output. */
+cui_plot_result cui_plot_background_sample(const cui_plot_background *, cui_plot_rect frame,
+                                           cui_plot_point position, cui_color *out);
+typedef struct {
+    cui_plot_cached_path path;
+    cui_plot_rect background_frame; /* origin-relative; paint colors share this frame */
+    cui_plot_background fill, stroke;
+    float stroke_width;
+} cui_plot_background_shape;
+/* Cached geometry with per-pixel fill/stroke background. Same raster budgets,
+ * sampling and transaction/lifetime contract as raster_cached. Origin translates
+ * frame+geometry together; changing paint backgrounds never tessellates again. */
+cui_plot_result cui_plot_raster_backgrounds(unsigned char *pixels, unsigned width, unsigned height,
+                                            size_t stride, size_t capacity_bytes,
+                                            const cui_plot_background_shape *, size_t count,
+                                            cui_color clear);
 /* Caller RGBA8 storage, straight alpha. Rasterizer accepts Move/Line/Cubic/Close;
  * use arc_flatten for ARC commands. Cubics use 16 uniform parameter chords.
  * Each shape <=4096 flattened segments, <=64 shapes, dimensions1..1024,

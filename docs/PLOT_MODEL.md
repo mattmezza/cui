@@ -583,17 +583,17 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | `ScalePoint` owned domain, duplicate-first map, tick-at, nearest | Point init/map/at/nearest | Uint64 keys, borrowed arrays, bounded finite validation rather than owned generic Vec |
 | `ScaleOrdinal` domain/range replacement, unknown, first duplicate, cycling cloned output | Ordinal init/map; reinitialize to replace arrays | Byte copies preserve C value representations but do not deep-clone arbitrary payloads; pointers remain caller-owned; finite capacity bounds |
 | `Curve::{Natural,Linear,StepAfter}` | Cartesian path and source Area builders | Source Catmull-Rom controls and omitted final StepAfter vertical reproduced; no additional upstream StepBefore/Step scale exists |
-| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | Dot geometry/themed drivers now available; no accessor callbacks, arbitrary Background/gradient, or source renderer mesh cache; caller-owned software segment cache available; numeric bounds/precision differ |
+| `Line` data/X/Y accessors, source skip-gaps, stroke/width, dots/size/fill/stroke, paint/cache | Materialized samples, path commands, shape raster stroke | Dot geometry/themed drivers now available; no accessor callbacks or source renderer mesh cache; software solid/two-stop gradient Background route available; caller-owned software segment cache available; numeric bounds/precision differ |
 | `Area` data/X/Y1, optional Y0, fill plus separate 1px upper stroke, curves, paint/cache | `cui_plot_area_paths` separate contours; two raster shapes | Source accessor callbacks/cache/backgrounds absent; open/singleton GPUI tessellator result not reproduced; extended per-point closed areas remain separate |
-| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; pure independently rounded-bar paths available; no generic label callback or arbitrary gradient renderer; negative width is rejected |
+| `Bar`, `BarAlignment` orientation/gradient angle, cross/band/base/value, fill(frame,alignment), labels, corner radii | `cui_plot_bar_layout`, projected vertical helper, rectangular paths | Geometry/label anchors, solid fill callback and Core per-corner styled driver available; pure rounded-bar paths support software solid/two-stop gradients; no generic label callback or native arbitrary Background renderer; negative width is rejected |
 | `Pie` positive-value arcs/index/padding and angular limits | `cui_plot_pie` | No accessor callback/borrowed arbitrary datum payload; stable normalized double summation replaces unchecked f32 sums; pad is metadata |
-| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; flattened output can use software segment cache, no native mesh cache/Background |
+| `ArcData`, `Arc` radii, centroid, contains, padded paint/cache | Arc metadata, centroid/contains/path/flatten | Strict nonnegative ordered radii rather than source clamping; explicit SOURCE_PADDING reproduces >=pi .0001 seam override and epsilon behavior, legacy SEAMLESS remains available; spans above one turn rejected; flattened output can use software segment cache, software two-stop Background route available for flattened paths, no native mesh cache |
 | `RadialLine` index-aware angle/radius, open/closed stroke, >=3-point fill, dots, paint | Materialized radial paths plus raster | Themed radial dot driver available, but no accessor callbacks; nonnegative radii enforced; split gaps and radial area are extensions, not separate upstream exports |
 | `Stack`, `StackPoint`, `StackSeries` keys/index, cloned datum, natural signed baseline, missing=0 | Series-major `cui_plot_stack` cells | Numeric stacking covered; key names/indices and data payload references supplied by application; no Rust-style cloning or retained series allocation |
 | `Sankey`, graph/link/node/layout/error types, topology/layout/layout_from, alignment, linear/sqrt, relaxation, ribbon path | Shared Base graph/path model and Chart adapter | Shared pure topology/layout/layout_from, adjacency queries, source defaults, scaled values and tapered ribbon path available; bounded capacities/strict finite nonnegative values and checked doubles differ; Chart adapter delegates while preserving its public contracts |
 | `PlotAxis`, `AxisText`, `AxisLabelSide`, `AXIS_GAP`, `axis_gutter` | Axis defaults/layout/paint/ticks/gutter | Line visibility, fixed source offsets/explicit colors via source constructor, legacy themed/font-scaled route preserved; dynamic Backgrounds absent |
 | `AxisLabelPlacement::{Outside,Inside}` | Application places labels/reserves gutters; Chart has its own layer | No standalone Plot placement enum or automatic gutter allocation; source PlotAxis itself only records position/side |
-| `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults and explicit-color paint covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; no arbitrary Background |
+| `Grid` X/Y, stroke, dash array, centered quads | Grid layout/themed paint | Dash parity/defaults and explicit-color paint covered; bounded counts, stricter finite input and DEGENERATE nonprogress behavior; Core Grid driver remains solid-only; generic software path route is separate; no native arbitrary Background |
 | `Text`, `PlotLabel`, text width/truncation helpers | Caller-owned PlotLabel collection/layout/paint and measured UTF-8 ellipsis helper | No automatic tooltip content/prepaint; frozen font_weight builder records a field that PlotLabel.paint ignores, not a verified weighted-text rendering feature |
 | `PathCache`, `PathCaches`, `ShapeKey` | Caller-owned flattened-segment cache, translated raster and shape-key helper | Cache hits skip builder/cubic flattening; empty builds are warm; opaque FNV keys preserve f32 bit sensitivity, not Rust hash values; no renderer-native stroke triangles or implicit keyed slot bank |
 | `PlotMotion` pointer Spring, enter/exit/appear Transitions | Caller-owned scalar transition clock with signed delay, easing and reversal shortening | Enter/exit projected clocks and scalar pointer glide available; explicit host policies and first-paint generation binding; no automatic theme projection/keyed renderer clock |
@@ -1122,3 +1122,47 @@ Registry capacity errors are preflight failures: no plot/state/completion entry
 is submitted or changed. Explicit caller frames, registry storage and unique
 owner IDs substitute for window keyed element state; they do not add an implicit
 retained scope tree or a renderer layout/prepaint scheduler.
+
+### Background draw routes and native renderer gap
+
+Frozen Base Plot exports no standalone `PlotStroke` or `Fill` wrapper. Its shapes
+accept GPUI `Background` directly. The pinned dependency is `gpui-pre =0.3.8`;
+its Background supports solid, two-stop linear gradients, slash/checkerboard
+patterns, and sRGB/Oklab interpolation. Plot's Bar explicitly uses a supplied
+background verbatim and never rotates its angle for orientation. Source story
+area gradients also use reversed stops (opaque at1, transparent at0).
+
+CUI's software subset uses `cui_plot_background` with solid or two-stop linear
+encoded-sRGB color stops. `cui_plot_background_sample` accepts an explicit
+positive relative frame and point. Angle0 points top,90 right, increasing
+clockwise; finite angles normalize modulo360. Gradient projection runs across
+the frame's full projected diagonal, clamps outside stop locations, and retains
+caller stop order. Equal stops produce an explicit right-continuous hard edge.
+Channels interpolate straight encoded-sRGB RGBA8 and are then source-over
+composited by the existing rasterizer. This checked CPU contract is not claimed
+byte-identical to GPU shader/Hsla conversion, premultiplication or Oklab output.
+
+`cui_plot_raster_backgrounds` consumes cached relative segments, explicit
+`background_frame`, fill/stroke backgrounds and stroke width. It prepares
+gradient coefficients once per shape, evaluates colors only on covered pixels,
+and shares the solid rasterizer's sampling/fill/stroke/alpha code. Origin moves
+frame and geometry together without rebuilding. Explicit gradients are never
+rotated based on bar alignment. A fill can fade to alpha0; stroke backgrounds
+are independent. Geometry/color/frame buffers are borrowed and must be stable
+and disjoint from pixel output during the call.
+
+The existing bounds remain: up to64 shapes,4096 segments per shape,1024² pixels,
+64-million pixel*segment work, positions/frame corners within +/-16384,
+stroke width0..1024; stop positions must be finite0..1. Invalid/capacity failures
+preserve all pixels. Old solid APIs preserve their behavior and defaults. Core
+quad-based Bar/Dot/Axis/Grid drivers still accept their existing solid colors;
+use pure paths plus this software route for gradient fills/strokes. No Oklab,
+pattern or arbitrary GPU Background parity is claimed.
+
+Native source painting requires a path/mesh command with bounds and tessellated
+vertices, fill/stroke background and clipping/coverage attributes. Source
+PathCache origin translation moves bounds and XY vertices while keeping coverage
+attributes unchanged. Core currently exposes rectangle/text/bitmap draw routes,
+not this path/mesh contract; adding it belongs to the integrator's Core/adapter
+work. The software segment cache does not become a native stroke triangle cache
+through naming, and per-pixel rasterization still runs on each frame.

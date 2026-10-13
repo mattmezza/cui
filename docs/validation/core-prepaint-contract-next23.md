@@ -393,3 +393,36 @@ this 64-bit build these sizes are 192, 52, 264, and 1 bytes: default capacities 
 3,170,304 bytes, before allocator rounding. Payloads/text consume the existing
 frame arena. There is no hidden per-frame heap allocation or unbounded binding
 cache, but the extra fixed reservation is material for small embedded hosts.
+
+## Actual WASM browser proof
+
+`tests/web/core_prepaint_probe.c` is a Core-only scene with a clipped scroll
+owner, absolute paint child, passive portal, and modal scope.
+`tests/web/test_core_prepaint.py` compiles that scene and Core using pinned
+Zig 0.16.0 with C11 and `-Wall -Wextra -Wpedantic -Werror`, then drives the
+result in Playwright 1.58.0 and Chromium 1208. Its small Canvas2D host renders
+actual portable rectangle/clip draw commands returned by Core; it does not
+substitute previous bounds or fabricate hover/tooltip geometry.
+
+The strict assertions cover unknown first pointer; actual pointer movement;
+local paint containment and deferred paint beyond that clip; passive and modal
+occlusion; viewport resize with no further pointer event; and genuine browser
+wheel input routed to the Core scroll owner, consumed by its fixture reducer,
+with exact current-frame owner displacement under the stationary pointer.
+Checkbox controls toggle overlays using keyboard Space so the real pointer
+stays stationary. Pixel reads check local colors, suppressed/visible deferred
+paint, overlay paint, and exposed scroll background. Callback/frame counters
+and input signals accompany pixels, and clip balance and browser errors are
+checked. The scroll capacity and reduction belong to this isolated host fixture,
+not an assertion that every production scroll component uses prepaint.
+
+Run from the repository with:
+
+```sh
+uv run --script tests/web/test_core_prepaint.py --output build/core-prepaint-probe
+```
+
+The default is installed Chromium 1208; `--chromium` may select its matching
+headless shell. The output includes the exact compiled WASM, HTML host, and a
+scroll-state PNG. This is Chromium/WASM Core seam evidence, not full Chart/Plot
+integration, physical touchscreen, or native Windows validation.

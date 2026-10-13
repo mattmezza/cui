@@ -211,11 +211,15 @@ the bounded rasterizer intentionally fills only explicitly closed runs.
 
 The [complete frozen export audit](PLOT_MODEL.md#complete-frozen-plot-export-audit)
 lists exact supported routes and remaining differences. In particular this
-styled layer does not yet implement arbitrary gradient backgrounds, renderer-native
-mesh caches, implicit appear scope tracking or the PlotElement renderer prepaint
-lifecycle. Caller-owned software segment caches, exit clocks and tooltip content
-composition are available; current bounds/pointer/occlusion remain host supplied. Chart-specific versions of some features do not automatically
-satisfy standalone Plot parity. Axis default positions and centered strokes are
+styled layer does not yet implement arbitrary renderer-native mesh backgrounds
+or implicit appear scope tracking. Caller-owned software segment caches, exit
+clocks and tooltip content composition are available. For Core-owned current
+bounds, clipping, pointer occlusion and deferred paint, opt into
+[current-frame PlotElement](PLOT_CHART_CURRENT_FRAME.md); the legacy path still
+requires host-supplied geometry. That opt-in has restricted paint callbacks and
+does not provide source-complete retained child layout, mobile long-press or
+native mesh rendering. Chart-specific features do not automatically satisfy
+standalone Plot parity. Axis default positions and centered strokes are
 covered, while nondefault font scaling and theme fallback are deliberate CUI
 policies rather than byte-for-byte source behavior.
 

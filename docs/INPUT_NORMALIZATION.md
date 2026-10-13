@@ -58,10 +58,11 @@ guarded, and no callback is replayed while committing. Undo/Redo restore recorde
 values without normalization or acceptance. Normalized typing coalesces using its
 existing intent; paste and IME retain atomic history behavior.
 
-The new composed test `test_input_normalization.c` covers typed/pasted selection
+The composed test `test_input_normalization.c` covers typed/pasted selection
 replacement, grouped Undo/Redo, normalized rejection, readonly/disabled and zero
 policy, Unicode/emoji endpoint mapping, fixed/growing IME views, empty update and
-cancel, helper aliases/rollback, model capacity and guarded destruction. Register
-it linked only to `cui` for native and WASI; root owns build registration/generated
-distribution. No native physical keyboard, autofill or complete Input parity claim
-follows from this source batch.
+cancel, helper aliases/rollback, model capacity and guarded destruction. It runs
+through CTest and the portable WASI runner. The website's validated Input example
+also exercises ordinary typing and native browser IME rejection/recovery on
+desktop and a 390px viewport. Browser clipboard paste, physical keyboard
+candidate windows, autofill and complete Input parity remain unverified.

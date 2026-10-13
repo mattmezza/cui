@@ -575,7 +575,10 @@
         "tests/unit/test_button_activation_blocker.c",
         "tests/unit/test_pointer_blocker_scroll_scope.c",
         "tests/web/test_button_activation_blocker.py",
-        "tests/web/test_button_blocker_scroll_scope.py"
+        "tests/web/test_button_blocker_scroll_scope.py",
+        "tests/unit/test_button_label_layout.c",
+        "tests/integration/test_button_label_font.c",
+        "tests/web/test_button_label_layout.py"
       ],
       "status": "tested",
       "platforms": {
@@ -662,6 +665,17 @@
             "tests/integration/test_button_group_sdl.c",
             "tests/web/test_button_collection_gallery.py"
           ]
+        },
+        {
+          "name": "current-frame constrained label ellipsis with full semantic name",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_label_layout.c",
+            "tests/integration/test_button_label_font.c",
+            "tests/web/test_button_label_layout.py",
+            "docs/BUTTON_BEHAVIOR.md"
+          ],
+          "scope": "Fixed and grow layout, grapheme-safe automatic ellipsis, caller-owned state cap and explicit content-overflow opt-out. Passive metadata/tooltip lifecycle still requires correction; no complete Button parity claim."
         }
       ],
       "upstream_doc": {
@@ -3422,7 +3436,14 @@
         "tests/unit/test_components.c",
         "tests/unit/test_input.c",
         "tests/web/test_browser.py",
-        "tests/unit/test_input_reference_contracts.c"
+        "tests/unit/test_input_reference_contracts.c",
+        "tests/unit/test_input_format_engine.c",
+        "tests/unit/test_input_format_control.c",
+        "tests/integration/test_input_format_native.c",
+        "tests/web/test_input_format_gallery.py",
+        "tests/unit/test_input_number_engine.c",
+        "tests/unit/test_input_number_control.c",
+        "tests/integration/test_input_number_native.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3432,7 +3453,7 @@
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
         "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
-        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Regex, formatting masks and full content-type/lifecycle behavior remain incomplete; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
+        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Bounded single-line pattern and grouped-number formatting are tested; multiline, token and multiple-selection masks, enabled NUL separators, regex and full content-type/lifecycle behavior remain incomplete; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
         "Opt-in hidden/revealed password and new-password purposes, scalar-bullet presentation, guarded clipboard, finalized focus generations, native SDL input hints and transient secure browser proxy pass headless/native/browser tests. Actual window-blur handler clears preedit DOM data. Physical OS autofill/privacy, all content purposes and complete accessibility remain unverified; see docs/PASSWORD_INPUT_STAGE2.md."
       ],
       "owner": "integrator",
@@ -3530,6 +3551,30 @@
             "tests/integration/test_password_sdl3.c",
             "tests/web/test_password_gallery.py"
           ]
+        },
+        {
+          "name": "bounded checked single-line pattern formatting with atomic staged presentation and IME commit",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input_format_engine.c",
+            "tests/unit/test_input_format_control.c",
+            "tests/integration/test_input_format_native.c",
+            "tests/web/test_input_format_gallery.py",
+            "docs/INPUT_PATTERN_FORMATTING.md"
+          ],
+          "scope": "Caller-owned workspace; source tokens/literals, automatic placeholder, invalid-old healing and one-step history. Multiline, inline-token and multi-selection masks remain unsupported."
+        },
+        {
+          "name": "bounded grouped-number formatting and normalized IME endpoint mapping",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input_number_engine.c",
+            "tests/unit/test_input_number_control.c",
+            "tests/integration/test_input_number_native.c",
+            "tests/web/test_input_format_gallery.py",
+            "docs/INPUT_NUMBER_FORMATTING.md"
+          ],
+          "scope": "Source-order grouping, configured fraction truncation, Unicode numeric normalization and unformatting. Enabled NUL separators and multiline/token/multi-selection formatting remain unsupported."
         }
       ],
       "upstream_doc": {

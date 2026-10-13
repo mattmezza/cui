@@ -1,12 +1,12 @@
 # Live development checkpoint
 
-## Current priorities — 13 October
+## Current priorities — 14 October
 
-Publishedbadef388 passes all6 framework CI jobs and Pages; initial Pages Chromium startup SIGSEGV is preserved, unchanged-source retry passes. All379 HTTPS files match artifact and public Attachment62/62 passes. No user dependency installation required.
+Published `5474ec7` fixes the acquired-swapchain SDL GPU assertion. All six framework jobs and Pages pass, and all411 HTTPS files match its artifact. MAIN `62b3bb4` passes framework CI but Pages failed the real secure touch-focus regression; deployment was skipped. It is not the published gallery.
 
-Frozen Next27 production6e36b5a passes native127/127, sanitizer122/122, WASI103/103, corrected complete browser78/78 and78 snippets. Native includes5optional GPU/Sokol/accessibility tests absent from sanitizer. Expanded sizes, Attachment62/62, Chart real/controlled clocks, source point-axis pixels, Tabs nested scroll ownership, touch/pinch and IME pass. New Input example passes desktop/mobile predicate and IME behavior. Initial documentation, proxy-focus and obsolete Skeleton continuous-redraw assertions are preserved and corrected without changing frozen production. See validation/gallery-next27.txt.
+Next31 frozen production `4241a56` passes strict native162/162, sanitizer154/154, WASI129/129 and Attachment62/62. Secure synthetic mouse focus and immediate typing after IME cancellation are corrected with preserved failing browser evidence. The complete49-command browser matrix passes before integration/publication, including all78 stories/78 snippet compilations. Source-pattern and number formatting, current-frame Button labels and selected copyable C11 usage examples are tested subsets.
 
-Ledger:332features,284tested subsets,4implemented,44not_started;76tested families,2implemented,0fullyverified. Only root integrates. Next28 isolated integration has scoped Radar source-title behavior; workers implement copied typed-tooltip staging and inert Button activation blockers, and refine complete password presentation/host/failure staging. Full goal remains active; Next27 publication awaits its own CI/artifact proof.
+Ledger:342features,294tested subsets,4implemented,44not_started;76tested families,2implemented,0fullyverified. All78 manifest entries remain. Root integrates isolated worker commits. Next32 contains tested Input word/line pointer selection and layout-only floating clipping; passive Button lifecycle/loading and inset shadows remain under validation. Regex provider feasibility is read-only and still lacks actual browser/WASI linkage proof. Full parity and native platform acceptance remain unfinished. No user dependency installation is required.
 
 ## Historical checkpoints
 

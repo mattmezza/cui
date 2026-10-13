@@ -682,6 +682,10 @@ uint64_t cui_frame_sequence(const cui_context *);
 /* Ordinary composition phase, including inert/layout-only ancestry. False
  * outside a frame, during host measurement, layout resolution or prepaint. */
 bool cui_frame_is_submitting(const cui_context *);
+/* Ordinary composition with painting enabled. Inert ancestry still paints;
+ * layout-only ancestry, host measurement, prepaint and outside-frame calls
+ * return false. Use to avoid scheduling animation for unpainted content. */
+bool cui_frame_paint_enabled(const cui_context *);
 /* Cooperative bubbling: leaf handlers consume events before ancestor handlers.
  * Event targets remain available for diagnostics; callers check consumption.
  * Consuming an accessibility action also cancels its pending activation. */
@@ -9206,6 +9210,9 @@ uint64_t cui_frame_sequence(const cui_context *ui) {
 bool cui_frame_is_submitting(const cui_context *ui) {
     return ui && ui->in_frame && !ui->prepainting && !ui->resolving_layout &&
            !ui->measuring_depth && !cui_core_paint_context;
+}
+bool cui_frame_paint_enabled(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && !cui_core_layout_only(ui);
 }
 cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
     if (!cui_frame_sequence(ui) || index >= ui->event_count || ui->error != CUI_OK)

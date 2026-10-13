@@ -3310,6 +3310,9 @@ bool cui_frame_is_submitting(const cui_context *ui) {
     return ui && ui->in_frame && !ui->prepainting && !ui->resolving_layout &&
            !ui->measuring_depth && !cui_core_paint_context;
 }
+bool cui_frame_paint_enabled(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && !cui_core_layout_only(ui);
+}
 cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
     if (!cui_frame_sequence(ui) || index >= ui->event_count || ui->error != CUI_OK)
         return 0;

@@ -1,0 +1,7 @@
+Compiled source:64d50d73b95220a0ee30978e3176ea842fbf4f00
+Warning-enabled native build:128/128 CTest PASS, including optional GPU/Sokol and three accessibility integrations.
+Standalone Radar tooltip-title browser:PASS using Zig0.16.0 WASM and Chromium1208 actual canvas text/raster pixels.
+Scope:legacy fallback title, source opt-in custom-label title omission, explicit title override, retained visible series row, and reduced measured tooltip height without the automatic title.
+The source opt-in does not complete Chart parity. Typed builder/content styles, arbitrary custom layout, native shadow and mobile long-press remain separate work. No full family promotion.
+This checkpoint does not claim combined sanitizer/WASI/full-gallery proof or publication for Next28.
+Logs:/home/matteo/.cache/cui-validation/next28-radar-{configure,build,test,browser}.log;next28-radar-format.log.

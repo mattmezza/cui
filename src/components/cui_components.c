@@ -339,7 +339,8 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         (cui_semantic_details){.description = o.loading ? cui_string("Loading") : (cui_str){0},
                                .busy = o.loading,
                                .no_pointer_focus = o.prevent_pointer_focus,
-                               .pointer_activatable = o.prevent_pointer_focus});
+                               .pointer_activatable = o.prevent_pointer_focus,
+                               .blocks_pointer_activation = inert});
     cui_set_tab_stop(ui, id, !o.skip_tab);
     if (o.custom_cursor)
         (void)cui_set_cursor(ui, id, o.cursor);

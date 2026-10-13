@@ -1,0 +1,32 @@
+{
+  "base": "cb8def7",
+  "upstream": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "status": "proposal_only",
+  "next_slice": "opt-in custom Radar label automatic tooltip title suppression",
+  "public_api": {
+    "enum": "cui_chart_radar_tooltip_title_mode",
+    "zero": "CUI_CHART_RADAR_TOOLTIP_TITLE_LEGACY",
+    "source": "CUI_CHART_RADAR_TOOLTIP_TITLE_SOURCE_LABEL",
+    "option": "radar_tooltip_title_mode"
+  },
+  "source_files": [
+    "crates/component/src/chart/mod.rs",
+    "crates/component/src/chart/radar_chart.rs",
+    "crates/component/src/plot/tooltip.rs",
+    "crates/component/src/styled.rs"
+  ],
+  "typed_followup": {
+    "rows": 32,
+    "bytes": 4096,
+    "string_bytes": 1024,
+    "copy": "synchronous builder setter/add_row",
+    "state_retention": "none",
+    "layout_callbacks_in_prepaint": false
+  },
+  "unverified": [
+    "gpui-pre0.3.8 compact text/rem utility definitions",
+    "Gaussian shadow adapter equivalence",
+    "native accessibility announcement"
+  ],
+  "runtime_experiments": "none; source and current implementation audit only"
+}

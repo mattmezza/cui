@@ -1,0 +1,784 @@
+{
+  "audit_commit": "6e36b5a",
+  "reference_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "scope": [
+    "Base Button",
+    "Components Button",
+    "ButtonGroup",
+    "ButtonIcon",
+    "Icon"
+  ],
+  "source_public_method_inventory": {
+    "crates/base/src/button.rs": [
+      {
+        "method": "new",
+        "line": 38
+      },
+      {
+        "method": "disabled",
+        "line": 59
+      },
+      {
+        "method": "selected",
+        "line": 70
+      },
+      {
+        "method": "styles",
+        "line": 76
+      },
+      {
+        "method": "accessibility_label",
+        "line": 82
+      },
+      {
+        "method": "role",
+        "line": 88
+      },
+      {
+        "method": "track_focus",
+        "line": 94
+      },
+      {
+        "method": "on_click",
+        "line": 100
+      },
+      {
+        "method": "tab_index",
+        "line": 109
+      },
+      {
+        "method": "tab_stop",
+        "line": 115
+      },
+      {
+        "method": "focusable",
+        "line": 127
+      },
+      {
+        "method": "selected",
+        "line": 173
+      },
+      {
+        "method": "disabled",
+        "line": 180
+      }
+    ],
+    "crates/component/src/button/button.rs": [
+      {
+        "method": "new",
+        "line": 103
+      },
+      {
+        "method": "color",
+        "line": 114
+      },
+      {
+        "method": "foreground",
+        "line": 120
+      },
+      {
+        "method": "hover",
+        "line": 126
+      },
+      {
+        "method": "active",
+        "line": 132
+      },
+      {
+        "method": "shadow",
+        "line": 138
+      },
+      {
+        "method": "is_link",
+        "line": 163
+      },
+      {
+        "method": "is_text",
+        "line": 168
+      },
+      {
+        "method": "is_ghost",
+        "line": 173
+      },
+      {
+        "method": "new",
+        "line": 241
+      },
+      {
+        "method": "role",
+        "line": 326
+      },
+      {
+        "method": "outline",
+        "line": 332
+      },
+      {
+        "method": "rounded",
+        "line": 338
+      },
+      {
+        "method": "label",
+        "line": 371
+      },
+      {
+        "method": "accessibility_id",
+        "line": 377
+      },
+      {
+        "method": "accessibility_label",
+        "line": 391
+      },
+      {
+        "method": "icon",
+        "line": 397
+      },
+      {
+        "method": "tooltip",
+        "line": 403
+      },
+      {
+        "method": "tooltip_placement",
+        "line": 412
+      },
+      {
+        "method": "tooltip_with_action",
+        "line": 418
+      },
+      {
+        "method": "loading",
+        "line": 435
+      },
+      {
+        "method": "compact",
+        "line": 441
+      },
+      {
+        "method": "on_click",
+        "line": 447
+      },
+      {
+        "method": "on_hover",
+        "line": 456
+      },
+      {
+        "method": "loading_icon",
+        "line": 464
+      },
+      {
+        "method": "tab_index",
+        "line": 472
+      },
+      {
+        "method": "tab_stop",
+        "line": 480
+      },
+      {
+        "method": "dropdown_caret",
+        "line": 486
+      },
+      {
+        "method": "toggled",
+        "line": 497
+      }
+    ],
+    "crates/component/src/button/button_group.rs": [
+      {
+        "method": "new",
+        "line": 44
+      },
+      {
+        "method": "child",
+        "line": 61
+      },
+      {
+        "method": "children",
+        "line": 67
+      },
+      {
+        "method": "multiple",
+        "line": 73
+      },
+      {
+        "method": "layout",
+        "line": 79
+      },
+      {
+        "method": "compact",
+        "line": 87
+      },
+      {
+        "method": "outline",
+        "line": 95
+      },
+      {
+        "method": "on_click",
+        "line": 123
+      }
+    ],
+    "crates/component/src/button/button_icon.rs": [
+      {
+        "method": "new",
+        "line": 25
+      }
+    ],
+    "crates/component/src/icon.rs": [
+      {
+        "method": "view",
+        "line": 42
+      },
+      {
+        "method": "new",
+        "line": 105
+      },
+      {
+        "method": "path",
+        "line": 117
+      },
+      {
+        "method": "data",
+        "line": 136
+      },
+      {
+        "method": "view",
+        "line": 153
+      },
+      {
+        "method": "transform",
+        "line": 158
+      },
+      {
+        "method": "empty",
+        "line": 163
+      },
+      {
+        "method": "rotate",
+        "line": 170
+      }
+    ]
+  },
+  "trait_contracts": {
+    "Base": [
+      "Selectable",
+      "Styled",
+      "ParentElement",
+      "InteractiveElement",
+      "StatefulInteractiveElement",
+      "RenderOnce"
+    ],
+    "Button": [
+      "ButtonVariants",
+      "Disableable",
+      "FocusableExt",
+      "Selectable selected/open",
+      "Sizable",
+      "Styled",
+      "ParentElement",
+      "InteractiveElement",
+      "RenderOnce"
+    ],
+    "ButtonGroup": [
+      "Disableable",
+      "Sizable",
+      "Styled",
+      "ButtonVariants",
+      "RenderOnce"
+    ],
+    "Icon": [
+      "Styled text_color",
+      "Sizable",
+      "From/IntoElement",
+      "Render/RenderOnce"
+    ]
+  },
+  "contracts": [
+    {
+      "area": "Base",
+      "contract": "Stable identity, caller children, neutral centered geometry",
+      "status": "partial tested",
+      "current_api": "cui_base_button + cui_begin_box + cui_button_paint",
+      "evidence": [
+        "crates/base/src/button.rs:20\u201335,207\u2013255",
+        "tests/unit/test_components.c:test_button_paint_composition"
+      ],
+      "remaining": "Base is a semantic reducer, not an automatic styled box. Caller layout is explicit; composed paint preserves one semantic and expanded/controls metadata."
+    },
+    {
+      "area": "Base",
+      "contract": "Selected/disabled state refinements and instance-style priority",
+      "status": "partial",
+      "current_api": "cui_interaction + caller layout; styled selected/custom colors",
+      "evidence": [
+        "crates/base/src/button.rs:141\u2013185",
+        "src/components/cui_components.c:156\u2013225"
+      ],
+      "remaining": "No general StyleRefinement chain or independent disabled palette override. Existing flat palette tests do not prove upstream style replay priority."
+    },
+    {
+      "area": "Base",
+      "contract": "Role override and explicit accessible name",
+      "status": "partial tested",
+      "current_api": "cui_set_semantic_role; name argument; cui_button_options.accessibility_label",
+      "evidence": [
+        "crates/base/src/button.rs:82\u201395",
+        "tests/unit/test_core.c:1798\u20131814",
+        "tests/unit/test_button_behavior.c"
+      ],
+      "remaining": "Core setter supports role override after registration; no Button option duplicates it. Native AT interpretation is not established by semantic unit tests."
+    },
+    {
+      "area": "Base",
+      "contract": "Caller focus handle, tab stop, focusability",
+      "status": "portable composition; partial tested",
+      "current_api": "stable cui_id/cui_focus; cui_set_tab_stop; no_focus/no_pointer_focus details",
+      "evidence": [
+        "crates/base/src/button.rs:94\u2013128",
+        "tests/unit/test_pointer_focus_policy.c"
+      ],
+      "remaining": "No GPUI handle/entity types in portable API. Styled skip_tab and pointer-focus opt-out exist; Base focusable(false) semantics need composition-specific proof."
+    },
+    {
+      "area": "Base",
+      "contract": "Ordered signed tab_index",
+      "status": "missing",
+      "current_api": "Core only sets tab stop 0/-1",
+      "evidence": [
+        "crates/base/src/button.rs:108\u2013111",
+        "src/core/cui.c:cui_core_tab,cui_set_tab_stop"
+      ],
+      "remaining": "Traversal uses previous semantic order, not ordered indexes. A positive public semantic field is not a supported setter or ordering implementation."
+    },
+    {
+      "area": "Base",
+      "contract": "Mouse and Enter/Space activation, disabled blocking of parent",
+      "status": "runtime failure",
+      "current_api": "cui_base_button/Core",
+      "evidence": [
+        "crates/base/src/button.rs:337\u2013381",
+        "crates/component/src/button/button.rs:1396\u20131437,1496\u20131580",
+        "button-disabled-parent-probe.log"
+      ],
+      "remaining": "Inert child does not activate itself, but parent activates for disabled/loading mouse/touch. Requires opt-in activation blocker; see proposal."
+    },
+    {
+      "area": "Button",
+      "contract": "Variants Default/Primary/Secondary/Danger/Warning/Success/Info/Ghost/Link/Text/Custom; outline orthogonal",
+      "status": "partial tested",
+      "current_api": "12 enum variants including legacy OUTLINE + outline flag",
+      "evidence": [
+        "crates/component/src/button/button.rs:49\u2013183",
+        "tests/unit/test_components.c:test_button_options,test_button_intent_outlines",
+        "tests/unit/test_button_behavior.c"
+      ],
+      "remaining": "Names and solid states covered; gradients/Oklab/shadow remain separate gaps. Zero CUI option remains legacy Primary, unlike upstream Default; intentional compatibility difference."
+    },
+    {
+      "area": "Button",
+      "contract": "Theme background tokens, semantic outline depth, gradients",
+      "status": "missing gradient parity",
+      "current_api": "cui_theme_button_colors contains flat cui_color",
+      "evidence": [
+        "crates/component/src/button/button.rs:900\u2013974,1812\u20131960",
+        "include/cui/cui_theme.h:70\u201377"
+      ],
+      "remaining": "No automatic gradient backgrounds/semantic gradient opacity states. A generic mesh renderer is not a Button token implementation."
+    },
+    {
+      "area": "Button",
+      "contract": "Custom normal/foreground/hover/active plus shadow",
+      "status": "partial tested",
+      "current_api": "custom_colors/colors; no shadow field",
+      "evidence": [
+        "crates/component/src/button/button.rs:40\u2013140,1093\u20131100",
+        "tests/unit/test_button_behavior.c",
+        "tests/unit/test_components.c:test_button_palette_overrides"
+      ],
+      "remaining": "Resolved palettes work; source custom shadow and Oklab transparent mixing absent. Built-in variants do not request shadow: do not invent mandatory shadows for all buttons."
+    },
+    {
+      "area": "Button",
+      "contract": "XS/S/M/L, custom pixel sizing, compact, centered icon/text",
+      "status": "partial tested",
+      "current_api": "size; height/font_size/icon_size; compact/icon_only/width",
+      "evidence": [
+        "crates/component/src/button/button.rs:630\u2013690",
+        "tests/unit/test_button_behavior.c",
+        "tests/unit/test_components.c:test_icon_button"
+      ],
+      "remaining": "Legacy dimensions and centering covered. Custom size is split into explicit C fields, and callback content needs caller constraints. Explicit width intentionally clips."
+    },
+    {
+      "area": "User extension",
+      "contract": "All 14 design sizes and density",
+      "status": "headless tested; responsive marker proof exists",
+      "current_api": "design_size plus theme font-derived density",
+      "evidence": [
+        "tests/unit/test_button_behavior.c:432 combinations",
+        "tests/web/test_button_behavior.py",
+        "tests/web/test_design_sizes.py:FAMILIES",
+        "tests/web/test_responsive_gallery.py:38\u201370"
+      ],
+      "remaining": "432 size/variant/density containment cases use plain label and two named SVGs. The Button-specific browser suite has 11 baseline cases. Responsive gallery tests cover all14 sizes/both densities at390/1280 but assert only that Loading text exists and its bottom fits canvas height. They do not prove every card-local label/icon/slot clip containment or activation at those scales; generic design-size family list omits standalone Button."
+    },
+    {
+      "area": "Button",
+      "contract": "None/Small/Medium/Large/custom rounding",
+      "status": "implemented; partial proof",
+      "current_api": "rounding/radius",
+      "evidence": [
+        "crates/component/src/button/button.rs:24\u201336,338\u2013340,604\u2013616",
+        "tests/unit/test_button_behavior.c"
+      ],
+      "remaining": "Custom radius is exercised; independent draw-radius/state matrix for every rounding mode is not established by that test."
+    },
+    {
+      "area": "Button",
+      "contract": "Normal/hover/pressed/selected colors",
+      "status": "partial tested",
+      "current_api": "shared interaction query and palettes",
+      "evidence": [
+        "crates/component/src/button/button.rs:703\u2013729",
+        "tests/unit/test_button_behavior.c",
+        "tests/web/test_button_behavior.py:paint_states"
+      ],
+      "remaining": "Actual browser hover/pressed changes and headless custom colors are covered; source gradient/state styling and group hover are not."
+    },
+    {
+      "area": "Button",
+      "contract": "selected and open are separate presentation states; toggled explicit semantics",
+      "status": "partial tested",
+      "current_api": "selected; toggle_semantics/toggled; compound expanded metadata",
+      "evidence": [
+        "crates/component/src/button/button.rs:196\u2013205,497\u2013558,1666\u20131694",
+        "tests/unit/test_button_behavior.c",
+        "tests/unit/test_components.c:test_button_paint_composition"
+      ],
+      "remaining": "Standalone options have no separate open field. Host can derive selected paint from open and preserve expanded metadata, but dedicated selected/open transitions are not fully proven. Selected does not imply checked."
+    },
+    {
+      "area": "Button",
+      "contract": "Disabled/loading inertness, normal 0.8 loading opacity, busy semantics",
+      "status": "partial tested plus parent failure",
+      "current_api": "disabled/loading; description/busy",
+      "evidence": [
+        "crates/component/src/button/button.rs:510\u2013519,819\u2013856",
+        "tests/unit/test_button_behavior.c",
+        "tests/unit/test_components.c:test_button_loading_artwork",
+        "tests/web/test_button_behavior.py:disabled"
+      ],
+      "remaining": "Self activation suppressed and actual loading SVG/reduced motion covered; parent-blocking fails. Arbitrary caller child semantics remain caller-owned."
+    },
+    {
+      "area": "Button",
+      "contract": "Default loading Spinner/custom loading Icon",
+      "status": "partial tested",
+      "current_api": "loading_icon; cui_icon_spinner; leading_content",
+      "evidence": [
+        "crates/component/src/button/button_icon.rs:116\u2013129",
+        "tests/unit/test_components.c:test_button_loading_artwork",
+        "tests/unit/test_button_behavior.c"
+      ],
+      "remaining": "Loading named glyph rotation/reduced motion tested. Full custom loading asset/state/size/geometry browser matrix absent."
+    },
+    {
+      "area": "ButtonIcon",
+      "contract": "Icon/Spinner/ProgressCircle typed slot; loading preserves explicit Spinner/Progress",
+      "status": "composable; runtime proof missing",
+      "current_api": "leading_content with cui_icon/cui_spinner_ex/cui_progress APIs",
+      "evidence": [
+        "crates/component/src/button/button_icon.rs:55\u2013129",
+        "tests/unit/test_button_behavior.c:slot"
+      ],
+      "remaining": "Slot precedence supports composition, but the current test uses colored boxes, not actual persistent ProgressCircle/Spinner across loading states. No typed ButtonIcon discriminator API is required to match paint behavior."
+    },
+    {
+      "area": "Button",
+      "contract": "Label, icon-only, appended children, content clipping and centering",
+      "status": "partial tested",
+      "current_api": "name/icon_only/content/children/leading_content/trailing_content",
+      "evidence": [
+        "crates/component/src/button/button.rs:371\u2013401,730\u2013775",
+        "tests/unit/test_button_behavior.c",
+        "tests/web/test_button_behavior.py:slots"
+      ],
+      "remaining": "Source appends arbitrary children; legacy replacement content remains compatible. Slot dimensions/colors/semantics are caller-owned. Every all14-size rich slot is not browser-tested."
+    },
+    {
+      "area": "Button",
+      "contract": "Ellipsis preserves full accessible label",
+      "status": "partial tested",
+      "current_api": "label_width plus state.label[256]; accessibility_label",
+      "evidence": [
+        "crates/component/src/button/button.rs:742\u2013756",
+        "tests/unit/test_button_behavior.c",
+        "tests/web/test_button_behavior.py:slots"
+      ],
+      "remaining": "Plain UTF-8 grapheme truncation and buffer exhaustion tested. Buffer-limited clipping differs from unconstrained upstream storage; rich child truncation/shaping is not promised."
+    },
+    {
+      "area": "Button",
+      "contract": "Dropdown caret and leading artwork",
+      "status": "partial tested",
+      "current_api": "dropdown_caret/icon/trailing_icon",
+      "evidence": [
+        "crates/component/src/button/button.rs:486\u2013490,754\u2013774",
+        "tests/web/test_button_behavior.py:slots"
+      ],
+      "remaining": "Three actual SVG commands fit baseline icon button; no exhaustive native pixel/size/caret matrix."
+    },
+    {
+      "area": "Button",
+      "contract": "on_click event callback and exact per-event multiplicity",
+      "status": "runtime divergence",
+      "current_api": "void(user) callback + boolean frame result",
+      "evidence": [
+        "crates/base/src/button.rs:100\u2013105",
+        "crates/component/src/button/button.rs:447\u2013452",
+        "button-burst-probe.log"
+      ],
+      "remaining": "Two queued click sequences retain two Core event activations but produce one callback/bool result. Existing tests establish one callback per activated frame across frames. No ClickEvent argument; event metadata is available through Core frame events."
+    },
+    {
+      "area": "Button",
+      "contract": "Interactive on_hover edges",
+      "status": "partial tested",
+      "current_api": "on_hover plus caller-owned state",
+      "evidence": [
+        "crates/component/src/button/button.rs:456\u2013461,855\u2013858",
+        "tests/unit/test_button_behavior.c"
+      ],
+      "remaining": "State ownership/reset documented; basic edges tested. New presence/leave handling is Core-tested, but Button-specific stationary leave/reenter and disable-during-hover callback matrix lacks direct browser proof."
+    },
+    {
+      "area": "Button",
+      "contract": "Focus ring opt-out, pointer-focus suppression, keyboard focus",
+      "status": "partial tested; default differs",
+      "current_api": "hide_focus_ring/prevent_pointer_focus/skip_tab",
+      "evidence": [
+        "crates/component/src/button/button.rs:531\u2013539,829\u2013841",
+        "tests/unit/test_pointer_focus_policy.c",
+        "tests/web/test_button_behavior.py:activation"
+      ],
+      "remaining": "Source styled pointer-down prevents default; CUI preserves legacy pointer focus unless opt-in. Ring currently uses 2px theme focus border rather than source Inside/Edge/Outside focus-line policy."
+    },
+    {
+      "area": "Button",
+      "contract": "Tooltip plain text, preferred placement, lifecycle",
+      "status": "partial tested",
+      "current_api": "tooltip/state/tooltip_options.side + shared hover",
+      "evidence": [
+        "crates/component/src/button/button.rs:403\u2013414,858\u2013875",
+        "tests/unit/test_button_behavior.c"
+      ],
+      "remaining": "Focus/open/Escape/cancel/disabled and description are tested. All side collision placements and focus/mouse/touch browser lifecycle on Button are not fully proven."
+    },
+    {
+      "area": "Button",
+      "contract": "Tooltip with action/context keybinding",
+      "status": "missing",
+      "current_api": "no action registry or keybinding tooltip option",
+      "evidence": [
+        "crates/component/src/button/button.rs:418\u2013431"
+      ],
+      "remaining": "Plain text containing a shortcut is not automatic action/context lookup."
+    },
+    {
+      "area": "Scope boundary",
+      "contract": "Arbitrary tooltip builder",
+      "status": "not a public pinned Button requirement",
+      "current_api": "No dedicated builder in CUI",
+      "evidence": [
+        "crates/component/src/button/button.rs:223,270,858\u2013862"
+      ],
+      "remaining": "Pinned field and render branch exist, but no public setter is present in this Button source. Treat a future arbitrary builder as an extension, not invented completeness criterion."
+    },
+    {
+      "area": "Button",
+      "contract": "Accessibility developer string id, role/name/toggled, platform actions",
+      "status": "partial",
+      "current_api": "numeric stable IDs; semantic role/name/checked; optional native bridge",
+      "evidence": [
+        "crates/component/src/button/button.rs:377\u2013391,773\u2013818",
+        "tests/unit/test_accessibility.c",
+        "tests/unit/test_core.c"
+      ],
+      "remaining": "Numeric identity is portable; no separate developer string identifier. Metadata/unit dispatch is not physical Windows/macOS/Linux AT certification or every browser aria mapping."
+    },
+    {
+      "area": "Button",
+      "contract": "Base supplied by compounds and complete child paint",
+      "status": "partial tested",
+      "current_api": "cui_button_paint separate from Base reducer",
+      "evidence": [
+        "crates/component/src/button/button.rs:287\u2013290,1727\u20131794",
+        "tests/unit/test_components.c:test_button_paint_composition"
+      ],
+      "remaining": "Painting preserves caller semantics and is non-activating. Upstream private with_base is not a public C API requirement. No previous-frame bitmap approximation is used for ordinary button children."
+    },
+    {
+      "area": "Compound internals",
+      "contract": "Connected edge/corner masks, hover-group held/open",
+      "status": "missing automatic general Button composition",
+      "current_api": "Dropdown has local corner helpers; no shared Button masks/hover group",
+      "evidence": [
+        "crates/component/src/button/button.rs:344\u2013366",
+        "crates/component/src/button/button_group.rs:184\u2013225",
+        "src/components/cui_choice.c:cui_dropdown_button_box"
+      ],
+      "remaining": "Private upstream hooks matter to ButtonGroup/split compounds, not standalone public builder completeness. Local Dropdown shape does not supply a reusable ButtonGroup implementation."
+    },
+    {
+      "area": "ButtonGroup",
+      "contract": "Collection identity/children, horizontal/vertical connected layout",
+      "status": "missing distinct API",
+      "current_api": "ToggleGroup APIs are separate",
+      "evidence": [
+        "crates/component/src/button/button_group.rs:18\u201395,153\u2013240",
+        "include/cui/cui_components.h:198\u2013213"
+      ],
+      "remaining": "No cui_button_group. ToggleGroup does not preserve per-child full Button options, callback behavior or connected Button border topology."
+    },
+    {
+      "area": "ButtonGroup",
+      "contract": "Optional inherited size/variant/compact/outline",
+      "status": "missing",
+      "current_api": "no full Button collection composition",
+      "evidence": [
+        "crates/component/src/button/button_group.rs:132\u2013150,229\u2013233"
+      ],
+      "remaining": "Requires explicit inheritance/override contract without mutating caller data; all14 scales are additional user work."
+    },
+    {
+      "area": "ButtonGroup",
+      "contract": "Controlled rendered selection, single/multiple requested index collection",
+      "status": "missing source contract",
+      "current_api": "ToggleGroup emits bool arrays with different semantics",
+      "evidence": [
+        "crates/component/src/button/button_group.rs:95\u2013128,154\u2013164,246\u2013264"
+      ],
+      "remaining": "Source derives selected indices from rendered child selected flags, emits request, does not persist selection itself; children expose toggled state."
+    },
+    {
+      "area": "ButtonGroup",
+      "contract": "Group callback replaces child callback; absent group preserves child",
+      "status": "missing",
+      "current_api": "No ButtonGroup callback API",
+      "evidence": [
+        "crates/component/src/button/button_group.rs:234\u2013239,346\u2013360"
+      ],
+      "remaining": "Do not equate callback replacement with simultaneously firing both callbacks. Requires exactly defined ownership and meaningful reject/accept tests."
+    },
+    {
+      "area": "ButtonGroup",
+      "contract": "Legacy keyboard callback and disabled builder-order edges",
+      "status": "source legacy divergence needs decision",
+      "current_api": "No matching collection API",
+      "evidence": [
+        "crates/component/src/button/button_group.rs:373\u2013423"
+      ],
+      "remaining": "Pinned tests deliberately show keyboard click never reaches group callback and disabled-after-child leaves child callback active. A new C API should document intentional corrections rather than claim byte-for-byte parity or invent roving arrow requirements."
+    },
+    {
+      "area": "Icon",
+      "contract": "Complete named catalog/default assets/native and WASM loading",
+      "status": "partial tested",
+      "current_api": "1830 catalog;106 default embedded; all-assets/provider",
+      "evidence": [
+        "crates/component/src/icon.rs:13\u201381",
+        "crates/assets/README.md:35\u2013107",
+        "tests/unit/test_icon.c:test_assets"
+      ],
+      "remaining": "Counts match source asset description. Upstream WASM on-demand CDN is not an implicit CUI dependency; host loader/full embed required. Default unbundled names explicitly NOT_FOUND; no silent fallback claim."
+    },
+    {
+      "area": "Icon",
+      "contract": "Path/raw copied SVG replacement, empty, source sharing/view",
+      "status": "partial tested portable adaptation",
+      "current_api": "set_path/set_name/set_data/set_empty; caller state",
+      "evidence": [
+        "crates/component/src/icon.rs:84\u2013170",
+        "tests/unit/test_icon.c:test_source_and_raster,test_loader"
+      ],
+      "remaining": "Copied source replacement/lifetime tested. No GPUI Entity/View or shared clone API; explicit independent state/resources are portable replacements."
+    },
+    {
+      "area": "Icon",
+      "contract": "Inherited color/text size, XS/S/M/L/custom, explicit width/height precedence",
+      "status": "partial tested; automatic inheritance gap",
+      "current_api": "cui_icon_options/theme/inherited overrides",
+      "evidence": [
+        "crates/component/src/icon.rs:175\u2013223",
+        "tests/unit/test_icon.c:test_component_sizes_color_and_lifetime,test_design_sizes"
+      ],
+      "remaining": "Explicit theme/text override supported; automatic global text-style scope inheritance absent. Icon design-size geometry has unit proof; native font/theme scope browser matrix remains partial."
+    },
+    {
+      "area": "Icon",
+      "contract": "Affine transform/rotate paint overflow without changing layout",
+      "status": "partial tested",
+      "current_api": "cui_icon_transform/rotation/prepare",
+      "evidence": [
+        "crates/component/src/icon.rs:158\u2013200",
+        "tests/unit/test_icon.c:test_source_and_raster,test_invalid_and_limits"
+      ],
+      "remaining": "Actual alpha/centroid/overflow tests exist. Full upstream transform/SVG renderer equivalence is not established."
+    },
+    {
+      "area": "Icon",
+      "contract": "Paint-only decorative layout and ownership/cache bounds",
+      "status": "partial tested",
+      "current_api": "cui_icon; named context cache; collect/destroy",
+      "evidence": [
+        "crates/component/src/icon.rs:204\u2013238",
+        "tests/unit/test_icon.c:test_context_convenience,test_component_sizes_color_and_lifetime"
+      ],
+      "remaining": "No focus/role added. Borrowed immutable masks retained until collect; bounded limits intentional. Caller state is not thread-safe or safely memcpy-clonable."
+    },
+    {
+      "area": "Icon",
+      "contract": "SVG renderer feature coverage and actual native pixels",
+      "status": "explicit limitation",
+      "current_api": "Pinned NanoSVG monochrome mask; portable image command",
+      "evidence": [
+        "docs/ICON.md:109\u2013126",
+        "tests/unit/test_icon.c",
+        "tests/web/test_browser.py:Icon story"
+      ],
+      "remaining": "Not full resvg/SVG CSS/text/filter/external-image parity. All embedded assets rasterize in configured unit builds; inspected tests do not certify every physical renderer/AT platform."
+    },
+    {
+      "area": "User pointer extension",
+      "contract": "Custom per-control named cursor and RGBA pointer images",
+      "status": "partial tested; RGBA absent",
+      "current_api": "custom_cursor/cui_set_cursor; SDL system cursors; browser CSS",
+      "evidence": [
+        "tests/unit/test_button_behavior.c",
+        "tests/web/test_button_behavior.py:paint_states",
+        "tests/unit/test_sdl3.c",
+        "docs/INTERACTION.md:102\u2013108"
+      ],
+      "remaining": "Hand/crosshair cases tested; SDL grab/zoom/help use documented fallbacks, no caller RGBA cursor+hotspot adapter. Generic queued SDL normalization is not actual Button end-to-end physical touch proof."
+    },
+    {
+      "area": "Scope boundary",
+      "contract": "Error state, URL navigation, spring Button animation, roving group arrows",
+      "status": "not pinned standalone requirements",
+      "current_api": "No dedicated fields",
+      "evidence": [
+        "crates/component/src/button/button.rs",
+        "crates/component/src/button/mod.rs"
+      ],
+      "remaining": "Error wording exists in the ledger but no standalone error builder/state is present. Link is a role/visual variant, not automatic URL navigation. Do not import Checkbox motion or RadioGroup arrow requirements."
+    }
+  ],
+  "validation": {
+    "warning_build": "clean",
+    "ctest": "122/122 PASS, 15.70 seconds",
+    "new_browser_runs": false,
+    "temporary_public_api_probes": [
+      "disabled/loading mouse/touch parent activates once, child zero",
+      "two queued clicks: event activations2, callbacks1, bool1"
+    ]
+  },
+  "full_completion_certified": false,
+  "physical_device_certified": false
+}

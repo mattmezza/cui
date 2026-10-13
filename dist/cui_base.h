@@ -271,7 +271,10 @@ bool cui_progress_animate(cui_progress_motion *state, float value, double now, f
     return true;
 }
 cui_interaction cui_base_button(cui_context *ui, cui_id id, cui_str name, bool disabled) {
-    return cui_interact(ui, id, CUI_ROLE_BUTTON, name, disabled, false, 0);
+    cui_interaction interaction = cui_interact(ui, id, CUI_ROLE_BUTTON, name, disabled, false, 0);
+    if (disabled)
+        cui_set_semantic_details(ui, id, (cui_semantic_details){.blocks_pointer_activation = true});
+    return interaction;
 }
 static bool cui_base_binary(cui_context *ui, cui_id id, cui_str name, bool *value, bool disabled,
                             cui_role role) {

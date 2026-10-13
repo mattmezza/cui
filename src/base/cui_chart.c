@@ -67,7 +67,11 @@ static bool cui_chart_sankey_margins_valid(const cui_chart_options *o) {
            (double)m.top + m.bottom + 16 < o->height;
 }
 static bool cui_chart_layout_valid(const cui_chart_options *o) {
-    return o && o->layout_mode >= CUI_CHART_LAYOUT_LEGACY &&
+    return o && o->radar_tooltip_title_mode >= CUI_CHART_RADAR_TOOLTIP_TITLE_LEGACY &&
+           o->radar_tooltip_title_mode <= CUI_CHART_RADAR_TOOLTIP_TITLE_SOURCE_LABEL &&
+           (o->radar_tooltip_title_mode == CUI_CHART_RADAR_TOOLTIP_TITLE_LEGACY ||
+            o->kind == CUI_CHART_RADAR) &&
+           o->layout_mode >= CUI_CHART_LAYOUT_LEGACY &&
            o->layout_mode <= CUI_CHART_LAYOUT_SOURCE_POINT &&
            (o->layout_mode != CUI_CHART_LAYOUT_SOURCE_POINT || o->kind == CUI_CHART_LINE ||
             o->kind == CUI_CHART_AREA);

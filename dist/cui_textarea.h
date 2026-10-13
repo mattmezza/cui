@@ -130,6 +130,21 @@ static size_t cui_textarea_boundary_before(cui_str text, size_t start, size_t at
     }
     return !strict && iterator.offset == at ? at : previous;
 }
+/* Layout has already validated these borrowed spans. Binary search avoids a
+ * full content validation for each wrapping boundary. */
+static size_t cui_textarea_token_boundary(cui_edit_content content, size_t offset, bool forward) {
+    size_t lo = 0, hi = content.token_count;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (content.tokens[mid].end <= offset)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    if (lo < content.token_count && content.tokens[lo].start < offset)
+        return forward ? content.tokens[lo].end : content.tokens[lo].start;
+    return offset;
+}
 static float cui_textarea_width(cui_context *ui, cui_str text, size_t start, size_t end, float font,
                                 cui_text_style style) {
     return cui_measure_text_ex(ui, (cui_str){text.data + start, end - start}, font, style).width;
@@ -267,7 +282,10 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
             state->error = CUI_TEXTAREA_INVALID;
         return CUI_TEXTAREA_INVALID;
     }
-    cui_str text = cui_edit_get_text(edit);
+    cui_edit_content content = cui_edit_get_content(edit);
+    if (content.token_count && !cui_edit_content_valid(content))
+        return state->error = CUI_TEXTAREA_INVALID;
+    cui_str text = content.text;
     cui_edit_state selection = cui_edit_get_state(edit);
     if (state->fold_count && state->fold_revision != selection.revision) {
         state->folds = NULL;
@@ -340,13 +358,15 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         size_t finish = end;
         if (wrap && start < end) {
             finish = cui_textarea_fit(ui, text, start, end, metrics.font_size, width, style);
+            finish = cui_textarea_token_boundary(content, finish, false);
             if (finish == start)
-                finish = cui_textarea_next(text, start);
+                finish = cui_textarea_token_boundary(content, cui_textarea_next(text, start), true);
             if (finish < end) {
                 size_t word = finish;
                 while (word > start && text.data[word - 1] != ' ' && text.data[word - 1] != '\t')
                     word--;
                 word = cui_textarea_boundary_before(text, start, word, false);
+                word = cui_textarea_token_boundary(content, word, false);
                 if (word > start)
                     finish = word;
                 next = finish;
@@ -404,6 +424,9 @@ size_t cui_textarea_hit_test(cui_context *ui, cui_edit *edit, cui_textarea_state
     size_t row = relative >= state->count ? state->count - 1 : (size_t)relative;
     size_t cursor = cui_textarea_offset(ui, cui_edit_get_text(edit), state, row,
                                         x - state->viewport.x + state->scroll_x);
+    if (cui_edit_get_content(edit).token_count &&
+        cui_edit_token_boundary(cui_edit_get_content(edit), cursor, false, &cursor) != CUI_EDIT_OK)
+        return SIZE_MAX;
     state->upstream_affinity = cursor == state->lines[row].end && !state->lines[row].hard_break;
     return cursor;
 }
@@ -451,6 +474,14 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
         result.error = CUI_TEXTAREA_INVALID;
         return result;
     }
+    if (cui_edit_get_content(edit).token_count &&
+        !cui_edit_content_valid(cui_edit_get_content(edit))) {
+        result.error = CUI_TEXTAREA_INVALID;
+        result.edit_error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    if (cui_edit_get_content(edit).token_count)
+        options.no_indent = true;
     cui_edit_state before = cui_edit_get_state(edit);
     bool external =
         state->initialized && (state->revision != before.revision ||
@@ -519,7 +550,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             cui_edit_state selection = cui_edit_get_state(edit);
             size_t anchor =
                 event.type == CUI_EVENT_POINTER_DOWN && !shift ? cursor : selection.anchor;
-            error = cui_edit_select(edit, anchor, cursor);
+            error = cui_edit_select_atomic(edit, anchor, cursor);
             state->dragging = event.type != CUI_EVENT_POINTER_UP;
             move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN && command &&
@@ -553,6 +584,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                 effective =
                     up ? cui_textarea_boundary_before(text, 0, first > 1 ? first - 2 : 0, false)
                        : cui_textarea_boundary_after(text, 0, last);
+                effective = cui_textarea_token_boundary(cui_edit_get_content(edit), effective, !up);
                 effective = cui_textarea_visible_offset(state, effective, up);
                 bool affinity = !up && effective == selection.cursor && state->upstream_affinity;
                 row = cui_textarea_cursor_line_ex(state, effective, affinity);
@@ -578,7 +610,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                                                                  row, state->preferred_x);
             state->upstream_affinity =
                 !selection_edge && cursor == state->lines[row].end && !state->lines[row].hard_break;
-            error = cui_edit_select(edit, shift ? selection.anchor : cursor, cursor);
+            error = cui_edit_select_atomic(edit, shift ? selection.anchor : cursor, cursor);
             move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN && !command &&
                    ((event.key == CUI_KEY_RIGHT && state->upstream_affinity &&
@@ -598,7 +630,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             cui_textarea_line line = state->lines[state->caret_line];
             size_t cursor = event.key == CUI_KEY_HOME ? line.start : line.end;
             state->upstream_affinity = event.key == CUI_KEY_END && !line.hard_break;
-            error = cui_edit_select(edit, shift ? selection.anchor : cursor, cursor);
+            error = cui_edit_select_atomic(edit, shift ? selection.anchor : cursor, cursor);
             move = handled = true;
             state->preferred_valid = false;
         } else if (event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ENTER) {
@@ -717,6 +749,8 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
     cui_textarea_result result = {.error = CUI_TEXTAREA_INVALID};
     cui_textarea_metrics metrics;
     if (!ui || !id || !theme || !edit || !state ||
+        (cui_edit_get_content(edit).token_count &&
+         !cui_edit_content_valid(cui_edit_get_content(edit))) ||
         !cui_textarea_measure(options, theme->font_size, &metrics) || !isfinite(options.width) ||
         !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
         options.rows > 65536 || options.min_rows > 65536 || options.max_rows > 65536 ||

@@ -100,7 +100,7 @@ const snippets = {
  Tree:'cui_tree(ui, id, &theme, model, &state,\n    &selection, options);',
  Label:'cui_label(ui, &theme,\n    cui_string("A useful label"));',
  Badge:'// Define draw_inbox to compose your button, avatar or other content.\nvoid draw_inbox(cui_context *, void *);\ncui_badge_options badge = cui_badge_defaults();\nbadge.count = 125; // Displays 99+; zero hides the marker.\ncui_badge_ex(ui, id, &theme, badge, draw_inbox, user);',
- Progress:'cui_progress(ui, id, &theme,\n    progress / 100.0f, 300);',
+ Progress:'cui_progress_options options = cui_progress_defaults();\noptions.motion = &motion; // retain zero-initialized state\noptions.now_seconds = now_seconds;\ncui_progress_ex(ui, id, &theme, progress / 100.0f, 300, options);',
  Alert:'cui_alert(ui, id, &theme, (cui_alert_options){\n    .kind = CUI_ALERT_INFO,\n    .title = cui_string("Heads up"),\n    .message = cui_string("Your changes were saved"),\n    .width = 360});',
  Bubble:'cui_begin_bubble(ui, id, &theme, CUI_BUBBLE_FILLED, 240);\ncui_label(ui, &theme, cui_string("Message"));\ncui_end_bubble(ui);',
  Empty:'cui_empty(ui, id, &theme, cui_string("No results"),\n    cui_string("Try a different search"), 320);',

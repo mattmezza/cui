@@ -273,10 +273,16 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         cui_edit_state current = cui_edit_get_state(edit);
         size_t cursor =
             options.hit_test(options.hit_test_user, cui_edit_get_text(edit), event.x, event.y);
+        size_t snapped;
+        if (event.type != CUI_EVENT_POINTER_DOWN &&
+            cui_edit_token_boundary(cui_edit_get_content(edit), cursor, false, &snapped) ==
+                CUI_EDIT_OK &&
+            snapped == current.cursor)
+            cursor = snapped;
         size_t anchor = event.type == CUI_EVENT_POINTER_DOWN && !(event.modifiers & CUI_MOD_SHIFT)
                             ? cursor
                             : current.anchor;
-        error = cui_edit_select(edit, anchor, cursor);
+        error = cui_edit_select_atomic(edit, anchor, cursor);
     } else if (event.type == CUI_EVENT_KEY_DOWN &&
                (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
                (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V)) {

@@ -405,13 +405,13 @@ API: `cui_pagination`. [Public header](../include/cui/cui_numeric.h); [guide](NU
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns progress fraction and animation timing.
+**State:** Caller owns the target fraction, host clock and optional zero-initialized cui_progress_motion.
 
-**Interaction:** Presentation only; a bool return from the extended function is not a user activation.
+**Interaction:** Presentation only; the extended return reports whether another animation frame is needed.
 
-**Usage:** Submit the current completion fraction and width each frame.
+**Usage:** Submit the controlled fraction each frame; use cui_progress_defaults for the source loading cycle and retain motion state for smooth value changes.
 
-API: `cui_progress`, `cui_progress_ex`. [Public header](../include/cui/cui_components.h); [guide](COMPONENTS.md).
+API: `cui_progress_defaults`, `cui_progress`, `cui_progress_ex`. [Public header](../include/cui/cui_components.h); [guide](PROGRESS.md).
 
 ## Radio
 

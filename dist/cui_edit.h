@@ -78,6 +78,43 @@ size_t cui_grapheme_iterator_next(cui_grapheme_iterator *iterator);
 size_t cui_word_next(cui_str text, size_t offset);
 size_t cui_word_previous(cui_str text, size_t offset);
 bool cui_word_boundary(cui_str text, size_t offset);
+/* Borrowed atomic inline content for ordinary Input/Textarea models. IDs may
+ * repeat. All span/string storage stays immutable and alive until detached. */
+typedef struct {
+    cui_str id, text, label;
+} cui_edit_inline_token;
+typedef struct {
+    size_t start, end;
+    cui_edit_inline_token token;
+} cui_edit_token_span;
+typedef struct {
+    cui_str text;
+    const cui_edit_token_span *tokens;
+    size_t token_count;
+} cui_edit_content;
+/* Spans are sorted, nonoverlapping, nonempty grapheme ranges matching token.text.
+ * IDs must contain a non-whitespace scalar; text/label reject controls and LS/PS.
+ * All strings use the edit model's NUL-free UTF-8 contract. Maximum 65536 spans. */
+bool cui_edit_content_valid(cui_edit_content);
+/* Pure helpers leave output untouched on rejection. Boundary snaps only strict
+ * token interiors; forward chooses end, otherwise start. Ranges expand outward;
+ * collapsed insertion ranges snap right. Inputs must be scalar byte offsets;
+ * the two range output pointers must differ. */
+cui_edit_result cui_edit_token_boundary(cui_edit_content, size_t offset, bool forward, size_t *out);
+cui_edit_result cui_edit_normalize_token_range(cui_edit_content, size_t start, size_t end,
+                                               size_t *out_start, size_t *out_end);
+cui_edit_content cui_edit_get_content(const cui_edit *);
+/* Atomic document replacement, then annotation adoption. Capacity/validation
+ * failure preserves text, selection, history and previous annotation attachment.
+ * Changing annotated content cannot borrow token strings from mutable edit storage. */
+cui_edit_result cui_edit_set_content(cui_edit *, cui_edit_content);
+/* Annotation-only attachment preserves text/selection/history. Any subsequent
+ * document revision (including undo/redo) detaches spans; the host must refresh.
+ * No metadata allocation, incremental remapping or token history is supplied. */
+cui_edit_result cui_edit_set_tokens(cui_edit *, const cui_edit_token_span *, size_t count);
+/* Token-safe view selection: nonempty ranges expand outward, collapsed cursors
+ * snap left. The legacy exact scalar selection function below remains available. */
+cui_edit_result cui_edit_select_atomic(cui_edit *, size_t anchor, size_t cursor);
 cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
 /* Legacy WORD motions skip punctuation/space and move between word starts. Letters,
  * digits, underscores and common Unicode letter/combining ranges form words.
@@ -89,12 +126,14 @@ cui_edit_result cui_edit_select(cui_edit *edit, size_t anchor, size_t cursor);
 cui_edit_result cui_edit_move(cui_edit *edit, cui_edit_motion motion, bool extend);
 cui_edit_result cui_edit_insert(cui_edit *edit, cui_str text);
 /* Replace a UTF-8 byte range as one history step without first changing the
- * selection. Undo restores the original selection; success collapses it after
- * the inserted text. Rejection leaves text, selection and history unchanged. */
+ * selection. Attached atomic spans expand overlapping ranges outward; collapsed
+ * insertion snaps right. Undo restores the original selection; success collapses
+ * it after the inserted text. Rejection leaves text, selection and history unchanged. */
 cui_edit_result cui_edit_replace_range(cui_edit *, size_t start, size_t end, cui_str text);
 /* Indent selected lines (inclusive of a selection ending at line start), or
  * insert at the collapsed cursor. Outdent removes only an exact line prefix.
- * One successful change is one undo step with both selection endpoints mapped. */
+ * One successful change is one undo step with both selection endpoints mapped.
+ * Attached inline tokens reject indent; detach or use host token-aware editing. */
 cui_edit_result cui_edit_indent(cui_edit *, bool outdent, size_t tab_size, bool hard_tabs);
 cui_edit_result cui_edit_backspace(cui_edit *edit);
 cui_edit_result cui_edit_delete(cui_edit *edit);
@@ -3050,6 +3089,8 @@ struct cui_edit {
     cui_edit_private_snapshot *states;
     size_t slots, count, index;
     uint64_t revision;
+    const cui_edit_token_span *tokens;
+    size_t token_count;
 };
 static bool cui_edit_private_decode(const unsigned char *s, size_t n, size_t *width) {
     if (!n)
@@ -3468,6 +3509,111 @@ bool cui_edit_valid_utf8(cui_str text) {
     }
     return true;
 }
+static bool cui_edit_private_token_string(cui_str text, bool id) {
+    if (!text.length || !cui_edit_valid_utf8(text))
+        return false;
+    bool nonwhite = false;
+    for (size_t at = 0; at < text.length;) {
+        size_t width;
+        const unsigned char *bytes = (const unsigned char *)text.data + at;
+        cui_edit_private_decode(bytes, text.length - at, &width);
+        uint32_t cp = bytes[0];
+        if (width > 1) {
+            cp &= width == 2 ? 31u : width == 3 ? 15u : 7u;
+            for (size_t i = 1; i < width; ++i)
+                cp = (cp << 6) | (bytes[i] & 63u);
+        }
+        nonwhite |= !(cui_edit_private_word_property(cp) & 64u);
+        if (!id && (cp < 32 || (cp >= 127 && cp <= 159) || cp == 0x2028 || cp == 0x2029))
+            return false;
+        at += width;
+    }
+    return !id || nonwhite;
+}
+bool cui_edit_content_valid(cui_edit_content content) {
+    if (!cui_edit_valid_utf8(content.text) || content.token_count > 65536 ||
+        (content.token_count && !content.tokens))
+        return false;
+    cui_grapheme_iterator iterator = {content.text, 0};
+    for (size_t i = 0; i < content.token_count; ++i) {
+        const cui_edit_token_span *span = &content.tokens[i];
+        if (span->start >= span->end || span->end > content.text.length ||
+            (i && content.tokens[i - 1].end > span->start) ||
+
+            !cui_edit_private_token_string(span->token.id, true) ||
+            !cui_edit_private_token_string(span->token.text, false) ||
+            !cui_edit_private_token_string(span->token.label, false) ||
+            span->token.text.length != span->end - span->start ||
+            memcmp(content.text.data + span->start, span->token.text.data, span->token.text.length))
+            return false;
+        while (iterator.offset < span->start)
+            cui_grapheme_iterator_next(&iterator);
+        if (iterator.offset != span->start)
+            return false;
+        while (iterator.offset < span->end)
+            cui_grapheme_iterator_next(&iterator);
+        if (iterator.offset != span->end)
+            return false;
+    }
+    return true;
+}
+static size_t cui_edit_private_token_boundary(cui_edit_content content, size_t offset,
+                                              bool forward) {
+    size_t lo = 0, hi = content.token_count;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        if (content.tokens[mid].end <= offset)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+    if (lo < content.token_count && content.tokens[lo].start < offset)
+        return forward ? content.tokens[lo].end : content.tokens[lo].start;
+    return offset;
+}
+static bool cui_edit_private_content_offset(cui_str text, size_t offset) {
+    return offset <= text.length &&
+           (offset == text.length || ((unsigned char)text.data[offset] & 0xc0u) != 0x80u);
+}
+cui_edit_result cui_edit_token_boundary(cui_edit_content content, size_t offset, bool forward,
+                                        size_t *out) {
+    if (!out || !cui_edit_content_valid(content))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_private_content_offset(content.text, offset))
+        return CUI_EDIT_BOUNDARY;
+    *out = cui_edit_private_token_boundary(content, offset, forward);
+    return CUI_EDIT_OK;
+}
+cui_edit_result cui_edit_normalize_token_range(cui_edit_content content, size_t start, size_t end,
+                                               size_t *out_start, size_t *out_end) {
+    if (!out_start || !out_end || out_start == out_end || !cui_edit_content_valid(content))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (start > end || !cui_edit_private_content_offset(content.text, start) ||
+        !cui_edit_private_content_offset(content.text, end))
+        return CUI_EDIT_BOUNDARY;
+    size_t first = cui_edit_private_token_boundary(content, start, start == end);
+    size_t last = cui_edit_private_token_boundary(content, end, true);
+    *out_start = first;
+    *out_end = last;
+    return CUI_EDIT_OK;
+}
+cui_edit_content cui_edit_get_content(const cui_edit *edit) {
+    return edit ? (cui_edit_content){cui_edit_get_text(edit), edit->tokens, edit->token_count}
+                : (cui_edit_content){0};
+}
+cui_edit_result cui_edit_set_tokens(cui_edit *edit, const cui_edit_token_span *tokens,
+                                    size_t count) {
+    if (!edit ||
+        !cui_edit_content_valid((cui_edit_content){cui_edit_get_text(edit), tokens, count}))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    edit->tokens = count ? tokens : NULL;
+    edit->token_count = count;
+    return CUI_EDIT_OK;
+}
+static void cui_edit_private_detach_tokens(cui_edit *edit) {
+    edit->tokens = NULL;
+    edit->token_count = 0;
+}
 static bool cui_edit_private_accepted(cui_edit *e, cui_str t) {
     if (!cui_edit_valid_utf8(t))
         return false;
@@ -3579,6 +3725,28 @@ cui_edit_result cui_edit_select(cui_edit *e, size_t a, size_t p) {
     cui_edit_private_save_state(e);
     return CUI_EDIT_OK;
 }
+cui_edit_result cui_edit_select_atomic(cui_edit *edit, size_t anchor, size_t cursor) {
+    if (!edit)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_content content = cui_edit_get_content(edit);
+    if (!content.token_count)
+        return cui_edit_select(edit, anchor, cursor);
+    if (!cui_edit_content_valid(content))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!cui_edit_private_content_offset(content.text, anchor) ||
+        !cui_edit_private_content_offset(content.text, cursor))
+        return CUI_EDIT_BOUNDARY;
+    if (anchor == cursor)
+        anchor = cursor = cui_edit_private_token_boundary(content, cursor, false);
+    else if (anchor < cursor) {
+        anchor = cui_edit_private_token_boundary(content, anchor, false);
+        cursor = cui_edit_private_token_boundary(content, cursor, true);
+    } else {
+        anchor = cui_edit_private_token_boundary(content, anchor, true);
+        cursor = cui_edit_private_token_boundary(content, cursor, false);
+    }
+    return cui_edit_select(edit, anchor, cursor);
+}
 static size_t cui_edit_private_previous(cui_edit *e, size_t p) {
     if (p) {
         p--;
@@ -3625,6 +3793,8 @@ static size_t cui_edit_private_line_end(cui_edit *e, size_t p) {
 }
 cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
     if (!e || m < CUI_EDIT_PREVIOUS || m > CUI_EDIT_UNICODE_WORD_NEXT)
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (e->token_count && !cui_edit_content_valid(cui_edit_get_content(e)))
         return CUI_EDIT_INVALID_ARGUMENT;
     size_t p = e->cursor;
     bool vertical = m == CUI_EDIT_LINE_PREVIOUS || m == CUI_EDIT_LINE_NEXT;
@@ -3720,7 +3890,15 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
         default:
             return CUI_EDIT_INVALID_ARGUMENT;
         }
-    cui_edit_result result = cui_edit_select(e, extend ? e->anchor : p, p);
+    bool legacy_scalar = m == CUI_EDIT_PREVIOUS || m == CUI_EDIT_NEXT ||
+                         m == CUI_EDIT_WORD_PREVIOUS || m == CUI_EDIT_WORD_NEXT;
+    if (!legacy_scalar && e->token_count) {
+        bool forward = m == CUI_EDIT_GRAPHEME_NEXT || m == CUI_EDIT_UNICODE_WORD_NEXT ||
+                       m == CUI_EDIT_LINE_NEXT || m == CUI_EDIT_LINE_END || m == CUI_EDIT_END;
+        p = cui_edit_private_token_boundary(cui_edit_get_content(e), p, forward);
+    }
+    cui_edit_result result = legacy_scalar ? cui_edit_select(e, extend ? e->anchor : p, p)
+                                           : cui_edit_select_atomic(e, extend ? e->anchor : p, p);
     if (vertical && result == CUI_EDIT_OK) {
         e->preferred_column = column;
         e->preferred_column_valid = true;
@@ -3729,6 +3907,15 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
 }
 static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_t start,
                                                 size_t end) {
+    if (e->token_count) {
+        size_t first, last;
+        cui_edit_result normalized =
+            cui_edit_normalize_token_range(cui_edit_get_content(e), start, end, &first, &last);
+        if (normalized != CUI_EDIT_OK)
+            return normalized;
+        start = first;
+        end = last;
+    }
     if (!cui_edit_valid_utf8(text))
         return CUI_EDIT_INVALID_UTF8;
     if (!cui_edit_private_accepted(e, text))
@@ -3754,6 +3941,7 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
         memcpy(e->config.buffer + start, e->scratch, text.length);
     e->length = remaining + text.length;
     e->cursor = e->anchor = start + text.length;
+    cui_edit_private_detach_tokens(e);
     e->revision++;
     cui_edit_private_record(e);
     return CUI_EDIT_OK;
@@ -3764,6 +3952,34 @@ cui_edit_result cui_edit_replace_range(cui_edit *e, size_t start, size_t end, cu
     if (start > end || !cui_edit_private_boundary(e, start) || !cui_edit_private_boundary(e, end))
         return CUI_EDIT_BOUNDARY;
     return cui_edit_private_replace(e, text, start, end);
+}
+static bool cui_edit_private_token_alias(cui_edit *edit, cui_str text) {
+    if (!text.length)
+        return false;
+    uintptr_t address = (uintptr_t)text.data, buffer = (uintptr_t)edit->config.buffer;
+    return address >= buffer ? address - buffer < edit->config.capacity
+                             : buffer - address < text.length;
+}
+cui_edit_result cui_edit_set_content(cui_edit *edit, cui_edit_content content) {
+    if (!edit || !cui_edit_content_valid(content))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    bool changes = content.text.length != edit->length ||
+                   (content.text.length &&
+                    memcmp(content.text.data, edit->config.buffer, content.text.length));
+    if (changes)
+        for (size_t i = 0; i < content.token_count; ++i) {
+            cui_edit_inline_token token = content.tokens[i].token;
+            if (cui_edit_private_token_alias(edit, token.id) ||
+                cui_edit_private_token_alias(edit, token.text) ||
+                cui_edit_private_token_alias(edit, token.label))
+                return CUI_EDIT_INVALID_ARGUMENT;
+        }
+    cui_edit_result result = cui_edit_private_replace(edit, content.text, 0, edit->length);
+    if (result != CUI_EDIT_OK)
+        return result;
+    edit->tokens = content.token_count ? content.tokens : NULL;
+    edit->token_count = content.token_count;
+    return CUI_EDIT_OK;
 }
 cui_edit_result cui_edit_insert(cui_edit *e, cui_str text) {
     if (!e)
@@ -3793,11 +4009,12 @@ static void cui_edit_private_indent_commit(cui_edit *e, size_t length, size_t an
     e->preferred_column_valid = false;
     e->anchor = anchor;
     e->cursor = cursor;
+    cui_edit_private_detach_tokens(e);
     e->revision++;
     cui_edit_private_record(e);
 }
 cui_edit_result cui_edit_indent(cui_edit *e, bool outdent, size_t tab_size, bool hard_tabs) {
-    if (!e || !e->config.multiline || !tab_size || tab_size > 4096)
+    if (!e || !e->config.multiline || !tab_size || tab_size > 4096 || e->token_count)
         return CUI_EDIT_INVALID_ARGUMENT;
     size_t unit = hard_tabs ? 1 : tab_size;
     bool block = e->anchor != e->cursor;
@@ -3940,6 +4157,7 @@ cui_edit_result cui_edit_undo(cui_edit *e) {
     cui_edit_private_save_state(e);
     e->index--;
     cui_edit_private_restore(e);
+    cui_edit_private_detach_tokens(e);
     e->revision++;
     return CUI_EDIT_OK;
 }
@@ -3951,6 +4169,7 @@ cui_edit_result cui_edit_redo(cui_edit *e) {
     cui_edit_private_save_state(e);
     e->index++;
     cui_edit_private_restore(e);
+    cui_edit_private_detach_tokens(e);
     e->revision++;
     return CUI_EDIT_OK;
 }

@@ -1825,37 +1825,53 @@
       "name": "Progress",
       "reference_url": "https://gpui-kit.com/component/progress/",
       "category": "fundamentals",
-      "base_behavior": [],
+      "base_behavior": [
+        "cui_progress_measure",
+        "cui_base_progress",
+        "cui_progress_animate"
+      ],
       "public_header": "include/cui/cui_components.h",
       "sample": "gallery/main.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_base.c",
+        "tests/unit/test_components.c",
+        "tests/web/test_browser.py"
       ],
-      "status": "implemented",
+      "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
         "headless": "tested_partial"
       },
       "limitations": [
-        "Determinate bar renders/clamps. Indeterminate motion, semantic values and dedicated story tests pending."
+        "ProgressCircle is not implemented; full Progress family parity is incomplete.",
+        "Arbitrary easing and theme motion-token overrides remain unsupported."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "determinate and indeterminate",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_base.c",
+            "tests/unit/test_components.c"
+          ]
         },
         {
           "name": "value semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_base.c",
+            "tests/unit/test_components.c"
+          ]
         },
         {
           "name": "theme variants and reduced motion",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_base.c",
+            "tests/unit/test_components.c"
+          ]
         }
       ],
       "upstream_doc": {
@@ -1886,7 +1902,7 @@
       },
       "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
       "evidence": [
-        "Partial coverage only; see limitations and named tests. Full family definition of done not met."
+        "Headless geometry/cycle, semantic values, colors/four sizes, controlled transition and reduced-motion tests; real WASM gallery animation. Full family definition of done not met."
       ]
     },
     {

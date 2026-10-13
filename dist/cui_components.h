@@ -222,10 +222,18 @@ bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
                   cui_button_content_fn content, void *user);
 typedef struct {
     bool indeterminate, reduced_motion;
-    double now_seconds; /* Monotonic host clock; one back-and-forth cycle is 1.6s. */
-    float height;       /* Zero selects the default 8px track. */
+    double now_seconds; /* Monotonic host clock; source cycle1s, legacy cycle1.6s. */
+    float height;       /* Zero selects the size-based4/6/8/10px track. */
     cui_str name;       /* Zero selects "Progress". */
+    cui_control_size size;
+    cui_color color;
+    bool custom_color, source_motion;
+    cui_corner_radii corners;
+    bool custom_corners;
+    cui_progress_motion *motion; /* Optional caller-owned determinate transition. */
+    float duration; /* Zero selects source180ms; explicit instant via reduced_motion. */
 } cui_progress_options;
+cui_progress_options cui_progress_defaults(void);
 /* Returns true while indeterminate motion needs another frame. The application
  * owns the fraction and clock; reduced motion shows a static centered segment. */
 bool cui_progress_ex(cui_context *, cui_id, const cui_theme *, float fraction, float width,
@@ -1249,35 +1257,48 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
     cui_end_box(ui);
     return true;
 }
+cui_progress_options cui_progress_defaults(void) {
+    return (cui_progress_options){.source_motion = true, .duration = .18f};
+}
 bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width,
                      cui_progress_options o) {
-    if (!ui || !t)
+    if (!ui || !id || !t || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
+        (o.name.length && !o.name.data))
         return false;
-    if (!isfinite(fraction))
-        fraction = 0;
-    fraction = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+    bool reduced = o.reduced_motion || cui_reduced_motion(ui);
+    cui_progress_geometry geometry =
+        cui_progress_measure(fraction, o.indeterminate, o.source_motion, o.now_seconds, reduced);
+    bool moving = geometry.animating;
+    if (!o.indeterminate && o.motion) {
+        cui_progress_motion_result transition;
+        if (!cui_progress_animate(o.motion, geometry.fraction, o.now_seconds,
+                                  o.duration == 0 ? .18f : o.duration, reduced, &transition))
+            return false;
+        geometry.length = transition.value;
+        moving = transition.active;
+    }
     if (width <= 0 || !isfinite(width))
         width = 160;
-    float height = isfinite(o.height) && o.height > 0 ? o.height : 8;
-    bool moving = o.indeterminate && !o.reduced_motion && !cui_reduced_motion(ui);
-    float offset = 0, fill_width = width * fraction;
-    if (o.indeterminate) {
-        double phase = .5;
-        if (moving && isfinite(o.now_seconds))
-            phase = .5 - .5 * cos(fmod(o.now_seconds, 1.6) * (6.283185307179586 / 1.6));
-        fill_width = width * .3f;
-        offset = (width - fill_width) * (float)phase;
-    }
+    float height = isfinite(o.height) && o.height > 0 ? o.height
+                   : o.size == CUI_CONTROL_XSMALL     ? 4
+                   : o.size == CUI_CONTROL_SMALL      ? 6
+                   : o.size == CUI_CONTROL_LARGE      ? 10
+                                                      : 8;
+    cui_color color = o.custom_color ? o.color : t->primary;
+    cui_color track = color;
+    track.a = (uint8_t)(track.a * .2f);
+    float radius = t->radius == 0 ? 0 : height * .5f;
     cui_begin_box(ui, id,
                   (cui_box){.width = width,
                             .height = height,
-                            .radius = t->radius,
-                            .background = t->border,
-                            .row = true});
-    cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, o.name.length ? o.name : cui_string("Progress"),
-                 false, false, o.indeterminate ? 0 : fraction);
-    cui_set_semantic_details(
-        ui, id, (cui_semantic_details){.minimum = 0, .maximum = 1, .busy = o.indeterminate});
+                            .radius = radius,
+                            .custom_corners = o.custom_corners,
+                            .corner_radii = o.corners,
+                            .background = track,
+                            .row = true,
+                            .clip = true});
+    cui_base_progress(ui, id, o.name, geometry.fraction, o.indeterminate);
+    float offset = width * geometry.start, fill_width = width * geometry.length;
     if (offset > 0) {
         cui_begin_box(ui, id ^ UINT64_C(0x1829d4cd19342f11),
                       (cui_box){.width = offset, .height = height});
@@ -1287,8 +1308,10 @@ bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fract
         cui_begin_box(ui, id ^ UINT64_C(0x7129d4cd19342f11),
                       (cui_box){.width = fill_width,
                                 .height = height,
-                                .radius = t->radius,
-                                .background = t->primary});
+                                .radius = radius,
+                                .custom_corners = o.custom_corners,
+                                .corner_radii = o.corners,
+                                .background = color});
         cui_end_box(ui);
     }
     cui_end_box(ui);

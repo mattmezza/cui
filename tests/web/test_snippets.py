@@ -63,7 +63,7 @@ def main():
         'Switch': 'cui_str label = {0}; bool enabled = false; cui_switch_state spring = {0}; double now = 0;',
         'Radio': 'cui_str label = {0}; int selection = 0;',
         'Slider': 'float value = 0;',
-        'Progress': 'float progress = 0;',
+        'Progress': 'float progress = 0; cui_progress_motion motion = {0};',
         'Input': 'cui_str label = {0}; cui_edit *edit = 0; cui_input_state state = {0};',
         'Textarea': 'cui_edit *edit = 0; cui_textarea_state state = {0};',
         'NumberInput': 'cui_number_state state = {0}; double value = 0; cui_str label = {0};',

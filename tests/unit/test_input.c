@@ -174,6 +174,41 @@ static void clipboard_and_readonly(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static size_t token_hit(void *user, cui_str text, float x, float y) {
+    (void)text;
+    (void)x;
+    (void)y;
+    return *(size_t *)user;
+}
+static void token_pointer_selection(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    char buffer[64] = "a @alice z";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_edit_token_span token = {
+        2, 8, {cui_string("alice"), cui_string("@alice"), cui_string("Alice")}};
+    assert(ui && edit && cui_edit_set_tokens(edit, &token, 1) == CUI_EDIT_OK);
+    cui_input_behavior_state state = {0};
+    size_t hit = 5;
+    cui_base_input_options options = {.hit_test = token_hit, .hit_test_user = &hit};
+    base_frame(ui, edit, &state, options);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 20, .y = 10}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 20, .y = 10}));
+    assert(base_frame(ui, edit, &state, options).error == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 2 && cui_edit_get_state(edit).anchor == 2);
+    assert(cui_edit_select_atomic(edit, 0, 0) == CUI_EDIT_OK);
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 20, .y = 10, .modifiers = CUI_MOD_SHIFT}));
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 20, .y = 10, .modifiers = CUI_MOD_SHIFT}));
+    assert(base_frame(ui, edit, &state, options).error == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).anchor == 0 && cui_edit_get_state(edit).cursor == 8);
+    assert(cui_edit_get_content(edit).token_count == 1 && !strcmp(buffer, "a @alice z"));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 #ifndef CUI_INPUT_BASE_ONLY
 static cui_size measure(void *user, cui_str text, float font_size) {
     (void)user;
@@ -496,6 +531,7 @@ static void size_metrics_and_centering(void) {
 #endif
 int main(void) {
     single_event_reduction();
+    token_pointer_selection();
 #ifndef CUI_INPUT_BASE_ONLY
     size_metrics_and_centering();
     grow_resize_and_alignment();

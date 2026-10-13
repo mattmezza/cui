@@ -20,6 +20,34 @@ bool cui_base_check(cui_context *, cui_id, cui_str, cui_check_state *, bool disa
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);
 typedef struct {
+    float fraction, start, length;
+    bool animating;
+} cui_progress_geometry;
+/* Pure geometry in normalized track units. Nonfinite fraction becomes zero;
+ * reduced/invalid clocks produce a static centered loading segment. Source
+ * loading uses the frozen one-second growing/shrinking quadratic cycle; false
+ * preserves the legacy1.6s fixed-width CUI cycle. */
+cui_progress_geometry cui_progress_measure(float fraction, bool indeterminate, bool source_motion,
+                                           double now_seconds, bool reduced_motion);
+/* Submit inside a box with this id; paints nothing. Controlled normalized
+ * fraction, numeric0..1 semantics, indeterminate busy/unknown value and no focus. */
+float cui_base_progress(cui_context *, cui_id, cui_str name, float fraction, bool indeterminate);
+typedef struct {
+    double start, last_time;
+    float from, target, value, duration;
+    bool ready, active;
+} cui_progress_motion;
+typedef struct {
+    float value;
+    bool active;
+} cui_progress_motion_result;
+/* Caller-owned deterministic transition, source move cubic-bezier(.2,0,0,1).
+ * Initial submission is immediate; changes/reversals continue from the current
+ * value. Duration0/reduced motion snaps. Invalid/nonfinite arguments preserve
+ * state and result. A regressing clock is clamped to the last observed time. */
+bool cui_progress_animate(cui_progress_motion *, float fraction, double now_seconds, float duration,
+                          bool reduced_motion, cui_progress_motion_result *);
+typedef struct {
     bool changed, submitted;
     cui_edit_result error;
 } cui_input_result;
@@ -93,6 +121,124 @@ cui_date cui_date_add_days(cui_date, int days);     /* years limited to 1..9999 
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
+static float cui_progress_fraction(float value) {
+    return isfinite(value) ? fmaxf(0, fminf(1, value)) : 0;
+}
+static double cui_progress_quadratic(double value) {
+    return value < .5 ? 2 * value * value : 1 - 2 * (1 - value) * (1 - value);
+}
+cui_progress_geometry cui_progress_measure(float fraction, bool indeterminate, bool source_motion,
+                                           double now, bool reduced) {
+    cui_progress_geometry result = {.fraction = cui_progress_fraction(fraction)};
+    if (!indeterminate) {
+        result.length = result.fraction;
+        return result;
+    }
+    bool moving = !reduced && isfinite(now) && now >= 0;
+    result.animating = moving;
+    if (source_motion) {
+        if (!moving) {
+            result.start = .325f;
+            result.length = .35f;
+        } else {
+            double delta = fmod(now, 1);
+            double start = cui_progress_quadratic(fmax(0, fmin(1, (delta - .5) * 2)));
+            double end = cui_progress_quadratic(1 - delta);
+            result.start = (float)start;
+            result.length = (float)fmax(0, 1 - start - end);
+        }
+    } else {
+        double phase = moving ? .5 - .5 * cos(fmod(now, 1.6) * (6.283185307179586 / 1.6)) : .5;
+        result.start = (float)(.7 * phase);
+        result.length = .3f;
+    }
+    return result;
+}
+float cui_base_progress(cui_context *ui, cui_id id, cui_str name, float fraction,
+                        bool indeterminate) {
+    float value = cui_progress_fraction(fraction);
+    if (!ui || !id || (name.length && !name.data))
+        return value;
+    cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, name.length ? name : cui_string("Progress"), false,
+                 false, indeterminate ? 0 : value);
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){
+            .minimum = 0, .maximum = 1, .busy = indeterminate, .no_focus = true});
+    cui_set_tab_stop(ui, id, false);
+    return value;
+}
+static float cui_progress_ease(float fraction) {
+    if (fraction <= 0 || fraction >= 1)
+        return fraction;
+    double low = 0, high = 1, parameter = fraction;
+    for (unsigned i = 0; i < 24; i++) {
+        parameter = (low + high) * .5;
+        double inverse = 1 - parameter;
+        double x = 3 * inverse * inverse * parameter * .2 + parameter * parameter * parameter;
+        if (x < fraction)
+            low = parameter;
+        else
+            high = parameter;
+    }
+    return (float)(3 * (1 - parameter) * parameter * parameter + parameter * parameter * parameter);
+}
+static void cui_progress_motion_sample(cui_progress_motion *state, double now) {
+    if (!state->active)
+        return;
+    double elapsed = now - state->start;
+    float fraction = (float)fmax(0, fmin(1, elapsed / state->duration));
+    state->value = state->from + (state->target - state->from) * cui_progress_ease(fraction);
+    if (fraction >= 1) {
+        state->value = state->target;
+        state->active = false;
+    }
+}
+bool cui_progress_animate(cui_progress_motion *state, float value, double now, float duration,
+                          bool reduced, cui_progress_motion_result *result) {
+    if (!state || !result || !isfinite(value) || !isfinite(now) || now < 0 || !isfinite(duration) ||
+        duration < 0 || duration > 60 ||
+        (state->ready &&
+         (!isfinite(state->start) || !isfinite(state->last_time) || !isfinite(state->from) ||
+          !isfinite(state->target) || !isfinite(state->value) || !isfinite(state->duration) ||
+          state->duration < 0 || state->duration > 60 || state->start < 0 ||
+          state->last_time < state->start || state->from < 0 || state->from > 1 ||
+          state->target < 0 || state->target > 1 || state->value < 0 || state->value > 1 ||
+          (state->active && state->duration <= 0))))
+        return false;
+    value = cui_progress_fraction(value);
+    cui_progress_motion next = *state;
+    if (!next.ready) {
+        next = (cui_progress_motion){.ready = true,
+                                     .from = value,
+                                     .target = value,
+                                     .value = value,
+                                     .start = now,
+                                     .last_time = now,
+                                     .duration = duration};
+    } else {
+        now = fmax(now, next.last_time);
+        cui_progress_motion_sample(&next, now);
+        if (next.target != value) {
+            next.from = next.value;
+            next.target = value;
+            next.start = now;
+            next.duration = duration;
+            next.active = next.from != value;
+        }
+        if (reduced || duration == 0) {
+            next.from = next.target = next.value = value;
+            next.active = false;
+            next.duration = duration;
+            next.start = now;
+        }
+        next.last_time = now;
+        cui_progress_motion_sample(&next, now);
+    }
+    *state = next;
+    *result = (cui_progress_motion_result){next.value, next.active};
+    return true;
+}
 cui_interaction cui_base_button(cui_context *ui, cui_id id, cui_str name, bool disabled) {
     return cui_interact(ui, id, CUI_ROLE_BUTTON, name, disabled, false, 0);
 }
@@ -247,10 +393,16 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         cui_edit_state current = cui_edit_get_state(edit);
         size_t cursor =
             options.hit_test(options.hit_test_user, cui_edit_get_text(edit), event.x, event.y);
+        size_t snapped;
+        if (event.type != CUI_EVENT_POINTER_DOWN &&
+            cui_edit_token_boundary(cui_edit_get_content(edit), cursor, false, &snapped) ==
+                CUI_EDIT_OK &&
+            snapped == current.cursor)
+            cursor = snapped;
         size_t anchor = event.type == CUI_EVENT_POINTER_DOWN && !(event.modifiers & CUI_MOD_SHIFT)
                             ? cursor
                             : current.anchor;
-        error = cui_edit_select(edit, anchor, cursor);
+        error = cui_edit_select_atomic(edit, anchor, cursor);
     } else if (event.type == CUI_EVENT_KEY_DOWN &&
                (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
                (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V)) {

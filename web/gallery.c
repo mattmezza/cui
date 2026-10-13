@@ -137,6 +137,7 @@ int gallery_theme_channel(int field, int channel) {
 }
 static bool redraw, reduced_motion, compact_density;
 static bool progress_indeterminate;
+static cui_progress_motion progress_motion;
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
 static const cui_semantic *semantics;
@@ -3131,15 +3132,19 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         break;
     }
-    case 9:
+    case 9: {
+        cui_progress_options options = cui_progress_defaults();
+        options.indeterminate = progress_indeterminate;
+        options.reduced_motion = reduced_motion;
+        options.now_seconds = host_seconds;
+        options.size = (cui_control_size)control_size;
+        options.motion = &progress_motion;
         cui_progress_ex(ui, cui_id_from(ui, "progress"), &t, slider / 100,
-                        width > 360 ? 300 : width - 48,
-                        (cui_progress_options){.indeterminate = progress_indeterminate,
-                                               .reduced_motion = reduced_motion,
-                                               .now_seconds = host_seconds});
+                        width > 360 ? 300 : width - 48, options);
         cui_slider(ui, cui_id_from(ui, "progress-control"), &t, cui_string("Progress"), &slider, 0,
                    100, 1, disabled);
         break;
+    }
     case 10:
         cui_label(ui, &t, cui_string("Before the separator"));
         cui_separator(ui, cui_id_from(ui, "separator"), &t, width - 48);

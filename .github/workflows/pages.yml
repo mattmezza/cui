@@ -76,6 +76,8 @@ jobs:
         run: uv run tests/web/test_alert_bubble_slots.py
       - name: Verify caller-clocked loading motion and reduced-motion quiescence
         run: uv run tests/web/test_status_motion.py
+      - name: Verify disabled and loading Button activation barriers
+        run: uv run tests/web/test_button_activation_blocker.py
       - name: Verify Button callbacks slots focus and painted states
         run: uv run tests/web/test_button_behavior.py
       - name: Verify Table sizing and selection-only DataTable actions
@@ -86,6 +88,8 @@ jobs:
           uv run tests/web/test_chart_appearance_hover.py --controlled-clock
       - name: Verify pointer presence capture and actual gallery leave behavior
         run: uv run tests/web/test_pointer_presence.py --directory build/web
+      - name: Verify copied Chart tooltip rows with actual WASM pixels
+        run: uv run tests/web/test_chart_typed_tooltip.py
       - name: Verify Radar custom-label tooltip titles with actual WASM pixels
         run: uv run tests/web/test_chart_radar_tooltip_title.py
       - name: Verify source point-axis geometry with actual WASM pixels

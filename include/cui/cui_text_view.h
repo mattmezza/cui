@@ -278,6 +278,7 @@ typedef struct {
     void (*on_reveal)(cui_rect window_line, void *);
     void *reveal_user;
     cui_text_view_selection *shared_selection;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_text_view_options;
 cui_text_view_options cui_text_view_default(void);
 /* Call once after begin_frame and before any member is painted. Uses retained layout;

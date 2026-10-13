@@ -334,6 +334,14 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
     if (!ui || !id || !s || !cui_message_scroller_validate_options(o))
         return r;
     r.valid = true;
+    if (o.scrollbar_style) {
+        if (isfinite(o.scrollbar_style->thickness) && o.scrollbar_style->thickness > 0)
+            o.bar_thickness = o.scrollbar_style->thickness;
+        if (o.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+            o.scrollbar = false;
+    }
+    if (!o.scrollbar)
+        s->scrollbar.dragging_y = false;
     for (size_t i = s->previous_begin; i < s->previous_end && i < s->count; i++) {
         double height = fmax(0, s->rows[i].bounds.h - s->rows[i].render_gap);
         if (s->rows[i].bounds.h > 0 && height != s->rows[i].raw_height) {
@@ -351,6 +359,7 @@ cui_message_scroller_result cui_base_message_scroller(cui_context *ui, cui_id id
                                  .content_height = (float)fmin(r.view.total, FLT_MAX),
                                  .bar_thickness = o.bar_thickness,
                                  .wheel_step = o.wheel_step,
+                                 .scrollbar_style = o.scrollbar_style,
                                  .vertical = o.scrollbar};
     cui_scroll_geometry geometry = {
         .viewport = {o.width - (o.scrollbar ? fminf(o.bar_thickness, o.width * .5f) : 0), o.height},

@@ -100,6 +100,7 @@ typedef struct {
     /* Adjust a configured button's appearance without replacing its action. */
     cui_message_slot jump_content;
     float jump_width, jump_height;
+    const cui_scrollbar_style *scrollbar_style;
 } cui_message_scroller_options;
 typedef struct {
     cui_message_scroller_view view;

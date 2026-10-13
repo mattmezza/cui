@@ -4,6 +4,7 @@
 #include "cui/cui_base.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_scroll.h"
 #include <math.h>
 static void cui_choice_menu_level(cui_context *, const cui_theme *, const cui_menu_entry *, size_t,
                                   cui_menu_tree_state *, size_t, cui_rect, cui_menu_tree_options,
@@ -431,6 +432,15 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         isfinite(options.last_empty_space_width) && options.last_empty_space_width >= 0)
         tail_width = options.last_empty_space_width * density;
     bool scrollable = options.scroll && isfinite(options.bar_extent) && options.bar_extent > 0;
+    cui_scrollbar_style scrollbar_skin =
+        options.scrollbar_style ? *options.scrollbar_style : theme->scrollbar;
+    scrollbar_skin.reduced_motion |= options.reduced_motion;
+    options.scrollbar_style = &scrollbar_skin;
+    if (options.scrollbar_style->visibility == CUI_SCROLLBAR_HIDDEN)
+        options.scrollbar = false;
+    else if (options.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
+             options.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE)
+        options.scrollbar = true;
     if (scrollable) {
         options.scroll->receiving_id = viewport_id;
         options.scroll->viewport = cui_bounds(ui, viewport_id);
@@ -696,15 +706,24 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     cui_end_box(ui);
     if (scrollable && options.scroll->scrollbar_id) {
         cui_tab_scroll_state *scroll = options.scroll;
+        const cui_scrollbar_style *style = options.scrollbar_style;
+        float opacity = cui_scrollbar_opacity(ui, viewport_id, scroll->scrollbar_id, style,
+                                              scroll->offset, scroll->scrollbar_dragging);
         cui_rect viewport = scroll->viewport;
-        cui_rect track = options.vertical
-                             ? (cui_rect){viewport.x + viewport.w - 6, viewport.y, 6, viewport.h}
-                             : (cui_rect){viewport.x, viewport.y + viewport.h - 6, viewport.w, 6};
-        if (track.w > 0 && track.h > 0) {
+        float thickness = isfinite(style->thickness) && style->thickness > 0 ? style->thickness : 6;
+        thickness = fminf(thickness, fminf(viewport.w, viewport.h) * .5f);
+        cui_rect track =
+            options.vertical
+                ? (cui_rect){viewport.x + viewport.w - thickness, viewport.y, thickness, viewport.h}
+                : (cui_rect){viewport.x, viewport.y + viewport.h - thickness, viewport.w,
+                             thickness};
+        if (opacity > 0 && track.w > 0 && track.h > 0) {
             float length = options.vertical ? track.h : track.w;
             float thumb_length = length * (float)((double)options.bar_extent /
                                                   ((double)options.bar_extent + scroll->maximum));
-            thumb_length = fminf(length, fmaxf(16, thumb_length));
+            float minimum =
+                isfinite(style->min_thumb) && style->min_thumb > 0 ? style->min_thumb : 16;
+            thumb_length = fminf(length, fmaxf(minimum, thumb_length));
             float thumb_start = (length - thumb_length) * scroll->offset / scroll->maximum;
             cui_rect thumb =
                 options.vertical
@@ -712,18 +731,33 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                     : (cui_rect){track.x + thumb_start, track.y, thumb_length, track.h};
             cui_begin_portal(
                 ui, scroll->scrollbar_id,
-                (cui_box){.background = theme->border,
-                          .radius = 3,
+                (cui_box){.background = style->no_track             ? (cui_color){0}
+                                        : style->custom_track_color ? style->track_color
+                                                                    : theme->border,
+                          .radius = isfinite(style->track_radius) && style->track_radius > 0
+                                        ? style->track_radius
+                                    : style->visibility == CUI_SCROLLBAR_INHERIT ? 3
+                                                                                 : 0,
+                          .custom_opacity = true,
+                          .opacity = opacity,
                           .border = theme->focus,
-                          .border_width = cui_focused(ui) == scroll->scrollbar_id ? 1 : 0},
+                          .border_width =
+                              !style->no_track && cui_focused(ui) == scroll->scrollbar_id ? 1 : 0},
                 track, 1);
             cui_interact(ui, scroll->scrollbar_id, CUI_ROLE_SCROLLBAR, cui_string("Tab scrollbar"),
                          options.disabled, false, scroll->offset);
             cui_end_box(ui);
             cui_begin_portal(
                 ui, scroll->scrollbar_id ^ UINT64_C(0x247d15723f61c98b),
-                (cui_box){.background = options.disabled ? theme->muted : theme->primary,
-                          .radius = 3},
+                (cui_box){.background = style->custom_thumb_color ? style->thumb_color
+                                        : options.disabled        ? theme->muted
+                                                                  : theme->primary,
+                          .radius = isfinite(style->thumb_radius) && style->thumb_radius > 0
+                                        ? style->thumb_radius
+                                    : style->visibility == CUI_SCROLLBAR_INHERIT ? 3
+                                                                                 : 0,
+                          .custom_opacity = true,
+                          .opacity = opacity},
                 thumb, 2);
             cui_end_box(ui);
         }
@@ -872,7 +906,46 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                                    options.visible_count && count > options.visible_count
                                        ? (count - options.visible_count) * metrics->height
                                        : 0});
-    cui_begin_box(ui, container, (cui_box){.width = -1, .gap = 0});
+    cui_scroll_options bars =
+        cui_scroll_resolve(theme, (cui_scroll_options){.vertical = true,
+                                                       .disabled = options.disabled,
+                                                       .wheel_step = metrics->height,
+                                                       .scrollbar_style = options.scrollbar_style});
+    bool overlay = bars.scrollbar_style &&
+                   (bars.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
+                    bars.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE) &&
+                   options.visible_count && isfinite(metrics->height) && metrics->height > 0;
+    size_t visible = options.visible_count < count ? options.visible_count : count;
+    float width = cui_bounds(ui, container).w;
+    cui_rect bar_viewport = {0, 0, width, visible * metrics->height};
+    cui_size bar_content = {width, count * metrics->height};
+    if (overlay && count > visible) {
+        float x = 0, y = state->first_visible * metrics->height;
+        if (width <= 0)
+            cui_invalidate(ui);
+        if (cui_base_scrollbar_overlay(ui, container, &x, &y, bar_viewport, bar_content, bars)) {
+            size_t first = (size_t)floorf(y / metrics->height);
+            state->first_visible = first < count - visible ? first : count - visible;
+            size_t active = count;
+            for (size_t i = 0; i < count; i++)
+                if (items[i].id == state->active)
+                    active = i;
+            if (active < state->first_visible || active >= state->first_visible + visible) {
+                bool focused = cui_focused(ui) == state->active;
+                state->active = 0;
+                for (size_t i = state->first_visible; i < state->first_visible + visible; i++)
+                    if (!items[i].disabled) {
+                        state->active = items[i].id;
+                        break;
+                    }
+                if (focused)
+                    cui_focus(ui, state->active);
+            }
+        }
+    }
+    cui_begin_box(
+        ui, container,
+        (cui_box){.width = -1, .gap = 0, .height = overlay ? bar_viewport.h : 0, .clip = overlay});
     size_t begin = options.visible_count ? state->first_visible : 0;
     size_t length = options.visible_count ? options.visible_count : count;
     if (begin > count)
@@ -952,6 +1025,9 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
         cui_set_semantic_details(ui, items[i].id,
                                  (cui_semantic_details){.selected = checked, .parent = container});
     }
+    if (overlay)
+        cui_scrollbar_overlay_paint(ui, container, theme, 0, state->first_visible * metrics->height,
+                                    bar_viewport, bar_content, bars);
     cui_end_box(ui);
 }
 bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
@@ -1023,7 +1099,8 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return false;
-    cui_list_options list_options = {.disabled = options.disabled,
+    cui_list_options list_options = {.scrollbar_style = options.scrollbar_style,
+                                     .disabled = options.disabled,
                                      .menu = menu,
                                      .dt = options.dt,
                                      .visible_begin = state->list.first_visible,
@@ -1156,7 +1233,8 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return result;
-    cui_list_options list_options = {.dt = options.dt,
+    cui_list_options list_options = {.scrollbar_style = options.scrollbar_style,
+                                     .dt = options.dt,
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
@@ -1296,7 +1374,8 @@ bool cui_select_multi(cui_context *ui, cui_id trigger, const cui_theme *theme, c
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return changed;
-    cui_list_options list_options = {.disabled = options.disabled,
+    cui_list_options list_options = {.scrollbar_style = options.scrollbar_style,
+                                     .disabled = options.disabled,
                                      .dt = options.dt,
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
@@ -1395,7 +1474,8 @@ cui_combobox_result cui_combobox_multi(cui_context *ui, cui_id input, const cui_
     cui_overlay_set_bounds(&state->overlay, placement.bounds);
     if (!cui_overlay_begin(ui, &state->overlay))
         return result;
-    cui_list_options list_options = {.dt = options.dt,
+    cui_list_options list_options = {.scrollbar_style = options.scrollbar_style,
+                                     .dt = options.dt,
                                      .visible_begin = state->list.first_visible,
                                      .visible_count = rows,
                                      .render = options.render,
@@ -1538,6 +1618,18 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
         2 * metrics.padding +
         (rows ? cui_choice_menu_window_height(entries, cursor->first_visible, rows, metrics)
               : metrics.row_height);
+    cui_scroll_options bars =
+        cui_scroll_resolve(theme, (cui_scroll_options){.vertical = true,
+                                                       .disabled = options.popup.disabled,
+                                                       .wheel_step = metrics.row_height,
+                                                       .scrollbar_style = options.scrollbar_style});
+    bool overlay =
+        bars.scrollbar_style && (bars.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
+                                 bars.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE);
+    float total_height = cui_choice_menu_window_height(entries, 0, count, metrics);
+    if (overlay)
+        height =
+            fminf(maximum_height, 2 * metrics.padding + fmaxf(total_height, metrics.row_height));
     cui_popup_result placement = cui_popup_place(
         anchor, (cui_size){width, height}, options.popup.viewport,
         level ? CUI_POPUP_RIGHT : options.popup.side, !level && state->contextual ? 0 : 4);
@@ -1578,6 +1670,46 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
                         (cursor->first_visible ? metrics.gap : 0),
             .scroll_max_y = fmaxf(0, cui_choice_menu_window_height(entries, 0, count, metrics) -
                                          (height - 2 * metrics.padding))});
+    cui_rect bar_viewport = {metrics.padding, metrics.padding,
+                             fmaxf(0, placement.bounds.w - 2 * metrics.padding),
+                             fmaxf(0, placement.bounds.h - 2 * metrics.padding)};
+    cui_size bar_content = {bar_viewport.w, total_height};
+    if (overlay) {
+        float x = 0, y = cui_choice_menu_window_height(entries, 0, cursor->first_visible, metrics) +
+                         (cursor->first_visible ? metrics.gap : 0);
+        if (cui_base_scrollbar_overlay(ui, scope, &x, &y, bar_viewport, bar_content, bars)) {
+            size_t first = 0;
+            float offset = 0;
+            while (first + 1 < count) {
+                float next =
+                    offset + cui_choice_menu_row_height(&entries[first], metrics) + metrics.gap;
+                if (next > y)
+                    break;
+                offset = next;
+                first++;
+            }
+            cursor->first_visible = first;
+            rows = cui_choice_menu_fit(entries, count, first, bar_viewport.h, metrics);
+            state->visible_rows[level] = rows;
+            bool active_visible = false;
+            for (size_t i = first; i < first + rows; i++)
+                active_visible |= entries[i].id == cursor->active;
+            if (!active_visible) {
+                bool focused = cui_focused(ui) == cursor->active;
+                cursor->active = 0;
+                for (size_t i = first; i < first + rows; i++)
+                    if (!entries[i].disabled && entries[i].kind != CUI_MENU_LABEL &&
+                        entries[i].kind != CUI_MENU_SEPARATOR) {
+                        cursor->active = entries[i].id;
+                        break;
+                    }
+                if (focused)
+                    cui_focus(ui, cursor->active);
+                if (state->depth > level + 1)
+                    state->depth = level + 1;
+            }
+        }
+    }
     size_t begin = cursor->first_visible, end = rows > count - begin ? count : begin + rows;
     float icon_size = metrics.icon_size;
     bool has_left_icon = false;
@@ -1662,6 +1794,12 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     }
     if (!count)
         cui_text(ui, cui_string("No actions"), theme->font_size, theme->muted);
+    if (overlay)
+        cui_scrollbar_overlay_paint(
+            ui, scope, theme, 0,
+            cui_choice_menu_window_height(entries, 0, cursor->first_visible, metrics) +
+                (cursor->first_visible ? metrics.gap : 0),
+            bar_viewport, bar_content, bars);
     if (level + 1 < state->depth) {
         size_t parent = count;
         for (size_t i = 0; i < count; i++)

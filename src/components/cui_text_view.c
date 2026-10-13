@@ -839,12 +839,30 @@ static void cui_text_view_paint(cui_context *ui, cui_id id, const cui_theme *the
                                          .disabled = o.disabled};
             cui_theme scroll_theme = *theme;
             scroll_theme.surface = style.table_background;
+            cui_scroll_options bars = cui_scroll_resolve(
+                theme, (cui_scroll_options){.horizontal = true,
+                                            .disabled = o.disabled,
+                                            .scrollbar_style = o.scrollbar_style});
+            cui_scrollbar_style skin = *bars.scrollbar_style;
+            skin.reduced_motion |= o.reduced_motion;
+            bars.scrollbar_style = &skin;
+            cui_rect bar_viewport = {0, 0, scroll.width, scroll.height};
+            cui_size bar_content = {scroll.content_width, scroll.height};
+            cui_base_scrollbar_overlay(ui, scroll_id, &block->table_scroll.x,
+                                       &block->table_scroll.y, bar_viewport, bar_content, bars);
             if (cui_scrollable_begin(ui, scroll_id, &scroll_theme, &block->table_scroll, scroll)) {
                 cui_text_view_options body = o;
                 body.table_actions = NULL;
                 cui_text_view_paint_range(ui, id, theme, s, style, body, viewport, first, end,
                                           frame.x + 1, frame.y + 1, false);
-                cui_scrollable_end_ex(ui, scroll_id, &scroll_theme, &block->table_scroll, scroll);
+                cui_base_scrollable_finish(ui, scroll_id, &block->table_scroll, scroll);
+                cui_set_box_scroll_offset(ui, scroll_id ^ UINT64_C(0x75b21b4d3cba0f89),
+                                          -block->table_scroll.x, -block->table_scroll.y);
+                bar_viewport.x = block->table_scroll.x;
+                bar_viewport.y = block->table_scroll.y;
+                cui_scrollbar_overlay_paint(ui, scroll_id, &scroll_theme, block->table_scroll.x,
+                                            block->table_scroll.y, bar_viewport, bar_content, bars);
+                cui_scrollable_end(ui, scroll_id, &scroll_theme, &block->table_scroll, scroll);
             }
             cui_end_box(ui);
             cui_text_view_paint_range(ui, id, theme, s, style, o, viewport, first, end, 0, 0, true);
@@ -864,7 +882,12 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
     cui_text_view_style style = o.custom_style ? o.style : cui_text_view_style_from_theme(theme);
     float width = o.width > 0 ? o.width : s->viewport.w > 0 ? s->viewport.w : 320;
     float viewport = o.height > 0 ? o.height : s->viewport.h > 0 ? s->viewport.h : 240;
-    float content_width = o.scrollable ? fmaxf(1, width - 10) : width;
+    cui_scroll_options body_scroll =
+        cui_scroll_resolve(theme, (cui_scroll_options){.width = width,
+                                                       .height = viewport,
+                                                       .vertical = true,
+                                                       .scrollbar_style = o.scrollbar_style});
+    float content_width = o.scrollable ? cui_scroll_layout(body_scroll).viewport.width : width;
     s->stream_fade = o.stream_fade;
     s->reduced_motion = o.reduced_motion;
     char resource[CUI_TEXT_VIEW_BYTE_LIMIT];
@@ -1009,12 +1032,15 @@ bool cui_text_view(cui_context *ui, cui_id id, const cui_theme *theme, cui_text_
     if (o.scrollable) {
         cui_theme scroll_theme = *theme;
         scroll_theme.surface = (cui_color){0};
+        scroll_theme.scrollbar = *body_scroll.scrollbar_style;
+        scroll_theme.scrollbar.reduced_motion |= o.reduced_motion;
         cui_id scroll_id = id ^ UINT64_C(0x891dd9c052ad9f04);
         cui_scroll_options scroll = {.width = width,
                                      .height = viewport,
                                      .content_height = s->height,
                                      .vertical = true,
-                                     .disabled = o.disabled};
+                                     .disabled = o.disabled,
+                                     .scrollbar_style = &scroll_theme.scrollbar};
         if (cui_scrollable_begin(ui, scroll_id, &scroll_theme, &s->scroll, scroll)) {
             cui_text_view_paint(ui, id, theme, s, style, o, viewport);
             cui_scrollable_end_ex(ui, scroll_id, &scroll_theme, &s->scroll, scroll);

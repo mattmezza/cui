@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_scroll.h"
 #include "cui/cui_textarea.h"
 #include <assert.h>
 #include <math.h>
@@ -1152,7 +1153,43 @@ static void test_ime_large_default_document(void) {
     free(rows);
     free(document);
 }
+static void test_overlay_scrollbars(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    char buffer[256] =
+        "A very long unwrapped first line with horizontal overflow\n2\n3\n4\n5\n6\n7\n8\n9";
+    cui_edit *edit = editor(buffer, sizeof(buffer));
+    cui_textarea_line lines[32];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 32));
+    cui_scrollbar_style style = {.visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 12};
+    cui_textarea_options options = {
+        .width = 180, .rows = 3, .no_wrap = true, .scrollbar_style = &style};
+    for (unsigned i = 0; i < 3; i++)
+        assert(frame(ui, edit, &state, options).error == CUI_TEXTAREA_OK);
+    assert(state.maximum_x > 0 && state.maximum_y > 0);
+    cui_rect bounds = cui_bounds(ui, cui_scrollbar_id(10, true));
+    assert(bounds.w == 12 && bounds.h > 0);
+    assert(cui_bounds(ui, cui_scrollbar_id(10, false)).h == 12);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h - 14}));
+    frame(ui, edit, &state, options);
+    assert(state.scroll_y > 0);
+    assert(cui_bounds(ui, cui_scrollbar_id(10, true)).y == bounds.y);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = bounds.x, .y = bounds.y}));
+    style.visibility = CUI_SCROLLBAR_HIDDEN;
+    frame(ui, edit, &state, options);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].id != cui_scrollbar_id(10, true) &&
+               semantics[i].id != cui_scrollbar_id(10, false));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 int main(void) {
+    test_overlay_scrollbars();
     test_ime_large_default_document();
     test_ime_virtual_rows();
     test_incremental_wrap_reflow();

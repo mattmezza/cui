@@ -56,6 +56,7 @@ typedef struct {
     /* Zero preserves immediate opening/closing. Uses cui_frame_time(ui). */
     float sheet_animation_seconds;
     bool reduced_motion;
+    const cui_scrollbar_style *scrollbar_style; /* Borrowed during begin; NULL uses theme. */
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);

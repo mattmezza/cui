@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
 #include "cui/cui_base.h"
+#include "cui/cui_scroll.h"
 #include <math.h>
 static void cui_tab_spring_axis(float *position, float *velocity, float target, float dt,
                                 cui_spring_settings settings) {
@@ -159,6 +160,13 @@ static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) 
     }
     if (options.disabled)
         scroll->scrollbar_dragging = false;
+    if (cui_scrollbar_opacity(ui,
+                              scroll->receiving_id ? scroll->receiving_id : scroll->scrollbar_id,
+                              scroll->scrollbar_id, options.scrollbar_style, scroll->offset,
+                              scroll->scrollbar_dragging) <= 0) {
+        scroll->scrollbar_dragging = false;
+        return;
+    }
     size_t count = 0;
     const cui_event *events = cui_frame_events(ui, &count);
     cui_rect bounds = scroll->scrollbar_bounds;
@@ -167,7 +175,11 @@ static void cui_tab_scrollbar_reduce(cui_context *ui, cui_tabs_options options) 
                       ? track * (float)((double)options.bar_extent /
                                         ((double)options.bar_extent + scroll->maximum))
                       : 0;
-    thumb = fminf(track, fmaxf(16, thumb));
+    float minimum = options.scrollbar_style && isfinite(options.scrollbar_style->min_thumb) &&
+                            options.scrollbar_style->min_thumb > 0
+                        ? options.scrollbar_style->min_thumb
+                        : 16;
+    thumb = fminf(track, fmaxf(minimum, thumb));
     float travel = track - thumb;
     for (size_t e = 0; e < count; e++) {
         if (cui_event_consumed(ui, e))

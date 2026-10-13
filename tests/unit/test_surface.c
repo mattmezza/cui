@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
+#include "cui/cui_scroll.h"
 #include <assert.h>
 #include <math.h>
 #include <string.h>
@@ -663,6 +664,114 @@ static void fixed_footer(void) {
         cui_destroy(ui);
     }
 }
+static void surface_overlay(void) {
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    cui_theme theme = cui_theme_light();
+    theme.scrollbar = (cui_scrollbar_style){
+        .visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 14, .thumb_radius = 4};
+    cui_surface_state state;
+    cui_surface_init(&state, 100, CUI_SURFACE_DIALOG);
+    footer_scene(ui, &theme, &state, 1000);
+    cui_surface_open(ui, &state, 1);
+    for (unsigned i = 0; i < 4; i++)
+        footer_scene(ui, &theme, &state, 1000);
+    cui_id bar = cui_scrollbar_id(cui_surface_part_id(100, 6), true);
+    cui_rect bounds = cui_bounds(ui, bar), footer = cui_bounds(ui, 41);
+    assert(bounds.w == 14 && bounds.h > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h - 2}));
+    footer_scene(ui, &theme, &state, 1000);
+    assert(state.body_scroll > 0 && cui_bounds(ui, 41).y == footer.y);
+    assert(cui_bounds(ui, bar).y == bounds.y && cui_bounds(ui, bar).h == bounds.h);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = bounds.x, .y = bounds.y}));
+    theme.scrollbar.visibility = CUI_SCROLLBAR_HIDDEN;
+    footer_scene(ui, &theme, &state, 1000);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].id != bar);
+    float previous = state.body_scroll;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = state.body_viewport.x + 20,
+                                           .y = state.body_viewport.y + 20,
+                                           .dy = 1}));
+    footer_scene(ui, &theme, &state, 1000);
+    assert(state.body_scroll < previous && cui_bounds(ui, 41).y == footer.y);
+    cui_destroy(ui);
+}
+static void surface_skin_resources(void) {
+    cui_theme theme = cui_theme_light();
+    cui_surface_state state;
+    cui_surface_init(&state, 100, CUI_SURFACE_DIALOG);
+    cui_surface_options options = {
+        .viewport = {0, 0, 600, 400}, .width = 300, .height = 200, .hide_close = true};
+    cui_context *ui = cui_create((cui_config){.max_resources = 1, .resource_bytes = 1});
+    cui_surface_open(ui, &state, 0);
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    assert(cui_surface_begin(ui, &theme, &state, cui_string("Legacy"), (cui_str){0}, options));
+    cui_surface_end(ui);
+    assert(cui_resource_get(ui, 999, 1, 1, NULL, NULL)); /* INHERIT allocated nothing. */
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+    ui = cui_create((cui_config){.max_resources = 1, .resource_bytes = 1});
+    theme.scrollbar.visibility = CUI_SCROLLBAR_VISIBLE;
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    assert(!cui_surface_begin(ui, &theme, &state, cui_string("Bounded"), (cui_str){0}, options));
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY && state.overlay.open);
+    cui_clear_error(ui);
+    assert(cui_resource_get(ui, 999, 1, 1, NULL, NULL));
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+static void nested_surface_skins(void) {
+    cui_context *ui = cui_create((cui_config){.max_resources = 3});
+    cui_theme outer = cui_theme_light(), inner = cui_theme_dark();
+    outer.scrollbar.visibility = CUI_SCROLLBAR_VISIBLE;
+    cui_surface_state parent, child;
+    cui_surface_init(&parent, 100, CUI_SURFACE_DIALOG);
+    cui_surface_init(&child, 200, CUI_SURFACE_POPOVER);
+    cui_surface_open(ui, &parent, 0);
+    cui_surface_open(ui, &child, 0);
+    for (unsigned policy = 0; policy < 2; policy++) {
+        inner.scrollbar.visibility = policy ? CUI_SCROLLBAR_VISIBLE : CUI_SCROLLBAR_INHERIT;
+        for (unsigned frame = 0; frame < 3; frame++) {
+            assert(cui_begin_frame(ui, 600, 400, .016f));
+            assert(cui_surface_begin(ui, &outer, &parent, cui_string("Parent"), (cui_str){0},
+                                     (cui_surface_options){.viewport = {0, 0, 600, 400},
+                                                           .width = 400,
+                                                           .height = 300,
+                                                           .hide_close = true}));
+            cui_begin_box(ui, 301, (cui_box){.height = 600});
+            cui_end_box(ui);
+            assert(cui_surface_begin(ui, &inner, &child, cui_string("Child"), (cui_str){0},
+                                     (cui_surface_options){.viewport = {0, 0, 600, 400},
+                                                           .anchor = {20, 20, 20, 20},
+                                                           .width = 200,
+                                                           .height = 150,
+                                                           .hide_close = true,
+                                                           .layer = 120,
+                                                           .no_outside_dismiss = true}));
+            cui_begin_box(ui, 302, (cui_box){.height = 500});
+            cui_end_box(ui);
+            cui_surface_footer_begin(ui, &inner);
+            cui_text(ui, cui_string("Child footer"), 14, inner.text);
+            cui_surface_end(ui);
+            cui_surface_footer_begin(ui, &outer);
+            cui_text(ui, cui_string("Parent footer"), 14, outer.text);
+            cui_surface_end(ui);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+        }
+        assert(cui_bounds(ui, cui_scrollbar_id(cui_surface_part_id(100, 6), true)).w > 0);
+        if (policy)
+            assert(cui_bounds(ui, cui_scrollbar_id(cui_surface_part_id(200, 6), true)).w > 0);
+    }
+    cui_destroy(ui);
+}
 #endif
 #ifdef CUI_SURFACE_BASE_ONLY
 static void base_scroll_scene(cui_context *ui, cui_surface_state *s) {
@@ -815,6 +924,9 @@ int main(void) {
 #ifndef CUI_SURFACE_BASE_ONLY
     styled_confirmation();
     fixed_footer();
+    surface_overlay();
+    surface_skin_resources();
+    nested_surface_skins();
 #else
     base_scroll_body();
 #endif

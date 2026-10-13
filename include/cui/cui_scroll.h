@@ -19,6 +19,9 @@ typedef struct {
     bool axis_lock;
     bool gesture_lock;    /* Persistent precise axis lock; disabled on WASM. */
     bool trap_horizontal; /* Opt-in horizontal mask edge ownership. */
+    /* Borrowed for this call/frame; NULL inherits the styled component's theme
+     * or keeps legacy behavior in a standalone Base call. Never retained. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_scroll_options;
 typedef struct {
     cui_size viewport;
@@ -39,6 +42,30 @@ void cui_scrollbar(cui_context *, cui_id, const cui_theme *, const cui_scroll_st
 cui_id cui_scrollbar_id(cui_id, bool vertical);
 cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float content,
                              bool vertical);
+cui_rect cui_scrollbar_thumb_ex(cui_rect track, float scroll, float viewport, float content,
+                                bool vertical, float minimum);
+/* Resolve shared skin before geometry and Base behavior. Legacy hide wins. */
+cui_scroll_options cui_scroll_resolve(const cui_theme *, cui_scroll_options);
+/* Shared bounded context-owned idle/fade state, driven by frame_time. Calling
+ * repeatedly during one frame does not advance time. No style/visible allocates
+ * no timer. Hidden/zero-opacity bars must not submit pointer semantics. */
+float cui_scrollbar_opacity(cui_context *, cui_id owner, cui_id scrollbar,
+                            const cui_scrollbar_style *, float value, bool dragging);
+/* Opt-in bars for a scrollable that had no bars by default. Call inside its
+ * viewport box after content, then apply changed offsets to that box. Local
+ * viewport coordinates are local to the current box; compensate a translated
+ * content box's position when necessary. Content extents are finite.
+ * Owns bounded drag state in the context, retains no caller pointers. */
+bool cui_scrollbar_overlay(cui_context *, cui_id owner, const cui_theme *, float *x, float *y,
+                           cui_rect viewport, cui_size content, cui_scroll_options);
+/* Split form for editors/virtual content: reduce before laying out the current
+ * offset, then paint after content inside the viewport. Base needs a resolved
+ * override style; INHERIT keeps the no-bar legacy. Paint takes final model
+ * offsets so deferred scrolling and discrete windows retain correct thumbs. */
+bool cui_base_scrollbar_overlay(cui_context *, cui_id owner, float *x, float *y, cui_rect viewport,
+                                cui_size content, cui_scroll_options);
+void cui_scrollbar_overlay_paint(cui_context *, cui_id owner, const cui_theme *, float x, float y,
+                                 cui_rect viewport, cui_size content, cui_scroll_options);
 /* Pair end only when begin succeeds. Children are clipped and translated. */
 bool cui_scrollable_begin(cui_context *, cui_id, const cui_theme *, cui_scroll_state *,
                           cui_scroll_options);

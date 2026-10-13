@@ -151,6 +151,14 @@ double gallery_editor_stat(int field) {
 }
 static cui_context *ui;
 static cui_theme current_theme;
+static int scrollbar_policy, scrollbar_width = 10, scrollbar_radius;
+static bool scrollbar_track = true;
+void gallery_scrollbar_options(int policy, int width, int radius, int track) {
+    scrollbar_policy = policy >= 0 && policy <= 3 ? policy : 0;
+    scrollbar_width = width >= 4 && width <= 24 ? width : 10;
+    scrollbar_radius = radius >= 0 && radius <= 12 ? radius : 0;
+    scrollbar_track = track != 0;
+}
 static void gallery_progress_content(cui_context *, void *);
 static int gallery_preset_index = -1;
 static uint32_t typography_family;
@@ -2367,6 +2375,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     next_wake = 0;
     /* The host has synchronously painted the preceding draw list by this call. */
     cui_icon_state_collect(&icon_state);
+    t.scrollbar = (cui_scrollbar_style){.visibility = (cui_scrollbar_visibility)scrollbar_policy,
+                                        .thickness = scrollbar_policy ? (float)scrollbar_width : 0,
+                                        .thumb_radius = (float)scrollbar_radius,
+                                        .track_radius = (float)scrollbar_radius,
+                                        .no_track = !scrollbar_track,
+                                        .idle_seconds = .8f,
+                                        .fade_seconds = .2f,
+                                        .reduced_motion = reduced_motion};
     current_theme = t;
     if (story == 80)
         composed_app_set_theme(gallery_app, &t);
@@ -3228,6 +3244,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 63: {
         cui_attachment_group_options options = cui_attachment_group_options_default();
+        options.scrollbar_theme = &t;
         options.width = width - 48;
         options.height = 220;
         options.gap = 12;

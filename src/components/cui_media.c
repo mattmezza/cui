@@ -2,6 +2,7 @@
 #include "cui/cui_media.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_scroll.h"
 #include <math.h>
 #include <stdio.h>
 static cui_id cui_media_id(cui_id parent, uint64_t child) {
@@ -505,6 +506,16 @@ cui_attachment_group_result cui_attachment_group(cui_context *ui, cui_id id,
                                                     .scroll_axis_lock = true,
                                                     .scroll_x = scroll->x,
                                                     .scroll_max_x = r.maximum});
+    cui_theme scrollbar_theme = o.scrollbar_theme ? *o.scrollbar_theme : cui_theme_light();
+    cui_scroll_options bars = cui_scroll_resolve(
+        &scrollbar_theme,
+        (cui_scroll_options){.horizontal = true, .scrollbar_style = o.scrollbar_style});
+    cui_scrollbar_style skin = *bars.scrollbar_style;
+    skin.reduced_motion |= o.reduced_motion;
+    bars.scrollbar_style = &skin;
+    r.changed |= cui_base_scrollbar_overlay(ui, id, &scroll->x, &scroll->y,
+                                            (cui_rect){0, 0, o.width, height},
+                                            (cui_size){s->content.w, height}, bars);
     cui_begin_box(
         ui, id,
         (cui_box){.width = o.width, .height = o.height, .clip = true, .offset_x = -scroll->x});
@@ -517,6 +528,9 @@ cui_attachment_group_result cui_attachment_group(cui_context *ui, cui_id id,
     cui_end_box(ui);
     cui_begin_box(ui, cui_media_id(id, 4), (cui_box){.height = 4, .fixed_height = true});
     cui_end_box(ui);
+    cui_scrollbar_overlay_paint(ui, id, &scrollbar_theme, scroll->x, 0,
+                                (cui_rect){0, 0, o.width, height}, (cui_size){s->content.w, height},
+                                bars);
     cui_end_box(ui);
     float leading = o.edge_fade && r.maximum > 1 && scroll->x > 1 ? 1 : 0;
     float trailing = o.edge_fade && r.maximum > 1 && scroll->x < r.maximum - 1 ? 1 : 0;

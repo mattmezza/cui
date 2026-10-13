@@ -2,6 +2,7 @@
 #include "cui/cui_scroll.h"
 #ifndef CUI_SCROLL_BASE_ONLY
 #include "cui/cui_base.h"
+#include "cui/cui_components.h"
 #include "cui/cui_resizable.h"
 #endif
 #include <assert.h>
@@ -619,12 +620,171 @@ static void nested_touch_drag_controls(void) {
     }
 }
 #endif
+static void appearance_policy(void) {
+    cui_scrollbar_style style = {.visibility = CUI_SCROLLBAR_HIDDEN, .thickness = 18};
+    cui_scroll_options options = {.width = 100,
+                                  .height = 100,
+                                  .content_width = 400,
+                                  .content_height = 400,
+                                  .horizontal = true,
+                                  .vertical = true,
+                                  .scrollbar_style = &style};
+    cui_scroll_geometry geometry = cui_scroll_layout(options);
+    assert(geometry.viewport.width == 100 && geometry.viewport.height == 100);
+    style.visibility = CUI_SCROLLBAR_VISIBLE;
+    geometry = cui_scroll_layout(options);
+    assert(geometry.viewport.width == 82 && geometry.viewport.height == 82);
+    cui_rect thumb = cui_scrollbar_thumb_ex((cui_rect){0, 0, 10, 100}, 0, 1, 1000, true, 25);
+    assert(thumb.h == 25);
+    cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
+    assert(ui);
+    style = (cui_scrollbar_style){
+        .visibility = CUI_SCROLLBAR_AUTO_HIDE, .idle_seconds = .05f, .fade_seconds = .05f};
+    float opacity = 0;
+    for (unsigned frame = 0; frame < 14; frame++) {
+        assert(cui_begin_frame(ui, 100, 100, .02f));
+        opacity = cui_scrollbar_opacity(ui, 1, 2, &style, 0, false);
+        cui_end_frame(ui);
+        if (frame == 0)
+            assert(opacity == 1 && cui_needs_redraw(ui));
+        if (frame == 4)
+            assert(opacity > 0 && opacity < 1);
+        if (frame > 6)
+            assert(opacity == 0 && !cui_needs_redraw(ui));
+    }
+    assert(cui_begin_frame(ui, 100, 100, .02f));
+    assert(cui_scrollbar_opacity(ui, 1, 2, &style, 20, false) == 1);
+    cui_end_frame(ui);
+    for (unsigned frame = 0; frame < 10; frame++) {
+        assert(cui_begin_frame(ui, 100, 100, .02f));
+        assert(cui_scrollbar_opacity(ui, 1, 2, &style, 20, true) == 1);
+        cui_end_frame(ui);
+        assert(!cui_needs_redraw(ui)); /* A held bar needs no timer-driven frames. */
+    }
+    style.reduced_motion = true;
+    for (unsigned frame = 0; frame < 7; frame++) {
+        assert(cui_begin_frame(ui, 100, 100, .02f));
+        opacity = cui_scrollbar_opacity(ui, 1, 2, &style, 20, false);
+        assert(opacity == 0 || opacity == 1);
+        cui_end_frame(ui);
+    }
+    assert(opacity == 0 && !cui_needs_redraw(ui));
+    cui_destroy(ui);
+    ui = cui_create((cui_config){.max_resources = 1, .resource_bytes = 1});
+    style.visibility = CUI_SCROLLBAR_VISIBLE;
+    options.scrollbar_style = &style;
+    float x = 3, y = 4;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    assert(!cui_base_scrollbar_overlay(ui, 1, &x, &y, (cui_rect){0, 0, NAN, 100},
+                                       (cui_size){400, 400}, options));
+    assert(x == 3 && y == 4 && cui_last_error(ui) == CUI_OK);
+    assert(cui_resource_get(ui, 999, 1, 1, NULL, NULL));
+    assert(!cui_base_scrollbar_overlay(ui, 1, &x, &y, (cui_rect){0, 0, 100, 100},
+                                       (cui_size){400, 400}, options));
+    assert(x == 3 && y == 4 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_clear_error(ui);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+}
+#ifndef CUI_SCROLL_BASE_ONLY
+static bool has_scrollbar(cui_context *ui, cui_id owner, bool vertical) {
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].id == cui_scrollbar_id(owner, vertical))
+            return true;
+    return false;
+}
+static void styled_tracks(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_theme theme = cui_theme_dark();
+    theme.scrollbar = (cui_scrollbar_style){.visibility = CUI_SCROLLBAR_VISIBLE,
+                                            .thickness = 17,
+                                            .min_thumb = 27,
+                                            .thumb_radius = 7,
+                                            .no_track = true,
+                                            .custom_thumb_color = true,
+                                            .thumb_color = {231, 17, 109, 255}};
+    cui_scroll_state state = {0};
+    cui_scroll_options options = {.width = 200,
+                                  .height = 100,
+                                  .content_width = 600,
+                                  .content_height = 500,
+                                  .horizontal = true,
+                                  .vertical = true};
+    cui_draw_list drawing = scene(ui, &theme, &state, options);
+    assert(has_scrollbar(ui, 1, true) && has_scrollbar(ui, 1, false));
+    assert(cui_bounds(ui, cui_scrollbar_id(1, true)).w == 17);
+    unsigned thumbs = 0;
+    for (size_t i = 0; i < drawing.count; i++)
+        if (drawing.commands[i].type == CUI_DRAW_RECT && drawing.commands[i].color.r == 231 &&
+            drawing.commands[i].color.g == 17) {
+            assert(drawing.commands[i].radius == 7);
+            thumbs++;
+        }
+    assert(thumbs == 2);
+    theme.scrollbar.visibility = CUI_SCROLLBAR_HIDDEN;
+    scene(ui, &theme, &state, options);
+    assert(!has_scrollbar(ui, 1, true) && !has_scrollbar(ui, 1, false));
+    pointer(ui, CUI_EVENT_POINTER_DOWN, 195, 50);
+    scene(ui, &theme, &state, options);
+    assert(!state.dragging_x && !state.dragging_y && state.x == 0 && state.y == 0);
+    pointer(ui, CUI_EVENT_POINTER_UP, 195, 50);
+    scene(ui, &theme, &state, options);
+    assert(cui_queue_event(
+        ui, (cui_event){
+                .type = CUI_EVENT_SCROLL, .x = 50, .y = 50, .dy = -31, .scroll_precise = true}));
+    scene(ui, &theme, &state, options);
+    assert(state.y == 31);
+    cui_destroy(ui);
+}
+static void list_overlay_policy(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_theme theme = cui_theme_light();
+    cui_choice_item rows[12];
+    for (size_t i = 0; i < 12; i++)
+        rows[i] = (cui_choice_item){.id = i + 100, .label = {"Option", 6}};
+    cui_list_state state = {0};
+    cui_id selected = 100;
+    cui_list_options options = {.visible_count = 3};
+    for (unsigned policy = 0; policy < 3; policy++) {
+        theme.scrollbar.visibility = policy == 0   ? CUI_SCROLLBAR_INHERIT
+                                     : policy == 1 ? CUI_SCROLLBAR_VISIBLE
+                                                   : CUI_SCROLLBAR_HIDDEN;
+        for (unsigned frame = 0; frame < 3; frame++) {
+            assert(cui_begin_frame(ui, 400, 300, .016f));
+            cui_begin_box(ui, 50, (cui_box){.width = 200});
+            cui_list(ui, 1, &theme, rows, 12, &selected, &state, options);
+            cui_end_box(ui);
+            cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+        }
+        assert(has_scrollbar(ui, 1, true) == (policy == 1));
+        if (policy == 1) {
+            cui_rect bounds = cui_bounds(ui, cui_scrollbar_id(1, true));
+            assert(bounds.w > 0 && bounds.h > 0);
+            pointer(ui, CUI_EVENT_POINTER_DOWN, bounds.x + bounds.w / 2, bounds.y + bounds.h - 2);
+            assert(cui_begin_frame(ui, 400, 300, .016f));
+            cui_begin_box(ui, 50, (cui_box){.width = 200});
+            cui_list(ui, 1, &theme, rows, 12, &selected, &state, options);
+            cui_end_box(ui);
+            cui_end_frame(ui);
+            assert(state.first_visible > 0 && selected == 100);
+            pointer(ui, CUI_EVENT_POINTER_UP, bounds.x, bounds.y);
+        }
+    }
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+    appearance_policy();
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
     assert(thumb.y == 64 && thumb.h == 12);
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
 #ifndef CUI_SCROLL_BASE_ONLY
+    styled_tracks();
+    list_overlay_policy();
     nested_touch_drag_controls();
 #endif
     full_touch_queue_handoff();

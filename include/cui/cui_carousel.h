@@ -86,6 +86,8 @@ typedef struct {
     void *controls_user;
     void (*pagination)(cui_context *, const cui_theme *, cui_carousel_state *, cui_id root, void *);
     void *pagination_user;
+    const cui_scrollbar_style
+        *scrollbar_style; /* Finite carousels only; looping has no finite range. */
 } cui_carousel_options;
 cui_carousel_options cui_carousel_default(void);
 bool cui_carousel(cui_context *, cui_id, const cui_theme *, cui_carousel_state *,

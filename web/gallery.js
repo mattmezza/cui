@@ -259,6 +259,7 @@ function render(){
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  canvas.width=Math.round(width*dpr);canvas.height=height*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
+ wasm.gallery_scrollbar_options(Number($('scrollbar-policy').value),Number($('scrollbar-width').value),Number($('scrollbar-radius').value),Number($('scrollbar-track').checked));
  wasm.gallery_table_pin(Number($('table-pin').value));
  wasm.gallery_table_mode(Number($('table-mode').value));
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
@@ -784,3 +785,5 @@ for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','te
 
 $('plot-mode').addEventListener('change',requestFrame);
 $('virtual-axis').addEventListener('change',requestFrame);
+
+for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track'])$(id).addEventListener('change',requestFrame);

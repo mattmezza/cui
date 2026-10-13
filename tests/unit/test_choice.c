@@ -2297,9 +2297,11 @@ static void test_tab_reveal_requests(void) {
     assert(!scroll.reveal_id && scroll.offset == 32);
     cui_destroy(ui);
 }
+static cui_scrollbar_style tab_test_skin;
 static void scrollbar_tabs_scene(cui_context *ui, cui_tab_scroll_state *scroll, bool vertical,
                                  bool disabled, size_t count) {
     cui_theme theme = cui_theme_light();
+    theme.scrollbar = tab_test_skin;
     const cui_choice_item entries[] = {{10, {"First long tab", 14}, false},
                                        {20, {"Second long tab", 15}, false},
                                        {30, {"Third long tab", 14}, false}};
@@ -2394,6 +2396,26 @@ static void test_tab_scrollbars(void) {
             assert(semantics[i].id != id);
         cui_destroy(ui);
     }
+}
+static void test_tab_scrollbar_skin(void) {
+    for (unsigned vertical = 0; vertical < 2; vertical++) {
+        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_tab_scroll_state state = {0};
+        tab_test_skin = (cui_scrollbar_style){.visibility = CUI_SCROLLBAR_VISIBLE,
+                                              .thickness = 13,
+                                              .thumb_radius = 5,
+                                              .no_track = true};
+        for (unsigned i = 0; i < 3; i++)
+            scrollbar_tabs_scene(ui, &state, vertical != 0, false, 3);
+        cui_rect bounds = cui_bounds(ui, state.scrollbar_id);
+        assert((vertical ? bounds.w : bounds.h) == 13);
+        state.scrollbar_dragging = true;
+        tab_test_skin.visibility = CUI_SCROLLBAR_HIDDEN;
+        scrollbar_tabs_scene(ui, &state, vertical != 0, false, 3);
+        assert(!state.scrollbar_dragging && !state.scrollbar_id && state.maximum > 0);
+        cui_destroy(ui);
+    }
+    tab_test_skin = (cui_scrollbar_style){0};
 }
 static void test_dropdown_presentation_variants(void) {
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
@@ -2492,6 +2514,7 @@ static void test_dropdown_presentation_variants(void) {
         }
 }
 static cui_menu_entry scrolling_menu[12], scrolling_child[12];
+static cui_scrollbar_style menu_test_skin;
 static bool menu_drag_enabled;
 static bool scrolling_menu_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *action,
                                  bool disabled) {
@@ -2500,6 +2523,7 @@ static bool scrolling_menu_scene(cui_context *ui, cui_menu_tree_state *state, cu
     bool result = cui_menu_tree(
         ui, 3000, &theme, cui_string("Scrollable"), scrolling_menu, 12, action, state,
         (cui_menu_tree_options){
+            .scrollbar_style = &menu_test_skin,
             .drag_scroll = menu_drag_enabled,
             .popup = {
                 .viewport = {0, 0, 640, 200}, .width = 180, .dt = .016f, .disabled = disabled}});
@@ -2510,6 +2534,40 @@ static bool scrolling_menu_scene(cui_context *ui, cui_menu_tree_state *state, cu
 static void menu_wheel(cui_context *ui, cui_rect panel, float dy) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = panel.x + 5, .y = panel.y + 15, .dy = dy}));
+}
+static void test_menu_scrollbar_skin(void) {
+    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_menu_tree_state state;
+    cui_menu_tree_init(&state, 3300);
+    cui_id action = 0;
+    menu_test_skin = (cui_scrollbar_style){
+        .visibility = CUI_SCROLLBAR_VISIBLE, .thickness = 11, .thumb_radius = 3};
+    scrolling_menu_scene(ui, &state, &action, false);
+    click(ui, 3000);
+    for (unsigned i = 0; i < 3; i++)
+        scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.overlay.open);
+    size_t count;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    cui_rect track = {0};
+    for (size_t i = 0; i < count; i++)
+        if (semantics[i].role == CUI_ROLE_SCROLLBAR)
+            track = semantics[i].bounds;
+    assert(track.w == 11 && track.h > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = track.x + track.w / 2,
+                                           .y = track.y + track.h - 2}));
+    scrolling_menu_scene(ui, &state, &action, false);
+    assert(state.levels[0].first_visible > 0 && action == 0 && state.overlay.open);
+    assert(
+        cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = track.x, .y = track.y}));
+    menu_test_skin.visibility = CUI_SCROLLBAR_HIDDEN;
+    scrolling_menu_scene(ui, &state, &action, false);
+    semantics = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; i++)
+        assert(semantics[i].role != CUI_ROLE_SCROLLBAR);
+    cui_destroy(ui);
+    menu_test_skin = (cui_scrollbar_style){0};
 }
 static void test_hierarchical_menu_scroll(void) {
     for (size_t i = 0; i < 12; i++) {
@@ -4470,6 +4528,7 @@ int main(void) {
     test_custom_tab_width_caps();
     test_dropdown_configurable_palettes();
     test_hierarchical_menu_scroll();
+    test_menu_scrollbar_skin();
     test_menu_pointer_drag_scroll();
     test_dropdown_presentation_variants();
     test_lists_and_popups();
@@ -4504,6 +4563,7 @@ int main(void) {
     test_dropdown_inner_button_presentation();
     test_tab_reveal_requests();
     test_tab_scrollbars();
+    test_tab_scrollbar_skin();
     cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),

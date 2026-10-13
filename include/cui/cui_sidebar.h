@@ -50,6 +50,7 @@ typedef struct {
     cui_str label;
     bool custom_box;
     cui_box box; /* Surface appearance; component owns padding/layout/dimensions. */
+    const cui_scrollbar_style *scrollbar_style;
 } cui_sidebar_options;
 cui_sidebar_options cui_sidebar_default(void);
 /* Pure bounded cache reconciliation and motion; no theme implementation needed. */

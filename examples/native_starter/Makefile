@@ -13,5 +13,5 @@ $(BUILD_DIR)/native_starter: main.c app.c app.h | $(BUILD_DIR)
 $(BUILD_DIR)/test_starter_app: test_app.c app.c app.h | $(BUILD_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) test_app.c app.c $(LDFLAGS) $(LDLIBS) -o $@
 test: $(BUILD_DIR)/test_starter_app
-	./$(BUILD_DIR)/test_starter_app
+	$(BUILD_DIR)/test_starter_app
 .PHONY: all test

@@ -26,11 +26,22 @@ def main():
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
-            page = browser.new_page(viewport={'width':1280,'height':1000}, device_scale_factor=2)
+            page = browser.new_page(viewport={'width':1280,'height':1000}, device_scale_factor=2, permissions=['clipboard-read', 'clipboard-write'])
             errors=[]
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery?.catalog.components.length===78')
+            page.locator('#home-page a[href="#docs/native-app-starter"]').first.click()
+            page.wait_for_function('document.querySelector("#docs-title").textContent==="Build your first native CUI app"')
+            content=page.locator('#docs-content').inner_text()
+            for required in ['SDL3', 'Python 3', 'CMake', 'Ninja', '-std=c11', 'pkg-config --static --libs cui-sdl3', 'account menu', '--font']:
+                assert required in content,required
+            assert page.locator('#docs-content img').count()==3
+            page.wait_for_function('Array.from(document.querySelectorAll("#docs-content img")).every(i=>i.complete&&i.naturalWidth>0)')
+            compile_block=page.locator('#docs-content pre').filter(has_text='cc -std=c11')
+            compile_block.locator('button.docs-copy').click()
+            page.wait_for_function('Array.from(document.querySelectorAll("#docs-content button.docs-copy")).some(b=>b.textContent==="Copied")')
+            assert 'pkg-config --static --libs cui-sdl3' in page.evaluate('navigator.clipboard.readText()')
             names=page.evaluate('cuiGallery.catalog.components.map(c=>c.name)')
             def story(name):
                 page.evaluate('(name)=>location.hash=name',name)

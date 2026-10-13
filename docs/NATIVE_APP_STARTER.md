@@ -13,7 +13,8 @@ credentials or network request.
 Use a C11 compiler (GCC, Clang or another conforming compiler), CMake 3.20 or
 newer, Ninja, pkg-config, SDL3 **3.2 or newer**, FreeType and HarfBuzz development
 packages, and a readable `.ttf` or `.otf` font. The Make path additionally needs
-Make. SDL2 is not interchangeable with SDL3. A desktop display/session is needed
+Make. Building CUI itself also needs Python 3; its optional C++ ABI example can
+be disabled as below, so this path only requires a C compiler. SDL2 is not interchangeable with SDL3. A desktop display/session is needed
 to open a window; Xvfb can provide an automated Linux test display.
 
 The commands below assume those tools and libraries are already installed. Check
@@ -27,12 +28,20 @@ pkg-config --atleast-version=3.2 sdl3
 pkg-config --modversion sdl3 freetype2 harfbuzz
 ```
 
+## Get the source
+
+```sh
+git clone https://github.com/mattmezza/cui.git
+cd cui
+```
+
 ## Build CUI, then the app
 
 From the CUI repository root, install into a directory owned by your user:
 
 ```sh
 cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=ON \
+  -DCMAKE_C_COMPILER=cc -DCUI_BUILD_CPP_EXAMPLE=OFF \
   -DCMAKE_INSTALL_PREFIX="$PWD/build/prefix"
 cmake --build build
 cmake --install build
@@ -72,6 +81,10 @@ cc -std=c11 -Wall -Wextra -Wpedantic \
   $(pkg-config --static --libs cui-sdl3) -o native_starter
 ./native_starter --font /absolute/path/to/your/font.ttf
 ```
+
+Choose Clang with `-DCMAKE_C_COMPILER=clang` when configuring a fresh CUI build
+and `CC=clang` for Make; `cc` normally selects your system compiler. CMake uses
+C11 without compiler extensions.
 
 Keep libraries **after** source/object files. CUI installs static archives, so use
 `--static`: it includes private adapter/font dependencies. In the tested prefix,

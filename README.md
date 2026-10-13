@@ -10,6 +10,8 @@ An experimental C11 native UI framework: Clay layout, unstyled interaction primi
 
 The current [composed application](docs/COMPOSED_APPS.md) uses CUI navigation, account menus, cards, forms and pricing actions. This capture shows the real C/WASM draw list rendered by the browser adapter; it is not a mockup.
 
+Build a real window with the [native app starter guide](docs/NATIVE_APP_STARTER.md): dependencies, CMake/Make/linker flags, sidebar pages and a bottom account menu.
+
 ## Build and run
 
 ```sh

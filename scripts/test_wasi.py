@@ -100,7 +100,7 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += [f"examples/{name}/main.c" for name in ("unstyled", "styled_settings")]
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
-    paths += ["web/touch_page_host.h"]
+    paths += ["web/touch_page_host.h", "examples/native_starter/app.c", "examples/native_starter/app.h", "examples/native_starter/test_app.c"]
     paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c"]
     paths += [str(path.relative_to(root)) for path in (root / "third_party/sheenbidi").rglob("*") if path.is_file()]
     paths += ["third_party/clay/clay.h", "tests/unit/cui_edit_grapheme_tests.inc", "tests/unit/cui_edit_word_tests.inc"]
@@ -217,6 +217,7 @@ def main() -> int:
                 "-o", str(bidi_object)], root)
         targets = [(name, [f"tests/unit/test_{name}.c"], True,
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("native_starter", ["examples/native_starter/app.c", "examples/native_starter/test_app.c"], True, [])]
         targets += [("bidi", ["tests/unit/test_bidi.c", "src/text/cui_bidi.c"], False,
                      bidi_include + [str(bidi_object)])]
         targets += [("speech_base_only", ["tests/unit/test_speech.c", "src/base/cui_speech.c"], False, ["-DCUI_SPEECH_BASE_ONLY=1"])]

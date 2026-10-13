@@ -4,7 +4,14 @@ CUI composes a user interface in portable C11. Your application supplies state a
 
 CUI is experimental. The gallery contains all 78 comparison entries, but the [feature manifest](gpui-parity.json) records incomplete behavior. Begin with the controls you need and check their documented limits.
 
-## Run a small C program first
+## Start with a native application
+
+Follow [Build your first native CUI app](NATIVE_APP_STARTER.md) for a complete
+three-page desktop starter, sidebar navigation and a bottom account menu. It
+explains dependencies, compiler choice, CMake, Make, static linker flags and
+native launch commands. The source is small enough to copy into your own app.
+
+## Try a headless C program
 
 From the repository root:
 

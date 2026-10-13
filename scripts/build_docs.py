@@ -18,7 +18,7 @@ REPOSITORY = 'https://github.com/mattmezza/cui/blob/main/'
 GUIDES = {'API', 'ARCHITECTURE', 'CORE', 'INTERFACES', 'THEME_GUIDE',
           'COMPONENT_AUTHORING', 'ACCESSIBILITY', 'PLATFORM_MATRIX', 'DEPENDENCIES',
           'WEB_GALLERY', 'WASI', 'EDITING', 'PERFORMANCE', 'IMMEDIATE_AND_STATE',
-          'LANGUAGE_BINDINGS', 'BACKGROUNDS', 'DESIGN_SYSTEM', 'COMPONENT_USAGE', 'COMPOSED_APPS', 'FORM_DESIGN_SCALE', 'TYPOGRAPHY', 'V1_READINESS', 'INTERACTION', 'SOFTWARE_MESH', 'BIDI', 'BIDI_SHAPING', 'IME', 'TOUCH_COMPONENT_COVERAGE', 'TOUCH_FOLLOWUP', 'IME_ADDITIONAL_AUDIT', 'TOUCH_PAGE_NAVIGATION', 'CONTROLLED_SIBLING_AUDIT', 'ACCESSIBILITY_ACTIONS'}
+          'LANGUAGE_BINDINGS', 'BACKGROUNDS', 'DESIGN_SYSTEM', 'COMPONENT_USAGE', 'COMPOSED_APPS', 'FORM_DESIGN_SCALE', 'TYPOGRAPHY', 'V1_READINESS', 'INTERACTION', 'SOFTWARE_MESH', 'BIDI', 'BIDI_SHAPING', 'IME', 'TOUCH_COMPONENT_COVERAGE', 'TOUCH_FOLLOWUP', 'IME_ADDITIONAL_AUDIT', 'TOUCH_PAGE_NAVIGATION', 'CONTROLLED_SIBLING_AUDIT', 'ACCESSIBILITY_ACTIONS', 'NATIVE_APP_STARTER'}
 DEVELOPMENT = {'NIGHTLY_REPORT', 'swarm-status', 'ROADMAP', 'DECISIONS',
                'MAINTAINER_ACTIONS', 'upstream-baseline'}
 
@@ -40,6 +40,7 @@ def document_slug(path, root):
     if relative.as_posix() == 'README.md':
         return 'getting-started'
     guide_slugs = {'docs/START_HERE.md': 'start-here',
+                   'docs/NATIVE_APP_STARTER.md': 'native-app-starter',
                    'docs/AI_AGENTS.md': 'ai-agents',
                    'docs/IMMEDIATE_AND_STATE.md': 'immediate-and-state',
                    'docs/LANGUAGE_BINDINGS.md': 'language-bindings',
@@ -52,7 +53,7 @@ def document_slug(path, root):
 
 
 def category(path, root):
-    if path == root / 'README.md' or path.stem in {'START_HERE', 'AI_AGENTS'}:
+    if path == root / 'README.md' or path.stem in {'START_HERE', 'AI_AGENTS', 'NATIVE_APP_STARTER'}:
         return 'Getting started'
     if path.stem in DEVELOPMENT:
         return 'Development'

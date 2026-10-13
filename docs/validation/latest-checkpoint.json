@@ -1,9 +1,9 @@
 {
   "source": "3f4e108fa82a3284240e371f0aad8ac716fc731f",
   "compiled_source": "3f4e108fa82a3284240e371f0aad8ac716fc731f",
-  "published_source": "fbbc40b4be6c86be1fce1ddd827279b9c80183cf",
+  "published_source": "3b28a2c26f9e0ed448fc72055b198fdeff8f39a5",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Next22 integrates Checkbox springs/wrapping/tooltip, contextual native paragraph shaping, semantic Alert/Bubble slots, pointer-focus policy, caller-clocked Spinner/Skeleton motion, richer Button contracts and named/design-sized Table parts with selection-only DataTable policies. Native112/112, WASI91/91, browser78 and all78 compiled excerpts pass; focused Checkbox34, Button11, Attachment62, Table, Alert/Bubble, motion and responsive proofs pass. Raw sanitizer111/112 has an SDL/Xlib-only reproducer failure; the actual GPU test passes with default leak checking when Xlib stays loaded. Published remains fbbc40b, whose339 files match HTTPS and Attachment62 passes. Full family verification remains0/78.",
+  "summary": "Next22 integrates Checkbox springs/wrapping/tooltip, contextual native paragraph shaping, semantic Alert/Bubble slots, pointer-focus policy, caller-clocked Spinner/Skeleton motion, richer Button contracts and named/design-sized Table parts with selection-only DataTable policies. Native112/112, WASI91/91, browser78 and all78 compiled excerpts pass; focused Checkbox34, Button11, Attachment62, Table, Alert/Bubble, motion and responsive proofs pass. Raw sanitizer111/112 has an SDL/Xlib-only reproducer failure; the actual GPU test passes with default leak checking when Xlib stays loaded. Published3b28a2c passes all six framework CI jobs and Pages;355 files match HTTPS and actual published Attachment62 passes. Local next23 Theme registry/Chart gating passes native117 and sanitizer115 (GPU/Sokol unregistered), plus actual Theme preference/Chart browser proofs; portable verification pending. Full family verification remains0/78.",
   "checks": [
     {
       "name": "native",
@@ -54,9 +54,9 @@
   "portable_test_source": "3f4e108fa82a3284240e371f0aad8ac716fc731f",
   "portable_source_sha256": "2261cee25e77353757e125d1bf2298a25246667c1f4381ae1b0257f4cae843ad",
   "publication": {
-    "pages_run": 38423548663,
-    "framework_run": 38423548633,
-    "artifact_https_files_matched": 339,
+    "pages_run": 38430968688,
+    "framework_run": 38430968598,
+    "artifact_https_files_matched": 355,
     "published_attachment_passed": 62,
     "published_attachment_total": 62
   }

@@ -33,7 +33,7 @@ static void colors(void) {
     assert(cui_theme_color_parse(string("neutral-200/60"), &c) &&
            color(c, (cui_color){229, 229, 229, 153}));
     assert(cui_theme_color_parse(string("blue"), &c) && color(c, (cui_color){59, 130, 246, 255}));
-    assert(cui_theme_color_parse(string("#123\u00a0"), &c) && c.r == 17);
+    assert(cui_theme_color_parse(string("#123\xc2\xa0"), &c) && c.r == 17);
     assert(!cui_theme_color_parse((cui_str){"white\0suffix", 12}, &c));
     const char *bad[] = {"#12",     "#GGG",    "#123456789", "blue-42", "blue/101",
                          "blue/-1", "red/NaN", "rgb(1,2,3)", "unknown", "neutral-200/50/50"};
@@ -64,7 +64,8 @@ static void semantic(void) {
     free(owned);
     assert(color(theme.primary, (cui_color){17, 34, 51, 68}) && theme.font_size == 20 &&
            theme.radius == 9 && theme.radius_lg == 12);
-    assert(!strcmp(tokens.typography.sans, "Portable α") && tokens.typography.mono_md.size == 15);
+    assert(!strcmp(tokens.typography.sans, "Portable \xce\xb1") &&
+           tokens.typography.mono_md.size == 15);
     assert(tokens.shadow.sm.count == 1 && tokens.shadow.sm.values[0].color.r == 255 &&
            tokens.shadow.sm.values[0].color.a == 128 && tokens.shadow.sm.values[0].inset);
     assert(!memcmp(theme.buttons, base.buttons, sizeof base.buttons) &&
@@ -152,7 +153,7 @@ static void bounds(void) {
     const char *original = "{\"tokens\":{\"colors\":{\"primary\":\"#123456\"},\"typography\":{"
                            "\"sans\":\"\\uD83D\\uDE00\"}}}";
     assert(cui_theme_semantic_import(string(original), &base, &tokens, &theme, &report) == 0 &&
-           !strcmp(tokens.typography.sans, "😀"));
+           !strcmp(tokens.typography.sans, "\xf0\x9f\x98\x80"));
     assert(cui_theme_semantic_import(string("{\"tokens\":{\"radius\":{\"md\":1,\"\\u006dd\":2}}}"),
                                      &base, &tokens, &theme,
                                      &report) == CUI_THEME_REGISTRY_INVALID);

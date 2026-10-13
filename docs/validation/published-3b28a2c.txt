@@ -1,0 +1,8 @@
+Published source: 3b28a2c26f9e0ed448fc72055b198fdeff8f39a5
+Gallery: https://matteo.merola.co/cui/
+Framework CI: https://github.com/mattmezza/cui/actions/runs/38430968598 (all six jobs successful)
+Pages: https://github.com/mattmezza/cui/actions/runs/38430968688 (build and deploy successful)
+Actual HTTPS artifact comparison: 355/355 files match SHA256.
+Actual published Chromium1208 Attachment: 62/62 cases pass, including all14 sizes, both densities/orientations, subtitle pixels, mobile geometry and CDP touch pan/tap on the initially offscreen9XL Open action.
+Pages gates also pass all78 gallery stories/snippets and new Checkbox/Button/Table/Alert/Bubble/motion checks.
+Physical mobile devices and full78-family parity remain unverified.

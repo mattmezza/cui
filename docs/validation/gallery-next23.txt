@@ -1,0 +1,9 @@
+Local next23 integration: Chart appearance hover gate and portable theme registry/semantic/motion module, with Core prepaint timing audit fixture. Not yet published.
+Strict native117/117 passes including actual GPU/Sokol, font-backed theme import rendering, primary-source fixtures and standalone generated ThemeRegistry header.
+Sanitizer115/115 passes; GPU and Sokol integration tests are unregistered in this sanitizer configuration. No whole physical-device/platform claim.
+Actual Chromium1208 Chart appearance gate/stationary hover/reduced motion PASS.
+Standalone WASM semantic import + actual matchMedia appearance/reduced/contrast host seam PASS; explicit host contract only, no native OS observer claim.
+New palette data source/derived SHA256 and Apache notice checked. UTF8 test expectations use explicit bytes for C11 compiler execution-charset portability.
+Header-only registry fixture uses owned entry lookup after caller input reset, reduced-motion host projection, palette parsing and reset; no link to compiled CUI.
+Portable full-source verification pending. Automatic current-frame bounds/occlusion and arbitrary custom tooltip layout remain architectural gaps, recorded in core-prepaint-contract-next23.md.
+Published3b28a2c all six CI jobs and Pages successful,355/355 HTTPS artifacts match, actual Attachment62/62 passes.

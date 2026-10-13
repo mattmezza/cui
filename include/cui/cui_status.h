@@ -206,13 +206,20 @@ typedef struct {
     cui_notification_callback retract, activate;
     void *user;
 } cui_notification_host;
+typedef enum {
+    CUI_NOTIFICATION_SHADOW_LEGACY = 0,
+    CUI_NOTIFICATION_SHADOW_SOURCE = 1
+} cui_notification_shadow_policy;
 typedef struct {
     cui_notification_anchor placement;
     cui_notification_delivery delivery;
     float width, margin_left, margin_right, margin_top, margin_bottom;
     size_t max_visible;
     bool reduced_motion;
+    cui_notification_shadow_policy shadow_policy; /* zero preserves legacy approximation */
 } cui_notification_settings;
+/* Pure checked settings validation, including the shadow policy. */
+bool cui_notification_settings_valid(cui_notification_settings);
 typedef struct {
     cui_notification notification;
     cui_notification_phase phase;
@@ -266,6 +273,14 @@ bool cui_notification_system_click(cui_notification_state *, cui_notification_id
 cui_notification_advance cui_notifications(cui_context *, cui_id, const cui_theme *,
                                            cui_notification_state *, cui_rect viewport,
                                            double now_seconds);
+/* Call during an active UI frame, with independent caller-owned output storage.
+ * Reject invalid inputs before reductions/callbacks/UI and leave output untouched.
+ * Later UI capacity errors cannot undo already accepted owner/host callbacks;
+ * end_frame and renderer preflight retain their existing failure contracts. */
+bool cui_notifications_checked(cui_context *, cui_id, const cui_theme *, cui_notification_state *,
+                               cui_rect viewport, double now_seconds,
+                               cui_notification_advance *out);
+
 #ifdef __cplusplus
 }
 #endif

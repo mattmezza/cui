@@ -555,9 +555,11 @@ static void cui_status_notification_shadow(cui_context *ui, cui_id id, cui_rect 
             cui_end_box(ui);
         }
 }
-cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *t,
-                                           cui_notification_state *s, cui_rect viewport,
-                                           double now) {
+static cui_notification_advance cui_status_notifications_render(cui_context *ui, cui_id id,
+                                                                const cui_theme *t,
+                                                                cui_notification_state *s,
+                                                                cui_rect viewport, double now,
+                                                                bool *submitted) {
     cui_notification_advance result = {0};
     if (!ui || !t || !s || !isfinite(now) || now < 0 || !isfinite(viewport.x) ||
         !isfinite(viewport.y) || !isfinite(viewport.w) || viewport.w <= 0 ||
@@ -715,10 +717,11 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                 slide = -slide;
             if (anchor == CUI_NOTIFICATION_LEFT_CENTER || anchor == CUI_NOTIFICATION_RIGHT_CENTER)
                 slide = 0;
+            float transition_alpha = alpha;
             alpha *= e->visibility;
             cui_theme theme = cui_status_notification_theme(t, alpha);
             cui_id card = cui_status_notification_element(id, n.id);
-            if (!hidden)
+            if (!hidden && s->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_LEGACY)
                 cui_status_notification_shadow(
                     ui, cui_status_child_id(card, 320),
                     (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
@@ -739,6 +742,21 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                              (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
                                         e->motion_width, n.height},
                              (int16_t)(21 + position));
+            if (!hidden && s->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE) {
+                /* Source strength is alpha^3; source element opacity contributes
+                 * once more. This path already fades its local theme colors. */
+                float shadow_alpha = fmaxf(0, fminf(transition_alpha, 1));
+                float visibility = fmaxf(0, fminf(e->visibility, 1));
+                unsigned char ink = (unsigned char)lroundf(
+                    25.5f * shadow_alpha * shadow_alpha * shadow_alpha * shadow_alpha * visibility);
+                cui_drop_shadow layers[2] = {
+                    {.offset_y = 10, .sigma = 7.5f, .spread = -3, .color = {0, 0, 0, ink}},
+                    {.offset_y = 4, .sigma = 3, .spread = -4, .color = {0, 0, 0, ink}}};
+                float radius = t->radius_lg;
+                if (!cui_set_drop_shadows(ui, layers, 2,
+                                          (cui_corner_radii){radius, radius, radius, radius}))
+                    *submitted = false;
+            }
             cui_track_bounds(ui, card, &e->bounds);
             cui_interaction interaction =
                 cui_interact(ui, card, n.on_click ? CUI_ROLE_BUTTON : CUI_ROLE_ALERT,
@@ -841,5 +859,44 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
         }
     if (result.changed)
         cui_invalidate(ui);
+    return result;
+}
+
+bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *theme,
+                               cui_notification_state *state, cui_rect viewport, double now,
+                               cui_notification_advance *out) {
+    if (!ui || !theme || !state || !out || !state->entries || !state->capacity ||
+        state->capacity > CUI_NOTIFICATION_MAX_ITEMS || state->count > state->capacity ||
+        state->system_count > 100 || !cui_notification_settings_valid(state->settings) ||
+        !isfinite(now) || now < 0 || !isfinite(viewport.x) || !isfinite(viewport.y) ||
+        !isfinite(viewport.w) || viewport.w <= 0 || !isfinite(viewport.h) || viewport.h <= 0 ||
+        !isfinite(viewport.x + viewport.w) || !isfinite(viewport.y + viewport.h) ||
+        (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE &&
+         (!isfinite(theme->radius_lg) || theme->radius_lg < 0 || theme->radius_lg > 16384)))
+        return false;
+    if (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE) {
+        if (!isfinite(state->last_render) || state->last_render < 0)
+            return false;
+        for (size_t i = 0; i < state->count; i++) {
+            const cui_notification_entry *e = &state->entries[i];
+            if (e->phase < CUI_NOTIFICATION_STARTING || e->phase > CUI_NOTIFICATION_ENDING ||
+                !isfinite(e->elapsed) || e->elapsed < 0 || !isfinite(e->last_advance) ||
+                !isfinite(e->visibility) || !isfinite(e->velocity_visibility))
+                return false;
+        }
+    }
+    bool submitted = true;
+    cui_notification_advance next =
+        cui_status_notifications_render(ui, id, theme, state, viewport, now, &submitted);
+    if (!submitted)
+        return false;
+    *out = next;
+    return true;
+}
+cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *theme,
+                                           cui_notification_state *state, cui_rect viewport,
+                                           double now) {
+    cui_notification_advance result = {0};
+    (void)cui_notifications_checked(ui, id, theme, state, viewport, now, &result);
     return result;
 }

@@ -126,8 +126,9 @@ static accesskit_role role(cui_semantic s) {
                                            ACCESSKIT_ROLE_REGION,
                                            ACCESSKIT_ROLE_RADIO_GROUP};
     _Static_assert(sizeof roles / sizeof roles[0] == CUI_ROLE_RADIOGROUP + 1, "role mapping");
-    return s.role == CUI_ROLE_TEXTBOX && s.details.multiline ? ACCESSKIT_ROLE_MULTILINE_TEXT_INPUT
-                                                             : roles[s.role];
+    return s.role == CUI_ROLE_TEXTBOX && s.details.password    ? ACCESSKIT_ROLE_PASSWORD_INPUT
+           : s.role == CUI_ROLE_TEXTBOX && s.details.multiline ? ACCESSKIT_ROLE_MULTILINE_TEXT_INPUT
+                                                               : roles[s.role];
 }
 static accesskit_rect rectangle(cui_rect r) {
     return (accesskit_rect){r.x, r.y, (double)r.x + r.w, (double)r.y + r.h};
@@ -377,6 +378,8 @@ static bool same_snapshot(snapshot *a, snapshot *b) {
 #define EQ(field)                                                                                  \
     if (d.field != e.field)                                                                        \
     return false
+        EQ(secret);
+        EQ(password);
         EQ(readonly);
         EQ(required);
         EQ(busy);

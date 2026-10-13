@@ -28,6 +28,8 @@ struct cui_sdl3 {
     cui_color ink;
     bool quit, glyph_ok, ime_composing, ime_commit_pending, input_suspended;
     cui_id ime_focus;
+    cui_text_input_state input_state;
+    bool input_active;
     glyph_entry glyphs[GLYPH_CACHE_SLOTS];
     bitmap_entry bitmaps[BITMAP_SLOTS];
     size_t bitmap_bytes;
@@ -71,7 +73,7 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     SDL_SetRenderDrawBlendMode(s->renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderVSync(s->renderer, 1);
     s->appearance = (cui_platform_appearance){system_appearance(), CUI_APPEARANCE_SYSTEM_THEME, 1};
-    SDL_StartTextInput(s->window);
+    SDL_StopTextInput(s->window);
     return s;
 }
 void cui_sdl3_destroy(cui_sdl3 *s) {
@@ -167,6 +169,45 @@ static size_t cui_sdl3_scalar_byte(const char *text, size_t scalar) {
 bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
     if (!s || !ui)
         return false;
+    bool reset_input = false;
+    cui_text_input_state input = {0};
+    bool eligible = cui_get_text_input_config(ui, &input);
+    if (s->input_active && (!eligible || input.owner != s->input_state.owner ||
+                            input.generation != s->input_state.generation)) {
+        SDL_StopTextInput(s->window);
+        reset_input = true;
+        s->input_active = false;
+        if (s->ime_composing || s->ime_commit_pending)
+            (void)cui_queue_event(ui, (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL,
+                                                  .composition_target = s->ime_focus});
+        s->ime_composing = s->ime_commit_pending = false;
+        s->ime_focus = 0;
+    }
+    if (eligible && !s->input_active) {
+        SDL_PropertiesID properties = SDL_CreateProperties();
+        if (!properties)
+            return false;
+        SDL_TextInputType type = input.config.type == CUI_TEXT_INPUT_PASSWORD_HIDDEN
+                                     ? SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_HIDDEN
+                                 : input.config.type == CUI_TEXT_INPUT_PASSWORD_VISIBLE
+                                     ? SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_VISIBLE
+                                     : SDL_TEXTINPUT_TYPE_TEXT;
+        bool secure = input.config.type != CUI_TEXT_INPUT_TEXT ||
+                      input.config.purpose != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+        bool ok = SDL_SetNumberProperty(properties, SDL_PROP_TEXTINPUT_TYPE_NUMBER, type);
+        ok = ok && SDL_SetBooleanProperty(properties, SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN,
+                                          input.multiline);
+        if (secure)
+            ok = ok &&
+                 SDL_SetBooleanProperty(properties, SDL_PROP_TEXTINPUT_AUTOCORRECT_BOOLEAN, false);
+        if (ok)
+            ok = SDL_StartTextInputWithProperties(s->window, properties);
+        SDL_DestroyProperties(properties);
+        if (!ok)
+            return false;
+        s->input_active = true;
+        s->input_state = input;
+    }
     (void)cui_sdl3_set_cursor(s, cui_pointer_cursor(ui));
     cui_rect caret;
     if (cui_text_input_rect(ui, &caret)) {
@@ -261,7 +302,7 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
                           ((e.key.mod & SDL_KMOD_GUI) ? CUI_MOD_META : 0);
             break;
         case SDL_EVENT_TEXT_EDITING:
-            if (s->input_suspended) {
+            if (s->input_suspended || reset_input) {
                 send = false;
                 break;
             }
@@ -285,7 +326,7 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
                                   : v.text_length;
             break;
         case SDL_EVENT_TEXT_INPUT:
-            if (s->input_suspended) {
+            if (s->input_suspended || reset_input) {
                 send = false;
                 break;
             }

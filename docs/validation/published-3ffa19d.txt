@@ -1,0 +1,7 @@
+Published source:3ffa19dcc4c5febbcfe06cf303fabbf3f1649161.
+Framework38461919410:all6 jobs SUCCESS (Windows/macOS/LinuxGCC/Clang); Pages38461919405:SUCCESS/deployed.
+All411 public HTTPS artifact files match SHA256; actual public Attachment62/62 passes all14 sizes, density/orientation/mobile containment and touch pan/tap.
+MAIN warnings clean131/131 CTest. Separate frozen portable proof134/134 native,129/129 sanitizer,110/110 WASI plus78 gallery stories/snippets and appearance pixels is in gallery-next29.txt.
+Logs:/home/matteo/.cache/cui-validation/{ci,pages}-3ffa19d.json;published-3ffa19d-{files,attachment}.log;published-3ffa19d-attachment.json;main-next29-{configure,build,test}.log.
+Artifact:/home/matteo/.cache/cui-validation/release-3ffa19d-artifact/artifact.tar.
+No full-family/source/native-device claim. The subsequently discovered SDL GPU cancellation bug has a separate hotfix; this release still contains that old adapter failure path.

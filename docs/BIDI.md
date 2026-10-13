@@ -51,6 +51,11 @@ selection. In particular, reversing scalar indices in a run is not sufficient
 to render a cluster correctly: shaping and cluster handling must follow. No
 claim of complete international-text rendering parity is made.
 
-For integration compile `Source/SheenBidi.c` with `SB_CONFIG_UNITY` and private
+CMake builds this as the optional `cui_bidi` static library by default. Disable it
+with `-DCUI_BUILD_BIDI=OFF`; Core does not link it implicitly. Installed consumers
+can use `pkg-config --cflags --libs cui-bidi`. Its archive contains the private
+backend objects, so consumers do not need a separate SheenBidi library.
+
+For manual integration compile `Source/SheenBidi.c` with `SB_CONFIG_UNITY` and private
 include paths `third_party/sheenbidi/Headers` and `third_party/sheenbidi/Source`.
 Only the CUI header is public. Preserve upstream notices and LICENSE in bundles.

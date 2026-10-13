@@ -1,0 +1,78 @@
+{
+  "cui_commit": "3af85cb",
+  "upstream_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "audit_only": true,
+  "features": [
+    {
+      "name": "shared routing",
+      "status": "partial tested",
+      "evidence": "src/base/cui_scroll.c:201\u2013223; tests/unit/test_scroll.c",
+      "limitations": "Precise versus line steps, actual-change consumption, boundary deferral, axis lock and horizontal trapping exist. Existing tests assert consumed/refused events and nested touch routing. These do not certify every owner."
+    },
+    {
+      "name": "VirtualList",
+      "status": "partial tested",
+      "evidence": "src/base/cui_virtual_scroll.c:40\u201375; tests/unit/test_virtual_styled.c",
+      "limitations": "Uses common scroll reduction and adds keyboard navigation. Windowing/model tests are separate from physical touch evidence."
+    },
+    {
+      "name": "Sidebar",
+      "status": "partial tested",
+      "evidence": "src/components/cui_sidebar.c:366\u2013425; tests/unit/test_sidebar.c:252",
+      "limitations": "Uses shared geometry, skin and scroll state with clipped translated content and cached rows. Existing precise-scroll fixture is not a physical native-device test."
+    },
+    {
+      "name": "Tabs consumption",
+      "status": "source gap; runtime reproduction pending",
+      "evidence": "src/base/cui_choice.c:340\u2013366; tests/unit/test_choice.c:2322",
+      "limitations": "Wheel/converted touch SCROLL changes offset without cui_consume_event or boundary deferral. Thumb reducer separately consumes keyboard events. Existing scrollbar tests cover drag, keyboard, hidden/style geometry; they do not establish nested SCROLL ownership."
+    },
+    {
+      "name": "DataTable consumption",
+      "status": "source gap; runtime reproduction pending",
+      "evidence": "src/base/cui_table.c:892\u2013903; tests/unit/test_table.c",
+      "limitations": "Body/root scroll offsets are changed in bespoke loops without consumption/deferral. Common bars exist, but their presence does not prove these loops chain correctly. Disabled/loading gates and final clamp exist."
+    },
+    {
+      "name": "shift wheel",
+      "status": "browser supported; native gap",
+      "evidence": "web/gallery.js:778\u2013790; backends/sdl3/cui_sdl3.c:245\u2013251",
+      "limitations": "Browser converts shift+vertical delta to horizontal only when deltaX is zero. SDL wheel branch forwards x/y without shift mapping or wheel modifiers. Hosts therefore differ. Upstream lock_scroll_axis is not proof that shift conversion is required by that API."
+    },
+    {
+      "name": "visibility modes",
+      "status": "upstream gap",
+      "evidence": "include/cui/cui_theme.h:11\u201324; upstream crates/base/src/scrollbar.rs:48\u201366",
+      "limitations": "Visible/Hidden/AutoHide/Inherited exist. Upstream Always/Scrolling/Hover includes distinct hover-only mode absent here. AUTO_HIDE also wakes on owner hover and holds focused descendants; do not equate it exactly with upstream Scrolling."
+    },
+    {
+      "name": "idle scheduling",
+      "status": "upstream efficiency gap",
+      "evidence": "src/base/cui_scroll.c:34\u201375; tests/unit/test_scroll.c:642\u2013671; upstream scrollbar.rs:1344\u20131365,2165",
+      "limitations": "CUI invalidates continuously through idle and fade; existing tests deliberately assert redraw during idle. Upstream requests animation only while moving and schedules a delayed idle notification. Changing this needs a reusable host-visible wake deadline, not simply removing invalidation."
+    },
+    {
+      "name": "skin and motion",
+      "status": "partial implemented; upstream gap",
+      "evidence": "include/cui/cui_theme.h:20\u201324; upstream scrollbar.rs:290\u2013372,2330\u20132340",
+      "limitations": "Thickness/minimum thumb/radii/track hiding/custom colors/fade/reduced motion exist. No independent active/hover width, thumb-hover entrance or configurable enter/expand choreography. Upstream drag notification throttling is also not represented by the CUI API."
+    },
+    {
+      "name": "touch drag lifetime",
+      "status": "partial tested",
+      "evidence": "tests/unit/test_scroll.c; tests/web/test_touch_components.py; upstream scrollbar.rs:1659\u20131708",
+      "limitations": "Core contact routing, explicit drag priority and cancellation are present. Upstream thumb touch drag prevents default/stops propagation. Existing CUI CDP and queued SDL tests are synthetic input evidence; no physical OS/device certification."
+    }
+  ],
+  "first_proposal": "Tabs SCROLL actual-change consumption and boundary chaining; no public API changes",
+  "physical_device_claim": false,
+  "validation": {
+    "warning_build": "clean, source-identical existing build",
+    "ctest_passed": 115,
+    "ctest_total": 117,
+    "known_failures": [
+      "checkbox_motion phantom initial hover fixture",
+      "distribution stale generated source"
+    ]
+  }
+}

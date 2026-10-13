@@ -23,7 +23,7 @@ def main():
    def target():return a.target('Run action',1)
    def activation():
     n=clicks();a.tap(target());assert clicks()==n+1,'Touch callback count';a.page.wait_for_timeout(400);assert clicks()==n+1,'Ghost mouse duplicated touch callback'
-    pt=a.point(target());a.page.mouse.click(pt['x'],pt['y']);assert clicks()==n+2,'Mouse callback count'
+    pt=a.point(target());a.page.mouse.click(pt['x'],pt['y']);a.page.wait_for_function('(n)=>cuiGallery.exports.gallery_clicks()===n',arg=n+2);assert clicks()==n+2,'Mouse callback count';a.page.wait_for_timeout(150);assert clicks()==n+2,'Mouse callback duplicated'
     assert not target()['f'][7],'Opt-in pointer focus unexpectedly changed'
     a.page.keyboard.press('Tab');a.page.keyboard.press('Enter');a.page.wait_for_timeout(60);assert clicks()==n+3,'Tab/Enter activation missing'
    a.case('Button','touch and mouse exact-once callbacks; pointer focus opt-out preserves keyboard',activation)

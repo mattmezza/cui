@@ -3202,7 +3202,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_button_options extra = {.size = (cui_control_size)control_size,
                                     .design_size = design_size,
                                     .disabled = disabled};
-        extra.icon = cui_string("download");
+        extra.icon = cui_string("check");
         extra.trailing_icon = cui_string("arrow-right");
         extra.dropdown_caret = true;
         cui_button_ex(ui, cui_id_from(ui, "button-icons"), &t, cui_string("With icon"), extra);

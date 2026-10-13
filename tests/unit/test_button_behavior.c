@@ -136,9 +136,12 @@ int main(void) {
     pointer(CUI_EVENT_POINTER_UP, true, 73);
     frame();
     assert(clicks == 4);
-    options.loading_icon = cui_string("refresh-cw");
-    frame();
-    assert(cui_needs_redraw(ui));
+    options.loading_icon = cui_string("loader");
+    draw = frame();
+    unsigned loading_images = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        loading_images += draw.commands[i].type == CUI_DRAW_IMAGE;
+    assert(loading_images == 1 && cui_needs_redraw(ui));
     cui_set_reduced_motion(ui, true);
     frame();
     frame();
@@ -179,7 +182,7 @@ int main(void) {
                     .variant = (cui_button_variant)variant,
                     .size = design < 4 ? (cui_control_size)design : CUI_CONTROL_MEDIUM,
                     .design_size = design < 4 ? CUI_DESIGN_INHERIT : (cui_design_size)(design - 3),
-                    .icon = {"download", 8},
+                    .icon = {"check", 5},
                     .trailing_icon = {"arrow-right", 11}};
                 float font = (options.size == CUI_CONTROL_XSMALL  ? 12
                               : options.size == CUI_CONTROL_LARGE ? 16
@@ -195,6 +198,10 @@ int main(void) {
                 draw = frame();
                 cui_rect b = button()->bounds;
                 assert(button()->value == 0 && !button()->checked && !button()->disabled);
+                unsigned icon_count = 0;
+                for (size_t i = 0; i < draw.count; i++)
+                    icon_count += draw.commands[i].type == CUI_DRAW_IMAGE;
+                assert(icon_count == 2);
                 for (size_t i = 0; i < draw.count; i++)
                     if (draw.commands[i].type == CUI_DRAW_TEXT ||
                         draw.commands[i].type == CUI_DRAW_IMAGE) {

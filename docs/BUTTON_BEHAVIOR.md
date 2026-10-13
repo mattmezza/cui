@@ -26,7 +26,10 @@ width retains Core's grow convention. Callers must allow enough height for
 arbitrary content.
 
 Named `icon`, `trailing_icon`, `loading_icon` and `dropdown_caret` use the real
-SVG icon renderer. Loading suppresses activation, exposes busy metadata, and
+SVG icon renderer. The catalog always lists all names, but default builds
+embed 106 SVG assets; choose bundled names (such as `check`, `arrow-right`,
+`chevron-down`, `loader`) or supply a theme loader / `CUI_ICON_ALL_ASSETS`
+for other catalog assets. Loading suppresses activation, exposes busy metadata, and
 fades the normal/selected palette to 80% rather than using disabled colors.
 A named loading glyph rotates using frame time; reduced motion keeps it still.
 A `leading_content` callback takes precedence over generated loading/leading

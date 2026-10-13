@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+prefix=${pcfiledir}/../..
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: cui-accessibility
+Description: Optional Linux AccessKit semantic snapshots and bounded Focus/Click bridge
+Version: @PROJECT_VERSION@
+Requires.private: cui
+Libs: -L${libdir} -lcui_accessibility
+Libs.private: -laccesskit -pthread -ldl -lm @CUI_ACCESSKIT_PC_SANITIZE@
+Cflags: -I${includedir}

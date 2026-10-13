@@ -1,4 +1,8 @@
-# Standalone worker harness. Root packaging registration is integrator-owned.
+if(NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+ include(root_bridge.cmake)
+ return()
+endif()
+# Standalone validation harness; installation uses the shared root entry point.
 cmake_minimum_required(VERSION 3.20)
 project(cui_accessibility_harness LANGUAGES C)
 set(CMAKE_C_STANDARD 11)

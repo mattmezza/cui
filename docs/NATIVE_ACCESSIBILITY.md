@@ -9,19 +9,31 @@ Windows/macOS adapters and Wayland screen extents are not implemented here.
 
 ## Build and use
 
-Ordinary Core builds have no Rust requirement. Explicitly build the optional
-library (Rust 1.85+, Cargo, installed SDL3/Freetype/HarfBuzz, DBus/libAT-SPI):
+Ordinary builds keep `CUI_BUILD_ACCESSIBILITY=OFF` and do not inspect the cache,
+invoke Rust or fetch dependencies. Explicitly prebuild the pinned archive with
+Rust 1.85+/Cargo, then enable the optional Linux adapter:
 
 ```sh
 python3 scripts/build_accesskit.py
-cmake -S backends/accesskit -B build-accesskit -G Ninja
-cmake --build build-accesskit
-ctest --test-dir build-accesskit --output-on-failure
-backends/accesskit/run_native.sh ./build-accesskit/test_accessibility_native
+cmake -S . -B build -G Ninja -DCUI_BUILD_ACCESSIBILITY=ON
+cmake --build build --parallel 6
+ctest --test-dir build --output-on-failure -R accessibility
+cmake --install build --prefix /your/local/prefix
 ```
 
-The standalone harness is Linux-specific and independently builds the assigned
-backend and Core; root CMake/package registration belongs to integration.
+CMake imports the existing archive; it never invokes Cargo or downloads a missing
+dependency. Missing or mismatched archive, lock, ownership extension or private
+header fail configuration. The binary SHA is recorded in installed
+`share/cui/licenses/accesskit/accesskit-build.json`; it identifies the local
+artifact, rather than claiming a reproducible upstream binary. Run the pinned
+builder before configuring to establish its provenance. This is a host-built
+Linux package; cross compilation is rejected. Native runtime tests additionally
+require SDL3/Freetype/HarfBuzz, libAT-SPI, DBus/gdbus and Xvfb. CMake reports when
+those tests are omitted, while the portable snapshot/action tests remain available.
+
+The standalone harness also remains available via
+`cmake -S backends/accesskit -B build-accesskit -G Ninja`. It is a validation
+harness rather than the installation/package entry point.
 Use `--cache PATH` and `-DACCESSKIT_CACHE=PATH` together for another private cache.
 Nothing installs globally. The script verifies the archive, every cached source
 file and Cargo.lock, and uses `cargo build --release --locked`. The private
@@ -153,5 +165,29 @@ library is not. Native leak detection is disabled for host libraries; C backend
 release counters remain checked. The runner isolates DBus/Xvfb and uses in-memory
 GSettings, never changing desktop accessibility settings. It starts the installed
 registry explicitly because service activation may require a systemd user manager.
-Root warning build/CTest on this worker passes 92/93; the reserved distribution
-check is expected stale until the integrator regenerates packages.
+Installation includes the portable accessibility header, production adapter,
+private static AccessKit archive, CUI Core, AccessKit C/Rust notices and the
+aggregate inventory of all ninety pinned Linux dependency notices. Private
+test hooks and the upstream AccessKit header are not installed.
+
+A relocated installation supports either:
+
+```cmake
+find_package(CUIAccessibility CONFIG REQUIRED)
+target_link_libraries(app PRIVATE CUI::cui_accessibility)
+```
+
+or `pkg-config --static --cflags --libs cui-accessibility`. CMake links Core,
+the imported Rust archive, Threads, dl and m transitively; pkg-config includes
+the static dependency flags. Set `CMAKE_PREFIX_PATH` or `PKG_CONFIG_LIBDIR` to
+the installation. Neither interface references the original private cache.
+
+`tests/packaging/test_accessibility_package.py --build build` installs into a
+temporary prefix, relocates it, compiles/runs strict C11 consumers through both
+interfaces, checks real Focus/Activate effects, all ninety notices, artifact SHA
+and absence of private test symbols. It also builds ordinary Core with a
+nonexistent cache while the option is OFF and checks missing/corrupt-cache
+configuration failures. The optional root CTest suite registers this proof.
+Full native runtime coverage still has the phase1 limits documented above.
+The reserved distribution check may remain stale until integration regenerates
+the global bundles.

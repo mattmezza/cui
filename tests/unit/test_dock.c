@@ -297,7 +297,44 @@ static void test_random_mutations(void) {
     }
     cui_dock_destroy(d);
 }
+static void test_split_layout(void) {
+    cui_dock *d = make();
+    cui_dock_node first = cui_dock_root(d), second;
+    assert(cui_dock_insert(d, first, 10, 0) == CUI_DOCK_OK);
+    assert(cui_dock_split(d, first, CUI_DOCK_SPLIT_HORIZONTAL, .25, 20, false, &second) ==
+           CUI_DOCK_OK);
+    assert(cui_dock_set_minimum(d, first, 100, 30) == CUI_DOCK_OK);
+    assert(cui_dock_set_minimum(d, second, 50, 20) == CUI_DOCK_OK);
+    cui_dock_split_geometry split;
+    assert(cui_dock_split_layout(d, cui_dock_root(d), (cui_rect){7, 9, 400, 200}, 4, &split) ==
+           CUI_DOCK_OK);
+    cui_dock_geometry leaves[2];
+    size_t count;
+    bool fit;
+    assert(cui_dock_layout(d, (cui_rect){7, 9, 400, 200}, 4, leaves, 2, &count, &fit) ==
+           CUI_DOCK_OK);
+    near(split.first.x, leaves[0].bounds.x);
+    near(split.first.w, leaves[0].bounds.w);
+    near(split.second.x, leaves[1].bounds.x);
+    near(split.second.w, leaves[1].bounds.w);
+    assert(split.fit_minimum && fit && count == 2);
+    near(split.first_minimum.width, 100);
+    near(split.second_minimum.width, 50);
+    assert(cui_dock_split_layout(d, cui_dock_root(d), (cui_rect){0, 0, 120, 100}, 4, &split) ==
+           CUI_DOCK_OK);
+    assert(!split.fit_minimum);
+    near(split.first.w + split.second.w + 4, 120);
+    cui_dock_split_geometry before = split;
+    assert(cui_dock_split_layout(d, first, (cui_rect){0, 0, 10, 10}, 0, &split) ==
+           CUI_DOCK_INVALID);
+    assert(!memcmp(&before, &split, sizeof split));
+    assert(cui_dock_split_layout(d, cui_dock_root(d), (cui_rect){0, 0, NAN, 10}, 0, &split) ==
+           CUI_DOCK_INVALID);
+    assert(!memcmp(&before, &split, sizeof split));
+    cui_dock_destroy(d);
+}
 int main(void) {
+    test_split_layout();
     test_nested_geometry_move();
     test_serialization_rejection();
     test_decimal_precision_roundtrip();

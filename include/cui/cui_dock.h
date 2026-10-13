@@ -2,6 +2,7 @@
 #ifndef CUI_DOCK_H
 #define CUI_DOCK_H
 #include "cui.h"
+#include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,11 +60,66 @@ cui_dock_result cui_dock_set_minimum(cui_dock *dock, cui_dock_node node, double 
 cui_dock_result cui_dock_layout(const cui_dock *dock, cui_rect bounds, float gap,
                                 cui_dock_geometry *output, size_t capacity, size_t *count,
                                 bool *fit_minimum);
+/* Derived split rectangles use the same ratio/minimum compression as layout.
+ * Child minima are aggregate subtree minima (before proportional compression). */
+typedef struct {
+    cui_rect first, second;
+    cui_size first_minimum, second_minimum;
+    bool fit_minimum;
+} cui_dock_split_geometry;
+cui_dock_result cui_dock_split_layout(const cui_dock *, cui_dock_node split, cui_rect, float gap,
+                                      cui_dock_split_geometry *);
 /* Required serialized length excludes NUL. Insufficient output is untouched.
    Restore is bounded and transactional; successful restore invalidates IDs. */
 cui_dock_result cui_dock_serialize(const cui_dock *dock, char *output, size_t capacity,
                                    size_t *length);
 cui_dock_result cui_dock_restore(cui_dock *dock, cui_str serialized);
+/* Styled adapter; the domain model above remains independently linkable. */
+typedef struct cui_dock_view cui_dock_view;
+typedef struct {
+    uint64_t key;
+    cui_str title;
+    bool closable, disabled;
+    void (*render)(cui_context *, uint64_t panel, void *user);
+    void *user;
+    cui_id focus_target; /* Optional content control; used when focus_content is enabled. */
+} cui_dock_panel;
+typedef enum {
+    CUI_DOCK_SELECTED,
+    CUI_DOCK_CLOSED,
+    CUI_DOCK_REORDERED,
+    CUI_DOCK_RESIZED
+} cui_dock_event;
+typedef struct {
+    float width, height, tab_height, key_step;
+    bool disabled, reduced_motion, allow_reorder, focus_content;
+    double now_seconds;
+    void (*on_event)(void *user, cui_dock_event, uint64_t panel, cui_dock_node node);
+    void *event_user;
+} cui_dock_view_options;
+typedef struct {
+    cui_dock_result error;
+    bool selected, closed, reordered, resized, fit_minimum;
+    uint64_t selected_panel, closed_panel, reordered_panel;
+} cui_dock_view_result;
+/* Bounded retained interaction storage, no per-frame allocation. Defaults 128/256. */
+cui_dock_view *cui_dock_view_create(size_t node_capacity, size_t panel_capacity);
+void cui_dock_view_destroy(cui_dock_view *);
+void cui_dock_view_reset(cui_dock_view *);
+cui_dock_view_options cui_dock_view_options_default(void);
+cui_id cui_dock_tab_id(cui_id view, uint64_t panel);
+cui_id cui_dock_close_id(cui_id view, uint64_t panel);
+cui_id cui_dock_group_id(cui_id view, cui_dock_node node);
+cui_id cui_dock_resize_id(cui_id view, const cui_dock *, cui_dock_node split);
+/* Submit within a frame. width/height must be positive finite logical pixels.
+ * Registry strings/user data and view must survive renderer completion.
+ * Model may not be mutated/destroyed by render or event callbacks.
+ * Selection is immediate; close/reorder commit after scene submission and
+ * invalidate a following frame. Missing registry keys paint a placeholder.
+ * Resize uses the existing Resizable adapter and updates model ratios. */
+cui_dock_view_result cui_dock_view_render(cui_context *, cui_id view_id, const cui_theme *,
+                                          cui_dock *, cui_dock_view *, const cui_dock_panel *,
+                                          size_t panel_count, cui_dock_view_options);
 #ifdef __cplusplus
 }
 #endif

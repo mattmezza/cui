@@ -391,15 +391,9 @@ static cui_dock_private_minimum cui_dock_private_min(const cui_dock_private_stat
         fmax(n->minh, n->kind == CUI_DOCK_SPLIT_VERTICAL ? a.h + b.h + gap : fmax(a.h, b.h)),
         a.tabs + b.tabs};
 }
-static void cui_dock_private_geometry(const cui_dock_private_state *s, size_t i, cui_rect r,
-                                      double gap, cui_dock_geometry *out, size_t *at) {
+static cui_dock_split_geometry cui_dock_private_split(const cui_dock_private_state *s, size_t i,
+                                                      cui_rect r, double gap) {
     const cui_dock_private_node *n = &s->nodes[i];
-    if (n->kind == CUI_DOCK_TABS) {
-        out[(*at)++] =
-            (cui_dock_geometry){cui_dock_private_id(s, i), r, n->count, n->active != SIZE_MAX,
-                                n->active != SIZE_MAX ? s->panels[n->active].key : 0};
-        return;
-    }
     cui_dock_private_minimum a = cui_dock_private_min(s, n->a, gap),
                              b = cui_dock_private_min(s, n->b, gap);
     bool horizontal = n->kind == CUI_DOCK_SPLIT_HORIZONTAL;
@@ -419,8 +413,39 @@ static void cui_dock_private_geometry(const cui_dock_private_state *s, size_t i,
         rb.y += (float)(first + g);
         rb.h = (float)(available - first);
     }
+    return (cui_dock_split_geometry){.first = ra,
+                                     .second = rb,
+                                     .first_minimum = {(float)a.w, (float)a.h},
+                                     .second_minimum = {(float)b.w, (float)b.h},
+                                     .fit_minimum = ma + mb <= available};
+}
+static void cui_dock_private_geometry(const cui_dock_private_state *s, size_t i, cui_rect r,
+                                      double gap, cui_dock_geometry *out, size_t *at) {
+    const cui_dock_private_node *n = &s->nodes[i];
+    if (n->kind == CUI_DOCK_TABS) {
+        out[(*at)++] =
+            (cui_dock_geometry){cui_dock_private_id(s, i), r, n->count, n->active != SIZE_MAX,
+                                n->active != SIZE_MAX ? s->panels[n->active].key : 0};
+        return;
+    }
+    cui_dock_split_geometry split = cui_dock_private_split(s, i, r, gap);
+    cui_rect ra = split.first, rb = split.second;
     cui_dock_private_geometry(s, n->a, ra, gap, out, at);
     cui_dock_private_geometry(s, n->b, rb, gap, out, at);
+}
+cui_dock_result cui_dock_split_layout(const cui_dock *d, cui_dock_node id, cui_rect r, float gap,
+                                      cui_dock_split_geometry *out) {
+    if (!d || !out || !isfinite(r.x) || !isfinite(r.y) || !isfinite(r.w) || !isfinite(r.h) ||
+        r.w < 0 || r.h < 0 || !isfinite(gap) || gap < 0 || fabs((double)r.x + r.w) > FLT_MAX ||
+        fabs((double)r.y + r.h) > FLT_MAX)
+        return CUI_DOCK_INVALID;
+    size_t node = cui_dock_private_node_index(d, id);
+    if (node == SIZE_MAX)
+        return CUI_DOCK_NOT_FOUND;
+    if (d->state.nodes[node].kind == CUI_DOCK_TABS)
+        return CUI_DOCK_INVALID;
+    *out = cui_dock_private_split(&d->state, node, r, gap);
+    return CUI_DOCK_OK;
 }
 cui_dock_result cui_dock_layout(const cui_dock *d, cui_rect r, float gap, cui_dock_geometry *out,
                                 size_t capacity, size_t *count, bool *fit) {

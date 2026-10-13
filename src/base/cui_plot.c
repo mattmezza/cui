@@ -2158,3 +2158,75 @@ cui_plot_result cui_plot_appear_registry_record(cui_plot_appear_registry *regist
         ++registry->count;
     return CUI_PLOT_OK;
 }
+
+static double plot_transition_progress(double elapsed, double duration, double delay,
+                                       cui_plot_motion_status *status) {
+    double active = elapsed - delay;
+    if (active < 0) {
+        *status = CUI_PLOT_MOTION_DELAYED;
+        return 0;
+    }
+    if (duration == 0 || active >= duration) {
+        *status = CUI_PLOT_MOTION_FINISHED;
+        return 1;
+    }
+    *status = CUI_PLOT_MOTION_RUNNING;
+    return active / duration;
+}
+static double plot_transition_sample(cui_plot_transition_policy policy, double progress) {
+    if (policy.easing)
+        return policy.easing(progress, policy.user);
+    double remaining = 1 - progress;
+    return 1 - remaining * remaining * remaining;
+}
+cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *clock, double target,
+                                         double now, cui_plot_transition_policy policy,
+                                         bool reduced_motion, cui_plot_motion_value *out) {
+    if (!clock || !out || !isfinite(target) || !isfinite(now) || now < 0 ||
+        !isfinite(policy.duration) || policy.duration < 0 || !isfinite(policy.delay))
+        return CUI_PLOT_INVALID;
+    cui_plot_transition_clock next = *clock;
+    if (!next.initialized)
+        next = (cui_plot_transition_clock){target, target, now, 1, policy.duration, true};
+    if (!isfinite(next.from) || !isfinite(next.target) || !isfinite(next.started_at) ||
+        next.started_at < 0 || !isfinite(next.reversing_factor) || next.reversing_factor < 0 ||
+        next.reversing_factor > 1 || !isfinite(next.duration) || next.duration < 0)
+        return CUI_PLOT_INVALID;
+    cui_plot_motion_value value = {target, CUI_PLOT_MOTION_FINISHED, false};
+    if (reduced_motion || policy.duration == 0) {
+        if (next.from != target || next.target != target)
+            next = (cui_plot_transition_clock){target, target, now, 1, policy.duration, true};
+    } else {
+        double elapsed = now > next.started_at ? now - next.started_at : 0;
+        double progress =
+            plot_transition_progress(elapsed, next.duration, policy.delay, &value.status);
+        double eased = plot_transition_sample(policy, progress);
+        if (!isfinite(eased))
+            return CUI_PLOT_INVALID;
+        /* Weighted interpolation avoids overflowing target-from. */
+        double sampled = (1 - eased) * next.from + eased * next.target;
+        if (next.target != target) {
+            double factor =
+                target == next.from ? eased * next.reversing_factor + 1 - next.reversing_factor : 1;
+            factor = fmax(0, fmin(1, factor));
+            next = (cui_plot_transition_clock){
+                sampled, target, now, factor, policy.duration * factor, true};
+            progress = plot_transition_progress(0, next.duration, policy.delay, &value.status);
+            eased = plot_transition_sample(policy, progress);
+            if (!isfinite(eased))
+                return CUI_PLOT_INVALID;
+            value.value = (1 - eased) * sampled + eased * target;
+        } else {
+            value.value = sampled;
+            if (next.from == next.target)
+                value.status = CUI_PLOT_MOTION_IDLE;
+        }
+        if (!isfinite(value.value) || !isfinite(next.from))
+            return CUI_PLOT_OVERFLOW;
+        value.request_frame =
+            value.status == CUI_PLOT_MOTION_DELAYED || value.status == CUI_PLOT_MOTION_RUNNING;
+    }
+    *clock = next;
+    *out = value;
+    return CUI_PLOT_OK;
+}

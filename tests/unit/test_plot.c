@@ -1195,7 +1195,81 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.25, 0, 3, -2, &local) == CUI_PLOT_OK && local == .25);
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
+static double clock_linear(double progress, void *user) {
+    assert(user == (void *)&seed);
+    return progress;
+}
+static double clock_invalid(double progress, void *user) {
+    (void)progress;
+    (void)user;
+    return NAN;
+}
+static void transition_clocks(void) {
+    cui_plot_transition_clock clock = {0};
+    cui_plot_motion_value value = {0};
+    cui_plot_transition_policy policy = {2, 0, clock_linear, &seed};
+    assert(cui_plot_transition_step(&clock, 0, 10, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 0 && value.status == CUI_PLOT_MOTION_IDLE && !value.request_frame);
+    assert(cui_plot_transition_step(&clock, 1, 10, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 0 && value.request_frame);
+    assert(cui_plot_transition_step(&clock, 1, 11, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, .5));
+    /* Reversal shortens duration to the traversed fraction and starts continuously. */
+    assert(cui_plot_transition_step(&clock, 0, 11, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, .5) && close(clock.duration, 1));
+    assert(cui_plot_transition_step(&clock, 0, 11.5, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, .25));
+    /* Reversing again to the prior retarget origin preserves the shortening history. */
+    cui_plot_transition_clock repeated = clock;
+    assert(cui_plot_transition_step(&repeated, .5, 11.5, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, .25) && close(repeated.duration, 1.5));
+    /* A different target restores full duration and samples the old trajectory first. */
+    assert(cui_plot_transition_step(&clock, 2, 11.5, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, .25) && clock.duration == 2);
+    assert(cui_plot_transition_step(&clock, 2, 9, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, .25));
+    assert(cui_plot_transition_step(&clock, 2, 13.5, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 2 && value.status == CUI_PLOT_MOTION_FINISHED && !value.request_frame);
+    assert(cui_plot_transition_step(&clock, 2, 14, policy, true, &value) == CUI_PLOT_OK);
+    policy.delay = 1;
+    assert(cui_plot_transition_step(&clock, 3, 14, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 2 && value.status == CUI_PLOT_MOTION_DELAYED && value.request_frame);
+    assert(cui_plot_transition_step(&clock, 3, 15, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 2 && value.status == CUI_PLOT_MOTION_RUNNING);
+    policy.delay = -1;
+    assert(cui_plot_transition_step(&clock, 4, 15, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value,
+                 3.5)); /* current negative delay finishes prior target, advances new one halfway */
+    policy.duration = 0;
+    assert(cui_plot_transition_step(&clock, 8, 15, policy, false, &value) == CUI_PLOT_OK);
+    assert(value.value == 8 && value.status == CUI_PLOT_MOTION_FINISHED);
+    policy.duration = 2;
+    assert(cui_plot_transition_step(&clock, 9, 15, policy, true, &value) == CUI_PLOT_OK);
+    assert(value.value == 9 && !value.request_frame);
+    policy = (cui_plot_transition_policy){2, 0, NULL, NULL};
+    assert(cui_plot_transition_step(&clock, 10, 15, policy, false, &value) == CUI_PLOT_OK);
+    assert(cui_plot_transition_step(&clock, 10, 16, policy, false, &value) == CUI_PLOT_OK);
+    assert(close(value.value, 9.875));
+    cui_plot_transition_clock before = clock;
+    cui_plot_motion_value saved = value;
+    policy.easing = clock_invalid;
+    assert(cui_plot_transition_step(&clock, 0, 16, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(memcmp(&clock, &before, sizeof clock) == 0 && memcmp(&value, &saved, sizeof value) == 0);
+    assert(cui_plot_transition_step(&clock, 0, NAN, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(cui_plot_transition_step(&clock, 0, 16, policy, false, NULL) == CUI_PLOT_INVALID);
+    policy.duration = NAN;
+    assert(cui_plot_transition_step(&clock, 0, 16, policy, false, &value) == CUI_PLOT_INVALID);
+    policy.duration = 2;
+    assert(cui_plot_transition_step(&clock, NAN, 16, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(cui_plot_transition_step(&clock, 0, -1, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(cui_plot_transition_step(NULL, 0, 16, policy, false, &value) == CUI_PLOT_INVALID);
+    clock.duration = -1;
+    before = clock;
+    assert(cui_plot_transition_step(&clock, 0, 16, policy, false, &value) == CUI_PLOT_INVALID);
+    assert(memcmp(&clock, &before, sizeof clock) == 0);
+}
 int main(void) {
+    transition_clocks();
     test_sankey_large_chain();
     test_sankey_graph();
     test_sankey_ribbon();

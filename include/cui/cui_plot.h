@@ -421,6 +421,35 @@ cui_plot_result cui_plot_cursor_long_press(cui_plot_cursor_memory *, cui_plot_re
 cui_plot_result cui_plot_cursor_resolve(const cui_plot_cursor_memory *, cui_plot_rect bounds,
                                         cui_plot_point live_global_position, bool appearing,
                                         cui_plot_point *relative, bool *resolved);
+/* Projected scalar transition clock used by Plot enter/exit policies. Seconds
+ * are caller-supplied monotonic timestamps; backward time saturates elapsed to
+ * zero. Zero-initialize each independently keyed channel. First target is
+ * adopted immediately. NULL easing uses source cubic-out; callback is synchronous
+ * and must return a finite sample. Invalid inputs preserve state and output. */
+typedef double (*cui_plot_easing_fn)(double progress, void *user);
+typedef struct {
+    double duration, delay;
+    cui_plot_easing_fn easing;
+    void *user;
+} cui_plot_transition_policy;
+typedef struct {
+    double from, target, started_at, reversing_factor, duration;
+    bool initialized;
+} cui_plot_transition_clock;
+typedef enum {
+    CUI_PLOT_MOTION_IDLE,
+    CUI_PLOT_MOTION_DELAYED,
+    CUI_PLOT_MOTION_RUNNING,
+    CUI_PLOT_MOTION_FINISHED
+} cui_plot_motion_status;
+typedef struct {
+    double value;
+    cui_plot_motion_status status;
+    bool request_frame;
+} cui_plot_motion_value;
+cui_plot_result cui_plot_transition_step(cui_plot_transition_clock *, double target, double now,
+                                         cui_plot_transition_policy, bool reduced_motion,
+                                         cui_plot_motion_value *);
 /* Caller-owned hover lifecycle. Dots are borrowed until replaced or exit completes;
  * live requires cursor. Progress is supplied by the caller's motion policy in [0,1].
  * Zero initialize. Invalid input leaves memory unchanged. */

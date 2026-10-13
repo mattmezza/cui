@@ -450,3 +450,13 @@ consecutively. Begin/end it explicitly each host frame and pass the innermost
 registry into child composition. Returning completed children can skip draw-in;
 interrupted children restart. No retained list/plot tree or implicit scheduler
 is introduced by this numeric state helper.
+
+For enter/exit animation, sample a separate `cui_plot_transition_clock` per
+channel with `cui_plot_transition_step`, feed its value to
+`cui_plot_hover_track`, and schedule a frame when `request_frame` is true.
+Initialize the channel at zero before its first hover target of one, since the
+source transition adopts its first target immediately. Signed delays, cubic-out
+(default) or synchronous custom easing, reversal shortening and reduced-motion
+snapping are supported. This host-driven clock does not add automatic pointer
+spring glide or renderer keyed state. See [projected transition clocks](PLOT_MODEL.md#projected-transition-clocks)
+for exact policy-change and ownership rules.

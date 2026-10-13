@@ -688,6 +688,39 @@ static void dot_geometry(void) {
     assert(cui_plot_dot_layout((cui_plot_point){0, 0}, 4, NULL) == CUI_PLOT_INVALID);
     assert(memcmp(&before, &dot, sizeof dot) == 0);
 }
+static void test_linear_extent(void) {
+    const double domain[] = {3, 1, 2, 1};
+    cui_plot_linear_extent s;
+    double pixel = -99;
+    assert(cui_plot_linear_extent_init(&s, domain, 4, 100, 0) == CUI_PLOT_OK);
+    assert(s.domain_min == 1 && s.domain_max == 3);
+    assert(cui_plot_linear_extent_tick(&s, 2, &pixel) == CUI_PLOT_OK && close(pixel, 50));
+    assert(cui_plot_linear_extent_tick(&s, 4, &pixel) == CUI_PLOT_OK && close(pixel, -50));
+    assert(cui_plot_linear_extent_init(&s, domain, 4, 7, 7) == CUI_PLOT_OK);
+    assert(cui_plot_linear_extent_tick(&s, DBL_MAX, &pixel) == CUI_PLOT_OK && pixel == 7);
+    cui_plot_scale strict = {CUI_PLOT_LINEAR, 1, 3, 7, 7, false};
+    assert(cui_plot_validate(&strict) == CUI_PLOT_DEGENERATE);
+    assert(cui_plot_linear_extent_init(&s, NULL, 0, 0, 100) == CUI_PLOT_OK);
+    assert(cui_plot_linear_extent_tick(&s, 1, &pixel) == CUI_PLOT_EMPTY && pixel == 7);
+    assert(cui_plot_linear_extent_init(&s, domain, 1, 0, 0) == CUI_PLOT_OK);
+    assert(cui_plot_linear_extent_tick(&s, 3, &pixel) == CUI_PLOT_EMPTY && pixel == 7);
+    cui_plot_linear_extent old = s;
+    double bad[] = {1, NAN};
+    assert(cui_plot_linear_extent_init(&s, bad, 2, 0, 1) == CUI_PLOT_INVALID);
+    assert(memcmp(&s, &old, sizeof s) == 0);
+    assert(cui_plot_linear_extent_init(&s, NULL, 1, 0, 1) == CUI_PLOT_INVALID);
+    assert(cui_plot_linear_extent_init(&s, domain, 4097, 0, 1) == CUI_PLOT_INVALID);
+    assert(cui_plot_linear_extent_tick(&s, NAN, &pixel) == CUI_PLOT_INVALID && pixel == 7);
+    double extreme[] = {-DBL_MAX, DBL_MAX};
+    assert(cui_plot_linear_extent_init(&s, extreme, 2, -DBL_MAX, DBL_MAX) == CUI_PLOT_OK);
+    assert(cui_plot_linear_extent_tick(&s, 0, &pixel) == CUI_PLOT_OK && pixel == 0);
+    double tiny[] = {0, 1};
+    assert(cui_plot_linear_extent_init(&s, tiny, 2, 0, DBL_MAX) == CUI_PLOT_OK);
+    pixel = 7;
+    assert(cui_plot_linear_extent_tick(&s, 2, &pixel) == CUI_PLOT_OVERFLOW && pixel == 7);
+    assert(cui_plot_linear_extent_tick(NULL, 1, &pixel) == CUI_PLOT_INVALID);
+    assert(cui_plot_linear_extent_tick(&s, 1, NULL) == CUI_PLOT_INVALID);
+}
 static void test_lifecycle(void) {
     cui_plot_hover_memory memory = {0};
     cui_plot_point dots[] = {{2, 3}}, cursor = {4, 5};
@@ -732,6 +765,7 @@ static void test_lifecycle(void) {
     assert(cui_plot_appear_stagger(.5, 0, 3, NAN, &local) == CUI_PLOT_INVALID && local == .25);
 }
 int main(void) {
+    test_linear_extent();
     test_lifecycle();
     shape_geometry();
     pie_geometry();

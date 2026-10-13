@@ -1183,3 +1183,35 @@ cui_plot_result cui_plot_appear_stagger(double progress, size_t index, size_t co
     *out = local;
     return CUI_PLOT_OK;
 }
+
+cui_plot_result cui_plot_linear_extent_init(cui_plot_linear_extent *out, const double *domain,
+                                            size_t count, double start, double end) {
+    if (!out || (count && !domain) || count > 4096 || !isfinite(start) || !isfinite(end))
+        return CUI_PLOT_INVALID;
+    cui_plot_linear_extent next = {.range_start = start, .range_end = end};
+    for (size_t i = 0; i < count; ++i) {
+        if (!isfinite(domain[i]))
+            return CUI_PLOT_INVALID;
+        if (i == 0 || domain[i] < next.domain_min)
+            next.domain_min = domain[i];
+        if (i == 0 || domain[i] > next.domain_max)
+            next.domain_max = domain[i];
+    }
+    *out = next;
+    return CUI_PLOT_OK;
+}
+cui_plot_result cui_plot_linear_extent_tick(const cui_plot_linear_extent *s, double value,
+                                            double *pixel) {
+    if (!s || !pixel || !isfinite(value) || !isfinite(s->domain_min) || !isfinite(s->domain_max) ||
+        !isfinite(s->range_start) || !isfinite(s->range_end) || s->domain_min > s->domain_max)
+        return CUI_PLOT_INVALID;
+    if (s->domain_min == s->domain_max)
+        return CUI_PLOT_EMPTY;
+    if (s->range_start == s->range_end) {
+        *pixel = s->range_start;
+        return CUI_PLOT_OK;
+    }
+    return cui_plot_number(cui_plot_lerp(s->range_start, s->range_end,
+                                         cui_plot_fraction(value, s->domain_min, s->domain_max)),
+                           pixel);
+}

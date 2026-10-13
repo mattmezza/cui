@@ -577,7 +577,7 @@ case does not validate all paint styles, lifecycle behavior or f32 corner cases.
 | Frozen export/features | Current CUI route | Exact gaps or deliberate differences |
 |---|---|---|
 | `Scale`, `PlotValue`; f32/f64/feature-gated Decimal; tick and default nearest=0 | Explicit C double scale/category functions | No generic trait, Decimal arithmetic or named continuous nearest-index query; discrete nearest available |
-| `ScaleLinear::new` from unordered domain extent; extrapolating tick; reversed/equal pixel range | `cui_plot_scale`, map/inverse/ticks/nice/pan/zoom | Caller supplies ascending endpoints; empty/equal domains rejected; **equal pixel ranges are rejected**, while frozen Linear maps them to the same pixel; CUI log/ticks/clamp/navigation are extensions |
+| `ScaleLinear::new` from unordered domain extent; extrapolating tick; reversed/equal pixel range | `cui_plot_linear_extent_init/tick` plus strict `cui_plot_scale` navigation | Extent/tick supports unordered finite values, empty/equal domains with no tick, reversed/equal pixel ranges and extrapolation; strict map still rejects equal ranges; CUI log/ticks/clamp/navigation are extensions |
 | `ScaleBand` dedup, leading reserved bands, width cap, inner/outer padding, step, nearest | Band init/layout/map/at/nearest | Uint64 application keys and bounded copied domain; stricter finite/padding/cap validation; no hash-generic domain or source unchecked negative widths |
 | `ScalePoint` owned domain, duplicate-first map, tick-at, nearest | Point init/map/at/nearest | Uint64 keys, borrowed arrays, bounded finite validation rather than owned generic Vec |
 | `ScaleOrdinal` domain/range replacement, unknown, first duplicate, cycling cloned output | Ordinal init/map; reinitialize to replace arrays | Byte copies preserve C value representations but do not deep-clone arbitrary payloads; pointers remain caller-owned; finite capacity bounds |
@@ -656,3 +656,36 @@ is true; record completion so later frames do not restart the appearance.
 Outside a source-style hover scope, use progress one and entering false.
 This is a state contract, not an implementation of PlotElement, motion presets,
 retained element scopes, tooltip layout, occlusion or renderer path caches.
+
+## Source-compatible Linear extent and tick
+
+The frozen `ScaleLinear::new` derives a domain extent from unordered input and
+its `tick` returns no coordinate when the domain has zero extent. Pixel ranges
+may be reversed or equal. `cui_plot_linear_extent_init` and
+`cui_plot_linear_extent_tick` expose this behavior separately from the strict
+`cui_plot_scale` navigation model: an empty input initializes [0,0], singleton
+or all-equal values produce `CUI_PLOT_EMPTY` on tick, and a nondegenerate domain
+with equal pixel endpoints maps every finite value to that endpoint. Tick
+extrapolates outside the extent. Empty/error results preserve the output pixel;
+invalid construction preserves the entire destination model.
+
+Construction accepts at most 4096 finite doubles, copies only their extent,
+and retains no input pointer. CUI uses checked double coordinates rather than
+the source's generic PlotValue and f32 output; NaN/infinity are rejected and
+unrepresentable extrapolation returns `CUI_PLOT_OVERFLOW`. This API has no
+inverse, automatic nice bounds, clamp, tick collection or category behavior.
+Existing strict scale validation, zoom and pan contracts remain unchanged.
+
+```c
+#include <assert.h>
+#include "cui/cui_plot.h"
+int main(void) {
+    const double values[] = {3, 1, 2};
+    cui_plot_linear_extent scale;
+    double pixel;
+    assert(cui_plot_linear_extent_init(&scale, values, 3, 12, 12) == CUI_PLOT_OK);
+    assert(cui_plot_linear_extent_tick(&scale, 2, &pixel) == CUI_PLOT_OK);
+    assert(pixel == 12);
+    return 0;
+}
+```

@@ -21,6 +21,18 @@ typedef struct {
     double domain_min, domain_max, range_start, range_end;
     bool clamp;
 } cui_plot_scale;
+/* Source-compatible Linear tick model, separate from strict navigation scales.
+ * Extent constructor copies finite unordered values (<=4096); no borrowed storage.
+ * Empty/single-valued domains have no tick (EMPTY, output unchanged). Equal pixel
+ * endpoints are valid, mapping every finite value to the same pixel. No clamp,
+ * inverse, ticks or implicit nice domain; extrapolation is intentional. */
+typedef struct {
+    double domain_min, domain_max, range_start, range_end;
+} cui_plot_linear_extent;
+cui_plot_result cui_plot_linear_extent_init(cui_plot_linear_extent *, const double *domain,
+                                            size_t count, double range_start, double range_end);
+cui_plot_result cui_plot_linear_extent_tick(const cui_plot_linear_extent *, double value,
+                                            double *pixel);
 typedef struct {
     double x, y;
 } cui_plot_point;

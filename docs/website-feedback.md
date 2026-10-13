@@ -50,8 +50,8 @@ This audit extends the 78-entry parity manifest. An item is closed only after li
 - [ ] Reproducible Go, Rust, JavaScript and TypeScript examples with actual support limits.
 - [ ] Improved browsable documentation and intuitive getting-started path.
 - [x] Copyable agent prompt and generated llms.txt / llms-full.txt, with llm.txt and llm-full.txt aliases. — Published f6c8cf8; actual HTTPS copy/export checks and artifact byte comparisons pass. Broader documentation and bindings remain open.
-- [ ] Original professional media with recorded provenance.
-- [ ] Complete Open Graph coverage, validated share images and metadata.
+- [x] Original product media with recorded provenance. — 31847cc adds real CUI WASM workspace captures for light/dark, a 1200×630 original social card and a pinned regeneration script. The larger composed-app gallery remains open. Publication pending.
+- [x] Static Open Graph coverage for home, all 78 components and every published docs entry. — 31847cc validates 147 distinct canonical pages, required tags, share-image dimensions, sitemap and JS-disabled fallback content. Direct project-Pages visits/reloads and Chromium78 pass. External sharing-service caches are not asserted. Publication pending.
 
 ## Existing work still in scope
 

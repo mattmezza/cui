@@ -1,0 +1,7 @@
+Combined source checkpoint 31847cc
+Native77, strict C11 WASM build, Chromium78 with direct share pages/JS-disabled checks,
+static-sharing tests3, docs tests3, targeted visual regressions and quality: PASS.
+Portable library is unchanged from8777cc4, validated native77/ASan75/WASI67.
+147 pages (home+78 components+68 docs) have crawler-visible metadata and fallback content.
+Original 1200x630 product card and actual light/dark CUI workspace captures validated.
+Full GPUI Kit parity and remaining design/docs/bindings feedback remain unfinished.

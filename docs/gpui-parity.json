@@ -3251,8 +3251,8 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Actual single-line caret/selection painting, UTF-8 scalar pointer positioning, horizontal scrolling, disabled/readonly/required/invalid semantics, host clipboard and bounded undo/redo shortcuts tested. Multiline presentation, graphemes, IME, bidi, shaping cluster hit testing and asynchronous browser clipboard integration remain pending.",
-        "Source XS/S/M/L/custom size metrics and centered field text are tested; native shaping/IME/menu and remaining detailed editing behavior are still partial. See docs/INPUT.md and docs/NUMERIC.md."
+        "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
+        "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3267,8 +3267,14 @@
         },
         {
           "name": "clipboard and IME",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input.c",
+            "tests/unit/test_edit.c",
+            "tests/unit/test_sdl3.c",
+            "tests/web/test_ime.py",
+            "docs/IME.md"
+          ]
         },
         {
           "name": "undo/redo and grapheme boundaries",
@@ -3912,7 +3918,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Measured wrap, selection, clipboard, history, XS/S/M/L, auto-grow and atomic Tab/Shift-Tab indentation have headless tests. Grapheme shaping/bidi, IME, atomic inline tokens and complete first-frame grow layout remain unfinished; see docs/TEXTAREA.md."
+        "Measured wrap, selection, clipboard, history, design sizes, auto-grow and atomic indentation have headless tests. Single-selection composition and precise touch panning have headless/browser regressions; default composition snapshots grow with the actual document. Bidi caret/selection geometry, automatic wrapping context and complete first-frame growth acceptance remain unfinished; see docs/TEXTAREA.md and docs/IME.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

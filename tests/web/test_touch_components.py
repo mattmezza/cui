@@ -233,8 +233,13 @@ def run_cases(a):
     def editor_pan():
         a.tap(a.target('C code editor', 6))
         a.page.keyboard.press('Control+End')
+        a.page.wait_for_function('cuiGallery.exports.gallery_editor_stat(0)===cuiGallery.exports.gallery_editor_stat(2)')
         for _ in range(30):
+            before = a.page.evaluate('cuiGallery.exports.gallery_editor_stat(2)')
             a.page.keyboard.press('Enter')
+            # Keyboard dispatch finishes before the asynchronous C frame. Measure
+            # the pan only after every fixture edit has reached the real model.
+            a.page.wait_for_function('(before)=>cuiGallery.exports.gallery_editor_stat(2)>before', arg=before)
         a.scroll('Editor')
     a.case('Editor', 'vertical pan consumes pixels after keyboard-created overflow', editor_pan)
     for family in ['Scrollable', 'VirtualList', 'Sidebar', 'MessageScroller', 'DataTable']:

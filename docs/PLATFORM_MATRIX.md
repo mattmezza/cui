@@ -2,7 +2,7 @@
 
 | Target | Status | Evidence and limits |
 |---|---|---|
-| Linux Xorg | tested partial | Native SDL_Renderer OpenGL, independent Sokol GLCORE and SDL_GPU Vulkan on Intel Graphics; actual frames/readbacks, pointer/key model and clipboard tests. No screen-reader/IME bridge. |
+| Linux Xorg | tested partial | Native SDL_Renderer OpenGL, independent Sokol GLCORE and SDL_GPU Vulkan on Intel Graphics; actual frames/readbacks, pointer/key model and clipboard tests. SDL composition/candidate-rectangle forwarding has injected service tests; real OS IME/candidate-window acceptance and native screen readers remain unverified. |
 | Linux headless | tested partial | GCC C11/software renderer, behavioral suites, ASan/UBSan, SDL dummy services. |
 | Linux Wayland | untested | SDL supports host integration; no compositor smoke run yet. Xorg is not Wayland evidence. |
 | Windows | tested portable subset | Hosted MSVC:34/34 portable checks passed on CI run38225532353, including encoding/hash/distribution gates. Native GUI untested. |

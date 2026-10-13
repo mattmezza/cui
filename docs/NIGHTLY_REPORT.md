@@ -2,7 +2,7 @@
 
 The [C/WASM gallery](https://matteo.merola.co/cui/) contains all 78 component families. Published `55e904a` passes library CI, Pages, 194 actual HTTPS artifact comparisons and both complete browser suites. See [deployed proof](validation/published-55e904a.txt). It includes the Unicode editing, completion examples, Badge variants and further Dock/Plot APIs covered by [integration proof](validation/unicode-badge-160cee1.txt).
 
-The next integration adds source Progress cycles/value transitions, token-aware Input/Textarea editing, Dock visibility/group policies/measured sizing/panel factories and Plot labels/truncation. It remains under combined sanitizer, WASI and browser validation.
+The next integration adds source Progress cycles/value transitions, token-aware Input/Textarea editing, Dock visibility/group policies/measured sizing/panel factories and Plot labels/truncation. It passes combined native90/90, sanitizer88/88, WASI75/75 and full browser validation: [proof](validation/progress-dock-plot-6747044.txt). Further ProgressCircle, Editor search/replace and Dock/Plot work continues.
 
 Full family parity remains unfinished: **78 entries, 3 implemented, 75 tested, 0 verified**. “Tested” means a documented subset has behavioral evidence. The [manifest](gpui-parity.json) and source export audits identify remaining features; documentation or gallery presence alone does not verify a family.
 

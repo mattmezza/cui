@@ -772,8 +772,9 @@ def main():
             control_change('progress-mode', '1')
             progress_probe = '''()=>{const e=cuiGallery.exports;
                 const i=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>
-                    e.gallery_command(i,0)===0&&Math.abs(e.gallery_command(i,3)-90)<.1&&e.gallery_command(i,4)===8);
+                    e.gallery_command(i,0)===0&&e.gallery_command(i,3)>0&&e.gallery_command(i,3)<300&&e.gallery_command(i,4)===8);
                 return i===undefined?null:e.gallery_command(i,1);}'''
+            page.wait_for_function('(%s)()!==null' % progress_probe)
             progress_x = page.evaluate(progress_probe)
             assert progress_x is not None
             page.wait_for_function('''(before)=>{const probe=(%s);return Math.abs(probe()-before)>5;}''' % progress_probe, arg=progress_x)

@@ -1,0 +1,15 @@
+Validated source:67470449a385967f6a7491e53d0ecdea69b009f8
+Portable source SHA256:
+cbda95cd6618065085c430b2046636911d291e4cbc8b1959958f92b8486a6523
+WASI fingerprint unchanged through75/75 runtime suites; tracked source clean.
+Warning-enabled native CTest90/90; ASan/UBSan88/88.
+Real CI Chromium headless shell: all78 C/WASM stories and78 compiled excerpts.
+Progress browser probe follows the source variable-width indicator rather than
+legacy fixed30% geometry; source itself unchanged after runtime validation.
+Design/app extensions in full Chromium: pass.
+Usage5/docs3/sharing3; manifest78, dependency/licenses, format/amalgamation: pass.
+Progress source cycle/value transitions/Base semantics, atomic token pointer
+selection, Dock visibility/policies/measured slots/panel factories and Plot
+labels/truncation have meaningful headless behavior checks.
+ProgressCircle and further queued worker slices are not part of this revision.
+Full-family parity unfinished:3implemented/75tested/0verified.

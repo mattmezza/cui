@@ -98,6 +98,8 @@ jobs:
         run: uv run tests/web/test_button_label_layout.py
       - name: Verify passive Button caller state and invisible loading quiescence
         run: uv run tests/web/test_button_passive_lifecycle.py
+      - name: Verify numeric Button metrics open presentation and caret tint
+        run: uv run tests/web/test_button_numeric.py
       - name: Verify Button callbacks slots focus and painted states
         run: uv run tests/web/test_button_behavior.py
       - name: Verify Table sizing and selection-only DataTable actions
@@ -124,6 +126,7 @@ jobs:
         run: |
           uv run tests/web/test_inset_shadow_canvas.py --output build/inset-shadow-probe
           uv run tests/web/test_inset_shadow_gallery.py
+          uv run tests/web/test_shadow_presets.py --output build/shadow-presets-probe
       - name: Verify current-frame prepaint clipping and pointer occlusion
         run: uv run tests/web/test_core_prepaint.py
       - name: Verify independent Plot and Chart motion policies

@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# dependencies = ["playwright==1.58.0"]
+# ///
 """Pinned named list values and actual Canvas/WASM composition at DPR1/2."""
 import argparse
 from pathlib import Path

@@ -331,6 +331,27 @@ typedef struct {
 } cui_box_shadow;
 enum { CUI_BOX_SHADOW_MAX = CUI_DROP_SHADOW_MAX };
 typedef cui_drop_shadow_paint cui_inset_shadow_paint;
+/* Source named DROP lists; default/none means no layers, never an implicit shadow. */
+typedef enum {
+    CUI_SHADOW_NONE = 0,
+    CUI_SHADOW_2XS,
+    CUI_SHADOW_XS,
+    CUI_SHADOW_SM,
+    CUI_SHADOW_MD,
+    CUI_SHADOW_LG,
+    CUI_SHADOW_XL,
+    CUI_SHADOW_2XL
+} cui_shadow_preset;
+enum { CUI_SHADOW_PRESET_MAX = 2 };
+/* Checked source constructor: DROP, sigma/spread zero, explicit color.
+ * Finite offsets must lie in [-4096,4096]; invalid input leaves output untouched. */
+bool cui_box_shadow_init(float offset_x, float offset_y, cui_color, cui_box_shadow *out);
+/* Copy ordered layers (black alpha13/26/64). Output count must not overlap the
+ * written layer span. Invalid enum, capacity/overflow or pointers leave all outputs
+ * untouched. NONE writes count0 only; its layer buffer may be NULL. */
+bool cui_shadow_preset_layers(cui_shadow_preset, cui_drop_shadow *out, size_t capacity,
+                              size_t *count);
+
 /* Invalid input leaves output untouched. Logical support is metadata; checked physical covering
  * determines empty paint. */
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint, cui_rect *out);
@@ -557,6 +578,8 @@ bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
 /* Replaces the copied complete mixed list, at most eight total layers. */
 bool cui_set_box_shadows(cui_context *, const cui_box_shadow *, size_t count, cui_corner_radii);
 bool cui_set_drop_shadows(cui_context *, const cui_drop_shadow *, size_t count, cui_corner_radii);
+/* Replaces the whole mixed list. NONE clears DROP and INSET; no buffer is retained. */
+bool cui_set_shadow_preset(cui_context *, cui_shadow_preset, cui_corner_radii);
 
 typedef struct {
     cui_rect bounds;
@@ -7627,6 +7650,73 @@ bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box bo
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint p, cui_rect *out) {
     return cui_drop_shadow_bounds_checked(p, out);
 }
+bool cui_box_shadow_init(float x, float y, cui_color color, cui_box_shadow *out) {
+    if (!out || !isfinite(x) || !isfinite(y) || fabsf(x) > 4096 || fabsf(y) > 4096)
+        return false;
+    *out = (cui_box_shadow){.layer = {.offset_x = x, .offset_y = y, .color = color},
+                            .kind = CUI_BOX_SHADOW_DROP};
+    return true;
+}
+bool cui_shadow_preset_layers(cui_shadow_preset preset, cui_drop_shadow *out, size_t capacity,
+                              size_t *count) {
+    if (!count || preset < CUI_SHADOW_NONE || preset > CUI_SHADOW_2XL ||
+        capacity > SIZE_MAX / sizeof(*out))
+        return false;
+    size_t n = preset == CUI_SHADOW_NONE                            ? 0
+               : preset >= CUI_SHADOW_SM && preset <= CUI_SHADOW_XL ? 2
+                                                                    : 1;
+    if (capacity < n || (n && !out))
+        return false;
+    if (n) {
+        uintptr_t begin = (uintptr_t)out, output_count = (uintptr_t)count;
+        size_t bytes = n * sizeof(*out);
+        if (begin > UINTPTR_MAX - bytes || output_count > UINTPTR_MAX - sizeof(*count) ||
+            (output_count < begin + bytes && begin < output_count + sizeof(*count)))
+            return false;
+    }
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX] = {0};
+    switch (preset) {
+    case CUI_SHADOW_NONE:
+        break;
+    case CUI_SHADOW_2XS:
+        layers[0] = (cui_drop_shadow){.offset_y = 1, .color = {0, 0, 0, 13}};
+        break;
+    case CUI_SHADOW_XS:
+        layers[0] = (cui_drop_shadow){.offset_y = 1, .sigma = 2, .color = {0, 0, 0, 13}};
+        break;
+    case CUI_SHADOW_SM:
+        layers[0] = (cui_drop_shadow){.offset_y = 1, .sigma = 3, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 1, .sigma = 2, .spread = -1, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_MD:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 4, .sigma = 6, .spread = -1, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 2, .sigma = 4, .spread = -2, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_LG:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 10, .sigma = 15, .spread = -3, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 4, .sigma = 6, .spread = -4, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_XL:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 20, .sigma = 25, .spread = -5, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 8, .sigma = 10, .spread = -6, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_2XL:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 25, .sigma = 50, .spread = -12, .color = {0, 0, 0, 64}};
+        break;
+    }
+    if (n)
+        memcpy(out, layers, n * sizeof(*out));
+    *count = n;
+    return true;
+}
 bool cui_set_box_shadows(cui_context *ui, const cui_box_shadow *layers, size_t count,
                          cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
@@ -7660,6 +7750,13 @@ bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t
     for (size_t i = 0; i < count; i++)
         copied[i] = (cui_box_shadow){.layer = layers[i]};
     return cui_set_box_shadows(ui, copied, count, radii);
+}
+bool cui_set_shadow_preset(cui_context *ui, cui_shadow_preset preset, cui_corner_radii radii) {
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX];
+    size_t count;
+    if (!cui_shadow_preset_layers(preset, layers, CUI_SHADOW_PRESET_MAX, &count))
+        return false;
+    return cui_set_drop_shadows(ui, layers, count, radii);
 }
 bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
     if (!cui_core_mutation(ui))

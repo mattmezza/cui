@@ -448,8 +448,16 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
         !state || !state->query || cui_edit_get_state(state->query).multiline || !isfinite(width) ||
         width < 0 || width > 1000000)
         return result;
+    bool replace_enabled =
+        state->matcher && state->replacement && state->scratch && state->scratch_capacity;
+    if (replace_enabled &&
+        (state->replacement == state->query || state->replacement == editor->edit ||
+         state->query == editor->edit || cui_edit_get_state(state->replacement).multiline))
+        return result;
+    cui_id replacement_field = id ^ UINT64_C(0x1b4a6c72d005ab81);
     cui_id field = id ^ UINT64_C(0x790a4100f05b190d);
-    bool navigate = false, reverse = false, close = false;
+    bool navigate = false, reverse = false, close = false, replace_current = false,
+         replace_all = false;
     size_t event_count;
     const cui_event *events = cui_frame_events(ui, &event_count);
     for (size_t i = 0; i < event_count && !disabled; ++i) {
@@ -457,8 +465,15 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
         if (e.type != CUI_EVENT_KEY_DOWN || cui_event_consumed(ui, i))
             continue;
         cui_id target = cui_event_target(ui, i);
-        if (e.key == CUI_KEY_F && (e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
-            (target == editor_id || (state->open && target == field))) {
+        bool replacement_shortcut =
+            replace_enabled && !state->replace_disabled &&
+            ((e.key == CUI_KEY_H && (e.modifiers & CUI_MOD_CTRL)) ||
+             (e.key == CUI_KEY_F && (e.modifiers & CUI_MOD_META) && (e.modifiers & CUI_MOD_SHIFT)));
+        if ((replacement_shortcut ||
+             (e.key == CUI_KEY_F && (e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))) &&
+            (target == editor_id ||
+             (state->open && (target == field || target == replacement_field)))) {
+            state->replace_mode = replacement_shortcut;
             state->open = true;
             cui_edit_select(state->query, 0, cui_edit_get_text(state->query).length);
             cui_focus(ui, field);
@@ -467,7 +482,14 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
             navigate = true;
             reverse = (e.modifiers & CUI_MOD_SHIFT) != 0;
             cui_consume_event(ui, i);
-        } else if (state->open && target == field && e.key == CUI_KEY_ESCAPE) {
+        } else if (state->open && state->replace_mode && target == replacement_field &&
+                   e.key == CUI_KEY_ENTER) {
+            if (!state->replace_disabled)
+                replace_current = true;
+            cui_consume_event(ui, i);
+        } else if (state->open &&
+                   (target == field || (replace_enabled && target == replacement_field)) &&
+                   e.key == CUI_KEY_ESCAPE) {
             close = true;
             cui_consume_event(ui, i);
         }
@@ -475,6 +497,12 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
     result.error = CUI_EDIT_OK;
     if (!state->open)
         return result;
+    if (replace_enabled)
+        cui_begin_box(ui, id ^ UINT64_C(0x0bc45b2e8d412020),
+                      (cui_box){.width = width > 0 ? width : 500,
+                                .fixed_width = true,
+                                .max_width = width > 0 ? width : 500,
+                                .gap = 4});
     cui_begin_box(
         ui, id,
         (cui_box){
@@ -490,7 +518,14 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
     if (edited.error != CUI_EDIT_OK)
         result.error = edited.error;
     cui_str query = cui_edit_get_text(state->query);
-    result.matches = cui_editor_match_count(editor, query);
+    if (replace_enabled) {
+        cui_edit_result synced = cui_editor_matcher_set_query(editor, state->matcher, query,
+                                                              state->matcher->case_insensitive);
+        if (synced != CUI_EDIT_OK)
+            result.error = synced;
+        result.matches = synced == CUI_EDIT_OK ? state->matcher->count : 0;
+    } else
+        result.matches = cui_editor_match_count(editor, query);
     if (cui_button(ui, id ^ UINT64_C(0x391cfd020af58d20), theme, cui_string("Prev"),
                    disabled || !result.matches)) {
         navigate = true;
@@ -502,18 +537,82 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
         reverse = false;
     }
     char status[48];
-    int length = snprintf(status, sizeof status, "%zu matches", result.matches);
+    int length = replace_enabled
+                     ? snprintf(status, sizeof status, "%zu/%zu",
+                                result.matches ? state->matcher->current + 1 : 0, result.matches)
+                     : snprintf(status, sizeof status, "%zu matches", result.matches);
     cui_text(ui, (cui_str){status, (size_t)length}, theme->font_size, theme->muted);
     close =
         cui_button(ui, id ^ UINT64_C(0x0092b880a17f63dd), theme, cui_string("Close"), disabled) ||
         close;
     cui_end_box(ui);
+    if (replace_enabled) {
+        cui_begin_box(ui, id ^ UINT64_C(0x44a08126b4c71f12), (cui_box){.row = true, .gap = 4});
+        if (cui_button(ui, id ^ UINT64_C(0x51a814631c060f34), theme, cui_string("Match case"),
+                       disabled)) {
+            result.error = cui_editor_matcher_set_query(editor, state->matcher, query,
+                                                        !state->matcher->case_insensitive);
+            result.matches = result.error == CUI_EDIT_OK ? state->matcher->count : 0;
+        }
+        cui_update_semantic(ui, id ^ UINT64_C(0x51a814631c060f34),
+                            !state->matcher->case_insensitive, 0);
+        if (cui_button(ui, id ^ UINT64_C(0x43b926eab194d100), theme, cui_string("Replace mode"),
+                       disabled || state->replace_disabled))
+            state->replace_mode = !state->replace_mode;
+        cui_update_semantic(ui, id ^ UINT64_C(0x43b926eab194d100), state->replace_mode, 0);
+        cui_end_box(ui);
+        if (state->replace_mode) {
+            cui_input_state replacement_input = {.behavior = state->replacement_input,
+                                                 .scroll_x = state->replacement_scroll_x};
+            cui_input_result changed =
+                cui_input_ex(ui, replacement_field, theme, cui_string("Replace with"),
+                             state->replacement, &replacement_input,
+                             (cui_input_options){.width = width > 0 ? width : 500,
+                                                 .disabled = disabled || state->replace_disabled,
+                                                 .placeholder = cui_string("Replacement text")});
+            state->replacement_input = replacement_input.behavior;
+            state->replacement_scroll_x = replacement_input.scroll_x;
+            result.replacement_changed = changed.changed;
+            if (changed.error != CUI_EDIT_OK)
+                result.error = changed.error;
+            cui_begin_box(ui, id ^ UINT64_C(0x620f8a41db96ab24), (cui_box){.row = true, .gap = 4});
+            bool blocked = disabled || state->replace_disabled || !result.matches ||
+                           result.error != CUI_EDIT_OK;
+            replace_current = cui_button(ui, id ^ UINT64_C(0x311b89208297ba14), theme,
+                                         cui_string("Replace"), blocked) ||
+                              replace_current;
+            replace_all = cui_button(ui, id ^ UINT64_C(0x4891147fe2443891), theme,
+                                     cui_string("Replace all"), blocked) ||
+                          replace_all;
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+    }
     if (navigate && !disabled) {
-        result.error = cui_editor_find(editor, query, reverse, true);
+        result.error = replace_enabled
+                           ? cui_editor_matcher_navigate(editor, state->matcher, reverse)
+                           : cui_editor_find(editor, query, reverse, true);
         result.navigated = result.error == CUI_EDIT_OK;
         cui_invalidate(ui);
     }
+    if (replace_enabled && !disabled && !state->replace_disabled && result.error == CUI_EDIT_OK &&
+        (replace_current || replace_all)) {
+        cui_str replacement = cui_edit_get_text(state->replacement);
+        if (replace_all)
+            result.error =
+                cui_editor_matcher_replace_all(editor, state->matcher, replacement, state->scratch,
+                                               state->scratch_capacity, &result.replaced);
+        else {
+            result.error = cui_editor_matcher_replace_current(
+                editor, state->matcher, replacement, state->scratch, state->scratch_capacity);
+            result.replaced = result.error == CUI_EDIT_OK ? 1 : 0;
+        }
+        result.matches = state->matcher->count;
+        cui_invalidate(ui);
+    }
     if (close && !disabled) {
+        if (replace_enabled)
+            cui_editor_matcher_close(state->matcher);
         state->open = false;
         result.closed = true;
         cui_focus(ui, editor_id);

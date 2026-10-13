@@ -699,7 +699,71 @@ static void retained_matcher(void) {
     assert(!memcmp(&snapshot, &small, sizeof small));
     cui_edit_destroy(edit);
 }
+static void replacement_panel(void) {
+    char buffer[128] = "foo FOO foo", query[32] = "foo", replacement[32] = "bar", scratch[256];
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 2048,
+                                                       .max_history_steps = 16});
+    cui_edit *q = cui_edit_create((cui_edit_config){.buffer = query, .capacity = sizeof query});
+    cui_edit *r =
+        cui_edit_create((cui_edit_config){.buffer = replacement, .capacity = sizeof replacement});
+    cui_textarea_line lines[32];
+    cui_editor_state editor;
+    cui_editor_search_state search;
+    cui_editor_match ranges[16];
+    cui_editor_matcher matcher;
+    assert(edit && q && r && cui_editor_state_init(&editor, edit, lines, 32));
+    assert(cui_editor_search_init(&search, q) && cui_editor_matcher_init(&matcher, ranges, 16));
+    assert(!cui_editor_search_enable_replace(&search, &matcher, q, scratch, sizeof scratch));
+    assert(cui_editor_search_enable_replace(&search, &matcher, r, scratch, sizeof scratch));
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    search_frame(ui, &editor, &search, false);
+    cui_focus(ui, 10);
+    assert(cui_queue_event(
+        ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_H, .modifiers = CUI_MOD_CTRL}));
+    cui_editor_search_result result = search_frame(ui, &editor, &search, false);
+    assert(search.open && search.replace_mode && result.matches == 3 && matcher.case_insensitive);
+    cui_id field = 20 ^ UINT64_C(0x1b4a6c72d005ab81);
+    assert(cui_bounds(ui, field).w > 0);
+    cui_focus(ui, field);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    result = search_frame(ui, &editor, &search, false);
+    assert(result.replaced == 1 && !strcmp(buffer, "bar FOO foo") && matcher.count == 2 &&
+           matcher.current == 0);
+    search.replace_disabled = true;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    result = search_frame(ui, &editor, &search, false);
+    assert(!result.replaced && !strcmp(buffer, "bar FOO foo"));
+    search.replace_disabled = false;
+    search_frame(ui, &editor, &search, false);
+    cui_rect bounds = cui_bounds(ui, 20 ^ UINT64_C(0x4891147fe2443891));
+    assert(bounds.w > 0 && bounds.h > 0);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h / 2,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    search_frame(ui, &editor, &search, false);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = bounds.x + bounds.w / 2,
+                                           .y = bounds.y + bounds.h / 2,
+                                           .pointer_button = CUI_POINTER_PRIMARY}));
+    result = search_frame(ui, &editor, &search, false);
+    assert(result.replaced == 2 && !strcmp(buffer, "bar bar bar") && !matcher.count);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK && !strcmp(buffer, "bar FOO foo"));
+    search_frame(ui, &editor, &search, false);
+    cui_focus(ui, field);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
+    result = search_frame(ui, &editor, &search, false);
+    assert(result.closed && !search.open && !matcher.active && cui_focused(ui) == 10);
+    cui_destroy(ui);
+    cui_edit_destroy(r);
+    cui_edit_destroy(q);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    replacement_panel();
     retained_matcher();
     replace_workflow();
     inline_tokens_reject_code_mode();

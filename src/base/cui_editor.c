@@ -450,6 +450,93 @@ cui_edit_result cui_editor_matcher_replace_current(cui_editor_state *editor,
     return CUI_EDIT_OK;
 }
 
+cui_edit_result cui_editor_matcher_replace_all(cui_editor_state *editor,
+                                               cui_editor_matcher *matcher, cui_str replacement,
+                                               char *scratch, size_t capacity, size_t *replaced) {
+    if (!editor || !editor->edit || !matcher || !matcher->initialized || !scratch || !replaced ||
+        !cui_edit_valid_utf8(replacement))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_str text = cui_edit_get_text(editor->edit);
+    size_t count;
+    cui_edit_result result = cui_editor_matcher_preflight(editor, matcher, matcher->query, text,
+                                                          matcher->case_insensitive, &count);
+    if (result != CUI_EDIT_OK)
+        return result;
+    size_t bytes = matcher->capacity * sizeof(*matcher->matches);
+    if (cui_editor_storage_overlap(scratch, capacity, text.data, text.length + 1) ||
+        cui_editor_storage_overlap(scratch, capacity, matcher->query.data, matcher->query.length) ||
+        cui_editor_storage_overlap(scratch, capacity, replacement.data, replacement.length) ||
+        cui_editor_storage_overlap(scratch, capacity, matcher->matches, bytes) ||
+        cui_editor_storage_overlap(scratch, capacity, replaced, sizeof(*replaced)) ||
+        cui_editor_storage_overlap(replaced, sizeof(*replaced), text.data, text.length + 1) ||
+        cui_editor_storage_overlap(replaced, sizeof(*replaced), matcher, sizeof(*matcher)) ||
+        cui_editor_storage_overlap(replaced, sizeof(*replaced), matcher->matches, bytes) ||
+        cui_editor_storage_overlap(replaced, sizeof(*replaced), matcher->query.data,
+                                   matcher->query.length))
+        return CUI_EDIT_INVALID_ARGUMENT;
+    if (!count) {
+        *replaced = 0;
+        return CUI_EDIT_OK;
+    }
+    size_t length = text.length - count * matcher->query.length;
+    if (replacement.length && count > (SIZE_MAX - length) / replacement.length)
+        return CUI_EDIT_CAPACITY;
+    length += count * replacement.length;
+    if (length >= capacity)
+        return CUI_EDIT_CAPACITY;
+    size_t at = 0, out = 0;
+    while (at < text.length) {
+        bool match = matcher->query.length <= text.length - at && cui_editor_boundary(text, at) &&
+                     cui_editor_boundary(text, at + matcher->query.length);
+        for (size_t j = 0; match && j < matcher->query.length; ++j)
+            match = cui_editor_ascii_fold((unsigned char)text.data[at + j],
+                                          matcher->case_insensitive) ==
+                    cui_editor_ascii_fold((unsigned char)matcher->query.data[j],
+                                          matcher->case_insensitive);
+        if (match) {
+            if (replacement.length)
+                memcpy(scratch + out, replacement.data, replacement.length);
+            at += matcher->query.length;
+            out += replacement.length;
+        } else
+            scratch[out++] = text.data[at++];
+    }
+    scratch[out] = 0;
+    cui_str candidate = {scratch, length};
+    size_t next_count =
+        cui_editor_scan_matches(candidate, matcher->query, matcher->case_insensitive, NULL);
+    if (next_count > matcher->capacity)
+        return CUI_EDIT_CAPACITY;
+    result = cui_edit_replace_range(editor->edit, 0, text.length, candidate);
+    if (result != CUI_EDIT_OK)
+        return result;
+    cui_editor_scan_matches(cui_edit_get_text(editor->edit), matcher->query,
+                            matcher->case_insensitive, matcher->matches);
+    matcher->count = next_count;
+    matcher->current = 0;
+    matcher->document = editor->edit;
+    matcher->revision = cui_edit_get_state(editor->edit).revision;
+    cui_edit_select(editor->edit, 0, 0);
+    editor->view.scroll_x = editor->view.scroll_y = 0;
+    cui_editor_cancel_completion(editor);
+    *replaced = count;
+    return CUI_EDIT_OK;
+}
+bool cui_editor_search_enable_replace(cui_editor_search_state *state, cui_editor_matcher *matcher,
+                                      cui_edit *replacement, char *scratch, size_t capacity) {
+    if (!state || !state->query || !matcher || !replacement || replacement == state->query ||
+        cui_edit_get_state(replacement).multiline || !scratch || !capacity ||
+        matcher->capacity > SIZE_MAX / sizeof(*matcher->matches) ||
+        (matcher->capacity && !matcher->matches))
+        return false;
+    state->matcher = matcher;
+    state->replacement = replacement;
+    state->scratch = scratch;
+    state->scratch_capacity = capacity;
+    state->replace_mode = false;
+    return true;
+}
+
 bool cui_editor_set_folds(cui_editor_state *state, cui_editor_fold *folds, size_t count) {
     return state && cui_textarea_set_folds(&state->view, state->edit, folds, count);
 }

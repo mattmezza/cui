@@ -100,18 +100,37 @@ cui_edit_result cui_editor_matcher_anchor(cui_editor_state *, cui_editor_matcher
 cui_edit_result cui_editor_matcher_replace_current(cui_editor_state *, cui_editor_matcher *,
                                                    cui_str replacement, char *scratch,
                                                    size_t capacity);
+cui_edit_result cui_editor_matcher_replace_all(cui_editor_state *, cui_editor_matcher *,
+                                               cui_str replacement, char *scratch, size_t capacity,
+                                               size_t *count);
 typedef struct {
     cui_edit *query; /* Borrowed single-line model. */
     cui_input_behavior_state input;
     float scroll_x;
     bool open;
+    /* Optional borrowed replacement UI resources. Keep alive while attached.
+     * replace_disabled enforces host readonly policy while retaining navigation. */
+    cui_editor_matcher *matcher;
+    cui_edit *replacement;
+    cui_input_behavior_state replacement_input;
+    float replacement_scroll_x;
+    char *scratch;
+    size_t scratch_capacity;
+    bool replace_mode, replace_disabled;
 } cui_editor_search_state;
 typedef struct {
     bool query_changed, navigated, closed;
     size_t matches;
     cui_edit_result error;
+    bool replacement_changed;
+    size_t replaced;
 } cui_editor_search_result;
 bool cui_editor_search_init(cui_editor_search_state *, cui_edit *query);
+/* Enable the optional replacement row and retained ASCII-insensitive matching.
+ * Models must be distinct; replacement must be single-line. Storage is borrowed.
+ * Ctrl-H / Meta-Shift-F opens replacement mode; Escape from either field closes. */
+bool cui_editor_search_enable_replace(cui_editor_search_state *, cui_editor_matcher *,
+                                      cui_edit *replacement, char *scratch, size_t capacity);
 /* Counts nonoverlapping literal matches; invalid/empty queries return zero. */
 size_t cui_editor_match_count(const cui_editor_state *, cui_str query);
 /* Draw before the editor to intercept Ctrl/Meta-F on editor_id. Enter and

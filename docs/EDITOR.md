@@ -321,7 +321,7 @@ annotations are attached, so Textarea releases Tab ownership for those models.
 Any text revision, including undo/redo, detaches annotations. Hosts must refresh
 and reattach them; undo restores document text and the original byte selection,
 but does not restore token metadata. This scoped borrowed-content model does
-not implement frozen token replacement exports, owned content snapshots,
+not implement owned content snapshots,
 incremental span/history remapping, chip/label rendering, masked/secret Input
 mode integration, grammar registries, or language services. Ordinary Input
 adapter wiring outside this module must enforce its own supported-mode rules.
@@ -351,9 +351,8 @@ uses a caller-provided byte scratch buffer, scans nonoverlapping matches, and
 commits one document replacement for one-step Undo. Its count is untouched on
 failure; scratch contents are unspecified. Successful replace-all resets selection
 and scroll to the start. These programmatic operations ignore view readonly and
-disabled options; host UI must enforce its editing policy. They remain case-sensitive;
-the frozen source's ASCII-insensitive retained matcher, automatic next-current-match
-tracking, and built-in replacement panel are not implemented by these APIs.
+disabled options; host UI must enforce its editing policy. These direct APIs remain case-sensitive; retained ASCII-insensitive matching and
+current-index replacement are provided by the separate matcher APIs below.
 
 `cui_editor_matcher` retains a borrowed immutable query and caller-owned match
 ranges. Set-query activates it; close retains query/ranges but deactivates it.
@@ -365,3 +364,15 @@ edit storage. Capacity rejection preserves session/range storage. Retained curre
 replacement preflights candidate match capacity, commits one edit, and keeps the
 logical index (last replacement wraps to zero). No hidden allocation or callback
 is involved. The existing literal APIs and find-bar retain their prior contracts.
+
+The find-bar can opt into a built-in replacement row with
+`cui_editor_search_enable_replace`, borrowing a retained matcher, distinct
+single-line replacement edit model, and byte scratch buffer. Ctrl-H or
+Meta-Shift-F opens replacement mode; Enter in the replacement field replaces the
+current retained match. Semantic buttons provide case matching, replacement mode,
+Replace, and Replace all; Escape from either field closes and returns editor focus.
+`replace_disabled` lets the host enforce readonly policy while keeping find
+navigation available. Replace-all respects ASCII-insensitive matching and remains
+one Undo step. Existing find-only callers retain their original behavior. Search
+matches are retained for navigation/status, but non-current match highlighting and
+viewport-based activation anchoring from the frozen implementation remain absent.

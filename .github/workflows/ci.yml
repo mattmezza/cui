@@ -90,15 +90,17 @@ jobs:
           python scripts/package_bindings.py node --prebuilt --output build/packages/dynamic
       - name: Install outside the checkout with native build tools blocked
         run: python scripts/test_binding_packages.py --artifacts build/packages/dynamic --require-prebuilt
+      - name: Exercise installed addon on pinned Node 18 and 22 runtimes
+        run: python scripts/test_node_package_runtimes.py --tarball build/packages/dynamic/cui-native-0.1.0-alpha.1.tgz --cache-dir ${{ runner.temp }}/cui-node-runtime-validation
       - name: Build embedded Go, public source Go and static Rust artifacts
         run: |
-          python scripts/package_bindings.py go --output build/packages/go-embedded
+          python scripts/package_bindings.py go --prebuilt --output build/packages/go-embedded
           python scripts/package_bindings.py go --source-only --output build/packages/go-source
           rustup run 1.85.1 python scripts/package_bindings.py rust --output build/packages/rust
       - name: Execute clean Go and Rust consumers after removing build sources
         run: |
           rustup run 1.85.1 python scripts/test_compiled_binding_packages.py --go-artifacts build/packages/go-embedded --rust-artifacts build/packages/rust
-          rustup run 1.85.1 python scripts/test_compiled_binding_packages.py --go-artifacts build/packages/go-source --rust-artifacts build/packages/rust --allow-runtime-build
+          rustup run 1.85.1 python scripts/test_compiled_binding_packages.py --go-artifacts build/packages/go-source --rust-artifacts build/packages/rust
 
   optional-regex:
     runs-on: ubuntu-latest

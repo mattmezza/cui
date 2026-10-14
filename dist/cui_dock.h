@@ -2376,7 +2376,10 @@ typedef struct {
 static void cui_dock_private_schema_write(cui_dock_private_schema_writer *writer, cui_dock_node id,
                                           size_t slot) {
     cui_dock_node_info info;
-    cui_dock_node_get(writer->model, id, &info);
+    if (!cui_dock_node_get(writer->model, id, &info)) {
+        writer->error = CUI_DOCK_INVALID;
+        return;
+    }
     cui_dock_schema_node *out = &writer->nodes[slot];
     writer->owned[slot] = true;
     bool tabs = info.kind == CUI_DOCK_TABS;
@@ -2396,7 +2399,10 @@ static void cui_dock_private_schema_write(cui_dock_private_schema_writer *writer
     for (size_t i = 0; i < count; i++) {
         if (tabs) {
             uint64_t key;
-            cui_dock_panel_at(writer->model, id, i, &key);
+            if (!cui_dock_panel_at(writer->model, id, i, &key)) {
+                writer->error = CUI_DOCK_INVALID;
+                return;
+            }
             if (info.has_active && key == info.active_panel)
                 out->active_index = i;
             if (!writer->dump || !writer->dump(writer->user, key, &writer->nodes[children + i]) ||
@@ -2407,7 +2413,10 @@ static void cui_dock_private_schema_write(cui_dock_private_schema_writer *writer
         } else {
             cui_dock_node child;
             cui_dock_slot_size size;
-            cui_dock_child_at(writer->model, id, i, &child, &size);
+            if (!cui_dock_child_at(writer->model, id, i, &child, &size)) {
+                writer->error = CUI_DOCK_INVALID;
+                return;
+            }
             writer->sizes[(size_t)(out->sizes - writer->sizes) + i] = size.has_size ? size.size : 0;
             cui_dock_private_schema_write(writer, child, children + i);
             if (writer->error != CUI_DOCK_OK)

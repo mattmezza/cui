@@ -13,6 +13,7 @@
 #include "cui_editor.h"
 #include "cui_form.h"
 #include "cui_icon.h"
+#include "cui_label.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
@@ -129,6 +130,10 @@ typedef struct {
     cui_str accessibility_label, tooltip;
     cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled supplied. */
     bool skip_tab, hide_focus_ring, prevent_pointer_focus;
+    /* Explicit signed source ordering; zero defaults retain legacy ordering.
+     * skip_tab controls eligibility independently, including index -1. */
+    bool custom_tab_index;
+    int tab_index;
     bool toggle_semantics,
         toggled; /* Explicit checked/value metadata; selected remains paint-only. */
     bool custom_cursor;

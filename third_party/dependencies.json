@@ -29,7 +29,7 @@
     "license_file": "third_party/nanosvg/LICENSE",
     "sha256": {
       "third_party/nanosvg/LICENSE": "e82bc3dd03400aecabe12201219ba14750dbc4b36faab58663a7a6068548d372",
-      "third_party/nanosvg/nanosvg.h": "e34fd5d084be106cea972d19ce5d27fd96d17ba89f8d06bdceee058420c8b2b0",
+      "third_party/nanosvg/nanosvg.h": "99230b1f967ea52e1b002fea5c8882118501125cd6aa6e4c66b44eb97e2d6dc7",
       "third_party/nanosvg/nanosvgrast.h": "79a9c5f4db19debf9f3a648a1589e96d92854f245a5cb4f3d823f263785234d8"
     }
   },

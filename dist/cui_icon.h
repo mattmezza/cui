@@ -77,8 +77,20 @@ typedef struct {
     cui_icon_transform transform;
     bool custom_transform;
     cui_design_size design_size; /* INHERIT preserves legacy metrics. */
+    /* Zero preserves legacy preset scaling by theme font size. Positive rem
+     * separates explicit preset sizes from inherited text size, as in source. */
+    float rem_size;
+    /* Default is decorative. A nonempty name opts into a noninteractive image
+     * semantic; decorative=true suppresses it even when a name is supplied.
+     * Names are borrowed for the frame and never inferred from path/SVG data. */
+    cui_str accessible_name;
+    bool decorative;
+    /* Optional layout decoration. width/height and sizing flags remain governed
+     * by options above; padding is unsupported and must be zero. Other box
+     * paint/clip/inert/opacity fields apply around the unchanged SVG square. */
+    const cui_box *style;
 } cui_icon_options;
-/* Paint-only component: no role, focus stop or hit target. Theme supplies fallback
+/* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
 cui_icon_error cui_icon(cui_context *, cui_id, const cui_theme *, cui_icon_state *,
                         cui_icon_options);
@@ -1719,7 +1731,10 @@ static int nsvg__parseTransformArgs(const char* str, float* args, int maxNa, int
 		if (*ptr == '-' || *ptr == '+' || *ptr == '.' || nsvg__isdigit(*ptr)) {
 			if (*na >= maxNa) return 0;
 			ptr = nsvg__parseNumber(ptr, it, 64);
-			args[(*na)++] = (float)nsvg__atof(it);
+			args[*na] = (float)nsvg__atof(it);
+			/* CUI local patch: reject overflow before constructing a transform. */
+			if (!isfinite(args[*na])) return 0;
+			++(*na);
 		} else {
 			++ptr;
 		}
@@ -1733,7 +1748,11 @@ static int nsvg__parseMatrix(float* xform, const char* str)
 	float t[6];
 	int na = 0;
 	int len = nsvg__parseTransformArgs(str, t, 6, &na);
-	if (na != 6) return len;
+	/* CUI local patch: malformed arity must still initialize the result. */
+	if (len == 0 || na != 6) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	memcpy(xform, t, sizeof(float)*6);
 	return len;
 }
@@ -1744,6 +1763,11 @@ static int nsvg__parseTranslate(float* xform, const char* str)
 	float t[6];
 	int na = 0;
 	int len = nsvg__parseTransformArgs(str, args, 2, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1 && na != 2)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	if (na == 1) args[1] = 0.0;
 
 	nsvg__xformSetTranslation(t, args[0], args[1]);
@@ -1757,6 +1781,11 @@ static int nsvg__parseScale(float* xform, const char* str)
 	int na = 0;
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 2, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1 && na != 2)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	if (na == 1) args[1] = args[0];
 	nsvg__xformSetScale(t, args[0], args[1]);
 	memcpy(xform, t, sizeof(float)*6);
@@ -1769,6 +1798,11 @@ static int nsvg__parseSkewX(float* xform, const char* str)
 	int na = 0;
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 1, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	nsvg__xformSetSkewX(t, args[0]/180.0f*NSVG_PI);
 	memcpy(xform, t, sizeof(float)*6);
 	return len;
@@ -1780,6 +1814,11 @@ static int nsvg__parseSkewY(float* xform, const char* str)
 	int na = 0;
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 1, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	nsvg__xformSetSkewY(t, args[0]/180.0f*NSVG_PI);
 	memcpy(xform, t, sizeof(float)*6);
 	return len;
@@ -1792,6 +1831,11 @@ static int nsvg__parseRotate(float* xform, const char* str)
 	float m[6];
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 3, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1 && na != 3)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	if (na == 1)
 		args[1] = args[2] = 0.0f;
 	nsvg__xformIdentity(m);
@@ -3337,7 +3381,8 @@ NSVGimage* nsvgParseFromFile(const char* filename, const char* units, float dpi)
 	if (!fp) goto error;
 	if (fseek(fp, 0, SEEK_END)) goto error;
 	size = ftell(fp);
-	if (size == -1l) goto error;
+	/* CUI local patch: ftell failure was converted to size_t above. */
+	if (size == (size_t)-1) goto error;
 	if (fseek(fp, 0, SEEK_SET)) goto error;
 	data = (char*)malloc(size+1);
 	if (data == NULL) goto error;
@@ -16145,10 +16190,40 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
 
 #include <math.h>
 #include <string.h>
+static bool cui_icon_options_valid(cui_icon_options o) {
+    if (o.size < CUI_ICON_INHERITED || o.size > CUI_ICON_CUSTOM ||
+        !cui_design_valid(o.design_size) || !isfinite(o.rem_size) || o.rem_size < 0 ||
+        o.rem_size > 4096 || (!o.decorative && o.accessible_name.length && !o.accessible_name.data))
+        return false;
+    if (o.style) {
+        const cui_box *b = o.style;
+        float nonnegative[] = {b->padding,
+                               b->gap,
+                               b->radius,
+                               b->border_width,
+                               b->max_width,
+                               b->max_height,
+                               b->corner_radii.top_left,
+                               b->corner_radii.top_right,
+                               b->corner_radii.bottom_left,
+                               b->corner_radii.bottom_right,
+                               b->border_edges.left,
+                               b->border_edges.right,
+                               b->border_edges.top,
+                               b->border_edges.bottom};
+        for (size_t i = 0; i < sizeof(nonnegative) / sizeof(nonnegative[0]); ++i)
+            if (!isfinite(nonnegative[i]) || nonnegative[i] < 0)
+                return false;
+        if (b->padding != 0 || !isfinite(b->offset_x) || !isfinite(b->offset_y) ||
+            !isfinite(b->opacity) || b->align_x < CUI_ALIGN_START || b->align_x > CUI_ALIGN_END ||
+            b->align_y < CUI_ALIGN_START || b->align_y > CUI_ALIGN_END)
+            return false;
+    }
+    return true;
+}
 cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_icon_state *state,
                         cui_icon_options options) {
-    if (!ui || !id || !theme || !state || options.size < CUI_ICON_INHERITED ||
-        options.size > CUI_ICON_CUSTOM || !cui_design_valid(options.design_size))
+    if (!ui || !id || !theme || !state || !cui_icon_options_valid(options))
         return CUI_ICON_INVALID;
     float size = options.size == CUI_ICON_XSMALL   ? 12
                  : options.size == CUI_ICON_SMALL  ? 14
@@ -16158,8 +16233,8 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                  : options.inherited_text_size > 0 ? options.inherited_text_size
                                                    : theme->font_size;
     if (options.size >= CUI_ICON_XSMALL && options.size <= CUI_ICON_LARGE &&
-        isfinite(theme->font_size) && theme->font_size > 0)
-        size *= theme->font_size / 16;
+        ((isfinite(theme->font_size) && theme->font_size > 0) || options.rem_size > 0))
+        size *= (options.rem_size > 0 ? options.rem_size : theme->font_size) / 16;
     if (options.design_size) {
         cui_design_metrics d;
         if (!cui_design_resolve(options.design_size, theme->font_size / 16, &d))
@@ -16181,9 +16256,18 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                                                        : theme->text;
     cui_icon_error result = cui_icon_prepare(
         state, width, height, options.custom_transform ? options.transform : cui_icon_identity());
-    cui_begin_box(
-        ui, id,
-        (cui_box){.width = width, .height = height, .fixed_width = true, .fixed_height = true});
+    cui_box box = options.style ? *options.style : (cui_box){0};
+    box.width = width;
+    box.height = height;
+    box.fixed_width = box.fixed_height = true;
+    box.width_percent = box.height_percent = false;
+    box.max_width = box.max_height = 0;
+    cui_begin_box(ui, id, box);
+    if (!options.decorative && options.accessible_name.length) {
+        cui_interact(ui, id, CUI_ROLE_IMAGE, options.accessible_name, false, false, 0);
+        cui_set_tab_stop(ui, id, false);
+        cui_set_semantic_details(ui, id, (cui_semantic_details){.no_focus = true});
+    }
     cui_bitmap bitmap = cui_icon_state_bitmap(state);
     if (result == CUI_ICON_OK && cui_bitmap_valid(bitmap)) {
         cui_rect paint = cui_icon_state_paint_bounds(state);
@@ -16240,8 +16324,7 @@ static bool cui_icon_name_equal(cui_str first, cui_str second) {
 }
 cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                               cui_icon_options options) {
-    if (!ui || !id || !theme || !name.data || !name.length ||
-        !cui_design_valid(options.design_size) ||
+    if (!ui || !id || !theme || !name.data || !name.length || !cui_icon_options_valid(options) ||
         (options.design_size &&
          (!isfinite(theme->font_size) || theme->font_size <= 0 || theme->font_size / 16 > 32)))
         return CUI_ICON_INVALID;
@@ -16272,7 +16355,7 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
 }
 cui_icon_error cui_icon_spinner(cui_context *ui, cui_id id, const cui_theme *theme,
                                 cui_icon_options options) {
-    if (!ui || !id || !theme || !cui_design_valid(options.design_size) ||
+    if (!ui || !id || !theme || !cui_icon_options_valid(options) ||
         (options.design_size &&
          (!isfinite(theme->font_size) || theme->font_size <= 0 || theme->font_size / 16 > 32)))
         return CUI_ICON_INVALID;

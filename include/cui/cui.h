@@ -307,7 +307,11 @@ typedef struct {
     bool disabled, checked, focused;
     float value;
     cui_semantic_details details;
-    int tab_index; /* 0: Tab stop; -1: pointer/programmatic focus only. */
+    int tab_index; /* Legacy negative values exclude Tab; set_tab_index opts into signed order. */
+    bool tab_ordered, tab_stop_disabled;
+    /* Frame-owned lexicographic group prefix; applications use begin/end_tab_group. */
+    int tab_path[32];
+    size_t tab_path_count;
 } cui_semantic;
 typedef struct {
     bool hovered, pressed, focused, focus_visible, activated;
@@ -663,6 +667,14 @@ bool cui_text_context_line(cui_context *, cui_text_line_source, float, cui_color
                            cui_text_style);
 bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, cui_color, float,
                                    cui_text_style, const cui_text_color_span *, size_t);
+/* Complete strict UTF-8 text with hard paragraphs, U+2028 visual breaks, and
+ * empty lines. Color spans use original text bytes and may cross separators.
+ * wrap=true uses available parent width (word wrapping); false preserves lines.
+ * Invalid input and preflight capacity failures publish no layout. Final layout
+ * errors remain observable through the normal Core error/draw-list contract. */
+bool cui_text_paragraph_colored(cui_context *, cui_str, float font_size, cui_color,
+                                float line_height, cui_text_style, bool wrap,
+                                const cui_text_color_span *, size_t);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);
@@ -699,6 +711,11 @@ void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value);
 bool cui_set_semantic_role(cui_context *, cui_id, cui_role);
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details);
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled);
+/* Signed source ordering, independent of Tab eligibility. Last setter wins. */
+void cui_set_tab_index(cui_context *ui, cui_id id, int index);
+/* Up to 32 nested groups. Failure leaves the group stack unchanged. */
+bool cui_begin_tab_group(cui_context *ui, int index);
+void cui_end_tab_group(cui_context *ui);
 /* Target resolved in input order against previous frame regions. */
 cui_id cui_event_target(cui_context *ui, size_t index);
 /* Defer an unconsumed scroll event currently routed to from_id to an eligible

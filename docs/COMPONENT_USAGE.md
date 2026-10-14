@@ -251,11 +251,11 @@ API: `cui_dropdown_button`. [Public header](../include/cui/cui_choice.h); [guide
 
 **State:** Caller owns title and description.
 
-**Interaction:** Presentation only; compose separate action buttons when needed.
+**Interaction:** Borrowed content callbacks can submit buttons and handle their activation events.
 
-**Usage:** Submit title, description and width each frame.
+**Usage:** Compose optional media/title/description header, content and appended children. Child callbacks submit ordinary native controls.
 
-API: `cui_empty`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_empty`, `cui_empty_ex`, `cui_empty_default_style`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md); [guide](EMPTY.md).
 
 ## Focus Trap
 
@@ -335,11 +335,11 @@ API: `cui_kbd`, `cui_kbd_format`. [Public header](../include/cui/cui_content.h);
 
 **State:** Caller owns label text.
 
-**Interaction:** Presentation only; no action callback.
+**Interaction:** Optional semantic control association; presentation has no action callback.
 
-**Usage:** Submit text inside the current parent layout.
+**Usage:** Compose secondary text, Unicode highlights and private scalar masking with cui_label_options; the plain wrapper remains available.
 
-API: `cui_label`. [Public header](../include/cui/cui_components.h); [guide](COMPONENTS.md).
+API: `cui_label`, `cui_label_source`, `cui_label_prepare`. [Public header](../include/cui/cui_components.h); [guide](COMPONENTS.md); [guide](TYPOGRAPHY.md); [guide](LABEL.md).
 
 ## Marker
 

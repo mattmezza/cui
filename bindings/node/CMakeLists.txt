@@ -47,3 +47,9 @@ endif()
 
 add_test(NAME node_components COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/components.test.cjs)
+add_test(NAME node_extended COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/extended.test.cjs)
+add_test(NAME node_models COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/models.test.cjs)
+add_test(NAME node_workspace COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/workspace.cjs --headless)

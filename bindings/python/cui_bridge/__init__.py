@@ -6,6 +6,7 @@ The widget tree lives in Python. ``step`` submits it through real CUI components
 from __future__ import annotations
 
 import ctypes as C
+import datetime
 from dataclasses import dataclass
 import math
 import os
@@ -52,6 +53,14 @@ class _EventEx(C.Structure):
                                  ("text_length", C.c_uint32), ("selected", _Handle)]
 
 
+class _Time(C.Structure):
+    _fields_ = [("hour", C.c_uint32), ("minute", C.c_uint32), ("second", C.c_uint32)]
+
+
+class _Date(C.Structure):
+    _fields_ = [("year", C.c_int32), ("month", C.c_int32), ("day", C.c_int32)]
+
+
 class _Options(C.Structure):
     _fields_ = [("struct_size", C.c_uint32), ("abi_version", C.c_uint32),
                 ("backend", C.c_int), ("max_nodes", C.c_uint32),
@@ -73,6 +82,7 @@ class _API:
             fn.restype = restype
             fn.argtypes = list(argtypes)
             return fn
+        self.set_font_fallbacks = bind("set_font_fallbacks", C.c_int, C.c_void_p, C.POINTER(C.c_char_p), C.c_uint32)
         self.abi_version = bind("abi_version", C.c_uint32)
         self.options_size = bind("options_size", C.c_uint32)
         self.status_message = bind("status_message", C.c_char_p, C.c_int)
@@ -99,6 +109,28 @@ class _API:
         self.set_open = bind("set_open", C.c_int, C.c_void_p, _Handle, C.c_uint32)
         self.set_selected = bind("set_selected", C.c_int, C.c_void_p, _Handle, _Handle)
         self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
+        self.get_open = bind("get_open", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
+        self.set_anchor = bind("set_anchor", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.set_visual = bind("set_visual_size", C.c_int, C.c_void_p, _Handle, C.c_float, C.c_float)
+        self.set_total = bind("set_total", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.set_step_status = bind("set_step_status", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.set_scroll_extent = bind("set_scroll_extent", C.c_int, C.c_void_p, _Handle, C.c_float, C.c_float)
+        self.queue_scroll = bind("queue_scroll", C.c_int, C.c_void_p, C.c_float, C.c_float, C.c_float, C.c_float)
+        self.numeric_bounds = bind("numeric_part_bounds", C.c_int, C.c_void_p, _Handle,
+                                  C.c_uint32, C.POINTER(_Rect))
+        self.set_attachment = bind("set_attachment_status", C.c_int, C.c_void_p, _Handle, C.c_int)
+        self.set_image = bind("set_image_rgba", C.c_int, C.c_void_p, _Handle, C.c_void_p,
+                              C.c_uint32, C.c_uint32, C.c_uint32, C.c_uint32)
+        self.set_time = bind("set_time", C.c_int, C.c_void_p, _Handle, _Time)
+        self.get_time = bind("get_time", C.c_int, C.c_void_p, _Handle, C.POINTER(_Time))
+        self.set_date = bind("set_date", C.c_int, C.c_void_p, _Handle, _Date)
+        self.get_date = bind("get_date", C.c_int, C.c_void_p, _Handle, C.POINTER(_Date))
+        self.set_color = bind("set_color_rgba", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.get_color = bind("get_color_rgba", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
+        self.color_bounds = bind("color_part_bounds", C.c_int, C.c_void_p, _Handle,
+                                C.c_uint32, C.POINTER(_Rect))
+        self.day_bounds = bind("calendar_day_bounds", C.c_int, C.c_void_p, _Handle,
+                              _Date, C.POINTER(_Rect))
         self.set_hover = bind("set_button_hover_rgba", C.c_int, C.c_void_p, _Handle,
                               C.c_uint8, C.c_uint8, C.c_uint8, C.c_uint8)
         self.queue_pointer = bind("queue_pointer", C.c_int, C.c_void_p, C.c_int,
@@ -129,12 +161,27 @@ _SIZE = {name: i for i, name in enumerate(("inherit", "xs", "sm", "base", "md", 
                                            "xl", "2xl", "3xl", "4xl", "5xl", "6xl",
                                            "7xl", "8xl", "9xl"))}
 _KIND = {"row": 1, "column": 2, "label": 3, "button": 4, "checkbox": 5,
-         "radio": 6, "switch": 7, "toggle": 8, "slider": 9, "progress": 10, "badge": 11, "input": 12, "textarea": 13, "number_input": 14, "collapsible": 15, "alert": 16, "radio_group": 17, "tabs": 18, "accordion": 19, "item": 20, "select": 21, "combobox": 22, "dropdown_button": 23}
+         "radio": 6, "switch": 7, "toggle": 8, "slider": 9, "progress": 10, "badge": 11, "input": 12, "textarea": 13, "number_input": 14, "collapsible": 15, "alert": 16, "radio_group": 17, "tabs": 18, "accordion": 19, "item": 20, "select": 21, "combobox": 22, "dropdown_button": 23, "dialog": 24, "alert_dialog": 25, "sheet": 26, "popover": 27, "tooltip": 28, "hover_card": 29, "avatar": 30, "bubble": 31, "empty_view": 32, "group_box": 33, "kbd": 34, "skeleton": 35, "spinner": 36, "tag": 37, "marker": 38, "shimmer": 39, "list_view": 40, "menu": 41, "pagination": 42, "rating": 43, "stepper": 44, "description_list": 45, "scrollable": 46, "status_bar": 47, "toolbar": 48, "title_bar": 49, "icon": 50, "message": 51, "attachment": 52, "image": 53, "tree": 54, "time_field": 55, "color_picker": 56, "calendar": 57, "date_picker": 58, "otp_input": 59, "form": 60, "input_group": 61, "notification": 62, "focus_trap": 63}
 _BOOLEAN = {"checkbox", "radio", "switch", "toggle"}
-_NUMERIC = {"slider", "progress", "number_input"}
+_NUMERIC = {"slider", "progress", "number_input", "pagination", "rating"}
 _EDITABLE = {"input", "textarea", "number_input", "combobox"}
-_GROUP = {"radio_group", "tabs", "accordion", "select", "combobox", "dropdown_button"}
-_CONTAINER = {"row", "column", "collapsible", "item"} | _GROUP
+_GROUP = {"radio_group", "tabs", "accordion", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "description_list", "status_bar", "toolbar", "title_bar"}
+_SURFACE = {"dialog", "alert_dialog", "sheet", "popover"}
+_HOVER = {"tooltip", "hover_card"}
+_DETAIL = {"alert", "select", "combobox", "dropdown_button", "empty_view", "item", "message"} | _SURFACE
+_VISUAL = {"avatar", "empty_view", "group_box", "skeleton", "spinner", "scrollable", "icon", "message"}
+_DISABLED = {"button", "slider", "pagination", "rating", "collapsible", "item"} | _BOOLEAN | _EDITABLE | (_GROUP - {"description_list", "status_bar", "title_bar"}) | _HOVER
+_NUMERIC |= {"attachment"}
+_EDITABLE |= {"otp_input", "input_group"}
+_GROUP |= {"tree", "form", "input_group"}
+_DETAIL |= {"attachment", "input_group", "notification"}
+_VISUAL |= {"attachment", "image", "tree", "color_picker", "date_picker", "form", "input_group"}
+_DISABLED |= {"tree", "time_field", "color_picker", "calendar", "date_picker", "otp_input", "toolbar", "form", "input_group"}
+_SELECTED = {"radio_group", "tabs", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "tree"}
+_SURFACE |= {"notification"}
+_CHANGE = _DISABLED - {"button", "accordion", "form"}
+_CONSTRUCTOR_CONTAINER = {"row", "column", "collapsible", "item", "dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
+_CONTAINER = _CONSTRUCTOR_CONTAINER | _GROUP
 _VARIANT = {"primary": 0, "secondary": 1, "outline": 2, "ghost": 3}
 _ROUND = {"theme": 0, "none": 1, "small": 2, "large": 3, "custom": 4}
 
@@ -167,10 +214,24 @@ class Widget:
         self._checked = False
         self._detail = ""
         self._open = False
+        self._open_set = False
+        self._checked_set = False
         self._selected: Widget | None = None
-        self._value = 0.0
-        self._range = (0.0, 1.0, 0.01)
+        self._anchor: Widget | None = None
+        self._extent: tuple[float, float] | None = None
+        self._visual: tuple[float, float] | None = None
+        self._total = 5 if kind == "rating" else 6 if kind == "otp_input" else 10
+        self._attachment = 0
+        self._image = None
+        self._time = (0, 0, 0)
+        self._date = (2026, 1, 1)
+        self._color = 0x000000FF
+        self._step_status: int | None = None
+        self._value = 1.0 if kind == "pagination" else 0.0
+        self._range = ((1.0,10.0,1.0) if kind == "pagination" else
+                       (0.0,5.0,1.0) if kind == "rating" else (0.0,1.0,0.01))
         self._hover: tuple[int, int, int, int] | None = None
+        self._close_callback: Callable[[Event], object] | None = None
         self._change_callback: Callable[[Event], object] | None = None
         self._callback: Callable[[Event], object] | None = None
         self._app: App | None = None
@@ -263,7 +324,7 @@ class Widget:
         return self
 
     def disabled(self, value: bool = True) -> "Widget":
-        if self.kind not in {"button", "slider", "collapsible", "item"} | _BOOLEAN | _EDITABLE | _GROUP:
+        if self.kind not in _DISABLED:
             raise ValueError("component does not support disabled")
         if type(value) is not bool:
             raise TypeError("disabled must be a bool")
@@ -272,14 +333,15 @@ class Widget:
         return self
 
     def checked(self, value: bool = True) -> "Widget":
-        if self.kind not in _BOOLEAN or type(value) is not bool:
+        if self.kind not in _BOOLEAN | {"item"} or type(value) is not bool:
             raise ValueError("checked requires a boolean component and bool value")
         self._change("set_checked", int(value))
         self._checked = value
+        self._checked_set = True
         return self
 
     def is_checked(self) -> bool:
-        if self.kind not in _BOOLEAN:
+        if self.kind not in _BOOLEAN | {"item"}:
             raise ValueError("component has no checked state")
         if self._app is None:
             if self._disposed:
@@ -333,27 +395,28 @@ class Widget:
         return buffer.value.decode("utf-8")
 
     def on_change(self, callback: Callable[[Event], object]) -> "Widget":
-        if self.kind not in _BOOLEAN | _EDITABLE | {"slider", "collapsible", "item"} | _GROUP or not callable(callback):
+        if self.kind not in _CHANGE | {"scrollable", "toolbar"} or not callable(callback):
             raise ValueError("on_change requires an interactive component and callable")
         self._change_callback = callback
         return self
 
     def detail(self, text: str) -> "Widget":
-        if self.kind not in {"alert", "select", "combobox"}:
+        if self.kind not in _DETAIL:
             raise ValueError("detail belongs to alert")
         self._change("set_detail", _utf8(text))
         self._detail = text
         return self
 
     def open(self, value: bool = True) -> "Widget":
-        if self.kind not in {"collapsible", "item"} or type(value) is not bool:
+        if self.kind not in {"collapsible", "item", "date_picker", "focus_trap"} | _SURFACE or type(value) is not bool:
             raise ValueError("open requires a disclosure component and bool")
         self._change("set_open", int(value))
         self._open = value
+        self._open_set = True
         return self
 
     def select(self, item: "Widget") -> "Widget":
-        if self.kind not in {"radio_group", "tabs", "select", "combobox", "dropdown_button"} or item not in self._children:
+        if self.kind not in _SELECTED or item not in self._children:
             raise ValueError("selection must be a direct group item")
         if self._app is not None:
             self._change("set_selected", item._handle)
@@ -361,7 +424,7 @@ class Widget:
         return self
 
     def selected(self) -> "Widget | None":
-        if self.kind not in {"radio_group", "tabs", "select", "combobox", "dropdown_button"}:
+        if self.kind not in _SELECTED:
             raise ValueError("component has no selection")
         if self._app is None:
             if self._disposed:
@@ -370,6 +433,152 @@ class Widget:
         handle = _Handle()
         self._change("get_selected", C.byref(handle))
         return self._app._by_handle.get((handle.slot, handle.generation))
+
+    def anchor(self, node: "Widget") -> "Widget":
+        if self.kind not in {"popover"} | _HOVER or not isinstance(node, Widget):
+            raise ValueError("anchor requires a popover/hover surface and widget")
+        if self._app is not None:
+            if node._app is not self._app:
+                raise ValueError("anchor belongs to another App")
+            self._change("set_anchor", node._handle)
+        self._anchor = node
+        return self
+
+    def is_open(self) -> bool:
+        if self.kind not in _SURFACE | _HOVER | {"collapsible", "item", "date_picker", "focus_trap"}:
+            raise ValueError("component has no open state")
+        if self._app is None:
+            if self._disposed:
+                raise RuntimeError("Widget is disposed")
+            return self._open
+        result = C.c_uint32()
+        self._change("get_open", C.byref(result))
+        return bool(result.value)
+
+    def on_close(self, callback: Callable[[Event], object]) -> "Widget":
+        if self.kind not in _SURFACE or not callable(callback):
+            raise ValueError("on_close requires a surface and callback")
+        self._close_callback = callback
+        return self
+
+    def visual_size(self, width: float, height: float) -> "Widget":
+        if self.kind not in _VISUAL or not all(math.isfinite(x) and 0 <= x <= 4096 for x in (width,height)):
+            raise ValueError("invalid visual size")
+        self._change("set_visual", width,height)
+        self._visual = (width,height)
+        return self
+
+    def total(self, total: int) -> "Widget":
+        if self.kind not in {"pagination", "rating", "otp_input"} or type(total) is not int or not 1 <= total <= (10 if self.kind == "rating" else 256 if self.kind == "otp_input" else 1000000):
+            raise ValueError("invalid total")
+        self._change("set_total", total)
+        self._total = total
+        if self.kind == "otp_input":
+            return self
+        self._range = (1.0 if self.kind == "pagination" else 0.0,float(total),1.0)
+        self._value = min(total,self._value)
+        return self
+
+    def step_status(self, status: int) -> "Widget":
+        if self.kind != "item" or type(status) is not int or not 0 <= status <= 63:
+            raise ValueError("step status/depth requires an item and 0..63 (parent enforces its limit)")
+        self._change("set_step_status", status)
+        self._step_status = status
+        return self
+
+    def scroll_extent(self, width: float, height: float) -> "Widget":
+        if self.kind != "scrollable" or not all(math.isfinite(x) and 0 <= x <= 32768 for x in (width,height)):
+            raise ValueError("invalid scroll extent")
+        self._change("set_scroll_extent",width,height)
+        self._extent = (width,height)
+        return self
+
+    def scroll_offset(self) -> float:
+        if self.kind != "scrollable":
+            raise ValueError("component has no scroll offset")
+        if self._app is None:
+            if self._disposed:
+                raise RuntimeError("Widget is disposed")
+            return 0.0
+        result = C.c_double()
+        self._change("get_value",C.byref(result))
+        return result.value
+
+    def attachment_status(self, status: str) -> "Widget":
+        names = {"pending": 0, "uploading": 1, "processing": 2, "failed": 3, "complete": 4}
+        if self.kind != "attachment" or status not in names:
+            raise ValueError("invalid attachment status")
+        self._change("set_attachment", names[status])
+        self._attachment = names[status]
+        return self
+
+    def image_rgba(self, pixels: bytes | bytearray | memoryview, width: int,
+                   height: int, stride: int | None = None) -> "Widget":
+        if self.kind != "image" or any(type(x) is not int or not 1 <= x <= 2048 for x in (width,height)):
+            raise ValueError("invalid image dimensions")
+        stride = width * 4 if stride is None else stride
+        if type(stride) is not int or stride < width * 4 or stride * height > 16777216:
+            raise ValueError("invalid image stride")
+        if not isinstance(pixels, (bytes, bytearray, memoryview)):
+            raise TypeError("pixels must be a byte buffer")
+        if memoryview(pixels).nbytes != stride * height:
+            raise ValueError("pixel byte count must equal stride * height")
+        data = bytes(pixels)
+        self._change("set_image", data,width,height,stride,len(data))
+        self._image = (data,width,height,stride,len(data))
+        return self
+
+    def time_value(self, hour: int, minute: int, second: int = 0) -> "Widget":
+        if self.kind != "time_field" or any(type(x) is not int for x in (hour,minute,second)):
+            raise ValueError("time requires integer fields and time_field")
+        datetime.time(hour,minute,second)
+        self._change("set_time", _Time(hour,minute,second))
+        self._time = (hour,minute,second)
+        return self
+
+    def current_time(self) -> tuple[int,int,int]:
+        if self.kind != "time_field":
+            raise ValueError("component has no time")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("Widget is disposed")
+            return self._time
+        result = _Time()
+        self._change("get_time", C.byref(result))
+        return result.hour,result.minute,result.second
+
+    def date_value(self, year: int, month: int, day: int) -> "Widget":
+        if self.kind not in {"calendar", "date_picker"} or any(type(x) is not int for x in (year,month,day)):
+            raise ValueError("date requires integer fields and calendar/date_picker")
+        datetime.date(year,month,day)
+        self._change("set_date", _Date(year,month,day))
+        self._date = (year,month,day)
+        return self
+
+    def current_date(self) -> tuple[int,int,int]:
+        if self.kind not in {"calendar", "date_picker"}:
+            raise ValueError("component has no date")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("Widget is disposed")
+            return self._date
+        result = _Date()
+        self._change("get_date", C.byref(result))
+        return result.year,result.month,result.day
+
+    def color_rgba(self, value: int) -> "Widget":
+        if self.kind != "color_picker" or type(value) is not int or not 0 <= value <= 0xffffffff:
+            raise ValueError("packed RGBA must be an unsigned 32-bit integer")
+        self._change("set_color", value)
+        self._color = value
+        return self
+
+    def current_color(self) -> int:
+        if self.kind != "color_picker": raise ValueError("component has no color")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("Widget is disposed")
+            return self._color
+        result = C.c_uint32()
+        self._change("get_color",C.byref(result))
+        return result.value
 
     def hover_color(self, color: str | tuple[int, int, int, int]) -> "Widget":
         if self.kind != "button" or self._variant == "ghost":
@@ -393,7 +602,7 @@ class Widget:
         return self
 
     def on_click(self, callback: Callable[[Event], object]) -> "Widget":
-        if self.kind not in {"button", "dropdown_button"} or not callable(callback):
+        if self.kind not in {"button", "dropdown_button", "item", "notification"} or not callable(callback):
             raise ValueError("button callback must be callable")
         self._callback = callback
         return self
@@ -491,6 +700,165 @@ def dropdown_button(key: str, text: str = "") -> Widget:
     return Widget("dropdown_button", key, text)
 
 
+def dialog(key: str, text: str = "") -> Widget:
+    return Widget("dialog", key, text)
+
+
+def alert_dialog(key: str, text: str = "") -> Widget:
+    return Widget("alert_dialog", key, text)
+
+
+def sheet(key: str, text: str = "") -> Widget:
+    return Widget("sheet", key, text)
+
+
+def popover(key: str, text: str = "") -> Widget:
+    return Widget("popover", key, text)
+
+
+def tooltip(key: str, text: str = "") -> Widget:
+    return Widget("tooltip", key, text)
+
+
+def hover_card(key: str, text: str = "") -> Widget:
+    return Widget("hover_card", key, text)
+
+
+def avatar(key: str, text: str = "") -> Widget:
+    return Widget("avatar", key, text)
+
+
+def bubble(key: str, text: str = "") -> Widget:
+    return Widget("bubble", key, text)
+
+
+def empty_view(key: str, text: str = "") -> Widget:
+    return Widget("empty_view", key, text)
+
+
+def group_box(key: str, text: str = "") -> Widget:
+    return Widget("group_box", key, text)
+
+
+def kbd(key: str, text: str = "") -> Widget:
+    return Widget("kbd", key, text)
+
+
+def skeleton(key: str, text: str = "") -> Widget:
+    return Widget("skeleton", key, text)
+
+
+def spinner(key: str, text: str = "") -> Widget:
+    return Widget("spinner", key, text)
+
+
+def tag(key: str, text: str = "") -> Widget:
+    return Widget("tag", key, text)
+
+
+def marker(key: str, text: str = "") -> Widget:
+    return Widget("marker", key, text)
+
+
+def shimmer(key: str, text: str = "") -> Widget:
+    return Widget("shimmer", key, text)
+
+
+def list_view(key: str, text: str = "") -> Widget:
+    return Widget("list_view", key, text)
+
+
+def menu(key: str, text: str = "") -> Widget:
+    return Widget("menu", key, text)
+
+
+def pagination(key: str, text: str = "") -> Widget:
+    return Widget("pagination", key, text)
+
+
+def rating(key: str, text: str = "") -> Widget:
+    return Widget("rating", key, text)
+
+
+def stepper(key: str, text: str = "") -> Widget:
+    return Widget("stepper", key, text)
+
+
+def description_list(key: str, text: str = "") -> Widget:
+    return Widget("description_list", key, text)
+
+
+def scrollable(key: str, text: str = "") -> Widget:
+    return Widget("scrollable", key, text)
+
+
+def status_bar(key: str, text: str = "") -> Widget:
+    return Widget("status_bar", key, text)
+
+
+def toolbar(key: str, text: str = "") -> Widget:
+    return Widget("toolbar", key, text)
+
+
+def title_bar(key: str, text: str = "") -> Widget:
+    return Widget("title_bar", key, text)
+
+
+def icon(key: str, text: str = "") -> Widget:
+    return Widget("icon", key, text)
+
+
+def message(key: str, text: str = "") -> Widget:
+    return Widget("message", key, text)
+
+
+def attachment(key: str, text: str = "") -> Widget:
+    return Widget("attachment", key, text)
+
+
+def image(key: str, text: str = "") -> Widget:
+    return Widget("image", key, text)
+
+
+def tree(key: str, text: str = "") -> Widget:
+    return Widget("tree", key, text)
+
+
+def time_field(key: str, text: str = "") -> Widget:
+    return Widget("time_field", key, text)
+
+
+def color_picker(key: str, text: str = "") -> Widget:
+    return Widget("color_picker", key, text)
+
+
+def calendar(key: str, text: str = "") -> Widget:
+    return Widget("calendar", key, text)
+
+
+def date_picker(key: str, text: str = "") -> Widget:
+    return Widget("date_picker", key, text)
+
+
+def otp_input(key: str, text: str = "") -> Widget:
+    return Widget("otp_input", key, text)
+
+
+def form(key: str, text: str = "") -> Widget:
+    return Widget("form", key, text)
+
+
+def input_group(key: str, text: str = "") -> Widget:
+    return Widget("input_group", key, text)
+
+
+def notification(key: str, text: str = "") -> Widget:
+    return Widget("notification", key, text)
+
+
+def focus_trap(key: str, text: str = "") -> Widget:
+    return Widget("focus_trap", key, text)
+
 class App:
     def __init__(self, *, backend: str = "none", width: float = 480, height: float = 240,
                  title: str = "CUI Bridge", font_path: str | None = None,
@@ -519,6 +887,17 @@ class App:
     def _ensure_open(self) -> None:
         if not self._ptr:
             raise RuntimeError("App is disposed")
+
+    def font_fallbacks(self, paths: list[str] | tuple[str, ...]) -> "App":
+        """Replace the SDL font's owned ordered fallback chain (at most 32)."""
+        self._ensure_open()
+        if not isinstance(paths, (list, tuple)) or len(paths) > 32:
+            raise ValueError("fallbacks must be a list/tuple of at most 32 paths")
+        encoded = [_utf8(path) for path in paths]
+        if any(not path for path in encoded): raise ValueError("font paths cannot be empty")
+        array = (C.c_char_p * len(encoded))(*encoded)
+        self._api.check(self._api.set_font_fallbacks(self._ptr,array,len(encoded)))
+        return self
 
     def mount(self, tree: Widget) -> "App":
         self._ensure_open()
@@ -560,21 +939,35 @@ class App:
                 node._app, node._handle = self, handle
                 created.append(node)
                 self._by_handle[(handle.slot, handle.generation)] = node
+                if node.kind == "otp_input": node._change("set_total",node._total)
                 if _KIND[node.kind] >= 3:
                     node._change("set_text", _utf8(node._text))
                 if node.kind in ("row", "column"):
                     node._change("set_gap", node._gap)
-                if node.kind in _BOOLEAN:
+                if node.kind in _BOOLEAN or (node.kind == "item" and node._checked_set):
                     node._change("set_checked", int(node._checked))
                 if node.kind in {"slider", "number_input"}:
                     node._change("set_range", *node._range)
+                if node.kind in {"pagination", "rating"}:
+                    node._change("set_total", node._total)
                 if node.kind in _NUMERIC:
                     node._change("set_value", node._value)
-                if node.kind in _BOOLEAN | _EDITABLE | _GROUP | {"slider", "collapsible", "item"}:
+                if node.kind == "attachment": node._change("set_attachment",node._attachment)
+                if node.kind == "image" and node._image is not None: node._change("set_image",*node._image)
+                if node.kind == "time_field": node._change("set_time",_Time(*node._time))
+                if node.kind in {"calendar", "date_picker"}: node._change("set_date",_Date(*node._date))
+                if node.kind == "color_picker": node._change("set_color",node._color)
+                if node._visual is not None:
+                    node._change("set_visual", *node._visual)
+                if node._extent is not None:
+                    node._change("set_scroll_extent", *node._extent)
+                if node._step_status is not None:
+                    node._change("set_step_status", node._step_status)
+                if node.kind in _DISABLED:
                     node._change("set_disabled", int(node._disabled))
-                if node.kind == "collapsible" or (node.kind == "item" and parent and parent.kind == "accordion"):
+                if node.kind == "collapsible" or (node.kind == "item" and node._open_set):
                     node._change("set_open", int(node._open))
-                if node.kind in {"alert", "select", "combobox"}:
+                if node.kind in _DETAIL:
                     node._change("set_detail", _utf8(node._detail))
                 if node.kind == "button":
                     node._change("set_variant", _VARIANT[node._variant])
@@ -584,6 +977,13 @@ class App:
                     if node._hover:
                         node._change("set_hover", *node._hover)
             for node, _, _ in order:
+                if node._anchor is not None:
+                    if node._anchor._app is not self:
+                        raise ValueError("anchor belongs to another App or unmounted tree")
+                    node._change("set_anchor", node._anchor._handle)
+            for node, _, _ in order:
+                if node.kind in _SURFACE | {"date_picker", "focus_trap"} and node._open:
+                    node._change("set_open", 1)
                 if node._selected is not None:
                     node._change("set_selected", node._selected._handle)
         except Exception:
@@ -640,6 +1040,35 @@ class App:
                                                  0 if part == "action" else 1,C.byref(rect)))
         return rect.x,rect.y,rect.width,rect.height
 
+    def queue_scroll(self, x: float, y: float, dx: float, dy: float) -> None:
+        self._ensure_open()
+        self._api.check(self._api.queue_scroll(self._ptr,x,y,dx,dy))
+
+    def numeric_part_bounds(self, node: Widget, part: int) -> tuple[float,float,float,float]:
+        self._ensure_open()
+        if node._app is not self or type(part) is not int or not 0 <= part <= 0xffffffff:
+            raise ValueError("invalid numeric node or part")
+        rect = _Rect()
+        self._api.check(self._api.numeric_bounds(self._ptr,node._handle,part,C.byref(rect)))
+        return rect.x,rect.y,rect.width,rect.height
+
+    def color_part_bounds(self, node: Widget, part: int) -> tuple[float,float,float,float]:
+        self._ensure_open()
+        if node._app is not self or type(part) is not int or part not in (1,2,3):
+            raise ValueError("invalid color picker node or part")
+        rect = _Rect()
+        self._api.check(self._api.color_bounds(self._ptr,node._handle,part,C.byref(rect)))
+        return rect.x,rect.y,rect.width,rect.height
+
+    def calendar_day_bounds(self, node: Widget, year: int, month: int, day: int) -> tuple[float,float,float,float]:
+        self._ensure_open()
+        if node._app is not self or any(type(x) is not int for x in (year,month,day)):
+            raise ValueError("invalid calendar node or date")
+        datetime.date(year,month,day)
+        rect = _Rect()
+        self._api.check(self._api.day_bounds(self._ptr,node._handle,_Date(year,month,day),C.byref(rect)))
+        return rect.x,rect.y,rect.width,rect.height
+
     def poll_events(self) -> Iterator[Event]:
         self._ensure_open()
         while True:
@@ -655,7 +1084,7 @@ class App:
             self._api.check(status)
             node = self._by_handle.get((raw.node.slot, raw.node.generation))
             if node is not None:
-                yield Event("click" if raw.type == 1 else "change", node, raw.frame_sequence,
+                yield Event({1:"click", 2:"change", 3:"close"}[raw.type], node, raw.frame_sequence,
                             bool(raw.checked), raw.value, buffer.value.decode("utf-8"),
                             (raw.selected.slot, raw.selected.generation))
 
@@ -663,7 +1092,8 @@ class App:
         """Invoke callbacks after step; Python exceptions propagate outside C frames."""
         count = 0
         for event in self.poll_events():
-            callback = event.node._callback if event.type == "click" else event.node._change_callback
+            callback = (event.node._callback if event.type == "click" else
+                        event.node._close_callback if event.type == "close" else event.node._change_callback)
             if callback:
                 callback(event)
             count += 1
@@ -707,3 +1137,15 @@ class App:
 
 
 __all__ = ["App", "Widget", "Event", "BridgeError", "row", "column", "label", "button", "checkbox", "radio", "switch", "toggle", "slider", "progress", "badge", "input", "textarea", "number_input", "collapsible", "alert", "radio_group", "tabs", "accordion", "item", "select", "combobox", "dropdown_button"]
+
+__all__ += ['dialog', 'alert_dialog', 'sheet', 'popover', 'tooltip', 'hover_card', 'avatar', 'bubble', 'empty_view', 'group_box', 'kbd', 'skeleton', 'spinner', 'tag', 'marker', 'shimmer', 'list_view', 'menu', 'pagination', 'rating', 'stepper']
+
+__all__ += ["description_list", "scrollable"]
+
+__all__ += ["status_bar", "toolbar", "title_bar", "icon", "message"]
+
+__all__ += ["attachment", "image", "tree", "time_field", "color_picker", "calendar", "date_picker", "otp_input"]
+
+__all__ += ["form", "input_group", "notification"]
+
+__all__ += ["focus_trap"]

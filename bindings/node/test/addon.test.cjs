@@ -12,6 +12,10 @@ async function main() {
   assert.throws(() => native.setGap(app, root, 1e300), /finite number/);
   assert.throws(() => native.create({backend: 0, width: 1e300, height: 200,
     maxNodes: 32, maxEvents: 32}), /finite number/);
+  const button = native.makeNode(app, root, 4, 'button');
+  assert.throws(() => native.setVariant(app, button, 0xffffffff), /supported range/);
+  assert.throws(() => native.setSize(app, button, 0xffffffff), /supported range/);
+  assert.throws(() => native.setRounding(app, button, 0xffffffff), /supported range/);
   native.setText(app, label, 'Safe');
   native.step(app, 1 / 60);
   assert.ok(native.bounds(app, label).width > 0);

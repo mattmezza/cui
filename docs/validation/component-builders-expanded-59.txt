@@ -1,0 +1,24 @@
+Expanded native component builders: integration freeze through bridge kind 63.
+59/78 manifest families have tested API subsets in Python, JS, TS, Go and Rust.
+19 families remain unbound. Constructors do not imply full native option parity.
+
+Strict C11/warnings build and isolated full CTest: 179/179 passed.
+Standalone Node + C/Python bridge CTest: 14/14 passed.
+C bridge fully instrumented ASan/UBSan, leak detection + stack-use-after-return: 2/2 passed.
+Reduced-stack (1 MB) regression includes 128 Rows and 16 nested selected Tabs panels.
+Go component and composed workspace test packages: race enabled, passed; go vet passed.
+Rust 1.85.1: 27 integration tests passed; composed workspace headless example passed.
+TypeScript 5.8.3 strict check: all used builders and unsupported-option rejection passed.
+Documentation renderer/unit suite: 6/6; sharing metadata suite: 4/4.
+Actual Chromium guide navigation and clipboard code copy: passed.
+Python and Node workspace examples: actual button/dialog/tab hit targets passed.
+SDL/Xvfb: 20 parameterized Python unittest methods passed with AdwaitaMono font.
+SDL/Xvfb: copied image buffer paints red after source freed; replacement paints green.
+SDL/Xvfb: NotoSans missing checkmark reproduces CORE_ERROR; explicit owned fallback restores render.
+SDL/Xvfb: failed fallback replacement preserves preceding chain; copied Input text unchanged.
+
+Thread contract: one thread per app; serialize ALL calls across ALL apps.
+Native macOS/Windows binding UI runtime not validated by these Linux results.
+Portable platform CI must validate this expanded tranche after integration.
+Default bridge styling beyond Button remains a separate unfinished capability.
+No external language runtime packages are required by these bindings.

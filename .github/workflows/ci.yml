@@ -63,6 +63,8 @@ jobs:
       - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components
       - run: ctest --test-dir build-node -R '^(bridge_|node_)' --output-on-failure
       - run: node bindings/node/examples/save.cjs --headless
+      - run: node bindings/node/examples/workspace.cjs --headless
+      - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 bindings/typescript/components.typecheck.ts
       - run: node bindings/typescript/examples/save.ts --headless
 
   optional-regex:
@@ -107,3 +109,7 @@ jobs:
         env:
           CUI_BRIDGE_LIB_DIR: ${{ github.workspace }}/build
         run: cargo +1.85.1 test --offline --locked --manifest-path bindings/rust/Cargo.toml -- --test-threads=1
+      - name: Composed Rust workspace interaction
+        env:
+          CUI_BRIDGE_LIB_DIR: ${{ github.workspace }}/build
+        run: cargo +1.85.1 run --offline --locked --manifest-path bindings/rust/Cargo.toml --example workspace -- --headless

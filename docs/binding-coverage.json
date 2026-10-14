@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Language authoring coverage; tested_subset never means complete component parity.",
-  "bridge_node_kinds": 23,
+  "bridge_node_kinds": 63,
   "additional_kinds": [
     "Row",
     "Column",
@@ -29,11 +29,11 @@
     {
       "name": "AlertDialog",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -49,21 +49,21 @@
     {
       "name": "Attachment",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Avatar",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -79,11 +79,11 @@
     {
       "name": "Bubble",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -139,71 +139,71 @@
     {
       "name": "Empty",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Focus Trap",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "GroupBox",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "HoverCard",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Icon",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Image",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Kbd",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -219,21 +219,21 @@
     {
       "name": "Marker",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Message",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -249,21 +249,21 @@
     {
       "name": "Notification",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Pagination",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -289,51 +289,51 @@
     {
       "name": "Rating",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Shimmer",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Skeleton",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Spinner",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Stepper",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -349,11 +349,11 @@
     {
       "name": "Tag",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -369,31 +369,31 @@
     {
       "name": "Tooltip",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Calendar",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "ColorPicker",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -409,11 +409,11 @@
     {
       "name": "DatePicker",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -429,11 +429,11 @@
     {
       "name": "Form",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -449,11 +449,11 @@
     {
       "name": "Input Group",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -469,11 +469,11 @@
     {
       "name": "OtpInput",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -529,11 +529,11 @@
     {
       "name": "TimeField",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -549,21 +549,21 @@
     {
       "name": "DescriptionList",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Dialog",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -579,31 +579,31 @@
     {
       "name": "List",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Menu",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Popover",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -629,11 +629,11 @@
     {
       "name": "Scrollable",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -649,11 +649,11 @@
     {
       "name": "Sheet",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -669,11 +669,11 @@
     {
       "name": "StatusBar",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -699,31 +699,31 @@
     {
       "name": "TitleBar",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Toolbar",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Tree",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {

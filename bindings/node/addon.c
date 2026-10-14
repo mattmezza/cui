@@ -305,6 +305,9 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
     which = (uint32_t)(uintptr_t)data;
     if (which != 1 && which != 7 && (number < 0 || number > UINT32_MAX || floor(number) != number))
         return fail(env, "expected unsigned integer");
+    if ((which == 2 && number > 3) || (which == 3 && number > 14) || (which == 4 && number > 4) ||
+        (which == 11 && number > 4))
+        return fail(env, "enum value is outside its supported range");
     cui_bridge_status code = CUI_BRIDGE_INVALID_ARGUMENT;
     if (which == 1)
         code = cui_bridge_set_gap(app->bridge, node->node, (float)number);
@@ -321,6 +324,15 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
         code = cui_bridge_set_disabled(app->bridge, node->node, (uint32_t)number);
     if (which == 6)
         code = cui_bridge_set_checked(app->bridge, node->node, (uint32_t)number);
+    if (which == 9)
+        code = cui_bridge_set_total(app->bridge, node->node, (uint32_t)number);
+    if (which == 10)
+        code = cui_bridge_set_step_status(app->bridge, node->node, (uint32_t)number);
+    if (which == 11)
+        code = cui_bridge_set_attachment_status(app->bridge, node->node,
+                                                (cui_bridge_attachment_status)number);
+    if (which == 12)
+        code = cui_bridge_set_color_rgba(app->bridge, node->node, (uint32_t)number);
     if (which == 8)
         code = cui_bridge_set_open(app->bridge, node->node, (uint32_t)number);
     if (which == 7)
@@ -364,6 +376,18 @@ static napi_value get_state(napi_env env, napi_callback_info info) {
         if (code != CUI_BRIDGE_OK)
             return status(env, code);
         if (napi_create_double(env, value, &result) != napi_ok)
+            return NULL;
+    } else if ((uintptr_t)data == 5) {
+        code = cui_bridge_get_color_rgba(app->bridge, node->node, &checked);
+        if (code != CUI_BRIDGE_OK)
+            return status(env, code);
+        if (napi_create_uint32(env, checked, &result) != napi_ok)
+            return NULL;
+    } else if ((uintptr_t)data == 4) {
+        code = cui_bridge_get_open(app->bridge, node->node, &checked);
+        if (code != CUI_BRIDGE_OK)
+            return status(env, code);
+        if (napi_get_boolean(env, checked != 0, &result) != napi_ok)
             return NULL;
     } else {
         code = cui_bridge_get_text(app->bridge, node->node, text, sizeof text, &required);
@@ -434,6 +458,204 @@ static napi_value dropdown_bounds(napi_env env, napi_callback_info info) {
         !uint_arg(env, v[2], &part))
         return NULL;
     cui_bridge_status code = cui_bridge_dropdown_part_bounds(app->bridge, node->node, part, &rect);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (napi_create_object(env, &result) != napi_ok)
+        return NULL;
+    const char *names[] = {"x", "y", "width", "height"};
+    float values[] = {rect.x, rect.y, rect.width, rect.height};
+    for (size_t i = 0; i < 4; i++)
+        if (napi_create_double(env, values[i], &x) != napi_ok ||
+            napi_set_named_property(env, result, names[i], x) != napi_ok)
+            return NULL;
+    return result;
+}
+static napi_value set_anchor(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node, *anchor;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !node_arg(env, v[2], app, &anchor))
+        return NULL;
+    cui_bridge_status code = cui_bridge_set_anchor(app->bridge, node->node, anchor->node);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_visual(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    double w, h;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !number_arg(env, v[2], &w) || !number_arg(env, v[3], &h))
+        return NULL;
+    cui_bridge_status code =
+        cui_bridge_set_visual_size(app->bridge, node->node, (float)w, (float)h);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value numeric_bounds(napi_env env, napi_callback_info info) {
+    napi_value v[3], result, x;
+    js_app *app;
+    js_node *node;
+    uint32_t part;
+    cui_bridge_rect rect;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &part))
+        return NULL;
+    cui_bridge_status code = cui_bridge_numeric_part_bounds(app->bridge, node->node, part, &rect);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (napi_create_object(env, &result) != napi_ok)
+        return NULL;
+    const char *names[] = {"x", "y", "width", "height"};
+    float values[] = {rect.x, rect.y, rect.width, rect.height};
+    for (size_t i = 0; i < 4; i++)
+        if (napi_create_double(env, values[i], &x) != napi_ok ||
+            napi_set_named_property(env, result, names[i], x) != napi_ok)
+            return NULL;
+    return result;
+}
+static napi_value set_scroll_extent(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    double w, h;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !number_arg(env, v[2], &w) || !number_arg(env, v[3], &h))
+        return NULL;
+    cui_bridge_status code =
+        cui_bridge_set_scroll_extent(app->bridge, node->node, (float)w, (float)h);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value queue_scroll(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    double x, y, dx, dy;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !number_arg(env, v[1], &x) ||
+        !number_arg(env, v[2], &y) || !number_arg(env, v[3], &dx) || !number_arg(env, v[4], &dy))
+        return NULL;
+    cui_bridge_status code =
+        cui_bridge_queue_scroll(app->bridge, (float)x, (float)y, (float)dx, (float)dy);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_font_fallbacks(napi_env env, napi_callback_info info) {
+    napi_value v[2], entry;
+    js_app *app;
+    bool is_array = false;
+    uint32_t count = 0;
+    char *paths[32] = {0};
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app))
+        return NULL;
+    if (napi_is_array(env, v[1], &is_array) != napi_ok || !is_array ||
+        napi_get_array_length(env, v[1], &count) != napi_ok || count > 32)
+        return fail(env, "fallbacks must be an array of at most 32 paths");
+    for (uint32_t i = 0; i < count; i++) {
+        if (napi_get_element(env, v[1], i, &entry) != napi_ok ||
+            !string_arg(env, entry, &paths[i])) {
+            for (uint32_t j = 0; j < count; j++)
+                free(paths[j]);
+            return NULL;
+        }
+    }
+    cui_bridge_status code =
+        cui_bridge_set_font_fallbacks(app->bridge, (const char *const *)paths, count);
+    for (uint32_t i = 0; i < count; i++)
+        free(paths[i]);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_image(napi_env env, napi_callback_info info) {
+    napi_value v[6];
+    js_app *app;
+    js_node *node;
+    uint32_t w, h, stride;
+    bool typed = false;
+    napi_typedarray_type type;
+    size_t length, offset;
+    void *data;
+    napi_value buffer;
+    if (!args(env, info, 6, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[3], &w) || !uint_arg(env, v[4], &h) || !uint_arg(env, v[5], &stride))
+        return NULL;
+    if (napi_is_typedarray(env, v[2], &typed) != napi_ok || !typed ||
+        napi_get_typedarray_info(env, v[2], &type, &length, &data, &buffer, &offset) != napi_ok ||
+        (type != napi_uint8_array && type != napi_uint8_clamped_array) || !data ||
+        length > 16777216)
+        return fail(env, "pixels must be a nonempty Uint8Array of at most 16 MiB");
+    cui_bridge_status code =
+        cui_bridge_set_image_rgba(app->bridge, node->node, data, w, h, stride, (uint32_t)length);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_temporal(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    js_node *node;
+    uint32_t a, b, c;
+    size_t count = 5;
+    void *which;
+    if (napi_get_cb_info(env, info, &count, v, NULL, &which) != napi_ok || count < 5 ||
+        !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &a) ||
+        !uint_arg(env, v[3], &b) || !uint_arg(env, v[4], &c))
+        return NULL;
+    if (a > 9999 || b > UINT16_MAX || c > UINT16_MAX)
+        return fail(env, "invalid time/date fields");
+    cui_bridge_status code =
+        (uintptr_t)which == 1
+            ? cui_bridge_set_time(app->bridge, node->node, (cui_bridge_time){a, b, c})
+            : cui_bridge_set_date(app->bridge, node->node,
+                                  (cui_bridge_date){(int32_t)a, (int32_t)b, (int32_t)c});
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value get_temporal(napi_env env, napi_callback_info info) {
+    napi_value v[2], result, x;
+    js_app *app;
+    js_node *node;
+    size_t count = 2;
+    void *which;
+    if (napi_get_cb_info(env, info, &count, v, NULL, &which) != napi_ok || count < 2 ||
+        !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    cui_bridge_time time = {0};
+    cui_bridge_date date = {0};
+    cui_bridge_status code = (uintptr_t)which == 1
+                                 ? cui_bridge_get_time(app->bridge, node->node, &time)
+                                 : cui_bridge_get_date(app->bridge, node->node, &date);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (napi_create_array_with_length(env, 3, &result) != napi_ok)
+        return NULL;
+    int32_t values[3] = {(int32_t)time.hour, (int32_t)time.minute, (int32_t)time.second};
+    if ((uintptr_t)which != 1) {
+        values[0] = date.year;
+        values[1] = date.month;
+        values[2] = date.day;
+    }
+    for (uint32_t i = 0; i < 3; i++)
+        if (napi_create_int32(env, values[i], &x) != napi_ok ||
+            napi_set_element(env, result, i, x) != napi_ok)
+            return NULL;
+    return result;
+}
+static napi_value specialized_bounds(napi_env env, napi_callback_info info) {
+    napi_value v[5], result, x;
+    js_app *app;
+    js_node *node;
+    size_t count = 5;
+    void *which;
+    uint32_t a, b = 0, c = 0;
+    if (napi_get_cb_info(env, info, &count, v, NULL, &which) != napi_ok || count < 3 ||
+        !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &a))
+        return NULL;
+    if ((uintptr_t)which == 2 &&
+        (count < 5 || !uint_arg(env, v[3], &b) || !uint_arg(env, v[4], &c)))
+        return NULL;
+    if ((uintptr_t)which == 2 && (a > 9999 || b > 12 || c > 31))
+        return fail(env, "invalid date");
+    cui_bridge_rect rect;
+    cui_bridge_status code =
+        (uintptr_t)which == 1
+            ? cui_bridge_color_part_bounds(app->bridge, node->node, a, &rect)
+            : cui_bridge_calendar_day_bounds(app->bridge, node->node,
+                                             (cui_bridge_date){(int32_t)a, (int32_t)b, (int32_t)c},
+                                             &rect);
     if (code != CUI_BRIDGE_OK)
         return status(env, code);
     if (napi_create_object(env, &result) != napi_ok)
@@ -637,6 +859,25 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("poll", poll, 0);
     EXPORT("bounds", bounds, 0);
     EXPORT("dropdownBounds", dropdown_bounds, 0);
+    EXPORT("numericBounds", numeric_bounds, 0);
+    EXPORT("setAnchor", set_anchor, 0);
+    EXPORT("setVisualSize", set_visual, 0);
+    EXPORT("getOpen", get_state, 4);
+    EXPORT("setTotal", set_num, 9);
+    EXPORT("setScrollExtent", set_scroll_extent, 0);
+    EXPORT("scroll", queue_scroll, 0);
+    EXPORT("setStepStatus", set_num, 10);
+    EXPORT("setAttachmentStatus", set_num, 11);
+    EXPORT("setColor", set_num, 12);
+    EXPORT("getColor", get_state, 5);
+    EXPORT("setImage", set_image, 0);
+    EXPORT("setFontFallbacks", set_font_fallbacks, 0);
+    EXPORT("setTime", set_temporal, 1);
+    EXPORT("getTime", get_temporal, 1);
+    EXPORT("setDate", set_temporal, 2);
+    EXPORT("getDate", get_temporal, 2);
+    EXPORT("colorBounds", specialized_bounds, 1);
+    EXPORT("dayBounds", specialized_bounds, 2);
     EXPORT("close", close_app, 0);
 #undef EXPORT
     return exports;

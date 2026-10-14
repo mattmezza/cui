@@ -71,3 +71,88 @@ export function combobox(key?: string, text?: string): ComboBox;
 
 export interface DropdownButton extends Group, Label {on_click(callback: (event: ClickEvent<DropdownButton>) => void): this; part_bounds(part: 'action' | 'menu'): Bounds}
 export function dropdown_button(key?: string, text?: string): DropdownButton;
+
+/** Close result: 1 accepted, 2 cancelled, 3 closed. Callbacks run after the C frame. */
+export interface CloseEvent { node: Node; frame: number; result: 1 | 2 | 3 }
+export interface OpenState extends Node {open(value?: boolean): this; is_open(): boolean}
+export interface Surface extends Label, OpenState {detail(text: string): this; on_close(callback: (event: CloseEvent) => void): this}
+export interface Dialog extends Surface, Composite {}
+export interface AlertDialog extends Surface {}
+export interface Sheet extends Surface, Composite {}
+export interface Popover extends Surface, Composite {anchor(node: Node): this}
+export interface HoverSurface extends Label {on_change(callback: (event: ChangeEvent) => void): this; anchor(node: Node): this; is_open(): boolean; disabled(value?: boolean): this}
+export interface HoverCard extends HoverSurface, Composite {}
+export function dialog(key?: string, text?: string): Dialog;
+export function alert_dialog(key?: string, text?: string): AlertDialog;
+export function sheet(key?: string, text?: string): Sheet;
+export function popover(key?: string, text?: string): Popover;
+export function tooltip(key?: string, text?: string): HoverSurface;
+export function hover_card(key?: string, text?: string): HoverCard;
+
+export interface Visual extends Label {visual_size(width: number, height: number): this}
+export interface EmptyView extends Visual {detail(text: string): this}
+export interface GroupBox extends Visual, Composite {}
+export interface Message extends Visual {detail(text: string): this}
+export function avatar(key?: string, text?: string): Visual;
+export function bubble(key?: string, text?: string): Label;
+export function empty_view(key?: string, text?: string): EmptyView;
+export function group_box(key?: string, text?: string): GroupBox;
+export function kbd(key?: string, text?: string): Label;
+export function skeleton(key?: string, text?: string): Visual;
+export function spinner(key?: string, text?: string): Visual;
+export function tag(key?: string, text?: string): Label;
+export function marker(key?: string, text?: string): Label;
+export function shimmer(key?: string, text?: string): Label;
+export function icon(key?: string, name?: string): Visual;
+export function message(key?: string, text?: string): Message;
+
+export interface Item extends Label {detail(text: string): this; step_status(value: number): this; checked(value?: boolean): this; is_checked(): boolean}
+export interface Pagination extends NumericControl {total(value: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this; numeric_part_bounds(part: number): Bounds}
+export interface Rating extends Pagination {}
+export function list_view(key?: string, text?: string): Group;
+export function menu(key?: string, text?: string): Group;
+export function stepper(key?: string, text?: string): Group & {numeric_part_bounds(part: number): Bounds};
+export function pagination(key?: string, text?: string): Pagination;
+export function rating(key?: string, text?: string): Rating;
+export function description_list(key?: string, text?: string): Composite;
+export function status_bar(key?: string, text?: string): Composite;
+export function title_bar(key?: string, text?: string): Composite;
+export interface Toolbar extends Composite {disabled(value?: boolean): this}
+export function toolbar(key?: string, text?: string): Toolbar;
+export interface Scrollable extends Visual, Composite {scroll_extent(width: number, height: number): this; scroll_offset(): number; on_change(callback: (event: ChangeEvent) => void): this}
+export function scrollable(key?: string, text?: string): Scrollable;
+export interface App {scroll(x: number, y: number, dx: number, dy: number): this}
+
+export type AttachmentStatus = 'pending' | 'uploading' | 'processing' | 'failed' | 'complete';
+export interface Attachment extends Visual, NumericControl {detail(text: string): this; attachment_status(value: AttachmentStatus): this}
+export interface Image extends Visual {image_rgba(pixels: Uint8Array, width: number, height: number, stride?: number): this}
+export interface Tree extends Group {visual_size(width: number, height: number): this}
+export interface TimeField extends Label {time_value(hour: number, minute: number, second?: number): this; current_time(): [number,number,number]; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface ColorPicker extends Visual {color_rgba(value: number): this; current_color(): number; color_part_bounds(part: 1 | 2 | 3): Bounds; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface Calendar extends Label {date_value(year: number, month: number, day: number): this; current_date(): [number,number,number]; calendar_day_bounds(year: number, month: number, day: number): Bounds; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface DatePicker extends Label, OpenState {date_value(year: number, month: number, day: number): this; current_date(): [number,number,number]; visual_size(width: number, height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface OtpInput extends Input {total(cells: number): this}
+export function attachment(key?: string, text?: string): Attachment;
+export function image(key?: string, text?: string): Image;
+export function tree(key?: string, text?: string): Tree;
+export function time_field(key?: string, text?: string): TimeField;
+export function color_picker(key?: string, text?: string): ColorPicker;
+export function calendar(key?: string, text?: string): Calendar;
+export function date_picker(key?: string, text?: string): DatePicker;
+export function otp_input(key?: string, text?: string): OtpInput;
+
+export interface Disclosure {is_open(): boolean}
+
+/** Item click callbacks are supported for InputGroup addons. */
+export interface Item {on_click(callback: (event: ClickEvent<Item>) => void): this}
+export interface Form extends Visual, Composite {disabled(value?: boolean): this}
+export interface InputGroup extends Input, Composite {detail(text: string): this; visual_size(width: number, height: number): this}
+export interface Notification extends Surface {on_click(callback: (event: ClickEvent<Notification>) => void): this}
+export function form(key?: string, text?: string): Form;
+export function input_group(key?: string, text?: string): InputGroup;
+export function notification(key?: string, text?: string): Notification;
+
+export interface FocusTrap extends Composite, OpenState {}
+export function focus_trap(key?: string, text?: string): FocusTrap;
+
+export interface App {font_fallbacks(paths: string[]): this}

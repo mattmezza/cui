@@ -54,7 +54,14 @@ cui_bridge_status cui_bridge_native_render(cui_bridge_app *app, const cui_draw_l
     if (!native || !native->host)
         return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     (void)cui_sdl3_set_cursor(native->host, cui_pointer_cursor(app->ui));
-    return cui_sdl3_render(native->host, list, app->theme.background)
-               ? CUI_BRIDGE_OK
-               : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    return cui_sdl3_render(native->host, list, app->theme.background) ? CUI_BRIDGE_OK
+                                                                      : CUI_BRIDGE_CORE_ERROR;
+}
+cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *app,
+                                                       const char *const *paths, uint32_t count) {
+    bridge_native *native = app->native;
+    if (!native || !native->font)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    return cui_font_register_fallbacks(native->font, paths, count) ? CUI_BRIDGE_OK
+                                                                   : CUI_BRIDGE_CORE_ERROR;
 }

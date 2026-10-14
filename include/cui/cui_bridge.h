@@ -62,8 +62,54 @@ typedef enum {
     CUI_BRIDGE_ITEM,
     CUI_BRIDGE_SELECT,
     CUI_BRIDGE_COMBOBOX,
-    CUI_BRIDGE_DROPDOWN_BUTTON
+    CUI_BRIDGE_DROPDOWN_BUTTON,
+    CUI_BRIDGE_DIALOG,
+    CUI_BRIDGE_ALERT_DIALOG,
+    CUI_BRIDGE_SHEET,
+    CUI_BRIDGE_POPOVER,
+    CUI_BRIDGE_TOOLTIP,
+    CUI_BRIDGE_HOVER_CARD,
+    CUI_BRIDGE_AVATAR,
+    CUI_BRIDGE_BUBBLE,
+    CUI_BRIDGE_EMPTY_VIEW,
+    CUI_BRIDGE_GROUP_BOX,
+    CUI_BRIDGE_KBD,
+    CUI_BRIDGE_SKELETON,
+    CUI_BRIDGE_SPINNER,
+    CUI_BRIDGE_TAG,
+    CUI_BRIDGE_MARKER,
+    CUI_BRIDGE_SHIMMER,
+    CUI_BRIDGE_LIST,
+    CUI_BRIDGE_MENU,
+    CUI_BRIDGE_PAGINATION,
+    CUI_BRIDGE_RATING,
+    CUI_BRIDGE_STEPPER,
+    CUI_BRIDGE_DESCRIPTION_LIST,
+    CUI_BRIDGE_SCROLLABLE,
+    CUI_BRIDGE_STATUS_BAR,
+    CUI_BRIDGE_TOOLBAR,
+    CUI_BRIDGE_TITLE_BAR,
+    CUI_BRIDGE_ICON,
+    CUI_BRIDGE_MESSAGE,
+    CUI_BRIDGE_ATTACHMENT,
+    CUI_BRIDGE_IMAGE,
+    CUI_BRIDGE_TREE,
+    CUI_BRIDGE_TIME_FIELD,
+    CUI_BRIDGE_COLOR_PICKER,
+    CUI_BRIDGE_CALENDAR,
+    CUI_BRIDGE_DATE_PICKER,
+    CUI_BRIDGE_OTP_INPUT,
+    CUI_BRIDGE_FORM,
+    CUI_BRIDGE_INPUT_GROUP,
+    CUI_BRIDGE_NOTIFICATION,
+    CUI_BRIDGE_FOCUS_TRAP
 } cui_bridge_kind;
+typedef struct {
+    uint32_t hour, minute, second;
+} cui_bridge_time;
+typedef struct {
+    int32_t year, month, day;
+} cui_bridge_date;
 typedef enum {
     CUI_BRIDGE_BUTTON_PRIMARY = 0,
     CUI_BRIDGE_BUTTON_SECONDARY,
@@ -95,6 +141,13 @@ typedef enum {
     CUI_BRIDGE_ROUND_CUSTOM
 } cui_bridge_button_rounding;
 typedef enum {
+    CUI_BRIDGE_ATTACHMENT_PENDING = 0,
+    CUI_BRIDGE_ATTACHMENT_UPLOADING,
+    CUI_BRIDGE_ATTACHMENT_PROCESSING,
+    CUI_BRIDGE_ATTACHMENT_FAILED,
+    CUI_BRIDGE_ATTACHMENT_COMPLETE
+} cui_bridge_attachment_status;
+typedef enum {
     CUI_BRIDGE_POINTER_MOVE = 0,
     CUI_BRIDGE_POINTER_DOWN,
     CUI_BRIDGE_POINTER_UP
@@ -116,7 +169,16 @@ enum {
     CUI_BRIDGE_MOD_ALT = 4u,
     CUI_BRIDGE_MOD_META = 8u
 };
-typedef enum { CUI_BRIDGE_EVENT_CLICK = 1, CUI_BRIDGE_EVENT_CHANGE = 2 } cui_bridge_event_type;
+typedef enum {
+    CUI_BRIDGE_EVENT_CLICK = 1,
+    CUI_BRIDGE_EVENT_CHANGE = 2,
+    CUI_BRIDGE_EVENT_CLOSE = 3
+} cui_bridge_event_type;
+typedef enum {
+    CUI_BRIDGE_SURFACE_ACCEPTED = 1,
+    CUI_BRIDGE_SURFACE_CANCELLED = 2,
+    CUI_BRIDGE_SURFACE_CLOSED = 3
+} cui_bridge_surface_result;
 typedef struct {
     cui_bridge_event_type type;
     cui_bridge_node node;
@@ -141,8 +203,9 @@ typedef struct {
     const char *font_path_utf8; /* Required for SDL; borrowed only during create. */
 } cui_bridge_options;
 
-/* Calls across all apps must be serialized, and each app is confined to one
- * thread: the layout engine currently has process-wide state. Strings are UTF-8,
+/* All calls for an app must be confined to one thread. Serialize all calls
+ * across all apps: the core currently uses a process-global Clay context.
+ * Strings are UTF-8,
  * NUL-terminated, and limited to 4096 bytes excluding NUL. */
 CUI_BRIDGE_API uint32_t cui_bridge_abi_version(void);
 CUI_BRIDGE_API uint32_t cui_bridge_options_size(void);
@@ -186,6 +249,45 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_detail_text(cui_bridge_app *, cu
                                                             const char *text_utf8);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_open(cui_bridge_app *, cui_bridge_node,
                                                      uint32_t open);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_open(cui_bridge_app *, cui_bridge_node,
+                                                     uint32_t *out_open);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_anchor(cui_bridge_app *, cui_bridge_node surface,
+                                                       cui_bridge_node anchor);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *, cui_bridge_node,
+                                                            float width, float height);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_total(cui_bridge_app *, cui_bridge_node,
+                                                      uint32_t total);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cui_bridge_node item,
+                                                            uint32_t status);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_attachment_status(
+    cui_bridge_app *, cui_bridge_node attachment, cui_bridge_attachment_status status);
+/* Copies a tightly packed or padded RGBA8 image (at most 16 MiB). */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *, cui_bridge_node image,
+                                                           const uint8_t *pixels, uint32_t width,
+                                                           uint32_t height, uint32_t stride,
+                                                           uint32_t byte_count);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_time(cui_bridge_app *, cui_bridge_node,
+                                                     cui_bridge_time);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_time(cui_bridge_app *, cui_bridge_node,
+                                                     cui_bridge_time *out_time);
+/* Packed color is 0xRRGGBBAA. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_color_rgba(cui_bridge_app *, cui_bridge_node,
+                                                           uint32_t rgba);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_color_rgba(cui_bridge_app *, cui_bridge_node,
+                                                           uint32_t *out_rgba);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_color_part_bounds(cui_bridge_app *, cui_bridge_node,
+                                                              uint32_t part,
+                                                              cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_date(cui_bridge_app *, cui_bridge_node,
+                                                     cui_bridge_date);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_date(cui_bridge_app *, cui_bridge_node,
+                                                     cui_bridge_date *out_date);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_calendar_day_bounds(cui_bridge_app *,
+                                                                cui_bridge_node calendar,
+                                                                cui_bridge_date day,
+                                                                cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_scroll_extent(cui_bridge_app *, cui_bridge_node,
+                                                              float width, float height);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_selected(cui_bridge_app *, cui_bridge_node group,
                                                          cui_bridge_node item);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_get_selected(cui_bridge_app *, cui_bridge_node group,
@@ -217,6 +319,13 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_key(cui_bridge_app *app,
                                                       cui_bridge_key_phase phase,
                                                       cui_bridge_key key, uint32_t modifiers,
                                                       uint32_t repeat);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_scroll(cui_bridge_app *, float x, float y,
+                                                         float dx, float dy);
+/* SDL-only. Installs an owned, transactional fallback font chain for missing glyphs.
+ * Count 0 clears the chain. Paths are copied by the native font loader. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_font_fallbacks(cui_bridge_app *,
+                                                               const char *const *paths_utf8,
+                                                               uint32_t count);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_event(cui_bridge_app *app,
                                                        cui_bridge_event *out_event);
@@ -233,6 +342,9 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_node_bounds(cui_bridge_app *app, cui
 CUI_BRIDGE_API cui_bridge_status cui_bridge_dropdown_part_bounds(cui_bridge_app *, cui_bridge_node,
                                                                  uint32_t menu_part,
                                                                  cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *, cui_bridge_node,
+                                                                uint32_t part,
+                                                                cui_bridge_rect *out_bounds);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_request_close(cui_bridge_app *app);
 
 #ifdef __cplusplus

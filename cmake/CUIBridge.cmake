@@ -48,3 +48,28 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CUI_SANITIZE)
   ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_small_stack.py
   $<TARGET_FILE:test_bridge_core> $<TARGET_FILE:test_bridge_components>)
 endif()
+add_test(NAME bridge_python_extended COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_extended_components.py)
+add_test(NAME bridge_python_models COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_model_components.py)
+add_test(NAME bridge_python_workspace COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/workspace.py --headless)
+
+if(TARGET cui_sdl3)
+ add_executable(test_bridge_components_sdl ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_components_sdl.c)
+ target_link_libraries(test_bridge_components_sdl PRIVATE cui_bridge)
+ cui_warnings(test_bridge_components_sdl)
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  add_test(NAME bridge_components_sdl COMMAND test_bridge_components_sdl)
+  set_tests_properties(bridge_components_sdl PROPERTIES SKIP_RETURN_CODE 77)
+ endif()
+endif()
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME bridge_python_image_native COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+  CUI_TEST_FONT=${CUI_TEST_FONT}
+  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_image_native_virtual.py)
+endif()

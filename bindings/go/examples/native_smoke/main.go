@@ -7,7 +7,8 @@ import (
 )
 
 func main() {
-	a, e := cui.New(cui.Options{Native: true, Width: 320, Height: 160, Title: "Go smoke", FontPath: os.Getenv("CUI_TEST_FONT")})
+	font := os.Getenv("CUI_TEST_FONT")
+	a, e := cui.New(cui.Options{Native: true, Width: 320, Height: 160, Title: "Go smoke", FontPath: font, FontFallbacks: []string{font}})
 	if e != nil {
 		log.Fatal(e)
 	}

@@ -14,6 +14,20 @@ struct RawNode {
     generation: u32,
 }
 #[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct Date {
+    pub year: i32,
+    pub month: i32,
+    pub day: i32,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct Time {
+    pub hour: u32,
+    pub minute: u32,
+    pub second: u32,
+}
+#[repr(C)]
 #[derive(Clone, Copy, Default, Debug)]
 pub struct Rect {
     pub x: f32,
@@ -52,6 +66,30 @@ pub struct ChangeEvent {
     pub value: f64,
     pub text: String,
     pub selected: Option<Node>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AttachmentStatus {
+    Pending = 0,
+    Uploading = 1,
+    Processing = 2,
+    Failed = 3,
+    Complete = 4,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SurfaceResult {
+    Accepted,
+    Cancelled,
+    Closed,
+}
+impl ChangeEvent {
+    pub fn surface_result(&self) -> Option<SurfaceResult> {
+        match self.value as u32 {
+            1 => Some(SurfaceResult::Accepted),
+            2 => Some(SurfaceResult::Cancelled),
+            3 => Some(SurfaceResult::Closed),
+            _ => None,
+        }
+    }
 }
 #[link(name = "cui_bridge")]
 extern "C" {
@@ -108,6 +146,33 @@ extern "C" {
     fn cui_bridge_set_detail_text(a: *mut c_void, n: RawNode, text: *const c_char) -> u32;
     fn cui_bridge_set_open(a: *mut c_void, n: RawNode, open: u32) -> u32;
     fn cui_bridge_set_selected(a: *mut c_void, group: RawNode, item: RawNode) -> u32;
+    fn cui_bridge_get_open(a: *mut c_void, n: RawNode, out: *mut u32) -> u32;
+    fn cui_bridge_set_anchor(a: *mut c_void, surface: RawNode, anchor: RawNode) -> u32;
+    fn cui_bridge_set_visual_size(a: *mut c_void, n: RawNode, width: f32, height: f32) -> u32;
+    fn cui_bridge_set_total(a: *mut c_void, n: RawNode, total: u32) -> u32;
+    fn cui_bridge_set_step_status(a: *mut c_void, n: RawNode, status: u32) -> u32;
+    fn cui_bridge_set_scroll_extent(a: *mut c_void, n: RawNode, width: f32, height: f32) -> u32;
+    fn cui_bridge_set_attachment_status(a: *mut c_void, n: RawNode, status: u32) -> u32;
+    fn cui_bridge_set_time(a: *mut c_void, n: RawNode, value: Time) -> u32;
+    fn cui_bridge_set_date(a: *mut c_void, n: RawNode, value: Date) -> u32;
+    fn cui_bridge_get_date(a: *mut c_void, n: RawNode, out: *mut Date) -> u32;
+    fn cui_bridge_calendar_day_bounds(a: *mut c_void, n: RawNode, day: Date, out: *mut Rect)
+        -> u32;
+    fn cui_bridge_set_color_rgba(a: *mut c_void, n: RawNode, color: u32) -> u32;
+    fn cui_bridge_get_color_rgba(a: *mut c_void, n: RawNode, out: *mut u32) -> u32;
+    fn cui_bridge_color_part_bounds(a: *mut c_void, n: RawNode, part: u32, out: *mut Rect) -> u32;
+    fn cui_bridge_get_time(a: *mut c_void, n: RawNode, out: *mut Time) -> u32;
+    fn cui_bridge_set_image_rgba(
+        a: *mut c_void,
+        n: RawNode,
+        pixels: *const u8,
+        width: u32,
+        height: u32,
+        stride: u32,
+        byte_count: u32,
+    ) -> u32;
+    fn cui_bridge_queue_scroll(a: *mut c_void, x: f32, y: f32, dx: f32, dy: f32) -> u32;
+    fn cui_bridge_numeric_part_bounds(a: *mut c_void, n: RawNode, part: u32, r: *mut Rect) -> u32;
     fn cui_bridge_get_selected(a: *mut c_void, group: RawNode, out: *mut RawNode) -> u32;
     fn cui_bridge_node_bounds(a: *mut c_void, n: RawNode, r: *mut Rect) -> u32;
     fn cui_bridge_dropdown_part_bounds(
@@ -115,6 +180,11 @@ extern "C" {
         n: RawNode,
         menu_part: u32,
         r: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_set_font_fallbacks(
+        a: *mut c_void,
+        paths: *const *const c_char,
+        count: u32,
     ) -> u32;
     fn cui_bridge_request_close(a: *mut c_void) -> u32;
 }
@@ -159,6 +229,46 @@ pub enum Kind {
     Select = 21,
     ComboBox = 22,
     DropdownButton = 23,
+    Dialog = 24,
+    AlertDialog = 25,
+    Sheet = 26,
+    Popover = 27,
+    Tooltip = 28,
+    HoverCard = 29,
+    Avatar = 30,
+    Bubble = 31,
+    EmptyView = 32,
+    GroupBox = 33,
+    Kbd = 34,
+    Skeleton = 35,
+    Spinner = 36,
+    Tag = 37,
+    Marker = 38,
+    Shimmer = 39,
+    List = 40,
+    Menu = 41,
+    Pagination = 42,
+    Rating = 43,
+    Stepper = 44,
+    DescriptionList = 45,
+    Scrollable = 46,
+    StatusBar = 47,
+    Toolbar = 48,
+    TitleBar = 49,
+    Icon = 50,
+    Message = 51,
+    Attachment = 52,
+    Image = 53,
+    Tree = 54,
+    TimeField = 55,
+    ColorPicker = 56,
+    Calendar = 57,
+    DatePicker = 58,
+    OtpInput = 59,
+    Form = 60,
+    InputGroup = 61,
+    Notification = 62,
+    FocusTrap = 63,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Variant {
@@ -413,6 +523,100 @@ impl App {
         })?;
         String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec()).map_err(|_| Error(7))
     }
+    pub fn date(&mut self, n: Node, value: Date) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_date(self.raw, n, value) })?;
+        Ok(self)
+    }
+    pub fn current_date(&self, n: Node) -> Result<Date> {
+        let n = self.valid(n)?;
+        let mut value = Date::default();
+        check(unsafe { cui_bridge_get_date(self.raw, n, &mut value) })?;
+        Ok(value)
+    }
+    pub fn calendar_day_bounds(&self, n: Node, day: Date) -> Result<Rect> {
+        let n = self.valid(n)?;
+        let mut r = Rect::default();
+        check(unsafe { cui_bridge_calendar_day_bounds(self.raw, n, day, &mut r) })?;
+        Ok(r)
+    }
+    pub fn color_rgba(&mut self, n: Node, color: u32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_color_rgba(self.raw, n, color) })?;
+        Ok(self)
+    }
+    pub fn current_color_rgba(&self, n: Node) -> Result<u32> {
+        let n = self.valid(n)?;
+        let mut color = 0;
+        check(unsafe { cui_bridge_get_color_rgba(self.raw, n, &mut color) })?;
+        Ok(color)
+    }
+    pub fn color_part_bounds(&self, n: Node, part: u32) -> Result<Rect> {
+        let n = self.valid(n)?;
+        let mut r = Rect::default();
+        check(unsafe { cui_bridge_color_part_bounds(self.raw, n, part, &mut r) })?;
+        Ok(r)
+    }
+    pub fn time(&mut self, n: Node, value: Time) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_time(self.raw, n, value) })?;
+        Ok(self)
+    }
+    pub fn current_time(&self, n: Node) -> Result<Time> {
+        let n = self.valid(n)?;
+        let mut value = Time::default();
+        check(unsafe { cui_bridge_get_time(self.raw, n, &mut value) })?;
+        Ok(value)
+    }
+    pub fn image_rgba(
+        &mut self,
+        n: Node,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        stride: u32,
+    ) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        let count = u32::try_from(pixels.len()).map_err(|_| Error(3))?;
+        check(unsafe {
+            cui_bridge_set_image_rgba(self.raw, n, pixels.as_ptr(), width, height, stride, count)
+        })?;
+        Ok(self)
+    }
+    pub fn attachment_status(&mut self, n: Node, status: AttachmentStatus) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_attachment_status(self.raw, n, status as u32) })?;
+        Ok(self)
+    }
+    pub fn scroll_extent(&mut self, n: Node, width: f32, height: f32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_scroll_extent(self.raw, n, width, height) })?;
+        Ok(self)
+    }
+    pub fn scroll(&mut self, x: f32, y: f32, dx: f32, dy: f32) -> Result<()> {
+        check(unsafe { cui_bridge_queue_scroll(self.raw, x, y, dx, dy) })
+    }
+    pub fn total(&mut self, n: Node, total: u32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_total(self.raw, n, total) })?;
+        Ok(self)
+    }
+    pub fn step_status(&mut self, n: Node, status: u32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_step_status(self.raw, n, status) })?;
+        Ok(self)
+    }
+    pub fn numeric_part_bounds(&self, n: Node, part: u32) -> Result<Rect> {
+        let n = self.valid(n)?;
+        let mut r = Rect::default();
+        check(unsafe { cui_bridge_numeric_part_bounds(self.raw, n, part, &mut r) })?;
+        Ok(r)
+    }
+    pub fn visual_size(&mut self, n: Node, width: f32, height: f32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_visual_size(self.raw, n, width, height) })?;
+        Ok(self)
+    }
     pub fn detail_text(&mut self, n: Node, text: &str) -> Result<&mut Self> {
         let n = self.valid(n)?;
         let text = string(text)?;
@@ -422,6 +626,28 @@ impl App {
     pub fn open(&mut self, n: Node, open: bool) -> Result<&mut Self> {
         let n = self.valid(n)?;
         check(unsafe { cui_bridge_set_open(self.raw, n, open as u32) })?;
+        Ok(self)
+    }
+    pub fn is_open(&self, n: Node) -> Result<bool> {
+        let n = self.valid(n)?;
+        let mut open = 0;
+        check(unsafe { cui_bridge_get_open(self.raw, n, &mut open) })?;
+        Ok(open != 0)
+    }
+    pub fn anchor(&mut self, surface: Node, anchor: Node) -> Result<&mut Self> {
+        let surface = self.valid(surface)?;
+        let anchor = self.valid(anchor)?;
+        check(unsafe { cui_bridge_set_anchor(self.raw, surface, anchor) })?;
+        Ok(self)
+    }
+    pub fn on_close_event(
+        &mut self,
+        n: Node,
+        f: impl FnMut(&ChangeEvent) + 'static,
+    ) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        self.callbacks
+            .insert((n, 3), Rc::new(RefCell::new(Box::new(f))));
         Ok(self)
     }
     pub fn select(&mut self, group: Node, item: Node) -> Result<&mut Self> {
@@ -517,6 +743,16 @@ impl App {
         check(unsafe { cui_bridge_dropdown_part_bounds(self.raw, n, menu_part as u32, &mut r) })?;
         Ok(r)
     }
+    pub fn font_fallbacks(&mut self, paths: &[&str]) -> Result<&mut Self> {
+        let count = u32::try_from(paths.len()).map_err(|_| Error(3))?;
+        let owned: Vec<CString> = paths
+            .iter()
+            .map(|path| string(path))
+            .collect::<Result<_>>()?;
+        let pointers: Vec<*const c_char> = owned.iter().map(|path| path.as_ptr()).collect();
+        check(unsafe { cui_bridge_set_font_fallbacks(self.raw, pointers.as_ptr(), count) })?;
+        Ok(self)
+    }
     pub fn close(&mut self) -> Result<()> {
         check(unsafe { cui_bridge_request_close(self.raw) })
     }
@@ -589,6 +825,43 @@ impl<'a> Builder<'a> {
         self.app.on_change_event(self.node, f)?;
         Ok(self)
     }
+    pub fn date(self, value: Date) -> Result<Self> {
+        self.app.date(self.node, value)?;
+        Ok(self)
+    }
+    pub fn color_rgba(self, color: u32) -> Result<Self> {
+        self.app.color_rgba(self.node, color)?;
+        Ok(self)
+    }
+    pub fn time(self, value: Time) -> Result<Self> {
+        self.app.time(self.node, value)?;
+        Ok(self)
+    }
+    pub fn image_rgba(self, pixels: &[u8], width: u32, height: u32, stride: u32) -> Result<Self> {
+        self.app
+            .image_rgba(self.node, pixels, width, height, stride)?;
+        Ok(self)
+    }
+    pub fn attachment_status(self, status: AttachmentStatus) -> Result<Self> {
+        self.app.attachment_status(self.node, status)?;
+        Ok(self)
+    }
+    pub fn scroll_extent(self, width: f32, height: f32) -> Result<Self> {
+        self.app.scroll_extent(self.node, width, height)?;
+        Ok(self)
+    }
+    pub fn total(self, total: u32) -> Result<Self> {
+        self.app.total(self.node, total)?;
+        Ok(self)
+    }
+    pub fn step_status(self, status: u32) -> Result<Self> {
+        self.app.step_status(self.node, status)?;
+        Ok(self)
+    }
+    pub fn visual_size(self, width: f32, height: f32) -> Result<Self> {
+        self.app.visual_size(self.node, width, height)?;
+        Ok(self)
+    }
     pub fn detail_text(self, text: &str) -> Result<Self> {
         self.app.detail_text(self.node, text)?;
         Ok(self)
@@ -599,6 +872,14 @@ impl<'a> Builder<'a> {
     }
     pub fn select(self, item: Node) -> Result<Self> {
         self.app.select(self.node, item)?;
+        Ok(self)
+    }
+    pub fn anchor(self, anchor: Node) -> Result<Self> {
+        self.app.anchor(self.node, anchor)?;
+        Ok(self)
+    }
+    pub fn on_close_event(self, f: impl FnMut(&ChangeEvent) + 'static) -> Result<Self> {
+        self.app.on_close_event(self.node, f)?;
         Ok(self)
     }
     pub fn finish(self) -> Node {

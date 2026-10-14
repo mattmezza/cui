@@ -3,6 +3,7 @@
 #define CUI_BRIDGE_INTERNAL_H
 #include "cui/cui_bridge.h"
 #include "cui/cui_components.h"
+#include "cui/cui_media.h"
 #include "cui/cui_text.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -35,6 +36,39 @@ typedef struct {
     cui_radio_group_state radio_group_state;
     cui_choice_popup choice_popup;
     cui_menu_tree_state menu_state;
+    cui_surface_state surface_state;
+    cui_bridge_node anchor;
+    cui_hover_state hover_state;
+    cui_marker_state marker_state;
+    cui_shimmer_state shimmer_state;
+    float visual_width, visual_height;
+    cui_list_state list_state;
+    uint32_t total;
+    uint32_t step_status;
+    cui_scroll_state scroll_state;
+    float content_width, content_height;
+    cui_title_bar_state title_bar_state;
+    cui_attachment_state attachment_state;
+    cui_bridge_attachment_status attachment_status;
+    cui_image_state image_state;
+    cui_image_frame image_frame;
+    unsigned char *image_pixels;
+    cui_tree_model *tree_model;
+    cui_tree_node *tree_nodes;
+    bool *tree_expanded;
+    cui_tree_state tree_state;
+    cui_time_state time_state;
+    cui_time time;
+    cui_color_state color_state;
+    cui_color color;
+    cui_date_selection date_selection;
+    cui_calendar_state calendar_state;
+    cui_date_picker_state date_picker_state;
+    cui_otp_state otp_state;
+    char *otp_buffer;
+    cui_input_group_state input_group_state;
+    cui_bridge_app *owner;
+    uint32_t own_slot;
 } cui_bridge_node_record;
 typedef struct {
     uint32_t checked;
@@ -53,8 +87,12 @@ struct cui_bridge_app {
     cui_bridge_event_payload *event_payloads;
     uint32_t max_events, event_head, event_count;
     cui_bridge_status frame_error;
+    bool render_disabled;
     bool stepping, closed;
     float width, height;
+    double now_seconds;
+    cui_notification_state *notifications;
+    cui_notification_entry *notification_entries;
     cui_bridge_backend backend;
     void *native;
 };
@@ -64,4 +102,6 @@ cui_bridge_status cui_bridge_native_create(cui_bridge_app *, const char *, const
 void cui_bridge_native_destroy(cui_bridge_app *);
 cui_bridge_status cui_bridge_native_poll(cui_bridge_app *);
 cui_bridge_status cui_bridge_native_render(cui_bridge_app *, const cui_draw_list *);
+cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *, const char *const *,
+                                                       uint32_t);
 #endif

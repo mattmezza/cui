@@ -78,6 +78,14 @@ typedef struct {
     float prefix_width, suffix_width;
     bool omit_leading_border; /* first Default tab: source tab_bar_prefix(false) */
 } cui_tab_parts;
+/* Explicit opt-in segmented appearance; zero preserves existing paint.
+ * SOURCE_TAB uses standalone XS. SOURCE_BAR requires animation and horizontal
+ * orientation, with SM before measurement and private raised layers afterward. */
+typedef enum {
+    CUI_TAB_SHADOW_LEGACY = 0,
+    CUI_TAB_SHADOW_SOURCE_TAB,
+    CUI_TAB_SHADOW_SOURCE_BAR
+} cui_tab_shadow_policy;
 typedef struct {
     bool vertical, disabled, manual_activation;
     cui_tab_size size;
@@ -106,7 +114,10 @@ typedef struct {
     bool custom_last_empty_space_width; /* permits an explicit zero-width tail */
     cui_design_size design_size;        /* INHERIT preserves legacy metrics. */
     const cui_scrollbar_style *scrollbar_style;
+    cui_tab_shadow_policy shadow_policy;
 } cui_tabs_options;
+/* Checked before reducers/callbacks; other variants ignore valid policies. */
+bool cui_tabs_shadow_policy_valid(cui_tabs_options);
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
 } cui_toggle_group_options;
@@ -742,8 +753,17 @@ static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, si
     cui_invalidate(ui);
     return true;
 }
+bool cui_tabs_shadow_policy_valid(cui_tabs_options options) {
+    return options.shadow_policy >= CUI_TAB_SHADOW_LEGACY &&
+           options.shadow_policy <= CUI_TAB_SHADOW_SOURCE_BAR &&
+           !(options.variant == CUI_TAB_SEGMENTED &&
+             options.shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR &&
+             (!options.animation || options.vertical));
+}
 bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_tabs_options options) {
+    if (!cui_tabs_shadow_policy_valid(options))
+        return false;
     if (!count && options.overflow) {
         options.overflow->visible = false;
         if (options.overflow->menu.overlay.open)
@@ -2272,12 +2292,47 @@ static cui_color cui_tab_foreground_fade(cui_color from, cui_color to, float ela
     return (cui_color){(uint8_t)lroundf((r + m) * 255), (uint8_t)lroundf((g + m) * 255),
                        (uint8_t)lroundf((blue + m) * 255), (uint8_t)lroundf(a[3] * 255)};
 }
+typedef struct {
+    cui_rect local;
+    float radius;
+    cui_color background;
+} cui_tab_raised_paint;
+static bool cui_tab_raised_prepaint(const cui_prepaint_info *info, const void *payload,
+                                    cui_prepaint_writer *writer) {
+    const cui_tab_raised_paint *p = payload;
+    cui_rect caster = p->local;
+    caster.x += info->bounds.x;
+    caster.y += info->bounds.y;
+    cui_corner_radii radii = {p->radius, p->radius, p->radius, p->radius};
+    const cui_drop_shadow layers[] = {
+        {.offset_y = 1, .sigma = 1.5f, .color = {0, 0, 0, 26}},
+        {.offset_y = 1, .sigma = 1, .spread = -1, .color = {0, 0, 0, 26}}};
+    for (size_t i = 0; i < 2; ++i) {
+        cui_drop_shadow_paint shadow = {.caster = caster, .radii = radii, .layer = layers[i]};
+        if (!cui_prepaint_drop_shadow(writer, &shadow, false))
+            return false;
+    }
+    cui_draw_command surface = {.type = CUI_DRAW_RECT,
+                                .bounds = caster,
+                                .color = p->background,
+                                .corner_radii = radii,
+                                .custom_corners = true};
+    return cui_prepaint_emit(writer, &surface, false);
+}
 static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                                bool selected, bool disabled, cui_tab_variant variant,
                                cui_choice_render_fn render, size_t index, void *render_user,
                                float max_width, const cui_tab_parts *parts,
-                               const cui_tab_metrics *metrics, const cui_tab_animation *animation) {
+                               const cui_tab_metrics *metrics, const cui_tab_animation *animation,
+                               cui_tab_shadow_policy shadow_policy, float source_inner_radius) {
     bool indicator_ready = animation && animation->ready;
+    float inner_radius =
+        metrics && variant == CUI_TAB_SEGMENTED
+            ? shadow_policy != CUI_TAB_SHADOW_LEGACY
+                  ? source_inner_radius
+                  : fmaxf(0, (metrics->inner_height >= 24 ? theme->radius_lg : theme->radius) -
+                                 (metrics->inner_height >= 28 ? 3 : 2))
+            : 0;
     float padding = metrics ? metrics->padding_x : theme->padding;
     float part_gap = metrics ? metrics->part_gap : theme->gap;
     bool composed = metrics || (parts && (parts->prefix || parts->suffix || parts->icon));
@@ -2376,16 +2431,24 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
                       .height = metrics ? metrics->inner_height : 0,
                       .row = true,
                       .gap = 0,
-                      .radius = metrics && variant == CUI_TAB_SEGMENTED
-                                    ? fmaxf(0, (metrics->inner_height >= 24 ? theme->radius_lg
-                                                                            : theme->radius) -
-                                                   (metrics->inner_height >= 28 ? 3 : 2))
-                                    : 0,
-                      .background = metrics && variant == CUI_TAB_SEGMENTED && selected &&
-                                            !(indicator_ready && !disabled)
-                                        ? theme->background
-                                        : (cui_color){0},
+                      .radius = inner_radius,
+                      .background =
+                          metrics && variant == CUI_TAB_SEGMENTED && selected &&
+                                  !(indicator_ready &&
+                                    (!disabled || shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR))
+                              ? theme->background
+                              : (cui_color){0},
                       .align_y = CUI_ALIGN_CENTER});
+        if (variant == CUI_TAB_SEGMENTED && selected && !disabled) {
+            if (shadow_policy == CUI_TAB_SHADOW_SOURCE_TAB)
+                cui_set_shadow_preset(
+                    ui, CUI_SHADOW_XS,
+                    (cui_corner_radii){inner_radius, inner_radius, inner_radius, inner_radius});
+            else if (shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR && !indicator_ready)
+                cui_set_shadow_preset(
+                    ui, CUI_SHADOW_SM,
+                    (cui_corner_radii){inner_radius, inner_radius, inner_radius, inner_radius});
+        }
         if (padding > 0) {
             cui_begin_box(ui, 0, (cui_box){.width = padding});
             cui_end_box(ui);
@@ -2467,7 +2530,7 @@ static void cui_choice_draw_ex(cui_context *ui, const cui_choice_item *item, con
 static void cui_choice_draw(cui_context *ui, const cui_choice_item *item, const cui_theme *theme,
                             bool selected, bool disabled, cui_tab_variant variant) {
     cui_choice_draw_ex(ui, item, theme, selected, disabled, variant, NULL, 0, NULL, 0, NULL, NULL,
-                       false);
+                       NULL, CUI_TAB_SHADOW_LEGACY, 0);
 }
 static float cui_tab_extent(cui_context *ui, const cui_theme *theme, const cui_choice_item *item,
                             size_t index, cui_tabs_options options,
@@ -2517,7 +2580,8 @@ static void cui_tab_overflow_artwork(cui_context *ui, const cui_choice_item *ite
 bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
               cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
-    if (!theme || !items || !selected || !cui_design_valid(options.design_size))
+    if (!theme || !items || !selected || !cui_design_valid(options.design_size) ||
+        !cui_tabs_shadow_policy_valid(options))
         return false;
     cui_id viewport_id = container ^ UINT64_C(0x739b1b53a6cef421);
     const cui_theme *supplied_theme = theme;
@@ -2542,6 +2606,14 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         metrics.inner_height *= options.height / metrics.height;
         metrics.height = options.height;
     }
+    float source_inner_radius =
+        options.design_size
+            ? fmaxf(0, (metrics.inner_height >= 24 ? theme->radius_lg : theme->radius) -
+                           (metrics.inner_height >= 28 ? 3 : 2))
+            : fmaxf(0, (options.size == CUI_TAB_MEDIUM || options.size == CUI_TAB_LARGE
+                            ? theme->radius_lg
+                            : theme->radius) -
+                           (options.size == CUI_TAB_LARGE ? 3 : 2));
     cui_theme tab_theme = *theme;
     tab_theme.control_height = metrics.height;
     tab_theme.font_size = metrics.font_size;
@@ -2668,7 +2740,10 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                       .offset_x = options.vertical ? 0 : -options.scroll->offset,
                       .offset_y = options.vertical ? -options.scroll->offset : 0});
     }
-    cui_tab_animation *animation = options.animation;
+    cui_tab_animation *animation =
+        options.variant == CUI_TAB_SEGMENTED && options.shadow_policy == CUI_TAB_SHADOW_SOURCE_TAB
+            ? NULL
+            : options.animation;
     bool animated_variant = options.variant == CUI_TAB_PILL ||
                             options.variant == CUI_TAB_SEGMENTED ||
                             options.variant == CUI_TAB_UNDERLINE;
@@ -2676,7 +2751,9 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
         animation->ready = false;
         size_t target = count;
         for (size_t i = 0; i < count; i++)
-            if (items[i].id == *selected && !items[i].disabled && !options.disabled)
+            if (items[i].id == *selected && ((!items[i].disabled && !options.disabled) ||
+                                             (options.variant == CUI_TAB_SEGMENTED &&
+                                              options.shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR)))
                 target = i;
         cui_id strip_id = scrollable ? viewport_id : container ^ UINT64_C(0xa7eb5ea7941c2240);
         cui_rect strip = cui_bounds(ui, strip_id);
@@ -2720,15 +2797,29 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                                       ? theme->radius_lg
                                       : theme->radius) -
                                      (options.size == CUI_TAB_LARGE ? 3 : 2));
+                    if (options.shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR)
+                        radius = source_inner_radius;
                     color = theme->background;
                 }
-                animation->ready = cui_set_underlay(
-                    ui, indicator, color, (cui_corner_radii){radius, radius, radius, radius});
+                if (options.variant == CUI_TAB_SEGMENTED &&
+                    options.shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR) {
+                    cui_tab_raised_paint paint = {indicator, radius, color};
+                    animation->ready = cui_set_prepaint(
+                        ui, (cui_prepaint_options){.callback = cui_tab_raised_prepaint,
+                                                   .payload = &paint,
+                                                   .payload_bytes = sizeof(paint),
+                                                   .command_budget = 5});
+                } else
+                    animation->ready = cui_set_underlay(
+                        ui, indicator, color, (cui_corner_radii){radius, radius, radius, radius});
                 if (animation->spring.left != left || animation->spring.width != bounds.w ||
                     animation->spring.left_velocity != 0 || animation->spring.width_velocity != 0 ||
                     (options.variant == CUI_TAB_PILL && animation->transitioning))
                     cui_invalidate(ui);
             }
+            if (options.variant == CUI_TAB_SEGMENTED &&
+                options.shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR && !animation->ready)
+                cui_invalidate(ui);
             cui_track_bounds(ui, items[target].id, &animation->target_bounds);
         }
         cui_track_bounds(ui, strip_id, &animation->strip_bounds);
@@ -2740,7 +2831,7 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
                            options.disabled || items[i].disabled, options.variant, options.render,
                            i, options.render_user, options.max_width,
                            options.parts && i < options.parts_count ? &options.parts[i] : NULL,
-                           &metrics, options.animation);
+                           &metrics, animation, options.shadow_policy, source_inner_radius);
         cui_set_semantic_details(
             ui, items[i].id,
             (cui_semantic_details){.selected = items[i].id == *selected,

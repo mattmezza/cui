@@ -38,6 +38,8 @@ jobs:
         run: python scripts/build_web.py --zig "$(python -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).parent / "zig")')" --regex-library build/regex-wasi/target/wasm32-wasip1/release/libcui_regex.a
       - name: Optional and default gallery regex acceptance and IME
         run: uv run tests/web/test_input_regex_gallery.py --directory build/web --default-directory build/web-default
+      - name: Verify segmented Tab shadow branches and measured caster
+        run: uv run tests/web/test_tabs_source_shadows.py
       - name: Actual Popover appearance consumers
         run: uv run tests/web/test_popover_appearance.py --output build/popover-appearance-probe
       - name: Gallery Popover and Notification shadow policies

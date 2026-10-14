@@ -120,6 +120,8 @@ jobs:
         run: uv run tests/web/test_button_numeric.py
       - name: Notification component source shadow consumers
         run: uv run tests/web/test_notification_shadows.py --output build/notification-shadow-probe
+      - name: Verify typed Button artwork and loading replacement
+        run: uv run tests/web/test_button_artwork.py
       - name: Copied button click events
         run: uv run tests/web/test_button_click_event.py
       - name: Verify Button callbacks slots focus and painted states

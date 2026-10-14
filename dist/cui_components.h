@@ -86,6 +86,7 @@ typedef struct {
     unsigned click_count; /* Pointer zero normalizes to one; nonpointer is zero. */
 } cui_button_click_event;
 typedef void (*cui_button_click_event_fn)(void *user, const cui_button_click_event *event);
+typedef struct cui_button_artwork cui_button_artwork;
 typedef void (*cui_button_hover_fn)(void *user, bool hovered);
 /* Optional bounded storage, one state per stable Button ID; retain through end_frame.
  * No allocation/cleanup. Hover callbacks and tooltip require this state. */
@@ -137,6 +138,7 @@ typedef struct {
     float pixel_size; /* 0: legacy/design sizing; finite (0,4096]: numeric source sizing. */
     bool open; /* Active presentation only; independent of selected/checked/menu lifecycle. */
     cui_button_click_event_fn on_click_event; /* After legacy on_click, per accepted event. */
+    const cui_button_artwork *leading_artwork, *loading_artwork; /* Optional typed slots. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
@@ -390,6 +392,38 @@ typedef struct {
     float diameter, raster_scale; /* Zero uses legacy8/12/16/20px or design control_height. */
 } cui_progress_circle_options;
 cui_progress_circle_options cui_progress_circle_defaults(void);
+/* Button artwork descriptors are copied during composition. Referenced states,
+ * pixel storage and result outputs remain caller-owned; keep render resources
+ * alive and unchanged until rendering completes. loading_artwork accepts ICON
+ * only. Explicit SPINNER/PROGRESS_CIRCLE leading artwork survives loading.
+ * leading_content takes priority. Button metrics override artwork dimensions.
+ * Group borrows immutable descriptors until group_ex returns; standalone Button
+ * copies their values before click callbacks. Result objects must not alias resources.
+ * Layout-only composition writes neither resources nor results. */
+typedef enum {
+    CUI_BUTTON_ARTWORK_ICON,
+    CUI_BUTTON_ARTWORK_SPINNER,
+    CUI_BUTTON_ARTWORK_PROGRESS_CIRCLE
+} cui_button_artwork_kind;
+typedef enum {
+    CUI_BUTTON_ARTWORK_OK,
+    CUI_BUTTON_ARTWORK_ICON_FAILURE,
+    CUI_BUTTON_ARTWORK_PROGRESS_FAILURE
+} cui_button_artwork_status;
+typedef struct {
+    cui_button_artwork_status status;
+    cui_icon_error icon_error;
+} cui_button_artwork_result;
+struct cui_button_artwork {
+    cui_button_artwork_kind kind;
+    cui_icon_state *icon; /* Required for ICON; optional custom Spinner icon. */
+    cui_icon_options icon_options;
+    cui_progress_circle_state *progress; /* Required for PROGRESS_CIRCLE. */
+    cui_progress_circle_options progress_options;
+    float fraction;
+    cui_button_artwork_result *result; /* Optional; local paint failures only. */
+};
+
 /* Caller owns pixel storage; no resource allocation. Returns animation demand.
  * Optional child callback composes centered content. Invalid arguments submit
  * no UI, do not invoke children and preserve motion/buffer/state. */
@@ -755,6 +789,109 @@ static bool cui_button_label_prepaint(const cui_prepaint_info *info, const void 
     }
     return true;
 }
+static void cui_button_artwork_empty(cui_context *ui, cui_id id, float size) {
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = size, .height = size, .fixed_width = true, .fixed_height = true});
+    cui_end_box(ui);
+}
+static bool cui_button_artwork_overlap(const void *a, size_t an, const void *b, size_t bn) {
+    if (!a || !b || !an || !bn)
+        return false;
+    uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
+    return x <= y ? y - x < an : x - y < bn;
+}
+static bool cui_button_artwork_valid(const cui_button_artwork *a, bool loading) {
+    if (!a)
+        return true;
+    if (a->result && (cui_button_artwork_overlap(a->result, sizeof(*a->result), a, sizeof(*a)) ||
+                      cui_button_artwork_overlap(a->result, sizeof(*a->result), a->icon,
+                                                 a->icon ? sizeof(*a->icon) : 0) ||
+                      cui_button_artwork_overlap(a->result, sizeof(*a->result), a->progress,
+                                                 a->progress ? sizeof(*a->progress) : 0)))
+        return false;
+    if (a->kind < CUI_BUTTON_ARTWORK_ICON || a->kind > CUI_BUTTON_ARTWORK_PROGRESS_CIRCLE ||
+        (loading && a->kind != CUI_BUTTON_ARTWORK_ICON))
+        return false;
+    if (a->kind == CUI_BUTTON_ARTWORK_PROGRESS_CIRCLE) {
+        cui_progress_options p = a->progress_options.progress;
+        float scale = a->progress_options.raster_scale;
+        if (a->progress && a->result &&
+            (cui_button_artwork_overlap(a->result, sizeof(*a->result), a->progress->pixels,
+                                        a->progress->capacity) ||
+             cui_button_artwork_overlap(a->result, sizeof(*a->result), p.motion,
+                                        p.motion ? sizeof(*p.motion) : 0)))
+            return false;
+        return a->progress && isfinite(a->fraction) && isfinite(scale) && scale >= 0 &&
+               scale <= 4 && isfinite(p.now_seconds) && isfinite(p.duration) && p.duration >= 0 &&
+               p.size >= CUI_CONTROL_MEDIUM && p.size <= CUI_CONTROL_XSMALL &&
+               (!p.name.length || p.name.data);
+    }
+    if (a->kind == CUI_BUTTON_ARTWORK_ICON && !a->icon)
+        return false;
+    cui_icon_options o = a->icon_options;
+    cui_icon_transform t = o.transform;
+    return (!o.custom_opacity || isfinite(o.opacity)) &&
+           (!o.custom_transform || (isfinite(t.a) && isfinite(t.b) && isfinite(t.c) &&
+                                    isfinite(t.d) && isfinite(t.tx) && isfinite(t.ty)));
+}
+static void cui_button_artwork_paint(cui_context *ui, cui_id id, const cui_theme *theme,
+                                     const cui_button_artwork *descriptor, float size,
+                                     cui_color foreground, bool rotate) {
+    cui_button_artwork a = *descriptor;
+    if (!cui_frame_paint_enabled(ui)) {
+        cui_button_artwork_empty(ui, id, size);
+        return;
+    }
+    cui_begin_box(ui, id,
+                  (cui_box){.width = size,
+                            .height = size,
+                            .fixed_width = true,
+                            .fixed_height = true,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER});
+    cui_id child_id = id ^ UINT64_C(0x41d0e78ad86f5307);
+    if (!child_id)
+        child_id = ~id;
+    cui_button_artwork_result result = {CUI_BUTTON_ARTWORK_OK, CUI_ICON_OK};
+    if (a.kind == CUI_BUTTON_ARTWORK_PROGRESS_CIRCLE) {
+        cui_progress_circle_options p = a.progress_options;
+        p.diameter = size;
+        p.progress.design_size = CUI_DESIGN_INHERIT;
+        uint64_t revision = a.progress->revision;
+        (void)cui_progress_circle(ui, child_id, theme, a.fraction, a.progress, p, NULL, NULL);
+        if (a.progress->revision == revision) {
+            result.status = CUI_BUTTON_ARTWORK_PROGRESS_FAILURE;
+        }
+    } else {
+        cui_icon_options o = a.icon_options;
+        o.size = CUI_ICON_CUSTOM;
+        o.custom_size = size;
+        o.design_size = CUI_DESIGN_INHERIT;
+        o.custom_width = o.custom_height = false;
+        if (!o.custom_color && !o.custom_inherited_color) {
+            o.custom_color = true;
+            o.color = foreground;
+        }
+        bool moving = rotate && !cui_reduced_motion(ui);
+        if (moving) {
+            double phase = fmod(cui_frame_time(ui), .8) / .8;
+            double eased =
+                phase < .5 ? 2 * phase * phase : 1 - (-2 * phase + 2) * (-2 * phase + 2) / 2;
+            o.custom_transform = true;
+            o.transform = cui_icon_rotation((float)(eased * 6.2831853071795864769));
+        }
+        result.icon_error = a.icon ? cui_icon(ui, child_id, theme, a.icon, o)
+                                   : cui_icon_spinner(ui, child_id, theme, o);
+        if (result.icon_error != CUI_ICON_OK)
+            result.status = CUI_BUTTON_ARTWORK_ICON_FAILURE;
+        else if (moving)
+            cui_invalidate(ui);
+    }
+    cui_end_box(ui);
+    if (a.result)
+        *a.result = result;
+}
 static bool cui_button_shape_valid(cui_button_options);
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state) {
@@ -845,7 +982,7 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
             measured += cui_measure_text(ui, name, font).width;
             parts++;
         }
-        if (o.loading || o.icon.length) {
+        if (o.loading || o.icon.length || o.leading_artwork) {
             measured += icon;
             parts++;
         } else if (o.leading.length) {
@@ -986,6 +1123,13 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         .size = CUI_ICON_CUSTOM, .custom_size = icon, .custom_color = true, .color = foreground};
     if (o.leading_content)
         o.leading_content(ui, o.leading_user);
+    else if (o.leading_artwork &&
+             (!o.loading || o.leading_artwork->kind != CUI_BUTTON_ARTWORK_ICON))
+        cui_button_artwork_paint(ui, id ^ UINT64_C(0x7185e28e9fb974db), t, o.leading_artwork, icon,
+                                 foreground, o.leading_artwork->kind == CUI_BUTTON_ARTWORK_SPINNER);
+    else if (o.loading && o.loading_artwork)
+        cui_button_artwork_paint(ui, id ^ UINT64_C(0x7185e28e9fb974db), t, o.loading_artwork, icon,
+                                 foreground, true);
     else if (o.loading && !cui_frame_paint_enabled(ui)) {
         /* Layout-only composition retains the icon slot without allocating or
          * scheduling invisible loading artwork. */
@@ -1103,7 +1247,9 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
     cui_button_paint_state(ui, id, t, name, o, state);
 }
 static bool cui_button_shape_valid(cui_button_options o) {
-    if (!isfinite(o.pixel_size) || o.pixel_size < 0 || o.pixel_size > 4096)
+    if (!cui_button_artwork_valid(o.leading_artwork, false) ||
+        !cui_button_artwork_valid(o.loading_artwork, true) || !isfinite(o.pixel_size) ||
+        o.pixel_size < 0 || o.pixel_size > 4096)
         return false;
     float radii[] = {o.corner_radii.top_left, o.corner_radii.top_right, o.corner_radii.bottom_left,
                      o.corner_radii.bottom_right};
@@ -1197,6 +1343,18 @@ static cui_button_click_event cui_button_click_snapshot(cui_context *ui, cui_id 
 }
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_button_options o) {
+    if (!ui || !t || !cui_button_shape_valid(o))
+        return false;
+    /* Freeze descriptor values before accepted callbacks; resource handles remain borrowed. */
+    cui_button_artwork leading, loading;
+    if (o.leading_artwork) {
+        leading = *o.leading_artwork;
+        o.leading_artwork = &leading;
+    }
+    if (o.loading_artwork) {
+        loading = *o.loading_artwork;
+        o.loading_artwork = &loading;
+    }
     cui_design_metrics design;
     if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
         !cui_button_shape_valid(o))

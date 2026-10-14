@@ -41,3 +41,10 @@ endif()
 add_test(NAME bridge_python_components COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_components.py)
+
+# ASan instrumentation has a separate stack budget; native Windows defaults to 1 MB.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CUI_SANITIZE)
+ add_test(NAME bridge_small_stack COMMAND ${Python3_EXECUTABLE}
+  ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_small_stack.py
+  $<TARGET_FILE:test_bridge_core> $<TARGET_FILE:test_bridge_components>)
+endif()

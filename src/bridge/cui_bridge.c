@@ -895,11 +895,12 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
             scratch->binding.slots[count] = child;
             scratch->radios[count] =
                 (cui_radio_group_item){item->id, cui_string(item->text), item->disabled};
-            scratch->tabs[count] = (cui_choice_item){item->id, cui_string(item->text), item->disabled};
+            scratch->tabs[count] =
+                (cui_choice_item){item->id, cui_string(item->text), item->disabled};
             scratch->menu_entries[count] = (cui_menu_entry){.id = item->id,
-                                                   .label = cui_string(item->text),
-                                                   .disabled = item->disabled,
-                                                   .kind = CUI_MENU_ACTION};
+                                                            .label = cui_string(item->text),
+                                                            .disabled = item->disabled,
+                                                            .kind = CUI_MENU_ACTION};
             scratch->disclosures[count] =
                 (cui_disclosure_item){item->id, cui_string(item->text), item->disabled};
             scratch->opened[count] = item->checked;
@@ -914,7 +915,8 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
                     selected = app->nodes[index].id;
             }
             cui_radio_group_result result = cui_radio_group(
-                app->ui, node->id, &app->theme, scratch->radios, count, &selected, &node->radio_group_state,
+                app->ui, node->id, &app->theme, scratch->radios, count, &selected,
+                &node->radio_group_state,
                 (cui_radio_group_options){.vertical = true, .disabled = node->disabled});
             if (result.changed) {
                 for (size_t i = 0; i < count; i++)
@@ -945,8 +947,8 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
                 .menu = {.popup = {.viewport = {0, 0, app->width, app->height}, .dt = .016f}}};
             cui_dropdown_button_result result = cui_dropdown_button(
                 app->ui, node->id, node->id | (UINT64_C(1) << 61), node->id | (UINT64_C(1) << 60),
-                &app->theme, cui_string(node->text), cui_string(node->detail), scratch->menu_entries, count,
-                &action, &node->menu_state, options);
+                &app->theme, cui_string(node->text), cui_string(node->detail),
+                scratch->menu_entries, count, &action, &node->menu_state, options);
             if (result.action_activated)
                 bridge_click_simple(app, slot);
             if (result.menu_activated) {
@@ -972,9 +974,10 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
                                      cui_string(node->detail), scratch->tabs, count, &selected,
                                      &node->choice_popup, options);
             } else {
-                cui_combobox_result result = cui_combobox(
-                    app->ui, node->id, &app->theme, cui_string(node->detail), node->edit, scratch->tabs,
-                    count, scratch->filtered, 64, &selected, &node->choice_popup, options);
+                cui_combobox_result result =
+                    cui_combobox(app->ui, node->id, &app->theme, cui_string(node->detail),
+                                 node->edit, scratch->tabs, count, scratch->filtered, 64, &selected,
+                                 &node->choice_popup, options);
                 changed = result.changed;
                 if (result.query_changed)
                     bridge_change(app, slot);
@@ -988,7 +991,8 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
                 bridge_change(app, slot);
             }
         } else {
-            if (cui_accordion(app->ui, node->id, &app->theme, scratch->disclosures, count, scratch->opened,
+            if (cui_accordion(app->ui, node->id, &app->theme, scratch->disclosures, count,
+                              scratch->opened,
                               (cui_accordion_options){.multiple = true, .disabled = node->disabled},
                               bridge_group_panel, &scratch->binding)) {
                 for (size_t i = 0; i < count; i++) {

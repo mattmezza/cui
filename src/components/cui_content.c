@@ -466,6 +466,151 @@ void cui_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble_optio
     }
     cui_end_box(ui);
 }
+cui_empty_style cui_empty_default_style(const cui_theme *t, cui_empty_part part,
+                                        cui_empty_media_variant variant, float rem) {
+    cui_empty_style s = {0};
+    if (!t)
+        return s;
+    if (!isfinite(rem) || rem <= 0)
+        rem = 16;
+    s.foreground = t->text;
+    s.font_size = rem * .875f;
+    s.box.align_x = CUI_ALIGN_CENTER;
+    if (part == CUI_EMPTY_ROOT) {
+        s.box.width = -1;
+        s.box.height = -1;
+        s.box.padding = rem * 1.5f;
+        s.box.gap = rem;
+        s.box.radius = t->radius_lg;
+        s.box.border = t->border;
+        s.box.align_y = CUI_ALIGN_CENTER;
+    } else if (part == CUI_EMPTY_HEADER || part == CUI_EMPTY_CONTENT) {
+        s.box.width = -1;
+        s.box.max_width = rem * 24;
+        s.box.gap = rem * (part == CUI_EMPTY_HEADER ? .5f : .625f);
+    } else if (part == CUI_EMPTY_MEDIA) {
+        s.font_size = rem;
+        s.box.align_y = CUI_ALIGN_CENTER;
+        if (variant == CUI_EMPTY_MEDIA_ICON) {
+            s.box.width = s.box.height = rem * 2;
+            s.box.fixed_width = s.box.fixed_height = true;
+            s.box.background = t->secondary;
+            s.box.radius = t->radius_lg;
+        }
+    } else if (part == CUI_EMPTY_TITLE) {
+        s.text.weight = CUI_TEXT_WEIGHT_MEDIUM;
+    } else if (part == CUI_EMPTY_DESCRIPTION) {
+        s.box.width = -1;
+        s.foreground = t->muted;
+        s.line_height = s.font_size * 1.625f;
+    }
+    return s;
+}
+static bool cui_empty_style_valid(const cui_empty_style *s) {
+    if (!s)
+        return true;
+    const cui_box *b = &s->box;
+    float values[] = {b->padding,
+                      b->gap,
+                      b->radius,
+                      b->border_width,
+                      b->max_width,
+                      b->max_height,
+                      s->font_size,
+                      s->line_height,
+                      b->corner_radii.top_left,
+                      b->corner_radii.top_right,
+                      b->corner_radii.bottom_left,
+                      b->corner_radii.bottom_right,
+                      b->border_edges.left,
+                      b->border_edges.right,
+                      b->border_edges.top,
+                      b->border_edges.bottom};
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
+        if (!isfinite(values[i]) || values[i] < 0)
+            return false;
+    return isfinite(b->width) && b->width >= -1 && isfinite(b->height) && b->height >= -1 &&
+           isfinite(b->offset_x) && isfinite(b->offset_y) && isfinite(b->opacity) &&
+           s->font_size > 0 && b->align_x <= CUI_ALIGN_END && b->align_x >= CUI_ALIGN_START &&
+           b->align_y <= CUI_ALIGN_END && b->align_y >= CUI_ALIGN_START &&
+           s->text.weight >= CUI_TEXT_WEIGHT_NORMAL && s->text.weight <= CUI_TEXT_WEIGHT_BOLD;
+}
+static bool cui_empty_span_valid(cui_str s) {
+    return !s.length || s.data;
+}
+static bool cui_empty_slot_valid(const cui_empty_slot *s) {
+    return !s || (cui_empty_style_valid(s->style) && cui_empty_span_valid(s->text));
+}
+static void cui_empty_render_slot(cui_context *ui, cui_id id, const cui_theme *t,
+                                  const cui_empty_slot *slot, cui_empty_style style) {
+    if (!slot)
+        return;
+    if (slot->style)
+        style = *slot->style;
+    cui_begin_box(ui, id, style.box);
+    if (slot->text.length)
+        cui_text_ex(ui, slot->text, style.font_size, style.foreground, style.line_height,
+                    style.text);
+    if (slot->children) {
+        cui_theme inherited = *t;
+        inherited.font_size = style.font_size;
+        inherited.text = style.foreground;
+        slot->children(ui, &inherited, style.foreground, slot->user);
+    }
+    cui_end_box(ui);
+}
+bool cui_empty_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_empty_options o) {
+    const cui_empty_header *h = o.header;
+    if (!ui || !id || !t || !isfinite(o.rem) || o.rem < 0 || o.rem > 4096 ||
+        !cui_empty_style_valid(o.style) || !cui_empty_span_valid(o.accessible_name) ||
+        !cui_empty_slot_valid(o.content) ||
+        (h &&
+         (!cui_empty_style_valid(h->style) || !cui_empty_slot_valid(h->media) ||
+          !cui_empty_slot_valid(h->title) || !cui_empty_slot_valid(h->description) ||
+          h->media_variant < CUI_EMPTY_MEDIA_DEFAULT || h->media_variant > CUI_EMPTY_MEDIA_ICON)))
+        return false;
+    float rem = o.rem ? o.rem : 16;
+    cui_empty_style root =
+        o.style ? *o.style
+                : cui_empty_default_style(t, CUI_EMPTY_ROOT, CUI_EMPTY_MEDIA_DEFAULT, rem);
+    cui_begin_box(ui, id, root.box);
+    cui_content_semantic(ui, id, CUI_ROLE_GROUP, o.accessible_name, false, false, 0);
+    if (h) {
+        cui_empty_style header =
+            h->style ? *h->style
+                     : cui_empty_default_style(t, CUI_EMPTY_HEADER, h->media_variant, rem);
+        if (!h->style)
+            header.foreground = root.foreground;
+        cui_theme header_theme = *t;
+        header_theme.text = header.foreground;
+        cui_begin_box(ui, cui_content_child(id, 1), header.box);
+        cui_empty_render_slot(
+            ui, cui_content_child(id, 2), t, h->media,
+            cui_empty_default_style(&header_theme, CUI_EMPTY_MEDIA, h->media_variant, rem));
+        /* Media's mb_2 is separate from the header's gap_2. */
+        if (h->media) {
+            cui_begin_box(ui, cui_content_child(id, 7),
+                          (cui_box){.height = 0, .fixed_height = true});
+            cui_end_box(ui);
+        }
+        cui_empty_render_slot(
+            ui, cui_content_child(id, 3), t, h->title,
+            cui_empty_default_style(&header_theme, CUI_EMPTY_TITLE, h->media_variant, rem));
+        cui_empty_render_slot(
+            ui, cui_content_child(id, 4), t, h->description,
+            cui_empty_default_style(t, CUI_EMPTY_DESCRIPTION, h->media_variant, rem));
+        cui_end_box(ui);
+    }
+    cui_theme root_theme = *t;
+    root_theme.text = root.foreground;
+    cui_empty_render_slot(
+        ui, cui_content_child(id, 5), t, o.content,
+        cui_empty_default_style(&root_theme, CUI_EMPTY_CONTENT, CUI_EMPTY_MEDIA_DEFAULT, rem));
+    if (o.children)
+        o.children(ui, t, root.foreground, o.user);
+    cui_end_box(ui);
+    return true;
+}
 void cui_empty(cui_context *ui, cui_id id, const cui_theme *t, cui_str title, cui_str description,
                float width) {
     if (!ui || !t)

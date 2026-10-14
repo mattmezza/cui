@@ -418,7 +418,7 @@
       "callback_symbols": [],
       "scope": "styled frame component",
       "name": "Label",
-      "public_header": "include/cui/cui_label.h",
+      "public_header": "include/cui/cui_components.h",
       "composition": "immediate frame submission"
     },
     {

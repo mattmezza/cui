@@ -673,7 +673,7 @@ static void gallery_empty_action(cui_context *ctx, const cui_theme *theme, cui_c
     (void)color;
     (void)user;
     if (cui_button(ctx, cui_id_from(ctx, "empty-create"), theme, cui_string("Create project"),
-                   CUI_BUTTON_PRIMARY, empty_disabled))
+                   empty_disabled))
         empty_created++;
 }
 

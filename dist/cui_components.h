@@ -131,6 +131,10 @@ typedef struct {
     cui_str accessibility_label, tooltip;
     cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled supplied. */
     bool skip_tab, hide_focus_ring, prevent_pointer_focus;
+    /* Explicit signed source ordering; zero defaults retain legacy ordering.
+     * skip_tab controls eligibility independently, including index -1. */
+    bool custom_tab_index;
+    int tab_index;
     bool toggle_semantics,
         toggled; /* Explicit checked/value metadata; selected remains paint-only. */
     bool custom_cursor;
@@ -1281,6 +1285,8 @@ static void cui_button_metadata(cui_context *ui, cui_id id, const cui_theme *t, 
                                .no_pointer_focus = o.prevent_pointer_focus,
                                .pointer_activatable = o.prevent_pointer_focus,
                                .blocks_pointer_activation = inert});
+    if (o.custom_tab_index)
+        cui_set_tab_index(ui, id, o.tab_index);
     cui_set_tab_stop(ui, id, !o.skip_tab);
     if (o.custom_cursor)
         (void)cui_set_cursor(ui, id, o.cursor);

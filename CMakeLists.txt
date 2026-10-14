@@ -908,7 +908,7 @@ foreach(probe release_key_activation release_key_overflow)
 endforeach()
 
 # Source-contract component tests; tab-order probe includes Core privately.
-foreach(probe label_source empty_source tab_order_source)
+foreach(probe label_source empty_source tab_order_source button_tab_order_source icon_accessibility_source)
  add_executable(test_${probe} tests/unit/test_${probe}.c)
  target_link_libraries(test_${probe} PRIVATE cui)
  cui_warnings(test_${probe})

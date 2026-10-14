@@ -18,11 +18,12 @@ static void clicked(void *user, const cui_button_click_event *event) {
     copied = *event;
     ++events;
 }
-static void item(cui_context *ui, const cui_theme *t, cui_id id, int index,
-                 bool skip, bool disabled) {
-    cui_button_options o = {.custom_tab_index = true, .tab_index = index,
-                            .skip_tab = skip, .disabled = disabled};
-    if (id == 3) o = options;
+static void item(cui_context *ui, const cui_theme *t, cui_id id, int index, bool skip,
+                 bool disabled) {
+    cui_button_options o = {
+        .custom_tab_index = true, .tab_index = index, .skip_tab = skip, .disabled = disabled};
+    if (id == 3)
+        o = options;
     cui_button_ex(ui, id, t, cui_string("Button"), o);
 }
 static void frame(cui_context *ui, bool modal, bool removed) {
@@ -33,7 +34,8 @@ static void frame(cui_context *ui, bool modal, bool removed) {
     assert(cui_begin_tab_group(ui, -2));
     item(ui, &t, 2, 99, false, false);
     assert(cui_begin_tab_group(ui, -1));
-    if (!removed) item(ui, &t, 3, -9, false, false);
+    if (!removed)
+        item(ui, &t, 3, -9, false, false);
     item(ui, &t, 4, -9, false, false);
     cui_end_tab_group(ui);
     item(ui, &t, 5, -1, true, false);
@@ -51,14 +53,17 @@ static void frame(cui_context *ui, bool modal, bool removed) {
     cui_end_frame(ui);
 }
 static void tab(cui_context *ui, bool reverse, cui_id expected, bool modal, bool removed) {
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_TAB,
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                           .key = CUI_KEY_TAB,
                                            .modifiers = reverse ? CUI_MOD_SHIFT : 0}));
     frame(ui, modal, removed);
     assert(cui_focused(ui) == expected);
 }
 int main(void) {
-    options = (cui_button_options){.custom_tab_index = true, .tab_index = -9,
-                                   .on_click = legacy, .on_click_event = clicked,
+    options = (cui_button_options){.custom_tab_index = true,
+                                   .tab_index = -9,
+                                   .on_click = legacy,
+                                   .on_click_event = clicked,
                                    .action_user = &options};
     cui_context *ui = cui_create((cui_config){0});
     assert(ui);
@@ -77,7 +82,9 @@ int main(void) {
             checked = true;
         }
     assert(checked);
-    options.tab_index = -9; options.skip_tab = false; options.on_click_event = clicked;
+    options.tab_index = -9;
+    options.skip_tab = false;
+    options.on_click_event = clicked;
     tab(ui, false, 4, false, false);
     tab(ui, false, 2, false, false);
     tab(ui, false, 1, false, false);
@@ -86,8 +93,12 @@ int main(void) {
     cui_focus(ui, 5);
     assert(cui_focused(ui) == 5); /* skip_tab preserves programmatic eligibility. */
     tab(ui, false, 3, false, false);
-    cui_focus(ui, 9); frame(ui, false, false); assert(cui_focused(ui) != 9);
-    cui_focus(ui, 6); frame(ui, false, false); assert(cui_focused(ui) != 6);
+    cui_focus(ui, 9);
+    frame(ui, false, false);
+    assert(cui_focused(ui) != 9);
+    cui_focus(ui, 6);
+    frame(ui, false, false);
+    assert(cui_focused(ui) != 6);
     cui_button_click_event saved = copied;
     frame(ui, true, false);
     tab(ui, false, 8, true, false);

@@ -590,7 +590,9 @@
         "tests/web/test_button_click_event.py",
         "tests/unit/test_button_artwork.c",
         "tests/integration/test_button_artwork_font.c",
-        "tests/web/test_button_artwork.py"
+        "tests/web/test_button_artwork.py",
+        "tests/unit/test_tab_order_source.c",
+        "tests/unit/test_button_tab_order_source.c"
       ],
       "status": "tested",
       "platforms": {
@@ -739,6 +741,19 @@
             "tests/web/test_button_artwork.py"
           ],
           "scope": "Copied standalone descriptor, immutable borrowed Group descriptor, source loading replacement, fixed failure slots, resource-table/capacity errors and passive lifecycle tested. Physical malloc OOM and arbitrary Source style refinements are not claimed."
+        },
+        {
+          "name": "signed hierarchical tab order independent of Tab eligibility",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_tab_order_source.c",
+            "tests/unit/test_button_tab_order_source.c",
+            "docs/TAB_ORDER.md",
+            "docs/BUTTON_TAB_ORDER.md"
+          ],
+          "limitations": [
+            "Explicit custom_tab_index opts into signed ordering; legacy zero/-1 details remain compatible. General inherited style/action framework parity is not established."
+          ]
         }
       ],
       "upstream_doc": {
@@ -764,7 +779,7 @@
           "Custom Children"
         ]
       },
-      "last_tested_commit": "12a465a522187e250826b7b26de7654eb736856c",
+      "last_tested_commit": "a25e580d",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -1065,7 +1080,9 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_empty_source.c",
+        "tests/web/test_source_composition_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -1073,7 +1090,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending."
+        "Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending.",
+        "Named header/media/title/description/content/appended child slots now work with native controls; this does not establish complete visual/style parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1096,6 +1114,18 @@
           "evidence": [
             "tests/unit/test_content.c"
           ]
+        },
+        {
+          "name": "named optional composition slots and native child actions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_empty_source.c",
+            "tests/web/test_source_composition_gallery.py",
+            "docs/EMPTY.md"
+          ],
+          "limitations": [
+            "Dashed visible borders, paragraph alignment, general style refinements and descendant inheritance remain pending."
+          ]
         }
       ],
       "upstream_doc": {
@@ -1114,7 +1144,7 @@
           "Styling defaults"
         ]
       },
-      "last_tested_commit": "eeb987ff107a0452e572b8672cb5fe0e6b059fc7"
+      "last_tested_commit": "a25e580d"
     },
     {
       "name": "Focus Trap",
@@ -1350,7 +1380,8 @@
       "public_header": "include/cui/cui_icon.h",
       "sample": null,
       "tests": [
-        "tests/unit/test_icon.c"
+        "tests/unit/test_icon.c",
+        "tests/unit/test_icon_accessibility_source.c"
       ],
       "status": "tested",
       "platforms": {
@@ -1379,8 +1410,14 @@
         },
         {
           "name": "accessible/decorative distinction",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon_accessibility_source.c",
+            "docs/ICON_ACCESSIBILITY.md"
+          ],
+          "limitations": [
+            "Accessible name is explicit; decorative SVG metadata is never exposed. No native accessibility bridge claim."
+          ]
         },
         {
           "name": "theme SVG provider, revision invalidation and bundled fallback",
@@ -1388,6 +1425,17 @@
           "evidence": [
             "tests/unit/test_icon.c",
             "docs/ICON.md"
+          ]
+        },
+        {
+          "name": "explicit rem sizing and box decoration",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_icon_accessibility_source.c",
+            "docs/ICON_ACCESSIBILITY.md"
+          ],
+          "limitations": [
+            "Ambient text style inheritance and general SVG renderer fidelity remain separate gaps."
           ]
         }
       ],
@@ -1426,7 +1474,7 @@
           "Notes"
         ]
       },
-      "last_tested_commit": "200caf1"
+      "last_tested_commit": "a25e580d"
     },
     {
       "name": "Image",
@@ -1567,17 +1615,20 @@
       "category": "fundamentals",
       "base_behavior": [],
       "public_header": "include/cui/cui_components.h",
-      "sample": "gallery/main.c",
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_components.c"
+        "tests/unit/test_components.c",
+        "tests/unit/test_label_source.c",
+        "tests/web/test_source_composition_gallery.py"
       ],
-      "status": "implemented",
+      "status": "tested",
       "platforms": {
         "linux_x11": "tested_partial",
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Text wrapper renders, but control association and standalone semantic labeling pending."
+        "Secondary text, Unicode lowercase highlighting, scalar masking privacy and optional semantic control association are tested. Automatic wrapping, general text alignment and arbitrary style refinement remain pending; not complete Label parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1591,18 +1642,37 @@
             "src/components/cui_components.c:cui_label"
           ],
           "limitations": [
-            "New test directly checks UTF8 bytes, theme font and color across four themes. Underlying Core handles text layout; no Label-specific secondary/masked/highlight API."
+            "Legacy wrapper remains; additive source API covers secondary text, highlighting and masking."
           ]
         },
         {
           "name": "control association",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_label_source.c",
+            "include/cui/cui_label.h",
+            "docs/LABEL.md"
+          ],
+          "limitations": [
+            "Optional controls/focus_target relation; callers set reverse labelled_by on the controlled widget."
+          ]
         },
         {
           "name": "disabled/error presentation",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "secondary text, Unicode highlights and scalar mask privacy",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_label_source.c",
+            "tests/web/test_source_composition_gallery.py",
+            "docs/LABEL.md"
+          ],
+          "limitations": [
+            "Single unwrapped paragraph in this receipt; multiline/wrapping remains pending."
+          ]
         }
       ],
       "upstream_doc": {
@@ -1632,7 +1702,7 @@
           "Custom Layouts"
         ]
       },
-      "last_tested_commit": "a294579bd8e78048e47c4beaba5acf0fe0a02012",
+      "last_tested_commit": "a25e580d",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]

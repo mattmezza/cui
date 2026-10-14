@@ -697,7 +697,7 @@ size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *t,
         cui_end_box(ui);
     }
     if (visible < count) {
-        char label[48], text[16];
+        char label[48], text[32];
         snprintf(label, sizeof label, "%zu more people", count - visible);
         snprintf(text, sizeof text, "+%zu", count - visible);
         cui_id child = cui_content_child(id, 99);

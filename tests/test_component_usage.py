@@ -64,7 +64,7 @@ class ComponentUsageTests(unittest.TestCase):
     def test_public_api_types_callbacks_and_references(self):
         for entry in self.entries:
             with self.subTest(component=entry['name']):
-                header = self.headers[entry['public_header']]
+                header = public_header_closure(self.headers, entry['public_header'])
                 self.assertTrue(entry['api_symbols'])
                 for api in entry['api_symbols']:
                     self.assertRegex(header, r'\b' + re.escape(api) + r'\s*\(')

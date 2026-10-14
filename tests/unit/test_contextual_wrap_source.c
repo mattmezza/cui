@@ -136,7 +136,8 @@ static void paragraphs(void) {
     cui_destroy(ui);
 }
 static void failures(void) {
-    cui_context *ui = cui_create((cui_config){.max_elements = 16, .frame_bytes = 128});
+    cui_context *ui = cui_create(
+        (cui_config){.max_elements = 16, .frame_bytes = 48 + 2 * sizeof(cui_text_color_span)});
     assert(ui);
     assert(cui_begin_frame(ui, 200, 100, 0));
     assert(!cui_text_paragraph_colored(ui, cui_string("\xf0\x80\x80\x80"), 16, (cui_color){0}, 20,
@@ -168,7 +169,7 @@ static void failures(void) {
     ui = cui_create((cui_config){.measure_styled = measure,
                                  .measure_user = &(unsigned){0},
                                  .max_elements = 64,
-                                 .frame_bytes = 128});
+                                 .frame_bytes = 48 + 2 * sizeof(cui_text_color_span)});
     assert(ui && cui_begin_frame(ui, 200, 300, 0));
     cui_begin_box(ui, 1, (cui_box){.width = 40});
     cui_text_color_span all = {0, 17, {255, 0, 0, 255}};

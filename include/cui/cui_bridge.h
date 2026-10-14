@@ -141,7 +141,8 @@ typedef struct {
     const char *font_path_utf8; /* Required for SDL; borrowed only during create. */
 } cui_bridge_options;
 
-/* All calls for an app must be confined to one thread. Strings are UTF-8,
+/* Calls across all apps must be serialized, and each app is confined to one
+ * thread: the layout engine currently has process-wide state. Strings are UTF-8,
  * NUL-terminated, and limited to 4096 bytes excluding NUL. */
 CUI_BRIDGE_API uint32_t cui_bridge_abi_version(void);
 CUI_BRIDGE_API uint32_t cui_bridge_options_size(void);

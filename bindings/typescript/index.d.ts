@@ -13,7 +13,7 @@ export class Column extends Container {}
 export class Label extends Node { label(value: string): this }
 export class Button extends Node {
   label(value: string): this; primary(): this; secondary(): this; outline(): this; ghost(): this;
-  inherit(): this; xs(): this; small(): this; base(): this; medium(): this; large(): this; xl(): this; size(value: "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "8xl" | "9xl"): this;
+  inherit(): this; xs(): this; sm(): this; small(): this; base(): this; md(): this; medium(): this; lg(): this; large(): this; xl(): this; size(value: "inherit" | "xs" | "sm" | "base" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "8xl" | "9xl"): this;
   rounded_theme(): this; rounded_none(): this; rounded_sm(): this; rounded_md(): this; rounded_px(radius: number): this;
   disabled(value?: boolean): this; hover_color(value: string | [number, number, number, number]): this;
   on_click(callback: (event: ClickEvent) => void): this;

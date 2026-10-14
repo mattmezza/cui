@@ -22,7 +22,7 @@ class Node {
   constructor(kind, text) {
     this.kind = kind; this.textValue = text; this.parent = null; this.owner = null;
     this[NODE] = null; this.keyValue = `node-${nextKey++}`; this.childrenValue = [];
-    this.gapValue = undefined; this.variantValue = 0; this.sizeValue = 0;
+    this.gapValue = undefined; this.variantValue = 0; this.sizeValue = 3;
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.hoverValue = undefined; this.clickValue = undefined;
   }
@@ -65,12 +65,15 @@ class Node {
   _size(value) { this._button(); this.sizeValue = value; if (this.owner) native.setSize(this.owner.handle, this[NODE], value); return this; }
   inherit() { return this._size(0); }
   xs() { return this._size(1); }
-  small() { return this._size(2); }
+  sm() { return this._size(2); }
+  small() { return this.sm(); }
   base() { return this._size(3); }
-  medium() { return this._size(4); }
-  large() { return this._size(5); }
+  md() { return this._size(4); }
+  medium() { return this.md(); }
+  lg() { return this._size(5); }
+  large() { return this.lg(); }
   xl() { return this._size(6); }
-  size(value) { const names = {"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14}; if (!Object.hasOwn(names, value)) throw new TypeError("size must be 2xl through 9xl"); return this._size(names[value]); }
+  size(value) { const names = {inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14}; if (!Object.hasOwn(names, value)) throw new TypeError("invalid button size"); return this._size(names[value]); }
   _round(value) { this._button(); this.roundingValue = value; if (this.owner) native.setRounding(this.owner.handle, this[NODE], value); return this; }
   rounded_theme() { return this._round(0); }
   rounded_none() { return this._round(1); }

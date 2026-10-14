@@ -8,6 +8,16 @@ async function main() {
   const status = label('Ready');
   const save = button('save').primary().rounded_md().medium().hover_color('#4466cc')
     .label('Save changes').on_click(() => { clicks++; status.label(`Saved ${clicks}`); });
+  const defaultSize = button('default-size').label('Equal');
+  const explicitBase = button('explicit-base').base().label('Equal');
+  const sizeApp = new App({width: 480, height: 240});
+  sizeApp.mount(row().children(defaultSize, explicitBase));
+  sizeApp.step();
+  const defaultBounds = defaultSize.bounds();
+  const baseBounds = explicitBase.bounds();
+  assert.equal(defaultBounds.width, baseBounds.width, 'default width equals explicit BASE');
+  assert.equal(defaultBounds.height, baseBounds.height, 'default height equals explicit BASE');
+  sizeApp.dispose();
   const app = new App({width: 480, height: 240});
   app.mount(column().gap_units(2).children(row().gap_px(8).children(status, save)));
   app.step();

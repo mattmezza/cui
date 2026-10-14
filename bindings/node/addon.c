@@ -7,7 +7,13 @@
 #include <string.h>
 
 typedef struct { cui_bridge_app *bridge; } js_app;
-typedef struct { js_app *owner; cui_bridge_node node; } js_node;
+typedef struct { js_app *owner; cui_bridge_node node; napi_ref app_ref; } js_node;
+static const napi_type_tag app_tag = { 0xd60f0a84f38740dfULL, 0x9b60ca1b25ce5a82ULL };
+static const napi_type_tag node_tag = { 0x6d74ed9190c54b22ULL, 0x8af239ce73bd1174ULL };
+static int tagged(napi_env env, napi_value value, const napi_type_tag *tag) {
+    bool match = false;
+    return napi_check_object_type_tag(env, value, tag, &match) == napi_ok && match;
+}
 
 static napi_value fail(napi_env env, const char *message) { napi_throw_error(env, NULL, message); return NULL; }
 static napi_value status(napi_env env, cui_bridge_status code) {
@@ -17,7 +23,7 @@ static void app_final(napi_env env, void *data, void *hint) {
     js_app *app = data; (void)env; (void)hint;
     if (app) { if (app->bridge) cui_bridge_destroy(app->bridge); free(app); }
 }
-static void node_final(napi_env env, void *data, void *hint) { (void)env; (void)hint; free(data); }
+static void node_final(napi_env env, void *data, void *hint) { js_node *node = data; (void)hint; if (node) { if (node->app_ref) (void)napi_delete_reference(env, node->app_ref); free(node); } }
 static int args(napi_env env, napi_callback_info info, size_t required, napi_value *v) {
     size_t count = required;
     if (napi_get_cb_info(env, info, &count, v, NULL, NULL) != napi_ok || count < required) {
@@ -26,13 +32,13 @@ static int args(napi_env env, napi_callback_info info, size_t required, napi_val
     return 1;
 }
 static int app_arg(napi_env env, napi_value v, js_app **out) {
-    if (napi_get_value_external(env, v, (void **)out) != napi_ok || !*out || !(*out)->bridge) {
+    if (!tagged(env, v, &app_tag) || napi_get_value_external(env, v, (void **)out) != napi_ok || !*out || !(*out)->bridge) {
         fail(env, "app is disposed or invalid"); return 0;
     }
     return 1;
 }
 static int node_arg(napi_env env, napi_value v, js_app *app, js_node **out) {
-    if (napi_get_value_external(env, v, (void **)out) != napi_ok || !*out || (*out)->owner != app) {
+    if (!tagged(env, v, &node_tag) || napi_get_value_external(env, v, (void **)out) != napi_ok || !*out || (*out)->owner != app) {
         fail(env, "node belongs to another app or is invalid"); return 0;
     }
     return 1;
@@ -40,11 +46,13 @@ static int node_arg(napi_env env, napi_value v, js_app *app, js_node **out) {
 static int string_arg(napi_env env, napi_value v, char **out) {
     size_t len;
     if (napi_get_value_string_utf8(env, v, NULL, 0, &len) != napi_ok) { fail(env, "expected string"); return 0; }
+    if (len > 4096) { fail(env, "string exceeds 4096 UTF-8 bytes"); return 0; }
     *out = malloc(len + 1);
     if (!*out) { fail(env, "allocation failed"); return 0; }
     if (napi_get_value_string_utf8(env, v, *out, len + 1, &len) != napi_ok) {
         free(*out); *out = NULL; fail(env, "invalid string"); return 0;
     }
+    if (strlen(*out) != len) { free(*out); *out = NULL; fail(env, "embedded NUL is not allowed"); return 0; }
     return 1;
 }
 static int number_arg(napi_env env, napi_value v, double *out) {
@@ -99,11 +107,12 @@ static napi_value create(napi_env env, napi_callback_info info) {
     if (napi_create_external(env, app, app_final, NULL, &result) != napi_ok) {
         app_final(env, app, NULL); return NULL;
     }
+    if (napi_type_tag_object(env, result, &app_tag) != napi_ok) return fail(env, "failed to tag app");
     return result;
 }
 static napi_value dispose(napi_env env, napi_callback_info info) {
     napi_value v[1]; js_app *app;
-    if (!args(env, info, 1, v) || napi_get_value_external(env, v[0], (void **)&app) != napi_ok || !app) return fail(env, "invalid app");
+    if (!args(env, info, 1, v) || !tagged(env, v[0], &app_tag) || napi_get_value_external(env, v[0], (void **)&app) != napi_ok || !app) return fail(env, "invalid app");
     if (app->bridge) { cui_bridge_destroy(app->bridge); app->bridge = NULL; }
     return undefined(env);
 }
@@ -120,15 +129,23 @@ static napi_value make_node(napi_env env, napi_callback_info info) {
     cui_bridge_status code = cui_bridge_node_create(app->bridge, parent ? parent->node : root, (cui_bridge_kind)kind, key, &node->node);
     free(key);
     if (code != CUI_BRIDGE_OK) { free(node); return status(env, code); }
+    if (napi_create_reference(env, v[0], 1, &node->app_ref) != napi_ok) {
+        (void)cui_bridge_node_remove(app->bridge, node->node);
+        free(node); return fail(env, "failed to retain app");
+    }
     if (napi_create_external(env, node, node_final, NULL, &result) != napi_ok) {
         (void)cui_bridge_node_remove(app->bridge, node->node);
-        free(node); return NULL;
+        node_final(env, node, NULL); return NULL;
+    }
+    if (napi_type_tag_object(env, result, &node_tag) != napi_ok) {
+        (void)cui_bridge_node_remove(app->bridge, node->node);
+        return fail(env, "failed to tag node");
     }
     return result;
 }
 static napi_value node_id(napi_env env, napi_callback_info info) {
     napi_value v[1], result, x; js_node *node;
-    if (!args(env, info, 1, v) || napi_get_value_external(env, v[0], (void **)&node) != napi_ok || !node) return fail(env, "invalid node");
+    if (!args(env, info, 1, v) || !tagged(env, v[0], &node_tag) || napi_get_value_external(env, v[0], (void **)&node) != napi_ok || !node) return fail(env, "invalid node");
     if (napi_create_object(env, &result) != napi_ok || napi_create_uint32(env, node->node.slot, &x) != napi_ok || napi_set_named_property(env, result, "slot", x) != napi_ok || napi_create_uint32(env, node->node.generation, &x) != napi_ok || napi_set_named_property(env, result, "generation", x) != napi_ok) return NULL;
     return result;
 }

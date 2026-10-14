@@ -9,7 +9,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 SDKS = [ROOT / "bindings/go/sdk/source", ROOT / "bindings/rust/sdk/source"]
 DEPENDENCIES = ("Clay", "NanoSVG", "GPUI Kit icon assets / Lucide", "GPUI Kit named palette data",
-                "Unicode grapheme and word properties and conformance fixtures")
+                "Unicode grapheme and word properties and conformance fixtures", "SheenBidi")
 
 def snapshot():
     tracked = subprocess.check_output(["git", "ls-files", "--cached", "-z"], cwd=ROOT).decode().split("\0")
@@ -29,7 +29,7 @@ def snapshot():
         files[name] = (ROOT / name).read_bytes()
     # Some generated icon/theme assets are not separately listed by the dependency manifest.
     for name in tracked:
-        if name.startswith(("third_party/clay/", "third_party/nanosvg/", "third_party/gpui_icons/", "third_party/gpui_themes/")):
+        if name.startswith(("third_party/clay/", "third_party/nanosvg/", "third_party/gpui_icons/", "third_party/gpui_themes/", "third_party/sheenbidi/")):
             files[name] = (ROOT / name).read_bytes()
     files["third_party/dependencies.json"] = (json.dumps(dependencies, indent=2) + "\n").encode()
     cmake = (ROOT / "CMakeLists.txt").read_text()
@@ -62,15 +62,23 @@ if(CUI_BUILD_NATIVE)
  find_package(PkgConfig REQUIRED)
  pkg_check_modules(TEXT REQUIRED IMPORTED_TARGET freetype2 harfbuzz)
  pkg_check_modules(SDL REQUIRED IMPORTED_TARGET sdl3>=3.2)
+ add_library(cui_sheenbidi_objects OBJECT third_party/sheenbidi/Source/SheenBidi.c)
+ target_compile_definitions(cui_sheenbidi_objects PRIVATE SB_CONFIG_UNITY)
+ target_include_directories(cui_sheenbidi_objects PRIVATE third_party/sheenbidi/Headers third_party/sheenbidi/Source)
+ # Match canonical upstream-only diagnostics; CUI text/analyzer retain strict warnings.
+ target_compile_options(cui_sheenbidi_objects PRIVATE -Wno-unused-parameter -Wno-unused-value -Wno-unused-function -Wno-implicit-fallthrough)
+ add_library(cui_bidi STATIC src/text/cui_bidi.c $<TARGET_OBJECTS:cui_sheenbidi_objects>)
+ target_include_directories(cui_bidi PUBLIC include PRIVATE third_party/sheenbidi/Headers)
  add_library(cui_text STATIC src/text/cui_text.c)
- target_link_libraries(cui_text PUBLIC cui PRIVATE PkgConfig::TEXT)
+ target_compile_definitions(cui_text PRIVATE CUI_TEXT_BIDI)
+ target_link_libraries(cui_text PUBLIC cui PRIVATE cui_bidi PkgConfig::TEXT)
  add_library(cui_sdl3 STATIC backends/sdl3/cui_sdl3.c)
  target_link_libraries(cui_sdl3 PUBLIC cui cui_text PRIVATE PkgConfig::SDL)
  target_sources(cui_bridge PRIVATE src/bridge/cui_bridge_sdl.c)
  target_compile_definitions(cui_bridge PRIVATE CUI_BRIDGE_WITH_SDL=1)
  target_link_libraries(cui_bridge PRIVATE cui_sdl3)
 endif()
-foreach(target cui cui_bridge cui_text cui_sdl3)
+foreach(target cui cui_bridge cui_text cui_sdl3 cui_bidi cui_sheenbidi_objects)
  if(TARGET ${target})
   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
  endif()
@@ -88,9 +96,21 @@ def main():
     for source in sources:
         name = "z_cui_" + source.replace("/", "_").replace(".c", "") + ".c"
         wrappers[name] = ('//go:build linux && !cui_dynamic\n\n/* Generated separate translation unit; do not edit. */\n#include "../sdk/source/' + source + '"\n').encode()
-    for source in ("src/text/cui_text.c", "backends/sdl3/cui_sdl3.c", "src/bridge/cui_bridge_sdl.c"):
+    for source in ("src/text/cui_text.c", "src/text/cui_bidi.c",
+                   "third_party/sheenbidi/Source/SheenBidi.c",
+                   "backends/sdl3/cui_sdl3.c", "src/bridge/cui_bridge_sdl.c"):
         name = "z_cui_native_" + source.replace("/", "_").replace(".c", "") + ".c"
-        wrappers[name] = ('//go:build linux && cui_native && !cui_dynamic\n\n/* Generated separate translation unit; do not edit. */\n#include "../sdk/source/' + source + '"\n').encode()
+        prefix = '//go:build linux && cui_native && !cui_dynamic\n\n/* Generated separate translation unit; do not edit. */\n'
+        if source == "third_party/sheenbidi/Source/SheenBidi.c":
+            prefix += ('#define SB_CONFIG_UNITY\n'
+                       '/* Exact canonical exceptions for unmodified pinned vendor code only. */\n'
+                       '#if defined(__GNUC__)\n#pragma GCC diagnostic push\n'
+                       '#pragma GCC diagnostic ignored "-Wunused-parameter"\n'
+                       '#pragma GCC diagnostic ignored "-Wunused-value"\n'
+                       '#pragma GCC diagnostic ignored "-Wunused-function"\n'
+                       '#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"\n#endif\n')
+        suffix = '\n#if defined(__GNUC__)\n#pragma GCC diagnostic pop\n#endif\n' if source == "third_party/sheenbidi/Source/SheenBidi.c" else ''
+        wrappers[name] = (prefix + '#include "../sdk/source/' + source + '"\n' + suffix).encode()
     integration = ROOT / "bindings/go/cui"
     extra = [path.name for path in integration.glob("z_cui_*.c") if path.name not in wrappers]
     stale = [name for name, data in wrappers.items() if not (integration / name).is_file() or (integration / name).read_bytes() != data]

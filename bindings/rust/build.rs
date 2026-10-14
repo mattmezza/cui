@@ -71,6 +71,7 @@ fn main() {
     if native {
         println!("cargo:rustc-link-lib=static=cui_sdl3");
         println!("cargo:rustc-link-lib=static=cui_text");
+        println!("cargo:rustc-link-lib=static=cui_bidi");
     }
     println!("cargo:rustc-link-lib=static=cui");
     println!("cargo:rustc-link-lib=m");

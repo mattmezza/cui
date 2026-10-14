@@ -42,7 +42,7 @@ static void wrapping(void) {
     cui_end_box(ui);
     cui_draw_list list = cui_end_frame(ui);
     assert(list.count == 3 && cui_bounds(ui, 100).h == 60);
-    assert(list.commands[0].text.length == 4 && !memcmp(list.commands[0].text.data, "Éé", 4));
+    assert(list.commands[0].text.length == 5 && !memcmp(list.commands[0].text.data, "Éé ", 5));
     assert(list.commands[0].text_color_count == 2);
     assert(list.commands[0].text_colors[0].color.r == 1 &&
            list.commands[0].text_colors[1].color.r == 3);

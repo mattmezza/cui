@@ -111,6 +111,8 @@ typedef struct {
     size_t color_count;
     const cui_core_wrap_cluster *wrap_clusters;
     size_t wrap_cluster_count;
+    cui_text_align alignment;
+    uint32_t alignment_box;
 } cui_core_text_source;
 struct cui_context {
     int tab_path[32];
@@ -2584,7 +2586,12 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
         retained_clusters = copy;
     }
     ui->text_sources[ui->text_source_count++] =
-        (cui_core_text_source){t, retained, colors, color_count, retained_clusters, wrap_count};
+        (cui_core_text_source){.submitted = t,
+                               .source = retained,
+                               .colors = colors,
+                               .color_count = color_count,
+                               .wrap_clusters = retained_clusters,
+                               .wrap_cluster_count = wrap_count};
     Clay__OpenTextElement(
         (Clay_String){false, (int32_t)t.length, t.data},
         (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? (void *)ui
@@ -2676,10 +2683,12 @@ static void cui_core_paragraph_lines_free(cui_core_paragraph_line *lines, size_t
             free(lines[i].clusters);
     free(lines);
 }
-bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_color color,
-                                float line_height, cui_text_style style, bool wrap,
-                                const cui_text_color_span *colors, size_t count) {
-    if (!ui || !cui_frame_active(ui) || (!text.data && text.length) || text.length > INT32_MAX ||
+static bool cui_core_paragraph_colored(cui_context *ui, cui_str text, float size, cui_color color,
+                                       float line_height, cui_text_style style, bool wrap,
+                                       const cui_text_color_span *colors, size_t count,
+                                       cui_text_align alignment, bool align_width) {
+    if (alignment < CUI_TEXT_ALIGN_LEFT || alignment > CUI_TEXT_ALIGN_RIGHT || !ui ||
+        !cui_frame_active(ui) || (!text.data && text.length) || text.length > INT32_MAX ||
         !isfinite(size) || size <= 0 || !isfinite(line_height) || line_height < 0 ||
         !cui_core_text_style_valid(style) || (!colors && count) || count > CUI_TEXT_COLOR_SPAN_MAX)
         return false;
@@ -2814,7 +2823,8 @@ bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_c
     float empty_height = line_height > 0
                              ? line_height
                              : cui_measure_text_ex(ui, (cui_str){"", 0}, size, style).height;
-    cui_begin_box(ui, 0, (cui_box){0});
+    cui_begin_box(ui, 0, (cui_box){.width = align_width ? -1 : 0});
+    uint32_t alignment_box = ui->depth ? ui->nodes[ui->node_stack[ui->depth - 1]].clay_id : 0;
     bool ok = true;
     for (size_t i = 0; i < n; ++i) {
         cui_core_paragraph_line line = lines[i];
@@ -2854,6 +2864,10 @@ bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_c
         } else
             cui_core_text(ui, (cui_str){0}, size, color, line_height, style, !wrap, &source, NULL,
                           0, line.clusters, line.cluster_count);
+        if (before != ui->text_source_count && align_width) {
+            ui->text_sources[before].alignment = alignment;
+            ui->text_sources[before].alignment_box = alignment_box;
+        }
         if (before == ui->text_source_count) {
             ok = false;
             break;
@@ -2865,6 +2879,19 @@ bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_c
     return ok;
 }
 
+bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_color color,
+                                float line_height, cui_text_style style, bool wrap,
+                                const cui_text_color_span *colors, size_t count) {
+    return cui_core_paragraph_colored(ui, text, size, color, line_height, style, wrap, colors,
+                                      count, CUI_TEXT_ALIGN_LEFT, false);
+}
+bool cui_text_paragraph_colored_aligned(cui_context *ui, cui_str text, float size, cui_color color,
+                                        float line_height, cui_text_style style, bool wrap,
+                                        const cui_text_color_span *colors, size_t count,
+                                        cui_text_align alignment) {
+    return cui_core_paragraph_colored(ui, text, size, color, line_height, style, wrap, colors,
+                                      count, alignment, true);
+}
 void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                  cui_text_style style) {
     cui_core_text(ui, t, size, c, line_height, style, false, NULL, NULL, 0, NULL, 0);
@@ -3787,6 +3814,17 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 if (offset > record->submitted.length ||
                     d.text.length > record->submitted.length - offset)
                     break;
+                if (record->alignment_box) {
+                    Clay_ElementData box =
+                        Clay_GetElementData((Clay_ElementId){.id = record->alignment_box});
+                    if (box.found) {
+                        float spare = box.boundingBox.width - d.bounds.w;
+                        float factor = record->alignment == CUI_TEXT_ALIGN_RIGHT    ? 1
+                                       : record->alignment == CUI_TEXT_ALIGN_CENTER ? 0.5f
+                                                                                    : 0;
+                        d.bounds.x = box.boundingBox.x + spare * factor;
+                    }
+                }
                 d.text_source = record->source;
                 d.text_colors = record->colors;
                 d.text_color_count = record->color_count;

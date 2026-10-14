@@ -733,6 +733,13 @@ bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, c
 bool cui_text_paragraph_colored(cui_context *, cui_str, float font_size, cui_color,
                                 float line_height, cui_text_style, bool wrap,
                                 const cui_text_color_span *, size_t);
+typedef enum { CUI_TEXT_ALIGN_LEFT, CUI_TEXT_ALIGN_CENTER, CUI_TEXT_ALIGN_RIGHT } cui_text_align;
+/* Opt-in physical alignment of each visual row within current available parent
+ * width, including nowrap rows. Empty rows retain line height. Oversized rows
+ * may receive negative offsets; alignment preserves original-byte source/spans. */
+bool cui_text_paragraph_colored_aligned(cui_context *, cui_str, float font_size, cui_color,
+                                        float line_height, cui_text_style, bool wrap,
+                                        const cui_text_color_span *, size_t, cui_text_align);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);

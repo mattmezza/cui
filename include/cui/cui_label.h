@@ -16,6 +16,7 @@ typedef struct {
     bool custom_color;
     cui_color color;
     cui_id semantic_id, control; /* Optional label node and controls/focus_target. */
+    cui_text_align alignment;    /* Physical left (default), center or right. */
 } cui_label_options;
 typedef struct {
     size_t text_length, span_count;

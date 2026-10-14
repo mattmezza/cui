@@ -2,6 +2,12 @@
 
 ## Current priorities — 14 October
 
+Current checkpoint: published `a3ea0c1` has all six framework jobs and Pages passing, all435 public files matching the artifact and actual public Attachment62/62 passing. Main `67d86ed4` integrates Next32 after strict168/168 CTest; its new CI/deployment is running and is not yet claimed published. Next32 independently passes native172/172, sanitizer167/167, WASI135/135 and all54 exact Pages browser commands, including all78 stories/78 snippets. Final sharing3/3 and selected usage compilation pass after metadata rebuild.
+
+Next33 source `5d253e73` adds guarded Input matcher sessions, an optional pinned Unicode regex archive and live examples, copied release-derived Button click payloads, typed Button loading artwork, checked Notification shadows and Popover appearance policies. Complete native/sanitizer/WASI/browser integration validation is in progress. The ledger has354 features:306 tested subsets,4 implemented and44 not_started. All78 families remain, zero fullyverified. Source press-snapshot forwarding, segmented Tab appearance and Notification96px motion are isolated later work. No user dependency installation is required.
+
+The paragraphs below preserve previous checkpoints and their then-current pending work.
+
 Published `5474ec7` fixes the acquired-swapchain SDL GPU assertion. All six framework jobs and Pages pass, and all411 HTTPS files match its artifact. MAIN `62b3bb4` passes framework CI but Pages failed the real secure touch-focus regression; deployment was skipped. It is not the published gallery.
 
 Next31 frozen production `4241a56` passes strict native162/162, sanitizer154/154, WASI129/129 and Attachment62/62. Secure synthetic mouse focus and immediate typing after IME cancellation are corrected with preserved failing browser evidence. The complete49-command browser matrix passes before integration/publication, including all78 stories/78 snippet compilations. Source-pattern and number formatting, current-frame Button labels and selected copyable C11 usage examples are tested subsets.

@@ -584,7 +584,13 @@
         "tests/web/test_button_passive_lifecycle.py",
         "tests/unit/test_button_numeric.c",
         "tests/integration/test_button_numeric_font.c",
-        "tests/web/test_button_numeric.py"
+        "tests/web/test_button_numeric.py",
+        "tests/unit/test_button_click_event.c",
+        "tests/integration/test_button_click_event_font.c",
+        "tests/web/test_button_click_event.py",
+        "tests/unit/test_button_artwork.c",
+        "tests/integration/test_button_artwork_font.c",
+        "tests/web/test_button_artwork.py"
       ],
       "status": "tested",
       "platforms": {
@@ -594,7 +600,7 @@
       "limitations": [
         "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied.",
         "Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md.",
-        "Numeric pixel sizing, independent open presentation, normal caret tint and passive caller state are tested. Exact focus styles, ordered tab indices, rich down/up click payload, event-local propagation, action tooltips, typed loading slots, shadow/gradient refinement and full accessibility remain incomplete."
+        "Numeric sizing, independent open presentation, passive lifecycle, release-derived click payload and typed loading artwork have bounded tests. Press snapshots, previous keyboard hitbox evidence, exact focus styles, ordered tab indices, event-local capture/bubble propagation, action tooltips, arbitrary shadow/gradient refinement and full accessibility remain incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -614,7 +620,7 @@
           ]
         },
         {
-          "name": "complete source state-style refinement and typed loading-slot preservation",
+          "name": "complete source state-style refinement",
           "status": "not_started",
           "evidence": []
         },
@@ -713,6 +719,26 @@
             "tests/web/test_button_numeric.py"
           ],
           "scope": "Open is presentation distinct from checked/expanded metadata; caret derives normal foreground alpha.75 and source Medium numeric size."
+        },
+        {
+          "name": "copied accepted-release click payload and ordered legacy/new callbacks",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_click_event.c",
+            "tests/integration/test_button_click_event_font.c",
+            "tests/web/test_button_click_event.py"
+          ],
+          "scope": "Mouse/touch/pen/key/access and joined Group tested. Press snapshots, previous keyboard bounds, first-mouse/long-press metadata and capture/bubble propagation remain outside this slice."
+        },
+        {
+          "name": "bounded typed icon spinner and progress-circle loading artwork",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_artwork.c",
+            "tests/integration/test_button_artwork_font.c",
+            "tests/web/test_button_artwork.py"
+          ],
+          "scope": "Copied standalone descriptor, immutable borrowed Group descriptor, source loading replacement, fixed failure slots, resource-table/capacity errors and passive lifecycle tested. Physical malloc OOM and arbitrary Source style refinements are not claimed."
         }
       ],
       "upstream_doc": {
@@ -1856,7 +1882,11 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_status.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_notification_shadows.c",
+        "tests/integration/test_notification_shadow_adapters.c",
+        "tests/web/test_notification_shadows.py",
+        "tests/web/test_surface_shadow_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -1900,6 +1930,17 @@
             "tests/unit/test_status.c",
             "tests/web/test_browser.py"
           ]
+        },
+        {
+          "name": "checked opt-in copied Source shadow layers",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_notification_shadows.c",
+            "tests/integration/test_notification_shadow_adapters.c",
+            "tests/web/test_notification_shadows.py",
+            "tests/web/test_surface_shadow_gallery.py"
+          ],
+          "scope": "Final card caster copied for two source-derived layers; transition alpha is raised to fourth power and stack visibility multiplies independently, with Core ancestor opacity applied once. Existing16px motion remains separate from Source96px motion."
         }
       ],
       "upstream_doc": {
@@ -3482,7 +3523,14 @@
         "tests/unit/test_input_number_control.c",
         "tests/integration/test_input_number_native.c",
         "tests/unit/test_input_pointer_selection.c",
-        "tests/integration/test_input_pointer_native.c"
+        "tests/integration/test_input_pointer_native.c",
+        "tests/unit/test_input_matcher.c",
+        "tests/unit/test_regex_provider.c",
+        "tests/integration/test_input_regex_control.c",
+        "tests/packaging/test_regex_package.py",
+        "tests/integration/test_regex_wasi.py",
+        "tests/web/test_input_regex.py",
+        "tests/web/test_input_regex_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -3492,7 +3540,7 @@
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
         "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
-        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Bounded single-line pattern and grouped-number formatting are tested; multiline, token and multiple-selection masks, enabled NUL separators, regex and full content-type/lifecycle behavior remain incomplete; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
+        "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Bounded single-line pattern and grouped-number formatting are tested; multiline, token and multiple-selection masks, enabled NUL separators and full content-type/lifecycle behavior remain incomplete; the optional pinned whole-value Unicode regex provider is a separately tested subset; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
         "Opt-in hidden/revealed password and new-password purposes, scalar-bullet presentation, guarded clipboard, finalized focus generations, native SDL input hints and transient secure browser proxy pass headless/native/browser tests. Actual window-blur handler clears preedit DOM data. Physical OS autofill/privacy, all content purposes and complete accessibility remain unverified; see docs/PASSWORD_INPUT_STAGE2.md."
       ],
       "owner": "integrator",
@@ -3624,6 +3672,27 @@
             "docs/INPUT_POINTER_SELECTION.md"
           ],
           "scope": "Single-line double/triple press and ordered shift/drag, masked/readonly/disabled/token guards. Full native touch selection menu and complete Input family remain unfinished."
+        },
+        {
+          "name": "guarded optional whole-value matcher sessions",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input_matcher.c"
+          ],
+          "scope": "Caller-owned bounded session supports checked matcher acceptance, atomic failures and edit/IME presentation. Default portable C11 does not require Rust or a regex runtime."
+        },
+        {
+          "name": "optional pinned Unicode regex provider and actual linked gallery",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_regex_provider.c",
+            "tests/integration/test_input_regex_control.c",
+            "tests/packaging/test_regex_package.py",
+            "tests/integration/test_regex_wasi.py",
+            "tests/web/test_input_regex.py",
+            "tests/web/test_input_regex_gallery.py"
+          ],
+          "scope": "Opt-in pinned Rust archive with C ABI, whole-value Unicode matching, initialized WASI and actual IME/clipboard gallery. Default builds stay provider-free. Linux native and WASI archive/linkage are tested; all native platforms and complete Source Input lifecycle are not claimed."
         }
       ],
       "upstream_doc": {
@@ -4894,7 +4963,11 @@
         "tests/unit/test_core.c",
         "tests/unit/test_base.c",
         "tests/unit/test_surface.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_popover_appearance.c",
+        "tests/integration/test_popover_appearance_native.c",
+        "tests/web/test_popover_appearance.py",
+        "tests/web/test_surface_shadow_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -4933,6 +5006,17 @@
             "tests/unit/test_surface.c",
             "docs/validation/gcc-surfaces.txt"
           ]
+        },
+        {
+          "name": "checked legacy source and none appearance policies",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_popover_appearance.c",
+            "tests/integration/test_popover_appearance_native.c",
+            "tests/web/test_popover_appearance.py",
+            "tests/web/test_surface_shadow_gallery.py"
+          ],
+          "scope": "Checked appearance refinement and copied source-derived layers validated in headless and actual native/Canvas consumers. Full arbitrary upstream style refinement, native shader identity and remaining anchor/focus contracts are not claimed."
         }
       ],
       "upstream_doc": {

@@ -218,6 +218,10 @@ typedef struct {
     bool reduced_motion;
     cui_notification_shadow_policy shadow_policy; /* zero preserves legacy approximation */
 } cui_notification_settings;
+typedef enum {
+    CUI_NOTIFICATION_MOTION_LEGACY = 0,
+    CUI_NOTIFICATION_MOTION_SOURCE = 1
+} cui_notification_motion_policy;
 /* Pure checked settings validation, including the shadow policy. */
 bool cui_notification_settings_valid(cui_notification_settings);
 typedef struct {
@@ -243,6 +247,9 @@ typedef struct {
     bool stack_initialized[8];
     cui_notification_id middle_capture;
     bool middle_pressed;
+    /* Post-init opt-in: SOURCE uses 96px/400ms enter and 96px/200ms exit.
+     * Independent from settings.shadow_policy; zero preserves legacy motion. */
+    cui_notification_motion_policy motion_policy;
 } cui_notification_state;
 typedef struct {
     bool changed;

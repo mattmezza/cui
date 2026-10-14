@@ -658,6 +658,25 @@ float gallery_carousel_stats(int field) {
 }
 static int icon_choice, icon_size = CUI_ICON_MEDIUM, icon_rotate, icon_color, icon_loaded = -1;
 static cui_icon_state icon_state;
+static unsigned empty_created;
+static bool empty_disabled;
+static void gallery_empty_media(cui_context *ctx, const cui_theme *theme, cui_color color,
+                                void *user) {
+    (void)user;
+    cui_icon_named(
+        ctx, cui_id_from(ctx, "empty-folder"), theme, cui_string("folder"),
+        (cui_icon_options){
+            .size = CUI_ICON_CUSTOM, .custom_size = 20, .color = color, .custom_color = true});
+}
+static void gallery_empty_action(cui_context *ctx, const cui_theme *theme, cui_color color,
+                                 void *user) {
+    (void)color;
+    (void)user;
+    if (cui_button(ctx, cui_id_from(ctx, "empty-create"), theme, cui_string("Create project"),
+                   empty_disabled))
+        empty_created++;
+}
+
 static int toolbar_size = CUI_TOOLBAR_MEDIUM, toolbar_grouped = 1, toolbar_show_input = 1;
 static bool toolbar_disabled;
 static unsigned toolbar_activations[4];
@@ -3934,7 +3953,20 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 7:
-        cui_label(ui, &t, cui_string("A useful label, rendered by CUI."));
+        cui_label_source(ui, &t,
+                         (cui_label_options){.primary = cui_string("Workspace"),
+                                             .secondary = cui_string("Ready to collaborate"),
+                                             .has_secondary = true,
+                                             .semantic_id = cui_id_from(ui, "label-secondary")});
+        cui_label_source(
+            ui, &t,
+            (cui_label_options){.primary = cui_string("Unicode highlight: CAFÉ and café"),
+                                .highlight = cui_string("café"),
+                                .semantic_id = cui_id_from(ui, "label-highlight")});
+        cui_label_source(ui, &t,
+                         (cui_label_options){.primary = cui_string("Private workspace"),
+                                             .masked = true,
+                                             .semantic_id = cui_id_from(ui, "label-masked")});
         break;
     case 8: {
         badge_disabled = disabled != 0;
@@ -4167,10 +4199,32 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         break;
     }
-    case 15:
-        cui_empty(ui, cui_id_from(ui, "empty"), &t, cui_string("No items yet"),
-                  cui_string("Add your first item to get started."), width - 48);
+    case 15: {
+        empty_disabled = disabled;
+        const cui_empty_slot media = {.children = gallery_empty_media};
+        const cui_empty_slot title = {.text = cui_string("No projects yet")};
+        const cui_empty_slot description = {
+            .text = cui_string("Create a project to organize your team's work.")};
+        const cui_empty_slot content = {.children = gallery_empty_action};
+        const cui_empty_header header = {.media = &media,
+                                         .title = &title,
+                                         .description = &description,
+                                         .media_variant = CUI_EMPTY_MEDIA_ICON};
+        cui_empty_style style =
+            cui_empty_default_style(&t, CUI_EMPTY_ROOT, CUI_EMPTY_MEDIA_DEFAULT, 16);
+        style.box.width = width - 48;
+        style.box.height = 220;
+        style.box.border_width = 1;
+        cui_empty_ex(ui, cui_id_from(ui, "empty"), &t,
+                     (cui_empty_options){.style = &style,
+                                         .header = &header,
+                                         .content = &content,
+                                         .accessible_name = cui_string("Empty project workspace")});
+        char status[80];
+        snprintf(status, sizeof status, "Projects created: %u", empty_created);
+        cui_label(ui, &t, cui_string(status));
         break;
+    }
     case 16:
         cui_begin_group_box(ui, cui_id_from(ui, "groupbox"), &t, cui_string("Preferences"),
                             width - 48);

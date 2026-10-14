@@ -76,8 +76,20 @@ typedef struct {
     cui_icon_transform transform;
     bool custom_transform;
     cui_design_size design_size; /* INHERIT preserves legacy metrics. */
+    /* Zero preserves legacy preset scaling by theme font size. Positive rem
+     * separates explicit preset sizes from inherited text size, as in source. */
+    float rem_size;
+    /* Default is decorative. A nonempty name opts into a noninteractive image
+     * semantic; decorative=true suppresses it even when a name is supplied.
+     * Names are borrowed for the frame and never inferred from path/SVG data. */
+    cui_str accessible_name;
+    bool decorative;
+    /* Optional layout decoration. width/height and sizing flags remain governed
+     * by options above; padding is unsupported and must be zero. Other box
+     * paint/clip/inert/opacity fields apply around the unchanged SVG square. */
+    const cui_box *style;
 } cui_icon_options;
-/* Paint-only component: no role, focus stop or hit target. Theme supplies fallback
+/* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
 cui_icon_error cui_icon(cui_context *, cui_id, const cui_theme *, cui_icon_state *,
                         cui_icon_options);

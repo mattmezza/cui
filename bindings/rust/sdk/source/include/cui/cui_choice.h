@@ -77,6 +77,14 @@ typedef struct {
     float prefix_width, suffix_width;
     bool omit_leading_border; /* first Default tab: source tab_bar_prefix(false) */
 } cui_tab_parts;
+/* Explicit opt-in segmented appearance; zero preserves existing paint.
+ * SOURCE_TAB uses standalone XS. SOURCE_BAR requires animation and horizontal
+ * orientation, with SM before measurement and private raised layers afterward. */
+typedef enum {
+    CUI_TAB_SHADOW_LEGACY = 0,
+    CUI_TAB_SHADOW_SOURCE_TAB,
+    CUI_TAB_SHADOW_SOURCE_BAR
+} cui_tab_shadow_policy;
 typedef struct {
     bool vertical, disabled, manual_activation;
     cui_tab_size size;
@@ -105,7 +113,10 @@ typedef struct {
     bool custom_last_empty_space_width; /* permits an explicit zero-width tail */
     cui_design_size design_size;        /* INHERIT preserves legacy metrics. */
     const cui_scrollbar_style *scrollbar_style;
+    cui_tab_shadow_policy shadow_policy;
 } cui_tabs_options;
+/* Checked before reducers/callbacks; other variants ignore valid policies. */
+bool cui_tabs_shadow_policy_valid(cui_tabs_options);
 typedef struct {
     bool vertical, disabled, multiple, allow_empty;
 } cui_toggle_group_options;

@@ -21,6 +21,7 @@ set(CUI_SOURCES
  src/theme/cui_theme_registry.c
  src/theme/cui_theme_motion.c
  src/components/cui_components.c
+ src/components/cui_label.c
  src/base/cui_content.c
  src/components/cui_content.c
  src/base/cui_disclosure.c

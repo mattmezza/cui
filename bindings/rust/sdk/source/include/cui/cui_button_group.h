@@ -20,6 +20,10 @@ typedef struct {
 typedef void (*cui_button_group_change_fn)(void *, const cui_button_group_request *);
 typedef void (*cui_button_group_child_click_fn)(void *);
 typedef void (*cui_button_group_child_event_fn)(void *, cui_context *, size_t event_index);
+/* Preparation hook, before legacy/post-legacy notifications. Snapshot is borrowed
+ * for this call and can be copied. Excluded from result.callbacks. */
+typedef void (*cui_button_group_child_snapshot_fn)(void *, cui_context *,
+                                                   const cui_activation_snapshot *);
 typedef struct {
     cui_id id;
     cui_str label;
@@ -30,6 +34,8 @@ typedef struct {
     void *action_user;
     cui_button_group_child_event_fn on_click_event; /* After legacy; on_change overrides both. */
     void *event_user;
+    cui_button_group_child_snapshot_fn
+        prepare_click_event; /* on_change overrides all child hooks. */
 } cui_button_group_item;
 typedef struct {
     bool multiple, disabled, vertical;

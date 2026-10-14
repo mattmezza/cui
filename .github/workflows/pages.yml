@@ -86,6 +86,8 @@ jobs:
         run: uv run tests/web/test_site_extensions.py
       - name: Check reported gallery geometry regressions
         run: uv run tests/web/test_visual_regressions.py
+      - name: Verify source Label privacy and Empty actions
+        run: uv run tests/web/test_source_composition_gallery.py
       - name: Verify Tabs nested wheel and touch event ownership
         run: uv run tests/web/test_tabs_scroll_chaining.py
       - name: Verify expanded design sizes and tab overflow

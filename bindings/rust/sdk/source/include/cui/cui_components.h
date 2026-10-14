@@ -13,6 +13,7 @@
 #include "cui_editor.h"
 #include "cui_form.h"
 #include "cui_icon.h"
+#include "cui_label.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
@@ -68,7 +69,8 @@ typedef enum {
     CUI_BUTTON_CLICK_ACCESSIBILITY
 } cui_button_click_origin;
 /* Pointer-free accepted-event snapshot; copyable beyond callback/frame lifetime.
- * Pointer fields describe release, not a fabricated down event. */
+ * Legacy pointer fields describe release; evidence preserves raw Core samples.
+ * Evidence is frozen before legacy callbacks can consume accessibility input. */
 typedef struct {
     cui_button_click_origin origin;
     cui_id target;
@@ -83,6 +85,8 @@ typedef struct {
     cui_pointer_button pointer_button;
     uint64_t pointer_id, pointer_device;
     unsigned click_count; /* Pointer zero normalizes to one; nonpointer is zero. */
+    bool has_evidence;
+    cui_activation_snapshot evidence; /* Fully copied; no host metadata is fabricated. */
 } cui_button_click_event;
 typedef void (*cui_button_click_event_fn)(void *user, const cui_button_click_event *event);
 typedef struct cui_button_artwork cui_button_artwork;
@@ -126,6 +130,10 @@ typedef struct {
     cui_str accessibility_label, tooltip;
     cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled supplied. */
     bool skip_tab, hide_focus_ring, prevent_pointer_focus;
+    /* Explicit signed source ordering; zero defaults retain legacy ordering.
+     * skip_tab controls eligibility independently, including index -1. */
+    bool custom_tab_index;
+    int tab_index;
     bool toggle_semantics,
         toggled; /* Explicit checked/value metadata; selected remains paint-only. */
     bool custom_cursor;

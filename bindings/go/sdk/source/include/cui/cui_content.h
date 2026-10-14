@@ -122,6 +122,49 @@ typedef struct {
 } cui_bubble_options;
 /* Synchronous borrowed slots. Reaction controls retain their base button semantics. */
 void cui_bubble(cui_context *, cui_id, const cui_theme *, cui_bubble_options);
+/* Source-composed Empty. Borrowed pointers and callbacks live through this call.
+ * Obtain defaults, then change desired fields for independent style refinements.
+ * Custom children own their IDs and ordinary native control behavior. */
+typedef enum {
+    CUI_EMPTY_ROOT,
+    CUI_EMPTY_HEADER,
+    CUI_EMPTY_MEDIA,
+    CUI_EMPTY_TITLE,
+    CUI_EMPTY_DESCRIPTION,
+    CUI_EMPTY_CONTENT
+} cui_empty_part;
+typedef enum { CUI_EMPTY_MEDIA_DEFAULT, CUI_EMPTY_MEDIA_ICON } cui_empty_media_variant;
+typedef struct {
+    cui_box box;
+    float font_size, line_height;
+    cui_color foreground;
+    cui_text_style text;
+} cui_empty_style;
+typedef struct {
+    const cui_empty_style *style;
+    cui_str text;
+    cui_content_slot_fn children;
+    void *user;
+} cui_empty_slot;
+typedef struct {
+    const cui_empty_style *style;
+    const cui_empty_slot *media, *title, *description;
+    cui_empty_media_variant media_variant;
+} cui_empty_header;
+typedef struct {
+    const cui_empty_style *style;
+    const cui_empty_header *header;
+    const cui_empty_slot *content;
+    cui_content_slot_fn children;
+    void *user;
+    cui_str accessible_name;
+    float rem; /* zero selects 16 logical pixels; independent of theme font size. */
+} cui_empty_options;
+cui_empty_style cui_empty_default_style(const cui_theme *, cui_empty_part, cui_empty_media_variant,
+                                        float rem);
+/* Rejects malformed styles/spans before any layout, callback or semantic mutation.
+ * Slots are rendered header(media/title/description), content, appended children. */
+bool cui_empty_ex(cui_context *, cui_id, const cui_theme *, cui_empty_options);
 void cui_empty(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,
                cui_str description, float width);
 void cui_begin_group_box(cui_context *ui, cui_id id, const cui_theme *theme, cui_str title,

@@ -12,4 +12,7 @@ routing passed; segmented Tab Canvas/WASM shadow composition passed 40 frames;
 Notification source transition Canvas/WASM pixels passed 64 frames.
 Native test windows remain confined to invisible Xvfb. Hardware GPU and native
 Windows/macOS UI acceptance are not established by this integration receipt.
-Full gallery browser matrix is still running before publication.
+Full GitHub Pages browser matrix: all 65 commands passed locally, including
+default and optional regex builds. All 78 displayed usage excerpts compile.
+This receipt is scoped to 37288d6e; later gallery controls and source component
+work are validated separately and must not inherit this result without checks.

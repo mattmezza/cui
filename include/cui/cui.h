@@ -667,6 +667,14 @@ bool cui_text_context_line(cui_context *, cui_text_line_source, float, cui_color
                            cui_text_style);
 bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, cui_color, float,
                                    cui_text_style, const cui_text_color_span *, size_t);
+/* Complete strict UTF-8 text with hard paragraphs, U+2028 visual breaks, and
+ * empty lines. Color spans use original text bytes and may cross separators.
+ * wrap=true uses available parent width (word wrapping); false preserves lines.
+ * Invalid input and preflight capacity failures publish no layout. Final layout
+ * errors remain observable through the normal Core error/draw-list contract. */
+bool cui_text_paragraph_colored(cui_context *, cui_str, float font_size, cui_color,
+                                float line_height, cui_text_style, bool wrap,
+                                const cui_text_color_span *, size_t);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);

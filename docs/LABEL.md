@@ -35,12 +35,41 @@ The text output is length-delimited with no NUL terminator. Span capacity is bou
 by Core's 4096 span maximum. Renderer failures are returned; an allocation failure
 inside Core after beginning an optional semantic box can leave an empty box.
 
-Scope remains explicitly limited: render submits a single unwrapped contextual
-paragraph. Hard paragraph separators are rejected by Core; prepare accepts them.
-Automatic wrapping, multiline layout and arbitrary GPUI style refinement are not
-implemented here. Root-relative rem scaling must be supplied through line_height
-when the application's root size differs from 16. These additions do not establish
-complete Label family parity or change the legacy wrapper.
+Rendering now submits a complete colored text paragraph through Core, wraps at
+its current-frame parent width, and stacks hard paragraphs and empty lines.
+CRLF is one break; LF, CR, NEL, paragraph separator and the Core information
+separators also start new paragraphs. U+2028 starts a visual line while preserving
+the full original bidi paragraph for shaping. Spans crossing either explicit or
+automatic line boundaries are clipped and rebased to each draw command's original
+UTF-8 paragraph. Blank and trailing lines contribute their configured line height.
+`no_wrap` disables automatic wrapping while retaining explicit line breaks.
+Masking occurs before line layout, so original paragraph separators become bullets
+and reveal neither source text nor original newline structure.
+
+The frozen Label source uses StyledText from its pinned gpui-pre 0.3.8 dependency.
+That measured layout chooses the definite current parent width when normal white
+space is enabled. The additive Core paragraph API supplies that available-width
+behavior without relying on previous-frame label bounds. The prior single-line
+and hard-separator rejection restrictions are removed.
+
+Exact remaining differences are explicit: Core's pinned Clay WORDS policy breaks
+at ASCII spaces, includes trailing spaces when deciding whether a word fits, and
+lets overlong tokens overflow. GPUI also has Unicode break candidates and fallback
+wrapping within long tokens. This implementation does not claim those wider
+line-breaking semantics, arbitrary GPUI style refinement, or complete Label family
+parity. Root-relative rem scaling must be supplied through line_height when the
+application's root size differs from 16. The legacy wrapper remains unchanged.
+
+The general `cui_text_paragraph_colored` Core API validates all UTF-8 and full-text
+color spans before publication. Invalid input and conservative storage/element
+preflight failures publish no layout. Per-draw clipped spans require bounded frame
+storage during final layout; exhaustion empties the draw list under Core's usual
+capacity-error contract. The pre-existing unwrapped contextual APIs retain their
+validation rules. `test_contextual_wrap_source` covers paragraph-relative spans,
+Unicode separators, empty lines, current-frame reflow, measurement identity and
+preflight failures. With `CUI_TEST_WRAP_RENDERER` it additionally renders colored
+wrapped text through the real software font renderer and verifies a copied draw
+snapshot after frame invalidation.
 
 ## Pinned Unicode provenance
 

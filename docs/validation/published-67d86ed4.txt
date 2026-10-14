@@ -1,0 +1,8 @@
+Published source:67d86ed48223a261d582ec28dcd451e023f94a76 (Next32).
+Framework CI38488091130: all six jobs SUCCESS. Pages38488091095: build and deploy SUCCESS.
+Hosted portable macOS AppleClang21.0.0.21000101 and Windows MSVC19.51.36260.0 each145/145 CTest PASS. Both configure CUI_BUILD_NATIVE=OFF; native GUI/Metal/Direct3D/OS IME/accessibility are not proven.
+Main warning-enabled native configure/build and168/168 CTest PASS. Separate integrated batch native172/172, ASan/UBSan167/167, actual WASI135/135 and complete54-command browser matrix PASS; see gallery-next32.txt.
+Downloaded exact github-pages artifact to private cache release-67d86ed4-artifact/artifact.tar. Every regular artifact file compared by SHA256 with its actual HTTPS URL:445/445 PASS, no exclusions.
+Actual public Attachment62/62 PASS across design sizes/densities/orientations,390px text/action containment and real touch pan/tap to offscreen actions.
+Private evidence cache:/home/matteo/.cache/cui-validation; published-67d86ed4-files.{py,log},published-67d86ed4-attachment.{log,json},next32-main-{configure,build,test}.log.
+Bounded tested subsets only: all78 manifest entries remain and zero families are fullyverified. CI/HTTPS publication does not establish full reference parity or native cross-platform acceptance.

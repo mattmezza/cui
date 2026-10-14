@@ -603,6 +603,55 @@ static bool schema_dump(void *user, uint64_t key, cui_dock_schema_node *out) {
     *out = *source->leaves[key - 1];
     return true;
 }
+typedef struct {
+    cui_dock *model;
+    size_t calls;
+} schema_mutation;
+static bool schema_remove_upcoming(void *user, uint64_t key, cui_dock_schema_node *out) {
+    schema_mutation *mutation = user;
+    assert(key == 1 && mutation->calls++ == 0);
+    assert(cui_dock_remove(mutation->model, 2) == CUI_DOCK_OK);
+    *out = (cui_dock_schema_node){
+        .panel_name = {"Leaf", 4}, .payload = {"null", 4}, .kind = CUI_DOCK_SCHEMA_PANEL};
+    return true;
+}
+static void test_schema_accessor_failure(void) {
+    for (int split = 0; split < 2; ++split) {
+        cui_dock *d = make();
+        cui_dock_node root = cui_dock_root(d);
+        assert(cui_dock_insert(d, root, 1, SIZE_MAX) == CUI_DOCK_OK);
+        if (split)
+            assert(cui_dock_split(d, root, CUI_DOCK_SPLIT_HORIZONTAL, .5, 2, false, NULL) ==
+                   CUI_DOCK_OK);
+        else
+            assert(cui_dock_insert(d, root, 2, SIZE_MAX) == CUI_DOCK_OK);
+        cui_dock_schema_node output[8], original[8];
+        double sizes[8], original_sizes[8];
+        memset(output, 0x5a, sizeof output);
+        memcpy(original, output, sizeof output);
+        memset(sizes, 0x6b, sizeof sizes);
+        memcpy(original_sizes, sizes, sizeof sizes);
+        size_t nc = 101, sc = 102;
+        schema_mutation mutation = {d, 0};
+        assert(cui_dock_schema_export(d, schema_remove_upcoming, &mutation, output, 8, sizes, 8,
+                                      &nc, &sc) == CUI_DOCK_INVALID);
+        assert(mutation.calls == 1 && nc == 101 && sc == 102);
+        assert(!memcmp(output, original, sizeof output));
+        assert(!memcmp(sizes, original_sizes, sizeof sizes));
+        assert(cui_dock_panel_find(d, 1, NULL, NULL));
+        assert(!cui_dock_panel_find(d, 2, NULL, NULL));
+        /* The callback's valid public edit remains; export itself publishes no state. */
+        char encoded[1024];
+        serialize(d, encoded, sizeof encoded);
+        cui_dock *restored = make();
+        assert(cui_dock_restore(restored, dock_test_string(encoded)) == CUI_DOCK_OK);
+        char roundtrip[1024];
+        serialize(restored, roundtrip, sizeof roundtrip);
+        assert(!strcmp(encoded, roundtrip));
+        cui_dock_destroy(restored);
+        cui_dock_destroy(d);
+    }
+}
 static void test_schema_conversion(void) {
     /* Exact center fields/payloads from frozen dock/fixtures/layout.json. */
     const char *payloads[] = {
@@ -1148,6 +1197,7 @@ int main(void) {
     test_nary_model();
     test_root_policy();
     test_schema_conversion();
+    test_schema_accessor_failure();
     test_hidden_geometry();
     test_slot_sizing();
     test_visibility_queries();

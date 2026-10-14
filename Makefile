@@ -4,7 +4,7 @@ all:
 	cmake -S . -B $(BUILD) -G Ninja
 	cmake --build $(BUILD)
 check: all
-	ctest --test-dir $(BUILD) --output-on-failure
+	python scripts/test_local.py --build-dir $(BUILD)
 lint:
 	python scripts/check_manifest.py
 	python scripts/check_licenses.py

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include <cui/cui_bridge.h>
+#include <float.h>
 #include <math.h>
 #include <node_api.h>
 #include <stdint.h>
@@ -101,7 +102,7 @@ static int string_arg(napi_env env, napi_value v, char **out) {
     return 1;
 }
 static int number_arg(napi_env env, napi_value v, double *out) {
-    if (napi_get_value_double(env, v, out) != napi_ok || !isfinite(*out)) {
+    if (napi_get_value_double(env, v, out) != napi_ok || !isfinite(*out) || fabs(*out) > FLT_MAX) {
         fail(env, "expected finite number");
         return 0;
     }

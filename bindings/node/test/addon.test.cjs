@@ -9,6 +9,9 @@ async function main() {
   const app = makeApp();
   const root = native.makeNode(app, null, 1, 'root');
   const label = native.makeNode(app, root, 3, 'label');
+  assert.throws(() => native.setGap(app, root, 1e300), /finite number/);
+  assert.throws(() => native.create({backend: 0, width: 1e300, height: 200,
+    maxNodes: 32, maxEvents: 32}), /finite number/);
   native.setText(app, label, 'Safe');
   native.step(app, 1 / 60);
   assert.ok(native.bounds(app, label).width > 0);

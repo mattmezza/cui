@@ -1822,22 +1822,11 @@ static void bridge_render_description_list(cui_bridge_app *app, cui_bridge_node_
                               cui_description_options_default()))
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
 }
-static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
+static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
     bool previous_disabled = node->disabled;
     node->disabled = node->disabled || app->render_disabled;
-    if (node->kind == CUI_BRIDGE_ROW || node->kind == CUI_BRIDGE_COLUMN) {
-        cui_box box = {.row = node->kind == CUI_BRIDGE_ROW, .gap = node->gap};
-        if (slot == app->root) {
-            box.width = -1;
-            box.height = -1;
-            box.padding = 16;
-        }
-        cui_begin_box(app->ui, node->id, box);
-        for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
-            bridge_render_node(app, child);
-        cui_end_box(app->ui);
-    } else if (node->kind == CUI_BRIDGE_SCROLLABLE) {
+    if (node->kind == CUI_BRIDGE_SCROLLABLE) {
         float width = node->visual_width > 0 ? node->visual_width : 200;
         float height = node->visual_height > 0 ? node->visual_height : 100;
         cui_scroll_options options = {
@@ -2195,6 +2184,29 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
         }
         (void)cui_button_ex(app->ui, node->id, &app->theme, cui_string(node->text), options);
     }
+    node->disabled = previous_disabled;
+}
+/* Structural nesting is the legal maximum-depth path. Keep its recursive frame
+ * independent of the many component-specific option structs above: MSVC Debug
+ * reserves the whole function's local area at every call site. */
+static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
+    cui_bridge_node_record *node = &app->nodes[slot];
+    if (node->kind != CUI_BRIDGE_ROW && node->kind != CUI_BRIDGE_COLUMN) {
+        bridge_render_node_other(app, slot);
+        return;
+    }
+    bool previous_disabled = node->disabled;
+    node->disabled = node->disabled || app->render_disabled;
+    cui_box box = {.row = node->kind == CUI_BRIDGE_ROW, .gap = node->gap};
+    if (slot == app->root) {
+        box.width = -1;
+        box.height = -1;
+        box.padding = 16;
+    }
+    cui_begin_box(app->ui, node->id, box);
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
+        bridge_render_node(app, child);
+    cui_end_box(app->ui);
     node->disabled = previous_disabled;
 }
 cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {

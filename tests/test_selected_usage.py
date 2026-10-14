@@ -14,7 +14,7 @@ class SelectedUsageTests(unittest.TestCase):
         script = '''
 import {selectedUsage} from './web/modules/cui_usage.js';
 const cases=[];
-for(const [name,modes] of [['Button',[1,2,3]],['Input',[4,5,6,7,8]]])
+for(const [name,modes] of [['Button',[1,2,3]],['Input',[4,5,6,7,8,9]]])
  for(const mode of modes)for(let size=0;size<15;size++)
   for(const disabled of [false,true])cases.push({name,mode,size,disabled,
    code:selectedUsage(name,mode,size,disabled)});
@@ -24,14 +24,18 @@ process.stdout.write(JSON.stringify(cases));
 '''
         cases = json.loads(subprocess.check_output(
             ['node', '--input-type=module', '-e', script], cwd=ROOT, text=True))
-        self.assertEqual(len(cases), 240)
+        self.assertEqual(len(cases), 270)
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / 'example.c'
             for case in cases:
                 with self.subTest(**{k: v for k, v in case.items() if k != 'code'}):
                     code = case['code']
                     self.assertIn(f".disabled = {str(case['disabled']).lower()}", code)
-                    if case['name'] == 'Input' and case['mode'] >= 7:
+                    if case['name'] == 'Input' and case['mode'] == 9:
+                        self.assertIn('cui_regex_matcher(&view->session)', code)
+                        self.assertIn('cui_regex_session_destroy', code)
+                        self.assertIn('1024 * 1024', code)
+                    elif case['name'] == 'Input' and case['mode'] >= 7:
                         self.assertIn('CUI_EDIT_FORMAT_PATTERN' if case['mode'] == 7 else 'CUI_EDIT_FORMAT_NUMBER', code)
                         self.assertIn('.format_workspace = {workspace, capacity}', code)
                     elif case['name'] == 'Input':

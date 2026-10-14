@@ -1,0 +1,57 @@
+--- a/src/nfa/thompson/pikevm.rs
++++ b/src/nfa/thompson/pikevm.rs
+@@ -1889,6 +1889,36 @@
+ }
+ 
+ impl Cache {
++    /// Task-local proof: fallible bounded capture-free Input cache.
++    pub fn cui_try_new(re: &PikeVM, budget: usize) -> Result<Cache, &'static str> {
++        if re.get_nfa().group_info().slot_len() != 0 { return Err("captures unsupported"); }
++        let states = re.get_nfa().states().len();
++        let mut stack_count = 1usize;
++        for state in re.get_nfa().states() {
++            let add = match state {
++                State::Union { alternates } => alternates.len().saturating_sub(1),
++                State::BinaryUnion { .. } => 1,
++                State::Capture { .. } => return Err("captures unsupported"),
++                _ => 0,
++            };
++            stack_count = stack_count.checked_add(add).ok_or("overflow")?;
++        }
++        let slots = re.get_nfa().pattern_len().checked_mul(2).ok_or("overflow")?;
++        let bytes = states.checked_mul(4 * core::mem::size_of::<StateID>())
++            .and_then(|x| slots.checked_mul(2 * core::mem::size_of::<Option<NonMaxUsize>>()).and_then(|y| x.checked_add(y)))
++            .and_then(|x| stack_count.checked_mul(core::mem::size_of::<FollowEpsilon>()).and_then(|y| x.checked_add(y)))
++            .ok_or("overflow")?;
++        if bytes > budget { return Err("budget"); }
++        let mut stack = vec![];stack.try_reserve_exact(stack_count).map_err(|_| "allocation")?;
++        let active = || -> Result<ActiveStates, &'static str> {
++            let set = SparseSet::cui_try_new(states).map_err(|_| "allocation")?;
++            let mut table = vec![];table.try_reserve_exact(slots).map_err(|_| "allocation")?;
++            table.resize(slots, None);
++            Ok(ActiveStates { set, slot_table: SlotTable { table, slots_per_state: 0, slots_for_captures: slots } })
++        };
++        Ok(Cache { stack, curr: active()?, next: active()? })
++    }
++
+     /// Create a new [`PikeVM`] cache.
+     ///
+     /// A potentially more convenient routine to create a cache is
+--- a/src/util/sparse_set.rs
++++ b/src/util/sparse_set.rs
+@@ -106,6 +106,15 @@
+ }
+ 
+ impl SparseSet {
++    pub(crate) fn cui_try_new(capacity: usize) -> Result<SparseSet, ()> {
++        if capacity > StateID::LIMIT { return Err(()); }
++        let mut dense = vec![];let mut sparse = vec![];
++        dense.try_reserve_exact(capacity).map_err(|_| ())?;
++        sparse.try_reserve_exact(capacity).map_err(|_| ())?;
++        dense.resize(capacity, StateID::ZERO);sparse.resize(capacity, StateID::ZERO);
++        Ok(SparseSet { len: 0, dense, sparse })
++    }
++
+     /// Create a new sparse set with the given capacity.
+     ///
+     /// Sparse sets have a fixed size and they cannot grow. Attempting to

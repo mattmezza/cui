@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+libdir=${prefix}/lib
+includedir=${prefix}/include
+Name: cui-regex
+Description: Optional pinned Unicode regex Input provider
+Version: @PROJECT_VERSION@
+Requires: cui
+Libs: -L${libdir} -lcui_regex
+Libs.private: -lgcc_s -lutil -lrt -pthread -lm -ldl
+Cflags: -I${includedir}

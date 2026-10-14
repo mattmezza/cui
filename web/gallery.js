@@ -888,6 +888,7 @@ try{
  const imports={wasi_snapshot_preview1:wasiImports(),host:{measure:(ptr,len,size)=>{ctx.font=canvasFont(size);return ctx.measureText(stringAt(ptr,len)).width;},measure_styled:(ptr,len,size,weight,italic,monospace,familyId)=>{ctx.font=canvasFont(size,weight,!!italic,!!monospace,familyId>>>0);return ctx.measureText(stringAt(ptr,len)).width;},font_metrics:(size,weight,italic,monospace,familyId,pointer)=>{const metrics=canvasFontMetrics(size,weight,!!italic,!!monospace,familyId>>>0);if(!metrics)return 0;new Float32Array(wasm.memory.buffer,pointer,3).set(metrics);return 1;}}};
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();shadowRenderer=createCuiShadowRenderer(cuiShadowWasmRasterizer(wasm));if(!wasm.gallery_init())throw Error('CUI initialization failed');
  let saved;try{saved=localStorage.getItem('cui.theme');}catch{}themeChoice=saved==='system'||saved==='high-contrast'||themes.some(theme=>theme.id===saved)?saved:'system';buildPaletteMenu();syncTheme();
+ const regexOption=$('input-mode').querySelector('option[value="9"]');regexOption.disabled=!wasm.gallery_regex_available();regexOption.textContent=regexOption.disabled?'Unicode letters · regex (unavailable)':'Unicode letters · regex';
  window.cuiGallery={exports:wasm,stories,catalog,documents,themes,render,shadowStats:()=>shadowRenderer.stats(),get themeChoice(){return themeChoice;}};$('home-story-count').textContent=String(Object.keys(stories).length);route();
 }catch(error){fatal(error);}
 

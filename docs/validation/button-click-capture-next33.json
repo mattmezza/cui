@@ -1,0 +1,11 @@
+{
+  "source_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "source_dependency": "gpui-pre=0.3.8",
+  "implemented_slice": "accepted release/key/accessibility payload, pointer-free and copyable",
+  "remaining": ["mouse down+up capture snapshot", "keyboard source hitbox bounds", "first_mouse host metadata", "touch long_press", "event-local propagation"],
+  "proposed_core_api": "validated read-only accepted-pointer snapshot by event index",
+  "storage": "bounded private capture-start sample plus dispatch-index snapshots",
+  "production_core_changes": false,
+  "physical_device_validation": false,
+  "full_button_parity": false
+}

@@ -2,6 +2,18 @@
 
 ## Current priorities — 14 October
 
+Current checkpoint: published `67d86ed4` has all six framework jobs and Pages passing, all445 public files matching the artifact and actual public Attachment62/62 passing. Main strict168/168 CTest passes. Next32 independently passes native172/172, sanitizer167/167, WASI135/135 and all54 exact Pages browser commands, including all78 stories/78 snippets. Final sharing3/3 and selected usage compilation pass after metadata rebuild.
+
+Next33 source `5d253e73` adds guarded Input matcher sessions, an optional pinned Unicode regex archive and live examples, copied release-derived Button click payloads, typed Button loading artwork, checked Notification shadows and Popover appearance policies. Full native185/185, sanitizer174/174, WASI140/140 and exact61-command Pages browser matrix PASS. Final documentation/static metadata is rebuilt before publication. The ledger has354 features:306 tested subsets,4 implemented and44 not_started. All78 families remain, zero fullyverified. Source press-snapshot forwarding, segmented Tab appearance and Notification96px motion are an isolated later batch (strict native192/192); release-key policy is still under worker validation. No user dependency installation is required.
+
+Maintainer requirement: automated native test windows must never use the user's desktop. Local Linux testing uses invisible Xvfb via scripts/test_local.py, with no desktop fallback. The runner3/3 unit tests and actual isolated SDL/Sokol2/2 checks pass; prior hardware proofs remain revision-scoped, and unsupported future hardware checks are deferred.
+
+The paragraphs below preserve previous checkpoints and their then-current pending work.
+
+Published `5474ec7` fixes the acquired-swapchain SDL GPU assertion. All six framework jobs and Pages pass, and all411 HTTPS files match its artifact. MAIN `62b3bb4` passes framework CI but Pages failed the real secure touch-focus regression; deployment was skipped. It is not the published gallery.
+
+Historical checkpoint carried from Main:
+
 Published `a3ea0c1` passes all six framework jobs and Pages. All435 public HTTPS files match the deployment artifact; actual public Attachment62/62 passes. It includes the acquired-swapchain SDL GPU fix and the secure touch/IME, formatting and Button label corrections. See [publication receipt](validation/published-a3ea0c1.txt).
 
 Next32 portable production passes strict native172/172, ASan/UBSan167/167 and pinned WASI135/135. Input pointer word/line selection, passive Button lifecycle, numeric Button sizing/open/caret, mixed inset shadows and named shadow presets are tested subsets. The original Theme corner/border sample is preserved beside the new shadow sample; both pass actual gallery pixel checks. The complete54-command browser matrix passes before integration/publication, including all78 stories/78 compiled snippets.

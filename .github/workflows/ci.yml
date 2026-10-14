@@ -47,3 +47,21 @@ jobs:
       - run: python scripts/check_manifest.py
       - run: python scripts/check_licenses.py
       - run: python scripts/amalgamate.py --check
+      - run: python tests/test_test_runner.py
+
+  optional-regex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Prepare checksum-verified private optional toolchain
+        run: python scripts/prepare_regex_toolchain.py --cache build/regex-toolchain
+      - name: Build pinned optional provider offline
+        run: python scripts/build_regex.py --cache build/regex-native --toolchain build/regex-toolchain/rust-1.85.1
+      - name: Regex source oracle and fallible allocation boundaries
+        run: CARGO_HOME="$PWD/build/regex-native/cargo" RUSTC="$PWD/build/regex-toolchain/rust-1.85.1/bin/rustc" build/regex-toolchain/rust-1.85.1/bin/cargo test --offline --locked --release --manifest-path build/regex-native/source/Cargo.toml --target-dir build/regex-native/target -- --test-threads=1
+      - run: cmake -S . -B build/native -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_REGEX=ON -DCUI_REGEX_LIBRARY=${{ github.workspace }}/build/regex-native/target/release/libcui_regex.a
+      - run: cmake --build build/native
+      - run: ctest --test-dir build/native --output-on-failure

@@ -74,14 +74,16 @@ static bool cui_status_notification_id_equal(cui_notification_id a, cui_notifica
 static bool cui_status_notification_time(double now) {
     return isfinite(now) && now >= 0;
 }
-static bool cui_status_notification_settings_valid(cui_notification_settings s) {
+bool cui_notification_settings_valid(cui_notification_settings s) {
     return s.placement >= CUI_NOTIFICATION_TOP_LEFT &&
            s.placement <= CUI_NOTIFICATION_RIGHT_CENTER && s.delivery >= CUI_NOTIFICATION_IN_APP &&
            s.delivery <= CUI_NOTIFICATION_BOTH && isfinite(s.width) && s.width > 0 &&
            isfinite(s.margin_left) && s.margin_left >= 0 && isfinite(s.margin_right) &&
            s.margin_right >= 0 && isfinite(s.margin_top) && s.margin_top >= 0 &&
            isfinite(s.margin_bottom) && s.margin_bottom >= 0 &&
-           s.max_visible <= CUI_NOTIFICATION_MAX_ITEMS;
+           s.max_visible <= CUI_NOTIFICATION_MAX_ITEMS &&
+           s.shadow_policy >= CUI_NOTIFICATION_SHADOW_LEGACY &&
+           s.shadow_policy <= CUI_NOTIFICATION_SHADOW_SOURCE;
 }
 static bool cui_status_notification_valid(cui_notification n) {
     return (n.id.type || n.id.key) && n.kind >= CUI_NOTIFICATION_UNTYPED &&
@@ -107,7 +109,7 @@ bool cui_notification_init(cui_notification_state *s, cui_notification_entry *en
                            size_t capacity, cui_notification_settings settings,
                            cui_notification_host host) {
     if (!s || !entries || !capacity || capacity > CUI_NOTIFICATION_MAX_ITEMS ||
-        !cui_status_notification_settings_valid(settings))
+        !cui_notification_settings_valid(settings))
         return false;
     *s = (cui_notification_state){
         .entries = entries, .capacity = capacity, .settings = settings, .host = host};
@@ -142,7 +144,7 @@ static void cui_status_notification_register(cui_notification_state *s, cui_noti
 }
 bool cui_notification_push(cui_notification_state *s, cui_notification n, double now) {
     if (!s || !s->entries || !cui_status_notification_time(now) ||
-        !cui_status_notification_valid(n) || !cui_status_notification_settings_valid(s->settings))
+        !cui_status_notification_valid(n) || !cui_notification_settings_valid(s->settings))
         return false;
     size_t existing = s->count;
     for (size_t i = 0; i < s->count; i++)
@@ -176,7 +178,7 @@ bool cui_notification_push(cui_notification_state *s, cui_notification n, double
     return true;
 }
 bool cui_notification_dismiss(cui_notification_state *s, cui_notification_id id, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return false;
     bool retracted = cui_status_notification_retract(s, id);
     for (size_t i = 0; i < s->count; i++)
@@ -194,7 +196,7 @@ bool cui_notification_dismiss(cui_notification_state *s, cui_notification_id id,
     return retracted;
 }
 size_t cui_notification_dismiss_type(cui_notification_state *s, uint64_t type, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return 0;
     size_t count = 0;
     for (size_t i = 0; i < s->system_count;)
@@ -208,7 +210,7 @@ size_t cui_notification_dismiss_type(cui_notification_state *s, uint64_t type, d
     return count;
 }
 size_t cui_notification_clear(cui_notification_state *s, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return 0;
     size_t count = 0;
     while (s->system_count)
@@ -220,7 +222,7 @@ size_t cui_notification_clear(cui_notification_state *s, double now) {
 cui_notification_advance cui_notification_update(cui_notification_state *s, double now,
                                                  bool paused) {
     cui_notification_advance r = {0};
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return r;
     for (size_t i = 0; i < s->count; i++) {
         cui_notification_entry *e = &s->entries[i];
@@ -315,7 +317,7 @@ bool cui_notification_stack_geometry(const float *heights, size_t count, size_t 
     return true;
 }
 bool cui_notification_system_click(cui_notification_state *s, cui_notification_id id, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return false;
     for (size_t i = 0; i < s->system_count; i++)
         if (cui_status_notification_id_equal(s->system_registry[i].id, id)) {

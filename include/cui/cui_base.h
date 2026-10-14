@@ -114,6 +114,7 @@ typedef struct {
     void *presentation_user;
     cui_edit_format format;
     cui_edit_workspace format_workspace; /* Caller-owned final formatted value + NUL. */
+    cui_text_match matcher; /* Optional synchronous whole-value regex/provider policy. */
 } cui_base_input_options;
 /* Reduce one frame event in queue order after registering the textbox with
  * cui_interact. Does not submit/paint semantics or replay other events. The

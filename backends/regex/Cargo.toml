@@ -1,0 +1,16 @@
+[package]
+name = "cui-regex"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[lib]
+crate-type = ["staticlib"]
+path = "src/lib.rs"
+[dependencies]
+regex = {version="=1.13.1",path="vendor/regex-1.13.1"}
+regex-automata = {version="=0.4.18",path="vendor/regex-automata-0.4.18"}
+[patch.crates-io]
+regex-syntax = {path="vendor/regex-syntax-0.8.11"}
+regex-automata = {path="vendor/regex-automata-0.4.18"}
+aho-corasick = {path="vendor/aho-corasick-1.1.5"}
+memchr = {path="vendor/memchr-2.8.3"}

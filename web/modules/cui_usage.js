@@ -8,6 +8,50 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
 // and calls draw only between begin_frame and end_frame.
 export function selectedUsage(name, mode, size = 3, disabled = false) {
  const design = sizes[size] || 'CUI_DESIGN_BASE';
+ if (name === 'Input' && mode === 9) return `#include <cui/cui_components.h>
+#include <cui/cui_regex.h>
+
+typedef struct {
+    cui_regex compiled;
+    cui_regex_session session;
+    bool ready;
+} unicode_name_view;
+
+/* Zero-initialize view. Prepare outside UI frames; link the optional regex archive.
+ * Keep this owner at a stable address until the last Input call finishes. */
+bool unicode_name_init(unicode_name_view *view) {
+    if (view->ready) return true;
+    if (cui_regex_compile(cui_string("^[\\\\p{L} ]*$"),
+            (cui_regex_options){.max_pattern_bytes = 64, .max_text_bytes = 1024},
+            &view->compiled) == CUI_REGEX_OK &&
+        cui_regex_session_create(&view->compiled, 1024 * 1024, &view->session) == CUI_REGEX_OK) {
+        view->ready = true;
+        return true;
+    }
+    (void)cui_regex_session_destroy(&view->session);
+    (void)cui_regex_destroy(&view->compiled);
+    return false;
+}
+
+/* Retain edit/state across frames; invoke between begin_frame/end_frame.
+ * Caller must initialize successfully before drawing. No JavaScript validation. */
+cui_input_result draw_unicode_name(cui_context *ui, cui_id id,
+    const cui_theme *theme, cui_edit *edit, cui_input_state *state,
+    unicode_name_view *view) {
+    return cui_input_ex(ui, id, theme, cui_string("Unicode name"), edit, state,
+        (cui_input_options){
+            .matcher = cui_regex_matcher(&view->session),
+            .normalization = CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF,
+            .design_size = ${design}, .disabled = ${disabled}, .width = 280
+        });
+}
+
+/* At shutdown outside any matcher lease; reset Input state before replacing edit. */
+void unicode_name_destroy(unicode_name_view *view) {
+    (void)cui_regex_session_destroy(&view->session);
+    (void)cui_regex_destroy(&view->compiled);
+    *view = (unicode_name_view){0};
+}`;
  if (name === 'Input' && mode >= 4 && mode <= 6) return `#include <cui/cui_components.h>
 
 /* Retain edit and state across frames. Reset state before replacing edit.

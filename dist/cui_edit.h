@@ -3,6 +3,7 @@
 #ifndef CUI_EDIT_H
 #define CUI_EDIT_H
 #include "cui.h"
+#include "cui_text_match.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,7 +17,10 @@ typedef enum {
     CUI_EDIT_INVALID_ARGUMENT,
     CUI_EDIT_LINE_BREAK,
     CUI_EDIT_CLIPBOARD_UNAVAILABLE,
-    CUI_EDIT_PRESENTATION
+    CUI_EDIT_PRESENTATION,
+    CUI_EDIT_MATCHER,
+    CUI_EDIT_MATCHER_STALE,
+    CUI_EDIT_MATCHER_BUSY
 } cui_edit_result;
 typedef struct {
     char *buffer;
@@ -132,6 +136,7 @@ typedef struct {
     bool masked_words; /* Checked-call word boundaries become whole-value endpoints. */
     cui_edit_format format;
     cui_edit_workspace format_workspace; /* Final value + NUL; disjoint caller storage. */
+    cui_text_match matcher; /* Single-line/single-selection synchronous whole-value gate. */
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;
@@ -3395,6 +3400,9 @@ struct cui_edit {
     cui_edit_column_anchor *columns;
     size_t column_capacity, column_count;
     cui_edit_column_snapshot *column_history;
+    cui_text_match matcher;
+    void *matcher_lease;
+    cui_edit_result matcher_error;
     cui_edit_acceptance acceptance;
     cui_edit_normalization normalization;
     cui_edit_presentation presentation;
@@ -3415,9 +3423,55 @@ static bool cui_edit_private_callback_guard(const cui_edit *e) {
     ((cui_edit *)e)->acceptance_violation = true;
     return true;
 }
+static cui_edit_result cui_edit_private_match_error(cui_text_match_result r) {
+    switch (r) {
+    case CUI_TEXT_MATCH_OK:
+        return CUI_EDIT_OK;
+    case CUI_TEXT_MATCH_CAPACITY:
+        return CUI_EDIT_CAPACITY;
+    case CUI_TEXT_MATCH_STALE:
+        return CUI_EDIT_MATCHER_STALE;
+    case CUI_TEXT_MATCH_BUSY:
+        return CUI_EDIT_MATCHER_BUSY;
+    case CUI_TEXT_MATCH_FAILED:
+        return CUI_EDIT_MATCHER;
+    default:
+        return CUI_EDIT_INVALID_ARGUMENT;
+    }
+}
+static bool cui_edit_private_match_begin(cui_edit *e) {
+    if (!e->matcher.ops.begin || e->matcher_lease)
+        return true;
+    e->callback_active = true;
+    cui_text_match_result r =
+        e->matcher.ops.begin(e->matcher.object, e->matcher.generation, &e->matcher_lease);
+    e->callback_active = false;
+    e->matcher_error = cui_edit_private_match_error(r);
+    if (r == CUI_TEXT_MATCH_OK && !e->matcher_lease)
+        e->matcher_error = CUI_EDIT_INVALID_ARGUMENT;
+    return e->matcher_error == CUI_EDIT_OK && !e->acceptance_violation;
+}
+static cui_edit_result cui_edit_private_match_end(cui_edit *e, cui_edit_result result) {
+    if (e->matcher_lease) {
+        void *lease = e->matcher_lease;
+        e->matcher_lease = NULL;
+        e->callback_active = true;
+        cui_text_match_result r = e->matcher.ops.end(e->matcher.object, lease);
+        e->callback_active = false;
+        if (r != CUI_TEXT_MATCH_OK)
+            e->matcher_error = cui_edit_private_match_error(r);
+    }
+    if (e->matcher_error != CUI_EDIT_OK)
+        result = e->matcher_error;
+    if (e->acceptance_violation)
+        result = CUI_EDIT_INVALID_ARGUMENT;
+    return result;
+}
 static bool cui_edit_private_predicate(cui_edit *e, cui_str value) {
     if (!value.length)
         return true;
+    if (!cui_edit_private_match_begin(e))
+        return false;
     e->callback_active = true;
     bool accepted = !e->acceptance.validate || e->acceptance.validate(e->acceptance.user, value);
     e->callback_active = false;
@@ -3427,25 +3481,30 @@ static bool cui_edit_private_predicate(cui_edit *e, cui_str value) {
             return false;
         accepted = valid;
     }
+    if (accepted && e->matcher.ops.match && !e->acceptance_violation) {
+        e->callback_active = true;
+        cui_text_match_result r =
+            e->matcher.ops.match(e->matcher_lease, value, e->matcher.scratch, &accepted);
+        e->callback_active = false;
+        e->matcher_error = cui_edit_private_match_error(r);
+        if (r != CUI_TEXT_MATCH_OK)
+            accepted = false;
+    }
     return accepted;
 }
 static cui_edit_result cui_edit_private_accept_value(cui_edit *e, cui_str candidate, cui_str old) {
-    if ((!e->acceptance.validate && !cui_edit_private_format_enabled(e->format)) ||
+    if ((!e->acceptance.validate && !e->matcher.ops.begin &&
+         !cui_edit_private_format_enabled(e->format)) ||
         e->config.multiline || e->acceptance_skip)
         return CUI_EDIT_OK;
     bool accepted = cui_edit_private_predicate(e, candidate);
-    if (e->acceptance_violation)
-        return CUI_EDIT_INVALID_ARGUMENT;
-    if (!accepted) {
+    if (!accepted && !e->acceptance_violation && e->matcher_error == CUI_EDIT_OK) {
         bool old_valid = cui_edit_private_predicate(e, old);
-        if (e->acceptance_violation)
-            return CUI_EDIT_INVALID_ARGUMENT;
-        if (old_valid) {
+        if (old_valid && !e->acceptance_violation && e->matcher_error == CUI_EDIT_OK)
             e->acceptance_rejected = true;
-            return CUI_EDIT_INVALID_ARGUMENT;
-        }
     }
-    return CUI_EDIT_OK;
+    return cui_edit_private_match_end(e, e->acceptance_rejected ? CUI_EDIT_INVALID_ARGUMENT
+                                                                : CUI_EDIT_OK);
 }
 static cui_edit_result cui_edit_private_present(cui_edit *e, cui_str candidate, bool provisional) {
     if (!e->presentation.prepare || e->presentation_skip)
@@ -4913,7 +4972,8 @@ static cui_edit_result cui_edit_private_replace(cui_edit *e, cui_str text, size_
     if (!length && start == end && !cui_edit_private_format_enabled(e->format))
         return CUI_EDIT_OK;
     if (strip || (e->presentation.prepare && !e->presentation_skip) ||
-        (e->acceptance.validate && !e->config.multiline && !e->acceptance_skip) ||
+        ((e->acceptance.validate || e->matcher.ops.begin) && !e->config.multiline &&
+         !e->acceptance_skip) ||
         cui_edit_private_format_enabled(e->format)) {
         /* The opaque engine knows its entire workspace extent. */
         uintptr_t source = (uintptr_t)text.data, work = (uintptr_t)e->scratch;
@@ -6343,7 +6403,7 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
                                                            cui_str text, size_t start, size_t end,
                                                            char *work, size_t capacity,
                                                            bool commit) {
-    if ((!e->acceptance.validate && !e->presentation.prepare &&
+    if ((!e->acceptance.validate && !e->matcher.ops.begin && !e->presentation.prepare &&
          !cui_edit_private_format_enabled(e->format)) ||
         e->config.multiline)
         return CUI_EDIT_OK;
@@ -6372,7 +6432,7 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
         return prepared;
     }
     bool accepted = cui_edit_private_predicate(e, (cui_str){work, length});
-    if (!accepted && !e->acceptance_violation) {
+    if (!accepted && !e->acceptance_violation && e->matcher_error == CUI_EDIT_OK) {
         if (rebuild_old) {
             cui_edit_private_compose_candidate(e, work, c->start, c->end,
                                                (cui_str){c->buffer, c->length});
@@ -6381,7 +6441,7 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
                 old.length = e->composition_view_length;
         }
         bool old_valid = cui_edit_private_predicate(e, old);
-        if (old_valid && !e->acceptance_violation)
+        if (old_valid && !e->acceptance_violation && e->matcher_error == CUI_EDIT_OK)
             e->acceptance_rejected = true;
     }
     /* Defined previous view bytes are restored even when the predicate attempts
@@ -6389,8 +6449,10 @@ static cui_edit_result cui_edit_private_accept_composition(cui_edit *e, cui_edit
     if (rebuild_old)
         cui_edit_private_compose_candidate(e, work, c->start, c->end,
                                            (cui_str){c->buffer, c->length});
-    if (e->acceptance_violation || e->acceptance_rejected)
-        return CUI_EDIT_INVALID_ARGUMENT;
+    cui_edit_result finished = cui_edit_private_match_end(
+        e, e->acceptance_rejected ? CUI_EDIT_INVALID_ARGUMENT : CUI_EDIT_OK);
+    if (finished != CUI_EDIT_OK)
+        return finished;
     if (commit) {
         e->format_ready = cui_edit_private_format_enabled(e->format);
         e->format_length = final.length;
@@ -6522,7 +6584,7 @@ cui_edit_result cui_edit_composition_event(cui_edit *e, cui_edit_composition *c,
             return prepared;
         }
     }
-    if ((e->acceptance.validate || e->presentation.prepare ||
+    if ((e->acceptance.validate || e->matcher.ops.begin || e->presentation.prepare ||
          cui_edit_private_format_enabled(e->format)) &&
         !state.multiline &&
         (v.type == CUI_EVENT_COMPOSITION_UPDATE || v.type == CUI_EVENT_COMPOSITION_COMMIT)) {
@@ -6667,7 +6729,7 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
         return false;
     if (p.prepare && e->config.multiline)
         return false;
-    cui_edit_workspace spans[7] = {{p.user, p.user_bytes}, p.caller_descriptor};
+    cui_edit_workspace spans[9] = {{p.user, p.user_bytes}, p.caller_descriptor};
     spans[5] = request.format_workspace;
     spans[6] = (cui_edit_workspace){
         request.format.pattern.length ? (void *)request.format.pattern.data : NULL,
@@ -6698,7 +6760,9 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
               cui_edit_private_storage_overlap(c->buffer, c->capacity, c->view_buffer,
                                                c->view_capacity)))
         return false;
-    for (size_t i = 0; i < 7; i++) {
+    spans[7] = (cui_edit_workspace){request.matcher.object, request.matcher.object_bytes};
+    spans[8] = (cui_edit_workspace){request.matcher.scratch.data, request.matcher.scratch.bytes};
+    for (size_t i = 0; i < 9; i++) {
         cui_edit_workspace a = spans[i];
         if (!cui_edit_private_workspace_valid(a) ||
             cui_edit_private_model_overlap(e, a.data, a.bytes) ||
@@ -6715,12 +6779,20 @@ static bool cui_edit_private_presentation_valid(cui_edit *e, cui_edit_request re
     }
     return true;
 }
+static bool cui_edit_private_match_valid(cui_edit *e, cui_text_match m) {
+    if (!m.ops.begin)
+        return !m.ops.match && !m.ops.end && !m.object && !m.object_bytes && !m.generation &&
+               !m.scratch.data && !m.scratch.bytes;
+    return m.ops.match && m.ops.end && m.object && m.object_bytes && m.generation &&
+           (e->config.multiline || (e->selection_count <= 1 && !e->token_count));
+}
 cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request request,
                                                cui_edit_acceptance acceptance) {
     if (!e || cui_edit_private_callback_guard(e) || request.kind < CUI_EDIT_REQUEST_EVENT ||
         request.kind > CUI_EDIT_REQUEST_PRESENT ||
         request.normalization < CUI_EDIT_NORMALIZE_NONE ||
         request.normalization > CUI_EDIT_NORMALIZE_SINGLE_LINE_CRLF ||
+        !cui_edit_private_match_valid(e, request.matcher) ||
         !cui_edit_private_format_config(request.format) ||
         (cui_edit_private_format_enabled(request.format) &&
          (e->config.multiline || e->selection_count > 1 || e->token_count ||
@@ -6735,7 +6807,7 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         !cui_edit_private_presentation_valid(e, request))
         return (cui_edit_checked_result){.error = CUI_EDIT_INVALID_ARGUMENT};
     /* Formatting failure must not follow an implicit stale-session cancellation. */
-    if (cui_edit_private_format_enabled(request.format) &&
+    if ((cui_edit_private_format_enabled(request.format) || request.matcher.ops.begin) &&
         request.kind == CUI_EDIT_REQUEST_COMPOSITION && request.composition) {
         cui_edit_composition *c = request.composition;
         if ((c->model_identity && c->model_identity != (uintptr_t)e) ||
@@ -6787,8 +6859,8 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
                                          .presentation_prepared = prepared,
                                          .presentation_applied = prepared && result == CUI_EDIT_OK};
     }
-    if ((!acceptance.validate && !request.presentation.prepare && !request.masked_words &&
-         !cui_edit_private_format_enabled(request.format) &&
+    if ((!acceptance.validate && !request.matcher.ops.begin && !request.presentation.prepare &&
+         !request.masked_words && !cui_edit_private_format_enabled(request.format) &&
          request.normalization == CUI_EDIT_NORMALIZE_NONE) ||
         e->config.multiline) {
         cui_edit_result legacy;
@@ -6813,6 +6885,9 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         return (cui_edit_checked_result){.error = legacy};
     }
     cui_edit saved = *e;
+    e->matcher = request.matcher;
+    e->matcher_lease = NULL;
+    e->matcher_error = CUI_EDIT_OK;
     e->acceptance = acceptance;
     e->normalization = request.normalization;
     e->presentation = request.presentation;
@@ -6841,12 +6916,17 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         result = CUI_EDIT_INVALID_ARGUMENT;
         break;
     }
+    result = cui_edit_private_match_end(e, result);
     bool rejected = e->acceptance_rejected, violation = e->acceptance_violation;
+    bool matcher_failed = e->matcher_error != CUI_EDIT_OK;
     bool prepared = e->presentation_prepared;
     bool applied = prepared && result == CUI_EDIT_OK && !rejected && !violation;
     if (rejected || violation || result != CUI_EDIT_OK)
         *e = saved;
     else {
+        e->matcher = saved.matcher;
+        e->matcher_lease = saved.matcher_lease;
+        e->matcher_error = saved.matcher_error;
         e->acceptance = saved.acceptance;
         e->normalization = saved.normalization;
         e->presentation = saved.presentation;
@@ -6861,10 +6941,14 @@ cui_edit_checked_result cui_edit_apply_checked(cui_edit *e, cui_edit_request req
         e->acceptance_rejected = saved.acceptance_rejected;
         e->acceptance_skip = saved.acceptance_skip;
     }
-    return (cui_edit_checked_result){.error = rejected && !violation ? CUI_EDIT_OK : result,
-                                     .rejected = rejected && !violation,
-                                     .presentation_prepared = prepared,
-                                     .presentation_applied = applied};
+    return (cui_edit_checked_result){
+        .error = rejected && !violation && result == CUI_EDIT_INVALID_ARGUMENT && !matcher_failed
+                     ? CUI_EDIT_OK
+                     : result,
+        .rejected =
+            rejected && !violation && !matcher_failed && result == CUI_EDIT_INVALID_ARGUMENT,
+        .presentation_prepared = prepared,
+        .presentation_applied = applied};
 }
 
 #endif

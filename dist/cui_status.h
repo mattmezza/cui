@@ -207,13 +207,20 @@ typedef struct {
     cui_notification_callback retract, activate;
     void *user;
 } cui_notification_host;
+typedef enum {
+    CUI_NOTIFICATION_SHADOW_LEGACY = 0,
+    CUI_NOTIFICATION_SHADOW_SOURCE = 1
+} cui_notification_shadow_policy;
 typedef struct {
     cui_notification_anchor placement;
     cui_notification_delivery delivery;
     float width, margin_left, margin_right, margin_top, margin_bottom;
     size_t max_visible;
     bool reduced_motion;
+    cui_notification_shadow_policy shadow_policy; /* zero preserves legacy approximation */
 } cui_notification_settings;
+/* Pure checked settings validation, including the shadow policy. */
+bool cui_notification_settings_valid(cui_notification_settings);
 typedef struct {
     cui_notification notification;
     cui_notification_phase phase;
@@ -267,6 +274,14 @@ bool cui_notification_system_click(cui_notification_state *, cui_notification_id
 cui_notification_advance cui_notifications(cui_context *, cui_id, const cui_theme *,
                                            cui_notification_state *, cui_rect viewport,
                                            double now_seconds);
+/* Call during an active UI frame, with independent caller-owned output storage.
+ * Reject invalid inputs before reductions/callbacks/UI and leave output untouched.
+ * Later UI capacity errors cannot undo already accepted owner/host callbacks;
+ * end_frame and renderer preflight retain their existing failure contracts. */
+bool cui_notifications_checked(cui_context *, cui_id, const cui_theme *, cui_notification_state *,
+                               cui_rect viewport, double now_seconds,
+                               cui_notification_advance *out);
+
 #ifdef __cplusplus
 }
 #endif
@@ -352,14 +367,16 @@ static bool cui_status_notification_id_equal(cui_notification_id a, cui_notifica
 static bool cui_status_notification_time(double now) {
     return isfinite(now) && now >= 0;
 }
-static bool cui_status_notification_settings_valid(cui_notification_settings s) {
+bool cui_notification_settings_valid(cui_notification_settings s) {
     return s.placement >= CUI_NOTIFICATION_TOP_LEFT &&
            s.placement <= CUI_NOTIFICATION_RIGHT_CENTER && s.delivery >= CUI_NOTIFICATION_IN_APP &&
            s.delivery <= CUI_NOTIFICATION_BOTH && isfinite(s.width) && s.width > 0 &&
            isfinite(s.margin_left) && s.margin_left >= 0 && isfinite(s.margin_right) &&
            s.margin_right >= 0 && isfinite(s.margin_top) && s.margin_top >= 0 &&
            isfinite(s.margin_bottom) && s.margin_bottom >= 0 &&
-           s.max_visible <= CUI_NOTIFICATION_MAX_ITEMS;
+           s.max_visible <= CUI_NOTIFICATION_MAX_ITEMS &&
+           s.shadow_policy >= CUI_NOTIFICATION_SHADOW_LEGACY &&
+           s.shadow_policy <= CUI_NOTIFICATION_SHADOW_SOURCE;
 }
 static bool cui_status_notification_valid(cui_notification n) {
     return (n.id.type || n.id.key) && n.kind >= CUI_NOTIFICATION_UNTYPED &&
@@ -385,7 +402,7 @@ bool cui_notification_init(cui_notification_state *s, cui_notification_entry *en
                            size_t capacity, cui_notification_settings settings,
                            cui_notification_host host) {
     if (!s || !entries || !capacity || capacity > CUI_NOTIFICATION_MAX_ITEMS ||
-        !cui_status_notification_settings_valid(settings))
+        !cui_notification_settings_valid(settings))
         return false;
     *s = (cui_notification_state){
         .entries = entries, .capacity = capacity, .settings = settings, .host = host};
@@ -420,7 +437,7 @@ static void cui_status_notification_register(cui_notification_state *s, cui_noti
 }
 bool cui_notification_push(cui_notification_state *s, cui_notification n, double now) {
     if (!s || !s->entries || !cui_status_notification_time(now) ||
-        !cui_status_notification_valid(n) || !cui_status_notification_settings_valid(s->settings))
+        !cui_status_notification_valid(n) || !cui_notification_settings_valid(s->settings))
         return false;
     size_t existing = s->count;
     for (size_t i = 0; i < s->count; i++)
@@ -454,7 +471,7 @@ bool cui_notification_push(cui_notification_state *s, cui_notification n, double
     return true;
 }
 bool cui_notification_dismiss(cui_notification_state *s, cui_notification_id id, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return false;
     bool retracted = cui_status_notification_retract(s, id);
     for (size_t i = 0; i < s->count; i++)
@@ -472,7 +489,7 @@ bool cui_notification_dismiss(cui_notification_state *s, cui_notification_id id,
     return retracted;
 }
 size_t cui_notification_dismiss_type(cui_notification_state *s, uint64_t type, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return 0;
     size_t count = 0;
     for (size_t i = 0; i < s->system_count;)
@@ -486,7 +503,7 @@ size_t cui_notification_dismiss_type(cui_notification_state *s, uint64_t type, d
     return count;
 }
 size_t cui_notification_clear(cui_notification_state *s, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return 0;
     size_t count = 0;
     while (s->system_count)
@@ -498,7 +515,7 @@ size_t cui_notification_clear(cui_notification_state *s, double now) {
 cui_notification_advance cui_notification_update(cui_notification_state *s, double now,
                                                  bool paused) {
     cui_notification_advance r = {0};
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return r;
     for (size_t i = 0; i < s->count; i++) {
         cui_notification_entry *e = &s->entries[i];
@@ -593,7 +610,7 @@ bool cui_notification_stack_geometry(const float *heights, size_t count, size_t 
     return true;
 }
 bool cui_notification_system_click(cui_notification_state *s, cui_notification_id id, double now) {
-    if (!s || !cui_status_notification_time(now))
+    if (!s || !cui_status_notification_time(now) || !cui_notification_settings_valid(s->settings))
         return false;
     for (size_t i = 0; i < s->system_count; i++)
         if (cui_status_notification_id_equal(s->system_registry[i].id, id)) {
@@ -1234,9 +1251,11 @@ static void cui_status_notification_shadow(cui_context *ui, cui_id id, cui_rect 
             cui_end_box(ui);
         }
 }
-cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *t,
-                                           cui_notification_state *s, cui_rect viewport,
-                                           double now) {
+static cui_notification_advance cui_status_notifications_render(cui_context *ui, cui_id id,
+                                                                const cui_theme *t,
+                                                                cui_notification_state *s,
+                                                                cui_rect viewport, double now,
+                                                                bool *submitted) {
     cui_notification_advance result = {0};
     if (!ui || !t || !s || !isfinite(now) || now < 0 || !isfinite(viewport.x) ||
         !isfinite(viewport.y) || !isfinite(viewport.w) || viewport.w <= 0 ||
@@ -1394,10 +1413,11 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                 slide = -slide;
             if (anchor == CUI_NOTIFICATION_LEFT_CENTER || anchor == CUI_NOTIFICATION_RIGHT_CENTER)
                 slide = 0;
+            float transition_alpha = alpha;
             alpha *= e->visibility;
             cui_theme theme = cui_status_notification_theme(t, alpha);
             cui_id card = cui_status_notification_element(id, n.id);
-            if (!hidden)
+            if (!hidden && s->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_LEGACY)
                 cui_status_notification_shadow(
                     ui, cui_status_child_id(card, 320),
                     (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
@@ -1418,6 +1438,21 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
                              (cui_rect){x + (width - e->motion_width) / 2, y + e->motion_y + slide,
                                         e->motion_width, n.height},
                              (int16_t)(21 + position));
+            if (!hidden && s->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE) {
+                /* Source strength is alpha^3; source element opacity contributes
+                 * once more. This path already fades its local theme colors. */
+                float shadow_alpha = fmaxf(0, fminf(transition_alpha, 1));
+                float visibility = fmaxf(0, fminf(e->visibility, 1));
+                unsigned char ink = (unsigned char)lroundf(
+                    25.5f * shadow_alpha * shadow_alpha * shadow_alpha * shadow_alpha * visibility);
+                cui_drop_shadow layers[2] = {
+                    {.offset_y = 10, .sigma = 7.5f, .spread = -3, .color = {0, 0, 0, ink}},
+                    {.offset_y = 4, .sigma = 3, .spread = -4, .color = {0, 0, 0, ink}}};
+                float radius = t->radius_lg;
+                if (!cui_set_drop_shadows(ui, layers, 2,
+                                          (cui_corner_radii){radius, radius, radius, radius}))
+                    *submitted = false;
+            }
             cui_track_bounds(ui, card, &e->bounds);
             cui_interaction interaction =
                 cui_interact(ui, card, n.on_click ? CUI_ROLE_BUTTON : CUI_ROLE_ALERT,
@@ -1520,6 +1555,45 @@ cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui
         }
     if (result.changed)
         cui_invalidate(ui);
+    return result;
+}
+
+bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *theme,
+                               cui_notification_state *state, cui_rect viewport, double now,
+                               cui_notification_advance *out) {
+    if (!ui || !theme || !state || !out || !state->entries || !state->capacity ||
+        state->capacity > CUI_NOTIFICATION_MAX_ITEMS || state->count > state->capacity ||
+        state->system_count > 100 || !cui_notification_settings_valid(state->settings) ||
+        !isfinite(now) || now < 0 || !isfinite(viewport.x) || !isfinite(viewport.y) ||
+        !isfinite(viewport.w) || viewport.w <= 0 || !isfinite(viewport.h) || viewport.h <= 0 ||
+        !isfinite(viewport.x + viewport.w) || !isfinite(viewport.y + viewport.h) ||
+        (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE &&
+         (!isfinite(theme->radius_lg) || theme->radius_lg < 0 || theme->radius_lg > 16384)))
+        return false;
+    if (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE) {
+        if (!isfinite(state->last_render) || state->last_render < 0)
+            return false;
+        for (size_t i = 0; i < state->count; i++) {
+            const cui_notification_entry *e = &state->entries[i];
+            if (e->phase < CUI_NOTIFICATION_STARTING || e->phase > CUI_NOTIFICATION_ENDING ||
+                !isfinite(e->elapsed) || e->elapsed < 0 || !isfinite(e->last_advance) ||
+                !isfinite(e->visibility) || !isfinite(e->velocity_visibility))
+                return false;
+        }
+    }
+    bool submitted = true;
+    cui_notification_advance next =
+        cui_status_notifications_render(ui, id, theme, state, viewport, now, &submitted);
+    if (!submitted)
+        return false;
+    *out = next;
+    return true;
+}
+cui_notification_advance cui_notifications(cui_context *ui, cui_id id, const cui_theme *theme,
+                                           cui_notification_state *state, cui_rect viewport,
+                                           double now) {
+    cui_notification_advance result = {0};
+    (void)cui_notifications_checked(ui, id, theme, state, viewport, now, &result);
     return result;
 }
 

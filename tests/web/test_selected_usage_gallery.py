@@ -36,10 +36,13 @@ def main():
                     permissions=['clipboard-read', 'clipboard-write'])
                 errors = []
                 page.on('pageerror', lambda error: errors.append(str(error)))
-                for name, modes in [('Button', [1, 2, 3]), ('Input', [4, 5, 6, 7, 8])]:
+                for name, modes in [('Button', [1, 2, 3]), ('Input', [4, 5, 6, 7, 8, 9])]:
                     page.goto(f'http://127.0.0.1:{server.server_port}/#{name}')
                     page.wait_for_function('(name)=>window.cuiGallery&&cuiGallery.renderedComponent===name', arg=name)
                     control = '#button-collection' if name == 'Button' else '#input-mode'
+                    if name == 'Input' and not page.evaluate('cuiGallery.exports.gallery_regex_available()'):
+                        assert page.locator('#input-mode option[value="9"]').is_disabled()
+                        modes = [mode for mode in modes if mode != 9]
                     for mode in modes:
                         page.locator(control).select_option(str(mode))
                         page.locator('#design-size').select_option('5')
@@ -48,6 +51,8 @@ def main():
                         if name == 'Button':
                             expected += [f'.multiple = {str(mode == 2).lower()}',
                                          f'.vertical = {str(mode == 3).lower()}']
+                        elif mode == 9:
+                            expected += ['cui_regex_matcher(&view->session)', 'cui_regex_compile']
                         elif mode >= 7:
                             expected += ['CUI_EDIT_FORMAT_PATTERN' if mode == 7 else 'CUI_EDIT_FORMAT_NUMBER']
                         else:
@@ -59,6 +64,9 @@ def main():
                             assert f'.multiple = {str(mode == 2).lower()}' in code
                             assert f'.vertical = {str(mode == 3).lower()}' in code
                             assert '.change_user = view' in code
+                        elif mode == 9:
+                            assert 'cui_regex_matcher(&view->session)' in code
+                            assert 'cui_regex_session_destroy' in code
                         elif mode >= 7:
                             assert ('CUI_EDIT_FORMAT_PATTERN' if mode == 7 else 'CUI_EDIT_FORMAT_NUMBER') in code
                             assert '.format_workspace = {workspace, capacity}' in code
@@ -81,7 +89,7 @@ def main():
             browser.close()
     finally:
         server.shutdown()
-    print('PASS: 16 desktop/mobile actual clipboard examples match selected modes, size and disabled state; all copied C11 units compile')
+    print('PASS: desktop/mobile actual clipboard examples (including regex when linked) match selected modes, size and disabled state; copied C11 units compile')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,28 @@
+{
+  "kind": "read_only_source_audit",
+  "source_commit": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "cui_commit": "12e183826ed39de0419ae2916091c41e52eed29b",
+  "complete_input_parity": false,
+  "production_changes": false,
+  "priority": [
+    "chrome_and_lifecycle_events",
+    "selection_actions_focus",
+    "plain_inline_token_vertical_slice",
+    "number_blur_step_multiline_search_async_paste_content_purposes"
+  ],
+  "source_differences": [
+    "CUI strict byte selection versus source clipping",
+    "CUI matcher rejects inline tokens which source plain token insertion validates",
+    "CUI multiline formatting unsupported although source shared builder exists",
+    "single-selection IME",
+    "embedded NUL numeric separator unsupported"
+  ],
+  "validation": {
+    "inherited_frozen_ctest": "155/156; stale generated distribution only",
+    "native_harness": "3/3",
+    "sanitizer_harness": "3/3 C ASan/UBSan; Rust not instrumented",
+    "actual_wasi_browser": true
+  },
+  "receipt": "backends/regex/proof.json",
+  "document": "docs/validation/input-after-regex-next33.md"
+}

@@ -39,6 +39,38 @@ typedef struct {
     bool sheet_motion_enabled, sheet_closing;
     cui_surface_result sheet_close_result;
 } cui_surface_state;
+/* Opt-in Popover defaults; zero retains the legacy surface appearance. */
+typedef enum {
+    CUI_POPOVER_APPEARANCE_LEGACY = 0,
+    CUI_POPOVER_APPEARANCE_SOURCE,
+    CUI_POPOVER_APPEARANCE_NONE
+} cui_popover_appearance;
+enum {
+    CUI_POPOVER_REFINE_BACKGROUND = 1u << 0,
+    CUI_POPOVER_REFINE_FOREGROUND = 1u << 1,
+    CUI_POPOVER_REFINE_RADIUS = 1u << 2,
+    CUI_POPOVER_REFINE_PADDING = 1u << 3,
+    CUI_POPOVER_REFINE_BORDER = 1u << 4,
+    CUI_POPOVER_REFINE_SHADOWS = 1u << 5
+};
+typedef struct {
+    unsigned flags;
+    cui_color background, foreground, border;
+    float radius, padding, border_width;
+    size_t shadow_count;
+    cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
+} cui_popover_refinement;
+typedef struct {
+    cui_color background, foreground, border;
+    float radius, padding, border_width;
+    size_t shadow_count;
+    cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
+} cui_popover_style;
+/* Pure validators/resolver; invalid input leaves output untouched. Source p_3 is
+ * 12 logical pixels at pinned 16px rem; customize padding for another host rem. */
+bool cui_popover_refinement_valid(cui_popover_appearance, cui_popover_refinement);
+bool cui_popover_style_resolve(const cui_theme *, cui_popover_appearance, cui_popover_refinement,
+                               cui_popover_style *out);
 typedef struct {
     cui_rect viewport, anchor;
     float width, height, margin;
@@ -57,6 +89,9 @@ typedef struct {
     float sheet_animation_seconds;
     bool reduced_motion;
     const cui_scrollbar_style *scrollbar_style; /* Borrowed during begin; NULL uses theme. */
+    /* Consumed only for POPOVER; copied values, no retained layer pointers. */
+    cui_popover_appearance popover_appearance;
+    cui_popover_refinement popover_refinement;
 } cui_surface_options;
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);

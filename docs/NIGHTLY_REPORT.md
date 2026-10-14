@@ -1,5 +1,11 @@
 # Nightly report — live development checkpoint
 
+Current publication is `67d86ed4`: six framework jobs and Pages pass; all445 HTTPS artifact files match and public Attachment62/62 passes. Main strict168/168 CTest passes. Hosted Windows/MSVC and macOS/AppleClang each145/145 portable checks pass with native adapters disabled. Next32 independently passes strict172/172, sanitizer167/167, pinned WASI135/135 and all54 exact Pages browser commands. See [Next32 evidence](validation/gallery-next32.txt).
+
+Next33 production `5d253e73` passes native185/185, sanitizer174/174, WASI140/140 and all61 exact Pages browser commands: optional Unicode regex/Input gallery, copied release click payloads, typed Button artwork, Notification shadows and Popover appearance policies are bounded tested additions. The ledger now has354 features,306 tested subsets,4 implemented and44 not_started; all78 families remain and none is fullyverified. Final metadata/publication is separate. Automated local native windows now run only under invisible Xvfb; runner3/3 and actual isolated SDL/Sokol2/2 pass. Later source snapshots/Tabs/Notification motion pass native192/192 before this display rule; their remaining proofs continue without using the desktop. The reports below describe historical revisions, not current completion.
+
+Historical checkpoint carried from Main:
+
 Published `a3ea0c1` passes all six framework jobs and Pages, with all435 HTTPS artifact files matching and actual public Attachment62/62. See [publication receipt](validation/published-a3ea0c1.txt).
 
 Next32 portable production passes strict native172/172, sanitizer167/167 and WASI135/135. Input pointer selection, passive Button lifecycle, numeric sizes/open/caret, inset shadows and shadow presets are tested subsets. The original Theme shape and adjacent shadow sample pass all78 actual gallery stories/78 compiled snippets and dedicated DPR1/2 inset pixels. The complete54-command browser matrix passes before publication. Ledger348features:300tested subsets,4implemented,44not_started;0fullyverified families. No user dependency installation is required.

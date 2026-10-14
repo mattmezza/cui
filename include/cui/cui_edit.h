@@ -2,6 +2,7 @@
 #ifndef CUI_EDIT_H
 #define CUI_EDIT_H
 #include "cui.h"
+#include "cui_text_match.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,7 +16,10 @@ typedef enum {
     CUI_EDIT_INVALID_ARGUMENT,
     CUI_EDIT_LINE_BREAK,
     CUI_EDIT_CLIPBOARD_UNAVAILABLE,
-    CUI_EDIT_PRESENTATION
+    CUI_EDIT_PRESENTATION,
+    CUI_EDIT_MATCHER,
+    CUI_EDIT_MATCHER_STALE,
+    CUI_EDIT_MATCHER_BUSY
 } cui_edit_result;
 typedef struct {
     char *buffer;
@@ -131,6 +135,7 @@ typedef struct {
     bool masked_words; /* Checked-call word boundaries become whole-value endpoints. */
     cui_edit_format format;
     cui_edit_workspace format_workspace; /* Final value + NUL; disjoint caller storage. */
+    cui_text_match matcher; /* Single-line/single-selection synchronous whole-value gate. */
 } cui_edit_request;
 typedef struct {
     cui_edit_result error;

@@ -65,7 +65,7 @@ def build(output, site_url=DEFAULT_SITE):
 
     def page(path, title, description, route, fallback):
         canonical = urljoin(site_url, path)
-        html = re.sub(r'<title>.*?</title>', metadata(title, description, canonical, image, alt), template, count=1, flags=re.S)
+        html = re.sub(r'<title>.*?</title>', lambda _match: metadata(title, description, canonical, image, alt), template, count=1, flags=re.S)
         if path:
             html = html.replace('<head>', '<head><base href="../../">', 1)
         html = html.replace('<body ', f'<body data-site-url="{escape(site_url, quote=True)}" data-route="{escape(route, quote=True)}" ', 1)

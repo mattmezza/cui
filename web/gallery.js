@@ -462,9 +462,12 @@ const roles=['','button','checkbox','switch','radio','slider','textbox','text','
 const interactiveRoles=[1,2,3,4,5,6,8,14,16,23,24,25,29,30,32,33,36];
 function syncSemantics(){
  const root=$('accessible'),seen=new Set(),entries=[];
+ let hasScrollablePanel=false;
  if(semanticStory!==selected.name){root.replaceChildren();semanticNodes.clear();semanticStory=selected.name;}
  for(let i=0;i<wasm.gallery_semantic_count();i++){
-  const f=n=>wasm.gallery_semantic(i,n),role=roles[f(0)];if(!role)continue;
+  const f=n=>wasm.gallery_semantic(i,n),role=roles[f(0)];
+  if(f(17)&&(f(20)>0||f(21)>0))hasScrollablePanel=true;
+  if(!role)continue;
   const id=`cui-semantic-${wasm.gallery_semantic_id(i)}`;seen.add(id);
   let el=semanticNodes.get(id);
   if(!el){el=document.createElement(interactiveRoles.includes(f(0))&&!['treeitem','columnheader'].includes(role)?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
@@ -498,6 +501,7 @@ function syncSemantics(){
   if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }
+ for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track-control'])$(id).hidden=!hasScrollablePanel;
  for(const [id,el] of semanticNodes)if(!seen.has(id)){el.remove();semanticNodes.delete(id);}
  const byId=new Map(entries.map(entry=>[entry.el.id,entry]));
  const depth=(entry,visited=new Set())=>{if(visited.has(entry.el.id))return 0;visited.add(entry.el.id);const parent=byId.get(entry.parent);return parent?1+depth(parent,visited):0;};

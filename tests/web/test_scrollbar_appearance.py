@@ -13,6 +13,12 @@ from playwright.sync_api import sync_playwright
 from test_touch_components import Audit
 
 
+def check_controls(a):
+    expected = any(s['f'][17] and (s['f'][20] > 0 or s['f'][21] > 0) for s in a.snapshot())
+    for control in ('scrollbar-policy', 'scrollbar-width', 'scrollbar-radius', 'scrollbar-track-control'):
+        assert a.page.locator('#' + control).is_visible() == expected, f'{control}: visibility must follow actual scrollable overflow'
+
+
 def bars(a):
     return [s for s in a.snapshot() if s['name'] in ('Vertical scroll', 'Horizontal scroll', 'Tab scrollbar')]
 
@@ -34,6 +40,16 @@ def main():
                 options['executable_path'] = args.chromium
             browser = playwright.chromium.launch(**options)
             a = Audit(browser, f'http://127.0.0.1:{server.server_port}')
+            for family in ('Button', 'Checkbox', 'Avatar', 'Alert', 'Pagination', 'Message', 'Toolbar'):
+                a.route(family)
+                check_controls(a)
+                assert not a.page.locator('#scrollbar-policy').is_visible(), family
+            families = a.page.evaluate("async()=> (await (await fetch('catalog.json')).json()).components.map(c=>c.name)")
+            assert len(families) == 78
+            for family in families:
+                a.route(family)
+                check_controls(a)
+            print('PASS: all 78 demos expose controls only for actual scrollable overflow', flush=True)
             a.configure('scrollbar-policy', 1)
             a.configure('scrollbar-width', 16)
             a.configure('scrollbar-radius', 6)
@@ -41,11 +57,13 @@ def main():
             for family in ('Scrollable', 'VirtualList', 'DataTable', 'MessageScroller', 'Sidebar', 'Attachment'):
                 a.route(family)
                 a.page.wait_for_timeout(120)
+                check_controls(a)
                 visible = bars(a)
                 assert visible, f'{family}: missing visible overflow bar'
                 assert any(abs(min(s['f'][3], s['f'][4])-16) < .1 for s in visible), f'{family}: width ignored'
                 a.configure('scrollbar-policy', 2)
                 assert not bars(a), f'{family}: hidden bar remains interactive'
+                check_controls(a)
                 owners = [s for s in a.snapshot() if s['f'][17] and (s['f'][20] > 0 or s['f'][21] > 0)]
                 assert owners, f'{family}: hiding lost scroll owner'
                 a.configure('scrollbar-policy', 1)
@@ -60,16 +78,20 @@ def main():
                 a.page.keyboard.insert_text('\n'.join(f'Actual editable fixture line {i}' for i in range(20)))
                 a.page.wait_for_timeout(120)
                 assert bars(a), f'{family}: no overlay after actual text input'
+                check_controls(a)
                 a.configure('scrollbar-policy', 2)
                 assert not bars(a), f'{family}: hidden editor bar remains'
                 a.configure('scrollbar-policy', 1)
                 print(f'PASS: {family}: real editable overflow + hidden overlay', flush=True)
             a.route('Tabs')
+            check_controls(a)
+            assert not a.page.locator('#scrollbar-policy').is_visible()
             for axis in (1, 2):
                 a.configure('tabs-mode', axis)
                 # The tab viewport bounds are measured from the preceding frame.
                 a.configure('tabs-mode', axis)
                 assert bars(a), f'Tabs: missing axis {axis} bar: ' + str(a.snapshot())
+                check_controls(a)
                 a.configure('scrollbar-policy', 2)
                 assert not bars(a), 'Tabs: hidden bar remains'
                 a.configure('scrollbar-policy', 1)
@@ -78,8 +100,11 @@ def main():
             assert bars(a), 'Finite carousel: missing bar'
             a.configure('carousel-loop', True)
             assert not bars(a), 'Infinite carousel: fabricated finite bar'
+            check_controls(a)
             a.route('TextView')
+            check_controls(a)
             a.configure('text-view-scroll', True)
+            check_controls(a)
             assert bars(a), 'TextView: missing body bar'
             a.configure('scrollbar-policy', 2)
             assert not bars(a), 'TextView: hidden bar remains'

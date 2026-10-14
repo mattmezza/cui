@@ -47,7 +47,7 @@ async function main() {
   assert.equal(app.step(), 0, 'disabled button does not click');
   assert.equal(clicks, 2);
   assert.throws(() => app.mount(row()), /already has a root/);
-  assert.throws(() => save.children(label('x')), /only row and column/);
+  assert.throws(() => save.children(label('x')), /does not accept children/);
   assert.throws(() => save.hover_color('bad'), /color/);
   const other = new App();
   assert.throws(() => other.mount(row().children(save)), /unattached/);

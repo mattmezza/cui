@@ -1,0 +1,21 @@
+Expanded component builders: integration through native bridge kind 23.
+
+Scope: 19 manifest families have binding subsets, plus Row, Column,
+RadioGroup and Item helpers. All 78 manifest entries remain present.
+No complete component or platform parity claim.
+
+Integrator results on Linux:
+- Full strict CMake/Ninja native build and invisible-display CTest: 175/175.
+- Standalone Node/C bridge/Python checks: 7/7.
+- Go: 10 headless tests, go vet, and go test -race pass.
+- Rust: 8 headless tests pass with local 1.99.0 and pinned 1.85.1.
+- ASan/UBSan/leak/stack-use-after-return C bridge checks: 2/2.
+- TypeScript 5.8.3 strict declaration check passes.
+- Go/Rust finite SDL smoke runs pass under isolated Xvfb.
+- Documentation unit tests: 6/6; sharing metadata tests: 4/4.
+- Built website documentation: browser navigation and copy-code proof pass.
+
+Detailed process logs: ~/.cache/cui-validation/bindings-expansion-*.log
+Platform limits: Linux native runtime evidence only for Go/Rust and Node.
+Portable C bridge/Python already have prior Linux/macOS/Windows CI evidence;
+expanded release CI must be revalidated after publication.

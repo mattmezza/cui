@@ -303,7 +303,7 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
         !number_arg(env, v[2], &number))
         return NULL;
     which = (uint32_t)(uintptr_t)data;
-    if (which != 1 && (number < 0 || number > UINT32_MAX || floor(number) != number))
+    if (which != 1 && which != 7 && (number < 0 || number > UINT32_MAX || floor(number) != number))
         return fail(env, "expected unsigned integer");
     cui_bridge_status code = CUI_BRIDGE_INVALID_ARGUMENT;
     if (which == 1)
@@ -318,10 +318,133 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
         code = cui_bridge_set_button_rounding(app->bridge, node->node,
                                               (cui_bridge_button_rounding)(int)number, 0);
     if (which == 5)
-        code = cui_bridge_set_button_disabled(app->bridge, node->node, (uint32_t)number);
+        code = cui_bridge_set_disabled(app->bridge, node->node, (uint32_t)number);
+    if (which == 6)
+        code = cui_bridge_set_checked(app->bridge, node->node, (uint32_t)number);
+    if (which == 8)
+        code = cui_bridge_set_open(app->bridge, node->node, (uint32_t)number);
+    if (which == 7)
+        code = cui_bridge_set_value(app->bridge, node->node, number);
     if (code != CUI_BRIDGE_OK)
         return status(env, code);
     return undefined(env);
+}
+static napi_value set_range(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    js_node *node;
+    double a, b, c;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !number_arg(env, v[2], &a) || !number_arg(env, v[3], &b) || !number_arg(env, v[4], &c))
+        return NULL;
+    cui_bridge_status code = cui_bridge_set_range(app->bridge, node->node, a, b, c);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value get_state(napi_env env, napi_callback_info info) {
+    napi_value v[2], result;
+    js_app *app;
+    js_node *node;
+    void *data;
+    size_t count = 2;
+    if (napi_get_cb_info(env, info, &count, v, NULL, &data) != napi_ok || count < 2 ||
+        !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    cui_bridge_status code;
+    uint32_t checked = 0, required = 0;
+    double value = 0;
+    char text[4097];
+    if ((uintptr_t)data == 1) {
+        code = cui_bridge_get_checked(app->bridge, node->node, &checked);
+        if (code != CUI_BRIDGE_OK)
+            return status(env, code);
+        if (napi_get_boolean(env, checked != 0, &result) != napi_ok)
+            return NULL;
+    } else if ((uintptr_t)data == 2) {
+        code = cui_bridge_get_value(app->bridge, node->node, &value);
+        if (code != CUI_BRIDGE_OK)
+            return status(env, code);
+        if (napi_create_double(env, value, &result) != napi_ok)
+            return NULL;
+    } else {
+        code = cui_bridge_get_text(app->bridge, node->node, text, sizeof text, &required);
+        if (code != CUI_BRIDGE_OK)
+            return status(env, code);
+        if (napi_create_string_utf8(env, text, NAPI_AUTO_LENGTH, &result) != napi_ok)
+            return NULL;
+    }
+    return result;
+}
+static napi_value queue_text(napi_env env, napi_callback_info info) {
+    napi_value v[2];
+    js_app *app;
+    char *text;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !string_arg(env, v[1], &text))
+        return NULL;
+    cui_bridge_status code = cui_bridge_queue_text(app->bridge, text);
+    free(text);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_detail(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    char *text;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !string_arg(env, v[2], &text))
+        return NULL;
+    cui_bridge_status code = cui_bridge_set_detail_text(app->bridge, node->node, text);
+    free(text);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_selected(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *group, *item;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &group) ||
+        !node_arg(env, v[2], app, &item))
+        return NULL;
+    cui_bridge_status code = cui_bridge_set_selected(app->bridge, group->node, item->node);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value get_selected(napi_env env, napi_callback_info info) {
+    napi_value v[2], result, x;
+    js_app *app;
+    js_node *node;
+    cui_bridge_node selected = {0};
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    cui_bridge_status code = cui_bridge_get_selected(app->bridge, node->node, &selected);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (napi_create_object(env, &result) != napi_ok ||
+        napi_create_uint32(env, selected.slot, &x) != napi_ok ||
+        napi_set_named_property(env, result, "slot", x) != napi_ok ||
+        napi_create_uint32(env, selected.generation, &x) != napi_ok ||
+        napi_set_named_property(env, result, "generation", x) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value dropdown_bounds(napi_env env, napi_callback_info info) {
+    napi_value v[3], result, x;
+    js_app *app;
+    js_node *node;
+    uint32_t part;
+    cui_bridge_rect rect;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &part))
+        return NULL;
+    cui_bridge_status code = cui_bridge_dropdown_part_bounds(app->bridge, node->node, part, &rect);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (napi_create_object(env, &result) != napi_ok)
+        return NULL;
+    const char *names[] = {"x", "y", "width", "height"};
+    float values[] = {rect.x, rect.y, rect.width, rect.height};
+    for (size_t i = 0; i < 4; i++)
+        if (napi_create_double(env, values[i], &x) != napi_ok ||
+            napi_set_named_property(env, result, names[i], x) != napi_ok)
+            return NULL;
+    return result;
 }
 static napi_value set_round(napi_env env, napi_callback_info info) {
     napi_value v[4];
@@ -404,10 +527,13 @@ static napi_value step(napi_env env, napi_callback_info info) {
 static napi_value poll(napi_env env, napi_callback_info info) {
     napi_value v[1], result, x;
     js_app *app;
-    cui_bridge_event event;
+    cui_bridge_event_ex event;
+    char text[4097];
+    uint32_t required;
     if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
         return NULL;
-    cui_bridge_status code = cui_bridge_poll_event(app->bridge, &event);
+    cui_bridge_status code =
+        cui_bridge_poll_event_ex(app->bridge, &event, text, sizeof text, &required);
     if (code == CUI_BRIDGE_EMPTY)
         return undefined(env);
     if (code != CUI_BRIDGE_OK)
@@ -420,7 +546,17 @@ static napi_value poll(napi_env env, napi_callback_info info) {
         napi_create_uint32(env, event.node.generation, &x) != napi_ok ||
         napi_set_named_property(env, result, "generation", x) != napi_ok ||
         napi_create_double(env, (double)event.frame_sequence, &x) != napi_ok ||
-        napi_set_named_property(env, result, "frame", x) != napi_ok)
+        napi_set_named_property(env, result, "frame", x) != napi_ok ||
+        napi_get_boolean(env, event.checked != 0, &x) != napi_ok ||
+        napi_set_named_property(env, result, "checked", x) != napi_ok ||
+        napi_create_double(env, event.value, &x) != napi_ok ||
+        napi_set_named_property(env, result, "value", x) != napi_ok ||
+        napi_create_string_utf8(env, text, NAPI_AUTO_LENGTH, &x) != napi_ok ||
+        napi_set_named_property(env, result, "text", x) != napi_ok ||
+        napi_create_uint32(env, event.selected.slot, &x) != napi_ok ||
+        napi_set_named_property(env, result, "selectedSlot", x) != napi_ok ||
+        napi_create_uint32(env, event.selected.generation, &x) != napi_ok ||
+        napi_set_named_property(env, result, "selectedGeneration", x) != napi_ok)
         return NULL;
     return result;
 }
@@ -482,6 +618,17 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setSize", set_num, 3);
     EXPORT("setRounding", set_num, 4);
     EXPORT("setDisabled", set_num, 5);
+    EXPORT("setDetail", set_detail, 0);
+    EXPORT("setOpen", set_num, 8);
+    EXPORT("setSelected", set_selected, 0);
+    EXPORT("getSelected", get_selected, 0);
+    EXPORT("setChecked", set_num, 6);
+    EXPORT("setValue", set_num, 7);
+    EXPORT("setRange", set_range, 0);
+    EXPORT("getChecked", get_state, 1);
+    EXPORT("getValue", get_state, 2);
+    EXPORT("getText", get_state, 3);
+    EXPORT("textInput", queue_text, 0);
     EXPORT("setCustomRounding", set_round, 0);
     EXPORT("setHoverRgba", set_hover, 0);
     EXPORT("pointer", pointer, 0);
@@ -489,6 +636,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("step", step, 0);
     EXPORT("poll", poll, 0);
     EXPORT("bounds", bounds, 0);
+    EXPORT("dropdownBounds", dropdown_bounds, 0);
     EXPORT("close", close_app, 0);
 #undef EXPORT
     return exports;

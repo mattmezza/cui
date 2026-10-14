@@ -2,8 +2,13 @@
 
 The component builders let you author a UI tree in your language. CUI performs
 layout and input handling in C; the optional SDL adapter draws a native window.
-Rows, columns, labels and buttons are exposed in this first slice. The other
-components and Go/Rust builders are still pending.
+The bridge currently exposes rows, columns, labels, buttons, checkbox, radio,
+switch, toggle, slider, progress, badge, input, textarea, number input,
+collapsible, alert, radio group, tabs, accordion, select, combo box and split dropdown button. Composite
+options and panels use `item` children. Python, JavaScript, TypeScript,
+[Go](GO_BUILDERS.md) and [Rust](RUST_BUILDERS.md) wrap these real CUI components.
+The [coverage table](BRIDGE_COMPONENTS.md) records each component's limits;
+remaining catalog components are still being implemented.
 
 ## Dependencies and compiler
 
@@ -26,7 +31,7 @@ runtime behavior is not verified. See the [platform matrix](PLATFORM_MATRIX.md).
 
 ```sh
 cmake -S bindings/bridge -B build-bridge -G Ninja
-cmake --build build-bridge --target cui_bridge test_bridge_core
+cmake --build build-bridge --target cui_bridge test_bridge_core test_bridge_components
 ctest --test-dir build-bridge -R '^bridge_' --output-on-failure
 export CUI_BRIDGE_LIBRARY="$PWD/build-bridge/libcui_bridge.so"
 export PYTHONPATH="$PWD/bindings/python"
@@ -62,7 +67,7 @@ paint a window or provide native font metrics.
 
 ```sh
 cmake -S bindings/node -B build-node -G Ninja
-cmake --build build-node --target cui_node_bindings test_bridge_core
+cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components
 ctest --test-dir build-node -R '^(bridge_|node_)' --output-on-failure
 node bindings/node/examples/save.cjs --headless
 export CUI_FONT_PATH=/path/to/your/font.ttf
@@ -127,6 +132,44 @@ root; deeper construction is rejected before frame submission.
 See the [C ABI guide](../bindings/bridge/docs/README.md)
 and [public header](../include/cui/cui_bridge.h) for capacities and status codes.
 
-Go and Rust currently have [C-host examples](LANGUAGE_BINDINGS.md), whose UI
-construction lives in C. The bridge header supplies a portable foundation for
-future builders in those languages; they are not shipped by this slice.
+[Go builders](GO_BUILDERS.md) and [Rust builders](RUST_BUILDERS.md) now construct
+real component trees in their own language and dispatch copied native events.
+The older [C-host examples](LANGUAGE_BINDINGS.md) remain useful for embedding an
+existing C-authored application.
+
+## Form controls and copied change events
+
+`on_change` receives a snapshot captured when the C component changed. Read
+`event.checked`, `event.value`, or `event.text`; these remain accurate even when
+multiple frames are queued before Python dispatch. JavaScript dispatches after
+each `step()`. Programmatic setters update the model without emitting user events.
+`radio` is standalone; use `radio_group` with `item` children for exclusive choice.
+
+```python
+from cui_bridge import App, column, checkbox, input, label, slider
+
+status = label("Ready")
+notifications = checkbox("notifications", "Enable notifications").checked()
+name = input("name", "Alex").on_change(lambda event: status.label(event.text))
+volume = slider("volume").range(0, 100, 1).value(50)
+with App() as app:
+    app.mount(column().gap_units(2).children(name, notifications, volume, status))
+    app.step()  # Headless layout; choose backend="sdl" and font_path for a native window.
+```
+
+```javascript
+const cui = require('./bindings/node/index.cjs');
+const status = cui.label('Ready');
+const name = cui.input('name', 'Alex').on_change(event => status.label(event.text));
+const app = new cui.App();
+app.mount(cui.column().gap_units(2).children(
+  name, cui.checkbox('notifications', 'Enable notifications').checked(),
+  cui.slider('volume').range(0, 100, 1).value(50), status
+)).step();
+app.dispose();
+```
+
+The Python and Node `test_components` fixtures exercise real pointer hit testing,
+disabled behavior, numeric ranges, UTF-8 edits, grouped selection and panel visibility.
+Design sizes, rounding, and custom hover styling currently apply to Button;
+other component styling APIs are a separate unfinished bridge capability.

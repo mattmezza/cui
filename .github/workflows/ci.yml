@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
-      - run: cmake --build build-node --target cui_node_bindings test_bridge_core
+      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components
       - run: ctest --test-dir build-node -R '^(bridge_|node_)' --output-on-failure
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/typescript/examples/save.ts --headless
@@ -81,3 +81,29 @@ jobs:
       - run: cmake -S . -B build/native -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_REGEX=ON -DCUI_REGEX_LIBRARY=${{ github.workspace }}/build/regex-native/target/release/libcui_regex.a
       - run: cmake --build build/native
       - run: ctest --test-dir build/native --output-on-failure
+
+  go-rust-builders:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.23.6'
+          cache: false
+      - run: rustup toolchain install 1.85.1 --profile minimal
+      - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
+      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components
+      - run: ctest --test-dir build -R '^bridge_' --output-on-failure
+      - name: Real Go component state and callback tests
+        working-directory: bindings/go
+        env:
+          CUI_BRIDGE_LIBRARY: ${{ github.workspace }}/build/libcui_bridge.so
+        run: go test -v ./...
+      - run: cd bindings/go && go vet ./...
+      - name: Real Rust component state and callback tests
+        env:
+          CUI_BRIDGE_LIB_DIR: ${{ github.workspace }}/build
+        run: cargo +1.85.1 test --offline --locked --manifest-path bindings/rust/Cargo.toml -- --test-threads=1

@@ -15,6 +15,10 @@ add_executable(test_bridge_core ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_br
 target_link_libraries(test_bridge_core PRIVATE cui_bridge)
 cui_warnings(test_bridge_core)
 add_test(NAME bridge_core COMMAND test_bridge_core)
+add_executable(test_bridge_components ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_components.c)
+target_link_libraries(test_bridge_components PRIVATE cui_bridge)
+cui_warnings(test_bridge_components)
+add_test(NAME bridge_components COMMAND test_bridge_components)
 add_test(NAME bridge_python
  COMMAND ${CMAKE_COMMAND} -E env
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
@@ -33,3 +37,7 @@ if(CUI_BRIDGE_NATIVE_TESTS)
   CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge> CUI_TEST_FONT=${CUI_TEST_FONT}
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_native_virtual.py)
 endif()
+
+add_test(NAME bridge_python_components COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_components.py)

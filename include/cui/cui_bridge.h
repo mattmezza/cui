@@ -43,7 +43,26 @@ typedef enum {
     CUI_BRIDGE_ROW = 1,
     CUI_BRIDGE_COLUMN,
     CUI_BRIDGE_LABEL,
-    CUI_BRIDGE_BUTTON
+    CUI_BRIDGE_BUTTON,
+    CUI_BRIDGE_CHECKBOX,
+    CUI_BRIDGE_RADIO,
+    CUI_BRIDGE_SWITCH,
+    CUI_BRIDGE_TOGGLE,
+    CUI_BRIDGE_SLIDER,
+    CUI_BRIDGE_PROGRESS,
+    CUI_BRIDGE_BADGE,
+    CUI_BRIDGE_INPUT,
+    CUI_BRIDGE_TEXTAREA,
+    CUI_BRIDGE_NUMBER_INPUT,
+    CUI_BRIDGE_COLLAPSIBLE,
+    CUI_BRIDGE_ALERT,
+    CUI_BRIDGE_RADIO_GROUP,
+    CUI_BRIDGE_TABS,
+    CUI_BRIDGE_ACCORDION,
+    CUI_BRIDGE_ITEM,
+    CUI_BRIDGE_SELECT,
+    CUI_BRIDGE_COMBOBOX,
+    CUI_BRIDGE_DROPDOWN_BUTTON
 } cui_bridge_kind;
 typedef enum {
     CUI_BRIDGE_BUTTON_PRIMARY = 0,
@@ -97,12 +116,21 @@ enum {
     CUI_BRIDGE_MOD_ALT = 4u,
     CUI_BRIDGE_MOD_META = 8u
 };
-typedef enum { CUI_BRIDGE_EVENT_CLICK = 1 } cui_bridge_event_type;
+typedef enum { CUI_BRIDGE_EVENT_CLICK = 1, CUI_BRIDGE_EVENT_CHANGE = 2 } cui_bridge_event_type;
 typedef struct {
     cui_bridge_event_type type;
     cui_bridge_node node;
     uint64_t frame_sequence;
 } cui_bridge_event;
+typedef struct {
+    cui_bridge_event_type type;
+    cui_bridge_node node;
+    uint64_t frame_sequence;
+    uint32_t checked;
+    double value;
+    uint32_t text_length;     /* Bytes excluding NUL. */
+    cui_bridge_node selected; /* Full selected Item snapshot; zero when inapplicable. */
+} cui_bridge_event_ex;
 typedef struct {
     uint32_t struct_size; /* Must equal cui_bridge_options_size(). */
     uint32_t abi_version;
@@ -132,6 +160,35 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui
 CUI_BRIDGE_API cui_bridge_status cui_bridge_node_remove(cui_bridge_app *app, cui_bridge_node node);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node node,
                                                      const char *text_utf8);
+/* State setters apply to matching component kinds only. Boolean values must be 0 or 1.
+ * Number ranges must be finite with minimum < maximum and positive step.
+ * Setting a range clamps the current value into it atomically. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_checked(cui_bridge_app *, cui_bridge_node,
+                                                        uint32_t checked);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *, cui_bridge_node,
+                                                         uint32_t disabled);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_value(cui_bridge_app *, cui_bridge_node,
+                                                      double value);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_range(cui_bridge_app *, cui_bridge_node,
+                                                      double minimum, double maximum, double step);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_checked(cui_bridge_app *, cui_bridge_node,
+                                                        uint32_t *out_checked);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_value(cui_bridge_app *, cui_bridge_node,
+                                                      double *out_value);
+/* Copies editable value and NUL. On CAPACITY, required_capacity receives bytes
+ * including NUL; destination and length are unchanged. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_text(cui_bridge_app *, cui_bridge_node,
+                                                     char *destination, uint32_t capacity,
+                                                     uint32_t *required_capacity);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_text(cui_bridge_app *, const char *text_utf8);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_detail_text(cui_bridge_app *, cui_bridge_node,
+                                                            const char *text_utf8);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_open(cui_bridge_app *, cui_bridge_node,
+                                                     uint32_t open);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_selected(cui_bridge_app *, cui_bridge_node group,
+                                                         cui_bridge_node item);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_selected(cui_bridge_app *, cui_bridge_node group,
+                                                         cui_bridge_node *out_item);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_gap(cui_bridge_app *app, cui_bridge_node node,
                                                     float gap);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *app,
@@ -162,8 +219,19 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_key(cui_bridge_app *app,
 CUI_BRIDGE_API cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_event(cui_bridge_app *app,
                                                        cui_bridge_event *out_event);
+/* CHANGE snapshots retain their value from the triggering frame. Text is copied
+ * to destination including NUL. On CAPACITY, required_capacity is set while the
+ * event remains queued and other outputs are preserved. Clicks have empty text.
+ * The legacy poll_event consumes only CLICK events and skips CHANGE events. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_event_ex(cui_bridge_app *,
+                                                          cui_bridge_event_ex *out_event,
+                                                          char *destination, uint32_t capacity,
+                                                          uint32_t *required_capacity);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_node_bounds(cui_bridge_app *app, cui_bridge_node node,
                                                         cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dropdown_part_bounds(cui_bridge_app *, cui_bridge_node,
+                                                                 uint32_t menu_part,
+                                                                 cui_bridge_rect *out_bounds);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_request_close(cui_bridge_app *app);
 
 #ifdef __cplusplus

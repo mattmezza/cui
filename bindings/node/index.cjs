@@ -4,6 +4,11 @@ const path = require('node:path');
 const native = require(process.env.CUI_NODE_ADDON || path.resolve(__dirname, '../../build-node/cui.node'));
 const NODE = Symbol('CUI node');
 let nextKey = 1;
+const booleans = new Set([5,6,7,8]);
+const numerics = new Set([9,10,14]);
+const editable = new Set([12,13,14,22]);
+const groups = new Set([17,18,19,21,22,23]);
+const containers = new Set([1,2,15,17,18,19,20,21,22,23]);
 function keyFor(node) { return `${node.slot}:${node.generation}`; }
 function positive(value, name) {
   if (!Number.isFinite(value) || value <= 0) throw new TypeError(`${name} must be positive and finite`);
@@ -24,6 +29,7 @@ class Node {
     this[NODE] = null; this.keyValue = `node-${nextKey++}`; this.childrenValue = [];
     this.gapValue = undefined; this.variantValue = 0; this.sizeValue = 3;
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
+    this.openValue = false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = 0; this.rangeValue = [0,1,.01]; this.changeValue = undefined;
     this.hoverValue = undefined; this.clickValue = undefined;
   }
   key(value) {
@@ -32,10 +38,11 @@ class Node {
     this.keyValue = value; return this;
   }
   children(...items) {
-    if (this.kind !== 1 && this.kind !== 2) throw new Error('only row and column accept children');
+    if (!containers.has(this.kind)) throw new Error('component does not accept children');
     if (this.owner) throw new Error('children cannot change after mount');
     for (const item of items.flat()) {
       if (!(item instanceof Node) || item.parent || item.owner) throw new TypeError('child must be an unattached CUI node');
+      if(groups.has(this.kind) && item.kind!==20) throw new TypeError('groups require item children');
       item.parent = this; this.childrenValue.push(item);
     }
     return this;
@@ -50,7 +57,7 @@ class Node {
   gap_px(value) { return this.gap(value); }
   gap_units(value) { return this.gap(value * 4); }
   label(value) {
-    if (this.kind !== 3 && this.kind !== 4) throw new Error('label applies to label or button');
+    if (this.kind < 3) throw new Error('label applies to label or button');
     if (typeof value !== 'string') throw new TypeError('label must be a string');
     this.textValue = value;
     if (this.owner) native.setText(this.owner.handle, this[NODE], value);
@@ -84,9 +91,32 @@ class Node {
     if (this.owner) native.setCustomRounding(this.owner.handle, this[NODE], 4, value);
     return this;
   }
-  disabled(value = true) { this._button(); this.disabledValue = !!value; if (this.owner) native.setDisabled(this.owner.handle, this[NODE], this.disabledValue ? 1 : 0); return this; }
+  disabled(value = true) { if (![4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23].includes(this.kind)) throw new Error('component does not support disabled'); if (typeof value !== 'boolean') throw new TypeError('disabled must be boolean'); this.disabledValue = !!value; if (this.owner) native.setDisabled(this.owner.handle, this[NODE], this.disabledValue ? 1 : 0); return this; }
+  checked(value = true) {
+    if (!booleans.has(this.kind) || typeof value !== 'boolean') throw new TypeError('checked requires a boolean component and value');
+    if(this.owner) native.setChecked(this.owner.handle,this[NODE],value ? 1 : 0);
+    this.checkedValue=value; return this;
+  }
+  is_checked() { if(!booleans.has(this.kind)) throw new Error('no checked state'); return this.owner ? native.getChecked(this.owner.handle,this[NODE]) : this.checkedValue; }
+  value(value) {
+    if(!numerics.has(this.kind) || !Number.isFinite(value) || value<this.rangeValue[0] || value>this.rangeValue[1]) throw new TypeError('invalid numeric value');
+    if(this.owner) native.setValue(this.owner.handle,this[NODE],value); this.numericValue=value; return this;
+  }
+  current_value() { if(!numerics.has(this.kind)) throw new Error('no numeric state'); return this.owner ? native.getValue(this.owner.handle,this[NODE]) : this.numericValue; }
+  range(minimum,maximum,step=1) {
+    if(![9,14].includes(this.kind) || ![minimum,maximum,step].every(Number.isFinite) || minimum>=maximum || step<=0) throw new TypeError('invalid range');
+    if(this.owner) native.setRange(this.owner.handle,this[NODE],minimum,maximum,step);
+    this.rangeValue=[minimum,maximum,step]; this.numericValue=Math.max(minimum,Math.min(maximum,this.numericValue)); return this;
+  }
+  current_text() { if(!editable.has(this.kind)) throw new Error('no editable text'); return this.owner ? native.getText(this.owner.handle,this[NODE]) : this.textValue; }
+  on_change(callback) { if(![5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23].includes(this.kind) || typeof callback!=='function') throw new TypeError('invalid change callback'); this.changeValue=callback; return this; }
+  detail(text) { if(![16,21,22].includes(this.kind) || typeof text!=='string') throw new TypeError('detail requires alert text');if(this.owner)native.setDetail(this.owner.handle,this[NODE],text);this.detailValue=text;return this; }
+  open(value=true) {if(![15,20].includes(this.kind)||typeof value!=='boolean')throw new TypeError('invalid open state');if(this.owner)native.setOpen(this.owner.handle,this[NODE],value?1:0);this.openValue=value;return this;}
+  select(item) {if(![17,18,21,22,23].includes(this.kind)||!this.childrenValue.includes(item))throw new TypeError('selection must belong to group');if(this.owner)native.setSelected(this.owner.handle,this[NODE],item[NODE]);this.selectedValue=item;return this;}
+  selected() {if(![17,18,21,22,23].includes(this.kind))throw new Error('component has no selection');return this.owner ? this.owner.nodes.get(keyFor(native.getSelected(this.owner.handle,this[NODE]))) : this.selectedValue;}
   hover_color(value) { this._button(); this.hoverValue = rgba(value); if (this.owner) native.setHoverRgba(this.owner.handle, this[NODE], ...this.hoverValue); return this; }
-  on_click(callback) { this._button(); if (typeof callback !== 'function') throw new TypeError('callback must be a function'); this.clickValue = callback; return this; }
+  on_click(callback) { if(![4,23].includes(this.kind))throw new Error("click requires button"); if (typeof callback !== 'function') throw new TypeError('callback must be a function'); this.clickValue = callback; return this; }
+  part_bounds(part) {if(!this.owner || !['action','menu'].includes(part))throw new Error('invalid dropdown part');return native.dropdownBounds(this.owner.handle,this[NODE],part==='action'?0:1);}
   bounds() { if (!this.owner) throw new Error('node is not mounted'); this.owner._alive(); return native.bounds(this.owner.handle, this[NODE]); }
   remove() { if (!this.owner) throw new Error('node is not mounted'); this.owner._remove(this); return this; }
 }
@@ -94,6 +124,27 @@ function row() { return new Node(1); }
 function column() { return new Node(2); }
 function label(value = '') { return new Node(3, value); }
 function button(key) { const node = new Node(4, ''); return key === undefined ? node : node.key(key); }
+function checkbox(key, text = "") { const node = new Node(5,text); return key === undefined ? node : node.key(key); }
+function radio(key, text = "") { const node = new Node(6,text); return key === undefined ? node : node.key(key); }
+function switch_control(key, text = "") { const node = new Node(7,text); return key === undefined ? node : node.key(key); }
+function toggle(key, text = "") { const node = new Node(8,text); return key === undefined ? node : node.key(key); }
+function slider(key, text = "") { const node = new Node(9,text); return key === undefined ? node : node.key(key); }
+function progress(key, text = "") { const node = new Node(10,text); return key === undefined ? node : node.key(key); }
+function badge(key, text = "") { const node = new Node(11,text); return key === undefined ? node : node.key(key); }
+function input(key, text = "") { const node = new Node(12,text); return key === undefined ? node : node.key(key); }
+function textarea(key, text = "") { const node = new Node(13,text); return key === undefined ? node : node.key(key); }
+function number_input(key, text = "") { const node = new Node(14,text); return key === undefined ? node : node.key(key); }
+function collapsible(key,text="") {const node=new Node(15,text);return key===undefined?node:node.key(key);}
+function alert(key,text="") {const node=new Node(16,text);return key===undefined?node:node.key(key);}
+function radio_group(key,text="") {const node=new Node(17,text);return key===undefined?node:node.key(key);}
+function tabs(key,text="") {const node=new Node(18,text);return key===undefined?node:node.key(key);}
+function accordion(key,text="") {const node=new Node(19,text);return key===undefined?node:node.key(key);}
+function item(key,text="") {const node=new Node(20,text);return key===undefined?node:node.key(key);}
+function select(key,text="") {const node=new Node(21,text);return key===undefined?node:node.key(key);}
+function combobox(key,text="") {const node=new Node(22,text);return key===undefined?node:node.key(key);}
+
+function dropdown_button(key,text="") {const node=new Node(23,text);return key===undefined?node:node.key(key);}
+
 class App {
   constructor(options = {}) {
     this.disposed = false; this.closed = false; this.nodes = new Map(); this.root = null; this.timer = null;
@@ -113,6 +164,12 @@ class App {
       const id = native.nodeId(node[NODE]); this.nodes.set(keyFor(id), node);
       if (node.textValue !== undefined) native.setText(this.handle, node[NODE], node.textValue);
       if (node.gapValue !== undefined) native.setGap(this.handle, node[NODE], node.gapValue);
+      if (booleans.has(node.kind)) native.setChecked(this.handle,node[NODE],node.checkedValue ? 1 : 0);
+      if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
+      if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
+      if ([5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23].includes(node.kind)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
+      if(node.kind===15 || (node.kind===20 && parent && parent.kind===19))native.setOpen(this.handle,node[NODE],node.openValue?1:0);
+      if([16,21,22].includes(node.kind))native.setDetail(this.handle,node[NODE],node.detailValue);
       if (node.kind === 4) {
         native.setVariant(this.handle, node[NODE], node.variantValue);
         native.setSize(this.handle, node[NODE], node.sizeValue);
@@ -123,7 +180,7 @@ class App {
       }
       for (const child of node.childrenValue) attach(child, node);
     };
-    try { attach(root, null); this.root = root; } catch (error) { this.dispose(); throw error; }
+    try { attach(root, null); for(const node of this.nodes.values())if(node.selectedValue)native.setSelected(this.handle,node[NODE],node.selectedValue[NODE]); this.root = root; } catch (error) { this.dispose(); throw error; }
     return this;
   }
   _remove(node) {
@@ -140,6 +197,7 @@ class App {
     if (!Object.hasOwn(phases, phase)) throw new TypeError('phase must be move, down, or up');
     native.pointer(this.handle, phases[phase], x, y); return this;
   }
+  text_input(text) { this._alive(); native.textInput(this.handle,text); return this; }
   key(phase, key, modifiers = 0, repeat = false) {
     this._alive();
     const phases = {down: 0, up: 1};
@@ -154,6 +212,7 @@ class App {
     while ((event = native.poll(this.handle)) !== undefined) {
       const node = this.nodes.get(keyFor(event));
       if (event.type === 1 && node && node.clickValue) { node.clickValue({node, frame: event.frame}); delivered++; }
+      if (event.type === 2 && node && node.changeValue) { node.changeValue({node,frame:event.frame,checked:event.checked,value:event.value,text:event.text,selectedHandle:{slot:event.selectedSlot,generation:event.selectedGeneration}}); delivered++; }
       if (this.disposed || this.closed) break;
     }
     return delivered;
@@ -173,4 +232,4 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; this.nodes.clear(); } }
 }
-module.exports = {App, row, column, label, button};
+module.exports = {App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button};

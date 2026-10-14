@@ -73,9 +73,9 @@ Use the [copyable agent setup prompt](AI_AGENTS.md). The website also publishes 
 
 ## Build with another language
 
-Use [Python, JavaScript or TypeScript component builders](BINDING_BUILDERS.md)
-to author a UI tree and click handlers in your own language. The first slice
-exposes rows, columns, labels and styled buttons, with runnable native-window
-examples and headless checks. The remaining components are not bound yet.
-The [C-host integration examples](LANGUAGE_BINDINGS.md) also cover Go and Rust;
-their UI construction lives in C.
+Use [Python, JavaScript, TypeScript, Go or Rust component builders](BINDING_BUILDERS.md)
+to author UI trees and callbacks in your own language. The guide includes native
+window build commands and examples; the [coverage table](BRIDGE_COMPONENTS.md)
+records supported controls and the limits of each binding. The full component
+catalog is still being bound and validated. The [C-host examples](LANGUAGE_BINDINGS.md)
+also demonstrate embedding an existing C-authored application.

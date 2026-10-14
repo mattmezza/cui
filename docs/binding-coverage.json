@@ -1,0 +1,800 @@
+{
+  "schema_version": 1,
+  "scope": "Language authoring coverage; tested_subset never means complete component parity.",
+  "bridge_node_kinds": 23,
+  "additional_kinds": [
+    "Row",
+    "Column",
+    "RadioGroup",
+    "Item"
+  ],
+  "languages": [
+    "python",
+    "javascript",
+    "typescript",
+    "go",
+    "rust"
+  ],
+  "components": [
+    {
+      "name": "Accordion",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "AlertDialog",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Alert",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Attachment",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Avatar",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Badge",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Bubble",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Button",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Checkbox",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Clipboard",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Collapsible",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "DropdownButton",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Empty",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Focus Trap",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "GroupBox",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "HoverCard",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Icon",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Image",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Kbd",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Label",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Marker",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Message",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "MessageScroller",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Notification",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Pagination",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Progress",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Radio",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Rating",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Shimmer",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Skeleton",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Spinner",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Stepper",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Switch",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Tag",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Toggle",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Tooltip",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Calendar",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "ColorPicker",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Combobox",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "DatePicker",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Editor",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Form",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Input",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Input Group",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "NumberInput",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "OtpInput",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Questionnaire",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Select",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Slider",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Speech",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Textarea",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "TimeField",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Carousel",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "DescriptionList",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Dialog",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Dock",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "List",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Menu",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Popover",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Resizable",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Root View",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Scrollable",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Settings",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Sheet",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Sidebar",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "StatusBar",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Tabs",
+      "languages": {
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
+      }
+    },
+    {
+      "name": "Theme",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "TitleBar",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Toolbar",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Tree",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "VirtualList",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Chart",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Command",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "DataTable",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Plot",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "Table",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    },
+    {
+      "name": "TextView",
+      "languages": {
+        "python": "not_bound",
+        "javascript": "not_bound",
+        "typescript": "not_bound",
+        "go": "not_bound",
+        "rust": "not_bound"
+      }
+    }
+  ]
+}

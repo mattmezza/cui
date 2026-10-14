@@ -47,6 +47,11 @@ class _Event(C.Structure):
                 ("frame_sequence", C.c_uint64)]
 
 
+class _EventEx(C.Structure):
+    _fields_ = _Event._fields_ + [("checked", C.c_uint32), ("value", C.c_double),
+                                 ("text_length", C.c_uint32), ("selected", _Handle)]
+
+
 class _Options(C.Structure):
     _fields_ = [("struct_size", C.c_uint32), ("abi_version", C.c_uint32),
                 ("backend", C.c_int), ("max_nodes", C.c_uint32),
@@ -82,8 +87,18 @@ class _API:
         self.set_size = bind("set_button_size", C.c_int, C.c_void_p, _Handle, C.c_int)
         self.set_rounding = bind("set_button_rounding", C.c_int, C.c_void_p,
                                  _Handle, C.c_int, C.c_float)
-        self.set_disabled = bind("set_button_disabled", C.c_int, C.c_void_p, _Handle,
+        self.set_disabled = bind("set_disabled", C.c_int, C.c_void_p, _Handle,
                                   C.c_uint32)
+        self.set_checked = bind("set_checked", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.set_value = bind("set_value", C.c_int, C.c_void_p, _Handle, C.c_double)
+        self.set_range = bind("set_range", C.c_int, C.c_void_p, _Handle,
+                              C.c_double, C.c_double, C.c_double)
+        self.get_checked = bind("get_checked", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_uint32))
+        self.get_value = bind("get_value", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_double))
+        self.set_detail = bind("set_detail_text", C.c_int, C.c_void_p, _Handle, C.c_char_p)
+        self.set_open = bind("set_open", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.set_selected = bind("set_selected", C.c_int, C.c_void_p, _Handle, _Handle)
+        self.get_selected = bind("get_selected", C.c_int, C.c_void_p, _Handle, C.POINTER(_Handle))
         self.set_hover = bind("set_button_hover_rgba", C.c_int, C.c_void_p, _Handle,
                               C.c_uint8, C.c_uint8, C.c_uint8, C.c_uint8)
         self.queue_pointer = bind("queue_pointer", C.c_int, C.c_void_p, C.c_int,
@@ -92,6 +107,13 @@ class _API:
                               C.c_uint32, C.c_uint32)
         self.step = bind("step", C.c_int, C.c_void_p, C.c_float)
         self.poll_event = bind("poll_event", C.c_int, C.c_void_p, C.POINTER(_Event))
+        self.poll_event_ex = bind("poll_event_ex", C.c_int, C.c_void_p, C.POINTER(_EventEx),
+                                   C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
+        self.get_text = bind("get_text", C.c_int, C.c_void_p, _Handle,
+                             C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
+        self.queue_text = bind("queue_text", C.c_int, C.c_void_p, C.c_char_p)
+        self.dropdown_bounds = bind("dropdown_part_bounds", C.c_int, C.c_void_p, _Handle,
+                                    C.c_uint32, C.POINTER(_Rect))
         self.bounds = bind("node_bounds", C.c_int, C.c_void_p, _Handle, C.POINTER(_Rect))
         self.request_close = bind("request_close", C.c_int, C.c_void_p)
         if self.abi_version() != 1 or self.options_size() != C.sizeof(_Options):
@@ -106,7 +128,13 @@ class _API:
 _SIZE = {name: i for i, name in enumerate(("inherit", "xs", "sm", "base", "md", "lg",
                                            "xl", "2xl", "3xl", "4xl", "5xl", "6xl",
                                            "7xl", "8xl", "9xl"))}
-_KIND = {"row": 1, "column": 2, "label": 3, "button": 4}
+_KIND = {"row": 1, "column": 2, "label": 3, "button": 4, "checkbox": 5,
+         "radio": 6, "switch": 7, "toggle": 8, "slider": 9, "progress": 10, "badge": 11, "input": 12, "textarea": 13, "number_input": 14, "collapsible": 15, "alert": 16, "radio_group": 17, "tabs": 18, "accordion": 19, "item": 20, "select": 21, "combobox": 22, "dropdown_button": 23}
+_BOOLEAN = {"checkbox", "radio", "switch", "toggle"}
+_NUMERIC = {"slider", "progress", "number_input"}
+_EDITABLE = {"input", "textarea", "number_input", "combobox"}
+_GROUP = {"radio_group", "tabs", "accordion", "select", "combobox", "dropdown_button"}
+_CONTAINER = {"row", "column", "collapsible", "item"} | _GROUP
 _VARIANT = {"primary": 0, "secondary": 1, "outline": 2, "ghost": 3}
 _ROUND = {"theme": 0, "none": 1, "small": 2, "large": 3, "custom": 4}
 
@@ -116,6 +144,10 @@ class Event:
     type: str
     node: "Widget"
     frame_sequence: int
+    checked: bool = False
+    value: float = 0.0
+    text: str = ""
+    selected_handle: tuple[int, int] = (0, 0)
 
 
 class Widget:
@@ -132,7 +164,14 @@ class Widget:
         self._rounding = "theme"
         self._radius = 0.0
         self._disabled = False
+        self._checked = False
+        self._detail = ""
+        self._open = False
+        self._selected: Widget | None = None
+        self._value = 0.0
+        self._range = (0.0, 1.0, 0.01)
         self._hover: tuple[int, int, int, int] | None = None
+        self._change_callback: Callable[[Event], object] | None = None
         self._callback: Callable[[Event], object] | None = None
         self._app: App | None = None
         self._handle: _Handle | None = None
@@ -150,12 +189,14 @@ class Widget:
         app._api.check(fn(app._ptr, self._handle, *args))
 
     def children(self, *children: "Widget") -> "Widget":
-        if self.kind not in ("row", "column"):
-            raise ValueError("Only rows and columns accept children")
+        if self.kind not in _CONTAINER:
+            raise ValueError("component does not accept children")
         if self._app is not None:
             raise RuntimeError("Mount children before attaching the tree")
         if any(not isinstance(child, Widget) for child in children):
             raise TypeError("children must be widgets")
+        if self.kind in _GROUP and any(child.kind != "item" for child in children):
+            raise ValueError("groups require item children")
         self._children.extend(children)
         return self
 
@@ -175,7 +216,7 @@ class Widget:
         return self.gap(units * 4)
 
     def label(self, text: str) -> "Widget":
-        if self.kind not in ("label", "button"):
+        if _KIND[self.kind] < 3:
             raise ValueError("label belongs to text or button")
         if not isinstance(text, str):
             raise TypeError("label must be a string")
@@ -222,11 +263,113 @@ class Widget:
         return self
 
     def disabled(self, value: bool = True) -> "Widget":
-        if self.kind != "button":
-            raise ValueError("disabled belongs to button")
+        if self.kind not in {"button", "slider", "collapsible", "item"} | _BOOLEAN | _EDITABLE | _GROUP:
+            raise ValueError("component does not support disabled")
+        if type(value) is not bool:
+            raise TypeError("disabled must be a bool")
         self._change("set_disabled", int(bool(value)))
         self._disabled = bool(value)
         return self
+
+    def checked(self, value: bool = True) -> "Widget":
+        if self.kind not in _BOOLEAN or type(value) is not bool:
+            raise ValueError("checked requires a boolean component and bool value")
+        self._change("set_checked", int(value))
+        self._checked = value
+        return self
+
+    def is_checked(self) -> bool:
+        if self.kind not in _BOOLEAN:
+            raise ValueError("component has no checked state")
+        if self._app is None:
+            if self._disposed:
+                raise RuntimeError("Widget is disposed")
+            return self._checked
+        result = C.c_uint32()
+        self._change("get_checked", C.byref(result))
+        return bool(result.value)
+
+    def value(self, value: float) -> "Widget":
+        if self.kind not in _NUMERIC or not math.isfinite(value):
+            raise ValueError("value requires a numeric component and finite number")
+        minimum, maximum, _ = self._range
+        if not minimum <= value <= maximum:
+            raise ValueError("value is outside the range")
+        self._change("set_value", float(value))
+        self._value = float(value)
+        return self
+
+    def current_value(self) -> float:
+        if self.kind not in _NUMERIC:
+            raise ValueError("component has no numeric value")
+        if self._app is None:
+            if self._disposed:
+                raise RuntimeError("Widget is disposed")
+            return self._value
+        result = C.c_double()
+        self._change("get_value", C.byref(result))
+        return result.value
+
+    def range(self, minimum: float, maximum: float, step: float = 1) -> "Widget":
+        if self.kind not in {"slider", "number_input"} or not all(math.isfinite(x) for x in (minimum, maximum, step)):
+            raise ValueError("range requires a slider and finite numbers")
+        if minimum >= maximum or step <= 0:
+            raise ValueError("range requires minimum < maximum and step > 0")
+        self._change("set_range", minimum, maximum, step)
+        self._range = (minimum, maximum, step)
+        self._value = min(maximum, max(minimum, self._value))
+        return self
+
+    def current_text(self) -> str:
+        if self.kind not in _EDITABLE:
+            raise ValueError("component has no editable text")
+        if self._app is None:
+            if self._disposed:
+                raise RuntimeError("Widget is disposed")
+            return self._text
+        buffer = C.create_string_buffer(4097)
+        required = C.c_uint32()
+        self._change("get_text", buffer, 4097, C.byref(required))
+        return buffer.value.decode("utf-8")
+
+    def on_change(self, callback: Callable[[Event], object]) -> "Widget":
+        if self.kind not in _BOOLEAN | _EDITABLE | {"slider", "collapsible", "item"} | _GROUP or not callable(callback):
+            raise ValueError("on_change requires an interactive component and callable")
+        self._change_callback = callback
+        return self
+
+    def detail(self, text: str) -> "Widget":
+        if self.kind not in {"alert", "select", "combobox"}:
+            raise ValueError("detail belongs to alert")
+        self._change("set_detail", _utf8(text))
+        self._detail = text
+        return self
+
+    def open(self, value: bool = True) -> "Widget":
+        if self.kind not in {"collapsible", "item"} or type(value) is not bool:
+            raise ValueError("open requires a disclosure component and bool")
+        self._change("set_open", int(value))
+        self._open = value
+        return self
+
+    def select(self, item: "Widget") -> "Widget":
+        if self.kind not in {"radio_group", "tabs", "select", "combobox", "dropdown_button"} or item not in self._children:
+            raise ValueError("selection must be a direct group item")
+        if self._app is not None:
+            self._change("set_selected", item._handle)
+        self._selected = item
+        return self
+
+    def selected(self) -> "Widget | None":
+        if self.kind not in {"radio_group", "tabs", "select", "combobox", "dropdown_button"}:
+            raise ValueError("component has no selection")
+        if self._app is None:
+            if self._disposed:
+                raise RuntimeError("Widget is disposed")
+            return self._selected
+        handle = _Handle()
+        self._change("get_selected", C.byref(handle))
+        return self._app._by_handle.get((handle.slot, handle.generation))
 
     def hover_color(self, color: str | tuple[int, int, int, int]) -> "Widget":
         if self.kind != "button" or self._variant == "ghost":
@@ -250,7 +393,7 @@ class Widget:
         return self
 
     def on_click(self, callback: Callable[[Event], object]) -> "Widget":
-        if self.kind != "button" or not callable(callback):
+        if self.kind not in {"button", "dropdown_button"} or not callable(callback):
             raise ValueError("button callback must be callable")
         self._callback = callback
         return self
@@ -270,6 +413,82 @@ def label(text: str, key: str | None = None) -> Widget:
 
 def button(key: str) -> Widget:
     return Widget("button", key, key)
+
+
+def checkbox(key: str, text: str = "") -> Widget:
+    return Widget("checkbox", key, text)
+
+
+def radio(key: str, text: str = "") -> Widget:
+    return Widget("radio", key, text)
+
+
+def switch(key: str, text: str = "") -> Widget:
+    return Widget("switch", key, text)
+
+
+def toggle(key: str, text: str = "") -> Widget:
+    return Widget("toggle", key, text)
+
+
+def slider(key: str, text: str = "") -> Widget:
+    return Widget("slider", key, text)
+
+
+def progress(key: str, text: str = "") -> Widget:
+    return Widget("progress", key, text)
+
+
+def badge(key: str, text: str = "") -> Widget:
+    return Widget("badge", key, text)
+
+
+def input(key: str, text: str = "") -> Widget:
+    return Widget("input", key, text)
+
+
+def textarea(key: str, text: str = "") -> Widget:
+    return Widget("textarea", key, text)
+
+
+def number_input(key: str, text: str = "") -> Widget:
+    return Widget("number_input", key, text)
+
+
+def collapsible(key: str, text: str = "") -> Widget:
+    return Widget("collapsible", key, text)
+
+
+def alert(key: str, text: str = "") -> Widget:
+    return Widget("alert", key, text)
+
+
+def radio_group(key: str, text: str = "") -> Widget:
+    return Widget("radio_group", key, text)
+
+
+def tabs(key: str, text: str = "") -> Widget:
+    return Widget("tabs", key, text)
+
+
+def accordion(key: str, text: str = "") -> Widget:
+    return Widget("accordion", key, text)
+
+
+def item(key: str, text: str = "") -> Widget:
+    return Widget("item", key, text)
+
+
+def select(key: str, text: str = "") -> Widget:
+    return Widget("select", key, text)
+
+
+def combobox(key: str, text: str = "") -> Widget:
+    return Widget("combobox", key, text)
+
+
+def dropdown_button(key: str, text: str = "") -> Widget:
+    return Widget("dropdown_button", key, text)
 
 
 class App:
@@ -322,7 +541,7 @@ class App:
             seen.add(id(node))
             key = node.key if node.key is not None else f"{node.kind}@{path}"
             _utf8(key)
-            if node.kind in ("label", "button"):
+            if _KIND[node.kind] >= 3:
                 _utf8(node._text)
             if key in keys:
                 raise ValueError(f"duplicate key: {key}")
@@ -341,10 +560,22 @@ class App:
                 node._app, node._handle = self, handle
                 created.append(node)
                 self._by_handle[(handle.slot, handle.generation)] = node
-                if node.kind in ("label", "button"):
+                if _KIND[node.kind] >= 3:
                     node._change("set_text", _utf8(node._text))
                 if node.kind in ("row", "column"):
                     node._change("set_gap", node._gap)
+                if node.kind in _BOOLEAN:
+                    node._change("set_checked", int(node._checked))
+                if node.kind in {"slider", "number_input"}:
+                    node._change("set_range", *node._range)
+                if node.kind in _NUMERIC:
+                    node._change("set_value", node._value)
+                if node.kind in _BOOLEAN | _EDITABLE | _GROUP | {"slider", "collapsible", "item"}:
+                    node._change("set_disabled", int(node._disabled))
+                if node.kind == "collapsible" or (node.kind == "item" and parent and parent.kind == "accordion"):
+                    node._change("set_open", int(node._open))
+                if node.kind in {"alert", "select", "combobox"}:
+                    node._change("set_detail", _utf8(node._detail))
                 if node.kind == "button":
                     node._change("set_variant", _VARIANT[node._variant])
                     node._change("set_size", _SIZE[node._size])
@@ -352,6 +583,9 @@ class App:
                     node._change("set_disabled", int(node._disabled))
                     if node._hover:
                         node._change("set_hover", *node._hover)
+            for node, _, _ in order:
+                if node._selected is not None:
+                    node._change("set_selected", node._selected._handle)
         except Exception:
             if created:
                 self._api.node_remove(self._ptr, created[0]._handle)
@@ -385,6 +619,10 @@ class App:
         self._api.check(self._api.queue_key(self._ptr, phases[phase], keys[key],
                                             modifiers, int(repeat)))
 
+    def queue_text(self, text: str) -> None:
+        self._ensure_open()
+        self._api.check(self._api.queue_text(self._ptr, _utf8(text)))
+
     def bounds(self, node: Widget) -> tuple[float, float, float, float]:
         self._ensure_open()
         if node._app is not self or node._handle is None:
@@ -393,26 +631,41 @@ class App:
         self._api.check(self._api.bounds(self._ptr, node._handle, C.byref(rect)))
         return rect.x, rect.y, rect.width, rect.height
 
+    def dropdown_bounds(self, node: Widget, part: str) -> tuple[float, float, float, float]:
+        self._ensure_open()
+        if node._app is not self or part not in {"action", "menu"}:
+            raise ValueError("invalid dropdown node or part")
+        rect = _Rect()
+        self._api.check(self._api.dropdown_bounds(self._ptr,node._handle,
+                                                 0 if part == "action" else 1,C.byref(rect)))
+        return rect.x,rect.y,rect.width,rect.height
+
     def poll_events(self) -> Iterator[Event]:
         self._ensure_open()
         while True:
             if not self._ptr:
                 return
-            raw = _Event()
-            status = self._api.poll_event(self._ptr, C.byref(raw))
+            raw = _EventEx()
+            buffer = C.create_string_buffer(4097)
+            required = C.c_uint32()
+            status = self._api.poll_event_ex(self._ptr, C.byref(raw), buffer, 4097,
+                                             C.byref(required))
             if status in (1, 2):
                 return
             self._api.check(status)
             node = self._by_handle.get((raw.node.slot, raw.node.generation))
             if node is not None:
-                yield Event("click", node, raw.frame_sequence)
+                yield Event("click" if raw.type == 1 else "change", node, raw.frame_sequence,
+                            bool(raw.checked), raw.value, buffer.value.decode("utf-8"),
+                            (raw.selected.slot, raw.selected.generation))
 
     def dispatch(self) -> int:
         """Invoke callbacks after step; Python exceptions propagate outside C frames."""
         count = 0
         for event in self.poll_events():
-            if event.node._callback:
-                event.node._callback(event)
+            callback = event.node._callback if event.type == "click" else event.node._change_callback
+            if callback:
+                callback(event)
             count += 1
         return count
 
@@ -453,4 +706,4 @@ class App:
             self.close()
 
 
-__all__ = ["App", "Widget", "Event", "BridgeError", "row", "column", "label", "button"]
+__all__ = ["App", "Widget", "Event", "BridgeError", "row", "column", "label", "button", "checkbox", "radio", "switch", "toggle", "slider", "progress", "badge", "input", "textarea", "number_input", "collapsible", "alert", "radio_group", "tabs", "accordion", "item", "select", "combobox", "dropdown_button"]

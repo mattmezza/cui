@@ -1,10 +1,11 @@
 # Python, Go, Rust, Node JavaScript and TypeScript with CUI
 
 For UI trees authored directly in Python, JavaScript or TypeScript, use
-[the component builders](BINDING_BUILDERS.md). Those builders expose rows,
-columns, labels and styled buttons through the shared C bridge, with language
-callbacks and mutable application state. This is the first component binding
-slice; the other manifest components and Go/Rust builders are not exposed yet.
+[the component builders](BINDING_BUILDERS.md). They expose the real C bridge
+components in Python, JavaScript and TypeScript, with dedicated
+[Go](GO_BUILDERS.md) and [Rust](RUST_BUILDERS.md) APIs as well. See the
+[coverage table](BRIDGE_COMPONENTS.md) for the current component scope and limits.
+The examples below also demonstrate hosting an existing C-authored application.
 
 The examples below remain useful for embedding an application whose UI is
 written in C.

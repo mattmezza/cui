@@ -44,3 +44,6 @@ if(CUI_BRIDGE_NATIVE_TESTS)
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_FONT_PATH=${CUI_TEST_FONT}
   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/native.test.cjs)
 endif()
+
+add_test(NAME node_components COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/components.test.cjs)

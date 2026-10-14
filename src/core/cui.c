@@ -1043,6 +1043,18 @@ static bool cui_core_release_policy(const cui_context *ui, cui_id id) {
                    cui_core_focusable(&ui->previous[n]) && cui_core_previous_allowed(ui, n);
     return false;
 }
+static bool cui_core_release_current_allowed(const cui_context *ui, size_t index) {
+    const cui_semantic *s = &ui->semantics[index];
+    if (ui->focus != s->id || !s->details.release_key_activation || !cui_core_focusable(s) ||
+        !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[index], ui->top_modal))
+        return false;
+    for (size_t n = 0; n < ui->previous_count; n++)
+        if (ui->previous[n].id == s->id)
+            return ui->previous[n].role == s->role &&
+                   ui->previous[n].details.release_key_activation &&
+                   cui_core_focusable(&ui->previous[n]) && cui_core_previous_allowed(ui, n);
+    return false;
+}
 static void cui_core_tab(cui_context *ui, bool reverse) {
     size_t found = ui->previous_count;
     for (size_t i = 0; i < ui->previous_count; i++)
@@ -1248,6 +1260,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         ui->event_origin[i] = i;
     ui->queued_count = 0;
     ui->activation_count = 0;
+    if (ui->release_pending && !cui_core_release_policy(ui, ui->focus))
+        ui->release_pending = false;
     memset(ui->release_slot_generation, 0, sizeof ui->release_slot_generation);
     memset(ui->activation_snapshots, 0, sizeof ui->activation_snapshots);
     memset(ui->event_accepted_activations, 0, sizeof ui->event_accepted_activations);
@@ -1384,8 +1398,10 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 ui->space_capture = 0;
             continue;
         }
-        if (e.type == CUI_EVENT_KEY_DOWN && e.key != CUI_KEY_ENTER &&
-            e.key != CUI_KEY_SPACE)
+        if (e.type == CUI_EVENT_KEY_DOWN && e.key != CUI_KEY_ENTER && e.key != CUI_KEY_SPACE)
+            ui->release_pending = false;
+        if (e.type == CUI_EVENT_KEY_UP && ui->release_pending &&
+            !cui_core_release_policy(ui, ui->focus))
             ui->release_pending = false;
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
@@ -1457,20 +1473,18 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                      (e.key == CUI_KEY_ENTER || e.key == CUI_KEY_SPACE))) &&
                    cui_core_release_policy(ui, ui->focus)) {
             bool activation_key = e.key == CUI_KEY_ENTER || e.key == CUI_KEY_SPACE;
-            bool qualifying = activation_key && !e.modifiers &&
-                              !ui->release_generation_exhausted;
+            bool qualifying = activation_key && !e.modifiers && !ui->release_generation_exhausted;
             if (e.type == CUI_EVENT_KEY_DOWN) {
                 ui->release_pending = qualifying;
                 if (qualifying) {
                     ui->release_pending_target = ui->focus;
                     ui->release_pending_generation = ui->focus_generation;
                     ui->release_pending_origin = ui->event_origin[i];
-                    ui->release_pending_frame = ui->frame_sequence == UINT64_MAX
-                                                     ? 1 : ui->frame_sequence + 1;
+                    ui->release_pending_frame =
+                        ui->frame_sequence == UINT64_MAX ? 1 : ui->frame_sequence + 1;
                 }
             } else {
-                if (qualifying && ui->release_pending &&
-                    ui->release_pending_target == ui->focus &&
+                if (qualifying && ui->release_pending && ui->release_pending_target == ui->focus &&
                     ui->release_pending_generation == ui->focus_generation) {
                     cui_core_activate(ui, ui->focus);
                     if (ui->activation_count > before_activation) {
@@ -2333,9 +2347,8 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
     }
     for (size_t i = 0; i < ui->activation_count; i++)
         if (ui->activations[i] == id) {
-            bool allowed = !disabled &&
-                           (!ui->release_slot_generation[i] ||
-                            ui->release_slot_generation[i] == ui->focus_generation);
+            bool allowed = !disabled && (!ui->release_slot_generation[i] ||
+                                         ui->release_slot_generation[i] == ui->focus_generation);
             for (size_t e = 0; e < ui->event_count; e++)
                 if (ui->events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION &&
                     ui->event_activation_slots[e] == i) {
@@ -3325,6 +3338,14 @@ cui_core_commands_done:
     }
     for (size_t i = 0; i < ui->semantic_count; i++)
         ui->semantics[i].focused = ui->semantics[i].id == ui->focus && !ui->semantics[i].disabled;
+    if (ui->release_pending) {
+        bool allowed = false;
+        for (size_t i = 0; i < ui->semantic_count; i++)
+            if (ui->semantics[i].id == ui->release_pending_target)
+                allowed = cui_core_release_current_allowed(ui, i);
+        if (!allowed)
+            ui->release_pending = false;
+    }
     if (!captured)
         cui_core_clear_capture(ui);
     if (!space)
@@ -3566,6 +3587,9 @@ cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
         if (s->id != id || s->disabled)
             continue;
         if (!cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
+            return 0;
+        if (slot < ui->activation_count && ui->release_slot_generation[slot] &&
+            !cui_core_release_current_allowed(ui, n))
             return 0;
         if (ui->events[index].type != CUI_EVENT_ACCESSIBILITY_ACTION)
             return id;
@@ -3875,6 +3899,8 @@ bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
         return false;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {
+            if (ui->release_pending_target == id && ui->semantics[i].role != role)
+                ui->release_pending = false;
             ui->semantics[i].role = role;
             return true;
         }
@@ -3948,6 +3974,9 @@ void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details d
         if (ui->semantics[i].id == id) {
             details.description = cui_core_copy_string(ui, details.description);
             ui->semantics[i].details = details;
+            if (ui->release_pending_target == id &&
+                (!details.release_key_activation || !cui_core_focusable(&ui->semantics[i])))
+                ui->release_pending = false;
             return;
         }
 }

@@ -12,6 +12,16 @@ semantic snapshot, including clipping and modal checks, and current composition
 can reject disabled or removed controls. Generation exhaustion permanently closes
 this opt-in path; it does not alter zero-option legacy controls.
 
+For accepted release-key queries and copied snapshots, Core rechecks the
+currently submitted control's release policy, focusability, focus identity,
+role continuity and modal eligibility. Changing details to legacy or `no_focus`
+after `cui_interact` therefore makes a later accepted query return false and
+leaves snapshot output untouched. The boolean already returned by
+`cui_interact` cannot be undone. The setter and end-of-frame publication also
+clear pending keys when the Source policy disappears, preventing a later
+Source-to-legacy-to-Source toggle from reviving an old down. Unrelated key ups
+clear Source pending state even while the published policy is inactive.
+
 The pending latch is one bounded Core value; each accepted release keeps a
 bounded slot generation and the down event's frame/origin. Synthetic touch
 cancellation inserts and reorders events, so Core remaps origin identifiers with

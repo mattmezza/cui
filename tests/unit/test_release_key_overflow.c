@@ -11,8 +11,8 @@ static cui_size measure(void *user, cui_str text, float size) {
 static bool scene(cui_context *ui, bool opt) {
     assert(cui_begin_frame(ui, 100, 100, 0));
     cui_begin_box(ui, 1, (cui_box){.width = 100, .height = 100});
-    cui_interaction result = cui_interact(ui, 10, CUI_ROLE_BUTTON, cui_string("Ten"),
-                                          false, false, 0);
+    cui_interaction result =
+        cui_interact(ui, 10, CUI_ROLE_BUTTON, cui_string("Ten"), false, false, 0);
     cui_set_semantic_details(ui, 10, (cui_semantic_details){.release_key_activation = opt});
     cui_end_box(ui);
     assert(cui_end_frame(ui).commands);

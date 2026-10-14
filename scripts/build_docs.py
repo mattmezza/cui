@@ -27,7 +27,7 @@ GUIDES.update({'DESIGN_SIZES', 'DATE_LOCALE_YEAR', 'SIDEBAR_CLIPPING',
                'PLOT_INTERACTIONS', 'CONTENT_STYLING', 'AVATAR_MESSAGE_EXAMPLES', 'SCROLLBAR_APPEARANCE', 'RADIO_GROUP', 'CHECKBOX_BEHAVIOR', 'CONTEXTUAL_NATIVE_TEXT', 'ALERT_BUBBLE_GUIDE', 'STATUS_MOTION_GUIDE', 'BUTTON_BEHAVIOR', 'TABLE_BEHAVIOR', 'CHART_APPEARANCE_HOVER', 'THEME_REGISTRY_GUIDE', 'SDL_SYSTEM_APPEARANCE', 'PLOT_CHART_OWNER_MOTION', 'INPUT_REFERENCE_CONTRACTS', 'CORE_PREPAINT', 'PLOT_CHART_CURRENT_FRAME', 'INPUT_ACCEPTANCE', 'CHART_SOURCE_POINT_AXIS', 'INPUT_NORMALIZATION', 'TABS_SCROLL_CHAINING', 'CHART_RADAR_TOOLTIP_TITLE', 'CHART_TYPED_TOOLTIP', 'BUTTON_ACTIVATION_BLOCKING', 'PASSWORD_ENGINE_STAGE1', 'PASSWORD_INPUT_STAGE2', 'INPUT_PATTERN_FORMATTING', 'INPUT_NUMBER_FORMATTING', 'INPUT_POINTER_SELECTION', 'BUTTON_GROUP', 'DROP_SHADOW', 'INSET_SHADOW', 'SHADOW_PRESETS', 'CHART_TOOLTIP_APPEARANCE'})
 
 
-GUIDES.update({"BINDING_BUILDERS", "GO_BUILDERS", "RUST_BUILDERS", "BRIDGE_COMPONENTS"})
+GUIDES.update({"BINDING_BUILDERS", "GO_BUILDERS", "RUST_BUILDERS", "BRIDGE_COMPONENTS", "PACKAGING"})
 
 
 def slugify(value):
@@ -39,7 +39,12 @@ def discover(root):
     paths += sorted((root / 'docs').rglob('*.md'))
     paths += sorted((root / 'backends').rglob('README.md'))
     paths += sorted((root / 'examples').rglob('README.md'))
-    paths += sorted((root / 'bindings').rglob('README.md'))
+    # Packaged SDKs carry implementation snapshots, including backend READMEs.
+    # Keep the canonical binding guides while excluding those vendored copies.
+    sdk_sources = [root / 'bindings' / language / 'sdk' / 'source'
+                   for language in ('go', 'rust')]
+    paths += sorted(path for path in (root / 'bindings').rglob('README.md')
+                    if not any(path.is_relative_to(source) for source in sdk_sources))
     return [p for p in paths if p.is_file() and p.resolve().is_relative_to(root.resolve())]
 
 

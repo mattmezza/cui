@@ -106,6 +106,39 @@ if (x < 2) puts("<script>");
             self.assertIn('if (x < 2) puts("<script>");', exported)
             self.assertIn(exported, full)
 
+    def test_packaging_guide_and_canonical_binding_docs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repo'
+            output = Path(directory) / 'site'
+            canonical = ['bindings/README.md', 'bindings/go/README.md',
+                         'bindings/rust/README.md', 'bindings/go/sdk/README.md',
+                         'bindings/rust/sdk/README.md']
+            copies = ['bindings/go/sdk/source/README.md',
+                      'bindings/go/sdk/source/backends/software/README.md',
+                      'bindings/rust/sdk/source/README.md',
+                      'bindings/rust/sdk/source/backends/software/README.md']
+            for relative in canonical + copies + ['docs/PACKAGING.md']:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f'# {relative}\n\nFixture documentation.\n')
+            discovered = {path.relative_to(root).as_posix() for path in DOCS.discover(root)}
+            self.assertEqual(discovered, set(canonical + ['docs/PACKAGING.md']))
+            pages = DOCS.build(root, output)
+            sources = {page['source'] for page in pages}
+            self.assertEqual(sources, {DOCS.REPOSITORY + relative for relative in discovered})
+            packaging = next(page for page in pages if page['slug'] == 'packaging')
+            self.assertEqual(packaging['category'], 'Guides')
+            index = (output / 'llms.txt').read_text()
+            full = (output / 'llms-full.txt').read_text()
+            self.assertIn('./markdown/docs/PACKAGING.md', index)
+            for relative in canonical:
+                self.assertIn('./markdown/' + relative, index)
+                self.assertTrue((output / 'markdown' / relative).is_file())
+            for relative in copies:
+                self.assertNotIn(relative, index)
+                self.assertNotIn(relative, full)
+                self.assertFalse((output / 'markdown' / relative).exists())
+
     def test_complete_repository_docs(self):
         with tempfile.TemporaryDirectory() as directory:
             pages = DOCS.build(ROOT, Path(directory))

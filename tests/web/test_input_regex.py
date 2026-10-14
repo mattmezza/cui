@@ -8,11 +8,11 @@ from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler
 from pathlib import Path
 import threading
 from playwright.sync_api import sync_playwright
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('--fixture',type=Path,required=True);a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--fixture',type=Path,required=True);p.add_argument('--chromium', default=str(Path.home()/'.cache/ms-playwright/chromium-1208/chrome-linux64/chrome'));a=p.parse_args()
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(SimpleHTTPRequestHandler,directory=str(a.fixture)))
 threading.Thread(target=server.serve_forever,daemon=True).start()
 with sync_playwright() as pw:
- browser=pw.chromium.launch(executable_path='/home/matteo/.cache/ms-playwright/chromium-1208/chrome-linux64/chrome',headless=True)
+ browser=pw.chromium.launch(executable_path=a.chromium,headless=True)
  page=browser.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.goto(f'http://127.0.0.1:{server.server_port}');page.wait_for_function('window.probe?.ready')
  def value():return page.evaluate('probe.value()')

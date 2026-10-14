@@ -118,5 +118,23 @@ int main(void) {
     assert(duplicate.slot == 73 && duplicate.generation == 91);
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
     cui_bridge_destroy(app);
+    app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    parent = (cui_bridge_node){0};
+    for (unsigned depth = 0; depth < CUI_BRIDGE_MAX_DEPTH - 2; depth++) {
+        char key[32];
+        snprintf(key, sizeof key, "list-level-%u", depth);
+        cui_bridge_node child;
+        assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_ROW, key, &child) == CUI_BRIDGE_OK);
+        parent = child;
+    }
+    cui_bridge_node list = {0}, item = {0};
+    assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_DESCRIPTION_LIST,
+                                  "deep-list", &list) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, list, CUI_BRIDGE_ITEM, "deep-item", &item) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, item, "Label") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, item, "Value") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
     puts("bridge core ok");
 }

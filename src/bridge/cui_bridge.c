@@ -1810,6 +1810,19 @@ static void bridge_render_tree(cui_bridge_app *app, uint32_t slot, cui_bridge_no
         }
     }
 }
+static void bridge_render_description_list(cui_bridge_app *app,
+                                           cui_bridge_node_record *node) {
+    cui_description_item items[64];
+    size_t count = 0;
+    for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
+        cui_bridge_node_record *item = &app->nodes[child];
+        items[count++] = (cui_description_item){
+            .id = item->id, .label = cui_string(item->text), .value = cui_string(item->detail)};
+    }
+    if (!cui_description_list(app->ui, node->id, &app->theme, items, count,
+                              cui_description_options_default()))
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+}
 static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
     cui_bridge_node_record *node = &app->nodes[slot];
     bool previous_disabled = node->disabled;
@@ -1912,16 +1925,7 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
         if (result.changed)
             bridge_change(app, slot);
     } else if (node->kind == CUI_BRIDGE_DESCRIPTION_LIST) {
-        cui_description_item items[64];
-        size_t count = 0;
-        for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {
-            cui_bridge_node_record *item = &app->nodes[child];
-            items[count++] = (cui_description_item){
-                .id = item->id, .label = cui_string(item->text), .value = cui_string(item->detail)};
-        }
-        if (!cui_description_list(app->ui, node->id, &app->theme, items, count,
-                                  cui_description_options_default()))
-            app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        bridge_render_description_list(app, node);
     } else if (node->kind == CUI_BRIDGE_TOOLTIP || node->kind == CUI_BRIDGE_HOVER_CARD) {
         cui_bridge_node_record *trigger = bridge_node(app, node->anchor);
         if (trigger) {

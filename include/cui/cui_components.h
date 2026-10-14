@@ -68,7 +68,8 @@ typedef enum {
     CUI_BUTTON_CLICK_ACCESSIBILITY
 } cui_button_click_origin;
 /* Pointer-free accepted-event snapshot; copyable beyond callback/frame lifetime.
- * Pointer fields describe release, not a fabricated down event. */
+ * Legacy pointer fields describe release; evidence preserves raw Core samples.
+ * Evidence is frozen before legacy callbacks can consume accessibility input. */
 typedef struct {
     cui_button_click_origin origin;
     cui_id target;
@@ -83,6 +84,8 @@ typedef struct {
     cui_pointer_button pointer_button;
     uint64_t pointer_id, pointer_device;
     unsigned click_count; /* Pointer zero normalizes to one; nonpointer is zero. */
+    bool has_evidence;
+    cui_activation_snapshot evidence; /* Fully copied; no host metadata is fabricated. */
 } cui_button_click_event;
 typedef void (*cui_button_click_event_fn)(void *user, const cui_button_click_event *event);
 typedef struct cui_button_artwork cui_button_artwork;

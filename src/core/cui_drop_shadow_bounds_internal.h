@@ -39,4 +39,11 @@ static inline bool cui_drop_shadow_bounds_checked(cui_drop_shadow_paint p, cui_r
     *out = next;
     return true;
 }
+static inline bool cui_inset_shadow_bounds_checked(cui_inset_shadow_paint p, cui_rect *out) {
+    cui_rect ignored;
+    if (!out || !cui_drop_shadow_bounds_checked(p, &ignored))
+        return false;
+    p.layer.offset_x = p.layer.offset_y = p.layer.spread = p.layer.sigma = 0;
+    return cui_drop_shadow_bounds_checked(p, out);
+}
 #endif

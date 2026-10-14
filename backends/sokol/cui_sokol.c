@@ -497,7 +497,7 @@ static sg_view bitmap_view(cui_sokol *r, const cui_draw_command *c) {
         fail(r, "CUI Sokol bitmap exceeds cache budget");
         return (sg_view){0};
     }
-    bool shadow = c->type == CUI_DRAW_DROP_SHADOW;
+    bool shadow = cui_shadow_type(c->type);
     cached_bitmap *entry = NULL;
     for (size_t i = 0; i < CUI_SOKOL_BITMAPS; i++)
         if (r->bitmaps[i].image.id && cui_bitmap_key_equal(&key, &r->bitmaps[i].key)) {
@@ -594,6 +594,7 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
             if (!mesh(r, c->mesh))
                 return false;
             break;
+        case CUI_DRAW_INSET_SHADOW:
         case CUI_DRAW_DROP_SHADOW:
         case CUI_DRAW_IMAGE:
             if (c->bounds.w > 0 && c->bounds.h > 0) {
@@ -713,7 +714,8 @@ static void destroy(void *r) {
 }
 cui_renderer cui_sokol_interface(cui_sokol *r) {
     unsigned capabilities = CUI_RENDER_ACCELERATED | CUI_RENDER_ROUNDED | CUI_RENDER_CLIP |
-                            CUI_RENDER_IMAGE | CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW;
+                            CUI_RENDER_IMAGE | CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW |
+                            CUI_RENDER_INSET_SHADOW;
 #ifdef CUI_HAS_TEXT
     if (r && r->config.font)
         capabilities |= CUI_RENDER_TEXT;

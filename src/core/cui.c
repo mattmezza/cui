@@ -46,7 +46,7 @@ typedef struct {
     float outline_width;
     cui_color outline_color;
     cui_corner_radii outline_radii;
-    cui_drop_shadow shadows[CUI_DROP_SHADOW_MAX];
+    cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
     size_t shadow_count;
     cui_corner_radii shadow_radii;
     cui_rect underlay_bounds;
@@ -1707,18 +1707,87 @@ bool cui_paint_mesh(cui_context *ui, cui_id id, cui_mesh_paint paint, cui_box bo
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint p, cui_rect *out) {
     return cui_drop_shadow_bounds_checked(p, out);
 }
-bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t count,
-                          cui_corner_radii radii) {
+bool cui_box_shadow_init(float x, float y, cui_color color, cui_box_shadow *out) {
+    if (!out || !isfinite(x) || !isfinite(y) || fabsf(x) > 4096 || fabsf(y) > 4096)
+        return false;
+    *out = (cui_box_shadow){.layer = {.offset_x = x, .offset_y = y, .color = color},
+                            .kind = CUI_BOX_SHADOW_DROP};
+    return true;
+}
+bool cui_shadow_preset_layers(cui_shadow_preset preset, cui_drop_shadow *out, size_t capacity,
+                              size_t *count) {
+    if (!count || preset < CUI_SHADOW_NONE || preset > CUI_SHADOW_2XL ||
+        capacity > SIZE_MAX / sizeof(*out))
+        return false;
+    size_t n = preset == CUI_SHADOW_NONE                            ? 0
+               : preset >= CUI_SHADOW_SM && preset <= CUI_SHADOW_XL ? 2
+                                                                    : 1;
+    if (capacity < n || (n && !out))
+        return false;
+    if (n) {
+        uintptr_t begin = (uintptr_t)out, output_count = (uintptr_t)count;
+        size_t bytes = n * sizeof(*out);
+        if (begin > UINTPTR_MAX - bytes || output_count > UINTPTR_MAX - sizeof(*count) ||
+            (output_count < begin + bytes && begin < output_count + sizeof(*count)))
+            return false;
+    }
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX] = {0};
+    switch (preset) {
+    case CUI_SHADOW_NONE:
+        break;
+    case CUI_SHADOW_2XS:
+        layers[0] = (cui_drop_shadow){.offset_y = 1, .color = {0, 0, 0, 13}};
+        break;
+    case CUI_SHADOW_XS:
+        layers[0] = (cui_drop_shadow){.offset_y = 1, .sigma = 2, .color = {0, 0, 0, 13}};
+        break;
+    case CUI_SHADOW_SM:
+        layers[0] = (cui_drop_shadow){.offset_y = 1, .sigma = 3, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 1, .sigma = 2, .spread = -1, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_MD:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 4, .sigma = 6, .spread = -1, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 2, .sigma = 4, .spread = -2, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_LG:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 10, .sigma = 15, .spread = -3, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 4, .sigma = 6, .spread = -4, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_XL:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 20, .sigma = 25, .spread = -5, .color = {0, 0, 0, 26}};
+        layers[1] =
+            (cui_drop_shadow){.offset_y = 8, .sigma = 10, .spread = -6, .color = {0, 0, 0, 26}};
+        break;
+    case CUI_SHADOW_2XL:
+        layers[0] =
+            (cui_drop_shadow){.offset_y = 25, .sigma = 50, .spread = -12, .color = {0, 0, 0, 64}};
+        break;
+    }
+    if (n)
+        memcpy(out, layers, n * sizeof(*out));
+    *count = n;
+    return true;
+}
+bool cui_set_box_shadows(cui_context *ui, const cui_box_shadow *layers, size_t count,
+                         cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui || !ui->in_frame || !ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
-        count > CUI_DROP_SHADOW_MAX || (count && !layers))
+        count > CUI_BOX_SHADOW_MAX || (count && !layers))
         return false;
     cui_rect ignored;
     for (size_t i = 0; i < count; i++)
-        if (!cui_drop_shadow_bounds(
-                (cui_drop_shadow_paint){.caster = {0, 0, 1, 1}, .radii = radii, .layer = layers[i]},
-                &ignored))
+        if ((layers[i].kind != CUI_BOX_SHADOW_DROP && layers[i].kind != CUI_BOX_SHADOW_INSET) ||
+            !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                            .radii = radii,
+                                                            .layer = layers[i].layer},
+                                    &ignored))
             return false;
     cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
     if (count)
@@ -1727,6 +1796,24 @@ bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t
     node->shadow_radii = radii;
     Clay__GetOpenLayoutElement()->config.custom.customData = node;
     return true;
+}
+bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t count,
+                          cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (count > CUI_DROP_SHADOW_MAX || (count && !layers))
+        return false;
+    cui_box_shadow copied[CUI_DROP_SHADOW_MAX];
+    for (size_t i = 0; i < count; i++)
+        copied[i] = (cui_box_shadow){.layer = layers[i]};
+    return cui_set_box_shadows(ui, copied, count, radii);
+}
+bool cui_set_shadow_preset(cui_context *ui, cui_shadow_preset preset, cui_corner_radii radii) {
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX];
+    size_t count;
+    if (!cui_shadow_preset_layers(preset, layers, CUI_SHADOW_PRESET_MAX, &count))
+        return false;
+    return cui_set_drop_shadows(ui, layers, count, radii);
 }
 bool cui_set_outline(cui_context *ui, float width, cui_color color, cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
@@ -2166,6 +2253,20 @@ static cui_color cui_core_color(Clay_Color c) {
  * nearest clipping ancestor. That root is painted outside its parent's draw
  * stack, so restore the complete CUI clip ancestry before renderer conversion.
  * Detached portals have parent == SIZE_MAX and retain their escape semantics. */
+static bool cui_core_layout_only_clip(cui_context *ui, const Clay_RenderCommand *command) {
+    if (command->userData)
+        return command->userData == ui;
+    for (int32_t i = 0; i < ui->clay->layoutElementTreeRoots.length; i++) {
+        const Clay__LayoutElementTreeRoot *root =
+            &ui->clay->layoutElementTreeRoots.internalArray[i];
+        const Clay_LayoutElement *element =
+            &ui->clay->layoutElements.internalArray[root->layoutElementIndex];
+        if (root->clipElementId &&
+            Clay__HashNumber(element->id, element->children.length + 10).id == command->id)
+            return element->config.userData == ui;
+    }
+    return false;
+}
 static cui_rect cui_core_ancestral_clip(cui_context *ui, const Clay_RenderCommand *command,
                                         cui_rect bounds) {
     uint32_t clip_id = command->id;
@@ -2312,7 +2413,7 @@ static bool cui_core_prepaint_rect(cui_rect r) {
 }
 static bool cui_core_prepaint_command(cui_draw_command *c) {
     if (!cui_core_prepaint_rect(c->bounds) || c->type < CUI_DRAW_RECT ||
-        c->type > CUI_DRAW_DROP_SHADOW || c->type == CUI_DRAW_CLIP_PUSH ||
+        c->type > CUI_DRAW_INSET_SHADOW || c->type == CUI_DRAW_CLIP_PUSH ||
         c->type == CUI_DRAW_CLIP_POP)
         return false;
     if (!isfinite(c->radius) || c->radius < 0 || !isfinite(c->stroke) || c->stroke < 0)
@@ -2333,6 +2434,8 @@ static bool cui_core_prepaint_command(cui_draw_command *c) {
     }
     if (c->type == CUI_DRAW_DROP_SHADOW)
         return cui_drop_shadow_bounds(c->shadow, &c->bounds);
+    if (c->type == CUI_DRAW_INSET_SHADOW)
+        return cui_inset_shadow_bounds_checked(c->shadow, &c->bounds);
     if (c->type == CUI_DRAW_IMAGE)
         return cui_core_bitmap_paint_valid(&c->bitmap);
     if (c->type == CUI_DRAW_MESH)
@@ -2360,6 +2463,13 @@ static bool cui_core_prepaint_command(cui_draw_command *c) {
                c->text_color_count)
         return false;
     return true;
+}
+bool cui_prepaint_inset_shadow(cui_prepaint_writer *writer, const cui_inset_shadow_paint *paint,
+                               bool deferred) {
+    if (!paint)
+        return cui_prepaint_emit(writer, NULL, deferred);
+    cui_draw_command command = {.type = CUI_DRAW_INSET_SHADOW, .shadow = *paint};
+    return cui_prepaint_emit(writer, &command, deferred);
 }
 bool cui_prepaint_drop_shadow(cui_prepaint_writer *writer, const cui_drop_shadow_paint *paint,
                               bool deferred) {
@@ -2587,7 +2697,7 @@ static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool
             cui_draw_command c = ui->prepaint_commands[p->offset + i];
             if (c.type == CUI_DRAW_IMAGE)
                 c.bitmap.opacity *= p->info.opacity;
-            else if (c.type == CUI_DRAW_DROP_SHADOW)
+            else if (c.type == CUI_DRAW_DROP_SHADOW || c.type == CUI_DRAW_INSET_SHADOW)
                 c.shadow.layer.color.a = (uint8_t)(c.shadow.layer.color.a * p->info.opacity);
             else if (c.type == CUI_DRAW_MESH) {
                 c.mesh.color.r *= p->info.opacity;
@@ -2668,7 +2778,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         // nesting depth so layout-only descendants emit neither half of a clip.
         // Inert painted nodes retain ordinary clipping and their paint.
         if (c->commandType == CLAY_RENDER_COMMAND_TYPE_SCISSOR_START &&
-            (layout_clip_depth || c->userData == ui)) {
+            (layout_clip_depth || cui_core_layout_only_clip(ui, c))) {
             layout_clip_depth++;
             continue;
         }
@@ -2734,10 +2844,12 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 goto cui_core_commands_done;
             }
             for (size_t shadow = 0; shadow < node->shadow_count; shadow++) {
+                if (node->shadows[shadow].kind != CUI_BOX_SHADOW_DROP)
+                    continue;
                 cui_draw_command command = {.type = CUI_DRAW_DROP_SHADOW,
                                             .shadow = {.caster = d.bounds,
                                                        .radii = node->shadow_radii,
-                                                       .layer = node->shadows[shadow]}};
+                                                       .layer = node->shadows[shadow].layer}};
                 command.shadow.layer.color.a = (uint8_t)(command.shadow.layer.color.a * opacity);
                 if (!cui_drop_shadow_bounds(command.shadow, &command.bounds)) {
                     cui_core_fail(ui, CUI_ERROR_LAYOUT);
@@ -2770,6 +2882,21 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                        .custom_corners = true,
                                        .corner_radii = {radius.topLeft, radius.topRight,
                                                         radius.bottomLeft, radius.bottomRight}};
+            }
+            for (size_t shadow = 0; shadow < node->shadow_count; shadow++) {
+                if (node->shadows[shadow].kind != CUI_BOX_SHADOW_INSET)
+                    continue;
+                cui_draw_command command = {.type = CUI_DRAW_INSET_SHADOW,
+                                            .shadow = {.caster = d.bounds,
+                                                       .radii = node->shadow_radii,
+                                                       .layer = node->shadows[shadow].layer}};
+                command.shadow.layer.color.a = (uint8_t)(command.shadow.layer.color.a * opacity);
+                if (!cui_inset_shadow_bounds_checked(command.shadow, &command.bounds)) {
+                    cui_core_fail(ui, CUI_ERROR_LAYOUT);
+                    ui->count = 0;
+                    goto cui_core_commands_done;
+                }
+                ui->commands[ui->count++] = command;
             }
             if (node->has_mesh) {
                 cui_mesh_paint mesh = node->mesh;
@@ -3295,6 +3422,9 @@ uint64_t cui_frame_sequence(const cui_context *ui) {
 bool cui_frame_is_submitting(const cui_context *ui) {
     return ui && ui->in_frame && !ui->prepainting && !ui->resolving_layout &&
            !ui->measuring_depth && !cui_core_paint_context;
+}
+bool cui_frame_paint_enabled(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && !cui_core_layout_only(ui);
 }
 cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
     if (!cui_frame_sequence(ui) || index >= ui->event_count || ui->error != CUI_OK)

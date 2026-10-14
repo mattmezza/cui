@@ -1,0 +1,158 @@
+{
+  "baseline": "effd616",
+  "upstream": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "source_hashes": {
+    "styled.rs": "751b5b4730b77d213623c33771f769ff18b914d7aa0b8919e4429a132ff94632",
+    "popover.rs": "6138c81736abebe02d0739be1af229ddcc685a3fb26ded11b1ff96cf854e7590",
+    "notification.rs": "09010c94024ee6e2580ecf557d97dcf276512a52be8cf298e0936088df0afeca",
+    "tab/tab_bar.rs": "e8f63514a809c916c71f3f602166720e151472b2529f10e1fb33b6a737da4c8d",
+    "tab/tab.rs": "dd66f8e05bc41fca661a5d0ed455392347dda5d61c7e29972b581efb1aa1ca6c"
+  },
+  "probe": {
+    "path": "/home/matteo/.cache/cui-validation/shadow-consumers-next33-probe.c",
+    "sha256": "2d5f5630883f0b6ce63172e4580a6c75062ac34d8b2e32243d94b3f435ac193f",
+    "log": "/home/matteo/.cache/cui-validation/shadow-consumers-next33-probe.log",
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "actual": {
+      "popover": {
+        "drop": 0,
+        "border": 1
+      },
+      "notification": {
+        "drop": 0,
+        "approximate_rectangles": 16,
+        "source_reconciliation_changed_pixels": {
+          "light": 11870,
+          "dark": 5768
+        }
+      },
+      "segmented_retained": {
+        "drop": 0
+      },
+      "segmented_static": {
+        "drop": 0
+      }
+    },
+    "pixels_scope": "actual decorative CUI commands; TEXT excluded identically because no font; no native GPUI renderer execution"
+  },
+  "contracts": {
+    "popover": {
+      "layers": [
+        [
+          0,
+          0,
+          0,
+          1,
+          "foreground .1"
+        ],
+        [
+          0,
+          4,
+          3,
+          -1,
+          "black .1"
+        ],
+        [
+          0,
+          2,
+          2,
+          -2,
+          "black .1"
+        ]
+      ],
+      "border": false,
+      "appearance_default": true,
+      "custom_style_applies_after_default": true,
+      "public_popover_dropdown_animation": false,
+      "outside_dismiss_appearance_comment_code_discrepancy": true
+    },
+    "toast": {
+      "layers": [
+        [
+          0,
+          10,
+          7.5,
+          -3,
+          "black .1"
+        ],
+        [
+          0,
+          4,
+          3,
+          -4,
+          "black .1"
+        ]
+      ],
+      "border": true,
+      "strength": "opacity^3",
+      "effective_ink": "0.1*opacity^4 before inherited opacity",
+      "motion_ms": [
+        400,
+        200
+      ],
+      "source_slide_px": 96,
+      "cui_slide_px": 16
+    },
+    "segmented": {
+      "shared_indicator_layers": [
+        [
+          0,
+          1,
+          1.5,
+          0,
+          "black .1"
+        ],
+        [
+          0,
+          1,
+          1,
+          -1,
+          "black .1"
+        ]
+      ],
+      "standalone": "public shadow_xs",
+      "first_measuring_fallback": "public shadow_sm",
+      "disabled_tab_style_shadow": false,
+      "shared_indicator_selector_filters_disabled": false
+    }
+  },
+  "recommended_slice": {
+    "owner": "notification card",
+    "api_policy": [
+      "LEGACY=0",
+      "SOURCE=1"
+    ],
+    "resources": "existing bounded copied Core layers; no new renderer/Core API",
+    "exact_checked_render_signature": "must be reviewed before production",
+    "private_helpers_are_public_requirements": false
+  },
+  "validation": {
+    "strict_build": {
+      "exit": 0,
+      "steps": 429,
+      "native": false
+    },
+    "complete_ctest": {
+      "passed": 142,
+      "total": 143,
+      "exit": 8,
+      "failure": "distribution"
+    },
+    "source_ctest": {
+      "passed": 142,
+      "total": 142,
+      "exit": 0
+    },
+    "probe_exit": 0
+  },
+  "remaining": [
+    "Popover actual styling/refinements/arrow",
+    "TabBar first-frame/raised/standalone branch integration",
+    "toast96px placement motion",
+    "arbitrary style/refinement and platform-native identity",
+    "no family completion claim"
+  ]
+}

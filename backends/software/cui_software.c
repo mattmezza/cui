@@ -272,6 +272,7 @@ bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color c
         case CUI_DRAW_MESH:
             mesh(r, &c->mesh);
             break;
+        case CUI_DRAW_INSET_SHADOW:
         case CUI_DRAW_DROP_SHADOW:
         case CUI_DRAW_IMAGE:
             if (!bitmap(r, c))
@@ -338,7 +339,7 @@ static void destroy(void *r) {
 cui_renderer cui_software_interface(cui_software *r) {
     return (cui_renderer){r, "CUI deterministic software",
                           CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE |
-                              CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW
+                              CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW | CUI_RENDER_INSET_SHADOW
 #ifdef CUI_HAS_TEXT
                               | (r && r->font ? CUI_RENDER_TEXT : 0)
 #endif

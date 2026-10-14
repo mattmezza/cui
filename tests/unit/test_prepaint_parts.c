@@ -12,6 +12,7 @@ typedef struct {
 static unsigned char expected[1024];
 static bool paint_parts(const cui_prepaint_info *info, const void *copied,
                         cui_prepaint_writer *writer) {
+    assert(!cui_frame_paint_enabled(cui_core_paint_context));
     const parts_header *header = copied;
     assert((uintptr_t)copied % _Alignof(parts_header) == 0);
     assert(header->alignment == 1.25L && header->tag == UINT64_C(0x123456789abcdef0));
@@ -29,11 +30,42 @@ static bool paint_empty(const cui_prepaint_info *info, const void *copied,
     assert(!copied);
     return true;
 }
+static cui_size measure_phase(void *user, cui_str text, float size) {
+    cui_context *ui = *(cui_context **)user;
+    assert(!cui_frame_paint_enabled(ui));
+    (void)text;
+    return (cui_size){size, size};
+}
+static void check_paint_phase(void) {
+    cui_context *ui = NULL;
+    ui = cui_create((cui_config){
+        .max_elements = 64, .max_commands = 64, .measure = measure_phase, .measure_user = &ui});
+    assert(ui && !cui_frame_paint_enabled(NULL) && !cui_frame_paint_enabled(ui));
+    assert(cui_begin_frame(ui, 200, 100, 0));
+    assert(cui_frame_paint_enabled(ui));
+    cui_begin_box(ui, 200, (cui_box){.inert = true});
+    assert(cui_frame_paint_enabled(ui));
+    cui_begin_box(ui, 201, (cui_box){.layout_only = true});
+    assert(!cui_frame_paint_enabled(ui));
+    cui_begin_box(ui, 202, (cui_box){0});
+    assert(!cui_frame_paint_enabled(ui));
+    cui_end_box(ui);
+    cui_end_box(ui);
+    assert(cui_frame_paint_enabled(ui));
+    cui_end_box(ui);
+    assert(cui_frame_paint_enabled(ui));
+    cui_size measured = cui_measure_text(ui, cui_string("phase"), 12);
+    assert(measured.width == 12 && cui_frame_paint_enabled(ui));
+    cui_text(ui, cui_string("phase"), 12, (cui_color){255, 255, 255, 255});
+    assert(cui_end_frame(ui).count && !cui_frame_paint_enabled(ui));
+    cui_destroy(ui);
+}
 static void open_owner(cui_context *ui) {
     assert(cui_begin_frame(ui, 200, 100, 0));
     cui_begin_box(ui, 10, (cui_box){.width = 100, .height = 40});
 }
 int main(void) {
+    check_paint_phase();
     for (size_t i = 0; i < sizeof expected; ++i)
         expected[i] = (unsigned char)('a' + i % 26);
     cui_context *ui =

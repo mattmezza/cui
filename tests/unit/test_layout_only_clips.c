@@ -54,6 +54,35 @@ int main(void) {
     assert(cui_last_error(ui) == CUI_OK && draw.count == 3);
     assert(draw.commands[0].type == CUI_DRAW_CLIP_PUSH && draw.commands[1].type == CUI_DRAW_RECT &&
            draw.commands[1].color.r == 90 && draw.commands[2].type == CUI_DRAW_CLIP_POP);
+    /* Clay gives floating-root ancestor scissors NULL userData. Their
+     * descendants remain layout-only; the anonymous clip must vanish too. */
+    assert(cui_begin_frame(ui, 200, 200, 0));
+    cui_begin_box(ui, 30, (cui_box){.width = 100, .height = 80, .clip = true, .layout_only = true});
+    cui_begin_absolute_box(ui, 31, (cui_box){.background = {9, 8, 7, 255}},
+                           (cui_rect){5, 5, 30, 20});
+    cui_text(ui, cui_string("Hidden portal"), 12, (cui_color){255, 255, 255, 255});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && draw.count == 0);
+    assert(cui_begin_frame(ui, 200, 200, 0));
+    cui_begin_box(ui, 30, (cui_box){.width = 100, .height = 80, .clip = true});
+    cui_begin_absolute_box(ui, 31, (cui_box){.background = {9, 8, 7, 255}},
+                           (cui_rect){5, 5, 80, 20});
+    cui_text(ui, cui_string("Visible"), 12, (cui_color){255, 255, 255, 255});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    draw = cui_end_frame(ui);
+    size_t pushes = 0, pops = 0, texts = 0;
+    rectangles = 0;
+    for (size_t i = 0; i < draw.count; ++i) {
+        pushes += draw.commands[i].type == CUI_DRAW_CLIP_PUSH;
+        pops += draw.commands[i].type == CUI_DRAW_CLIP_POP;
+        rectangles += draw.commands[i].type == CUI_DRAW_RECT;
+        texts += draw.commands[i].type == CUI_DRAW_TEXT;
+    }
+    assert(cui_last_error(ui) == CUI_OK && pushes == 2 && pops == 2 && rectangles == 1 &&
+           texts == 1);
     cui_destroy(ui);
     puts("layout-only nested clips suppressed; inert and sibling paint clips retained");
     return 0;

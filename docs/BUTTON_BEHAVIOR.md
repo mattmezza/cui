@@ -133,3 +133,82 @@ supported combining-mark case. `test_button_label_layout.py` compiles actual WAS
 checks Canvas pixels, current-frame widths and ellipsis commands, and dispatches
 real Chromium mouse and CDP touch contacts. These tests close this label-layout
 slice; they do not certify the entire Button family or physical device behavior.
+
+Standalone Button composition under inherited inert or layout-only ancestry now
+uses a passive path selected by Core's ordinary-submission phase queries. Inert
+scopes retain content layout, artwork, clipping and presentation; layout-only
+scopes retain layout without paint. Neither path registers Button metadata,
+reduces tooltip state, invokes action/hover notifications, schedules a tooltip wake, or
+changes any bytes of the caller-owned Button state. Content callbacks still run
+to compose the visual children; they remain application code.
+
+The original state pointer remains borrowed through deferred label paint, so its
+existing 256-byte diagnostic-prefix cap stays consistent without a temporary
+stack-state lifetime. The synchronous legacy overflow/explicit-ellipsis branch
+uses a temporary paint copy whose visible bytes Core copies immediately; no
+temporary state pointer reaches deferred paint. Passive ID reuse preserves state; a later ordinary frame
+performs normal ID reconciliation. Explicit disabled/loading options in an
+ordinary frame retain their existing blockers, hover/tooltip cleanup and loading
+presentation. Calls outside ordinary submission, including font measurement and
+prepaint callbacks, perform no standalone Button work. This is a CUI passive
+composition correctness rule, not an upstream GPUI inert-scope parity claim.
+
+The focused passive lifecycle fixture compares complete preloaded caller-state
+bytes across fixed/grow labels, same/changed IDs, direct/inherited ancestry,
+tooltip open/pending/suppressed states and zero/nonzero frame deltas. It retains
+strict no-draw assertions for layout-only composition and checks ordinary touch
+reuse, cancellation, disabled/loading behavior and guarded phases. The native
+font fixture and independent Chromium WASM fixture extend that evidence to real
+font measurement and actual hover-opened tooltips, Canvas paint and mouse/CDP
+touch/keyboard reuse; they do not claim physical touchscreen coverage.
+
+Visible inert loading artwork keeps its animation redraw requests. Layout-only
+loading composes the same-sized icon slot without calling the artwork painter or
+requesting invisible animation redraw. The existing Core paint-enabled query
+distinguishes these policies; caller state/deadlines remain unchanged in both.
+The fixture separately checks Core redraw state after each begin-frame reset and
+verifies normal loading resumes, rather than inferring wake behavior from pixels.
+
+### Numeric sizing, open presentation, and caret
+
+`pixel_size` is an optional finite logical-pixel size in `(0, 4096]`; zero retains
+legacy/design sizing. Negative, nonfinite, or larger values reject the Button
+before layout, semantic registration, or callbacks. Numeric sizing follows the
+pinned source's numeric `Size` branch: horizontal padding is 20% of the size,
+leading/trailing artwork is 75%, normal text uses the theme's base font, and the
+content gap uses the medium gap. A normal button has intrinsic content height;
+an icon-only button defaults to a square of `pixel_size` except Link/Text. Compact mode does not
+change numeric padding. Link and Text still have no horizontal padding.
+
+Numeric sizing takes precedence over legacy/design metrics. Explicit `height`,
+`font_size`, and `icon_size` then override their respective metrics; `width`
+retains its existing FIT/grow/fixed behavior. Numeric dimensions are literal
+logical pixels, independent of density, while base text, medium gap, and medium
+caret follow theme density. Raster artwork reserves its rounded-up pixel extent;
+the existing Icon resource capacity and validity rules still apply. This bounded
+API does not promise successful artwork allocation for every large valid size.
+Joined ButtonGroup children retain their own numeric sizing and `open` options
+when group legacy/design/style inheritance is applied.
+
+`open` selects active presentation without changing checked/value semantics,
+selection, callbacks, focus, or managing a menu. It is independent of `selected`
+and `toggled`. The dropdown caret uses normal foreground at 75% alpha even when
+hover, press, open, disabled, or selected changes the label palette. Outline and
+custom normal foregrounds are respected; loading and ancestor opacity still
+compose over the whole control. Numeric sizing uses the medium caret size,
+independent of numeric or explicitly overridden leading artwork size.
+
+This slice implements those three documented contracts, not complete Button
+family or platform parity. Its focused tests cover numeric precedence and geometry
+across all 18 legacy/design sizes and two densities, normal/compact/icon-only
+layout, explicit dimensions, custom/outline caret tint, disabled/loading paint,
+and invalid numeric domains. A real Noto font fixture and Chromium WASM fixture
+exercise the same implementation; Chromium input evidence is not physical device
+validation. Existing constrained-label and passive lifecycle fixtures remain
+separate regression gates.
+
+The numeric formulas come from pinned `button/button.rs` lines 615–619 and
+662–670, `sizing.rs` lines 337–343, and `select.rs` lines 59–67 at upstream
+commit `87d10ae5e1299d1be18670a37570c5402f952e34`. Numeric Link/Text normal and icon-only buttons use intrinsic height and width,
+matching the source no-padding branch; explicit caller dimensions still win.
+The zero numeric default preserves CUI's established legacy icon-only sizing.

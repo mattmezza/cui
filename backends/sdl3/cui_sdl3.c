@@ -567,7 +567,7 @@ static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_onl
     size_t bytes = (size_t)key.width * key.height * 4;
     if (bytes > BITMAP_BYTES)
         return false;
-    bool shadow = c->type == CUI_DRAW_DROP_SHADOW;
+    bool shadow = cui_shadow_type(c->type);
     bitmap_entry *entry = NULL;
     for (size_t i = 0; i < BITMAP_SLOTS; i++)
         if (s->bitmaps[i].texture && cui_bitmap_key_equal(&key, &s->bitmaps[i].key)) {
@@ -617,10 +617,49 @@ static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_onl
     if (prepare_only)
         return true;
     SDL_FRect bounds = {c->bounds.x, c->bounds.y, c->bounds.w, c->bounds.h};
-    return SDL_SetTextureBlendMode(entry->texture, SDL_BLENDMODE_BLEND) &&
-           SDL_SetTextureScaleMode(entry->texture, SDL_SCALEMODE_NEAREST) &&
-           SDL_SetTextureAlphaModFloat(entry->texture, c->bitmap.opacity) &&
-           SDL_RenderTexture(s->renderer, entry->texture, NULL, &bounds);
+    if (!SDL_SetTextureBlendMode(entry->texture, SDL_BLENDMODE_BLEND) ||
+        !SDL_SetTextureScaleMode(entry->texture, SDL_SCALEMODE_NEAREST) ||
+        !SDL_SetTextureAlphaModFloat(entry->texture, c->bitmap.opacity))
+        return false;
+    if (!shadow)
+        return SDL_RenderTexture(s->renderer, entry->texture, NULL, &bounds);
+    SDL_RendererLogicalPresentation mode;
+    int lw, lh;
+    float sx, sy;
+    SDL_FRect presentation;
+    SDL_Rect viewport, clip;
+    bool clipped = SDL_RenderClipEnabled(s->renderer);
+    bool viewport_set = SDL_RenderViewportSet(s->renderer);
+    if (!SDL_GetRenderLogicalPresentation(s->renderer, &lw, &lh, &mode) ||
+        !SDL_GetRenderLogicalPresentationRect(s->renderer, &presentation) ||
+        !SDL_GetRenderScale(s->renderer, &sx, &sy) ||
+        !SDL_GetRenderViewport(s->renderer, &viewport) ||
+        !SDL_GetRenderClipRect(s->renderer, &clip))
+        return false;
+    float px = mode == SDL_LOGICAL_PRESENTATION_DISABLED ? 1 : presentation.w / lw;
+    float py = mode == SDL_LOGICAL_PRESENTATION_DISABLED ? 1 : presentation.h / lh;
+    float ox = mode == SDL_LOGICAL_PRESENTATION_DISABLED ? 0 : presentation.x;
+    float oy = mode == SDL_LOGICAL_PRESENTATION_DISABLED ? 0 : presentation.y;
+    ox += viewport.x * px * sx;
+    oy += viewport.y * py * sy;
+    bounds = (SDL_FRect){roundf(c->bounds.x * px * sx + ox), roundf(c->bounds.y * py * sy + oy),
+                         (float)entry->key.width, (float)entry->key.height};
+    bool ok =
+        SDL_SetRenderLogicalPresentation(s->renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED) &&
+        SDL_SetRenderScale(s->renderer, 1, 1) && SDL_SetRenderViewport(s->renderer, NULL) &&
+        SDL_SetRenderClipRect(s->renderer, NULL);
+    if (ok)
+        ok = SDL_RenderTexture(s->renderer, entry->texture, NULL, &bounds);
+    /* Restore each property even when a previous operation failed. */
+    if (!SDL_SetRenderLogicalPresentation(s->renderer, lw, lh, mode))
+        ok = false;
+    if (!SDL_SetRenderScale(s->renderer, sx, sy))
+        ok = false;
+    if (!SDL_SetRenderViewport(s->renderer, viewport_set ? &viewport : NULL))
+        ok = false;
+    if (!SDL_SetRenderClipRect(s->renderer, clipped ? &clip : NULL))
+        ok = false;
+    return ok;
 }
 bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color clear,
                              const char *path) {
@@ -658,7 +697,7 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
         list = &prepared;
         /* Resource creation is complete before clear; no texture draw here. */
         for (size_t i = 0; i < list->count; i++)
-            if ((list->commands[i].type == CUI_DRAW_DROP_SHADOW ||
+            if ((cui_shadow_type(list->commands[i].type) ||
                  list->commands[i].type == CUI_DRAW_IMAGE) &&
                 !bitmap_draw(s, &list->commands[i], true))
                 return false;
@@ -674,9 +713,11 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
         if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
             !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
             !isfinite(c->stroke) || fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f ||
-            fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)
+            (!cui_shadow_type(c->type) &&
+             (fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)))
             return false;
         switch (c->type) {
+        case CUI_DRAW_INSET_SHADOW:
         case CUI_DRAW_DROP_SHADOW: {
             SDL_Rect saved;
             bool enabled = SDL_RenderClipEnabled(s->renderer);
@@ -805,6 +846,7 @@ cui_renderer cui_sdl3_interface(cui_sdl3 *s) {
     return (cui_renderer){s, name,
                           (s && s->font ? CUI_RENDER_TEXT : 0) | CUI_RENDER_ROUNDED |
                               CUI_RENDER_CLIP | CUI_RENDER_IMAGE | CUI_RENDER_DROP_SHADOW |
+                              CUI_RENDER_INSET_SHADOW |
                               (s && strcmp(name, "software") ? CUI_RENDER_ACCELERATED : 0),
                           render, destroy};
 }

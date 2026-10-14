@@ -2,11 +2,11 @@
 
 ## Current priorities — 14 October
 
-Published `5474ec7` fixes the acquired-swapchain SDL GPU assertion. All six framework jobs and Pages pass, and all411 HTTPS files match its artifact. MAIN `62b3bb4` passes framework CI but Pages failed the real secure touch-focus regression; deployment was skipped. It is not the published gallery.
+Published `a3ea0c1` passes all six framework jobs and Pages. All435 public HTTPS files match the deployment artifact; actual public Attachment62/62 passes. It includes the acquired-swapchain SDL GPU fix and the secure touch/IME, formatting and Button label corrections. See [publication receipt](validation/published-a3ea0c1.txt).
 
-Next31 frozen production `4241a56` passes strict native162/162, sanitizer154/154, WASI129/129 and Attachment62/62. Secure synthetic mouse focus and immediate typing after IME cancellation are corrected with preserved failing browser evidence. The complete49-command browser matrix passes before integration/publication, including all78 stories/78 snippet compilations. Source-pattern and number formatting, current-frame Button labels and selected copyable C11 usage examples are tested subsets.
+Next32 portable production passes strict native172/172, ASan/UBSan167/167 and pinned WASI135/135. Input pointer word/line selection, passive Button lifecycle, numeric Button sizing/open/caret, mixed inset shadows and named shadow presets are tested subsets. The original Theme corner/border sample is preserved beside the new shadow sample; both pass actual gallery pixel checks. The complete54-command browser matrix passes before integration/publication, including all78 stories/78 compiled snippets.
 
-Ledger:342features,294tested subsets,4implemented,44not_started;76tested families,2implemented,0fullyverified. All78 manifest entries remain. Root integrates isolated worker commits. Next32 contains tested Input word/line pointer selection and layout-only floating clipping; passive Button lifecycle/loading and inset shadows remain under validation. Regex provider feasibility is read-only and still lacks actual browser/WASI linkage proof. Full parity and native platform acceptance remain unfinished. No user dependency installation is required.
+Ledger:348features,300tested subsets,4implemented,44not_started;76tested families,2implemented,0fullyverified. All78 manifest entries remain. Root integrates isolated worker commits. Next33 optional regex/click payloads pass integrated native178/178 and actual browser/WASI Input proofs; optional package/toolchain checks also pass. Notification/Popover/typed Button artwork integration is ongoing. Full parity and native platform acceptance remain unfinished. No user dependency installation is required.
 
 ## Historical checkpoints
 

@@ -578,7 +578,13 @@
         "tests/web/test_button_blocker_scroll_scope.py",
         "tests/unit/test_button_label_layout.c",
         "tests/integration/test_button_label_font.c",
-        "tests/web/test_button_label_layout.py"
+        "tests/web/test_button_label_layout.py",
+        "tests/unit/test_button_passive_lifecycle.c",
+        "tests/integration/test_button_passive_font.c",
+        "tests/web/test_button_passive_lifecycle.py",
+        "tests/unit/test_button_numeric.c",
+        "tests/integration/test_button_numeric_font.c",
+        "tests/web/test_button_numeric.py"
       ],
       "status": "tested",
       "platforms": {
@@ -587,7 +593,8 @@
       },
       "limitations": [
         "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied.",
-        "Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md."
+        "Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md.",
+        "Numeric pixel sizing, independent open presentation, normal caret tint and passive caller state are tested. Exact focus styles, ordered tab indices, rich down/up click payload, event-local propagation, action tooltips, typed loading slots, shadow/gradient refinement and full accessibility remain incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -607,7 +614,7 @@
           ]
         },
         {
-          "name": "disabled/loading/error states",
+          "name": "complete source state-style refinement and typed loading-slot preservation",
           "status": "not_started",
           "evidence": []
         },
@@ -675,7 +682,37 @@
             "tests/web/test_button_label_layout.py",
             "docs/BUTTON_BEHAVIOR.md"
           ],
-          "scope": "Fixed and grow layout, grapheme-safe automatic ellipsis, caller-owned state cap and explicit content-overflow opt-out. Passive metadata/tooltip lifecycle still requires correction; no complete Button parity claim."
+          "scope": "Fixed and grow layout, grapheme-safe automatic ellipsis, caller-owned state cap and explicit content-overflow opt-out. Passive lifecycle is covered separately; no complete Button parity claim."
+        },
+        {
+          "name": "passive caller lifecycle and invisible loading redraw suppression",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_passive_lifecycle.c",
+            "tests/integration/test_button_passive_font.c",
+            "tests/web/test_button_passive_lifecycle.py"
+          ],
+          "scope": "Inert/layout-only/measurement/prepaint preserves caller state; visible inert loading animates and invisible loading schedules no redraw."
+        },
+        {
+          "name": "bounded numeric pixel-size source metrics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_numeric.c",
+            "tests/integration/test_button_numeric_font.c",
+            "tests/web/test_button_numeric.py"
+          ],
+          "scope": "Numeric normal/icon-only/Link/Text geometry, explicit overrides and all18 legacy/design choices. Positive pixel-size and artwork resource domain remains bounded."
+        },
+        {
+          "name": "independent open presentation and normal-color caret tint",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_numeric.c",
+            "tests/integration/test_button_numeric_font.c",
+            "tests/web/test_button_numeric.py"
+          ],
+          "scope": "Open is presentation distinct from checked/expanded metadata; caret derives normal foreground alpha.75 and source Medium numeric size."
         }
       ],
       "upstream_doc": {
@@ -701,7 +738,7 @@
           "Custom Children"
         ]
       },
-      "last_tested_commit": "8e701b342945e1a3ff8d7cb9e3a1223a44ba4aad",
+      "last_tested_commit": "12a465a522187e250826b7b26de7654eb736856c",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -3443,7 +3480,9 @@
         "tests/web/test_input_format_gallery.py",
         "tests/unit/test_input_number_engine.c",
         "tests/unit/test_input_number_control.c",
-        "tests/integration/test_input_number_native.c"
+        "tests/integration/test_input_number_native.c",
+        "tests/unit/test_input_pointer_selection.c",
+        "tests/integration/test_input_pointer_native.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3575,6 +3614,16 @@
             "docs/INPUT_NUMBER_FORMATTING.md"
           ],
           "scope": "Source-order grouping, configured fraction truncation, Unicode numeric normalization and unformatting. Enabled NUL separators and multiline/token/multi-selection formatting remain unsupported."
+        },
+        {
+          "name": "bounded source word and line pointer selection with sticky drag",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_input_pointer_selection.c",
+            "tests/integration/test_input_pointer_native.c",
+            "docs/INPUT_POINTER_SELECTION.md"
+          ],
+          "scope": "Single-line double/triple press and ordered shift/drag, masked/readonly/disabled/token guards. Full native touch selection menu and complete Input family remain unfinished."
         }
       ],
       "upstream_doc": {
@@ -3613,7 +3662,7 @@
           "JavaScript"
         ]
       },
-      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc",
+      "last_tested_commit": "12a465a522187e250826b7b26de7654eb736856c",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]
@@ -5564,7 +5613,14 @@
         "tests/integration/test_theme_registry_native.c",
         "tests/integration/test_theme_registry_source.c",
         "tests/distribution/theme_registry.c",
-        "tests/web/test_theme_registry.py"
+        "tests/web/test_theme_registry.py",
+        "tests/unit/test_inset_shadow.c",
+        "tests/distribution/inset_shadow_effects.c",
+        "tests/integration/test_inset_shadow_adapters.c",
+        "tests/web/test_inset_shadow_canvas.py",
+        "tests/web/test_inset_shadow_gallery.py",
+        "tests/unit/test_shadow_presets.c",
+        "tests/web/test_shadow_presets.py"
       ],
       "status": "tested",
       "platforms": {
@@ -5573,7 +5629,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "38 pinned palettes, caller-owned bounded registry, transactional supported legacy/semantic imports, explicit host appearance/high-contrast/reduced-motion projection, semantic typography/shadow snapshots and native font-backed import rendering are tested. SDL actual system-theme queries and queued change notifications, explicit overrides and a native follow-system application have tests. Physical OS setting changes, native high contrast and native reduced-motion observation remain unverified; applications pass those preferences explicitly. Semantic font/spacing/shadow and motion snapshots require explicit consumer integration. Unsupported source gradients, syntax/highlight and nonrepresentable fields reject by default, or return an observable partial import when opted in. Registry name ordering uses ASCII case folding. See docs/THEME_REGISTRY_GUIDE.md and docs/THEME_PRESETS.md."
+        "38 pinned palettes, caller-owned bounded registry, transactional supported legacy/semantic imports, explicit host appearance/high-contrast/reduced-motion projection, semantic typography/shadow snapshots and native font-backed import rendering are tested. SDL actual system-theme queries and queued change notifications, explicit overrides and a native follow-system application have tests. Physical OS setting changes, native high contrast and native reduced-motion observation remain unverified; applications pass those preferences explicitly. Semantic font/spacing/shadow and motion snapshots require explicit consumer integration. Unsupported source gradients, syntax/highlight and nonrepresentable fields reject by default, or return an observable partial import when opted in. Registry name ordering uses ASCII case folding. See docs/THEME_REGISTRY_GUIDE.md and docs/THEME_PRESETS.md.",
+        "Bounded DROP/INSET/preset primitives and Theme sample are tested across all five consumers. Popover/Notification/raised-Tab consumed shadows and broader source style/color contracts remain separately incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5641,6 +5698,29 @@
             "examples/system_theme/main.c",
             "docs/SDL_SYSTEM_APPEARANCE.md"
           ]
+        },
+        {
+          "name": "bounded mixed DROP and INSET shadow phases across all consumers",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_inset_shadow.c",
+            "tests/distribution/inset_shadow_effects.c",
+            "tests/integration/test_inset_shadow_adapters.c",
+            "tests/web/test_inset_shadow_canvas.py",
+            "tests/web/test_inset_shadow_gallery.py",
+            "docs/INSET_SHADOW.md"
+          ],
+          "scope": "Copied eight-total-layer list, source cover/hole culling/kernel, pure standalone Effects and Software/SDLRenderer/SDLGPU/Sokol/Canvas preparation. Uniform transform/budgets/RGBA8 limits; no native source shader pixel identity or full Theme-family claim."
+        },
+        {
+          "name": "checked source shadow presets and constructor replacement semantics",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_shadow_presets.c",
+            "tests/web/test_shadow_presets.py",
+            "docs/SHADOW_PRESETS.md"
+          ],
+          "scope": "Exact ordered 2xs/xs/sm/md/lg/xl/2xl geometry, NONE clearing mixed lists, atomic output guards. Existing RGBA8 alpha quantization is explicit; consumer style completion is separate."
         }
       ],
       "upstream_doc": {
@@ -5651,7 +5731,7 @@
           "Theme Registry"
         ]
       },
-      "last_tested_commit": "6e0c4bf716f84a10a8c4c8ee432fd08cba51a7bc",
+      "last_tested_commit": "12a465a522187e250826b7b26de7654eb736856c",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]

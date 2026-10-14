@@ -390,7 +390,7 @@ function render(){
  applyTouchPageFallback();
  const commands=Array.from({length:wasm.gallery_count()},(_,i)=>{
   const type=wasm.gallery_command(i,0);
-  return type===7?{type:'shadow',values:Array.from({length:16},(_,field)=>wasm.gallery_shadow_value(i,field))}
+  return(type===7||type===8)?{type:type===8?'insetShadow':'shadow',values:Array.from({length:16},(_,field)=>wasm.gallery_shadow_value(i,field))}
    :type===3?{type:'clipPush',bounds:[1,2,3,4].map(field=>wasm.gallery_command(i,field))}
    :type===4?{type:'clipPop'}:{type:'other'};
  });
@@ -406,7 +406,7 @@ function render(){
   const f=n=>wasm.gallery_command(i,n);const type=f(0),x=f(1),y=f(2),w=f(3),h=f(4);
   if(type===3){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();clips.push([x,y,w,h]);continue;}
   if(type===4){if(clips.length){ctx.restore();clips.pop();}continue;}
-  if(type===7){
+  if(type===7||type===8){
    // Shadow's prepared physical covered mask owns clipping; a fractional
    // browser clip would incorrectly trim source-covered boundary pixels.
    for(let n=0;n<clips.length;n++)ctx.restore();

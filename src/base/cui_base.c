@@ -234,9 +234,73 @@ static bool cui_input_readonly_event(cui_event event) {
            event.key == CUI_KEY_DOWN || event.key == CUI_KEY_HOME || event.key == CUI_KEY_END ||
            (event.key == CUI_KEY_A && (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)));
 }
+/* Pinned source text_boundary::word_range_from_chars, not UAX word motion.
+ * Scalar decoding is bounded by the already-valid model and 128 neighbors. */
+static size_t cui_input_scalar_next(cui_str text, size_t at) {
+    if (at >= text.length)
+        return text.length;
+    at++;
+    while (at < text.length && ((unsigned char)text.data[at] & 0xc0u) == 0x80u)
+        at++;
+    return at;
+}
+static size_t cui_input_scalar_previous(cui_str text, size_t at) {
+    if (!at)
+        return 0;
+    at--;
+    while (at && ((unsigned char)text.data[at] & 0xc0u) == 0x80u)
+        at--;
+    return at;
+}
+static unsigned cui_input_character_kind(cui_str text, size_t at) {
+    size_t end = cui_input_scalar_next(text, at), width = end - at;
+    const unsigned char *p = (const unsigned char *)text.data + at;
+    uint32_t cp = p[0] & (width == 1 ? 127u : width == 2 ? 31u : width == 3 ? 15u : 7u);
+    for (size_t i = 1; i < width; i++)
+        cp = (cp << 6) | (p[i] & 63u);
+    if (cp == '_' || (cp >= '0' && cp <= '9') || (cp >= 'A' && cp <= 'Z') ||
+        (cp >= 'a' && cp <= 'z') || (cp >= 0xc0 && cp <= 0x24f) || (cp >= 0x400 && cp <= 0x4ff) ||
+        (cp >= 0x1e00 && cp <= 0x1eff) || (cp >= 0x300 && cp <= 0x36f))
+        return 1;
+    if (cp == '\n' || cp == '\r')
+        return 3;
+    if ((cp >= 9 && cp <= 13) || cp == 0x20 || cp == 0x85 || cp == 0xa0 || cp == 0x1680 ||
+        (cp >= 0x2000 && cp <= 0x200a) || cp == 0x2028 || cp == 0x2029 || cp == 0x202f ||
+        cp == 0x205f || cp == 0x3000)
+        return 2;
+    return 0;
+}
+static bool cui_input_pointer_word(cui_str text, size_t offset, size_t *start, size_t *end) {
+    if (offset > text.length)
+        offset = text.length;
+    while (offset < text.length && offset && ((unsigned char)text.data[offset] & 0xc0u) == 0x80u)
+        offset--;
+    if (offset == text.length)
+        return false;
+    unsigned kind = cui_input_character_kind(text, offset);
+    *start = offset;
+    *end = cui_input_scalar_next(text, offset);
+    if (kind != 1 && kind != 2)
+        return true;
+    for (unsigned i = 0; i < 128 && *start; i++) {
+        size_t previous = cui_input_scalar_previous(text, *start);
+        if (cui_input_character_kind(text, previous) != kind)
+            break;
+        *start = previous;
+    }
+    for (unsigned i = 0; i < 128 && *end < text.length; i++) {
+        if (cui_input_character_kind(text, *end) != kind)
+            break;
+        *end = cui_input_scalar_next(text, *end);
+    }
+    return true;
+}
 static void cui_input_history_focus(cui_context *ui, cui_id id, cui_edit *edit,
                                     cui_input_behavior_state *state, bool disabled) {
     bool focused = !disabled && cui_focused(ui) == id;
+    if (disabled || !focused || state->bound_edit_identity != (uintptr_t)edit ||
+        state->pointer_word_revision != cui_edit_get_state(edit).revision)
+        state->pointer_word_active = false;
     if (!state->focus_initialized || state->bound_edit_identity != (uintptr_t)edit ||
         state->was_focused != focused)
         cui_edit_break_coalescing(edit);
@@ -246,6 +310,8 @@ static void cui_input_history_focus(cui_context *ui, cui_id id, cui_edit *edit,
 }
 static void cui_input_secure_lifecycle(cui_edit *edit, cui_input_behavior_state *state,
                                        cui_base_input_options options) {
+    if (state->secure_initialized && state->was_masked != options.masked)
+        state->pointer_word_active = false;
     if (state->secure_initialized &&
         (state->was_masked != options.masked ||
          state->previous_content_type != options.content_type) &&
@@ -304,14 +370,22 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
     if (state->composition && (options.disabled || options.readonly || cui_focused(ui) != id))
         (void)cui_edit_composition_event(edit, state->composition,
                                          (cui_event){.type = CUI_EVENT_COMPOSITION_CANCEL}, false);
-    if (options.disabled)
+    if (options.disabled) {
         state->dragging = false;
+        state->pointer_word_active = false;
+    }
     cui_event event = events[i];
-    if (event.type == CUI_EVENT_CANCEL)
+    if (event.type == CUI_EVENT_KEY_DOWN || event.type == CUI_EVENT_TEXT)
+        state->pointer_word_active = false;
+    if (event.type == CUI_EVENT_CANCEL) {
         state->dragging = false;
+        state->pointer_word_active = false;
+    }
     if (cui_event_consumed(ui, i) && event.type == CUI_EVENT_POINTER_UP &&
-        event.pointer_button == CUI_POINTER_PRIMARY)
+        event.pointer_button == CUI_POINTER_PRIMARY) {
         state->dragging = false;
+        state->pointer_word_active = false;
+    }
     if (options.disabled || cui_event_consumed(ui, i) || cui_event_target(ui, i) != id ||
         (event.type == CUI_EVENT_KEY_DOWN && (event.ime_composing || event.prefer_character_input)))
         return result;
@@ -368,8 +442,10 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         cui_consume_event(ui, i);
     cui_edit_result error = CUI_EDIT_OK;
     bool primary = event.pointer_button == CUI_POINTER_PRIMARY;
-    if (primary && event.type == CUI_EVENT_POINTER_DOWN)
+    if (primary && event.type == CUI_EVENT_POINTER_DOWN) {
         state->dragging = true;
+        state->pointer_word_active = false;
+    }
     if (options.hit_test && primary &&
         (event.type == CUI_EVENT_POINTER_DOWN ||
          ((state->dragging || cui_pressed(ui, id)) &&
@@ -392,7 +468,35 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         size_t anchor = event.type == CUI_EVENT_POINTER_DOWN && !(event.modifiers & CUI_MOD_SHIFT)
                             ? cursor
                             : current.anchor;
+        if (!current.multiline && event.type == CUI_EVENT_POINTER_DOWN && event.click_count >= 3) {
+            /* Single-line source line selection; dragging then moves its end. */
+            anchor = 0;
+            cursor = current.length;
+        } else if (!current.multiline && event.type == CUI_EVENT_POINTER_DOWN &&
+                   event.click_count == 2) {
+            size_t start, end;
+            if (!cui_input_pointer_word(cui_edit_get_text(edit), cursor, &start, &end)) {
+                state->dragging = false;
+                return result; /* Source end-of-value double-click is a no-op. */
+            }
+            anchor = start;
+            cursor = end;
+            state->pointer_word_start = start;
+            state->pointer_word_end = end;
+            state->pointer_word_revision = current.revision;
+            state->pointer_word_active = true;
+        } else if (state->pointer_word_active) {
+            if (cursor < state->pointer_word_start) {
+                anchor = state->pointer_word_end;
+            } else {
+                anchor = state->pointer_word_start;
+                if (cursor < state->pointer_word_end)
+                    cursor = state->pointer_word_end;
+            }
+        }
         error = cui_edit_select_atomic(edit, anchor, cursor);
+        if (error != CUI_EDIT_OK)
+            state->pointer_word_active = false;
     } else if (event.type == CUI_EVENT_KEY_DOWN &&
                (event.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)) &&
                (event.key == CUI_KEY_C || event.key == CUI_KEY_X || event.key == CUI_KEY_V)) {
@@ -429,8 +533,10 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
         error = cui_input_checked(
             edit, (cui_edit_request){.kind = CUI_EDIT_REQUEST_EVENT, .event = event}, options,
             &result.rejected);
-    if (primary && event.type == CUI_EVENT_POINTER_UP)
+    if (primary && event.type == CUI_EVENT_POINTER_UP) {
         state->dragging = false;
+        state->pointer_word_active = false;
+    }
     if (!before.multiline && event.type == CUI_EVENT_KEY_DOWN && event.key == CUI_KEY_ENTER &&
         !event.repeat)
         result.submitted = true;

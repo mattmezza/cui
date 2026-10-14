@@ -323,6 +323,34 @@ typedef struct {
     cui_corner_radii radii; /* Clamped to original caster, never to spread bounds. */
     cui_drop_shadow layer;
 } cui_drop_shadow_paint;
+typedef enum { CUI_BOX_SHADOW_DROP = 0, CUI_BOX_SHADOW_INSET = 1 } cui_box_shadow_kind;
+typedef struct {
+    cui_drop_shadow layer;
+    cui_box_shadow_kind kind;
+} cui_box_shadow;
+enum { CUI_BOX_SHADOW_MAX = CUI_DROP_SHADOW_MAX };
+typedef cui_drop_shadow_paint cui_inset_shadow_paint;
+/* Source named DROP lists; default/none means no layers, never an implicit shadow. */
+typedef enum {
+    CUI_SHADOW_NONE = 0,
+    CUI_SHADOW_2XS,
+    CUI_SHADOW_XS,
+    CUI_SHADOW_SM,
+    CUI_SHADOW_MD,
+    CUI_SHADOW_LG,
+    CUI_SHADOW_XL,
+    CUI_SHADOW_2XL
+} cui_shadow_preset;
+enum { CUI_SHADOW_PRESET_MAX = 2 };
+/* Checked source constructor: DROP, sigma/spread zero, explicit color.
+ * Finite offsets must lie in [-4096,4096]; invalid input leaves output untouched. */
+bool cui_box_shadow_init(float offset_x, float offset_y, cui_color, cui_box_shadow *out);
+/* Copy ordered layers (black alpha13/26/64). Output count must not overlap the
+ * written layer span. Invalid enum, capacity/overflow or pointers leave all outputs
+ * untouched. NONE writes count0 only; its layer buffer may be NULL. */
+bool cui_shadow_preset_layers(cui_shadow_preset, cui_drop_shadow *out, size_t capacity,
+                              size_t *count);
+
 /* Invalid input leaves output untouched. Logical support is metadata; checked physical covering
  * determines empty paint. */
 bool cui_drop_shadow_bounds(cui_drop_shadow_paint, cui_rect *out);
@@ -412,7 +440,8 @@ typedef enum {
     CUI_DRAW_CLIP_POP,
     CUI_DRAW_IMAGE,
     CUI_DRAW_MESH,
-    CUI_DRAW_DROP_SHADOW
+    CUI_DRAW_DROP_SHADOW,
+    CUI_DRAW_INSET_SHADOW
 } cui_draw_type;
 typedef enum {
     CUI_TEXT_WEIGHT_NORMAL,
@@ -545,7 +574,11 @@ bool cui_set_underlay(cui_context *, cui_rect, cui_color, cui_corner_radii);
  * Uses current-frame box bounds and ancestor clipping. Zero width clears it. */
 bool cui_set_outline(cui_context *, float width, cui_color, cui_corner_radii);
 /* Copies <=8 layers immediately; count 0 clears. Paints before background. */
+/* Replaces the copied complete mixed list, at most eight total layers. */
+bool cui_set_box_shadows(cui_context *, const cui_box_shadow *, size_t count, cui_corner_radii);
 bool cui_set_drop_shadows(cui_context *, const cui_drop_shadow *, size_t count, cui_corner_radii);
+/* Replaces the whole mixed list. NONE clears DROP and INSET; no buffer is retained. */
+bool cui_set_shadow_preset(cui_context *, cui_shadow_preset, cui_corner_radii);
 
 typedef struct {
     cui_rect bounds;
@@ -562,6 +595,8 @@ bool cui_set_bitmap_underlay(cui_context *, cui_underlay_layout, cui_bitmap_pain
 /* Current-frame paint after the single layout pass. Register on an open box
  * with a nonzero ID. No layout/input/focus mutation is permitted in callbacks. */
 typedef struct cui_prepaint_writer cui_prepaint_writer;
+bool cui_prepaint_inset_shadow(cui_prepaint_writer *, const cui_inset_shadow_paint *,
+                               bool deferred);
 bool cui_prepaint_drop_shadow(cui_prepaint_writer *, const cui_drop_shadow_paint *, bool deferred);
 typedef struct {
     cui_id owner;
@@ -681,6 +716,10 @@ uint64_t cui_frame_sequence(const cui_context *);
 /* Ordinary composition phase, including inert/layout-only ancestry. False
  * outside a frame, during host measurement, layout resolution or prepaint. */
 bool cui_frame_is_submitting(const cui_context *);
+/* Ordinary composition with painting enabled. Inert ancestry still paints;
+ * layout-only ancestry, host measurement, prepaint and outside-frame calls
+ * return false. Use to avoid scheduling animation for unpainted content. */
+bool cui_frame_paint_enabled(const cui_context *);
 /* Cooperative bubbling: leaf handlers consume events before ancestor handlers.
  * Event targets remain available for diagnostics; callers check consumption.
  * Consuming an accessibility action also cancels its pending activation. */

@@ -111,6 +111,8 @@ typedef struct {
     cui_corner_radii corner_radii;
     cui_border_edges border_edges; /* Finite nonnegative logical widths. */
     bool allow_content_overflow;   /* Explicit legacy overflow/wrapping opt-out; default clips. */
+    float pixel_size; /* 0: legacy/design sizing; finite (0,4096]: numeric source sizing. */
+    bool open; /* Active presentation only; independent of selected/checked/menu lifecycle. */
 } cui_button_options;
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
@@ -732,8 +734,8 @@ static bool cui_button_shape_valid(cui_button_options);
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    cui_button_options o, cui_interaction state) {
     cui_design_metrics design;
-    if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
-        !cui_button_shape_valid(o))
+    if (!ui || !t || !cui_frame_is_submitting(ui) ||
+        !cui_components_design(t, o.design_size, &design) || !cui_button_shape_valid(o))
         return;
     bool disabled = o.disabled;
     cui_box b = cui_components_control(t, disabled, false);
@@ -764,6 +766,15 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         gap = design.gap;
         icon = design.indicator_size;
     }
+    float caret = icon;
+    if (o.pixel_size > 0) {
+        font = 16 * density;
+        padding = o.pixel_size * .2f;
+        gap = 8 * density;
+        icon = o.pixel_size * .75f;
+        caret = 16 * density;
+        b.height = o.icon_only ? o.pixel_size : 0;
+    }
     if (cui_button_dimension(o.height))
         b.height = o.height;
     if (cui_button_dimension(o.font_size))
@@ -772,7 +783,8 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         icon = o.icon_size;
     /* Raster icons occupy integral pixels; reserve the complete painted extent. */
     icon = ceilf(icon);
-    if (o.compact) {
+    caret = o.pixel_size > 0 ? ceilf(caret) : icon;
+    if (o.compact && o.pixel_size == 0) {
         if (o.design_size != CUI_DESIGN_INHERIT)
             padding *= .8f;
         else
@@ -784,7 +796,8 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     bool text = o.variant == CUI_BUTTON_TEXT;
     if (o.variant == CUI_BUTTON_LINK || text)
         padding = 0;
-    if (text && !cui_button_dimension(o.height))
+    bool numeric_no_padding = o.pixel_size > 0 && (o.variant == CUI_BUTTON_LINK || text);
+    if ((text || numeric_no_padding) && !cui_button_dimension(o.height))
         b.height = 0;
     b.padding = 0;
     b.gap = 0;
@@ -792,9 +805,9 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     b.fixed_width = b.width > 0;
     if (o.icon_only) {
         padding = 0;
-        if (text && !b.height)
+        if (text && !b.height && !numeric_no_padding)
             b.height = icon;
-        if (!b.width) {
+        if (!b.width && !numeric_no_padding) {
             b.width = b.height;
             b.fixed_width = true;
         }
@@ -822,7 +835,7 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
             parts++;
         }
         if (o.dropdown_caret) {
-            measured += icon;
+            measured += caret;
             parts++;
         }
         measured += padding * 2 + (parts ? parts - 1 : 0) * gap;
@@ -855,8 +868,20 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     if (o.variant == CUI_BUTTON_CUSTOM && !o.custom_colors)
         palette = (cui_theme_button_colors){.foreground = t->text, .outline_foreground = t->text};
     bool outlined = o.outline || o.variant == CUI_BUTTON_OUTLINE;
-    bool active = state.pressed || o.selected;
+    bool active = state.pressed || o.selected || o.open;
     cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
+    cui_color caret_color = foreground;
+    if (!o.custom_colors) {
+        if (o.variant == CUI_BUTTON_GHOST)
+            caret_color = t->secondary_foreground;
+        else if (o.variant == CUI_BUTTON_LINK)
+            caret_color = t->link;
+        else if (o.variant == CUI_BUTTON_TEXT) {
+            caret_color = t->text;
+            caret_color.a = (uint8_t)(caret_color.a * .9f);
+        }
+    }
+    caret_color.a = (uint8_t)(caret_color.a * .75f);
     b.background = outlined ? (active          ? palette.outline_active
                                : state.hovered ? palette.outline_hover
                                                : palette.outline_normal)
@@ -936,7 +961,14 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         .size = CUI_ICON_CUSTOM, .custom_size = icon, .custom_color = true, .color = foreground};
     if (o.leading_content)
         o.leading_content(ui, o.leading_user);
-    else if (o.loading) {
+    else if (o.loading && !cui_frame_paint_enabled(ui)) {
+        /* Layout-only composition retains the icon slot without allocating or
+         * scheduling invisible loading artwork. */
+        cui_begin_box(
+            ui, id ^ UINT64_C(0x7185e28e9fb974db),
+            (cui_box){.width = icon, .height = icon, .fixed_width = true, .fixed_height = true});
+        cui_end_box(ui);
+    } else if (o.loading) {
         if (o.loading_icon.length) {
             if (!cui_reduced_motion(ui)) {
                 double phase = fmod(cui_frame_time(ui), .8) / .8;
@@ -984,7 +1016,14 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
                 name.data, name.length);
             cui_end_box(ui);
         } else {
-            cui_str visible = cui_button_label(ui, o.state, name, font, o.label_width);
+            cui_button_state passive_label;
+            cui_button_state *label_state = o.state;
+            if (label_state && !cui_frame_sequence(ui)) {
+                /* This legacy branch copies text synchronously into the frame arena. */
+                passive_label = *label_state;
+                label_state = &passive_label;
+            }
+            cui_str visible = cui_button_label(ui, label_state, name, font, o.label_width);
             cui_begin_box(
                 ui, 0,
                 (cui_box){.width = cui_button_dimension(o.label_width) ? o.label_width : 0,
@@ -1022,9 +1061,9 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         }
         (void)cui_icon_named(ui, id ^ UINT64_C(0x7e51d), t, cui_string("chevron-down"),
                              (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                                .custom_size = icon,
+                                                .custom_size = caret,
                                                 .custom_color = true,
-                                                .color = foreground});
+                                                .color = caret_color});
     }
     cui_end_box(ui);
     cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
@@ -1039,6 +1078,8 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
     cui_button_paint_state(ui, id, t, name, o, state);
 }
 static bool cui_button_shape_valid(cui_button_options o) {
+    if (!isfinite(o.pixel_size) || o.pixel_size < 0 || o.pixel_size > 4096)
+        return false;
     float radii[] = {o.corner_radii.top_left, o.corner_radii.top_right, o.corner_radii.bottom_left,
                      o.corner_radii.bottom_right};
     float edges[] = {o.border_edges.left, o.border_edges.right, o.border_edges.top,
@@ -1109,6 +1150,15 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     if (!ui || !t || !cui_components_design(t, o.design_size, &design) ||
         !cui_button_shape_valid(o))
         return false;
+    if (!cui_frame_is_submitting(ui))
+        return false;
+    if (!cui_frame_sequence(ui)) {
+        /* Suppressed ancestry composes visuals without touching caller lifecycle state.
+         * The borrowed state survives through deferred label paint, whose inert guard
+         * preserves the diagnostic prefix cap without writing it. */
+        cui_button_paint_state(ui, id, t, name, o, (cui_interaction){0});
+        return false;
+    }
     bool inert = o.disabled || o.loading;
     cui_str accessible = o.accessibility_label.length ? o.accessibility_label : name;
     cui_interaction interaction = cui_interact(

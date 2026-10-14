@@ -87,6 +87,9 @@ typedef struct {
     bool focus_initialized, was_focused; /* Zero-init; focus/rebind splits typing history. */
     bool secure_initialized, was_masked;
     cui_text_input_purpose previous_content_type;
+    bool pointer_word_active; /* Internal double-click drag range; zero-init. */
+    size_t pointer_word_start, pointer_word_end;
+    uint64_t pointer_word_revision; /* Numeric revision; no borrowed text pointer. */
 } cui_input_behavior_state;
 /* Lazy bounded default preedit (4095 bytes); model-owned rendered view grows. */
 cui_edit_composition *cui_base_composition(cui_context *, cui_id, cui_edit_composition *,

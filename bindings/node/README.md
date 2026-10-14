@@ -13,7 +13,7 @@ ctest --test-dir build-node -R "^(bridge_core|node_binding)$" --output-on-failur
 node bindings/node/examples/save.cjs --headless
 ```
 
-The build copies `cui.node` next to `index.cjs`. The private CMake project builds the C bridge and links the addon; there are no npm packages or node-gyp steps. For an actual window, ensure CMake reports that SDL3 and text adapters are enabled, and provide a font file:
+The build places `cui.node` in `build-node/`; set `CUI_NODE_ADDON=/absolute/path/to/cui.node` if using another build directory. The private CMake project builds the C bridge and links the addon; there are no npm packages or node-gyp steps. For an actual window, ensure CMake reports that SDL3 and text adapters are enabled, and provide a font file:
 
 ```sh
 CUI_FONT_PATH=$(fc-match -f '%{file}\n' sans | head -1) node bindings/node/examples/save.cjs

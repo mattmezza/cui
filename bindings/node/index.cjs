@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 'use strict';
-const native = require('./cui.node');
+const path = require('node:path');
+const native = require(process.env.CUI_NODE_ADDON || path.resolve(__dirname, '../../build-node/cui.node'));
 const NODE = Symbol('CUI node');
 let nextKey = 1;
 function keyFor(node) { return `${node.slot}:${node.generation}`; }

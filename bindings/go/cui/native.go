@@ -21,11 +21,11 @@ static void *bridge_lib;
 static DWORD bridge_last_error;
 static char bridge_error_buf[80];
 #endif
-#define API(X) X(abi_version, uint32_t, (void), ()) \
+#define API(X, V) X(abi_version, uint32_t, (void), ()) \
  X(options_size, uint32_t, (void), ()) \
  X(status_message, const char *, (cui_bridge_status s), (s)) \
  X(create, cui_bridge_app *, (const cui_bridge_options *o, cui_bridge_status *s), (o,s)) \
- X(destroy, void, (cui_bridge_app *a), (a)) \
+ V(destroy, void, (cui_bridge_app *a), (a)) \
  X(node_create, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node p, cui_bridge_kind k, const char *key, cui_bridge_node *out), (a,p,k,key,out)) \
  X(node_remove, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n), (a,n)) \
  X(set_text, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, const char *v), (a,n,v)) \
@@ -118,11 +118,21 @@ static char bridge_error_buf[80];
  X(node_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_rect *r), (a,n,r)) \
  X(request_close, cui_bridge_status, (cui_bridge_app *a), (a))
 #define DECL(name, ret, params, args) static ret (*fp_##name) params; static ret go_##name params { return fp_##name args; }
-#define DECL_VOID(name, ret, params, args) DECL(name, ret, params, args)
-API(DECL)
+#define DECL_VOID(name, ret, params, args) static void (*fp_##name) params; static void go_##name params { fp_##name args; }
+API(DECL, DECL_VOID)
 #undef DECL
+static int bridge_initialized;
 static int bridge_open(const char *path) {
- if (bridge_lib) return 0;
+ if (bridge_initialized) return 0;
+#if defined(CUI_GO_STATIC)
+ if (!path[0]) {
+#define STATIC_LOAD(name, ret, params, args) fp_##name = cui_bridge_##name;
+ API(STATIC_LOAD, STATIC_LOAD)
+#undef STATIC_LOAD
+ bridge_initialized = 1;
+ return 0;
+ }
+#endif
 #if defined(_WIN32)
  int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
  if (count <= 0) { bridge_last_error = GetLastError(); return -3; }
@@ -140,9 +150,10 @@ static int bridge_open(const char *path) {
  if (!lib) return -1;
 #define LOAD(name, ret, params, args) do { void *sym = dlsym(lib, "cui_bridge_" #name); if (!sym) { dlclose(lib); return -2; } memcpy(&fp_##name, &sym, sizeof sym); } while (0);
 #endif
- API(LOAD)
+ API(LOAD, LOAD)
 #undef LOAD
  bridge_lib = lib;
+ bridge_initialized = 1;
  return 0;
 }
 static const char *bridge_dlerror(void) {
@@ -402,11 +413,15 @@ func New(o Options) (*App, error) {
 	if err := valid(o.Library); err != nil {
 		return nil, fmt.Errorf("invalid bridge library path: %w", err)
 	}
-	if !filepath.IsAbs(o.Library) {
+	if o.Library != "" && !filepath.IsAbs(o.Library) {
 		return nil, errors.New("bridge library path must be absolute")
 	}
+	identity := o.Library
+	if identity == "" {
+		identity = "<statically linked CUI>"
+	}
 	loaderMu.Lock()
-	if loadedLibrary != "" && loadedLibrary != o.Library {
+	if loadedLibrary != "" && loadedLibrary != identity {
 		loaderMu.Unlock()
 		return nil, errors.New("different bridge library already loaded")
 	}
@@ -417,7 +432,7 @@ func New(o Options) (*App, error) {
 		loaderMu.Unlock()
 		return nil, fmt.Errorf("bridge load failed: %s", C.GoString(C.bridge_dlerror()))
 	}
-	loadedLibrary = o.Library
+	loadedLibrary = identity
 	loaderMu.Unlock()
 	if C.go_abi_version() != C.CUI_BRIDGE_ABI_VERSION || C.go_options_size() != C.uint32_t(C.sizeof_cui_bridge_options) {
 		return nil, errors.New("bridge ABI mismatch")

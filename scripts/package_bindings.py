@@ -80,7 +80,7 @@ def build_bridge(source, build):
     subprocess.run(["cmake", "--build", str(build), "--target", "cui_bridge", "-j2"], check=True)
     return build / "libcui_bridge.so"
 
-def package_go(package, output, temporary, source_only=False):
+def package_go(package, output, temporary, source_only=True):
     if platform.system() != "Linux":
         raise SystemExit("Alpha Go binary source artifact currently validates Linux only")
     subprocess.run(["python", str(ROOT / "scripts/generate_go_sdk.py"), "--check"], check=True)
@@ -131,11 +131,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("language", choices=("python", "node", "go", "rust"))
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--source-only", action="store_true", help="Package canonical public Go source SDK without host binary")
-    parser.add_argument("--prebuilt", action="store_true", help="Build and bundle Linux Node addon/bridge before packing")
+    parser.add_argument("--source-only", action="store_true", help="Package canonical Go build-time source SDK (the default)")
+    parser.add_argument("--prebuilt", action="store_true", help="Build and bundle Linux addon/bridge before packing Node or Go")
     args = parser.parse_args()
+    if args.source_only and args.prebuilt: parser.error("--source-only and --prebuilt are alternatives")
     if args.source_only and args.language != "go": parser.error("--source-only applies to go")
-    if args.prebuilt and args.language != "node": parser.error("--prebuilt applies to node")
+    if args.prebuilt and args.language not in ("node", "go"): parser.error("--prebuilt applies to node or go")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="cui-package-stage-") as temporary:
@@ -150,7 +151,7 @@ def main():
                 subprocess.run(["node", str(package / "packaging/install.cjs")], cwd=package, check=True)
             subprocess.run(["npm", "pack", "--pack-destination", str(output)], cwd=package, check=True)
         elif args.language == "go":
-            package_go(package, output, Path(temporary), args.source_only)
+            package_go(package, output, Path(temporary), not args.prebuilt)
         elif args.language == "rust":
             package_rust(package, output, Path(temporary))
 if __name__ == "__main__":

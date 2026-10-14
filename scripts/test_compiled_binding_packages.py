@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import zipfile
 import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,10 +17,14 @@ def main():
     parser.add_argument("--go-artifacts", type=Path, required=True)
     parser.add_argument("--rust-artifacts", type=Path, required=True)
     parser.add_argument("--native", action="store_true")
-    parser.add_argument("--allow-runtime-build", action="store_true", help="Validate the source-only Go alpha fallback")
+    parser.add_argument("--go-dynamic", action="store_true", help="Validate optional cui_dynamic embedded bridge mode")
     parser.add_argument("--font", type=Path)
     parser.add_argument("--virtual-token", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    for artifact in args.go_artifacts.resolve().rglob("*.zip"):
+        with zipfile.ZipFile(artifact) as archive:
+            if any(name.endswith("/cui/_native/build-info.json") for name in archive.namelist()):
+                args.go_dynamic = True
     env = dict(os.environ)
     for key in ("CUI_BRIDGE_LIBRARY", "CUI_BRIDGE_LIB_DIR", "LD_LIBRARY_PATH", "GOPRIVATE", "GONOPROXY", "GONOSUMDB"):
         env.pop(key, None)
@@ -41,7 +46,7 @@ def main():
                 str(Path(__file__).resolve()), "--go-artifacts", str(args.go_artifacts.resolve()),
                 "--rust-artifacts", str(args.rust_artifacts.resolve()), "--native"]
             command += ["--virtual-token", token]
-            if getattr(args, "allow_runtime_build", False): command.append("--allow-runtime-build")
+            if args.go_dynamic: command.append("--go-dynamic")
             raise SystemExit(subprocess.run(command, env=env).returncode)
     if args.native:
         if not child or not env.get("DISPLAY") or env["DISPLAY"].split(".")[0] == ":0" or env.get("WAYLAND_DISPLAY"):
@@ -58,8 +63,9 @@ def main():
         shutil.copy2(ROOT / "tests/packaging/go_smoke.go", consumer / "main.go")
         subprocess.run(["go", "mod", "download", "all"], cwd=consumer, env=env, check=True)
         binary = clean / "go-smoke"
-        subprocess.run(["go", "build", "-o", str(binary), "."], cwd=consumer, env=env, check=True)
-        # Both artifact modes embed their inputs; neither may read the module checkout.
+        tags = "cui_dynamic" if args.go_dynamic else "cui_native" if args.native else ""
+        subprocess.run(["go", "build", "-tags", tags, "-o", str(binary), "."], cwd=consumer, env=env, check=True)
+        # Static executables carry CUI; dynamic artifacts carry an embedded bridge.
         (clean / "go-modules").rename(clean / "unused-go-modules")
         blocked = clean / "blocked-toolchain"
         blocked.mkdir()
@@ -68,18 +74,19 @@ def main():
             executable.write_text("#!/bin/sh\necho compiler forbidden at runtime >&2\nexit 99\n")
             executable.chmod(0o755)
         runtime_env = dict(env, PATH=str(blocked) + os.pathsep + env["PATH"])
-        subprocess.run([str(binary)], cwd=clean, env=env if args.allow_runtime_build else runtime_env, check=True)
-        # Repeated consumers share a cold cache; process locking must serialize writes.
-        shutil.rmtree(clean / "runtime-cache")
-        go_runtime = env if args.allow_runtime_build else runtime_env
+        subprocess.run([str(binary)], cwd=clean, env=runtime_env, check=True)
+        # Repeat independent consumers; dynamic cache creation must serialize writes.
+        if args.go_dynamic: shutil.rmtree(clean / "runtime-cache")
+        go_runtime = runtime_env
         concurrent = [subprocess.Popen([str(binary)], cwd=clean, env=go_runtime) for _ in range(2)]
         if any(process.wait() != 0 for process in concurrent):
             raise SystemExit("Concurrent Go package cache initialization failed")
-        libraries = list((clean / "runtime-cache").rglob("libcui_bridge.so"))
-        if len(libraries) != 1:
-            raise SystemExit("Expected one verified Go cached bridge")
-        libraries[0].write_bytes(b"invalid cached library")
-        subprocess.run([str(binary)], cwd=clean, env=go_runtime, check=True)
+        if args.go_dynamic:
+            libraries = list((clean / "runtime-cache").rglob("libcui_bridge.so"))
+            if len(libraries) != 1:
+                raise SystemExit("Expected one verified Go cached bridge")
+            libraries[0].write_bytes(b"invalid cached library")
+            subprocess.run([str(binary)], cwd=clean, env=go_runtime, check=True)
         invalid_env = dict(go_runtime, CUI_BRIDGE_LIBRARY=str(clean / "missing-override.so"))
         failed = subprocess.run([str(binary)], cwd=clean, env=invalid_env, capture_output=True)
         if failed.returncode == 0 or b"missing-override.so" not in failed.stderr:

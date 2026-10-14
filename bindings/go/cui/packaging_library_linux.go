@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && cui_dynamic
 
 package cui
 

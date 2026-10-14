@@ -135,21 +135,33 @@ GOPROXY=file:///tmp/cui-go-artifacts GOSUMDB=off go build -o counter .
 
 This example renders a portable frame, sends a click and asserts the callback.
 The canonical module path describes this repository; these commands use a local
-proxy ZIP, not an unpublished registry/tag. The default artifact embeds a compiled
-Linux bridge into the Go executable, extracted into a verified private cache.
-It needs no CMake/compiler at runtime. Native system libraries remain required.
+proxy ZIP, not an unpublished registry/tag. The default artifact includes a tracked source SDK and separate C translation
+units. cgo compiles and statically links CUI at `go build`; the executable needs
+no checkout, CMake, compiler or extracted CUI library cache at runtime. Native
+system libraries remain required.
 
-To validate native rendering, build the Go artifact with `CUI_PACKAGE_NATIVE=1`
-in a different output directory, use that directory as `GOPROXY`, then run the
-example with `CUI_PACKAGE_SMOKE_BACKEND=sdl CUI_PACKAGE_SMOKE_FONT=/path/to/font.ttf`.
+To validate native rendering, build the consumer with `go build -tags cui_native`.
+This build requires SDL3 >=3.2, FreeType and HarfBuzz development packages through
+pkg-config. Run the smoke example with
+`CUI_PACKAGE_SMOKE_BACKEND=sdl CUI_PACKAGE_SMOKE_FONT=/path/to/font.ttf`.
 For an interactive application, see the [Go workspace UI](GO_BUILDERS.md).
+The portable default opens no window and reports a clear error if native options
+are requested without the native build tag.
 
-`--source-only` instead creates a module embedding SDK source. Its first App
-creation needs CMake and a C11 compiler; this is an alpha development fallback.
-A public build-time cgo/static or explicit artifact embedding release path is
-still needed for production Go distribution. Cache receipts validate source,
-backend, ABI, OS, architecture and library hashes; writes are locked and atomic.
-Existing explicit library overrides remain supported.
+`--source-only` remains an alias for the default source module. For optional
+embedded shared-library packaging, use `--prebuilt` and build the consumer with
+`-tags cui_dynamic`. That mode extracts its hashed bridge into a locked, atomic
+private cache, validating SDK/backend/ABI/OS/architecture receipts. Dynamic source
+fallback exists only under this explicit tag; it may require a runtime compiler
+if the artifact has no prebuilt library. Explicit `Library` and
+`CUI_BRIDGE_LIBRARY` overrides retain precedence in both modes. A process keeps
+one selected bridge, so switching between static and dynamic paths requires a
+new process.
+
+Go resolves this public repository directly; it needs no Go registry account.
+A repository commit or `@main` becomes fetchable when those files are published.
+The versioned `v0.1.0-alpha.1` tag used above remains a local artifact version;
+no command here assumes that public tag has been created.
 
 ## Rust: local crate and statically linked executable
 

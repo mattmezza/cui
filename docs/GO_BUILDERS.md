@@ -127,3 +127,17 @@ Settings contains up to eight `Item` pages, each with up to eight `Item` groups,
 VirtualList accepts up to 64 keyed `Item` rows with fixed 32-pixel height and an overscanned viewport. `VisualSize` sets its viewport, `Value` sets a vertical offset, and `App.Value` reads the live offset. `App.VirtualListItemBounds` returns bounds only for a visible row. Native wheel and keyboard scroll emit `OnChange` with the offset; disabling the list suppresses scrolling.
 
 The composed workspace example lives at `bindings/go/examples/workspace`. From `bindings/go`, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --headless` to validate native hit targets, Account/Preferences tab navigation, name editing, notifications checkbox, an older birthday, save dialog, and status update without opening a window. To use the SDL UI, run `CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`. Automated SDL runs on Linux must use invisible Xvfb, for example `xvfb-run -a env -u WAYLAND_DISPLAY CUI_BRIDGE_LIBRARY=/absolute/path/to/libcui_bridge.so go run ./examples/workspace --font /absolute/path/to/font.ttf`; native mode remains open until the user closes its window.
+
+## Packaged build-time CUI bridge
+
+The canonical module path is `github.com/mattmezza/cui/bindings/go`. Linux cgo
+builds compile separate CUI translation units from the tracked SDK and statically
+link the bridge by default. `go build -tags cui_native` adds SDL3, FreeType and
+HarfBuzz through pkg-config; portable builds open no window. A copied executable
+needs no CUI checkout or runtime compiler, while native system libraries and a
+font remain required.
+
+Explicit `Options.Library` or `CUI_BRIDGE_LIBRARY` still selects a shared bridge.
+The optional `cui_dynamic` build tag uses packaged shared-library discovery and
+its verified cache. See [local artifact install commands](PACKAGING.md) for
+source-only module ZIPs, optional prebuilt modules, and release/tag limitations.

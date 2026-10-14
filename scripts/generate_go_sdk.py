@@ -80,9 +80,25 @@ endforeach()
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--go-only", action="store_true")
     args = parser.parse_args()
     files = snapshot()
-    for SDK in SDKS:
+    wrappers = {}
+    sources = [name.strip() for name in files["CUI_SOURCES.cmake"].decode().splitlines()[2:-1]] + ["src/bridge/cui_bridge.c"]
+    for source in sources:
+        name = "z_cui_" + source.replace("/", "_").replace(".c", "") + ".c"
+        wrappers[name] = ('//go:build linux && !cui_dynamic\n\n/* Generated separate translation unit; do not edit. */\n#include "../sdk/source/' + source + '"\n').encode()
+    for source in ("src/text/cui_text.c", "backends/sdl3/cui_sdl3.c", "src/bridge/cui_bridge_sdl.c"):
+        name = "z_cui_native_" + source.replace("/", "_").replace(".c", "") + ".c"
+        wrappers[name] = ('//go:build linux && cui_native && !cui_dynamic\n\n/* Generated separate translation unit; do not edit. */\n#include "../sdk/source/' + source + '"\n').encode()
+    integration = ROOT / "bindings/go/cui"
+    extra = [path.name for path in integration.glob("z_cui_*.c") if path.name not in wrappers]
+    stale = [name for name, data in wrappers.items() if not (integration / name).is_file() or (integration / name).read_bytes() != data]
+    if extra or (args.check and stale):
+        raise SystemExit("Go translation units are stale: " + ", ".join(extra + stale))
+    if not args.check:
+        for name, data in wrappers.items(): (integration / name).write_bytes(data)
+    for SDK in SDKS[:1] if args.go_only else SDKS:
         if args.check:
             try:
                 receipt = json.loads((SDK.parent / "SOURCE_PROVENANCE.json").read_text())
@@ -109,7 +125,7 @@ def main():
                    "snapshot_manifest_sha256": hashlib.sha256(files["SOURCE_FILES.sha256"]).hexdigest()}
         (SDK.parent / "SOURCE_PROVENANCE.json").write_text(json.dumps(receipt, indent=2) + "\n")
         (SDK.parent / ".gitattributes").write_text("source/** -text\n")
-    if args.check: print("Go/Rust SDK source freshness and pinned checksums verified")
+    if args.check: print(("Go" if args.go_only else "Go/Rust") + " SDK source freshness and pinned checksums verified")
     else: print("Generated", len(files), "minimal SDK files per binding")
 
 if __name__ == "__main__":

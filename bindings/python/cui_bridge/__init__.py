@@ -311,7 +311,7 @@ class App:
         keys: set[str] = set()
         order: list[tuple[Widget, Widget | None, str]] = []
         def validate(node: Widget, parent: Widget | None, path: str, depth: int) -> None:
-            if depth > 128:
+            if depth >= 128:
                 raise ValueError("widget tree exceeds 128 levels")
             if id(node) in seen:
                 raise ValueError("widget tree contains a cycle or shared node")

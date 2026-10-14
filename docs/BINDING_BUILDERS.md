@@ -122,7 +122,9 @@ The language layer retains its tree; the bridge owns copied strings, stable IDs
 and button state and composes immediate CUI frames. Nodes belong to one app.
 Disposed or stale handles are rejected. Keep each app on one thread, explicitly
 release it, and drain its bounded event queue. Strings must be valid UTF-8 without
-embedded NUL, at most 4096 bytes. See the [C ABI guide](../bindings/bridge/docs/README.md)
+embedded NUL, at most 4096 bytes. Trees support up to 128 levels including their
+root; deeper construction is rejected before frame submission.
+See the [C ABI guide](../bindings/bridge/docs/README.md)
 and [public header](../include/cui/cui_bridge.h) for capacities and status codes.
 
 Go and Rust currently have [C-host examples](LANGUAGE_BINDINGS.md), whose UI

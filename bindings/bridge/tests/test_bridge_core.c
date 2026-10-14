@@ -101,5 +101,22 @@ int main(void) {
            CUI_BRIDGE_CAPACITY);
     assert(duplicate.slot == 73 && duplicate.generation == 91);
     cui_bridge_destroy(app);
+    options.max_nodes = 256;
+    app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node parent = {0};
+    for (unsigned depth = 0; depth < CUI_BRIDGE_MAX_DEPTH; depth++) {
+        char key[32];
+        snprintf(key, sizeof key, "level-%u", depth);
+        cui_bridge_node child;
+        assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_ROW, key, &child) == CUI_BRIDGE_OK);
+        parent = child;
+    }
+    duplicate = (cui_bridge_node){73, 91};
+    assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_ROW, "too-deep", &duplicate) ==
+           CUI_BRIDGE_CAPACITY);
+    assert(duplicate.slot == 73 && duplicate.generation == 91);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
     puts("bridge core ok");
 }

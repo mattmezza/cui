@@ -242,6 +242,10 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
             return CUI_BRIDGE_STALE_HANDLE;
         if (p->kind != CUI_BRIDGE_ROW && p->kind != CUI_BRIDGE_COLUMN)
             return CUI_BRIDGE_INVALID_STATE;
+        uint32_t depth = 1;
+        for (uint32_t ancestor = parent.slot; ancestor; ancestor = app->nodes[ancestor].parent)
+            if (++depth > CUI_BRIDGE_MAX_DEPTH)
+                return CUI_BRIDGE_CAPACITY;
     }
     size_t length = 0;
     if (!bridge_utf8(key_utf8, &length) || !length)

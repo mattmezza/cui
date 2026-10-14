@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #define CUI_BRIDGE_ABI_VERSION 1u
+#define CUI_BRIDGE_MAX_DEPTH 128u
 
 typedef struct cui_bridge_app cui_bridge_app;
 typedef struct {
@@ -123,7 +124,8 @@ CUI_BRIDGE_API void cui_bridge_destroy(cui_bridge_app *app);
 /* Zero parent creates the single root. Keys are copied, unique among live nodes;
  * stale handles never alias a replacement node within an app. Handle provenance
  * is app-scoped: callers must use each handle only with its creating app.
- * Mutations are rejected during step. */
+ * Mutations are rejected during step. Trees are limited to 128 levels including
+ * the root; deeper creation returns CAPACITY without changing the tree. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
                                                         cui_bridge_kind kind, const char *key_utf8,
                                                         cui_bridge_node *out_node);

@@ -142,6 +142,13 @@ struct cui_context {
     cui_id event_accepted_activations[CUI_CORE_DISPATCH_MAX];
     cui_id event_previous_focus[CUI_CORE_DISPATCH_MAX];
     size_t event_activation_slots[CUI_CORE_DISPATCH_MAX];
+    size_t event_origin[CUI_CORE_DISPATCH_MAX], release_down_origin[CUI_CORE_EVENT_MAX];
+    uint64_t release_slot_generation[CUI_CORE_EVENT_MAX], release_down_frame[CUI_CORE_EVENT_MAX];
+    uint64_t focus_generation, release_pending_frame;
+    cui_id release_pending_target;
+    uint64_t release_pending_generation;
+    size_t release_pending_origin;
+    bool release_pending, release_generation_exhausted;
     cui_activation_snapshot activation_snapshots[CUI_CORE_EVENT_MAX];
     cui_pointer_activation_sample capture_start;
     bool capture_start_valid;
@@ -1017,6 +1024,25 @@ static void cui_core_activate(cui_context *ui, cui_id id) {
     if (id && ui->activation_count < CUI_CORE_EVENT_MAX)
         ui->activations[ui->activation_count++] = id;
 }
+static void cui_core_set_focus(cui_context *ui, cui_id id) {
+    if (ui->focus == id)
+        return;
+    ui->focus = id;
+    ui->release_pending = false;
+    if (ui->focus_generation == UINT64_MAX)
+        ui->release_generation_exhausted = true;
+    else
+        ui->focus_generation++;
+}
+static bool cui_core_release_policy(const cui_context *ui, cui_id id) {
+    if (!id)
+        return false;
+    for (size_t n = 0; n < ui->previous_count; n++)
+        if (ui->previous[n].id == id)
+            return ui->previous[n].details.release_key_activation &&
+                   cui_core_focusable(&ui->previous[n]) && cui_core_previous_allowed(ui, n);
+    return false;
+}
 static void cui_core_tab(cui_context *ui, bool reverse) {
     size_t found = ui->previous_count;
     for (size_t i = 0; i < ui->previous_count; i++)
@@ -1030,7 +1056,7 @@ static void cui_core_tab(cui_context *ui, bool reverse) {
                                                           : (found + step) % ui->previous_count);
         if (cui_core_focusable(&ui->previous[i]) && ui->previous[i].tab_index >= 0 &&
             cui_core_previous_allowed(ui, i)) {
-            ui->focus = ui->previous[i].id;
+            cui_core_set_focus(ui, ui->previous[i].id);
             break;
         }
     }
@@ -1201,10 +1227,10 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 cui_core_previous_allowed(ui, i))
                 allowed = true;
         if (!allowed) {
-            ui->focus = 0;
+            cui_core_set_focus(ui, 0);
             for (size_t i = 0; i < ui->previous_count; i++)
                 if (cui_core_focusable(&ui->previous[i]) && cui_core_previous_allowed(ui, i)) {
-                    ui->focus = ui->previous[i].id;
+                    cui_core_set_focus(ui, ui->previous[i].id);
                     break;
                 }
         }
@@ -1218,8 +1244,11 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->queued_text_bytes = 0;
     ui->event_count = ui->queued_count;
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
+    for (size_t i = 0; i < ui->event_count; i++)
+        ui->event_origin[i] = i;
     ui->queued_count = 0;
     ui->activation_count = 0;
+    memset(ui->release_slot_generation, 0, sizeof ui->release_slot_generation);
     memset(ui->activation_snapshots, 0, sizeof ui->activation_snapshots);
     memset(ui->event_accepted_activations, 0, sizeof ui->event_accepted_activations);
     cui_id touch_cancellations[CUI_CORE_DISPATCH_MAX] = {0};
@@ -1257,12 +1286,15 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             if (ui->event_count < CUI_CORE_DISPATCH_MAX) {
                 size_t next = i + 1, remaining = ui->event_count - next;
                 memmove(ui->events + next + 1, ui->events + next, remaining * sizeof(*ui->events));
+                memmove(ui->event_origin + next + 1, ui->event_origin + next,
+                        remaining * sizeof(*ui->event_origin));
                 memmove(touch_cancellations + next + 1, touch_cancellations + next,
                         remaining * sizeof(*touch_cancellations));
                 ui->events[next] = (cui_event){.type = CUI_EVENT_CANCEL,
                                                .pointer_type = CUI_POINTER_TOUCH,
                                                .pointer_id = e.pointer_id,
                                                .pointer_device = e.pointer_device};
+                ui->event_origin[next] = SIZE_MAX;
                 touch_cancellations[next] = before_capture;
                 ui->event_count++;
             } else {
@@ -1289,7 +1321,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             }
             ui->event_targets[i] = e.accessibility_target;
             if (e.accessibility_action == CUI_ACCESSIBILITY_FOCUS) {
-                ui->focus = e.accessibility_target;
+                cui_core_set_focus(ui, e.accessibility_target);
                 ui->focus_visible = true;
             } else {
                 cui_core_activate(ui, e.accessibility_target);
@@ -1347,10 +1379,14 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         }
         if ((e.type == CUI_EVENT_KEY_DOWN || e.type == CUI_EVENT_KEY_UP) &&
             (e.ime_composing || e.prefer_character_input)) {
+            ui->release_pending = false;
             if (e.key == CUI_KEY_SPACE)
                 ui->space_capture = 0;
             continue;
         }
+        if (e.type == CUI_EVENT_KEY_DOWN && e.key != CUI_KEY_ENTER &&
+            e.key != CUI_KEY_SPACE)
+            ui->release_pending = false;
         if (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
             ui->previous_focus_scope_count) {
             size_t scope = ui->previous_focus_scope_count;
@@ -1394,7 +1430,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             }
             if (!blocked && !pointer_only) {
                 if (hit || ui->previous_top_modal == SIZE_MAX)
-                    ui->focus = target;
+                    cui_core_set_focus(ui, target);
                 ui->focus_visible = false;
             }
         } else if (e.type == CUI_EVENT_POINTER_UP && e.pointer_button == CUI_POINTER_PRIMARY) {
@@ -1410,10 +1446,44 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             if (ui->activation_count > before_activation)
                 cui_core_activation_evidence(ui, ui->activation_count - 1, e, true);
             cui_core_clear_capture(ui);
-        } else if (e.type == CUI_EVENT_CANCEL && !touch_cancellations[i]) {
-            cui_core_clear_capture(ui);
-            ui->space_capture = 0;
+        } else if (e.type == CUI_EVENT_CANCEL) {
+            if (!touch_cancellations[i]) {
+                cui_core_clear_capture(ui);
+                ui->space_capture = 0;
+            }
+            ui->release_pending = false;
+        } else if ((e.type == CUI_EVENT_KEY_UP ||
+                    (e.type == CUI_EVENT_KEY_DOWN &&
+                     (e.key == CUI_KEY_ENTER || e.key == CUI_KEY_SPACE))) &&
+                   cui_core_release_policy(ui, ui->focus)) {
+            bool activation_key = e.key == CUI_KEY_ENTER || e.key == CUI_KEY_SPACE;
+            bool qualifying = activation_key && !e.modifiers &&
+                              !ui->release_generation_exhausted;
+            if (e.type == CUI_EVENT_KEY_DOWN) {
+                ui->release_pending = qualifying;
+                if (qualifying) {
+                    ui->release_pending_target = ui->focus;
+                    ui->release_pending_generation = ui->focus_generation;
+                    ui->release_pending_origin = ui->event_origin[i];
+                    ui->release_pending_frame = ui->frame_sequence == UINT64_MAX
+                                                     ? 1 : ui->frame_sequence + 1;
+                }
+            } else {
+                if (qualifying && ui->release_pending &&
+                    ui->release_pending_target == ui->focus &&
+                    ui->release_pending_generation == ui->focus_generation) {
+                    cui_core_activate(ui, ui->focus);
+                    if (ui->activation_count > before_activation) {
+                        size_t slot = ui->activation_count - 1;
+                        ui->release_down_origin[slot] = ui->release_pending_origin;
+                        ui->release_down_frame[slot] = ui->release_pending_frame;
+                        ui->release_slot_generation[slot] = ui->focus_generation;
+                    }
+                }
+                ui->release_pending = false;
+            }
         } else if (e.type == CUI_EVENT_KEY_DOWN && !e.repeat) {
+            ui->release_pending = false;
             if (e.key == CUI_KEY_TAB) {
                 bool handled = false;
                 if (!(e.modifiers & (CUI_MOD_CTRL | CUI_MOD_META)))
@@ -1435,6 +1505,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 ui->space_capture = 0;
             }
         } else if (e.type == CUI_EVENT_KEY_UP && e.key == CUI_KEY_SPACE) {
+            ui->release_pending = false;
             if (ui->space_capture == ui->focus)
                 cui_core_activate(ui, ui->focus);
             ui->space_capture = 0;
@@ -1457,6 +1528,9 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         cui_event event = ui->events[previous];
         ui->events[previous] = ui->events[i];
         ui->events[i] = event;
+        size_t origin = ui->event_origin[previous];
+        ui->event_origin[previous] = ui->event_origin[i];
+        ui->event_origin[i] = origin;
         cui_id target = ui->event_targets[previous];
         ui->event_targets[previous] = ui->event_targets[i];
         ui->event_targets[i] = target;
@@ -2242,7 +2316,7 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
                     ui->event_targets[e] = 0;
                     break;
                 }
-            ui->focus = restored;
+            cui_core_set_focus(ui, restored);
         }
         if (ui->capture == id)
             cui_core_clear_capture(ui);
@@ -2259,7 +2333,9 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
     }
     for (size_t i = 0; i < ui->activation_count; i++)
         if (ui->activations[i] == id) {
-            bool allowed = !disabled;
+            bool allowed = !disabled &&
+                           (!ui->release_slot_generation[i] ||
+                            ui->release_slot_generation[i] == ui->focus_generation);
             for (size_t e = 0; e < ui->event_count; e++)
                 if (ui->events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION &&
                     ui->event_activation_slots[e] == i) {
@@ -3166,7 +3242,7 @@ cui_core_commands_done:
         if (!allowed) {
             if (ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS &&
                 ui->focus == ui->events[e].accessibility_target)
-                ui->focus = ui->event_previous_focus[e];
+                cui_core_set_focus(ui, ui->event_previous_focus[e]);
             size_t slot = ui->event_activation_slots[e];
             if (slot < ui->activation_count)
                 ui->activations[slot] = 0;
@@ -3227,7 +3303,7 @@ cui_core_commands_done:
         s->focused = s->id == ui->focus && !s->disabled;
     }
     if (!retained)
-        ui->focus = 0;
+        cui_core_set_focus(ui, 0);
     if (ui->top_modal != SIZE_MAX) {
         bool allowed = false;
         for (size_t i = 0; i < ui->semantic_count; i++)
@@ -3235,12 +3311,12 @@ cui_core_commands_done:
                 cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal))
                 allowed = true;
         if (!allowed) {
-            ui->focus = 0;
+            cui_core_set_focus(ui, 0);
             for (size_t i = 0; i < ui->semantic_count; i++)
                 if (cui_core_focusable(&ui->semantics[i]) &&
                     cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
                                             ui->top_modal)) {
-                    ui->focus = ui->semantics[i].id;
+                    cui_core_set_focus(ui, ui->semantics[i].id);
                     ui->focus_visible = true;
                     ui->dirty = true;
                     break;
@@ -3329,7 +3405,7 @@ void cui_focus(cui_context *ui, cui_id id) {
                 ui->text_input_state.owner = 0;
             }
         }
-        ui->focus = id;
+        cui_core_set_focus(ui, id);
         ui->focus_visible = true;
         ui->dirty = true;
     }
@@ -3481,6 +3557,10 @@ cui_id cui_event_accepted_activation(const cui_context *ui, size_t index) {
     if (!cui_frame_sequence(ui) || index >= ui->event_count || ui->error != CUI_OK)
         return 0;
     cui_id id = ui->event_accepted_activations[index];
+    size_t slot = ui->event_activation_slots[index];
+    if (slot < ui->activation_count && ui->release_slot_generation[slot] &&
+        ui->release_slot_generation[slot] != ui->focus_generation)
+        return 0;
     for (size_t n = 0; id && n < ui->semantic_count; n++) {
         const cui_semantic *s = &ui->semantics[n];
         if (s->id != id || s->disabled)
@@ -3518,12 +3598,39 @@ bool cui_event_activation_snapshot(const cui_context *ui, size_t index,
 bool cui_event_consumed(cui_context *ui, size_t index) {
     return ui && index < ui->event_count && ui->event_consumed[index];
 }
+static void cui_core_invalidate_release_origin(cui_context *ui, size_t index) {
+    size_t origin = ui->event_origin[index];
+    if (origin == SIZE_MAX)
+        return;
+    if (ui->release_pending && ui->release_pending_frame == ui->frame_sequence &&
+        ui->release_pending_origin == origin)
+        ui->release_pending = false;
+    for (size_t slot = 0; slot < ui->activation_count; slot++) {
+        if (!ui->release_slot_generation[slot] ||
+            ui->release_down_frame[slot] != ui->frame_sequence ||
+            ui->release_down_origin[slot] != origin)
+            continue;
+        ui->activations[slot] = 0;
+        for (size_t e = 0; e < ui->event_count; e++)
+            if (ui->event_activation_slots[e] == slot) {
+                ui->event_activations[e] = 0;
+                ui->event_accepted_activations[e] = 0;
+            }
+    }
+}
 bool cui_consume_event(cui_context *ui, size_t index) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui || !ui->in_frame || cui_core_inert(ui) || index >= ui->event_count)
         return false;
     ui->event_consumed[index] = true;
+    cui_core_invalidate_release_origin(ui, index);
+    size_t release_slot = ui->event_activation_slots[index];
+    if (release_slot < ui->activation_count && ui->release_slot_generation[release_slot]) {
+        ui->activations[release_slot] = 0;
+        ui->event_activations[index] = 0;
+        ui->event_accepted_activations[index] = 0;
+    }
     if (ui->events[index].type == CUI_EVENT_ACCESSIBILITY_ACTION) {
         (void)cui_cancel_event_activation(ui, index);
         ui->event_activations[index] = 0;
@@ -3539,6 +3646,7 @@ bool cui_cancel_event_activation(cui_context *ui, size_t index) {
     if (slot >= ui->activation_count || !ui->activations[slot])
         return false;
     ui->activations[slot] = 0;
+    cui_core_invalidate_release_origin(ui, index);
     ui->event_activations[index] = 0;
     return true;
 }
@@ -3750,12 +3858,12 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
         return false;
     for (size_t i = 0; i < ui->previous_count; i++)
         if (ui->previous[i].id == trigger && cui_core_focusable(&ui->previous[i])) {
-            ui->focus = trigger;
+            cui_core_set_focus(ui, trigger);
             ui->focus_visible = true;
             ui->dirty = true;
             return true;
         }
-    ui->focus = 0;
+    cui_core_set_focus(ui, 0);
     return false;
 }
 

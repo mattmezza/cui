@@ -294,6 +294,10 @@ typedef struct {
     /* Internal frame registration; use set_text_input_config instead. */
     bool text_input_configured;
     cui_text_input_config text_input_config;
+    /* Opt into unmodified Enter/Space release activation. A qualifying key down
+     * latches the current focus generation; either activation-key up may fire.
+     * Zero preserves the existing Enter-down and Space-up behavior. */
+    bool release_key_activation;
 } cui_semantic_details;
 typedef struct {
     cui_id id;

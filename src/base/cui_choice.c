@@ -307,8 +307,17 @@ static bool cui_tab_drag_event(cui_context *ui, const cui_choice_item *items, si
     cui_invalidate(ui);
     return true;
 }
+bool cui_tabs_shadow_policy_valid(cui_tabs_options options) {
+    return options.shadow_policy >= CUI_TAB_SHADOW_LEGACY &&
+           options.shadow_policy <= CUI_TAB_SHADOW_SOURCE_BAR &&
+           !(options.variant == CUI_TAB_SEGMENTED &&
+             options.shadow_policy == CUI_TAB_SHADOW_SOURCE_BAR &&
+             (!options.animation || options.vertical));
+}
 bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
                    cui_tabs_options options) {
+    if (!cui_tabs_shadow_policy_valid(options))
+        return false;
     if (!count && options.overflow) {
         options.overflow->visible = false;
         if (options.overflow->menu.overlay.open)

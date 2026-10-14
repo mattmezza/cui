@@ -307,7 +307,11 @@ typedef struct {
     bool disabled, checked, focused;
     float value;
     cui_semantic_details details;
-    int tab_index; /* 0: Tab stop; -1: pointer/programmatic focus only. */
+    int tab_index; /* Legacy negative values exclude Tab; set_tab_index opts into signed order. */
+    bool tab_ordered, tab_stop_disabled;
+    /* Frame-owned lexicographic group prefix; applications use begin/end_tab_group. */
+    int tab_path[32];
+    size_t tab_path_count;
 } cui_semantic;
 typedef struct {
     bool hovered, pressed, focused, focus_visible, activated;
@@ -699,6 +703,11 @@ void cui_update_semantic(cui_context *ui, cui_id id, bool checked, float value);
 bool cui_set_semantic_role(cui_context *, cui_id, cui_role);
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details);
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled);
+/* Signed source ordering, independent of Tab eligibility. Last setter wins. */
+void cui_set_tab_index(cui_context *ui, cui_id id, int index);
+/* Up to 32 nested groups. Failure leaves the group stack unchanged. */
+bool cui_begin_tab_group(cui_context *ui, int index);
+void cui_end_tab_group(cui_context *ui);
 /* Target resolved in input order against previous frame regions. */
 cui_id cui_event_target(cui_context *ui, size_t index);
 /* Defer an unconsumed scroll event currently routed to from_id to an eligible

@@ -95,6 +95,8 @@ typedef struct {
     size_t color_count;
 } cui_core_text_source;
 struct cui_context {
+    int tab_path[32];
+    size_t tab_depth;
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
         previous_focus_scopes[CUI_CORE_STACK_MAX];
     size_t focus_stack[CUI_CORE_STACK_MAX], focus_depth, focus_scope_count,
@@ -1055,23 +1057,42 @@ static bool cui_core_release_current_allowed(const cui_context *ui, size_t index
                    cui_core_focusable(&ui->previous[n]) && cui_core_previous_allowed(ui, n);
     return false;
 }
+static bool cui_core_tab_stop(const cui_semantic *s) {
+    return !s->tab_stop_disabled && (s->tab_ordered || s->tab_index >= 0);
+}
+/* GPUI TabStopNode orders signed group-prefix + leaf, then submission. */
+static int cui_core_tab_compare(const cui_semantic *a, size_t ai,
+                                const cui_semantic *b, size_t bi) {
+    size_t an = a->tab_path_count + 1, bn = b->tab_path_count + 1;
+    for (size_t n = 0; n < an && n < bn; ++n) {
+        int av = n < a->tab_path_count ? a->tab_path[n] : a->tab_index;
+        int bv = n < b->tab_path_count ? b->tab_path[n] : b->tab_index;
+        if (av != bv) return av < bv ? -1 : 1;
+    }
+    if (an != bn) return an < bn ? -1 : 1;
+    return ai == bi ? 0 : ai < bi ? -1 : 1;
+}
 static void cui_core_tab(cui_context *ui, bool reverse) {
-    size_t found = ui->previous_count;
-    for (size_t i = 0; i < ui->previous_count; i++)
-        if (ui->previous[i].id == ui->focus)
-            found = i;
-    for (size_t step = 1; step <= ui->previous_count; step++) {
-        size_t i = reverse ? (found == ui->previous_count
-                                  ? ui->previous_count - step
-                                  : (found + ui->previous_count - step) % ui->previous_count)
-                           : (found == ui->previous_count ? step - 1
-                                                          : (found + step) % ui->previous_count);
-        if (cui_core_focusable(&ui->previous[i]) && ui->previous[i].tab_index >= 0 &&
-            cui_core_previous_allowed(ui, i)) {
-            cui_core_set_focus(ui, ui->previous[i].id);
-            break;
+    size_t found = SIZE_MAX, next = SIZE_MAX, wrap = SIZE_MAX;
+    for (size_t i = 0; i < ui->previous_count; ++i)
+        if (ui->previous[i].id == ui->focus) found = i;
+    for (size_t i = 0; i < ui->previous_count; ++i) {
+        const cui_semantic *s = &ui->previous[i];
+        if (!cui_core_focusable(s) || !cui_core_tab_stop(s) ||
+            !cui_core_previous_allowed(ui, i)) continue;
+        if (wrap == SIZE_MAX || (reverse ? cui_core_tab_compare(s, i, &ui->previous[wrap], wrap) > 0
+                                        : cui_core_tab_compare(s, i, &ui->previous[wrap], wrap) < 0))
+            wrap = i;
+        if (found != SIZE_MAX) {
+            int order = cui_core_tab_compare(s, i, &ui->previous[found], found);
+            if ((reverse ? order < 0 : order > 0) &&
+                (next == SIZE_MAX || (reverse ? cui_core_tab_compare(s, i, &ui->previous[next], next) > 0
+                                             : cui_core_tab_compare(s, i, &ui->previous[next], next) < 0)))
+                next = i;
         }
     }
+    if (next == SIZE_MAX) next = wrap;
+    if (next != SIZE_MAX) cui_core_set_focus(ui, ui->previous[next].id);
     ui->focus_visible = true;
 }
 static bool cui_core_accessibility_activate(const cui_semantic *s) {
@@ -1572,6 +1593,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->prepaint_capacity = false;
     ui->overflow_depth = 0;
     ui->focus_depth = ui->focus_scope_count = 0;
+    ui->tab_depth = 0;
     ui->top_modal = SIZE_MAX;
     ui->semantic_count = ui->id_count = ui->element_count = ui->scope_count = ui->depth =
         ui->string_used = 0;
@@ -2384,6 +2406,9 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
                                                          .checked = checked,
                                                          .focused = out.focused,
                                                          .value = value};
+    cui_semantic *tab = &ui->semantics[ui->semantic_count - 1];
+    tab->tab_path_count = ui->tab_depth;
+    memcpy(tab->tab_path, ui->tab_path, ui->tab_depth * sizeof(*ui->tab_path));
     return out;
 }
 static cui_color cui_core_color(Clay_Color c) {
@@ -3825,11 +3850,10 @@ bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
             start = i;
     if (start == SIZE_MAX)
         return false;
-    for (size_t step = 1; step <= ui->semantic_count; ++step) {
-        size_t i = forward ? (start + step) % ui->semantic_count
-                           : (start + ui->semantic_count - step) % ui->semantic_count;
+    size_t next = SIZE_MAX, wrap = SIZE_MAX;
+    for (size_t i = 0; i < ui->semantic_count; ++i) {
         cui_semantic *candidate = &ui->semantics[i];
-        if (!cui_core_focusable(candidate) || candidate->tab_index < 0 ||
+        if (!cui_core_focusable(candidate) || !cui_core_tab_stop(candidate) ||
             !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], owner) ||
             !cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal))
             continue;
@@ -3844,9 +3868,15 @@ bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
                 active = false;
         if (!active)
             continue;
-        cui_focus(ui, candidate->id);
-        return true;
+        if (wrap == SIZE_MAX || (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) < 0
+                                         : cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) > 0)) wrap = i;
+        int order = cui_core_tab_compare(candidate, i, &ui->semantics[start], start);
+        if ((forward ? order > 0 : order < 0) &&
+            (next == SIZE_MAX || (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[next], next) < 0
+                                          : cui_core_tab_compare(candidate, i, &ui->semantics[next], next) > 0))) next = i;
     }
+    if (next == SIZE_MAX) next = wrap;
+    if (next != SIZE_MAX) { cui_focus(ui, ui->semantics[next].id); return true; }
     return false;
 }
 
@@ -3987,9 +4017,29 @@ void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
         return;
     for (size_t i = 0; i < ui->semantic_count; i++)
         if (ui->semantics[i].id == id) {
-            ui->semantics[i].tab_index = enabled ? 0 : -1;
+            ui->semantics[i].tab_stop_disabled = !enabled;
+            if (!ui->semantics[i].tab_ordered)
+                ui->semantics[i].tab_index = enabled ? 0 : -1;
             return;
         }
+}
+
+void cui_set_tab_index(cui_context *ui, cui_id id, int index) {
+    if (!cui_core_mutation(ui) || !cui_core_active(ui)) return;
+    for (size_t i = 0; i < ui->semantic_count; ++i)
+        if (ui->semantics[i].id == id) {
+            ui->semantics[i].tab_index = index;
+            ui->semantics[i].tab_ordered = true;
+            return;
+        }
+}
+bool cui_begin_tab_group(cui_context *ui, int index) {
+    if (!cui_core_mutation(ui) || !cui_core_active(ui) || ui->tab_depth == 32) return false;
+    ui->tab_path[ui->tab_depth++] = index;
+    return true;
+}
+void cui_end_tab_group(cui_context *ui) {
+    if (cui_core_mutation(ui) && cui_core_active(ui) && ui->tab_depth) --ui->tab_depth;
 }
 
 bool cui_pressed(cui_context *ui, cui_id id) {

@@ -21,6 +21,10 @@ typedef struct {
 typedef void (*cui_button_group_change_fn)(void *, const cui_button_group_request *);
 typedef void (*cui_button_group_child_click_fn)(void *);
 typedef void (*cui_button_group_child_event_fn)(void *, cui_context *, size_t event_index);
+/* Preparation hook, before legacy/post-legacy notifications. Snapshot is borrowed
+ * for this call and can be copied. Excluded from result.callbacks. */
+typedef void (*cui_button_group_child_snapshot_fn)(void *, cui_context *,
+                                                   const cui_activation_snapshot *);
 typedef struct {
     cui_id id;
     cui_str label;
@@ -31,6 +35,8 @@ typedef struct {
     void *action_user;
     cui_button_group_child_event_fn on_click_event; /* After legacy; on_change overrides both. */
     void *event_user;
+    cui_button_group_child_snapshot_fn
+        prepare_click_event; /* on_change overrides all child hooks. */
 } cui_button_group_item;
 typedef struct {
     bool multiple, disabled, vertical;
@@ -191,6 +197,11 @@ cui_button_group_result cui_base_button_group_end(cui_context *ui, cui_button_gr
             continue;
         ++result.accepted_activations;
         if (!w->options.on_change) {
+            if (index != SIZE_MAX && w->items[index].prepare_click_event) {
+                cui_activation_snapshot snapshot;
+                if (cui_event_activation_snapshot(ui, e, &snapshot))
+                    w->items[index].prepare_click_event(w->items[index].event_user, ui, &snapshot);
+            }
             if (index != SIZE_MAX && w->items[index].on_click) {
                 w->items[index].on_click(w->items[index].action_user);
                 ++result.callbacks;

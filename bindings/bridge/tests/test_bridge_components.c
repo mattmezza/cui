@@ -12,7 +12,36 @@ static void press(cui_bridge_app *app, cui_bridge_node node) {
     assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
 }
+static void test_nested_group_stack(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+        .abi_version = CUI_BRIDGE_ABI_VERSION, .backend = CUI_BRIDGE_BACKEND_NONE,
+        .width = 600, .height = 400, .max_nodes = 256};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node parent = {0}, root = {0};
+    assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    parent = root;
+    /* Each selected Item renders another Tabs group through its panel callback. */
+    for (unsigned i = 0; i < 16; ++i) {
+        cui_bridge_node tabs = {0}, item = {0};
+        char tab_key[32], item_key[32];
+        snprintf(tab_key, sizeof tab_key, "tabs-%u", i);
+        snprintf(item_key, sizeof item_key, "item-%u", i);
+        assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_TABS, tab_key, &tabs) == CUI_BRIDGE_OK);
+        assert(cui_bridge_node_create(app, tabs, CUI_BRIDGE_ITEM, item_key, &item) == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(app, item, "Nested") == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_selected(app, tabs, item) == CUI_BRIDGE_OK);
+        parent = item;
+    }
+    cui_bridge_node leaf = {0};
+    assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_LABEL, "leaf", &leaf) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, leaf, "End") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
 int main(void) {
+    test_nested_group_stack();
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
                             .backend = CUI_BRIDGE_BACKEND_NONE,

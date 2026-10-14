@@ -1,0 +1,11 @@
+[build-system]
+requires = []
+build-backend = "wheel_backend"
+backend-path = ["packaging"]
+
+[project]
+name = "cui-bridge"
+version = "0.1.0a1"
+description = "Alpha CUI retained builders over the portable C bridge"
+requires-python = ">=3.10"
+license = "MIT"

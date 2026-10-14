@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 const path = require('node:path');
-const native = require(process.env.CUI_NODE_ADDON || path.resolve(__dirname, '../../build-node/cui.node'));
+const fs = require('node:fs');
+const packaged = path.join(__dirname, 'native', 'cui.node');
+const sourceArtifact = fs.existsSync(path.join(__dirname, '_source'));
+const addonPath = process.env.CUI_NODE_ADDON || (fs.existsSync(packaged) || sourceArtifact
+  ? packaged : path.resolve(__dirname, '../../build-node/cui.node'));
+const native = require(addonPath);
 const NODE = Symbol('CUI node');
 let nextKey = 1;
 const disabledKinds = new Set([4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23,28,29,40,41,42,43,44,48,54,55,56,57,58,59,60,61,65,66,67,68,69,71,73,74,75,77,78,79]);

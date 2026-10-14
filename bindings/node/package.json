@@ -1,1 +1,30 @@
-{"name":"@cui/native","version":"0.1.0","private":true,"description":"Native CUI JavaScript binding","main":"index.cjs","types":"../typescript/index.d.ts","scripts":{"test":"node --expose-gc test/binding.test.cjs"},"engines":{"node":">=18"}}
+{
+  "name": "@cui/native",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Alpha CUI native builders; tested subset, not full binding parity",
+  "main": "index.cjs",
+  "types": "index.d.cts",
+  "scripts": {
+    "test": "node --expose-gc test/binding.test.cjs",
+    "install": "node packaging/install.cjs",
+    "build": "node packaging/install.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "files": [
+    "index.cjs",
+    "index.d.cts",
+    "types",
+    "addon.c",
+    "packaging",
+    "_source",
+    "LICENSE",
+    "README.md"
+  ],
+  "os": [
+    "linux"
+  ]
+}

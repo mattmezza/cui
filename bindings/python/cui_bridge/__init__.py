@@ -80,7 +80,12 @@ class _API:
         if path is None:
             path = os.environ.get("CUI_BRIDGE_LIBRARY")
         if not path:
-            raise FileNotFoundError("Pass library= or set CUI_BRIDGE_LIBRARY to libcui_bridge.so")
+            bundled = Path(__file__).resolve().parent / "_native" / "libcui_bridge.so"
+            if bundled.is_file():
+                path = bundled
+            else:
+                raise FileNotFoundError("CUI packaged bridge is missing; install a built wheel, "
+                                        "pass library=, or set CUI_BRIDGE_LIBRARY")
         self.lib = C.CDLL(os.fspath(path))
         lib = self.lib
         def bind(name: str, restype, *argtypes):

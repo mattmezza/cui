@@ -6,9 +6,24 @@ color spans. `cui_label_source` copies those bytes into Core frame storage.
 Initialize options to zero and provide `primary`. `has_secondary` adds exactly
 one ASCII space even if either string is empty. Secondary text and its preceding
 space use theme muted foreground. Matches override either foreground with theme
-info (the semantic blue). `custom_color` changes primary foreground. Font size,
+info (the semantic blue). `custom_color` changes primary foreground. A supplied
+`color` is inert unless `custom_color` is true; zero initialization uses theme text.
+Caller-selected error presentation uses `custom_color = true` and `color = theme.danger`.
+Secondary text stays muted and matches override either foreground, including
+matches that cross the primary/secondary separator. Masked bullets use the selected
+base foreground uniformly and never emit secondary/highlight spans. Font size,
 weight, italic, monospace and family are forwarded; line height defaults to
 20 logical pixels, matching the source's 1.25rem at its 16px root size.
+
+The frozen `crates/component/src/label.rs:53-59,61-91,192-215` has no disabled or
+error state flags; it accepts inherited Styled text color. Its website error
+example (`website/component/label.md:231-233`) selects `theme.destructive` through
+`.text_color(...)`. C's caller color option covers that presentation rather than
+adding an invented validation/disabled API. Required/optional markers likewise
+remain ordinary secondary text. `test_label_source` checks prepared spans and real
+Core draw commands for default and caller error foregrounds, muted secondary text,
+a Unicode highlight crossing the separator, alpha preservation, default theme font
+and 20px line metrics, and masked display/semantic privacy with a custom color.
 
 Matching uses Unicode 17.0.0 default, locale-independent lowercase, including
 one-to-many mappings and contextual Greek final sigma. Full matching finds all
@@ -52,13 +67,17 @@ space is enabled. The additive Core paragraph API supplies that available-width
 behavior without relying on previous-frame label bounds. The prior single-line
 and hard-separator rejection restrictions are removed.
 
-Exact remaining differences are explicit: Core's pinned Clay WORDS policy breaks
-at ASCII spaces, includes trailing spaces when deciding whether a word fits, and
-lets overlong tokens overflow. GPUI also has Unicode break candidates and fallback
-wrapping within long tokens. This implementation does not claim those wider
-line-breaking semantics, arbitrary GPUI style refinement, or complete Label family
-parity. Root-relative rem scaling must be supplied through line_height when the
-application's root size differs from 16. The legacy wrapper remains unchanged.
+Core now uses the pinned measured wrapping candidates, including punctuation,
+Unicode word ranges and fallback inside long tokens. Trailing spaces remain in
+the preceding visual row. Unicode 17 graphemes and provider shaping clusters
+are kept intact during fallback; this deliberately strengthens the source's
+individual-glyph fallback. See [the wrapping contract](UNICODE_WRAP.md) for the
+exact policy, resource limits and measurement-only host limitations.
+`alignment` supports physical left (default), center and right per visual row,
+using current-frame available width. See [the alignment contract](TEXT_ALIGNMENT.md).
+Arbitrary GPUI style refinement remains incomplete. Root-relative rem scaling
+must be supplied through line_height when the application's root size differs
+from 16. The legacy wrapper remains unchanged.
 
 The general `cui_text_paragraph_colored` Core API validates all UTF-8 and full-text
 color spans before publication. Invalid input and conservative storage/element

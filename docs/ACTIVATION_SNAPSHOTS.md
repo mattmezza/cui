@@ -22,6 +22,11 @@ Keyboard evidence contains the previous rendered clipped routing rectangle, even
 
 False leaves the output untouched. The query refuses unaccepted/cancelled events, current disabled/modal/accessibility rejection, invalid indices, null output, Core errors, inert/layout-only ancestry, measurement/prepaint and calls outside a frame. Accessibility consumption can invalidate a subsequent query; copy evidence before callbacks that may consume it. A returned value contains no pointers and survives later frames or context destruction. Frame sequence and event index identify only this context/frame, not recreated contexts or sequence wrap.
 
-This API preserves existing Enter-down, Space-up, focus and consumption behavior. Reference activation-key-up generation policy, signed tab paths, capture/bubble propagation and Button callback forwarding remain separate slices. See `validation/button-event-contract-next33.md` for the source audit.
+The default retains Enter-down, Space-up, focus and consumption behavior.
+Core now also supports opt-in activation on key release; see
+[the bounded release-key policy](validation/release-key-activation-sol6.md).
+Button forwards copied evidence before callbacks; see
+[Button click evidence](BUTTON_CLICK_EVIDENCE.md). Signed tab paths and
+capture/bubble propagation remain separate unfinished capabilities.
 
 Standalone Core-only headless tests cover multiple clicks, cross-frame pen capture and leave/enter, raw counts/modifiers/device, unmatched releases, cancellation, previous rendered keyboard bounds, modal/disabled/accessibility rejection, phase guards, output preservation, retained-copy lifetime and synthesized touch event reordering. Native strict C11 and ASan/UBSan/leak checks pass. Actual Zig0.16/Wasmtime49 reports136-byte snapshots and40-byte pointer samples, matching this native host; these are receipts rather than cross-platform ABI requirements. Portable full CTest148/148 passes; the final expanded fixture was rerun separately. WASI assertions remain enabled.

@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[2]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--chromium');p.add_argument('--output',type=Path,required=True);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True);wasm=a.output/'notification.wasm'
     exports=['notification_source_motion_scene','notification_source_motion_bound','notification_shadow_type','notification_shadow_value','notification_shadow_paint','notification_shadow_palette','cui_canvas_shadow_values','cui_canvas_shadow_query','cui_canvas_shadow_prepare','cui_canvas_shadow_width','cui_canvas_shadow_height','cui_canvas_shadow_layer_bound','cui_canvas_shadow_bound','cui_canvas_shadow_pixels']
-    sources=[str(x) for x in (ROOT/'src').rglob('*.c') if 'text' not in x.relative_to(ROOT/'src').parts]+[str(ROOT/'web/modules/cui_shadow_bridge.c'),str(ROOT/'tests/web/notification_source_motion_probe.c')]
+    sources=[str(x) for x in (ROOT/'src').rglob('*.c') if x.relative_to(ROOT/'src').parts[0] in ('core', 'base', 'components', 'theme', 'effects')]+[str(ROOT/'web/modules/cui_shadow_bridge.c'),str(ROOT/'tests/web/notification_source_motion_probe.c')]
     assert subprocess.check_output(['zig','version'],text=True).strip()=='0.16.0'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-UNDEBUG','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*sources,'-lm',*[f'-Wl,--export={x}' for x in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:

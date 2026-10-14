@@ -40,6 +40,9 @@ The integrator registers these two unique test targets in CMake.
 `tests/web/test_release_key_core.py` builds the Core-only reactor with pinned
 Zig 0.16 and drives real browser keydown/keyup events through Chromium 1208.
 The portable standalone fixture also passed under Wasmtime 49 with 80 billion
-fuel and under native ASan/UBSan/leak checks. Full native CTest under invisible
-Xvfb passed 171/172; the distribution freshness check fails until the
-integrator regenerates `dist/cui.h`. Hardware GPU validation is deferred.
+fuel and under native ASan/UBSan/leak checks. The integrated strict warning build now passes 187/187 CTests under invisible
+Xvfb, including registered release-key and overflow regressions; generated
+distribution headers are current. The portable WASI matrix passes 146/146,
+and instrumented C suites pass 159/159. See
+[next integration receipt](next35-bindings-integration.txt). Hardware GPU
+validation is deferred.

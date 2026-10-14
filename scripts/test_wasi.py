@@ -224,6 +224,8 @@ def main() -> int:
                     (["src/core/cui.c"] if name == "pointer_presence" else []),
                     name != "pointer_presence",
                     virtual_clock if name == "virtual" else []) for name in SUITES]
+        targets += [("release_key_activation", ["tests/unit/test_release_key_activation.c", "src/core/cui.c"], False, [])]
+        targets += [("release_key_overflow", ["tests/unit/test_release_key_overflow.c"], False, [])]
         targets += [("prepaint_parts_core_only", ["tests/unit/test_prepaint_parts.c"], False, [])]
         targets += [("layout_only_clips_core_only", ["tests/unit/test_layout_only_clips.c", "src/core/cui.c"], False, [])]
         targets += [("accepted_activation_core_only", ["tests/unit/test_accepted_activation.c", "src/core/cui.c"], False, [])]

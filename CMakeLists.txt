@@ -906,3 +906,8 @@ foreach(probe release_key_activation release_key_overflow)
  add_test(NAME ${probe}_core_only COMMAND test_${probe})
  set_tests_properties(${probe}_core_only PROPERTIES TIMEOUT 60)
 endforeach()
+
+add_executable(test_svg_transform_validation tests/unit/test_svg_transform_validation.c)
+target_link_libraries(test_svg_transform_validation PRIVATE cui)
+cui_warnings(test_svg_transform_validation)
+add_test(NAME svg_transform_validation COMMAND test_svg_transform_validation)

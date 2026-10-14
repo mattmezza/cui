@@ -9,72 +9,101 @@ use regex_automata::{
     util::syntax,
 };
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst};
-static TRACK: AtomicBool = AtomicBool::new(false);
-static CALLS: AtomicUsize = AtomicUsize::new(0);
-static FAIL: AtomicUsize = AtomicUsize::new(0);
-static LIVE: AtomicUsize = AtomicUsize::new(0);
+use std::cell::Cell;
+
+// The global allocator runs on every test-harness thread. Keep the allocation
+// oracle and injected failure position local to the thread executing this test.
+#[derive(Clone, Copy)]
+struct AllocationProbe {
+    tracking: bool,
+    calls: usize,
+    fail: usize,
+    live: isize,
+}
+thread_local! {
+    static PROBE: Cell<AllocationProbe> = const { Cell::new(AllocationProbe {
+        tracking: false, calls: 0, fail: 0, live: 0,
+    }) };
+}
+fn attempted_allocation() -> bool {
+    PROBE
+        .try_with(|probe| {
+            let mut state = probe.get();
+            if !state.tracking {
+                return false;
+            }
+            state.calls += 1;
+            probe.set(state);
+            state.fail == state.calls
+        })
+        .unwrap_or(false)
+}
+fn change_live(delta: isize) {
+    let _ = PROBE.try_with(|probe| {
+        let mut state = probe.get();
+        state.live += delta;
+        probe.set(state);
+    });
+}
+fn live() -> isize {
+    PROBE.with(|probe| probe.get().live)
+}
 struct Spy;
 unsafe impl GlobalAlloc for Spy {
     unsafe fn alloc(&self, l: Layout) -> *mut u8 {
-        if TRACK.load(SeqCst) {
-            let n = CALLS.fetch_add(1, SeqCst) + 1;
-            if FAIL.load(SeqCst) == n {
-                return std::ptr::null_mut();
-            }
+        if attempted_allocation() {
+            return std::ptr::null_mut();
         }
         let p = System.alloc(l);
         if !p.is_null() {
-            LIVE.fetch_add(l.size(), SeqCst);
+            change_live(l.size() as isize);
         }
         p
     }
     unsafe fn alloc_zeroed(&self, l: Layout) -> *mut u8 {
-        if TRACK.load(SeqCst) {
-            let n = CALLS.fetch_add(1, SeqCst) + 1;
-            if FAIL.load(SeqCst) == n {
-                return std::ptr::null_mut();
-            }
+        if attempted_allocation() {
+            return std::ptr::null_mut();
         }
         let p = System.alloc_zeroed(l);
         if !p.is_null() {
-            LIVE.fetch_add(l.size(), SeqCst);
+            change_live(l.size() as isize);
         }
         p
     }
     unsafe fn realloc(&self, p: *mut u8, l: Layout, n: usize) -> *mut u8 {
-        if TRACK.load(SeqCst) {
-            let c = CALLS.fetch_add(1, SeqCst) + 1;
-            if FAIL.load(SeqCst) == c {
-                return std::ptr::null_mut();
-            }
+        if attempted_allocation() {
+            return std::ptr::null_mut();
         }
         let q = System.realloc(p, l, n);
         if !q.is_null() {
-            if n >= l.size() {
-                LIVE.fetch_add(n - l.size(), SeqCst);
-            } else {
-                LIVE.fetch_sub(l.size() - n, SeqCst);
-            }
+            change_live(n as isize - l.size() as isize);
         }
         q
     }
     unsafe fn dealloc(&self, p: *mut u8, l: Layout) {
-        LIVE.fetch_sub(l.size(), SeqCst);
+        change_live(-(l.size() as isize));
         System.dealloc(p, l)
     }
 }
 #[global_allocator]
 static ALLOC: Spy = Spy;
 fn start(fail: usize) {
-    CALLS.store(0, SeqCst);
-    FAIL.store(fail, SeqCst);
-    TRACK.store(true, SeqCst)
+    PROBE.with(|probe| {
+        let mut state = probe.get();
+        state.calls = 0;
+        state.fail = fail;
+        state.tracking = true;
+        probe.set(state);
+    });
 }
 fn finish() -> usize {
-    TRACK.store(false, SeqCst);
-    FAIL.store(0, SeqCst);
-    CALLS.load(SeqCst)
+    PROBE.with(|probe| {
+        let mut state = probe.get();
+        state.tracking = false;
+        state.fail = 0;
+        probe.set(state);
+        state.calls
+    })
 }
 #[derive(Clone, Copy)]
 struct Flags {
@@ -379,11 +408,11 @@ fn oracle() {
     let zero = Cache::cui_try_new(&vm, 0);
     assert!(zero.is_err());
     drop(zero);
-    let live_before = LIVE.load(SeqCst);
+    let live_before = live();
     start(0);
     let cache = Cache::cui_try_new(&vm, 64 * 1024 * 1024).unwrap();
     let prep_allocations = finish();
-    let cache_bytes = LIVE.load(SeqCst) - live_before;
+    let cache_bytes = usize::try_from(live() - live_before).unwrap();
     drop(cache);
     start(0);
     let short = Cache::cui_try_new(&vm, cache_bytes - 1);
@@ -393,13 +422,13 @@ fn oracle() {
     let exact = Cache::cui_try_new(&vm, cache_bytes).unwrap();
     drop(exact);
     for fail in 1..=prep_allocations {
-        let before = LIVE.load(SeqCst);
+        let before = live();
         start(fail);
         let result = Cache::cui_try_new(&vm, 64 * 1024 * 1024);
         finish();
         assert!(result.is_err(), "allocation failure ignored");
         drop(result);
-        assert_eq!(LIVE.load(SeqCst), before, "failed preparation leaked");
+        assert_eq!(live(), before, "failed preparation leaked");
     }
     let options = super::Options {
         flags: 0,
@@ -427,7 +456,7 @@ fn oracle() {
             0
         );
     }
-    let before = LIVE.load(SeqCst);
+    let before = live();
     let mut session = super::Handle {
         state: std::ptr::null_mut(),
         generation: 0,
@@ -441,16 +470,16 @@ fn oracle() {
     unsafe {
         assert_eq!(super::cui_regex_session_destroy(&mut session), 0);
     }
-    assert_eq!(LIVE.load(SeqCst), before);
+    assert_eq!(live(), before);
     for fail in 1..=reserves {
-        let before = LIVE.load(SeqCst);
+        let before = live();
         start(fail);
         let status =
             unsafe { super::cui_regex_session_create(&handle, 64 * 1024 * 1024, &mut session) };
         finish();
         assert_eq!(status, super::CAPACITY);
         assert!(session.state.is_null());
-        assert_eq!(LIVE.load(SeqCst), before);
+        assert_eq!(live(), before);
     }
     unsafe {
         assert_eq!(super::cui_regex_destroy(&mut handle), 0);
@@ -505,4 +534,37 @@ fn oracle() {
         "expected source captured-NFA compile-limit distinction"
     );
     println!("compiled={compiled} compile_rejections={compile_errors} comparisons={compared} prepared_match_allocations=0 unprepared_first_match_allocations={baseline} cache_prepare_allocations={prep_allocations} injected_prepare_failures={prep_allocations} exact_cache_heap_budget={cache_bytes} capture_free_compile_limit_difference={limit_difference} differing_compile_limit={difference_limit} provider_session_failure_positions={reserves}");
+}
+
+#[test]
+fn allocator_probe_ignores_other_threads_but_counts_its_own() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let go = Arc::new(AtomicBool::new(false));
+    let done = Arc::new(AtomicBool::new(false));
+    let worker_go = Arc::clone(&go);
+    let worker_done = Arc::clone(&done);
+    let worker = std::thread::spawn(move || {
+        while !worker_go.load(Ordering::Acquire) {
+            std::hint::spin_loop();
+        }
+        for _ in 0..32 {
+            std::hint::black_box(vec![7u8; 128]);
+        }
+        worker_done.store(true, Ordering::Release);
+    });
+    start(0);
+    go.store(true, Ordering::Release);
+    while !done.load(Ordering::Acquire) {
+        std::hint::spin_loop();
+    }
+    assert_eq!(finish(), 0, "another thread affected the allocation oracle");
+    worker.join().unwrap();
+
+    start(0);
+    std::hint::black_box(vec![7u8; 128]);
+    assert!(
+        finish() > 0,
+        "own-thread allocations must remain observable"
+    );
 }

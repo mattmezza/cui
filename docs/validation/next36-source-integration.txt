@@ -1,0 +1,11 @@
+Source composition integration after Next35 and the gallery scrollbar visibility change.
+Strict C11/native/headless CTest: 195/195 passed on Linux, native windows isolated
+with scripts/test_local.py. Includes Core colored paragraph wrap, Label, Empty,
+Icon semantic/decoration, hierarchical Core/Button tab order, malformed SVG transform,
+and software renderer/font snapshot tests. Hardware GPU and native macOS/Windows
+acceptance remain unverified. This is tested API/behavior coverage, not full parity.
+Actual Chromium Label masking/Unicode text and Empty pointer/keyboard/disabled
+native actions passed at 1280px and 390px. All78 displayed usage excerpts compile.
+The source contracts document remaining wrapping/style/SVG fidelity differences.
+Broader 66-command browser matrix and portable WASI assertions are running; this
+receipt must be updated with their actual terminal results before publication.

@@ -668,6 +668,14 @@ bool cui_text_context_line(cui_context *, cui_text_line_source, float, cui_color
                            cui_text_style);
 bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, cui_color, float,
                                    cui_text_style, const cui_text_color_span *, size_t);
+/* Complete strict UTF-8 text with hard paragraphs, U+2028 visual breaks, and
+ * empty lines. Color spans use original text bytes and may cross separators.
+ * wrap=true uses available parent width (word wrapping); false preserves lines.
+ * Invalid input and preflight capacity failures publish no layout. Final layout
+ * errors remain observable through the normal Core error/draw-list contract. */
+bool cui_text_paragraph_colored(cui_context *, cui_str, float font_size, cui_color,
+                                float line_height, cui_text_style, bool wrap,
+                                const cui_text_color_span *, size_t);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);
@@ -7044,38 +7052,45 @@ static bool cui_core_tab_stop(const cui_semantic *s) {
     return !s->tab_stop_disabled && (s->tab_ordered || s->tab_index >= 0);
 }
 /* GPUI TabStopNode orders signed group-prefix + leaf, then submission. */
-static int cui_core_tab_compare(const cui_semantic *a, size_t ai,
-                                const cui_semantic *b, size_t bi) {
+static int cui_core_tab_compare(const cui_semantic *a, size_t ai, const cui_semantic *b,
+                                size_t bi) {
     size_t an = a->tab_path_count + 1, bn = b->tab_path_count + 1;
     for (size_t n = 0; n < an && n < bn; ++n) {
         int av = n < a->tab_path_count ? a->tab_path[n] : a->tab_index;
         int bv = n < b->tab_path_count ? b->tab_path[n] : b->tab_index;
-        if (av != bv) return av < bv ? -1 : 1;
+        if (av != bv)
+            return av < bv ? -1 : 1;
     }
-    if (an != bn) return an < bn ? -1 : 1;
+    if (an != bn)
+        return an < bn ? -1 : 1;
     return ai == bi ? 0 : ai < bi ? -1 : 1;
 }
 static void cui_core_tab(cui_context *ui, bool reverse) {
     size_t found = SIZE_MAX, next = SIZE_MAX, wrap = SIZE_MAX;
     for (size_t i = 0; i < ui->previous_count; ++i)
-        if (ui->previous[i].id == ui->focus) found = i;
+        if (ui->previous[i].id == ui->focus)
+            found = i;
     for (size_t i = 0; i < ui->previous_count; ++i) {
         const cui_semantic *s = &ui->previous[i];
-        if (!cui_core_focusable(s) || !cui_core_tab_stop(s) ||
-            !cui_core_previous_allowed(ui, i)) continue;
-        if (wrap == SIZE_MAX || (reverse ? cui_core_tab_compare(s, i, &ui->previous[wrap], wrap) > 0
-                                        : cui_core_tab_compare(s, i, &ui->previous[wrap], wrap) < 0))
+        if (!cui_core_focusable(s) || !cui_core_tab_stop(s) || !cui_core_previous_allowed(ui, i))
+            continue;
+        if (wrap == SIZE_MAX ||
+            (reverse ? cui_core_tab_compare(s, i, &ui->previous[wrap], wrap) > 0
+                     : cui_core_tab_compare(s, i, &ui->previous[wrap], wrap) < 0))
             wrap = i;
         if (found != SIZE_MAX) {
             int order = cui_core_tab_compare(s, i, &ui->previous[found], found);
             if ((reverse ? order < 0 : order > 0) &&
-                (next == SIZE_MAX || (reverse ? cui_core_tab_compare(s, i, &ui->previous[next], next) > 0
-                                             : cui_core_tab_compare(s, i, &ui->previous[next], next) < 0)))
+                (next == SIZE_MAX ||
+                 (reverse ? cui_core_tab_compare(s, i, &ui->previous[next], next) > 0
+                          : cui_core_tab_compare(s, i, &ui->previous[next], next) < 0)))
                 next = i;
         }
     }
-    if (next == SIZE_MAX) next = wrap;
-    if (next != SIZE_MAX) cui_core_set_focus(ui, ui->previous[next].id);
+    if (next == SIZE_MAX)
+        next = wrap;
+    if (next != SIZE_MAX)
+        cui_core_set_focus(ui, ui->previous[next].id);
     ui->focus_visible = true;
 }
 static bool cui_core_accessibility_activate(const cui_semantic *s) {
@@ -8228,6 +8243,179 @@ bool cui_text_context_line_colored(cui_context *ui, cui_text_line_source source,
     }
     return true;
 }
+/* Paragraph boundaries follow the same Unicode separators as contextual geometry.
+ * U+2028 is a visual line break inside the existing bidi paragraph. */
+static bool cui_core_hard_separator(uint32_t cp) {
+    return cp == 10 || cp == 13 || cp == 0x85 || cp == 0x2029 || cp == 0x1c || cp == 0x1d ||
+           cp == 0x1e;
+}
+typedef struct {
+    size_t paragraph_start, paragraph_end, line_start, line_end;
+} cui_core_paragraph_line;
+bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_color color,
+                                float line_height, cui_text_style style, bool wrap,
+                                const cui_text_color_span *colors, size_t count) {
+    if (!ui || !cui_frame_active(ui) || (!text.data && text.length) || text.length > INT32_MAX ||
+        !isfinite(size) || size <= 0 || !isfinite(line_height) || line_height < 0 ||
+        !cui_core_text_style_valid(style) || (!colors && count) || count > CUI_TEXT_COLOR_SPAN_MAX)
+        return false;
+    size_t scan = 0, line_count = 1, boundary = 0;
+    uint32_t cp, previous_cp = 0;
+    while (scan < text.length) {
+        if (!cui_core_text_scalar(text, &scan, &cp))
+            return false;
+        if ((cui_core_hard_separator(cp) || cp == 0x2028) && !(cp == 10 && previous_cp == 13))
+            ++line_count;
+        previous_cp = cp;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        if (colors[i].byte_start < boundary || colors[i].byte_start >= colors[i].byte_end ||
+            colors[i].byte_end > text.length)
+            return false;
+        size_t targets[2] = {colors[i].byte_start, colors[i].byte_end};
+        for (size_t j = 0; j < 2; ++j)
+            if (targets[j] < text.length && ((unsigned char)text.data[targets[j]] & 0xc0u) == 0x80u)
+                return false;
+        boundary = colors[i].byte_end;
+    }
+    if (!cui_core_active(ui) || ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
+        return false;
+    if (line_count >= ui->config.max_elements - ui->element_count ||
+        ui->depth > CUI_CORE_STACK_MAX - 2 ||
+        line_count > SIZE_MAX / sizeof(cui_core_paragraph_line)) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    cui_core_paragraph_line *lines = malloc(line_count * sizeof(*lines));
+    cui_text_color_span *selected = count ? malloc(count * sizeof(*selected)) : NULL;
+    if (!lines || (count && !selected)) {
+        free(lines);
+        free(selected);
+        return false;
+    }
+    size_t n = 0, paragraph_start = 0;
+    do {
+        size_t paragraph_end = paragraph_start, next = paragraph_start;
+        while (next < text.length) {
+            size_t start = next;
+            (void)cui_core_text_scalar(text, &next, &cp);
+            if (cui_core_hard_separator(cp)) {
+                paragraph_end = start;
+                if (cp == 13 && next < text.length && text.data[next] == '\n')
+                    ++next;
+                break;
+            }
+            paragraph_end = next;
+        }
+        size_t line_start = paragraph_start, cursor = paragraph_start;
+        while (cursor < paragraph_end) {
+            size_t start = cursor;
+            (void)cui_core_text_scalar(text, &cursor, &cp);
+            if (cp == 0x2028) {
+                lines[n++] =
+                    (cui_core_paragraph_line){paragraph_start, paragraph_end, line_start, start};
+                line_start = cursor;
+            }
+        }
+        lines[n++] =
+            (cui_core_paragraph_line){paragraph_start, paragraph_end, line_start, paragraph_end};
+        if (next == text.length && paragraph_end == text.length)
+            break;
+        paragraph_start = next;
+    } while (paragraph_start <= text.length);
+    /* Conservative reservation validates bounded frame storage before any layout
+     * submission. Each paragraph is shared across its U+2028 visual lines. */
+    size_t required = 0;
+    for (size_t i = 0; i < n; ++i) {
+        size_t bytes = lines[i].line_end - lines[i].line_start + 1;
+        if (!i || lines[i].paragraph_start != lines[i - 1].paragraph_start) {
+            size_t paragraph_bytes = lines[i].paragraph_end - lines[i].paragraph_start + 1;
+            if (paragraph_bytes > SIZE_MAX - bytes) {
+                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                free(lines);
+                free(selected);
+                return false;
+            }
+            bytes += paragraph_bytes;
+        }
+        size_t intersections = 0;
+        for (size_t j = 0; j < count; ++j)
+            if (colors[j].byte_start < lines[i].line_end &&
+                colors[j].byte_end > lines[i].line_start)
+                ++intersections;
+        size_t color_bytes = intersections * sizeof(*colors) + _Alignof(cui_text_color_span) - 1;
+        if (color_bytes > SIZE_MAX - bytes ||
+            bytes + color_bytes > ui->config.frame_bytes - ui->string_used - required) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            free(lines);
+            free(selected);
+            return false;
+        }
+        required += bytes + color_bytes;
+    }
+    size = fminf(size, 65535);
+    line_height = fminf(line_height, 65535);
+    bool special = size != floorf(size) || line_height != floorf(line_height) || style.weight ||
+                   style.italic || style.monospace || style.family;
+    if (special && !cui_core_text_style_id(ui, size, line_height, style)) {
+        free(lines);
+        free(selected);
+        return false;
+    }
+    float empty_height = line_height > 0
+                             ? line_height
+                             : cui_measure_text_ex(ui, (cui_str){"", 0}, size, style).height;
+    cui_begin_box(ui, 0, (cui_box){0});
+    bool ok = true;
+    for (size_t i = 0; i < n; ++i) {
+        cui_core_paragraph_line line = lines[i];
+        if (line.line_start == line.line_end) {
+            cui_begin_box(ui, 0, (cui_box){.height = empty_height, .fixed_height = true});
+            cui_end_box(ui);
+            continue;
+        }
+        size_t selected_count = 0;
+        for (size_t j = 0; j < count; ++j) {
+            size_t start =
+                colors[j].byte_start > line.line_start ? colors[j].byte_start : line.line_start;
+            size_t end = colors[j].byte_end < line.line_end ? colors[j].byte_end : line.line_end;
+            if (start < end)
+                selected[selected_count++] = (cui_text_color_span){
+                    start - line.paragraph_start, end - line.paragraph_start, colors[j].color};
+        }
+        cui_text_line_source source = {{text.length ? text.data + line.paragraph_start : "",
+                                        line.paragraph_end - line.paragraph_start},
+                                       line.line_start - line.paragraph_start,
+                                       line.line_end - line.paragraph_start};
+        size_t before = ui->text_source_count;
+        if (selected_count) {
+            size_t padding =
+                (_Alignof(cui_text_color_span) - ui->string_used % _Alignof(cui_text_color_span)) %
+                _Alignof(cui_text_color_span);
+            cui_text_color_span *copy = (void *)(ui->strings + ui->string_used + padding);
+            memcpy(copy, selected, selected_count * sizeof(*copy));
+            float opacity = ui->depth && !cui_core_layout_only(ui)
+                                ? ui->nodes[ui->node_stack[ui->depth - 1]].opacity
+                                : 1;
+            for (size_t j = 0; j < selected_count; ++j)
+                copy[j].color.a = (uint8_t)(copy[j].color.a * opacity);
+            ui->string_used += padding + selected_count * sizeof(*copy);
+            cui_core_text(ui, (cui_str){0}, size, color, line_height, style, !wrap, &source, copy,
+                          selected_count);
+        } else
+            cui_core_text(ui, (cui_str){0}, size, color, line_height, style, !wrap, &source, NULL,
+                          0);
+        if (before == ui->text_source_count) {
+            ok = false;
+            break;
+        }
+    }
+    cui_end_box(ui);
+    free(lines);
+    free(selected);
+    return ok;
+}
+
 void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                  cui_text_style style) {
     cui_core_text(ui, t, size, c, line_height, style, false, NULL, NULL, 0);
@@ -9164,6 +9352,52 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                     d.text_source.byte_end -= paragraph_start;
                 } else
                     d.text_source = (cui_text_line_source){0};
+                if (d.text_source.paragraph.data && d.text_color_count) {
+                    size_t first = d.text_source.byte_start + paragraph_start;
+                    size_t last = d.text_source.byte_end + paragraph_start;
+                    size_t intersections = 0;
+                    bool unchanged = paragraph_start == 0;
+                    for (size_t i = 0; i < record->color_count; ++i) {
+                        cui_text_color_span span = record->colors[i];
+                        if (span.byte_start < last && span.byte_end > first) {
+                            ++intersections;
+                            unchanged &= span.byte_start >= first && span.byte_end <= last;
+                        } else
+                            unchanged = false;
+                    }
+                    if (!intersections) {
+                        d.text_colors = NULL;
+                        d.text_color_count = 0;
+                    } else if (!unchanged) {
+                        size_t padding = (_Alignof(cui_text_color_span) -
+                                          ui->string_used % _Alignof(cui_text_color_span)) %
+                                         _Alignof(cui_text_color_span);
+                        size_t available = ui->config.frame_bytes - ui->string_used;
+                        if (padding > available ||
+                            intersections > (available - padding) / sizeof(cui_text_color_span)) {
+                            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                            ui->count = 0;
+                            goto cui_core_commands_done;
+                        }
+                        cui_text_color_span *copy =
+                            (void *)(ui->strings + ui->string_used + padding);
+                        size_t written = 0;
+                        for (size_t i = 0; i < record->color_count; ++i) {
+                            cui_text_color_span span = record->colors[i];
+                            size_t start = span.byte_start > first ? span.byte_start : first;
+                            size_t end = span.byte_end < last ? span.byte_end : last;
+                            if (start < end)
+                                copy[written++] = (cui_text_color_span){
+                                    start - paragraph_start, end - paragraph_start, span.color};
+                        }
+                        ui->string_used += padding + written * sizeof(*copy);
+                        d.text_colors = copy;
+                        d.text_color_count = written;
+                    }
+                } else if (!d.text_source.paragraph.data) {
+                    d.text_colors = NULL;
+                    d.text_color_count = 0;
+                }
                 break;
             }
             d.font_size = c->renderData.text.fontSize;
@@ -9851,15 +10085,23 @@ bool cui_focus_step_within(cui_context *ui, cui_id scope, bool forward) {
                 active = false;
         if (!active)
             continue;
-        if (wrap == SIZE_MAX || (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) < 0
-                                         : cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) > 0)) wrap = i;
+        if (wrap == SIZE_MAX ||
+            (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) < 0
+                     : cui_core_tab_compare(candidate, i, &ui->semantics[wrap], wrap) > 0))
+            wrap = i;
         int order = cui_core_tab_compare(candidate, i, &ui->semantics[start], start);
         if ((forward ? order > 0 : order < 0) &&
-            (next == SIZE_MAX || (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[next], next) < 0
-                                          : cui_core_tab_compare(candidate, i, &ui->semantics[next], next) > 0))) next = i;
+            (next == SIZE_MAX ||
+             (forward ? cui_core_tab_compare(candidate, i, &ui->semantics[next], next) < 0
+                      : cui_core_tab_compare(candidate, i, &ui->semantics[next], next) > 0)))
+            next = i;
     }
-    if (next == SIZE_MAX) next = wrap;
-    if (next != SIZE_MAX) { cui_focus(ui, ui->semantics[next].id); return true; }
+    if (next == SIZE_MAX)
+        next = wrap;
+    if (next != SIZE_MAX) {
+        cui_focus(ui, ui->semantics[next].id);
+        return true;
+    }
     return false;
 }
 
@@ -10008,7 +10250,8 @@ void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
 }
 
 void cui_set_tab_index(cui_context *ui, cui_id id, int index) {
-    if (!cui_core_mutation(ui) || !cui_core_active(ui)) return;
+    if (!cui_core_mutation(ui) || !cui_core_active(ui))
+        return;
     for (size_t i = 0; i < ui->semantic_count; ++i)
         if (ui->semantics[i].id == id) {
             ui->semantics[i].tab_index = index;
@@ -10017,12 +10260,14 @@ void cui_set_tab_index(cui_context *ui, cui_id id, int index) {
         }
 }
 bool cui_begin_tab_group(cui_context *ui, int index) {
-    if (!cui_core_mutation(ui) || !cui_core_active(ui) || ui->tab_depth == 32) return false;
+    if (!cui_core_mutation(ui) || !cui_core_active(ui) || ui->tab_depth == 32)
+        return false;
     ui->tab_path[ui->tab_depth++] = index;
     return true;
 }
 void cui_end_tab_group(cui_context *ui) {
-    if (cui_core_mutation(ui) && cui_core_active(ui) && ui->tab_depth) --ui->tab_depth;
+    if (cui_core_mutation(ui) && cui_core_active(ui) && ui->tab_depth)
+        --ui->tab_depth;
 }
 
 bool cui_pressed(cui_context *ui, cui_id id) {

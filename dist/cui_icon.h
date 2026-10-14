@@ -1731,7 +1731,10 @@ static int nsvg__parseTransformArgs(const char* str, float* args, int maxNa, int
 		if (*ptr == '-' || *ptr == '+' || *ptr == '.' || nsvg__isdigit(*ptr)) {
 			if (*na >= maxNa) return 0;
 			ptr = nsvg__parseNumber(ptr, it, 64);
-			args[(*na)++] = (float)nsvg__atof(it);
+			args[*na] = (float)nsvg__atof(it);
+			/* CUI local patch: reject overflow before constructing a transform. */
+			if (!isfinite(args[*na])) return 0;
+			++(*na);
 		} else {
 			++ptr;
 		}
@@ -1745,7 +1748,11 @@ static int nsvg__parseMatrix(float* xform, const char* str)
 	float t[6];
 	int na = 0;
 	int len = nsvg__parseTransformArgs(str, t, 6, &na);
-	if (na != 6) return len;
+	/* CUI local patch: malformed arity must still initialize the result. */
+	if (len == 0 || na != 6) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	memcpy(xform, t, sizeof(float)*6);
 	return len;
 }
@@ -1756,6 +1763,11 @@ static int nsvg__parseTranslate(float* xform, const char* str)
 	float t[6];
 	int na = 0;
 	int len = nsvg__parseTransformArgs(str, args, 2, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1 && na != 2)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	if (na == 1) args[1] = 0.0;
 
 	nsvg__xformSetTranslation(t, args[0], args[1]);
@@ -1769,6 +1781,11 @@ static int nsvg__parseScale(float* xform, const char* str)
 	int na = 0;
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 2, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1 && na != 2)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	if (na == 1) args[1] = args[0];
 	nsvg__xformSetScale(t, args[0], args[1]);
 	memcpy(xform, t, sizeof(float)*6);
@@ -1781,6 +1798,11 @@ static int nsvg__parseSkewX(float* xform, const char* str)
 	int na = 0;
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 1, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	nsvg__xformSetSkewX(t, args[0]/180.0f*NSVG_PI);
 	memcpy(xform, t, sizeof(float)*6);
 	return len;
@@ -1792,6 +1814,11 @@ static int nsvg__parseSkewY(float* xform, const char* str)
 	int na = 0;
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 1, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	nsvg__xformSetSkewY(t, args[0]/180.0f*NSVG_PI);
 	memcpy(xform, t, sizeof(float)*6);
 	return len;
@@ -1804,6 +1831,11 @@ static int nsvg__parseRotate(float* xform, const char* str)
 	float m[6];
 	float t[6];
 	int len = nsvg__parseTransformArgs(str, args, 3, &na);
+	/* CUI local patch: do not read missing arguments or apply partial lists. */
+	if (len == 0 || (na != 1 && na != 3)) {
+		nsvg__xformIdentity(xform);
+		return len;
+	}
 	if (na == 1)
 		args[1] = args[2] = 0.0f;
 	nsvg__xformIdentity(m);
@@ -3349,7 +3381,8 @@ NSVGimage* nsvgParseFromFile(const char* filename, const char* units, float dpi)
 	if (!fp) goto error;
 	if (fseek(fp, 0, SEEK_END)) goto error;
 	size = ftell(fp);
-	if (size == -1l) goto error;
+	/* CUI local patch: ftell failure was converted to size_t above. */
+	if (size == (size_t)-1) goto error;
 	if (fseek(fp, 0, SEEK_SET)) goto error;
 	data = (char*)malloc(size+1);
 	if (data == NULL) goto error;

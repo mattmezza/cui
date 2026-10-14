@@ -48,5 +48,4 @@ is a functioning named composition API, not a claim of complete visual/style par
 
 `tests/unit/test_empty_source.c` checks ordering, optional omissions, replacement,
 24rem bounds, default paint/metrics, Unicode narrow wrapping, native keyboard and
-pointer actions, disabled actions and invalid preflight atomicity. Integrator must
-register the test in CMake and regenerate distribution headers.
+pointer actions, disabled actions and invalid preflight atomicity. The test is registered in CMake and the standalone distribution includes this API.

@@ -1619,7 +1619,8 @@
       "tests": [
         "tests/unit/test_components.c",
         "tests/unit/test_label_source.c",
-        "tests/web/test_source_composition_gallery.py"
+        "tests/web/test_source_composition_gallery.py",
+        "tests/unit/test_contextual_wrap_source.c"
       ],
       "status": "tested",
       "platforms": {
@@ -1628,7 +1629,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Secondary text, Unicode lowercase highlighting, scalar masking privacy and optional semantic control association are tested. Automatic wrapping, general text alignment and arbitrary style refinement remain pending; not complete Label parity."
+        "Secondary text, Unicode lowercase highlighting, scalar masking, semantic control association, multiline and parent-width wrapping are tested. Clay ASCII-space breaks, overlong tokens, general text alignment and arbitrary style refinement still differ from the reference."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1671,7 +1672,18 @@
             "docs/LABEL.md"
           ],
           "limitations": [
-            "Single unwrapped paragraph in this receipt; multiline/wrapping remains pending."
+            "Multiline and automatic parent-width wrapping are available; full Unicode line-break/fallback wrapping still differs."
+          ]
+        },
+        {
+          "name": "multiline and parent-width colored paragraph wrapping",
+          "status": "implemented",
+          "evidence": [
+            "tests/unit/test_contextual_wrap_source.c",
+            "docs/LABEL.md"
+          ],
+          "limitations": [
+            "Integration portability/browser gates are being run; Unicode word boundaries and overlong-token policy still differ."
           ]
         }
       ],

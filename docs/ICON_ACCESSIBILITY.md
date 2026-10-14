@@ -58,4 +58,4 @@ explicit sizing priority, label privacy/decorative suppression, pointer/focus
 ineligibility, invalid preflight atomicity and owned custom-SVG replacement
 lifecycle. Existing icon tests cover catalog assets, raster geometry, affine
 transforms, parser limits, explicit-zero dimensions and loader caching. The
-integrator registers the new test and regenerates distribution headers.
+the new test is registered in CMake and generated distribution headers include the API.

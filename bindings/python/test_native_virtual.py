@@ -7,7 +7,8 @@ import tempfile
 from cui_bridge import App, button, label, row
 
 font = os.environ['CUI_TEST_FONT']
-if not os.environ.get('DISPLAY') or os.environ.get('DISPLAY') == ':0':
+if (os.environ.get('CUI_TEST_VIRTUAL_DISPLAY') != '1' or os.environ.get('WAYLAND_DISPLAY')
+        or not os.environ.get('DISPLAY') or os.environ.get('DISPLAY') == ':0'):
     raise RuntimeError('Native proof requires an isolated virtual display')
 clicks = []
 save = button('save').primary().rounded_md().hover_color('#ff0000').label('Save changes').on_click(

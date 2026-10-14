@@ -281,6 +281,10 @@ class App:
             raise ValueError("backend must be 'none' or 'sdl'")
         if backend == "sdl" and not font_path:
             raise ValueError("SDL requires an explicit font_path")
+        if type(max_nodes) is not int or not 1 <= max_nodes <= 1024:
+            raise ValueError("max_nodes must be an integer in 1..1024")
+        if type(max_events) is not int or not 1 <= max_events <= 4096:
+            raise ValueError("max_events must be an integer in 1..4096")
         self._api = _API(library)
         options = _Options(C.sizeof(_Options), 1, 0 if backend == "none" else 1,
                            max_nodes, max_events, width, height,
@@ -376,6 +380,8 @@ class App:
                 "left": 5, "right": 6, "up": 7, "down": 8}
         if phase not in phases or key not in keys:
             raise ValueError("unsupported key or phase")
+        if type(modifiers) is not int or not 0 <= modifiers <= 15:
+            raise ValueError("modifiers must contain only the four supported bits")
         self._api.check(self._api.queue_key(self._ptr, phases[phase], keys[key],
                                             modifiers, int(repeat)))
 
@@ -390,9 +396,11 @@ class App:
     def poll_events(self) -> Iterator[Event]:
         self._ensure_open()
         while True:
+            if not self._ptr:
+                return
             raw = _Event()
             status = self._api.poll_event(self._ptr, C.byref(raw))
-            if status == 1:
+            if status in (1, 2):
                 return
             self._api.check(status)
             node = self._by_handle.get((raw.node.slot, raw.node.generation))

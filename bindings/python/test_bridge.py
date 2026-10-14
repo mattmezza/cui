@@ -11,6 +11,16 @@ def click(app, widget):
 
 
 class BridgeTests(unittest.TestCase):
+    def test_callback_can_close_or_request_close(self):
+        for dispose in (False, True):
+            with App() as app:
+                save = button("close").on_click(
+                    lambda event: app.close() if dispose else app.request_close())
+                app.mount(row().children(save))
+                app.step()
+                click(app, save)
+                self.assertEqual(app.dispatch(), 1)
+
     def test_real_click_callback_mutation_and_disabled(self):
         seen = []
         caption = label("Ready ✓", key="caption")
@@ -68,6 +78,11 @@ class BridgeTests(unittest.TestCase):
             widget.label("after dispose")
 
     def test_invalid_and_unsupported(self):
+        for value in (-1, 0, 2**32, 2**32 + 1, True, 1.5):
+            with self.assertRaises(ValueError):
+                App(max_nodes=value)
+            with self.assertRaises(ValueError):
+                App(max_events=value)
         with self.assertRaises(ValueError):
             button("x").size("20xl")
         with self.assertRaises(ValueError):

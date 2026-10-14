@@ -96,7 +96,7 @@ function label(value = '') { return new Node(3, value); }
 function button(key) { const node = new Node(4, ''); return key === undefined ? node : node.key(key); }
 class App {
   constructor(options = {}) {
-    this.disposed = false; this.nodes = new Map(); this.root = null; this.timer = null;
+    this.disposed = false; this.closed = false; this.nodes = new Map(); this.root = null; this.timer = null;
     this.handle = native.create({width: positive(options.width ?? 640, 'width'), height: positive(options.height ?? 480, 'height'),
       backend: options.backend === 'sdl' ? 1 : options.backend === undefined || options.backend === 'headless' ? 0 : NaN,
       maxNodes: options.maxNodes ?? 1024, maxEvents: options.maxEvents ?? 1024,
@@ -154,7 +154,7 @@ class App {
     while ((event = native.poll(this.handle)) !== undefined) {
       const node = this.nodes.get(keyFor(event));
       if (event.type === 1 && node && node.clickValue) { node.clickValue({node, frame: event.frame}); delivered++; }
-      if (this.disposed) break;
+      if (this.disposed || this.closed) break;
     }
     return delivered;
   }
@@ -170,7 +170,7 @@ class App {
     return this;
   }
   stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } return this; }
-  close() { this._alive(); this.stop(); native.close(this.handle); return this; }
+  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; this.nodes.clear(); } }
 }
 module.exports = {App, row, column, label, button};

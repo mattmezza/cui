@@ -23,6 +23,7 @@ def test_invocation(build, extra, platform, environment, locate, runtime=None):
         env.pop('XDG_RUNTIME_DIR', None)
         if runtime is not None:
             env['XDG_RUNTIME_DIR'] = str(runtime)
+        env['CUI_TEST_VIRTUAL_DISPLAY'] = '1'
         command = [virtual, '-a', '-s', '-screen 0 1920x1080x24', *command]
     else:
         cache = build / 'CMakeCache.txt'

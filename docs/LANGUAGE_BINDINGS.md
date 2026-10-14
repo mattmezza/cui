@@ -1,5 +1,14 @@
 # Python, Go, Rust, Node JavaScript and TypeScript with CUI
 
+For UI trees authored directly in Python, JavaScript or TypeScript, use
+[the component builders](BINDING_BUILDERS.md). Those builders expose rows,
+columns, labels and styled buttons through the shared C bridge, with language
+callbacks and mutable application state. This is the first component binding
+slice; the other manifest components and Go/Rust builders are not exposed yet.
+
+The examples below remain useful for embedding an application whose UI is
+written in C.
+
 These runnable examples call the actual CUI library through a small C host. Each
 creates a styled **Increment** button, renders a counter, and calls your language
 synchronously when the button changes it. With SDL3 and shaped text available,

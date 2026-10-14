@@ -4,6 +4,17 @@ const assert = require('node:assert/strict');
 const {App, row, column, label, button} = require('..');
 
 async function main() {
+  for (const dispose of [false, true]) {
+    const closingApp = new App();
+    const closer = button('close').label('Close').on_click(() =>
+      dispose ? closingApp.dispose() : closingApp.close());
+    closingApp.mount(row().children(closer)); closingApp.step();
+    const bounds = closer.bounds();
+    closingApp.pointer('down', bounds.x + 2, bounds.y + 2)
+      .pointer('up', bounds.x + 2, bounds.y + 2);
+    assert.equal(closingApp.step(), 1, 'closing within a callback stops event delivery safely');
+    closingApp.dispose();
+  }
   let clicks = 0;
   const status = label('Ready');
   const save = button('save').primary().rounded_md().medium().hover_color('#4466cc')

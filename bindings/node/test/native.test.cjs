@@ -2,6 +2,9 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {App, row, button} = require('..');
+if (process.env.CUI_TEST_VIRTUAL_DISPLAY !== '1' || process.env.WAYLAND_DISPLAY ||
+    !process.env.DISPLAY || process.env.DISPLAY === ':0')
+  throw new Error('Native proof requires the isolated local test runner');
 if (!process.env.CUI_FONT_PATH) throw new Error('CUI_FONT_PATH must name a readable font file');
 let clicks = 0;
 const action = button('native-proof').primary().label('Native button').on_click(() => clicks++);

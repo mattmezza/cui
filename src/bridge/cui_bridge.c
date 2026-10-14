@@ -1810,8 +1810,7 @@ static void bridge_render_tree(cui_bridge_app *app, uint32_t slot, cui_bridge_no
         }
     }
 }
-static void bridge_render_description_list(cui_bridge_app *app,
-                                           cui_bridge_node_record *node) {
+static void bridge_render_description_list(cui_bridge_app *app, cui_bridge_node_record *node) {
     cui_description_item items[64];
     size_t count = 0;
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling) {

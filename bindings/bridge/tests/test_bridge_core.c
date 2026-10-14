@@ -129,8 +129,8 @@ int main(void) {
         parent = child;
     }
     cui_bridge_node list = {0}, item = {0};
-    assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_DESCRIPTION_LIST,
-                                  "deep-list", &list) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_DESCRIPTION_LIST, "deep-list", &list) ==
+           CUI_BRIDGE_OK);
     assert(cui_bridge_node_create(app, list, CUI_BRIDGE_ITEM, "deep-item", &item) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_text(app, item, "Label") == CUI_BRIDGE_OK);
     assert(cui_bridge_set_detail_text(app, item, "Value") == CUI_BRIDGE_OK);

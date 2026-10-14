@@ -38,6 +38,12 @@ jobs:
         run: python scripts/build_web.py --zig "$(python -c 'import pathlib, ziglang; print(pathlib.Path(ziglang.__file__).parent / "zig")')" --regex-library build/regex-wasi/target/wasm32-wasip1/release/libcui_regex.a
       - name: Optional and default gallery regex acceptance and IME
         run: uv run tests/web/test_input_regex_gallery.py --directory build/web --default-directory build/web-default
+      - name: Verify copied Button activation evidence with real input
+        run: uv run tests/web/test_button_click_snapshot.py
+      - name: Verify exact Notification transition motion and reduced deadlines
+        run: uv run tests/web/test_notification_source_motion.py --output build/notification-source-motion-probe
+      - name: Verify segmented Tab shadow branches and measured caster
+        run: uv run tests/web/test_tabs_source_shadows.py --output build/tabs-source-shadows-probe
       - name: Actual Popover appearance consumers
         run: uv run tests/web/test_popover_appearance.py --output build/popover-appearance-probe
       - name: Gallery Popover and Notification shadow policies
@@ -157,6 +163,8 @@ jobs:
         run: uv run tests/web/test_plot_chart_owner_motion.py
       - name: Verify portable theme host preferences with real browser events
         run: uv run tests/web/test_theme_registry.py
+      - name: Verify opt-in keyboard release activation and copied evidence
+        run: uv run tests/web/test_release_key_core.py --output build/release-key-core-probe
       - name: Upload static gallery
         uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:

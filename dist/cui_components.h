@@ -69,7 +69,8 @@ typedef enum {
     CUI_BUTTON_CLICK_ACCESSIBILITY
 } cui_button_click_origin;
 /* Pointer-free accepted-event snapshot; copyable beyond callback/frame lifetime.
- * Pointer fields describe release, not a fabricated down event. */
+ * Legacy pointer fields describe release; evidence preserves raw Core samples.
+ * Evidence is frozen before legacy callbacks can consume accessibility input. */
 typedef struct {
     cui_button_click_origin origin;
     cui_id target;
@@ -84,6 +85,8 @@ typedef struct {
     cui_pointer_button pointer_button;
     uint64_t pointer_id, pointer_device;
     unsigned click_count; /* Pointer zero normalizes to one; nonpointer is zero. */
+    bool has_evidence;
+    cui_activation_snapshot evidence; /* Fully copied; no host metadata is fabricated. */
 } cui_button_click_event;
 typedef void (*cui_button_click_event_fn)(void *user, const cui_button_click_event *event);
 typedef struct cui_button_artwork cui_button_artwork;
@@ -1316,7 +1319,8 @@ static void cui_button_tooltip(cui_context *ui, cui_id id, const cui_theme *t,
         o.state->tooltip = (cui_hover_state){0};
 }
 static cui_button_click_event cui_button_click_snapshot(cui_context *ui, cui_id id, size_t index,
-                                                        const cui_event *event) {
+                                                        const cui_event *event,
+                                                        const cui_activation_snapshot *evidence) {
     cui_button_click_event result = {.target = id,
                                      .frame_sequence = cui_frame_sequence(ui),
                                      .event_index = index,
@@ -1339,6 +1343,11 @@ static cui_button_click_event cui_button_click_snapshot(cui_context *ui, cui_id 
         result.origin = CUI_BUTTON_CLICK_KEYBOARD;
         result.key = event->key;
     }
+    if (evidence) {
+        result.has_evidence = true;
+        result.evidence = *evidence;
+    } else
+        result.has_evidence = cui_event_activation_snapshot(ui, index, &result.evidence);
     return result;
 }
 bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
@@ -1380,7 +1389,7 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     for (size_t e = 0; e < count; e++)
         if (cui_event_accepted_activation(ui, e) == id) {
             activated = true;
-            cui_button_click_event event = cui_button_click_snapshot(ui, id, e, &events[e]);
+            cui_button_click_event event = cui_button_click_snapshot(ui, id, e, &events[e], NULL);
             if (o.on_click)
                 o.on_click(o.action_user);
             if (o.on_click_event)
@@ -1390,15 +1399,29 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     cui_button_tooltip(ui, id, t, o);
     return activated;
 }
-static void cui_button_group_click_event(void *user, cui_context *ui, size_t index) {
-    const cui_button_group_styled_item *child = user;
+typedef struct {
+    const cui_button_group_styled_item *child;
+    cui_button_click_event event;
+    bool prepared;
+} cui_button_group_event_forward;
+static void cui_button_group_prepare_click(void *user, cui_context *ui,
+                                           const cui_activation_snapshot *snapshot) {
+    cui_button_group_event_forward *forward = user;
     size_t count = 0;
     const cui_event *events = cui_frame_events(ui, &count);
-    /* Base dispatch already validated acceptance before the legacy callback. */
-    if (index >= count)
+    forward->prepared = snapshot->event_index < count;
+    if (forward->prepared) {
+        forward->event = cui_button_click_snapshot(ui, forward->child->id, snapshot->event_index,
+                                                   &events[snapshot->event_index], snapshot);
+    }
+}
+static void cui_button_group_click_event(void *user, cui_context *ui, size_t index) {
+    (void)ui;
+    cui_button_group_event_forward *forward = user;
+    if (!forward->prepared || forward->event.event_index != index)
         return;
-    cui_button_click_event event = cui_button_click_snapshot(ui, child->id, index, &events[index]);
-    child->options.on_click_event(child->options.action_user, &event);
+    forward->child->options.on_click_event(forward->child->options.action_user, &forward->event);
+    forward->prepared = false;
 }
 static bool cui_button_group_style_valid(cui_button_options o) {
     cui_str strings[] = {o.leading,       o.trailing,     o.icon,
@@ -1445,6 +1468,7 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
         return false;
     if (count)
         memmove(w->items, items, count * sizeof *items);
+    cui_button_group_event_forward forwarding[CUI_BUTTON_GROUP_MAX_ITEMS];
     for (size_t i = 0; i < count; i++) {
         cui_button_group_styled_item *child = &w->items[i];
         cui_button_options *o = &child->options;
@@ -1464,6 +1488,7 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
         if (!cui_button_group_style_valid(*o) ||
             !cui_components_design(t, o->design_size, &metrics))
             return false;
+        forwarding[i] = (cui_button_group_event_forward){.child = child};
         w->behavior.items[i] = (cui_button_group_item){
             .id = child->id,
             .label = o->accessibility_label.length ? o->accessibility_label : child->label,
@@ -1477,7 +1502,8 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
             .on_click = o->on_click,
             .action_user = o->action_user,
             .on_click_event = o->on_click_event ? cui_button_group_click_event : NULL,
-            .event_user = &w->items[i]};
+            .event_user = &forwarding[i],
+            .prepare_click_event = o->on_click_event ? cui_button_group_prepare_click : NULL};
     }
     w->composing = true;
     bool passive = !cui_frame_sequence(ui) || options.box.inert || options.box.layout_only;

@@ -294,6 +294,10 @@ typedef struct {
     /* Internal frame registration; use set_text_input_config instead. */
     bool text_input_configured;
     cui_text_input_config text_input_config;
+    /* Opt into unmodified Enter/Space release activation. A qualifying key down
+     * latches the current focus generation; either activation-key up may fire.
+     * Zero preserves the existing Enter-down and Space-up behavior. */
+    bool release_key_activation;
 } cui_semantic_details;
 typedef struct {
     cui_id id;
@@ -713,6 +717,33 @@ cui_id cui_event_accepted_activation(const cui_context *, size_t index);
  * outside ordinary submission. Wrap skips zero; reset caller workspaces on
  * context recreation and do not retain them across a full uint64_t cycle. */
 uint64_t cui_frame_sequence(const cui_context *);
+/* Fully copied accepted activation evidence. No host-derived first-focus or
+ * long-press values are fabricated. Pointer samples preserve raw click count.
+ * Keyboard bounds are the previous rendered clipped routing rectangle. */
+typedef struct {
+    float x, y;
+    unsigned modifiers, click_count;
+    cui_pointer_type type;
+    cui_pointer_button button;
+    uint64_t contact, device;
+} cui_pointer_activation_sample;
+typedef struct {
+    cui_id target;
+    uint64_t frame_sequence;
+    size_t event_index;
+    cui_event_type event_type;
+    cui_key key;
+    unsigned modifiers;
+    bool has_press, has_release, has_key_bounds;
+    cui_pointer_activation_sample press, release;
+    cui_rect key_bounds;
+} cui_activation_snapshot;
+/* Only accepted ordinary submission activations; same rejection guards as
+ * cui_event_accepted_activation. False leaves out untouched. Successful copied
+ * values remain usable after later frames/context destruction. Frame/index
+ * identity is local to this context, not global across recreated contexts. */
+bool cui_event_activation_snapshot(const cui_context *, size_t event_index,
+                                   cui_activation_snapshot *out);
 /* Ordinary composition phase, including inert/layout-only ancestry. False
  * outside a frame, during host measurement, layout resolution or prepaint. */
 bool cui_frame_is_submitting(const cui_context *);

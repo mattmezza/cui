@@ -521,6 +521,36 @@ static float cui_status_notification_ease(float phase) {
     }
     return 3 * (1 - u) * (1 - u) * u * .1f + 3 * (1 - u) * u * u + u * u * u;
 }
+static float cui_status_notification_source_ease(float phase) {
+    /* Pinned gpui-base unit-Bezier solver for (.25,.1,.25,1).
+     * Eight Newton steps and bounded bisection preserve finite sampling. */
+    const float cx = 3 * .25f, cy = 3 * .1f;
+    const float bx = 3 * (.25f - .25f) - cx, by = 3 * (1 - .1f) - cy;
+    const float ax = 1 - cx - bx, ay = 1 - cy - by;
+    float u = phase;
+    for (int i = 0; i < 8; i++) {
+        float error = ((ax * u + bx) * u + cx) * u - phase;
+        if (fabsf(error) < 1e-6f)
+            return fmaxf(0, fminf(1, ((ay * u + by) * u + cy) * u));
+        float slope = (3 * ax * u + 2 * bx) * u + cx;
+        if (fabsf(slope) < 1e-6f)
+            break;
+        u = fmaxf(0, fminf(1, u - error / slope));
+    }
+    float low = 0, high = 1;
+    u = phase;
+    for (int i = 0; i < 32; i++) {
+        float x = ((ax * u + bx) * u + cx) * u;
+        if (fabsf(x - phase) < 1e-6f)
+            break;
+        if (x < phase)
+            low = u;
+        else
+            high = u;
+        u = (low + high) / 2;
+    }
+    return fmaxf(0, fminf(1, ((ay * u + by) * u + cy) * u));
+}
 static void cui_status_notification_spring(float *position, float *velocity, float target,
                                            double dt, float epsilon) {
     /* Closed-form critically damped response, stable for large frame intervals. */
@@ -618,6 +648,10 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
             }
         }
     result = cui_notification_update(s, now, paused);
+    bool source_reduced =
+        s->motion_policy == CUI_NOTIFICATION_MOTION_SOURCE && s->settings.reduced_motion;
+    if (source_reduced)
+        result.next_wake_seconds = 0;
     double dt = fmax(0, now - s->last_render);
     s->last_render = fmax(now, s->last_render);
     for (size_t anchor = 0; anchor < 8; anchor++) {
@@ -705,12 +739,16 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
                           e->visibility != (hidden ? 0 : 1);
             float phase =
                 (float)fmin(1, e->elapsed / (e->phase == CUI_NOTIFICATION_ENDING ? .2 : .4));
-            float eased = s->settings.reduced_motion ? 1 : cui_status_notification_ease(phase);
+            float eased = s->settings.reduced_motion ? 1
+                          : s->motion_policy == CUI_NOTIFICATION_MOTION_SOURCE
+                              ? cui_status_notification_source_ease(phase)
+                              : cui_status_notification_ease(phase);
+            float distance = s->motion_policy == CUI_NOTIFICATION_MOTION_SOURCE ? 96 : 16;
             float alpha = e->phase == CUI_NOTIFICATION_STARTING ? eased
                           : e->phase == CUI_NOTIFICATION_ENDING ? 1 - eased
                                                                 : 1,
-                  slide = e->phase == CUI_NOTIFICATION_STARTING ? (1 - eased) * 16
-                          : e->phase == CUI_NOTIFICATION_ENDING ? eased * 16
+                  slide = e->phase == CUI_NOTIFICATION_STARTING ? (1 - eased) * distance
+                          : e->phase == CUI_NOTIFICATION_ENDING ? eased * distance
                                                                 : 0;
             if (!bottom && anchor != CUI_NOTIFICATION_LEFT_CENTER &&
                 anchor != CUI_NOTIFICATION_RIGHT_CENTER)
@@ -851,12 +889,22 @@ static cui_notification_advance cui_status_notifications_render(cui_context *ui,
         cui_end_focus_scope(ui);
         cui_end_box(ui);
     }
-    for (size_t i = 0; i < s->count; i++)
+    for (size_t i = 0; i < s->count; i++) {
         if (s->entries[i].in_app && s->entries[i].phase != CUI_NOTIFICATION_PRESENT) {
-            double wake = now + 1.0 / 60;
+            double wake =
+                now + (source_reduced
+                           ? fmax(0, (s->entries[i].phase == CUI_NOTIFICATION_ENDING ? .2 : .4) -
+                                         s->entries[i].elapsed)
+                           : 1.0 / 60);
+            if (!result.next_wake_seconds || wake < result.next_wake_seconds)
+                result.next_wake_seconds = wake;
+        } else if (source_reduced && s->entries[i].in_app && !paused &&
+                   s->entries[i].remaining >= 0) {
+            double wake = now + fmin(.05, s->entries[i].remaining);
             if (!result.next_wake_seconds || wake < result.next_wake_seconds)
                 result.next_wake_seconds = wake;
         }
+    }
     if (result.changed)
         cui_invalidate(ui);
     return result;
@@ -868,13 +916,16 @@ bool cui_notifications_checked(cui_context *ui, cui_id id, const cui_theme *them
     if (!ui || !theme || !state || !out || !state->entries || !state->capacity ||
         state->capacity > CUI_NOTIFICATION_MAX_ITEMS || state->count > state->capacity ||
         state->system_count > 100 || !cui_notification_settings_valid(state->settings) ||
-        !isfinite(now) || now < 0 || !isfinite(viewport.x) || !isfinite(viewport.y) ||
-        !isfinite(viewport.w) || viewport.w <= 0 || !isfinite(viewport.h) || viewport.h <= 0 ||
+        state->motion_policy < CUI_NOTIFICATION_MOTION_LEGACY ||
+        state->motion_policy > CUI_NOTIFICATION_MOTION_SOURCE || !isfinite(now) || now < 0 ||
+        !isfinite(viewport.x) || !isfinite(viewport.y) || !isfinite(viewport.w) ||
+        viewport.w <= 0 || !isfinite(viewport.h) || viewport.h <= 0 ||
         !isfinite(viewport.x + viewport.w) || !isfinite(viewport.y + viewport.h) ||
         (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE &&
          (!isfinite(theme->radius_lg) || theme->radius_lg < 0 || theme->radius_lg > 16384)))
         return false;
-    if (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE) {
+    if (state->settings.shadow_policy == CUI_NOTIFICATION_SHADOW_SOURCE ||
+        state->motion_policy == CUI_NOTIFICATION_MOTION_SOURCE) {
         if (!isfinite(state->last_render) || state->last_render < 0)
             return false;
         for (size_t i = 0; i < state->count; i++) {

@@ -256,16 +256,21 @@
     },
     {
       "api_symbols": [
-        "cui_empty"
+        "cui_empty",
+        "cui_empty_ex",
+        "cui_empty_default_style"
       ],
       "state_types": [],
       "state_ownership": "Caller owns title and description.",
-      "interaction": "Presentation only; compose separate action buttons when needed.",
-      "usage": "Submit title, description and width each frame.",
+      "interaction": "Borrowed content callbacks can submit buttons and handle their activation events.",
+      "usage": "Compose optional media/title/description header, content and appended children. Child callbacks submit ordinary native controls.",
       "docs": [
-        "docs/CONTENT.md"
+        "docs/CONTENT.md",
+        "docs/EMPTY.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_content_slot_fn"
+      ],
       "scope": "styled frame component",
       "name": "Empty",
       "public_header": "include/cui/cui_content.h",
@@ -397,20 +402,23 @@
     },
     {
       "api_symbols": [
-        "cui_label"
+        "cui_label",
+        "cui_label_source",
+        "cui_label_prepare"
       ],
       "state_types": [],
       "state_ownership": "Caller owns label text.",
-      "interaction": "Presentation only; no action callback.",
-      "usage": "Submit text inside the current parent layout.",
+      "interaction": "Optional semantic control association; presentation has no action callback.",
+      "usage": "Compose secondary text, Unicode highlights and private scalar masking with cui_label_options; the plain wrapper remains available.",
       "docs": [
         "docs/COMPONENTS.md",
-        "docs/TYPOGRAPHY.md"
+        "docs/TYPOGRAPHY.md",
+        "docs/LABEL.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
       "name": "Label",
-      "public_header": "include/cui/cui_components.h",
+      "public_header": "include/cui/cui_label.h",
       "composition": "immediate frame submission"
     },
     {

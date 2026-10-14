@@ -5,7 +5,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#define BRIDGE_PHASE(label) do { fputs("bridge_core: " label "\n", stderr); fflush(stderr); } while (0)
+#define BRIDGE_PHASE(label)                                                                        \
+    do {                                                                                           \
+        fputs("bridge_core: " label "\n", stderr);                                                 \
+        fflush(stderr);                                                                            \
+    } while (0)
 static cui_bridge_status click(cui_bridge_app *app, cui_bridge_node node) {
     cui_bridge_rect bounds = {0};
     cui_bridge_status status = cui_bridge_node_bounds(app, node, &bounds);

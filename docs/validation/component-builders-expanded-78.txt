@@ -1,0 +1,33 @@
+Expanded native language authoring: integration through bridge kind 80 (Settings).
+All 78 manifest families have tested API subsets in Python, JS, TS, Go and Rust.
+Clipboard and Theme are app services; Row, Column, RadioGroup and Item are helpers.
+This does not certify complete component feature or visual parity.
+
+Strict C11/warnings build and isolated full CTest: 180/180 passed.
+Standalone Node + C/Python bridge CTest: 16/16 passed.
+C bridge fully instrumented ASan/UBSan, leaks + stack-use-after-return: 2/2 passed.
+Reduced-stack (1 MB) regression includes 128 Rows and 16 nested selected Tabs panels.
+Go component and composed workspace packages: race enabled, passed; go vet passed.
+Rust 1.85.1: 46 component tests and one callback-panic test passed;
+headless composed workspace passed. Callback panic leaves the C frame recoverable.
+TypeScript 5.8.3 strict check passed, including unsupported-option rejection.
+Documentation renderer tests: 6/6; sharing metadata tests: 4/4.
+Actual Chromium guide navigation, scope text and clipboard code copy passed.
+Invisible SDL/Xvfb: Python/Node Unicode, 64 KiB and empty clipboard round trips passed.
+Invisible SDL/Xvfb: Go native smoke and Rust composed workspace rendering passed.
+Python and Node models: real native divider drag, scrolling, selection, editor edits,
+questionnaire validation/submission, dock topology, Settings edits/reset/filtering.
+One-slot event queue regression: Dock activation, questionnaire navigation and
+Speech start return CAPACITY transactionally and preserve queued snapshots.
+Python and Node sidebar examples: native navigation/editing/save hit targets passed.
+
+Thread contract: one owner thread per app; serialize ALL calls across ALL apps.
+Native macOS/Windows binding application rendering remains unvalidated.
+Portable platform CI must validate this expanded tranche after integration.
+Design sizes/rounding/custom hover styling beyond Button remain unfinished.
+Plot bridge only renders dots; no mapped pan/zoom, axes or hit-testing.
+DataTable emits sort requests; hosts must reorder and resupply data.
+Speech lifecycle consumes host recognition results; no audio recognition engine.
+Dock serialization has no restore or floating-window mapping.
+Settings has four native field types; hosts own preference persistence.
+No external language runtime packages are required by these bindings.

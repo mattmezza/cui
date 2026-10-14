@@ -2,12 +2,35 @@
 #ifndef CUI_BRIDGE_INTERNAL_H
 #define CUI_BRIDGE_INTERNAL_H
 #include "cui/cui_bridge.h"
+#include "cui/cui_carousel.h"
+#include "cui/cui_chart.h"
+#include "cui/cui_command.h"
 #include "cui/cui_components.h"
+#include "cui/cui_dock.h"
+#include "cui/cui_editor.h"
 #include "cui/cui_media.h"
+#include "cui/cui_message.h"
+#include "cui/cui_plot_view.h"
+#include "cui/cui_questionnaire.h"
+#include "cui/cui_resizable.h"
+#include "cui/cui_root.h"
+#include "cui/cui_settings.h"
+#include "cui/cui_sidebar.h"
+#include "cui/cui_speech.h"
+#include "cui/cui_table.h"
 #include "cui/cui_text.h"
+#include "cui/cui_text_view.h"
+#include "cui/cui_virtual_scroll.h"
 #include <stdbool.h>
 #include <stddef.h>
 
+typedef struct bridge_text_view_owned bridge_text_view_owned;
+typedef struct bridge_chart_owned bridge_chart_owned;
+typedef struct bridge_speech_owned bridge_speech_owned;
+typedef struct bridge_questionnaire_owned bridge_questionnaire_owned;
+typedef struct bridge_dock_owned bridge_dock_owned;
+typedef struct bridge_settings_owned bridge_settings_owned;
+typedef struct bridge_data_table_owned bridge_data_table_owned;
 typedef struct {
     uint32_t generation;
     bool live;
@@ -67,6 +90,33 @@ typedef struct {
     cui_otp_state otp_state;
     char *otp_buffer;
     cui_input_group_state input_group_state;
+    cui_message_scroller_state *message_scroller;
+    uint32_t message_count;
+    cui_carousel_state *carousel_state;
+    cui_carousel_geometry *carousel_geometry;
+    cui_resizable_state *resizable_state;
+    cui_resizable_slot *resizable_slots;
+    bridge_text_view_owned *text_view;
+    cui_editor_state editor_state;
+    bridge_chart_owned *chart;
+    bridge_data_table_owned *data_table;
+    uint32_t table_selection_mode;
+    cui_plot_sample *plot_samples;
+    uint32_t plot_count;
+    cui_command_state command_state;
+    cui_command_row *command_rows;
+    cui_command_entry *command_entries;
+    cui_str *command_keywords;
+    uint32_t *command_slots;
+    cui_virtual_list *virtual_list;
+    cui_virtual_widget_state virtual_state;
+    cui_sidebar_state sidebar_state;
+    cui_sidebar_cache *sidebar_cache;
+    cui_sidebar_item_state sidebar_item_state;
+    bridge_speech_owned *speech;
+    bridge_questionnaire_owned *questionnaire;
+    bridge_dock_owned *dock;
+    bridge_settings_owned *settings;
     cui_bridge_app *owner;
     uint32_t own_slot;
 } cui_bridge_node_record;
@@ -80,6 +130,8 @@ typedef struct {
 struct cui_bridge_app {
     cui_context *ui;
     cui_theme theme;
+    cui_root root_view;
+    uint32_t theme_preset_index;
     cui_bridge_node_record *nodes;
     uint32_t max_nodes, root;
     uint64_t next_id;
@@ -104,4 +156,6 @@ cui_bridge_status cui_bridge_native_poll(cui_bridge_app *);
 cui_bridge_status cui_bridge_native_render(cui_bridge_app *, const cui_draw_list *);
 cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *, const char *const *,
                                                        uint32_t);
+cui_bridge_status cui_bridge_native_clipboard_set(cui_bridge_app *, cui_str);
+cui_bridge_status cui_bridge_native_clipboard_get(cui_bridge_app *, char *, uint32_t, uint32_t *);
 #endif

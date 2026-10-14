@@ -14,6 +14,18 @@ struct RawNode {
     generation: u32,
 }
 #[repr(C)]
+struct ChartDatumRaw {
+    label_utf8: *const c_char,
+    value: f64,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChartKind {
+    Line = 0,
+    Area = 1,
+    Bar = 2,
+    Pie = 3,
+}
+#[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 pub struct Date {
     pub year: i32,
@@ -34,6 +46,12 @@ pub struct Rect {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+pub struct PlotPoint {
+    pub x: f64,
+    pub y: f64,
 }
 #[repr(C)]
 struct Options {
@@ -63,9 +81,33 @@ pub struct ChangeEvent {
     pub node: Node,
     pub frame: u64,
     pub checked: bool,
+    pub checked_raw: u32,
     pub value: f64,
     pub text: String,
     pub selected: Option<Node>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DataTableState {
+    pub row: u32,
+    pub column: u32,
+    pub sort_column: u32,
+    pub sort_direction: u32,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct QuestionnaireState {
+    pub current: Option<Node>,
+    pub complete: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DataTableSelectionMode {
+    Row = 0,
+    Column = 1,
+    Cell = 2,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DockAxis {
+    Horizontal = 0,
+    Vertical = 1,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AttachmentStatus {
@@ -74,6 +116,12 @@ pub enum AttachmentStatus {
     Processing = 2,
     Failed = 3,
     Complete = 4,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TextViewFormat {
+    Markdown = 0,
+    Html = 1,
+    Plain = 2,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SurfaceResult {
@@ -94,6 +142,96 @@ impl ChangeEvent {
 #[link(name = "cui_bridge")]
 extern "C" {
     fn cui_bridge_abi_version() -> u32;
+    fn cui_bridge_theme_preset_count() -> u32;
+    fn cui_bridge_set_root_padding(a: *mut c_void, n: RawNode, padding: f32) -> u32;
+    fn cui_bridge_theme_preset_name(
+        index: u32,
+        destination: *mut c_char,
+        capacity: u32,
+        length: *mut u32,
+    ) -> u32;
+    fn cui_bridge_set_theme_preset(a: *mut c_void, index: u32) -> u32;
+    fn cui_bridge_get_theme_preset(a: *const c_void, out: *mut u32) -> u32;
+    fn cui_bridge_clipboard_set(a: *mut c_void, text: *const c_char) -> u32;
+    fn cui_bridge_clipboard_get(
+        a: *mut c_void,
+        destination: *mut c_char,
+        capacity: u32,
+        length: *mut u32,
+    ) -> u32;
+    fn cui_bridge_speech_start(a: *mut c_void, n: RawNode) -> u32;
+    fn cui_bridge_speech_report(
+        a: *mut c_void,
+        n: RawNode,
+        text: *const c_char,
+        final_phrase: u32,
+    ) -> u32;
+    fn cui_bridge_speech_finish(a: *mut c_void, n: RawNode) -> u32;
+    fn cui_bridge_speech_transcript(
+        a: *mut c_void,
+        n: RawNode,
+        destination: *mut c_char,
+        capacity: u32,
+        length: *mut u32,
+    ) -> u32;
+    fn cui_bridge_questionnaire_set_question(
+        a: *mut c_void,
+        question: RawNode,
+        required: u32,
+        multiple: u32,
+    ) -> u32;
+    fn cui_bridge_questionnaire_get_state(
+        a: *mut c_void,
+        form: RawNode,
+        current: *mut RawNode,
+        complete: *mut u32,
+    ) -> u32;
+    fn cui_bridge_questionnaire_choice_selected(
+        a: *mut c_void,
+        choice: RawNode,
+        selected: *mut u32,
+    ) -> u32;
+    fn cui_bridge_questionnaire_next(a: *mut c_void, form: RawNode) -> u32;
+    fn cui_bridge_questionnaire_previous(a: *mut c_void, form: RawNode) -> u32;
+    fn cui_bridge_questionnaire_submit(a: *mut c_void, form: RawNode) -> u32;
+    fn cui_bridge_dock_activate(a: *mut c_void, dock: RawNode, panel: RawNode) -> u32;
+    fn cui_bridge_dock_move_split(
+        a: *mut c_void,
+        dock: RawNode,
+        panel: RawNode,
+        reference: RawNode,
+        axis: u32,
+        ratio: f64,
+        before: u32,
+    ) -> u32;
+    fn cui_bridge_dock_get_active(a: *mut c_void, dock: RawNode, out: *mut RawNode) -> u32;
+    fn cui_bridge_dock_panel_bounds(
+        a: *mut c_void,
+        dock: RawNode,
+        panel: RawNode,
+        out: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_dock_serialize(
+        a: *mut c_void,
+        dock: RawNode,
+        destination: *mut c_char,
+        capacity: u32,
+        required: *mut u32,
+    ) -> u32;
+    fn cui_bridge_settings_set_query(
+        a: *mut c_void,
+        settings: RawNode,
+        query: *const c_char,
+    ) -> u32;
+    fn cui_bridge_settings_get_page(a: *mut c_void, settings: RawNode, out: *mut RawNode) -> u32;
+    fn cui_bridge_settings_set_page(a: *mut c_void, settings: RawNode, page: RawNode) -> u32;
+    fn cui_bridge_settings_reset_page(a: *mut c_void, settings: RawNode, page: RawNode) -> u32;
+    fn cui_bridge_settings_field_bounds(
+        a: *mut c_void,
+        settings: RawNode,
+        field: RawNode,
+        out: *mut Rect,
+    ) -> u32;
     fn cui_bridge_options_size() -> u32;
     fn cui_bridge_create(o: *const Options, status: *mut u32) -> *mut c_void;
     fn cui_bridge_destroy(a: *mut c_void);
@@ -186,6 +324,100 @@ extern "C" {
         paths: *const *const c_char,
         count: u32,
     ) -> u32;
+    fn cui_bridge_resizable_handle_bounds(
+        a: *mut c_void,
+        group: RawNode,
+        item: RawNode,
+        out: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_command_item_bounds(
+        a: *mut c_void,
+        command: RawNode,
+        item: RawNode,
+        out: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_virtual_list_item_bounds(
+        a: *mut c_void,
+        list: RawNode,
+        item: RawNode,
+        out: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_chart_set_data(
+        a: *mut c_void,
+        n: RawNode,
+        data: *const ChartDatumRaw,
+        count: u32,
+    ) -> u32;
+    fn cui_bridge_chart_set_kind(a: *mut c_void, n: RawNode, kind: u32) -> u32;
+    fn cui_bridge_chart_get_datum(
+        a: *mut c_void,
+        n: RawNode,
+        index: u32,
+        label: *mut c_char,
+        capacity: u32,
+        required: *mut u32,
+        value: *mut f64,
+    ) -> u32;
+    fn cui_bridge_data_table_set(
+        a: *mut c_void,
+        n: RawNode,
+        headers: *const *const c_char,
+        column_count: u32,
+        cells: *const *const c_char,
+        row_count: u32,
+    ) -> u32;
+    fn cui_bridge_data_table_get_cell(
+        a: *mut c_void,
+        n: RawNode,
+        row: u32,
+        column: u32,
+        destination: *mut c_char,
+        capacity: u32,
+        required: *mut u32,
+    ) -> u32;
+    fn cui_bridge_data_table_get_state(
+        a: *mut c_void,
+        n: RawNode,
+        row: *mut u32,
+        column: *mut u32,
+        sort_column: *mut u32,
+        sort_direction: *mut u32,
+    ) -> u32;
+    fn cui_bridge_data_table_set_selection_mode(a: *mut c_void, n: RawNode, mode: u32) -> u32;
+    fn cui_bridge_data_table_cell_bounds(
+        a: *mut c_void,
+        n: RawNode,
+        row: u32,
+        column: u32,
+        out: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_data_table_header_bounds(
+        a: *mut c_void,
+        n: RawNode,
+        column: u32,
+        out: *mut Rect,
+    ) -> u32;
+    fn cui_bridge_plot_set_points(
+        a: *mut c_void,
+        n: RawNode,
+        points: *const PlotPoint,
+        count: u32,
+    ) -> u32;
+    fn cui_bridge_plot_get_point(
+        a: *mut c_void,
+        n: RawNode,
+        index: u32,
+        out: *mut PlotPoint,
+    ) -> u32;
+    fn cui_bridge_set_text_view_format(a: *mut c_void, n: RawNode, format: u32) -> u32;
+    fn cui_bridge_text_view_select(a: *mut c_void, n: RawNode, anchor: u32, cursor: u32) -> u32;
+    fn cui_bridge_text_view_copy_selection(
+        a: *mut c_void,
+        n: RawNode,
+        destination: *mut c_char,
+        capacity: u32,
+        required: *mut u32,
+    ) -> u32;
     fn cui_bridge_request_close(a: *mut c_void) -> u32;
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -269,6 +501,23 @@ pub enum Kind {
     InputGroup = 61,
     Notification = 62,
     FocusTrap = 63,
+    MessageScroller = 64,
+    Carousel = 65,
+    Resizable = 66,
+    TextView = 67,
+    Editor = 68,
+    Chart = 69,
+    Table = 70,
+    DataTable = 71,
+    Plot = 72,
+    Command = 73,
+    VirtualList = 74,
+    Sidebar = 75,
+    RootView = 76,
+    Speech = 77,
+    Questionnaire = 78,
+    Dock = 79,
+    Settings = 80,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Variant {
@@ -339,6 +588,57 @@ impl Drop for App {
     }
 }
 impl App {
+    pub fn theme_presets() -> Result<Vec<String>> {
+        let mut names = Vec::new();
+        for index in 0..unsafe { cui_bridge_theme_preset_count() } {
+            let mut buf = vec![0u8; 4097];
+            let mut length = 0;
+            check(unsafe {
+                cui_bridge_theme_preset_name(
+                    index,
+                    buf.as_mut_ptr().cast(),
+                    buf.len() as u32,
+                    &mut length,
+                )
+            })?;
+            names.push(String::from_utf8(buf[..length as usize].to_vec()).map_err(|_| Error(7))?);
+        }
+        Ok(names)
+    }
+    pub fn set_theme_preset(&mut self, index: u32) -> Result<&mut Self> {
+        check(unsafe { cui_bridge_set_theme_preset(self.raw, index) })?;
+        Ok(self)
+    }
+    pub fn theme_preset(&self) -> Result<Option<u32>> {
+        let mut index = 0;
+        let status = unsafe { cui_bridge_get_theme_preset(self.raw, &mut index) };
+        if status == 1 {
+            return Ok(None);
+        }
+        check(status)?;
+        Ok(Some(index))
+    }
+    pub fn clipboard_set(&mut self, text: &str) -> Result<&mut Self> {
+        if text.len() > 65536 {
+            return Err(Error(3));
+        }
+        let text = CString::new(text).map_err(|_| Error(3))?;
+        check(unsafe { cui_bridge_clipboard_set(self.raw, text.as_ptr()) })?;
+        Ok(self)
+    }
+    pub fn clipboard_get(&self) -> Result<String> {
+        let mut buf = vec![0u8; 65537];
+        let mut length = 0;
+        check(unsafe {
+            cui_bridge_clipboard_get(
+                self.raw,
+                buf.as_mut_ptr().cast(),
+                buf.len() as u32,
+                &mut length,
+            )
+        })?;
+        String::from_utf8(buf[..length as usize].to_vec()).map_err(|_| Error(7))
+    }
     pub fn headless(width: f32, height: f32) -> Result<Self> {
         Self::new(width, height, None, None)
     }
@@ -522,6 +822,369 @@ impl App {
             )
         })?;
         String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec()).map_err(|_| Error(7))
+    }
+    pub fn text_view_format(&mut self, n: Node, format: TextViewFormat) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_text_view_format(self.raw, n, format as u32) })?;
+        Ok(self)
+    }
+    pub fn text_view_select(&mut self, n: Node, anchor: u32, cursor: u32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_text_view_select(self.raw, n, anchor, cursor) })?;
+        Ok(self)
+    }
+    pub fn text_view_selection(&self, n: Node) -> Result<String> {
+        let n = self.valid(n)?;
+        let mut required = 0;
+        let mut buf = vec![0u8; 4097];
+        check(unsafe {
+            cui_bridge_text_view_copy_selection(
+                self.raw,
+                n,
+                buf.as_mut_ptr().cast(),
+                buf.len() as u32,
+                &mut required,
+            )
+        })?;
+        String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec()).map_err(|_| Error(7))
+    }
+    pub fn chart_data(&mut self, n: Node, data: &[(&str, f64)]) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        if data.len() > 64 {
+            return Err(Error(3));
+        }
+        let labels: Vec<CString> = data
+            .iter()
+            .map(|(label, _)| string(label))
+            .collect::<Result<_>>()?;
+        let raw: Vec<ChartDatumRaw> = labels
+            .iter()
+            .zip(data.iter())
+            .map(|(label, (_, value))| ChartDatumRaw {
+                label_utf8: label.as_ptr(),
+                value: *value,
+            })
+            .collect();
+        check(unsafe { cui_bridge_chart_set_data(self.raw, n, raw.as_ptr(), raw.len() as u32) })?;
+        Ok(self)
+    }
+    pub fn chart_kind(&mut self, n: Node, kind: ChartKind) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_chart_set_kind(self.raw, n, kind as u32) })?;
+        Ok(self)
+    }
+    pub fn chart_datum(&self, n: Node, index: u32) -> Result<(String, f64)> {
+        let n = self.valid(n)?;
+        let mut buf = vec![0u8; 4097];
+        let mut required = 0;
+        let mut value = 0.;
+        check(unsafe {
+            cui_bridge_chart_get_datum(
+                self.raw,
+                n,
+                index,
+                buf.as_mut_ptr().cast(),
+                buf.len() as u32,
+                &mut required,
+                &mut value,
+            )
+        })?;
+        let label = String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec())
+            .map_err(|_| Error(7))?;
+        Ok((label, value))
+    }
+    pub fn data_table(&mut self, n: Node, headers: &[&str], rows: &[&[&str]]) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        if headers.is_empty()
+            || headers.len() > 16
+            || rows.len() > 32
+            || rows.iter().any(|r| r.len() != headers.len())
+        {
+            return Err(Error(3));
+        }
+        let header_strings: Vec<CString> =
+            headers.iter().map(|h| string(h)).collect::<Result<_>>()?;
+        let cell_strings: Vec<CString> = rows
+            .iter()
+            .flat_map(|r| r.iter())
+            .map(|c| string(c))
+            .collect::<Result<_>>()?;
+        let header_ptrs: Vec<*const c_char> = header_strings.iter().map(|s| s.as_ptr()).collect();
+        let cell_ptrs: Vec<*const c_char> = cell_strings.iter().map(|s| s.as_ptr()).collect();
+        check(unsafe {
+            cui_bridge_data_table_set(
+                self.raw,
+                n,
+                header_ptrs.as_ptr(),
+                headers.len() as u32,
+                cell_ptrs.as_ptr(),
+                rows.len() as u32,
+            )
+        })?;
+        Ok(self)
+    }
+    pub fn data_table_cell(&self, n: Node, row: u32, column: u32) -> Result<String> {
+        let n = self.valid(n)?;
+        let mut buf = vec![0u8; 4097];
+        let mut required = 0;
+        check(unsafe {
+            cui_bridge_data_table_get_cell(
+                self.raw,
+                n,
+                row,
+                column,
+                buf.as_mut_ptr().cast(),
+                buf.len() as u32,
+                &mut required,
+            )
+        })?;
+        String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec()).map_err(|_| Error(7))
+    }
+    pub fn data_table_state(&self, n: Node) -> Result<DataTableState> {
+        let n = self.valid(n)?;
+        let mut state = DataTableState {
+            row: 0,
+            column: 0,
+            sort_column: 0,
+            sort_direction: 0,
+        };
+        check(unsafe {
+            cui_bridge_data_table_get_state(
+                self.raw,
+                n,
+                &mut state.row,
+                &mut state.column,
+                &mut state.sort_column,
+                &mut state.sort_direction,
+            )
+        })?;
+        Ok(state)
+    }
+    pub fn data_table_selection_mode(
+        &mut self,
+        n: Node,
+        mode: DataTableSelectionMode,
+    ) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_data_table_set_selection_mode(self.raw, n, mode as u32) })?;
+        Ok(self)
+    }
+    pub fn root_padding(&mut self, n: Node, padding: f32) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_root_padding(self.raw, n, padding) })?;
+        Ok(self)
+    }
+    pub fn speech_start(&mut self, n: Node) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_speech_start(self.raw, n) })?;
+        Ok(self)
+    }
+    pub fn speech_report(&mut self, n: Node, text: &str, final_phrase: bool) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        let text = string(text)?;
+        check(unsafe {
+            cui_bridge_speech_report(self.raw, n, text.as_ptr(), final_phrase as u32)
+        })?;
+        Ok(self)
+    }
+    pub fn speech_finish(&mut self, n: Node) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_speech_finish(self.raw, n) })?;
+        Ok(self)
+    }
+    pub fn speech_transcript(&self, n: Node) -> Result<String> {
+        let n = self.valid(n)?;
+        let mut buf = vec![0u8; 4097];
+        let mut length = 0;
+        check(unsafe {
+            cui_bridge_speech_transcript(
+                self.raw,
+                n,
+                buf.as_mut_ptr().cast(),
+                buf.len() as u32,
+                &mut length,
+            )
+        })?;
+        String::from_utf8(buf[..length as usize].to_vec()).map_err(|_| Error(7))
+    }
+    pub fn questionnaire_question(
+        &mut self,
+        question: Node,
+        required: bool,
+        multiple: bool,
+    ) -> Result<&mut Self> {
+        let question = self.valid(question)?;
+        check(unsafe {
+            cui_bridge_questionnaire_set_question(
+                self.raw,
+                question,
+                required as u32,
+                multiple as u32,
+            )
+        })?;
+        Ok(self)
+    }
+    pub fn questionnaire_state(&self, form: Node) -> Result<QuestionnaireState> {
+        let form = self.valid(form)?;
+        let mut current = RawNode::default();
+        let mut complete = 0;
+        check(unsafe {
+            cui_bridge_questionnaire_get_state(self.raw, form, &mut current, &mut complete)
+        })?;
+        Ok(QuestionnaireState {
+            current: (current.slot != 0).then_some(Node {
+                raw: current,
+                app_id: self.id,
+            }),
+            complete: complete != 0,
+        })
+    }
+    pub fn questionnaire_choice_selected(&self, choice: Node) -> Result<bool> {
+        let choice = self.valid(choice)?;
+        let mut selected = 0;
+        check(unsafe {
+            cui_bridge_questionnaire_choice_selected(self.raw, choice, &mut selected)
+        })?;
+        Ok(selected != 0)
+    }
+    pub fn questionnaire_next(&mut self, form: Node) -> Result<&mut Self> {
+        let form = self.valid(form)?;
+        check(unsafe { cui_bridge_questionnaire_next(self.raw, form) })?;
+        Ok(self)
+    }
+    pub fn questionnaire_previous(&mut self, form: Node) -> Result<&mut Self> {
+        let form = self.valid(form)?;
+        check(unsafe { cui_bridge_questionnaire_previous(self.raw, form) })?;
+        Ok(self)
+    }
+    pub fn questionnaire_submit(&mut self, form: Node) -> Result<&mut Self> {
+        let form = self.valid(form)?;
+        check(unsafe { cui_bridge_questionnaire_submit(self.raw, form) })?;
+        Ok(self)
+    }
+    pub fn dock_activate(&mut self, dock: Node, panel: Node) -> Result<&mut Self> {
+        let dock = self.valid(dock)?;
+        let panel = self.valid(panel)?;
+        check(unsafe { cui_bridge_dock_activate(self.raw, dock, panel) })?;
+        Ok(self)
+    }
+    pub fn dock_move_split(
+        &mut self,
+        dock: Node,
+        panel: Node,
+        reference: Node,
+        axis: DockAxis,
+        ratio: f64,
+        before: bool,
+    ) -> Result<&mut Self> {
+        let dock = self.valid(dock)?;
+        let panel = self.valid(panel)?;
+        let reference = self.valid(reference)?;
+        check(unsafe {
+            cui_bridge_dock_move_split(
+                self.raw,
+                dock,
+                panel,
+                reference,
+                axis as u32,
+                ratio,
+                before as u32,
+            )
+        })?;
+        Ok(self)
+    }
+    pub fn dock_active(&self, dock: Node) -> Result<Option<Node>> {
+        let dock = self.valid(dock)?;
+        let mut out = RawNode::default();
+        check(unsafe { cui_bridge_dock_get_active(self.raw, dock, &mut out) })?;
+        Ok((out.slot != 0).then_some(Node {
+            raw: out,
+            app_id: self.id,
+        }))
+    }
+    pub fn dock_panel_bounds(&self, dock: Node, panel: Node) -> Result<Rect> {
+        let dock = self.valid(dock)?;
+        let panel = self.valid(panel)?;
+        let mut out = Rect::default();
+        check(unsafe { cui_bridge_dock_panel_bounds(self.raw, dock, panel, &mut out) })?;
+        Ok(out)
+    }
+    pub fn dock_serialize(&self, dock: Node) -> Result<String> {
+        let dock = self.valid(dock)?;
+        let mut buf = vec![0u8; 65537];
+        let mut required = 0;
+        check(unsafe {
+            cui_bridge_dock_serialize(
+                self.raw,
+                dock,
+                buf.as_mut_ptr().cast(),
+                buf.len() as u32,
+                &mut required,
+            )
+        })?;
+        String::from_utf8(buf[..required.saturating_sub(1) as usize].to_vec()).map_err(|_| Error(7))
+    }
+    pub fn settings_query(&mut self, settings: Node, query: &str) -> Result<&mut Self> {
+        let settings = self.valid(settings)?;
+        let query = string(query)?;
+        check(unsafe { cui_bridge_settings_set_query(self.raw, settings, query.as_ptr()) })?;
+        Ok(self)
+    }
+    pub fn settings_page(&self, settings: Node) -> Result<Option<Node>> {
+        let settings = self.valid(settings)?;
+        let mut out = RawNode::default();
+        check(unsafe { cui_bridge_settings_get_page(self.raw, settings, &mut out) })?;
+        Ok((out.slot != 0).then_some(Node {
+            raw: out,
+            app_id: self.id,
+        }))
+    }
+    pub fn settings_set_page(&mut self, settings: Node, page: Node) -> Result<&mut Self> {
+        let settings = self.valid(settings)?;
+        let page = self.valid(page)?;
+        check(unsafe { cui_bridge_settings_set_page(self.raw, settings, page) })?;
+        Ok(self)
+    }
+    pub fn settings_reset_page(&mut self, settings: Node, page: Node) -> Result<&mut Self> {
+        let settings = self.valid(settings)?;
+        let page = self.valid(page)?;
+        check(unsafe { cui_bridge_settings_reset_page(self.raw, settings, page) })?;
+        Ok(self)
+    }
+    pub fn settings_field_bounds(&self, settings: Node, field: Node) -> Result<Rect> {
+        let settings = self.valid(settings)?;
+        let field = self.valid(field)?;
+        let mut out = Rect::default();
+        check(unsafe { cui_bridge_settings_field_bounds(self.raw, settings, field, &mut out) })?;
+        Ok(out)
+    }
+    pub fn data_table_cell_bounds(&self, n: Node, row: u32, column: u32) -> Result<Rect> {
+        let n = self.valid(n)?;
+        let mut out = Rect::default();
+        check(unsafe { cui_bridge_data_table_cell_bounds(self.raw, n, row, column, &mut out) })?;
+        Ok(out)
+    }
+    pub fn data_table_header_bounds(&self, n: Node, column: u32) -> Result<Rect> {
+        let n = self.valid(n)?;
+        let mut out = Rect::default();
+        check(unsafe { cui_bridge_data_table_header_bounds(self.raw, n, column, &mut out) })?;
+        Ok(out)
+    }
+    pub fn plot_points(&mut self, n: Node, points: &[PlotPoint]) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        if points.len() > 256 {
+            return Err(Error(3));
+        }
+        check(unsafe {
+            cui_bridge_plot_set_points(self.raw, n, points.as_ptr(), points.len() as u32)
+        })?;
+        Ok(self)
+    }
+    pub fn plot_point(&self, n: Node, index: u32) -> Result<PlotPoint> {
+        let n = self.valid(n)?;
+        let mut out = PlotPoint::default();
+        check(unsafe { cui_bridge_plot_get_point(self.raw, n, index, &mut out) })?;
+        Ok(out)
     }
     pub fn date(&mut self, n: Node, value: Date) -> Result<&mut Self> {
         let n = self.valid(n)?;
@@ -712,6 +1375,7 @@ impl App {
                 },
                 frame: e.frame,
                 checked: e.checked != 0,
+                checked_raw: e.checked,
                 value: e.value,
                 text: String::from_utf8(text[..e.text_length as usize].to_vec())
                     .map_err(|_| Error(7))?,
@@ -741,6 +1405,27 @@ impl App {
         let n = self.valid(n)?;
         let mut r = Rect::default();
         check(unsafe { cui_bridge_dropdown_part_bounds(self.raw, n, menu_part as u32, &mut r) })?;
+        Ok(r)
+    }
+    pub fn resizable_handle_bounds(&self, group: Node, preceding_item: Node) -> Result<Rect> {
+        let group = self.valid(group)?;
+        let item = self.valid(preceding_item)?;
+        let mut r = Rect::default();
+        check(unsafe { cui_bridge_resizable_handle_bounds(self.raw, group, item, &mut r) })?;
+        Ok(r)
+    }
+    pub fn command_item_bounds(&self, command: Node, item: Node) -> Result<Rect> {
+        let command = self.valid(command)?;
+        let item = self.valid(item)?;
+        let mut r = Rect::default();
+        check(unsafe { cui_bridge_command_item_bounds(self.raw, command, item, &mut r) })?;
+        Ok(r)
+    }
+    pub fn virtual_list_item_bounds(&self, list: Node, item: Node) -> Result<Rect> {
+        let list = self.valid(list)?;
+        let item = self.valid(item)?;
+        let mut r = Rect::default();
+        check(unsafe { cui_bridge_virtual_list_item_bounds(self.raw, list, item, &mut r) })?;
         Ok(r)
     }
     pub fn font_fallbacks(&mut self, paths: &[&str]) -> Result<&mut Self> {
@@ -864,6 +1549,43 @@ impl<'a> Builder<'a> {
     }
     pub fn detail_text(self, text: &str) -> Result<Self> {
         self.app.detail_text(self.node, text)?;
+        Ok(self)
+    }
+    pub fn text_view_format(self, format: TextViewFormat) -> Result<Self> {
+        self.app.text_view_format(self.node, format)?;
+        Ok(self)
+    }
+    pub fn chart_data(self, data: &[(&str, f64)]) -> Result<Self> {
+        self.app.chart_data(self.node, data)?;
+        Ok(self)
+    }
+    pub fn chart_kind(self, kind: ChartKind) -> Result<Self> {
+        self.app.chart_kind(self.node, kind)?;
+        Ok(self)
+    }
+    pub fn data_table(self, headers: &[&str], rows: &[&[&str]]) -> Result<Self> {
+        self.app.data_table(self.node, headers, rows)?;
+        Ok(self)
+    }
+    pub fn data_table_selection_mode(self, mode: DataTableSelectionMode) -> Result<Self> {
+        self.app.data_table_selection_mode(self.node, mode)?;
+        Ok(self)
+    }
+    pub fn root_padding(self, padding: f32) -> Result<Self> {
+        self.app.root_padding(self.node, padding)?;
+        Ok(self)
+    }
+    pub fn questionnaire_question(self, required: bool, multiple: bool) -> Result<Self> {
+        self.app
+            .questionnaire_question(self.node, required, multiple)?;
+        Ok(self)
+    }
+    pub fn settings_query(self, query: &str) -> Result<Self> {
+        self.app.settings_query(self.node, query)?;
+        Ok(self)
+    }
+    pub fn plot_points(self, points: &[PlotPoint]) -> Result<Self> {
+        self.app.plot_points(self.node, points)?;
         Ok(self)
     }
     pub fn open(self, open: bool) -> Result<Self> {

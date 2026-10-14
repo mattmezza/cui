@@ -2,8 +2,10 @@
 #include "cui/cui_bridge.h"
 #include <assert.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static void press(cui_bridge_app *app, cui_bridge_node node) {
     cui_bridge_rect r = {0};
@@ -662,6 +664,1222 @@ static void test_focus_trap(void) {
     assert(cui_bridge_poll_event(app, &event) == CUI_BRIDGE_OK && event.node.slot == outside.slot);
     cui_bridge_destroy(app);
 }
+static void test_message_scroller(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, scroller = {0}, items[20] = {{0}};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_MESSAGE_SCROLLER, "messages", &scroller) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, scroller, 280, 100) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_value(app, scroller, 0) == CUI_BRIDGE_INVALID_STATE);
+    for (unsigned i = 0; i < 20; i++) {
+        char key[20];
+        snprintf(key, sizeof key, "message-%u", i);
+        assert(cui_bridge_node_create(app, scroller, CUI_BRIDGE_ITEM, key, &items[i]) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(app, items[i], key) == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_detail_text(app, items[i], "Sender") == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_step_status(app, items[i], i % 2) == CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_set_step_status(app, items[0], 2) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    double offset = 0;
+    assert(cui_bridge_get_value(app, scroller, &offset) == CUI_BRIDGE_OK && offset > 0);
+    assert(cui_bridge_set_value(app, scroller, -1) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_value(app, scroller, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_value(app, scroller, &offset) == CUI_BRIDGE_OK && offset == 0);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, items[0], &bounds) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, items[1]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_node replacement = {0};
+    assert(cui_bridge_node_create(app, scroller, CUI_BRIDGE_ITEM, "replacement", &replacement) ==
+           CUI_BRIDGE_OK);
+    assert(replacement.slot == items[1].slot && replacement.generation != items[1].generation);
+    assert(cui_bridge_set_text(app, replacement, "Replacement") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
+static void test_carousel(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, carousel = {0}, slides[3] = {{0}};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_CAROUSEL, "carousel", &carousel) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, carousel, 240, 100) == CUI_BRIDGE_OK);
+    for (unsigned i = 0; i < 3; i++) {
+        char key[16];
+        snprintf(key, sizeof key, "slide-%u", i);
+        assert(cui_bridge_node_create(app, carousel, CUI_BRIDGE_ITEM, key, &slides[i]) ==
+               CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(app, slides[i], key) == CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_node selected = {0};
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == slides[0].slot);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, carousel, &bounds) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_scroll(app, bounds.x + 30, bounds.y + 30, -1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == slides[1].slot);
+    cui_bridge_event_ex event = {0};
+    char payload[8] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.selected.slot == slides[1].slot &&
+           event.selected.generation == slides[1].generation);
+    assert(cui_bridge_set_selected(app, carousel, slides[2]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == slides[2].slot);
+    assert(cui_bridge_set_disabled(app, carousel, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_scroll(app, bounds.x + 30, bounds.y + 30, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == slides[2].slot);
+    assert(cui_bridge_node_remove(app, slides[2]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == 0);
+    cui_bridge_node replacement = {0};
+    assert(cui_bridge_node_create(app, carousel, CUI_BRIDGE_ITEM, "replacement", &replacement) ==
+           CUI_BRIDGE_OK);
+    assert(replacement.slot == slides[2].slot && replacement.generation != slides[2].generation);
+    assert(cui_bridge_get_selected(app, carousel, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == 0);
+    cui_bridge_destroy(app);
+}
+static void test_resizable(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, group = {0}, first = {0}, second = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_RESIZABLE, "split", &group) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_ITEM, "first", &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_ITEM, "second", &second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, first, "First panel") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, second, "Second panel") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, group, 420, 160) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_value(app, first, 90) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_value(app, first, 240) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    double before = 0, after = 0;
+    assert(cui_bridge_get_value(app, first, &before) == CUI_BRIDGE_OK && before >= 100);
+    cui_bridge_rect handle = {0};
+    assert(cui_bridge_resizable_handle_bounds(app, group, first, &handle) == CUI_BRIDGE_OK);
+    assert(cui_bridge_resizable_handle_bounds(app, group, second, &handle) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    float x = handle.x + handle.width / 2, y = handle.y + handle.height / 2;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x + 30, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x + 30, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_value(app, first, &after) == CUI_BRIDGE_OK && after > before);
+    cui_bridge_event_ex event = {0};
+    char payload[8] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == first.slot &&
+           event.value > before);
+    assert(cui_bridge_set_disabled(app, group, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_resizable_handle_bounds(app, group, first, &handle) == CUI_BRIDGE_OK);
+    x = handle.x + handle.width / 2;
+    y = handle.y + handle.height / 2;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x - 30, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x - 30, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_value(app, first, &before) == CUI_BRIDGE_OK && before == after);
+    cui_bridge_destroy(app);
+}
+static void test_text_view(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, view = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_TEXT_VIEW, "view", &view) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, view, 320, 120) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, view, "**Hello** world") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_text_view_select(app, view, 0, 5) == CUI_BRIDGE_OK);
+    char selected[32] = "preserve";
+    uint32_t needed = 0;
+    assert(cui_bridge_text_view_copy_selection(app, view, selected, 2, &needed) ==
+           CUI_BRIDGE_CAPACITY);
+    assert(strcmp(selected, "preserve") == 0 && needed == 6);
+    assert(cui_bridge_text_view_copy_selection(app, view, selected, sizeof selected, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(strcmp(selected, "Hello") == 0 && needed == 6);
+    assert(cui_bridge_text_view_select(app, view, 50, 51) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_text_view_format(app, view, 3) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_text_view_format(app, view, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, view, "<b>HTML</b> text") == CUI_BRIDGE_OK);
+    assert(cui_bridge_text_view_select(app, view, 0, 4) == CUI_BRIDGE_OK);
+    assert(cui_bridge_text_view_copy_selection(app, view, selected, sizeof selected, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(strcmp(selected, "HTML") == 0);
+    assert(cui_bridge_set_text_view_format(app, view, 2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, view, "Plain text") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, view, &bounds) == CUI_BRIDGE_OK && bounds.width > 0);
+    assert(cui_bridge_text_view_select(app, view, 0, 0) == CUI_BRIDGE_OK);
+    float x = bounds.x + 10, y = bounds.y + 14;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x + 50, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x + 50, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_event_ex event = {0};
+    char snapshot[32] = {0};
+    assert(cui_bridge_poll_event_ex(app, &event, snapshot, sizeof snapshot, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == view.slot &&
+           event.text_length > 0);
+    assert(cui_bridge_set_disabled(app, view, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_MOVE, x + 50, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x + 50, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, snapshot, sizeof snapshot, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    cui_bridge_destroy(app);
+}
+static void test_editor(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, editor = {0}, other = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_EDITOR, "editor", &editor) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_EDITOR, "other", &other) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, editor, "first\nsecond") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, editor, "c") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, editor, 300, 120) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, other, 300, 120) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    press(app, editor);
+    assert(cui_bridge_queue_text(app, "\xE2\x9C\x93") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_event_ex event = {0};
+    char snapshot[4097] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, snapshot, sizeof snapshot, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == editor.slot &&
+           strstr(snapshot, "\xE2\x9C\x93"));
+    char text[4097] = {0};
+    assert(cui_bridge_get_text(app, editor, text, sizeof text, &needed) == CUI_BRIDGE_OK);
+    assert(strstr(text, "\xE2\x9C\x93"));
+    assert(cui_bridge_get_text(app, other, text, sizeof text, &needed) == CUI_BRIDGE_OK &&
+           needed == 1);
+    assert(cui_bridge_set_disabled(app, editor, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_text(app, "X") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, snapshot, sizeof snapshot, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    cui_bridge_destroy(app);
+}
+static void test_chart(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, chart = {0}, second = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_CHART, "revenue", &chart) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_CHART, "cost", &second) == CUI_BRIDGE_OK);
+    char label[] = "North";
+    cui_bridge_chart_datum data[] = {{label, 10}, {"South", 20}};
+    assert(cui_bridge_chart_set_data(app, chart, data, 2) == CUI_BRIDGE_OK);
+    label[0] = 'X';
+    char readback[16] = "sentinel";
+    uint32_t needed = 0;
+    double value = -1;
+    assert(cui_bridge_chart_get_datum(app, chart, 0, readback, 2, &needed, &value) ==
+           CUI_BRIDGE_CAPACITY);
+    assert(strcmp(readback, "sentinel") == 0 && value == -1 && needed == 6);
+    assert(cui_bridge_chart_get_datum(app, chart, 0, readback, sizeof readback, &needed, &value) ==
+           CUI_BRIDGE_OK);
+    assert(strcmp(readback, "North") == 0 && value == 10);
+    assert(cui_bridge_chart_set_data(app, second, data, 65) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_chart_set_kind(app, chart, 2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_chart_set_kind(app, chart, 4) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_visual_size(app, chart, 256, 160) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, chart, 513, 160) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, chart, &bounds) == CUI_BRIDGE_OK && bounds.width > 0);
+    assert(cui_bridge_chart_set_kind(app, chart, 3) == CUI_BRIDGE_OK);
+    cui_bridge_chart_datum bad[] = {{"negative", -1}};
+    assert(cui_bridge_chart_set_data(app, chart, bad, 1) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, chart) == CUI_BRIDGE_OK);
+    assert(cui_bridge_chart_get_datum(app, chart, 0, readback, sizeof readback, &needed, &value) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
+static void test_table(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, table = {0}, head = {0}, body = {0};
+    cui_bridge_node h1 = {0}, h2 = {0}, c1 = {0}, c2 = {0}, invalid = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_TABLE, "scores", &table) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, table, CUI_BRIDGE_BUTTON, "invalid", &invalid) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_create(app, table, CUI_BRIDGE_ITEM, "head", &head) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, head, CUI_BRIDGE_ITEM, "name", &h1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, head, CUI_BRIDGE_ITEM, "score", &h2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, table, CUI_BRIDGE_ITEM, "body", &body) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, body, CUI_BRIDGE_ITEM, "alice", &c1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, body, CUI_BRIDGE_ITEM, "95", &c2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, body, CUI_BRIDGE_BUTTON, "invalid", &invalid) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_text(app, h1, "Name") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, h2, "Score") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, c1, "Alice") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, c2, "95") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, table, 400, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect tr = {0}, hr = {0}, br = {0}, cr = {0};
+    assert(cui_bridge_node_bounds(app, table, &tr) == CUI_BRIDGE_OK && tr.width > 0);
+    assert(cui_bridge_node_bounds(app, head, &hr) == CUI_BRIDGE_OK && hr.height > 0);
+    assert(cui_bridge_node_bounds(app, body, &br) == CUI_BRIDGE_OK && br.y > hr.y);
+    assert(cui_bridge_node_bounds(app, c2, &cr) == CUI_BRIDGE_OK && cr.x > br.x);
+    assert(cui_bridge_set_text(app, c2, "96") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, body) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, c2, &cr) == CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
+static void test_data_table(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, table = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_DATA_TABLE, "results", &table) ==
+           CUI_BRIDGE_OK);
+    char first[] = "Name";
+    const char *headers[] = {first, "Score"};
+    const char *cells[] = {"Alice", "95", "Bob", "87"};
+    assert(cui_bridge_data_table_set(app, table, headers, 2, cells, 2) == CUI_BRIDGE_OK);
+    first[0] = 'X';
+    char copied[16] = "sentinel";
+    uint32_t required = 0;
+    assert(cui_bridge_data_table_get_cell(app, table, 0, 0, copied, 2, &required) ==
+           CUI_BRIDGE_CAPACITY);
+    assert(strcmp(copied, "sentinel") == 0 && required == 6);
+    assert(cui_bridge_data_table_get_cell(app, table, 0, 0, copied, sizeof copied, &required) ==
+           CUI_BRIDGE_OK);
+    assert(strcmp(copied, "Alice") == 0);
+    const char *invalid[] = {"okay", NULL};
+    assert(cui_bridge_data_table_set(app, table, headers, 2, invalid, 1) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_data_table_get_cell(app, table, 1, 0, copied, sizeof copied, &required) ==
+           CUI_BRIDGE_OK);
+    assert(strcmp(copied, "Bob") == 0);
+    assert(cui_bridge_set_visual_size(app, table, 320, 150) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect cell = {0}, header = {0};
+    assert(cui_bridge_data_table_cell_bounds(app, table, 1, 0, &cell) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_header_bounds(app, table, 0, &header) == CUI_BRIDGE_OK);
+    assert(cell.y > header.y && cell.width > 0);
+    float x = cell.x + cell.width * .5f, y = cell.y + cell.height * .5f;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    uint32_t row = 0, column = 0, sort_column = 0, sort_direction = 0;
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == 2);
+    x = header.x + header.width * .5f;
+    y = header.y + header.height * .5f;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(sort_column == 1 && sort_direction != 0);
+    cui_bridge_event_ex event = {.value = 123};
+    char payload[128] = {0}, too_small[4] = "old";
+    assert(cui_bridge_poll_event_ex(app, &event, too_small, sizeof too_small, &required) ==
+           CUI_BRIDGE_CAPACITY);
+    assert(event.value == 123 && strcmp(too_small, "old") == 0 && required > sizeof too_small);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK);
+    assert(event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == table.slot &&
+           event.value == 2 && strstr(payload, "\"reason\":\"selection\"") &&
+           strstr(payload, "\"row\":2") && strstr(payload, "\"sortColumn\":0"));
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK);
+    assert(strstr(payload, "\"reason\":\"sort\"") && strstr(payload, "\"sortColumn\":1") &&
+           event.value == 2);
+    const char *reordered[] = {"Bob", "87", "Alice", "95"};
+    assert(cui_bridge_data_table_set(app, table, headers, 2, reordered, 2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_cell(app, table, 0, 0, copied, sizeof copied, &required) ==
+               CUI_BRIDGE_OK &&
+           strcmp(copied, "Bob") == 0);
+    assert(cui_bridge_data_table_set_selection_mode(app, table, 3) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_data_table_set_selection_mode(app, table, 2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 0, 1, &cell) == CUI_BRIDGE_OK);
+    x = cell.x + cell.width * .5f;
+    y = cell.y + cell.height * .5f;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == 1 && column == 2);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK);
+    assert(strstr(payload, "\"reason\":\"selection\"") && strstr(payload, "\"column\":2"));
+    assert(cui_bridge_set_disabled(app, table, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    uint32_t disabled_sort = 0;
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &disabled_sort) == CUI_BRIDGE_OK);
+    assert(disabled_sort == sort_direction);
+    assert(cui_bridge_node_remove(app, table) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+static void test_plot(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, plot = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_PLOT, "samples", &plot) == CUI_BRIDGE_OK);
+    cui_bridge_plot_point points[] = {{20, 20}, {60, 60}, {100, 30}};
+    assert(cui_bridge_plot_set_points(app, plot, points, 3) == CUI_BRIDGE_OK);
+    points[0].x = 999;
+    cui_bridge_plot_point readback = {0};
+    assert(cui_bridge_plot_get_point(app, plot, 0, &readback) == CUI_BRIDGE_OK && readback.x == 20);
+    cui_bridge_plot_point invalid[] = {{0, 0}, {INFINITY, 1}};
+    assert(cui_bridge_plot_set_points(app, plot, invalid, 2) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_plot_get_point(app, plot, 2, &readback) == CUI_BRIDGE_OK &&
+           readback.x == 100);
+    assert(cui_bridge_set_visual_size(app, plot, 240, 120) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, plot, &bounds) == CUI_BRIDGE_OK && bounds.width > 0);
+    assert(cui_bridge_node_remove(app, plot) == CUI_BRIDGE_OK);
+    assert(cui_bridge_plot_get_point(app, plot, 0, &readback) == CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
+static void test_command(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, command = {0}, open = {0}, close = {0}, invalid = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COMMAND, "actions", &command) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, command, CUI_BRIDGE_BUTTON, "bad", &invalid) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_create(app, command, CUI_BRIDGE_ITEM, "open", &open) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, command, CUI_BRIDGE_ITEM, "close", &close) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, open, "Open") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, close, "Close") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, close, "exit") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, command, 300, 150) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_node selected = {0};
+    assert(cui_bridge_get_selected(app, command, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == open.slot);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_command_item_bounds(app, command, close, &bounds) == CUI_BRIDGE_OK);
+    float x = bounds.x + bounds.width * .5f, y = bounds.y + bounds.height * .5f;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, command, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == close.slot);
+    cui_bridge_event_ex event = {0};
+    char payload[4097] = {0};
+    uint32_t required = 0;
+    bool clicked = false;
+    while (cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK)
+        if (event.type == CUI_BRIDGE_EVENT_CLICK && event.node.slot == close.slot)
+            clicked = true;
+    assert(clicked);
+    assert(cui_bridge_set_text(app, command, "exit") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, command, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == close.slot);
+    assert(cui_bridge_set_disabled(app, close, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_selected(app, command, &selected) == CUI_BRIDGE_OK && selected.slot == 0);
+    assert(cui_bridge_node_remove(app, command) == CUI_BRIDGE_OK);
+    assert(cui_bridge_command_item_bounds(app, command, close, &bounds) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+static void test_virtual_list(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, list = {0}, items[20] = {{0}};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_VIRTUAL_LIST, "items", &list) ==
+           CUI_BRIDGE_OK);
+    for (unsigned i = 0; i < 20; i++) {
+        char key[16];
+        snprintf(key, sizeof key, "item-%u", i);
+        assert(cui_bridge_node_create(app, list, CUI_BRIDGE_ITEM, key, &items[i]) == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(app, items[i], key) == CUI_BRIDGE_OK);
+    }
+    assert(cui_bridge_set_visual_size(app, list, 200, 96) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect surface = {0}, first = {0}, last = {0};
+    assert(cui_bridge_node_bounds(app, list, &surface) == CUI_BRIDGE_OK && surface.height > 0);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, items[0], &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, items[19], &last) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_queue_scroll(app, surface.x + 20, surface.y + 20, 0, -1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    double offset = 0;
+    assert(cui_bridge_get_value(app, list, &offset) == CUI_BRIDGE_OK && offset > 0);
+    cui_bridge_event_ex event = {0};
+    char text[8] = {0};
+    uint32_t required = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, text, sizeof text, &required) == CUI_BRIDGE_OK &&
+           event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == list.slot &&
+           event.value > 0);
+    assert(cui_bridge_set_value(app, list, 500) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, items[19], &last) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_disabled(app, list, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_value(app, list, &offset) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_scroll(app, surface.x + 20, surface.y + 20, 0, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    double disabled_offset = 0;
+    assert(cui_bridge_get_value(app, list, &disabled_offset) == CUI_BRIDGE_OK &&
+           disabled_offset == offset);
+    assert(cui_bridge_node_remove(app, items[19]) == CUI_BRIDGE_OK);
+    assert(cui_bridge_virtual_list_item_bounds(app, list, items[19], &last) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_destroy(app);
+}
+static void test_sidebar(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, sidebar = {0}, home = {0}, settings = {0}, invalid = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SIDEBAR, "navigation", &sidebar) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, sidebar, CUI_BRIDGE_BUTTON, "invalid", &invalid) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_create(app, sidebar, CUI_BRIDGE_ITEM, "home", &home) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, sidebar, CUI_BRIDGE_ITEM, "settings", &settings) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, settings, CUI_BRIDGE_BUTTON, "invalid", &invalid) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_text(app, home, "Home") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, settings, "Settings") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, sidebar, 240, 180) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, home, &bounds) == CUI_BRIDGE_OK && bounds.height > 0);
+    press(app, settings);
+    cui_bridge_node selected = {0};
+    assert(cui_bridge_get_selected(app, sidebar, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == settings.slot);
+    cui_bridge_event_ex event = {0};
+    char payload[16] = {0};
+    uint32_t required = 0;
+    bool selected_event = false, clicked = false;
+    while (cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK) {
+        if (event.type == CUI_BRIDGE_EVENT_CHANGE && event.node.slot == sidebar.slot &&
+            event.selected.slot == settings.slot)
+            selected_event = true;
+        if (event.type == CUI_BRIDGE_EVENT_CLICK && event.node.slot == settings.slot)
+            clicked = true;
+    }
+    assert(selected_event && clicked);
+    assert(cui_bridge_set_open(app, sidebar, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    uint32_t open = 1;
+    assert(cui_bridge_get_open(app, sidebar, &open) == CUI_BRIDGE_OK && open == 0);
+    assert(cui_bridge_set_open(app, sidebar, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_disabled(app, home, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    press(app, home);
+    assert(cui_bridge_get_selected(app, sidebar, &selected) == CUI_BRIDGE_OK &&
+           selected.slot == settings.slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_node_remove(app, sidebar) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_open(app, sidebar, &open) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+static void test_theme_presets(void) {
+    uint32_t count = cui_bridge_theme_preset_count();
+    assert(count >= 3);
+    char name[128] = "untouched";
+    uint32_t length = 777;
+    assert(cui_bridge_theme_preset_name(0, name, 1, &length) == CUI_BRIDGE_CAPACITY);
+    assert(strcmp(name, "untouched") == 0 && length == 777);
+    assert(cui_bridge_theme_preset_name(count, name, sizeof name, &length) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_theme_preset_name(0, name, sizeof name, &length) == CUI_BRIDGE_OK);
+    assert(strlen(name) == length && length > 0);
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 320,
+                            .height = 240};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    uint32_t selected = 777;
+    assert(cui_bridge_get_theme_preset(app, &selected) == CUI_BRIDGE_EMPTY && selected == 777);
+    assert(cui_bridge_set_theme_preset(app, count) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_theme_preset(app, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_theme_preset(app, &selected) == CUI_BRIDGE_OK && selected == 0);
+    cui_bridge_node root = {0}, button = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_BUTTON, "button", &button) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, button, "Action") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_theme_preset(app, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_theme_preset(app, &selected) == CUI_BRIDGE_OK && selected == 1);
+    cui_bridge_destroy(app);
+}
+static void test_root_view(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 320,
+                            .height = 240};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, button = {0}, nested = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_ROOT_VIEW, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_ROOT_VIEW, "nested", &nested) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_BUTTON, "button", &button) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, button, "Apply") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_root_padding(app, button, 5) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_root_padding(app, root, -1) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_root_padding(app, root, 20) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, root, &bounds) == CUI_BRIDGE_OK);
+    assert(bounds.width == 320 && bounds.height == 240);
+    assert(cui_bridge_node_bounds(app, button, &bounds) == CUI_BRIDGE_OK && bounds.x >= 20);
+    press(app, button);
+    cui_bridge_event event = {0};
+    assert(cui_bridge_poll_event(app, &event) == CUI_BRIDGE_OK && event.node.slot == button.slot);
+    assert(cui_bridge_set_root_padding(app, root, 40) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, button, &bounds) == CUI_BRIDGE_OK && bounds.x >= 40);
+    cui_bridge_destroy(app);
+}
+static void test_clipboard(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 320,
+                            .height = 240};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    char output[64] = "untouched";
+    uint32_t length = 999;
+    assert(cui_bridge_clipboard_set(app, "\xC0\xAF") == CUI_BRIDGE_INVALID_UTF8);
+    char *large = malloc(65538), *readback = malloc(65537);
+    assert(large && readback);
+    for (size_t i = 0; i < 32768; i++) {
+        large[i * 2] = (char)0xc3;
+        large[i * 2 + 1] = (char)0xa9;
+    }
+    large[65536] = '\0';
+    assert(cui_bridge_clipboard_set(app, large) == CUI_BRIDGE_BACKEND_UNAVAILABLE);
+    large[65536] = 'x';
+    large[65537] = '\0';
+    assert(cui_bridge_clipboard_set(app, large) == CUI_BRIDGE_CAPACITY);
+    large[65536] = '\0';
+    assert(cui_bridge_clipboard_set(app, "copy") == CUI_BRIDGE_BACKEND_UNAVAILABLE);
+    assert(cui_bridge_clipboard_get(app, output, sizeof output, &length) ==
+           CUI_BRIDGE_BACKEND_UNAVAILABLE);
+    assert(strcmp(output, "untouched") == 0 && length == 999);
+    cui_bridge_destroy(app);
+    const char *font = getenv("CUI_BRIDGE_NATIVE_FONT");
+    if (!font || !font[0]) {
+        free(large);
+        free(readback);
+        return;
+    }
+    o.backend = CUI_BRIDGE_BACKEND_SDL;
+    o.font_path_utf8 = font;
+    app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    assert(cui_bridge_clipboard_set(app, "copy \xE2\x9C\x93") == CUI_BRIDGE_OK);
+    assert(cui_bridge_clipboard_get(app, output, 1, &length) == CUI_BRIDGE_CAPACITY);
+    assert(strcmp(output, "untouched") == 0 && length == 999);
+    assert(cui_bridge_clipboard_get(app, output, sizeof output, &length) == CUI_BRIDGE_OK);
+    assert(length == strlen("copy \xE2\x9C\x93") && strcmp(output, "copy \xE2\x9C\x93") == 0);
+    assert(cui_bridge_clipboard_set(app, large) == CUI_BRIDGE_OK);
+    assert(cui_bridge_clipboard_get(app, readback, 65536, &length) == CUI_BRIDGE_CAPACITY);
+    assert(cui_bridge_clipboard_get(app, readback, 65537, &length) == CUI_BRIDGE_OK);
+    assert(length == 65536 && memcmp(readback, large, 65537) == 0);
+    assert(cui_bridge_clipboard_set(app, "") == CUI_BRIDGE_OK);
+    assert(cui_bridge_clipboard_get(app, output, sizeof output, &length) == CUI_BRIDGE_OK);
+    assert(length == 0 && output[0] == '\0');
+    cui_bridge_destroy(app);
+    free(large);
+    free(readback);
+}
+static void test_speech(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 320,
+                            .height = 240};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, speech = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SPEECH, "speech", &speech) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_node_bounds(app, speech, &bounds) == CUI_BRIDGE_OK && bounds.width > 0);
+    assert(cui_bridge_speech_report(app, speech, "early", 1) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_speech_start(app, speech) == CUI_BRIDGE_OK);
+    assert(cui_bridge_speech_start(app, speech) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_speech_report(app, speech, "bad\xC0\xAF", 0) == CUI_BRIDGE_INVALID_UTF8);
+    assert(cui_bridge_speech_report(app, speech, "hel", 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_speech_report(app, speech, "hello", 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    char transcript[32] = "untouched";
+    uint32_t length = 777, checked = 0;
+    assert(cui_bridge_speech_transcript(app, speech, transcript, 1, &length) ==
+           CUI_BRIDGE_CAPACITY);
+    assert(strcmp(transcript, "untouched") == 0 && length == 777);
+    assert(cui_bridge_speech_transcript(app, speech, transcript, sizeof transcript, &length) ==
+           CUI_BRIDGE_OK);
+    assert(length == 5 && strcmp(transcript, "hello") == 0);
+    assert(cui_bridge_get_checked(app, speech, &checked) == CUI_BRIDGE_OK && checked == 1);
+    cui_bridge_event_ex event = {0};
+    char payload[32] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == speech.slot && event.value == 0 && event.checked == 1);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.value == 1 && strcmp(payload, "hel") == 0);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.value == 1 && strcmp(payload, "hello") == 0);
+    assert(cui_bridge_speech_finish(app, speech) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.value == 2 && event.checked == 0 && strcmp(payload, "hello") == 0);
+    assert(cui_bridge_set_disabled(app, speech, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_speech_start(app, speech) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_remove(app, speech) == CUI_BRIDGE_OK);
+    assert(cui_bridge_speech_start(app, speech) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+static void test_questionnaire(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 480,
+                            .height = 400};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, form = {0}, q1 = {0}, q2 = {0};
+    cui_bridge_node a = {0}, b = {0}, c = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_QUESTIONNAIRE, "survey", &form) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, form, CUI_BRIDGE_ITEM, "color", &q1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, q1, CUI_BRIDGE_ITEM, "red", &a) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, q1, CUI_BRIDGE_ITEM, "blue", &b) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, form, CUI_BRIDGE_ITEM, "shape", &q2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, q2, CUI_BRIDGE_ITEM, "round", &c) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, q1, "Choose a color") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, a, "Red") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, b, "Blue") == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_set_question(app, q1, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_set_question(app, q2, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_node current = {0};
+    uint32_t complete = 7, selected = 7;
+    assert(cui_bridge_questionnaire_get_state(app, form, &current, &complete) == CUI_BRIDGE_OK);
+    assert(current.slot == q1.slot && complete == 0);
+    assert(cui_bridge_questionnaire_next(app, form) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_questionnaire_submit(app, form) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_text(app, a, "Changed") == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_remove(app, b) == CUI_BRIDGE_INVALID_STATE);
+    press(app, a);
+    press(app, b);
+    assert(cui_bridge_questionnaire_choice_selected(app, b, &selected) == CUI_BRIDGE_OK &&
+           selected == 1);
+    assert(cui_bridge_questionnaire_choice_selected(app, a, &selected) == CUI_BRIDGE_OK &&
+           selected == 0);
+    cui_bridge_event_ex event = {0};
+    char payload[128] = {0};
+    uint32_t needed = 0;
+    event.value = 777;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, 1, &needed) == CUI_BRIDGE_CAPACITY);
+    assert(event.value == 777 && needed > 1);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == form.slot && strstr(payload, "\"selected\":[1]") != NULL);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == form.slot && strstr(payload, "\"selected\":[2]") != NULL);
+    assert(cui_bridge_questionnaire_next(app, form) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_get_state(app, form, &current, &complete) == CUI_BRIDGE_OK);
+    assert(current.slot == q2.slot && complete == 0);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_bounds(app, c, &(cui_bridge_rect){0}) == CUI_BRIDGE_OK);
+    press(app, c);
+    assert(cui_bridge_questionnaire_previous(app, form) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_get_state(app, form, &current, &complete) == CUI_BRIDGE_OK);
+    assert(current.slot == q1.slot);
+    assert(cui_bridge_questionnaire_submit(app, form) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_submit(app, form) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_get_state(app, form, &current, &complete) == CUI_BRIDGE_OK &&
+           complete == 1);
+    unsigned completed = 0, submitted = 0;
+    while (cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK) {
+        if (event.value == 2) {
+            completed++;
+            assert(strstr(payload, "\"complete\":1") != NULL);
+        }
+        if (event.value == 3) {
+            submitted++;
+            assert(strstr(payload, "\"complete\":1") != NULL);
+        }
+    }
+    assert(completed == 1 && submitted == 2);
+    assert(cui_bridge_node_remove(app, form) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_get_state(app, form, &current, &complete) ==
+           CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+static void test_dock(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, dock = {0}, first = {0}, second = {0};
+    cui_bridge_node content = {0}, current = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_DOCK, "dock", &dock) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, dock, CUI_BRIDGE_ITEM, "one", &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, dock, CUI_BRIDGE_ITEM, "two", &second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, first, "First") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, second, "Second") == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, first, CUI_BRIDGE_LABEL, "content", &content) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, content, "Panel body") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, dock, 480, 300) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_get_active(app, dock, &current) == CUI_BRIDGE_OK &&
+           current.slot == first.slot);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_dock_panel_bounds(app, dock, second, &bounds) == CUI_BRIDGE_OK &&
+           bounds.width > 0);
+    assert(cui_bridge_set_text(app, second, "Later") == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_remove(app, second) == CUI_BRIDGE_INVALID_STATE);
+    char before_model[4096] = {0};
+    uint32_t before_required = 0;
+    assert(cui_bridge_dock_serialize(app, dock, before_model, sizeof before_model,
+                                     &before_required) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_move_split(app, dock, second, first, 2, .5, 0) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_dock_move_split(app, dock, second, first, 0, .4, 0) == CUI_BRIDGE_OK);
+    char model[4096] = "untouched";
+    uint32_t required = 0;
+    assert(cui_bridge_dock_serialize(app, dock, model, 1, &required) == CUI_BRIDGE_CAPACITY);
+    assert(strcmp(model, "untouched") == 0 && required > 1);
+    assert(cui_bridge_dock_serialize(app, dock, model, sizeof model, &required) == CUI_BRIDGE_OK);
+    assert(strlen(model) + 1 == required && strcmp(model, before_model) != 0);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_activate(app, dock, second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_get_active(app, dock, &current) == CUI_BRIDGE_OK &&
+           current.slot == second.slot);
+    cui_bridge_event_ex event = {0};
+    char payload[8] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == dock.slot && event.selected.slot == second.slot &&
+           event.selected.generation == second.generation);
+    assert(cui_bridge_set_disabled(app, dock, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_activate(app, dock, first) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_node_remove(app, dock) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_get_active(app, dock, &current) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+}
+static void test_settings(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 900,
+                            .height = 650};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, settings = {0}, general = {0}, advanced = {0};
+    cui_bridge_node group = {0}, other_group = {0}, toggle = {0}, checkbox = {0};
+    cui_bridge_node input = {0}, number = {0}, current = {0};
+    cui_bridge_node second_settings = {0}, second_page = {0};
+    cui_bridge_node second_group = {0}, second_toggle = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SETTINGS, "settings", &settings) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, settings, CUI_BRIDGE_ITEM, "general", &general) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, general, CUI_BRIDGE_ITEM, "group", &group) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_SWITCH, "switch", &toggle) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_CHECKBOX, "check", &checkbox) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_INPUT, "name", &input) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_NUMBER_INPUT, "count", &number) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, settings, CUI_BRIDGE_ITEM, "advanced", &advanced) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, advanced, CUI_BRIDGE_ITEM, "other", &other_group) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, general, "General") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, advanced, "Advanced") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, group, "Preferences") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, toggle, "Enable") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, checkbox, "Confirm") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, input, "Name") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_detail_text(app, number, "Count") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, settings, 720, 500) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SETTINGS, "second-settings",
+                                  &second_settings) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, second_settings, CUI_BRIDGE_ITEM, "second-page",
+                                  &second_page) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, second_page, CUI_BRIDGE_ITEM, "second-group",
+                                  &second_group) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, second_group, CUI_BRIDGE_SWITCH, "second-switch",
+                                  &second_toggle) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, second_settings, 300, 200) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_settings_get_page(app, settings, &current) == CUI_BRIDGE_OK &&
+           current.slot == general.slot);
+    assert(cui_bridge_settings_get_page(app, second_settings, &current) == CUI_BRIDGE_OK &&
+           current.slot == second_page.slot);
+    assert(cui_bridge_node_remove(app, group) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_text(app, general, "Changed") == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_set_detail_text(app, general, "Changed") == CUI_BRIDGE_INVALID_STATE);
+    cui_bridge_rect bounds = {0};
+    assert(cui_bridge_settings_field_bounds(app, settings, toggle, &bounds) == CUI_BRIDGE_OK &&
+           bounds.width > 0 && bounds.height > 0);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, bounds.x + bounds.width * .5f,
+                                    bounds.y + bounds.height * .5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, bounds.x + bounds.width * .5f,
+                                    bounds.y + bounds.height * .5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    uint32_t checked = 0;
+    assert(cui_bridge_get_checked(app, toggle, &checked) == CUI_BRIDGE_OK && checked == 1);
+    cui_bridge_event_ex event = {0};
+    char payload[16] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == toggle.slot && event.checked == 1);
+    assert(cui_bridge_settings_field_bounds(app, settings, input, &bounds) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, bounds.x + bounds.width * .5f,
+                                    bounds.y + bounds.height * .5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, bounds.x + bounds.width * .5f,
+                                    bounds.y + bounds.height * .5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_text(app, "Zoë") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    char input_text[16] = {0};
+    assert(cui_bridge_get_text(app, input, input_text, sizeof input_text, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(strcmp(input_text, "Zoë") == 0);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == input.slot && strcmp(payload, "Zoë") == 0);
+    assert(cui_bridge_set_disabled(app, checkbox, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_settings_field_bounds(app, settings, checkbox, &bounds) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, bounds.x + bounds.width * .5f,
+                                    bounds.y + bounds.height * .5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, bounds.x + bounds.width * .5f,
+                                    bounds.y + bounds.height * .5f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_checked(app, checkbox, &checked) == CUI_BRIDGE_OK && checked == 0);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_settings_set_page(app, settings, advanced) == CUI_BRIDGE_OK);
+    assert(cui_bridge_settings_get_page(app, settings, &current) == CUI_BRIDGE_OK &&
+           current.slot == advanced.slot);
+    assert(cui_bridge_settings_set_page(app, settings, general) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == settings.slot && event.selected.slot == advanced.slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == settings.slot && event.selected.slot == general.slot);
+    assert(cui_bridge_settings_reset_page(app, settings, general) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_checked(app, toggle, &checked) == CUI_BRIDGE_OK && checked == 0);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == toggle.slot && event.checked == 0);
+    bool saw_input_reset = false;
+    while (cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) == CUI_BRIDGE_OK)
+        if (event.node.slot == input.slot) {
+            saw_input_reset = true;
+            assert(event.text_length == 0);
+        }
+    assert(saw_input_reset);
+    assert(cui_bridge_get_text(app, input, input_text, sizeof input_text, &needed) ==
+               CUI_BRIDGE_OK &&
+           strcmp(input_text, "") == 0);
+    assert(cui_bridge_set_text(app, input, "Host") == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_text(app, input, input_text, sizeof input_text, &needed) ==
+               CUI_BRIDGE_OK &&
+           strcmp(input_text, "Host") == 0);
+    assert(cui_bridge_set_value(app, number, 7) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    double number_value = 0;
+    assert(cui_bridge_get_value(app, number, &number_value) == CUI_BRIDGE_OK && number_value == 7);
+    assert(cui_bridge_settings_reset_page(app, settings, general) == CUI_BRIDGE_OK);
+    assert(cui_bridge_get_value(app, number, &number_value) == CUI_BRIDGE_OK && number_value == 0);
+    while (cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK) {
+    }
+    char too_long[258];
+    memset(too_long, 'a', sizeof too_long - 1);
+    too_long[257] = 0;
+    assert(cui_bridge_settings_set_query(app, settings, too_long) == CUI_BRIDGE_CAPACITY);
+    assert(cui_bridge_settings_set_query(app, settings, "\xC0") == CUI_BRIDGE_INVALID_UTF8);
+    assert(cui_bridge_settings_set_query(app, settings, "Advanced") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    bounds = (cui_bridge_rect){11, 12, 13, 14};
+    assert(cui_bridge_settings_field_bounds(app, settings, toggle, &bounds) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(bounds.x == 11 && bounds.y == 12 && bounds.width == 13 && bounds.height == 14);
+    assert(cui_bridge_settings_get_page(app, second_settings, &current) == CUI_BRIDGE_OK &&
+           current.slot == second_page.slot);
+    assert(cui_bridge_get_checked(app, second_toggle, &checked) == CUI_BRIDGE_OK && checked == 0);
+    assert(cui_bridge_node_remove(app, settings) == CUI_BRIDGE_OK);
+    assert(cui_bridge_settings_get_page(app, settings, &current) == CUI_BRIDGE_STALE_HANDLE);
+    cui_bridge_destroy(app);
+    o.max_events = 1;
+    app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    root = settings = general = group = toggle = checkbox = (cui_bridge_node){0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SETTINGS, "settings", &settings) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, settings, CUI_BRIDGE_ITEM, "page", &general) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, general, CUI_BRIDGE_ITEM, "group", &group) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_SWITCH, "one", &toggle) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, group, CUI_BRIDGE_CHECKBOX, "two", &checkbox) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_checked(app, toggle, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_settings_reset_page(app, settings, general) == CUI_BRIDGE_CAPACITY);
+    assert(cui_bridge_get_checked(app, toggle, &checked) == CUI_BRIDGE_OK && checked == 1);
+    cui_bridge_destroy(app);
+}
+static void test_model_event_capacity(void) {
+    cui_bridge_options o = {.struct_size = sizeof o,
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_NONE,
+                            .width = 640,
+                            .height = 480,
+                            .max_events = 1};
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    cui_bridge_app *app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, dock = {0}, first = {0}, second = {0}, current = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_DOCK, "dock", &dock) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, dock, CUI_BRIDGE_ITEM, "first", &first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, dock, CUI_BRIDGE_ITEM, "second", &second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_activate(app, dock, second) == CUI_BRIDGE_OK);
+    assert(cui_bridge_dock_activate(app, dock, first) == CUI_BRIDGE_CAPACITY);
+    assert(cui_bridge_dock_get_active(app, dock, &current) == CUI_BRIDGE_OK &&
+           current.slot == second.slot);
+    cui_bridge_event_ex event = {0};
+    char payload[128] = {0};
+    uint32_t needed = 0;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == dock.slot && event.selected.slot == second.slot);
+    assert(cui_bridge_dock_activate(app, dock, first) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.selected.slot == first.slot && event.selected.generation == first.generation);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_EMPTY);
+    cui_bridge_destroy(app);
+
+    app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    root = (cui_bridge_node){0};
+    cui_bridge_node survey = {0}, q1 = {0}, q2 = {0}, choice_a = {0}, choice_b = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_QUESTIONNAIRE, "survey", &survey) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, survey, CUI_BRIDGE_ITEM, "one", &q1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, q1, CUI_BRIDGE_ITEM, "choice-one", &choice_a) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, survey, CUI_BRIDGE_ITEM, "two", &q2) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, q2, CUI_BRIDGE_ITEM, "choice-two", &choice_b) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    press(app, choice_a);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_next(app, survey) == CUI_BRIDGE_OK);
+    assert(cui_bridge_questionnaire_previous(app, survey) == CUI_BRIDGE_CAPACITY);
+    uint32_t complete = 0;
+    assert(cui_bridge_questionnaire_get_state(app, survey, &current, &complete) == CUI_BRIDGE_OK &&
+           current.slot == q2.slot);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == survey.slot && strstr(payload, "\"current\":2") != NULL);
+    assert(cui_bridge_questionnaire_previous(app, survey) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(strstr(payload, "\"current\":1") != NULL);
+    cui_bridge_destroy(app);
+
+    app = cui_bridge_create(&o, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    root = (cui_bridge_node){0};
+    cui_bridge_node speech_a = {0}, speech_b = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SPEECH, "a", &speech_a) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_SPEECH, "b", &speech_b) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_speech_start(app, speech_a) == CUI_BRIDGE_OK);
+    assert(cui_bridge_speech_start(app, speech_b) == CUI_BRIDGE_CAPACITY);
+    uint32_t active = 99;
+    assert(cui_bridge_get_checked(app, speech_b, &active) == CUI_BRIDGE_OK && active == 0);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == speech_a.slot);
+    assert(cui_bridge_speech_start(app, speech_b) == CUI_BRIDGE_OK);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &needed) ==
+           CUI_BRIDGE_OK);
+    assert(event.node.slot == speech_b.slot && event.checked == 1);
+    cui_bridge_destroy(app);
+}
 int main(void) {
     test_nested_group_stack();
     test_chrome();
@@ -677,6 +1895,26 @@ int main(void) {
     test_input_group();
     test_notification();
     test_focus_trap();
+    test_message_scroller();
+    test_carousel();
+    test_resizable();
+    test_text_view();
+    test_editor();
+    test_chart();
+    test_table();
+    test_data_table();
+    test_plot();
+    test_command();
+    test_virtual_list();
+    test_sidebar();
+    test_theme_presets();
+    test_root_view();
+    test_clipboard();
+    test_speech();
+    test_questionnaire();
+    test_dock();
+    test_settings();
+    test_model_event_capacity();
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
                             .backend = CUI_BRIDGE_BACKEND_NONE,

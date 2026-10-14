@@ -1,7 +1,9 @@
 package cui
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
 	"runtime"
 	"strings"
 	"testing"
@@ -1061,5 +1063,855 @@ func TestFontFallbackValidation(t *testing.T) {
 	}
 	if err := a.SetFontFallbacks([]string{"/some/font.ttf"}); err == nil {
 		t.Fatal("headless app accepted SDL font fallbacks")
+	}
+}
+
+func TestMessageScroller(t *testing.T) {
+	a := app(t)
+	items := make([]*Node, 20)
+	for i := range items {
+		items[i] = Item(fmt.Sprintf("message-%d", i), fmt.Sprintf("Message %d", i)).Detail("Sender").StepStatus(uint32(i % 2))
+	}
+	scroller := MessageScroller("messages").VisualSize(280, 100).Children(items...)
+	check(t, a.Mount(Column("root").Children(scroller)))
+	if err := scroller.SetOffset(0); err == nil {
+		t.Fatal("offset accepted before first frame")
+	}
+	check(t, a.Step(.016))
+	offset, err := a.Value(scroller)
+	check(t, err)
+	if offset <= 0 {
+		t.Fatalf("expected bottom scroll, got %v", offset)
+	}
+	check(t, scroller.SetOffset(0))
+	check(t, a.Step(.016))
+	offset, err = a.Value(scroller)
+	check(t, err)
+	if offset != 0 {
+		t.Fatalf("offset = %v", offset)
+	}
+	if err := scroller.SetOffset(-1); err == nil {
+		t.Fatal("negative offset accepted")
+	}
+	r, err := a.Bounds(items[0])
+	check(t, err)
+	if r.Width <= 0 {
+		t.Fatalf("empty message bounds %+v", r)
+	}
+}
+
+func TestCarousel(t *testing.T) {
+	a := app(t)
+	first := Item("slide-1", "First")
+	second := Item("slide-2", "Second")
+	third := Item("slide-3", "Third")
+	carousel := Carousel("carousel").VisualSize(240, 100).Children(first, second, third)
+	var changes []Event
+	carousel.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(carousel)))
+	check(t, a.Step(.016))
+	selected, err := a.Selected(carousel)
+	check(t, err)
+	if selected != first {
+		t.Fatal("initial slide not selected")
+	}
+	r, err := a.Bounds(carousel)
+	check(t, err)
+	check(t, a.QueueScroll(r.X+30, r.Y+30, -1, 0))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	selected, err = a.Selected(carousel)
+	check(t, err)
+	if selected != second || len(changes) == 0 || changes[0].Selected != second {
+		t.Fatalf("carousel selection: %v %+v", selected, changes)
+	}
+	carousel.Selected(third)
+	check(t, carousel.Err())
+	check(t, a.Step(.016))
+	carousel.Disabled(true)
+	check(t, carousel.Err())
+}
+func TestResizable(t *testing.T) {
+	a := app(t)
+	first := Item("first", "First panel").PanelSize(240)
+	second := Item("second", "Second panel")
+	group := Resizable("split").VisualSize(420, 160).Children(first, second)
+	var changes []Event
+	first.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(group)))
+	check(t, a.Step(.016))
+	before, err := a.Value(first)
+	check(t, err)
+	if before < 100 {
+		t.Fatalf("panel width %v", before)
+	}
+	r, err := a.ResizableHandleBounds(group, first)
+	check(t, err)
+	if r.Width <= 0 {
+		t.Fatalf("empty handle %+v", r)
+	}
+	if _, err := a.ResizableHandleBounds(group, second); err == nil {
+		t.Fatal("last panel has handle")
+	}
+	x, y := r.X+r.Width/2, r.Y+r.Height/2
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.Step(.016))
+	check(t, a.QueuePointer(PointerMove, x+30, y))
+	check(t, a.Step(.016))
+	check(t, a.QueuePointer(PointerUp, x+30, y))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	after, err := a.Value(first)
+	check(t, err)
+	if after <= before || len(changes) == 0 || changes[0].Value <= before {
+		t.Fatalf("resize %v -> %v, %+v", before, after, changes)
+	}
+	group.Disabled(true)
+	check(t, group.Err())
+	if Item("bad", "Bad").PanelSize(90).Err() == nil {
+		t.Fatal("small panel accepted")
+	}
+}
+
+func TestTextView(t *testing.T) {
+	a := app(t)
+	view := TextView("view", "**Hello** world").VisualSize(320, 120)
+	check(t, a.Mount(Column("root").Children(view)))
+	check(t, a.Step(.016))
+	check(t, a.SelectText(view, 0, 5))
+	selected, err := a.CopySelection(view)
+	check(t, err)
+	if selected != "Hello" {
+		t.Fatalf("markdown selection %q", selected)
+	}
+	if err := a.SelectText(view, 50, 51); err == nil {
+		t.Fatal("out of bounds selection accepted")
+	}
+	view.Format(HTML)
+	check(t, view.Err())
+	check(t, view.SetText("<b>HTML</b> text"))
+	check(t, a.SelectText(view, 0, 4))
+	selected, err = a.CopySelection(view)
+	check(t, err)
+	if selected != "HTML" {
+		t.Fatalf("HTML selection %q", selected)
+	}
+	view.Format(Plain)
+	check(t, view.Err())
+	check(t, view.SetText("Plain text"))
+	check(t, a.Step(.016))
+	if TextView("bad", "").Format(TextViewFormat(3)).Err() == nil {
+		t.Fatal("unknown format accepted")
+	}
+}
+
+func TestEditor(t *testing.T) {
+	a := app(t)
+	editor := Editor("editor", "first\nsecond", "c").VisualSize(300, 120)
+	other := Editor("other", "", "plain").VisualSize(300, 120)
+	var changes []Event
+	editor.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(editor, other)))
+	check(t, a.Step(.016))
+	press(t, a, editor)
+	check(t, a.QueueText("✓"))
+	check(t, a.Step(.016))
+	_, err := a.Dispatch()
+	check(t, err)
+	text, err := a.Text(editor)
+	check(t, err)
+	if !strings.Contains(text, "✓") || len(changes) == 0 || !strings.Contains(changes[0].Text, "✓") {
+		t.Fatalf("editor edit: %q %+v", text, changes)
+	}
+	otherText, err := a.Text(other)
+	check(t, err)
+	if otherText != "" {
+		t.Fatalf("other editor changed %q", otherText)
+	}
+	editor.Disabled(true)
+	check(t, editor.Err())
+	check(t, a.QueueText("X"))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	unchanged, err := a.Text(editor)
+	check(t, err)
+	if unchanged != text {
+		t.Fatal("disabled editor accepted text")
+	}
+}
+
+func TestChart(t *testing.T) {
+	a := app(t)
+	data := []ChartDatum{{"North", 10}, {"South", 20}}
+	chart := Chart("chart").ChartKind(BarChart).Data(data).VisualSize(320, 180)
+	check(t, a.Mount(Column("root").Children(chart)))
+	data[0].Label = "changed"
+	check(t, a.Step(.016))
+	r, err := a.Bounds(chart)
+	check(t, err)
+	if r.Width <= 0 || r.Height <= 0 {
+		t.Fatalf("empty chart bounds %+v", r)
+	}
+	datum, err := a.ChartDatum(chart, 0)
+	check(t, err)
+	if datum != (ChartDatum{"North", 10}) {
+		t.Fatalf("chart data %+v", datum)
+	}
+	chart.ChartKind(PieChart)
+	check(t, chart.Err())
+	if err := chart.SetData([]ChartDatum{{"bad", -1}}); err == nil {
+		t.Fatal("negative pie data accepted")
+	}
+	if err := chart.SetData([]ChartDatum{{"West", 5}}); err != nil {
+		t.Fatal(err)
+	}
+	chart.Disabled(true)
+	check(t, chart.Err())
+	if Chart("bad").Data(make([]ChartDatum, 65)).Err() == nil {
+		t.Fatal("too many data accepted")
+	}
+}
+
+func TestTable(t *testing.T) {
+	a := app(t)
+	header := Item("header", "").Children(Item("h-name", "Name"), Item("h-role", "Role"))
+	name := Item("name", "Ada")
+	row := Item("row", "").Children(name, Item("role", "Engineer"))
+	table := Table("table").VisualSize(360, 0).Children(header, row)
+	check(t, a.Mount(Column("root").Children(table)))
+	check(t, a.Step(.016))
+	for _, n := range []*Node{table, header, row, name} {
+		r, err := a.Bounds(n)
+		check(t, err)
+		if r.Width <= 0 {
+			t.Fatalf("empty table bounds %+v", r)
+		}
+	}
+	check(t, name.SetText("Grace"))
+	check(t, a.Step(.016))
+	got, err := a.Text(name)
+	check(t, err)
+	if got != "Grace" {
+		t.Fatalf("cell text %q", got)
+	}
+	if err := a.Mount(Table("bad").Children(Label("wrong"))); err == nil {
+		t.Fatal("non-Item row accepted")
+	}
+}
+
+func TestDataTable(t *testing.T) {
+	a := app(t)
+	headers := []string{"Name", "Score"}
+	rows := [][]string{{"Alice", "95"}, {"Bob", "87"}}
+	table := DataTable("results").TableData(headers, rows).VisualSize(320, 150)
+	var changes []Event
+	table.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(table)))
+	headers[0] = "Changed"
+	rows[0][0] = "Changed"
+	check(t, a.Step(.016))
+	got, err := a.DataTableCell(table, 0, 0)
+	check(t, err)
+	if got != "Alice" {
+		t.Fatalf("copied cell %q", got)
+	}
+	cell, err := a.DataTableCellBounds(table, 1, 0)
+	check(t, err)
+	header, err := a.DataTableHeaderBounds(table, 0)
+	check(t, err)
+	if cell.Width <= 0 || cell.Y <= header.Y {
+		t.Fatalf("bad table geometry %+v %+v", cell, header)
+	}
+	x, y := cell.X+cell.Width/2, cell.Y+cell.Height/2
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.QueuePointer(PointerUp, x, y))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	state, err := a.DataTableState(table)
+	check(t, err)
+	if state.Row != 2 || len(changes) == 0 || changes[0].Value != 2 {
+		t.Fatalf("row selection %+v %+v", state, changes)
+	}
+	var snapshot struct {
+		Reason string `json:"reason"`
+		Row    uint32 `json:"row"`
+		Column uint32 `json:"column"`
+	}
+	if err := json.Unmarshal([]byte(changes[0].Text), &snapshot); err != nil || snapshot.Row != 2 || snapshot.Reason == "" {
+		t.Fatalf("selection snapshot %+v: %v", snapshot, err)
+	}
+	x, y = header.X+header.Width/2, header.Y+header.Height/2
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.QueuePointer(PointerUp, x, y))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	state, err = a.DataTableState(table)
+	check(t, err)
+	if state.SortColumn != 1 || state.SortDirection == 0 {
+		t.Fatalf("sort state %+v", state)
+	}
+	table.SelectionMode(SelectCells)
+	check(t, table.Err())
+	check(t, a.Step(.016))
+	cell, err = a.DataTableCellBounds(table, 0, 1)
+	check(t, err)
+	x, y = cell.X+cell.Width/2, cell.Y+cell.Height/2
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.QueuePointer(PointerUp, x, y))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	state, err = a.DataTableState(table)
+	check(t, err)
+	if state.Row != 1 || state.Column != 2 {
+		t.Fatalf("cell selection %+v", state)
+	}
+	if err := json.Unmarshal([]byte(changes[len(changes)-1].Text), &snapshot); err != nil || snapshot.Column != 2 || snapshot.Row != 1 {
+		t.Fatalf("cell snapshot %+v: %v", snapshot, err)
+	}
+	table.Disabled(true)
+	check(t, table.Err())
+	if DataTable("bad").TableData([]string{"A"}, [][]string{{"one", "two"}}).Err() == nil {
+		t.Fatal("row mismatch accepted")
+	}
+	if DataTable("bad-mode").SelectionMode(3).Err() == nil {
+		t.Fatal("invalid selection mode accepted")
+	}
+}
+
+func TestSidebar(t *testing.T) {
+	a := app(t)
+	home := Item("home", "Home")
+	settings := Item("settings", "Settings")
+	sidebar := Sidebar("nav").VisualSize(240, 180).Children(home, settings)
+	var changes []Event
+	clicked := false
+	sidebar.OnChange(func(e Event) { changes = append(changes, e) })
+	settings.OnClick(func(Event) { clicked = true })
+	check(t, a.Mount(Column("root").Children(sidebar)))
+	check(t, a.Step(.016))
+	press(t, a, settings)
+	_, err := a.Dispatch()
+	check(t, err)
+	selected, err := a.Selected(sidebar)
+	check(t, err)
+	if selected != settings || len(changes) != 1 || changes[0].Selected != settings || !clicked {
+		t.Fatalf("sidebar selection %v %+v %v", selected, changes, clicked)
+	}
+	sidebar.Open(false)
+	check(t, sidebar.Err())
+	check(t, a.Step(.016))
+	open, err := a.Open(sidebar)
+	check(t, err)
+	if open {
+		t.Fatal("sidebar remained open")
+	}
+	sidebar.Open(true)
+	home.Disabled(true)
+	check(t, home.Err())
+	check(t, a.Step(.016))
+	press(t, a, home)
+	_, err = a.Dispatch()
+	check(t, err)
+	selected, err = a.Selected(sidebar)
+	check(t, err)
+	if selected != settings || len(changes) != 1 {
+		t.Fatalf("disabled item selected: %v %+v", selected, changes)
+	}
+	if a.Mount(Column("invalid-root").Children(Sidebar("bad").Children(Button("button")))) == nil {
+		t.Fatal("invalid Sidebar child accepted")
+	}
+}
+
+func TestThemePresets(t *testing.T) {
+	a := app(t)
+	names, err := a.ThemePresets()
+	check(t, err)
+	if len(names) == 0 || names[0] == "" {
+		t.Fatalf("empty native presets: %v", names)
+	}
+	_, selected, err := a.ThemePreset()
+	check(t, err)
+	if selected {
+		t.Fatal("default preset should be unset")
+	}
+	check(t, a.SetThemePreset(uint32(len(names)-1)))
+	index, selected, err := a.ThemePreset()
+	check(t, err)
+	if !selected || index != uint32(len(names)-1) {
+		t.Fatalf("preset %d %v", index, selected)
+	}
+	if err := a.SetThemePreset(uint32(len(names))); err == nil {
+		t.Fatal("invalid preset accepted")
+	}
+	index, selected, err = a.ThemePreset()
+	check(t, err)
+	if !selected || index != uint32(len(names)-1) {
+		t.Fatal("failed preset call changed theme")
+	}
+	check(t, a.Mount(Column("root").Children(Label("Theme"))))
+	check(t, a.Step(.016))
+}
+
+func TestRootView(t *testing.T) {
+	a := app(t)
+	button := Button("go").Text("Go")
+	clicks := 0
+	button.OnClick(func(Event) { clicks++ })
+	root := RootView("root").RootPadding(20).Children(Column("content").Children(button))
+	check(t, a.Mount(root))
+	check(t, a.Step(.016))
+	before, err := a.Bounds(button)
+	check(t, err)
+	if before.X < 19 || before.Y < 19 {
+		t.Fatalf("root padding did not affect button: %+v", before)
+	}
+	press(t, a, button)
+	_, err = a.Dispatch()
+	check(t, err)
+	if clicks != 1 {
+		t.Fatalf("root click count %d", clicks)
+	}
+	root.RootPadding(40)
+	check(t, root.Err())
+	check(t, a.Step(.016))
+	after, err := a.Bounds(button)
+	check(t, err)
+	if after.X <= before.X || after.Y <= before.Y {
+		t.Fatalf("padding did not move content: %+v -> %+v", before, after)
+	}
+	if RootView("invalid").RootPadding(257).Err() == nil {
+		t.Fatal("excess padding accepted")
+	}
+	b := app(t)
+	if b.Mount(Column("bad").Children(RootView("nested"))) == nil {
+		t.Fatal("nested root accepted")
+	}
+}
+
+func TestClipboardHeadlessErrors(t *testing.T) {
+	a := app(t)
+	if err := a.SetClipboard("hello"); err == nil {
+		t.Fatal("headless clipboard set accepted")
+	}
+	if _, err := a.Clipboard(); err == nil {
+		t.Fatal("headless clipboard get accepted")
+	}
+	if err := a.SetClipboard("bad\x00text"); err == nil {
+		t.Fatal("NUL clipboard accepted")
+	}
+	if err := a.SetClipboard(strings.Repeat("x", 65537)); err == nil {
+		t.Fatal("oversized clipboard accepted")
+	}
+	if err := a.SetClipboard(string([]byte{0xff})); err == nil {
+		t.Fatal("invalid UTF-8 clipboard accepted")
+	}
+}
+
+func TestSpeechLifecycle(t *testing.T) {
+	a := app(t)
+	speech := Speech("speech")
+	var changes []Event
+	speech.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(speech)))
+	check(t, a.Step(.016))
+	bounds, err := a.Bounds(speech)
+	check(t, err)
+	if bounds.Width <= 0 {
+		t.Fatalf("speech has no native bounds: %+v", bounds)
+	}
+	if err := a.ReportSpeech(speech, "early", true); err == nil {
+		t.Fatal("report before start accepted")
+	}
+	check(t, a.StartSpeech(speech))
+	if err := a.StartSpeech(speech); err == nil {
+		t.Fatal("duplicate start accepted")
+	}
+	check(t, a.ReportSpeech(speech, "hel", false))
+	check(t, a.Step(.016))
+	check(t, a.ReportSpeech(speech, "hello", true))
+	check(t, a.Step(.016))
+	transcript, err := a.SpeechTranscript(speech)
+	check(t, err)
+	if transcript != "hello" {
+		t.Fatalf("transcript %q", transcript)
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(changes) != 3 || changes[0].Value != 0 || changes[1].Text != "hel" || changes[2].Text != "hello" {
+		t.Fatalf("speech snapshots %+v", changes)
+	}
+	check(t, a.FinishSpeech(speech))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(changes) != 4 || changes[3].Value != 2 || changes[3].Text != "hello" || changes[3].Checked {
+		t.Fatalf("finish snapshot %+v", changes)
+	}
+	speech.Disabled(true)
+	check(t, speech.Err())
+	if err := a.StartSpeech(speech); err == nil {
+		t.Fatal("disabled speech started")
+	}
+	if err := a.ReportSpeech(speech, string([]byte{0xff}), false); err == nil {
+		t.Fatal("invalid UTF-8 report accepted")
+	}
+}
+
+func TestQuestionnaire(t *testing.T) {
+	a := app(t)
+	red, blue := Item("red", "Red"), Item("blue", "Blue")
+	q1 := Item("color", "Choose a color").Question(true, false).Children(red, blue)
+	round := Item("round", "Round")
+	q2 := Item("shape", "Choose a shape").Question(false, false).Children(round)
+	form := Questionnaire("survey").VisualSize(320, 0).Children(q1, q2)
+	var changes []Event
+	form.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(form)))
+	check(t, a.Step(.016))
+	current, complete, err := a.QuestionnaireState(form)
+	check(t, err)
+	if current != q1 || complete {
+		t.Fatalf("initial state %v %v", current, complete)
+	}
+	if err := a.NextQuestion(form); err == nil {
+		t.Fatal("required question skipped")
+	}
+	if err := a.SubmitQuestionnaire(form); err == nil {
+		t.Fatal("required questionnaire submitted")
+	}
+	press(t, a, red)
+	press(t, a, blue)
+	selected, err := a.ChoiceSelected(blue)
+	check(t, err)
+	if !selected {
+		t.Fatal("blue was not selected")
+	}
+	selected, err = a.ChoiceSelected(red)
+	check(t, err)
+	if selected {
+		t.Fatal("red remained selected")
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(changes) != 2 {
+		t.Fatalf("choice events %+v", changes)
+	}
+	var first, second struct {
+		Selected []uint32 `json:"selected"`
+		Current  uint32   `json:"current"`
+	}
+	check(t, json.Unmarshal([]byte(changes[0].Text), &first))
+	check(t, json.Unmarshal([]byte(changes[1].Text), &second))
+	if len(first.Selected) != 1 || first.Selected[0] != 1 || len(second.Selected) != 1 || second.Selected[0] != 2 {
+		t.Fatalf("queued choice snapshots %+v %+v", first, second)
+	}
+	check(t, a.NextQuestion(form))
+	current, complete, err = a.QuestionnaireState(form)
+	check(t, err)
+	if current != q2 || complete {
+		t.Fatalf("next state %v %v", current, complete)
+	}
+	check(t, a.Step(.016))
+	press(t, a, round)
+	check(t, a.PreviousQuestion(form))
+	current, _, err = a.QuestionnaireState(form)
+	check(t, err)
+	if current != q1 {
+		t.Fatal("previous did not return to first question")
+	}
+	check(t, a.SubmitQuestionnaire(form))
+	check(t, a.SubmitQuestionnaire(form))
+	current, complete, err = a.QuestionnaireState(form)
+	check(t, err)
+	if !complete {
+		t.Fatal("questionnaire remained incomplete")
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	completed, submitted := 0, 0
+	for _, event := range changes {
+		if event.Value == 2 || event.Value == 3 {
+			var snapshot struct {
+				Complete uint32 `json:"complete"`
+			}
+			check(t, json.Unmarshal([]byte(event.Text), &snapshot))
+			if snapshot.Complete != 1 {
+				t.Fatalf("incomplete event snapshot %+v", event)
+			}
+			if event.Value == 2 {
+				completed++
+			} else {
+				submitted++
+			}
+		}
+	}
+	if completed != 1 || submitted != 2 {
+		t.Fatalf("completion events %d, submit events %d", completed, submitted)
+	}
+	b := app(t)
+	if err := b.Mount(Column("root").Children(Questionnaire("bad").Children(Button("wrong")))); err == nil {
+		t.Fatal("invalid questionnaire topology accepted")
+	}
+}
+
+func TestDock(t *testing.T) {
+	a := app(t)
+	first := Item("one", "First").Children(Label("Panel body"))
+	second := Item("two", "Second")
+	dock := Dock("dock").VisualSize(480, 300).Children(first, second)
+	var changes []Event
+	dock.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(dock)))
+	check(t, a.Step(.016))
+	active, err := a.ActiveDockPanel(dock)
+	check(t, err)
+	if active != first {
+		t.Fatalf("initial Dock panel %v", active)
+	}
+	bounds, err := a.DockPanelBounds(dock, second)
+	check(t, err)
+	if bounds.Width <= 0 {
+		t.Fatalf("empty Dock panel bounds %+v", bounds)
+	}
+	before, err := a.SerializeDock(dock)
+	check(t, err)
+	if before == "" {
+		t.Fatal("empty Dock model")
+	}
+	if err := a.MoveDockSplit(dock, second, first, DockAxis(2), .5, false); err == nil {
+		t.Fatal("invalid Dock axis accepted")
+	}
+	check(t, a.MoveDockSplit(dock, second, first, DockHorizontal, .4, false))
+	after, err := a.SerializeDock(dock)
+	check(t, err)
+	if after == before {
+		t.Fatal("Dock model did not change")
+	}
+	check(t, a.Step(.016))
+	check(t, a.ActivateDockPanel(dock, second))
+	active, err = a.ActiveDockPanel(dock)
+	check(t, err)
+	if active != second {
+		t.Fatalf("active Dock panel %v", active)
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(changes) == 0 || changes[len(changes)-1].Selected != second {
+		t.Fatalf("Dock selection snapshot %+v", changes)
+	}
+	dock.Disabled(true)
+	check(t, dock.Err())
+	if err := a.ActivateDockPanel(dock, first); err == nil {
+		t.Fatal("disabled Dock activated")
+	}
+	b := app(t)
+	if err := b.Mount(Column("root").Children(Dock("bad").Children(Button("wrong")))); err == nil {
+		t.Fatal("invalid Dock topology accepted")
+	}
+}
+
+func TestSettings(t *testing.T) {
+	a := app(t)
+	toggle := Switch("notifications").Text("Enable notifications")
+	name := Input("name").Detail("Name")
+	number := NumberInput("count").Detail("Count")
+	general := Item("general", "General").Children(Item("preferences", "Preferences").Children(toggle, name, number))
+	advanced := Item("advanced", "Advanced").Children(Item("other", "Other").Children(Checkbox("confirm").Text("Confirm")))
+	settings := Settings("settings").VisualSize(720, 500).Children(general, advanced)
+	var pageChanges, fieldChanges []Event
+	settings.OnChange(func(e Event) { pageChanges = append(pageChanges, e) })
+	toggle.OnChange(func(e Event) { fieldChanges = append(fieldChanges, e) })
+	check(t, a.Mount(Column("root").Children(settings)))
+	check(t, a.Step(.016))
+	page, err := a.SettingsPage(settings)
+	check(t, err)
+	if page != general {
+		t.Fatalf("initial Settings page %v", page)
+	}
+	r, err := a.SettingsFieldBounds(settings, toggle)
+	check(t, err)
+	if r.Width <= 0 || r.Height <= 0 {
+		t.Fatalf("empty Settings field %+v", r)
+	}
+	x, y := r.X+r.Width/2, r.Y+r.Height/2
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.QueuePointer(PointerUp, x, y))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	checked, err := a.Checked(toggle)
+	check(t, err)
+	if !checked || len(fieldChanges) != 1 || !fieldChanges[0].Checked {
+		t.Fatalf("native toggle %v %+v", checked, fieldChanges)
+	}
+	check(t, a.SetSettingsPage(settings, advanced))
+	check(t, a.SetSettingsPage(settings, general))
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(pageChanges) != 2 || pageChanges[0].Selected != advanced || pageChanges[1].Selected != general {
+		t.Fatalf("page snapshots %+v", pageChanges)
+	}
+	check(t, name.SetText("Zoë"))
+	number.Value(7)
+	check(t, number.Err())
+	check(t, a.Step(.016))
+	check(t, a.ResetSettingsPage(settings, general))
+	checked, err = a.Checked(toggle)
+	check(t, err)
+	if checked {
+		t.Fatal("reset did not restore toggle default")
+	}
+	_, err = a.Dispatch()
+	check(t, err)
+	if len(fieldChanges) < 2 || fieldChanges[len(fieldChanges)-1].Checked {
+		t.Fatalf("reset snapshot %+v", fieldChanges)
+	}
+	resetName, err := a.Text(name)
+	check(t, err)
+	resetNumber, err := a.Value(number)
+	check(t, err)
+	if resetName != "" || resetNumber != 0 {
+		t.Fatalf("reset editable defaults %q %v", resetName, resetNumber)
+	}
+	settings.Query("Advanced")
+	check(t, settings.Err())
+	check(t, a.Step(.016))
+	if _, err := a.SettingsFieldBounds(settings, toggle); err == nil {
+		t.Fatal("filtered field still visible")
+	}
+	if Settings("bad-query").Query(strings.Repeat("x", 257)).Err() == nil {
+		t.Fatal("oversized query accepted")
+	}
+	b := app(t)
+	if err := b.Mount(Column("root").Children(Settings("invalid").Children(Item("page", "Page").Children(Button("wrong"))))); err == nil {
+		t.Fatal("invalid Settings topology accepted")
+	}
+}
+
+func TestPlot(t *testing.T) {
+	a := app(t)
+	points := []PlotPoint{{20, 20}, {60, 60}, {100, 30}}
+	plot := Plot("plot").Points(points).VisualSize(240, 120)
+	check(t, a.Mount(Column("root").Children(plot)))
+	points[0].X = 999
+	check(t, a.Step(.016))
+	r, err := a.Bounds(plot)
+	check(t, err)
+	if r.Width <= 0 {
+		t.Fatalf("empty plot bounds %+v", r)
+	}
+	got, err := a.PlotPoint(plot, 0)
+	check(t, err)
+	if got != (PlotPoint{20, 20}) {
+		t.Fatalf("copied point %+v", got)
+	}
+	if err := plot.SetPoints([]PlotPoint{{0, 0}, {math.Inf(1), 1}}); err == nil {
+		t.Fatal("infinite point accepted")
+	}
+	got, err = a.PlotPoint(plot, 2)
+	check(t, err)
+	if got != (PlotPoint{100, 30}) {
+		t.Fatalf("model mutated on error %+v", got)
+	}
+	if Plot("too-many").Points(make([]PlotPoint, 257)).Err() == nil {
+		t.Fatal("too many points accepted")
+	}
+}
+
+func TestCommand(t *testing.T) {
+	a := app(t)
+	open := Item("open", "Open")
+	closeItem := Item("close", "Close").Detail("exit")
+	clicked := false
+	closeItem.OnClick(func(Event) { clicked = true })
+	command := Command("actions").VisualSize(300, 150).Children(open, closeItem)
+	check(t, a.Mount(Column("root").Children(command)))
+	check(t, a.Step(.016))
+	selected, err := a.Selected(command)
+	check(t, err)
+	if selected != open {
+		t.Fatal("initial command selection")
+	}
+	r, err := a.CommandItemBounds(command, closeItem)
+	check(t, err)
+	if r.Width <= 0 {
+		t.Fatalf("empty command item %+v", r)
+	}
+	x, y := r.X+r.Width/2, r.Y+r.Height/2
+	check(t, a.QueuePointer(PointerDown, x, y))
+	check(t, a.QueuePointer(PointerUp, x, y))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	selected, err = a.Selected(command)
+	check(t, err)
+	if selected != closeItem || !clicked {
+		t.Fatalf("command click %v %v", selected, clicked)
+	}
+	check(t, command.SetText("exit"))
+	check(t, a.Step(.016))
+	query, err := a.Text(command)
+	check(t, err)
+	if query != "exit" {
+		t.Fatalf("query %q", query)
+	}
+	closeItem.Disabled(true)
+	check(t, closeItem.Err())
+	check(t, a.Step(.016))
+	selected, err = a.Selected(command)
+	check(t, err)
+	if selected != nil {
+		t.Fatalf("disabled command item selected %v", selected)
+	}
+}
+
+func TestVirtualList(t *testing.T) {
+	a := app(t)
+	items := make([]*Node, 20)
+	for i := range items {
+		items[i] = Item(fmt.Sprintf("item-%d", i), fmt.Sprintf("Item %d", i))
+	}
+	list := VirtualList("items").VisualSize(200, 96).Children(items...)
+	var changes []Event
+	list.OnChange(func(e Event) { changes = append(changes, e) })
+	check(t, a.Mount(Column("root").Children(list)))
+	check(t, a.Step(.016))
+	first, err := a.VirtualListItemBounds(list, items[0])
+	check(t, err)
+	if first.Width <= 0 {
+		t.Fatalf("empty first row %+v", first)
+	}
+	if _, err := a.VirtualListItemBounds(list, items[19]); err == nil {
+		t.Fatal("offscreen row has bounds")
+	}
+	r, err := a.Bounds(list)
+	check(t, err)
+	check(t, a.QueueScroll(r.X+20, r.Y+20, 0, -1))
+	check(t, a.Step(.016))
+	_, err = a.Dispatch()
+	check(t, err)
+	offset, err := a.Value(list)
+	check(t, err)
+	if offset <= 0 || len(changes) == 0 || changes[0].Value <= 0 {
+		t.Fatalf("list scroll %v %+v", offset, changes)
+	}
+	list.Value(500)
+	check(t, list.Err())
+	check(t, a.Step(.016))
+	last, err := a.VirtualListItemBounds(list, items[19])
+	check(t, err)
+	if last.Width <= 0 {
+		t.Fatalf("empty last row %+v", last)
+	}
+	list.Disabled(true)
+	check(t, list.Err())
+	if VirtualList("bad").Value(-1).Err() == nil {
+		t.Fatal("negative offset accepted")
 	}
 }

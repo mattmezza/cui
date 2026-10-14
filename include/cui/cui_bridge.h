@@ -39,6 +39,18 @@ typedef enum {
     CUI_BRIDGE_CORE_ERROR
 } cui_bridge_status;
 typedef enum { CUI_BRIDGE_BACKEND_NONE = 0, CUI_BRIDGE_BACKEND_SDL = 1 } cui_bridge_backend;
+CUI_BRIDGE_API uint32_t cui_bridge_theme_preset_count(void);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_theme_preset_name(uint32_t index, char *out_utf8,
+                                                              uint32_t capacity,
+                                                              uint32_t *out_length);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_theme_preset(cui_bridge_app *, uint32_t index);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_theme_preset(const cui_bridge_app *,
+                                                             uint32_t *out_index);
+/* Clipboard calls must run on the SDL owner thread, outside a bridge step.
+ * Headless apps report BACKEND_UNAVAILABLE. Reads copy before native storage expires. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_clipboard_set(cui_bridge_app *, const char *text_utf8);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_clipboard_get(cui_bridge_app *, char *out_utf8,
+                                                          uint32_t capacity, uint32_t *out_length);
 typedef enum {
     CUI_BRIDGE_ROW = 1,
     CUI_BRIDGE_COLUMN,
@@ -102,8 +114,138 @@ typedef enum {
     CUI_BRIDGE_FORM,
     CUI_BRIDGE_INPUT_GROUP,
     CUI_BRIDGE_NOTIFICATION,
-    CUI_BRIDGE_FOCUS_TRAP
+    CUI_BRIDGE_FOCUS_TRAP,
+    CUI_BRIDGE_MESSAGE_SCROLLER,
+    CUI_BRIDGE_CAROUSEL,
+    CUI_BRIDGE_RESIZABLE,
+    CUI_BRIDGE_TEXT_VIEW,
+    CUI_BRIDGE_EDITOR,
+    CUI_BRIDGE_CHART,
+    CUI_BRIDGE_TABLE,
+    CUI_BRIDGE_DATA_TABLE,
+    CUI_BRIDGE_PLOT,
+    CUI_BRIDGE_COMMAND,
+    CUI_BRIDGE_VIRTUAL_LIST,
+    CUI_BRIDGE_SIDEBAR,
+    CUI_BRIDGE_ROOT_VIEW,
+    CUI_BRIDGE_SPEECH,
+    CUI_BRIDGE_QUESTIONNAIRE,
+    CUI_BRIDGE_DOCK,
+    CUI_BRIDGE_SETTINGS
 } cui_bridge_kind;
+CUI_BRIDGE_API cui_bridge_status cui_bridge_settings_set_query(cui_bridge_app *,
+                                                               cui_bridge_node settings,
+                                                               const char *query_utf8);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_settings_get_page(cui_bridge_app *,
+                                                              cui_bridge_node settings,
+                                                              cui_bridge_node *out_page);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_settings_set_page(cui_bridge_app *,
+                                                              cui_bridge_node settings,
+                                                              cui_bridge_node page);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_settings_reset_page(cui_bridge_app *,
+                                                                cui_bridge_node settings,
+                                                                cui_bridge_node page);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_settings_field_bounds(cui_bridge_app *,
+                                                                  cui_bridge_node settings,
+                                                                  cui_bridge_node field,
+                                                                  cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dock_activate(cui_bridge_app *, cui_bridge_node dock,
+                                                          cui_bridge_node panel);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dock_move_split(
+    cui_bridge_app *, cui_bridge_node dock, cui_bridge_node panel, cui_bridge_node reference,
+    uint32_t axis, double ratio, uint32_t before); /* axis 0 horizontal, 1 vertical */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dock_get_active(cui_bridge_app *, cui_bridge_node dock,
+                                                            cui_bridge_node *out_panel);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dock_panel_bounds(cui_bridge_app *,
+                                                              cui_bridge_node dock,
+                                                              cui_bridge_node panel,
+                                                              cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_dock_serialize(cui_bridge_app *, cui_bridge_node dock,
+                                                           char *destination, uint32_t capacity,
+                                                           uint32_t *required_capacity);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_questionnaire_set_question(cui_bridge_app *,
+                                                                       cui_bridge_node question,
+                                                                       uint32_t required,
+                                                                       uint32_t multiple);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_questionnaire_get_state(cui_bridge_app *,
+                                                                    cui_bridge_node questionnaire,
+                                                                    cui_bridge_node *current,
+                                                                    uint32_t *complete);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_questionnaire_choice_selected(cui_bridge_app *,
+                                                                          cui_bridge_node choice,
+                                                                          uint32_t *selected);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_questionnaire_next(cui_bridge_app *,
+                                                               cui_bridge_node questionnaire);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_questionnaire_previous(cui_bridge_app *,
+                                                                   cui_bridge_node questionnaire);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_questionnaire_submit(cui_bridge_app *,
+                                                                 cui_bridge_node questionnaire);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_speech_start(cui_bridge_app *, cui_bridge_node);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_speech_report(cui_bridge_app *, cui_bridge_node,
+                                                          const char *text_utf8,
+                                                          uint32_t final_phrase);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_speech_finish(cui_bridge_app *, cui_bridge_node);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_speech_transcript(cui_bridge_app *, cui_bridge_node,
+                                                              char *out_utf8, uint32_t capacity,
+                                                              uint32_t *out_length);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_root_padding(cui_bridge_app *,
+                                                             cui_bridge_node root_view,
+                                                             float padding);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_command_item_bounds(cui_bridge_app *,
+                                                                cui_bridge_node command,
+                                                                cui_bridge_node item,
+                                                                cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_virtual_list_item_bounds(cui_bridge_app *,
+                                                                     cui_bridge_node list,
+                                                                     cui_bridge_node item,
+                                                                     cui_bridge_rect *out_bounds);
+typedef struct {
+    double x, y;
+} cui_bridge_plot_point;
+CUI_BRIDGE_API cui_bridge_status cui_bridge_plot_set_points(cui_bridge_app *, cui_bridge_node,
+                                                            const cui_bridge_plot_point *points,
+                                                            uint32_t count);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_plot_get_point(cui_bridge_app *, cui_bridge_node,
+                                                           uint32_t index,
+                                                           cui_bridge_plot_point *out_point);
+typedef struct {
+    const char *label_utf8;
+    double value;
+} cui_bridge_chart_datum;
+CUI_BRIDGE_API cui_bridge_status cui_bridge_chart_set_data(cui_bridge_app *, cui_bridge_node,
+                                                           const cui_bridge_chart_datum *,
+                                                           uint32_t count);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_chart_set_kind(cui_bridge_app *, cui_bridge_node,
+                                                           uint32_t kind);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_chart_get_datum(cui_bridge_app *, cui_bridge_node,
+                                                            uint32_t index, char *label,
+                                                            uint32_t capacity,
+                                                            uint32_t *required_capacity,
+                                                            double *value);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *, cui_bridge_node,
+                                                           const char *const *headers,
+                                                           uint32_t column_count,
+                                                           const char *const *cells,
+                                                           uint32_t row_count);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_get_cell(cui_bridge_app *, cui_bridge_node,
+                                                                uint32_t row, uint32_t column,
+                                                                char *destination,
+                                                                uint32_t capacity,
+                                                                uint32_t *required_capacity);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_get_state(cui_bridge_app *, cui_bridge_node,
+                                                                 uint32_t *row, uint32_t *column,
+                                                                 uint32_t *sort_column,
+                                                                 uint32_t *sort_direction);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set_selection_mode(
+    cui_bridge_app *, cui_bridge_node, uint32_t mode); /* 0 row, 1 column, 2 cell */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_cell_bounds(cui_bridge_app *,
+                                                                   cui_bridge_node, uint32_t row,
+                                                                   uint32_t column,
+                                                                   cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_header_bounds(cui_bridge_app *,
+                                                                     cui_bridge_node,
+                                                                     uint32_t column,
+                                                                     cui_bridge_rect *out_bounds);
 typedef struct {
     uint32_t hour, minute, second;
 } cui_bridge_time;
@@ -326,6 +468,19 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_queue_scroll(cui_bridge_app *, float
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_font_fallbacks(cui_bridge_app *,
                                                                const char *const *paths_utf8,
                                                                uint32_t count);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_resizable_handle_bounds(cui_bridge_app *,
+                                                                    cui_bridge_node group,
+                                                                    cui_bridge_node preceding_item,
+                                                                    cui_bridge_rect *out_bounds);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text_view_format(
+    cui_bridge_app *, cui_bridge_node, uint32_t format); /* 0 Markdown, 1 HTML, 2 plain */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_text_view_select(cui_bridge_app *, cui_bridge_node,
+                                                             uint32_t anchor, uint32_t cursor);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_text_view_copy_selection(cui_bridge_app *,
+                                                                     cui_bridge_node,
+                                                                     char *destination,
+                                                                     uint32_t capacity,
+                                                                     uint32_t *required_capacity);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_event(cui_bridge_app *app,
                                                        cui_bridge_event *out_event);

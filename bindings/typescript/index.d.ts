@@ -156,3 +156,56 @@ export interface FocusTrap extends Composite, OpenState {}
 export function focus_trap(key?: string, text?: string): FocusTrap;
 
 export interface App {font_fallbacks(paths: string[]): this}
+
+export interface MessageScroller extends Label, Composite {visual_size(width: number,height: number): this; scroll_offset(): number; scroll_to(offset: number): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface Carousel extends Group {visual_size(width: number,height: number): this}
+export interface Resizable extends Label, Composite {visual_size(width: number,height: number): this; disabled(value?: boolean): this; resizable_handle_bounds(preceding: Item): Bounds}
+export interface Item {panel_size(size: number): this; current_panel_size(): number}
+export interface TextView extends Label {current_text(): string; text_format(format: 'markdown'|'html'|'plain'): this; select_text(anchor: number,cursor: number): this; selection_text(): string; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface Editor extends Input {detail(language: string): this; visual_size(width: number,height: number): this}
+export function message_scroller(key?: string,text?: string): MessageScroller;
+export function carousel(key?: string,text?: string): Carousel;
+export function resizable(key?: string,text?: string): Resizable;
+export function text_view(key?: string,text?: string): TextView;
+export function editor(key?: string,text?: string): Editor;
+
+export interface Chart extends Label {chart_data(data: Array<[string,number]>): this; chart_kind(kind: 'line'|'area'|'bar'|'pie'): this; current_datum(index: number): [string,number]; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface Table extends Label, Composite {visual_size(width: number,height: number): this}
+export interface DataTableState {row: number; column: number; sortColumn: number; sortDirection: number}
+export interface DataTable extends Label {table_data(headers: string[],rows: string[][]): this; current_cell(row: number,column: number): string; table_state(): DataTableState; table_cell_bounds(row: number,column: number): Bounds; table_header_bounds(column: number): Bounds; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface Plot extends Label {plot_points(points: Array<[number,number]>): this; current_point(index: number): [number,number]; visual_size(width: number,height: number): this}
+export function chart(key?: string,text?: string): Chart;
+export function table(key?: string,text?: string): Table;
+export function data_table(key?: string,text?: string): DataTable;
+export function plot(key?: string,text?: string): Plot;
+export interface Command extends Label, Composite {current_text(): string; selected(): Item | undefined; item_bounds(item: Item): Bounds; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export interface VirtualList extends Label, Composite {item_bounds(item: Item): Bounds; scroll_to(offset: number): this; scroll_offset(): number; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export function command(key?: string,text?: string): Command;
+export function virtual_list(key?: string,text?: string): VirtualList;
+export interface DataTable {selection_mode(mode: 'row'|'column'|'cell'): this}
+export interface Sidebar extends Group, OpenState {visual_size(width: number,height: number): this}
+export function sidebar(key?: string,text?: string): Sidebar;
+export interface App {theme_presets(): string[]; theme_preset(index: number): this; current_theme_preset(): number | undefined}
+export interface RootView extends Composite {padding(pixels: number): this}
+export function root_view(key?: string): RootView;
+export interface App {clipboard_set(text: string): this; clipboard_get(): string}
+export interface Speech {speech_start(): this; speech_finish(): this; speech_report(text: string,final?: boolean): this; speech_transcript(): string; speech_active(): boolean; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export function speech(key: string): Speech;
+export interface Item {question(required?: boolean,multiple?: boolean): this; choice_selected(): boolean}
+export interface Questionnaire extends Label, Composite {questionnaire_state(): {current: Item | undefined; complete: boolean}; questionnaire_next(): this; questionnaire_previous(): this; questionnaire_submit(): this; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export function questionnaire(key: string,text?: string): Questionnaire;
+export interface Dock extends Label, Composite {dock_activate(panel: Item): this; dock_move_split(panel: Item,reference: Item,axis?: 'horizontal'|'vertical',ratio?: number,before?: boolean): this; dock_active(): Item | undefined; dock_panel_bounds(panel: Item): Bounds; dock_serialize(): string; visual_size(width: number,height: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
+export function dock(key: string,text?: string): Dock;
+
+export interface Settings extends Label, Composite {
+  settings_query(query: string): this;
+  settings_page(): Item | undefined;
+  settings_select(page: Item): this;
+  settings_reset(page: Item): this;
+  settings_field_bounds(field: BooleanControl | Input | NumberInput): Bounds;
+  visual_size(width: number, height: number): this;
+  on_change(callback: (event: ChangeEvent) => void): this;
+}
+export function settings(key: string, text?: string): Settings;
+
+export interface Input {detail(text: string): this}

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Language authoring coverage; tested_subset never means complete component parity.",
-  "bridge_node_kinds": 63,
+  "bridge_node_kinds": 80,
   "additional_kinds": [
     "Row",
     "Column",
@@ -109,11 +109,11 @@
     {
       "name": "Clipboard",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -239,11 +239,11 @@
     {
       "name": "MessageScroller",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -419,11 +419,11 @@
     {
       "name": "Editor",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -479,11 +479,11 @@
     {
       "name": "Questionnaire",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -509,11 +509,11 @@
     {
       "name": "Speech",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -539,11 +539,11 @@
     {
       "name": "Carousel",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -569,11 +569,11 @@
     {
       "name": "Dock",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -609,21 +609,21 @@
     {
       "name": "Resizable",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Root View",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -639,11 +639,11 @@
     {
       "name": "Settings",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -659,11 +659,11 @@
     {
       "name": "Sidebar",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -689,11 +689,11 @@
     {
       "name": "Theme",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
@@ -729,71 +729,71 @@
     {
       "name": "VirtualList",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Chart",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Command",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "DataTable",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Plot",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "Table",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     },
     {
       "name": "TextView",
       "languages": {
-        "python": "not_bound",
-        "javascript": "not_bound",
-        "typescript": "not_bound",
-        "go": "not_bound",
-        "rust": "not_bound"
+        "python": "tested_subset",
+        "javascript": "tested_subset",
+        "typescript": "tested_subset",
+        "go": "tested_subset",
+        "rust": "tested_subset"
       }
     }
   ]

@@ -69,6 +69,50 @@ static char bridge_error_buf[80];
  X(queue_pointer, cui_bridge_status, (cui_bridge_app *a, cui_bridge_pointer_phase p, float x, float y), (a,p,x,y)) \
  X(queue_key, cui_bridge_status, (cui_bridge_app *a, cui_bridge_key_phase p, cui_bridge_key k, uint32_t m, uint32_t r), (a,p,k,m,r)) \
  X(set_font_fallbacks, cui_bridge_status, (cui_bridge_app *a, const char *const *paths, uint32_t count), (a,paths,count)) \
+ X(resizable_handle_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node group, cui_bridge_node before, cui_bridge_rect *r), (a,group,before,r)) \
+ X(set_text_view_format, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t format), (a,n,format)) \
+ X(text_view_select, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t anchor, uint32_t cursor), (a,n,anchor,cursor)) \
+ X(text_view_copy_selection, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, char *dst, uint32_t cap, uint32_t *required), (a,n,dst,cap,required)) \
+ X(chart_set_data, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, const cui_bridge_chart_datum *data, uint32_t count), (a,n,data,count)) \
+ X(chart_set_kind, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t kind), (a,n,kind)) \
+ X(chart_get_datum, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t index, char *label, uint32_t cap, uint32_t *required, double *value), (a,n,index,label,cap,required,value)) \
+ X(data_table_set, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, const char *const *headers, uint32_t columns, const char *const *cells, uint32_t rows), (a,n,headers,columns,cells,rows)) \
+ X(data_table_get_cell, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t row, uint32_t col, char *dst, uint32_t cap, uint32_t *required), (a,n,row,col,dst,cap,required)) \
+ X(data_table_get_state, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t *row, uint32_t *col, uint32_t *sort_col, uint32_t *sort_dir), (a,n,row,col,sort_col,sort_dir)) \
+ X(data_table_cell_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t row, uint32_t col, cui_bridge_rect *r), (a,n,row,col,r)) \
+ X(data_table_header_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t col, cui_bridge_rect *r), (a,n,col,r)) \
+ X(plot_set_points, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, const cui_bridge_plot_point *points, uint32_t count), (a,n,points,count)) \
+ X(plot_get_point, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t index, cui_bridge_plot_point *out), (a,n,index,out)) \
+ X(command_item_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node command, cui_bridge_node item, cui_bridge_rect *r), (a,command,item,r)) \
+ X(virtual_list_item_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node list, cui_bridge_node item, cui_bridge_rect *r), (a,list,item,r)) \
+ X(data_table_set_selection_mode, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t mode), (a,n,mode)) \
+ X(set_root_padding, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, float padding), (a,n,padding)) \
+ X(clipboard_set, cui_bridge_status, (cui_bridge_app *a, const char *text), (a,text)) \
+ X(clipboard_get, cui_bridge_status, (cui_bridge_app *a, char *dst, uint32_t capacity, uint32_t *length), (a,dst,capacity,length)) \
+ X(speech_start, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n), (a,n)) \
+ X(speech_report, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, const char *text, uint32_t final_phrase), (a,n,text,final_phrase)) \
+ X(speech_finish, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n), (a,n)) \
+ X(speech_transcript, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, char *dst, uint32_t capacity, uint32_t *length), (a,n,dst,capacity,length)) \
+ X(questionnaire_set_question, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t required, uint32_t multiple), (a,n,required,multiple)) \
+ X(questionnaire_get_state, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_node *current, uint32_t *complete), (a,n,current,complete)) \
+ X(questionnaire_choice_selected, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t *selected), (a,n,selected)) \
+ X(questionnaire_next, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n), (a,n)) \
+ X(questionnaire_previous, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n), (a,n)) \
+ X(questionnaire_submit, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n), (a,n)) \
+ X(dock_activate, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node dock, cui_bridge_node panel), (a,dock,panel)) \
+ X(dock_move_split, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node dock, cui_bridge_node panel, cui_bridge_node reference, uint32_t axis, double ratio, uint32_t before), (a,dock,panel,reference,axis,ratio,before)) \
+ X(dock_get_active, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node dock, cui_bridge_node *panel), (a,dock,panel)) \
+ X(dock_panel_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node dock, cui_bridge_node panel, cui_bridge_rect *bounds), (a,dock,panel,bounds)) \
+ X(dock_serialize, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node dock, char *dst, uint32_t capacity, uint32_t *required), (a,dock,dst,capacity,required)) \
+ X(settings_set_query, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node settings, const char *query), (a,settings,query)) \
+ X(settings_get_page, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node settings, cui_bridge_node *page), (a,settings,page)) \
+ X(settings_set_page, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node settings, cui_bridge_node page), (a,settings,page)) \
+ X(settings_reset_page, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node settings, cui_bridge_node page), (a,settings,page)) \
+ X(settings_field_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node settings, cui_bridge_node field, cui_bridge_rect *bounds), (a,settings,field,bounds)) \
+ X(theme_preset_count, uint32_t, (void), ()) \
+ X(theme_preset_name, cui_bridge_status, (uint32_t index, char *dst, uint32_t capacity, uint32_t *length), (index,dst,capacity,length)) \
+ X(set_theme_preset, cui_bridge_status, (cui_bridge_app *a, uint32_t index), (a,index)) \
+ X(get_theme_preset, cui_bridge_status, (const cui_bridge_app *a, uint32_t *index), (a,index)) \
  X(step, cui_bridge_status, (cui_bridge_app *a, float dt), (a,dt)) \
  X(dropdown_part_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t menu, cui_bridge_rect *r), (a,n,menu,r)) \
  X(node_bounds, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_rect *r), (a,n,r)) \
@@ -191,6 +235,25 @@ type Node struct {
 	hasTime                              bool
 	colorRGBA                            uint32
 	hasColor                             bool
+	textViewFormat                       uint32
+	hasTextViewFormat                    bool
+	chartKind                            ChartKind
+	hasChartKind                         bool
+	chartData                            []ChartDatum
+	hasChartData                         bool
+	tableHeaders                         []string
+	tableRows                            [][]string
+	hasTableData                         bool
+	tableSelectionMode                   uint32
+	hasTableSelectionMode                bool
+	plotPoints                           []PlotPoint
+	hasPlotPoints                        bool
+	rootPadding                          float32
+	hasRootPadding                       bool
+	questionRequired, questionMultiple   bool
+	hasQuestionConfig                    bool
+	settingsQuery                        string
+	hasSettingsQuery                     bool
 	dateValue                            Date
 	hasDate                              bool
 	onClose                              func(Event)
@@ -388,6 +451,358 @@ func (a *App) check() error {
 	}
 	return nil
 }
+func (a *App) ThemePresets() ([]string, error) {
+	if err := a.check(); err != nil {
+		return nil, err
+	}
+	count := uint32(C.go_theme_preset_count())
+	if count > 1024 {
+		return nil, errors.New("theme preset count exceeds limit")
+	}
+	names := make([]string, 0, count)
+	buf := (*C.char)(C.malloc(4096))
+	if buf == nil {
+		return nil, errors.New("theme preset allocation failed")
+	}
+	defer C.free(unsafe.Pointer(buf))
+	for i := uint32(0); i < count; i++ {
+		var length C.uint32_t
+		if err := result(C.go_theme_preset_name(C.uint32_t(i), buf, 4096, &length)); err != nil {
+			return nil, err
+		}
+		names = append(names, C.GoStringN(buf, C.int(length)))
+	}
+	return names, nil
+}
+func (a *App) SetThemePreset(index uint32) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+	return result(C.go_set_theme_preset(a.ptr, C.uint32_t(index)))
+}
+func (a *App) ThemePreset() (uint32, bool, error) {
+	if err := a.check(); err != nil {
+		return 0, false, err
+	}
+	var index C.uint32_t
+	code := C.go_get_theme_preset(a.ptr, &index)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return 0, false, nil
+	}
+	if err := result(code); err != nil {
+		return 0, false, err
+	}
+	return uint32(index), true, nil
+}
+func (a *App) SetClipboard(text string) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+	if !utf8.ValidString(text) || strings.IndexByte(text, 0) >= 0 || len(text) > 65536 {
+		return errors.New("clipboard text must be UTF-8 without NUL and <=65536 bytes")
+	}
+	p := cs(text)
+	defer C.free(unsafe.Pointer(p))
+	return result(C.go_clipboard_set(a.ptr, p))
+}
+func (a *App) Clipboard() (string, error) {
+	if err := a.check(); err != nil {
+		return "", err
+	}
+	p := (*C.char)(C.malloc(65537))
+	if p == nil {
+		return "", errors.New("clipboard allocation failed")
+	}
+	defer C.free(unsafe.Pointer(p))
+	var length C.uint32_t
+	if err := result(C.go_clipboard_get(a.ptr, p, 65537, &length)); err != nil {
+		return "", err
+	}
+	return C.GoStringN(p, C.int(length)), nil
+}
+func Speech(key string) *Node        { return &Node{kind: 77, key: key} }
+func Questionnaire(key string) *Node { return &Node{kind: 78, key: key} }
+func Dock(key string) *Node          { return &Node{kind: 79, key: key} }
+func Settings(key string) *Node      { return &Node{kind: 80, key: key} }
+func (n *Node) Query(query string) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 80 || n.removed || !utf8.ValidString(query) || strings.IndexByte(query, 0) >= 0 || len(query) > 256 {
+		n.err = errors.New("invalid Settings query")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		p := cs(query)
+		defer C.free(unsafe.Pointer(p))
+		if e := result(C.go_settings_set_query(n.app.ptr, n.handle, p)); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.settingsQuery = query
+	n.hasSettingsQuery = true
+	return n
+}
+func (a *App) settingsNode(n *Node) error {
+	if e := a.check(); e != nil {
+		return e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 80 {
+		return errors.New("invalid Settings node")
+	}
+	return nil
+}
+func (a *App) settingsPage(settings, page *Node) error {
+	if e := a.settingsNode(settings); e != nil {
+		return e
+	}
+	if page == nil || page.app != a || page.removed || page.kind != 20 {
+		return errors.New("invalid Settings page")
+	}
+	return nil
+}
+func (a *App) SettingsPage(settings *Node) (*Node, error) {
+	if e := a.settingsNode(settings); e != nil {
+		return nil, e
+	}
+	var page C.cui_bridge_node
+	if e := result(C.go_settings_get_page(a.ptr, settings.handle, &page)); e != nil {
+		return nil, e
+	}
+	return a.nodes[keyID(page)], nil
+}
+func (a *App) SetSettingsPage(settings, page *Node) error {
+	if e := a.settingsPage(settings, page); e != nil {
+		return e
+	}
+	return result(C.go_settings_set_page(a.ptr, settings.handle, page.handle))
+}
+func (a *App) ResetSettingsPage(settings, page *Node) error {
+	if e := a.settingsPage(settings, page); e != nil {
+		return e
+	}
+	return result(C.go_settings_reset_page(a.ptr, settings.handle, page.handle))
+}
+func (a *App) SettingsFieldBounds(settings, field *Node) (Rect, error) {
+	if e := a.settingsNode(settings); e != nil {
+		return Rect{}, e
+	}
+	if field == nil || field.app != a || field.removed {
+		return Rect{}, errors.New("invalid Settings field")
+	}
+	var r C.cui_bridge_rect
+	if e := result(C.go_settings_field_bounds(a.ptr, settings.handle, field.handle, &r)); e != nil {
+		return Rect{}, e
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+
+type DockAxis uint32
+
+const (
+	DockHorizontal DockAxis = iota
+	DockVertical
+)
+
+func (a *App) dockPanel(dock, panel *Node) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+	if dock == nil || dock.app != a || dock.removed || dock.kind != 79 || panel == nil || panel.app != a || panel.removed || panel.kind != 20 {
+		return errors.New("invalid Dock panel")
+	}
+	return nil
+}
+func (a *App) ActivateDockPanel(dock, panel *Node) error {
+	if err := a.dockPanel(dock, panel); err != nil {
+		return err
+	}
+	return result(C.go_dock_activate(a.ptr, dock.handle, panel.handle))
+}
+func (a *App) MoveDockSplit(dock, panel, reference *Node, axis DockAxis, ratio float64, before bool) error {
+	if err := a.dockPanel(dock, panel); err != nil {
+		return err
+	}
+	if err := a.dockPanel(dock, reference); err != nil {
+		return err
+	}
+	if axis > DockVertical || math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio <= 0 || ratio >= 1 {
+		return errors.New("invalid Dock split")
+	}
+	return result(C.go_dock_move_split(a.ptr, dock.handle, panel.handle, reference.handle, C.uint32_t(axis), C.double(ratio), C.uint32_t(btoi(before))))
+}
+func (a *App) ActiveDockPanel(dock *Node) (*Node, error) {
+	if err := a.check(); err != nil {
+		return nil, err
+	}
+	if dock == nil || dock.app != a || dock.removed || dock.kind != 79 {
+		return nil, errors.New("invalid Dock")
+	}
+	var panel C.cui_bridge_node
+	if err := result(C.go_dock_get_active(a.ptr, dock.handle, &panel)); err != nil {
+		return nil, err
+	}
+	return a.nodes[keyID(panel)], nil
+}
+func (a *App) DockPanelBounds(dock, panel *Node) (Rect, error) {
+	if err := a.dockPanel(dock, panel); err != nil {
+		return Rect{}, err
+	}
+	var r C.cui_bridge_rect
+	if err := result(C.go_dock_panel_bounds(a.ptr, dock.handle, panel.handle, &r)); err != nil {
+		return Rect{}, err
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+func (a *App) SerializeDock(dock *Node) (string, error) {
+	if err := a.check(); err != nil {
+		return "", err
+	}
+	if dock == nil || dock.app != a || dock.removed || dock.kind != 79 {
+		return "", errors.New("invalid Dock")
+	}
+	var required C.uint32_t
+	code := C.go_dock_serialize(a.ptr, dock.handle, nil, 0, &required)
+	if code != C.CUI_BRIDGE_CAPACITY {
+		return "", result(code)
+	}
+	if required == 0 || required > 1048576 {
+		return "", errors.New("Dock model exceeds limit")
+	}
+	p := (*C.char)(C.malloc(C.size_t(required)))
+	if p == nil {
+		return "", errors.New("Dock model allocation failed")
+	}
+	defer C.free(unsafe.Pointer(p))
+	if err := result(C.go_dock_serialize(a.ptr, dock.handle, p, required, &required)); err != nil {
+		return "", err
+	}
+	return C.GoStringN(p, C.int(required-1)), nil
+}
+func (n *Node) Question(required, multiple bool) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 20 || n.removed {
+		n.err = errors.New("question requires Item")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := result(C.go_questionnaire_set_question(n.app.ptr, n.handle, C.uint32_t(btoi(required)), C.uint32_t(btoi(multiple)))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.questionRequired, n.questionMultiple, n.hasQuestionConfig = required, multiple, true
+	return n
+}
+func (a *App) questionnaireNode(n *Node) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 78 {
+		return errors.New("invalid Questionnaire node")
+	}
+	return nil
+}
+func (a *App) QuestionnaireState(n *Node) (*Node, bool, error) {
+	if err := a.questionnaireNode(n); err != nil {
+		return nil, false, err
+	}
+	var current C.cui_bridge_node
+	var complete C.uint32_t
+	if err := result(C.go_questionnaire_get_state(a.ptr, n.handle, &current, &complete)); err != nil {
+		return nil, false, err
+	}
+	return a.nodes[keyID(current)], complete != 0, nil
+}
+func (a *App) ChoiceSelected(choice *Node) (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	if choice == nil || choice.app != a || choice.removed || choice.kind != 20 {
+		return false, errors.New("invalid questionnaire choice")
+	}
+	var selected C.uint32_t
+	if err := result(C.go_questionnaire_choice_selected(a.ptr, choice.handle, &selected)); err != nil {
+		return false, err
+	}
+	return selected != 0, nil
+}
+func (a *App) NextQuestion(n *Node) error {
+	if err := a.questionnaireNode(n); err != nil {
+		return err
+	}
+	return result(C.go_questionnaire_next(a.ptr, n.handle))
+}
+func (a *App) PreviousQuestion(n *Node) error {
+	if err := a.questionnaireNode(n); err != nil {
+		return err
+	}
+	return result(C.go_questionnaire_previous(a.ptr, n.handle))
+}
+func (a *App) SubmitQuestionnaire(n *Node) error {
+	if err := a.questionnaireNode(n); err != nil {
+		return err
+	}
+	return result(C.go_questionnaire_submit(a.ptr, n.handle))
+}
+func (a *App) speechNode(n *Node) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 77 {
+		return errors.New("invalid Speech node")
+	}
+	return nil
+}
+func (a *App) StartSpeech(n *Node) error {
+	if err := a.speechNode(n); err != nil {
+		return err
+	}
+	return result(C.go_speech_start(a.ptr, n.handle))
+}
+func (a *App) ReportSpeech(n *Node, text string, finalPhrase bool) error {
+	if err := a.speechNode(n); err != nil {
+		return err
+	}
+	if err := valid(text); err != nil {
+		return err
+	}
+	p := cs(text)
+	defer C.free(unsafe.Pointer(p))
+	return result(C.go_speech_report(a.ptr, n.handle, p, C.uint32_t(btoi(finalPhrase))))
+}
+func (a *App) FinishSpeech(n *Node) error {
+	if err := a.speechNode(n); err != nil {
+		return err
+	}
+	return result(C.go_speech_finish(a.ptr, n.handle))
+}
+func (a *App) SpeechTranscript(n *Node) (string, error) {
+	if err := a.speechNode(n); err != nil {
+		return "", err
+	}
+	p := (*C.char)(C.malloc(4097))
+	if p == nil {
+		return "", errors.New("transcript allocation failed")
+	}
+	defer C.free(unsafe.Pointer(p))
+	var length C.uint32_t
+	if err := result(C.go_speech_transcript(a.ptr, n.handle, p, 4097, &length)); err != nil {
+		return "", err
+	}
+	return C.GoStringN(p, C.int(length)), nil
+}
 func (a *App) Close() error {
 	if err := a.check(); err != nil {
 		return err
@@ -438,8 +853,30 @@ func (a *App) SetFontFallbacks(paths []string) error {
 func keyID(h C.cui_bridge_node) uint64 { return uint64(h.slot)<<32 | uint64(h.generation) }
 func Row(key string) *Node             { return &Node{kind: 1, key: key, size: int(Base)} }
 func Column(key string) *Node          { return &Node{kind: 2, key: key, size: int(Base)} }
-func Label(text string) *Node          { return &Node{kind: 3, text: text, size: int(Base)} }
-func Button(key string) *Node          { return &Node{kind: 4, key: key, size: int(Base)} }
+func RootView(key string) *Node        { return &Node{kind: 76, key: key} }
+func (n *Node) RootPadding(padding float32) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 76 || n.removed || !finite(padding) || padding < 0 || padding > 256 {
+		n.err = errors.New("invalid root padding")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := result(C.go_set_root_padding(n.app.ptr, n.handle, C.float(padding))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.rootPadding, n.hasRootPadding = padding, true
+	return n
+}
+func Label(text string) *Node { return &Node{kind: 3, text: text, size: int(Base)} }
+func Button(key string) *Node { return &Node{kind: 4, key: key, size: int(Base)} }
 func (n *Node) Key(key string) *Node {
 	if n.err != nil {
 		return n
@@ -569,7 +1006,7 @@ func (n *Node) Disabled(v bool) *Node {
 	if n.err != nil {
 		return n
 	}
-	if !(n.kind == 4 || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61)) {
+	if !(n.kind == 4 || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || (n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79) {
 		n.err = errors.New("disabled requires control")
 		return n
 	}
@@ -639,6 +1076,55 @@ func (a *App) Mount(root *Node) error {
 		if d > 128 {
 			return errors.New("tree too deep")
 		}
+		if n.kind == 76 && d != 1 {
+			return errors.New("RootView must be the root")
+		}
+		if n.kind == 78 {
+			if len(n.children) == 0 || len(n.children) > 16 {
+				return errors.New("Questionnaire needs 1..16 questions")
+			}
+			total := 0
+			for _, q := range n.children {
+				if q == nil || q.kind != 20 || len(q.children) == 0 {
+					return errors.New("Questionnaire questions require Item choices")
+				}
+				total += len(q.children)
+				for _, c := range q.children {
+					if c == nil || c.kind != 20 || len(c.children) > 0 {
+						return errors.New("Questionnaire choices must be leaf Items")
+					}
+				}
+			}
+			if total > 256 {
+				return errors.New("Questionnaire exceeds 256 choices")
+			}
+		}
+		if n.kind == 80 {
+			if len(n.children) == 0 || len(n.children) > 8 {
+				return errors.New("Settings needs 1..8 pages")
+			}
+			groups, fields := 0, 0
+			for _, page := range n.children {
+				if page == nil || page.kind != 20 || len(page.children) == 0 || len(page.children) > 8 {
+					return errors.New("Settings pages need 1..8 Item groups")
+				}
+				groups += len(page.children)
+				for _, group := range page.children {
+					if group == nil || group.kind != 20 || len(group.children) == 0 || len(group.children) > 16 {
+						return errors.New("Settings groups need 1..16 fields")
+					}
+					fields += len(group.children)
+					for _, field := range group.children {
+						if field == nil || (field.kind != 5 && field.kind != 7 && field.kind != 12 && field.kind != 14) || len(field.children) > 0 {
+							return errors.New("invalid Settings field")
+						}
+					}
+				}
+			}
+			if groups > 32 || fields > 128 {
+				return errors.New("Settings exceeds group or field limit")
+			}
+		}
 		if n.err != nil {
 			return n.err
 		}
@@ -655,13 +1141,13 @@ func (a *App) Mount(root *Node) error {
 			return errors.New("duplicate key")
 		}
 		keys[n.key] = true
-		if n.kind >= 3 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && len(n.children) > 0 {
+		if n.kind >= 3 && n.kind != 15 && n.kind != 17 && n.kind != 18 && n.kind != 19 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 24 && n.kind != 26 && n.kind != 27 && n.kind != 29 && n.kind != 33 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 45 && n.kind != 46 && n.kind != 47 && n.kind != 48 && n.kind != 49 && n.kind != 54 && n.kind != 60 && n.kind != 61 && n.kind != 63 && n.kind != 64 && n.kind != 65 && n.kind != 66 && n.kind != 70 && n.kind != 73 && n.kind != 74 && n.kind != 75 && n.kind != 76 && n.kind != 78 && n.kind != 79 && n.kind != 80 && len(n.children) > 0 {
 			return errors.New("leaf has children")
 		}
-		if (n.kind == 54 || n.kind == 60) && len(n.children) > 64 {
+		if (n.kind == 54 || n.kind == 60 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79) && len(n.children) > 64 {
 			return errors.New("tree exceeds 64 Items")
 		}
-		if n.kind == 17 || n.kind == 18 || n.kind == 19 || n.kind == 21 || n.kind == 22 || n.kind == 23 || n.kind == 40 || n.kind == 41 || n.kind == 44 || n.kind == 45 || n.kind == 47 || n.kind == 48 || n.kind == 49 || n.kind == 54 || n.kind == 60 || n.kind == 61 {
+		if n.kind == 17 || n.kind == 18 || n.kind == 19 || n.kind == 21 || n.kind == 22 || n.kind == 23 || n.kind == 40 || n.kind == 41 || n.kind == 44 || n.kind == 45 || n.kind == 47 || n.kind == 48 || n.kind == 49 || n.kind == 54 || n.kind == 60 || n.kind == 61 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 70 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 79 {
 			for _, ch := range n.children {
 				if ch == nil || ch.kind != 20 {
 					return errors.New("group children must be Item")
@@ -689,6 +1175,24 @@ func (a *App) Mount(root *Node) error {
 		n.app = a
 		n.handle = h
 		a.nodes[keyID(h)] = n
+		if n.hasSettingsQuery {
+			p := cs(n.settingsQuery)
+			e := result(C.go_settings_set_query(a.ptr, h, p))
+			C.free(unsafe.Pointer(p))
+			if e != nil {
+				return e
+			}
+		}
+		if n.hasQuestionConfig {
+			if e := result(C.go_questionnaire_set_question(a.ptr, h, C.uint32_t(btoi(n.questionRequired)), C.uint32_t(btoi(n.questionMultiple)))); e != nil {
+				return e
+			}
+		}
+		if n.hasRootPadding {
+			if e := result(C.go_set_root_padding(a.ptr, h, C.float(n.rootPadding))); e != nil {
+				return e
+			}
+		}
 		if n.kind == 59 && n.hasTotal {
 			if e := result(C.go_set_total(a.ptr, h, C.uint32_t(n.total))); e != nil {
 				return e
@@ -697,6 +1201,36 @@ func (a *App) Mount(root *Node) error {
 		if n.text != "" {
 			if err := n.SetText(n.text); err != nil {
 				return err
+			}
+		}
+		if n.hasTextViewFormat {
+			if e := result(C.go_set_text_view_format(a.ptr, h, C.uint32_t(n.textViewFormat))); e != nil {
+				return e
+			}
+		}
+		if n.hasChartKind {
+			if e := result(C.go_chart_set_kind(a.ptr, h, C.uint32_t(n.chartKind))); e != nil {
+				return e
+			}
+		}
+		if n.hasChartData {
+			if e := n.SetData(n.chartData); e != nil {
+				return e
+			}
+		}
+		if n.hasTableData {
+			if e := n.SetTable(n.tableHeaders, n.tableRows); e != nil {
+				return e
+			}
+		}
+		if n.hasTableSelectionMode {
+			if e := result(C.go_data_table_set_selection_mode(a.ptr, h, C.uint32_t(n.tableSelectionMode))); e != nil {
+				return e
+			}
+		}
+		if n.hasPlotPoints {
+			if e := n.SetPoints(n.plotPoints); e != nil {
+				return e
 			}
 		}
 		if len(n.imagePixels) > 0 {
@@ -754,7 +1288,7 @@ func (a *App) Mount(root *Node) error {
 				return e
 			}
 		}
-		if n.hasOpen && (n.kind < 24 || n.kind == 58 || n.kind == 62 || n.kind == 63) {
+		if n.hasOpen && (n.kind < 24 || n.kind == 58 || n.kind == 62 || n.kind == 63 || n.kind == 75) {
 			if e := result(C.go_set_open(a.ptr, h, C.uint32_t(btoi(n.opened)))); e != nil {
 				return e
 			}
@@ -769,7 +1303,7 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
-		if ((n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61))) && n.disabled {
+		if ((n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
 			if err := result(C.go_set_disabled(a.ptr, h, 1)); err != nil {
 				return err
 			}
@@ -779,7 +1313,7 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
-		if (n.kind == 9 || n.kind == 10 || n.kind == 14 || n.kind == 42 || n.kind == 43 || n.kind == 52) && n.hasValue {
+		if (n.kind == 9 || n.kind == 10 || n.kind == 14 || n.kind == 42 || n.kind == 43 || n.kind == 52 || n.kind == 20 || n.kind == 74) && n.hasValue {
 			if err := result(C.go_set_value(a.ptr, h, C.double(n.value))); err != nil {
 				return err
 			}
@@ -1052,7 +1586,7 @@ func (n *Node) Value(v float64) *Node {
 	if n.err != nil {
 		return n
 	}
-	if (n.kind != 9 && n.kind != 10 && n.kind != 14 && n.kind != 42 && n.kind != 43 && n.kind != 52) || math.IsNaN(v) || math.IsInf(v, 0) {
+	if (n.kind != 9 && n.kind != 10 && n.kind != 14 && n.kind != 42 && n.kind != 43 && n.kind != 52 && n.kind != 74) || math.IsNaN(v) || math.IsInf(v, 0) || (n.kind == 74 && (v < 0 || v > 1000000)) {
 		n.err = errors.New("invalid value")
 		return n
 	}
@@ -1090,7 +1624,7 @@ func (n *Node) OnChange(fn func(Event)) *Node {
 	if n.err != nil {
 		return n
 	}
-	if !((n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || n.kind == 17 || n.kind == 18 || (n.kind >= 20 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 46 || (n.kind >= 54 && n.kind <= 59) || n.kind == 61) {
+	if !((n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || n.kind == 17 || n.kind == 18 || (n.kind >= 20 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 46 || (n.kind >= 54 && n.kind <= 59) || n.kind == 61 || n.kind == 64 || n.kind == 65 || n.kind == 67 || n.kind == 68 || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79 || n.kind == 80) {
 		n.err = errors.New("change requires stateful component")
 		return n
 	}
@@ -1164,7 +1698,7 @@ func (n *Node) Detail(v string) *Node {
 	if n.err != nil {
 		return n
 	}
-	if n.kind != 16 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 32 && n.kind != 51 && n.kind != 52 && n.kind != 61 && n.kind != 62 && (n.kind < 24 || n.kind > 27) {
+	if n.kind != 12 && n.kind != 14 && n.kind != 16 && n.kind != 20 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 32 && n.kind != 51 && n.kind != 52 && n.kind != 61 && n.kind != 62 && n.kind != 68 && (n.kind < 24 || n.kind > 27) {
 		n.err = errors.New("detail requires Alert, Select, or ComboBox")
 		return n
 	}
@@ -1188,7 +1722,7 @@ func (n *Node) Open(v bool) *Node {
 	if n.err != nil {
 		return n
 	}
-	if n.kind != 15 && n.kind != 20 && n.kind != 58 && n.kind != 62 && n.kind != 63 && (n.kind < 24 || n.kind > 27) {
+	if n.kind != 15 && n.kind != 20 && n.kind != 58 && n.kind != 62 && n.kind != 63 && n.kind != 75 && (n.kind < 24 || n.kind > 27) {
 		n.err = errors.New("open requires Collapsible or Accordion Item")
 		return n
 	}
@@ -1207,7 +1741,7 @@ func (n *Node) Selected(item *Node) *Node {
 	if n.err != nil {
 		return n
 	}
-	if n.kind != 17 && n.kind != 18 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 54 {
+	if n.kind != 17 && n.kind != 18 && n.kind != 21 && n.kind != 22 && n.kind != 23 && n.kind != 40 && n.kind != 41 && n.kind != 44 && n.kind != 54 && n.kind != 65 {
 		n.err = errors.New("selected requires a choice group")
 		return n
 	}
@@ -1341,7 +1875,7 @@ func (n *Node) VisualSize(width, height float32) *Node {
 	if n.err != nil {
 		return n
 	}
-	if !(n.kind == 30 || n.kind == 32 || n.kind == 33 || n.kind == 35 || n.kind == 36 || n.kind == 46 || n.kind == 50 || n.kind == 51 || n.kind == 52 || n.kind == 53 || n.kind == 54 || n.kind == 56 || n.kind == 58 || n.kind == 60 || n.kind == 61) || !finite(width) || !finite(height) || width < 0 || height < 0 || width > 4096 || height > 4096 {
+	if !(n.kind == 30 || n.kind == 32 || n.kind == 33 || n.kind == 35 || n.kind == 36 || n.kind == 46 || n.kind == 50 || n.kind == 51 || n.kind == 52 || n.kind == 53 || n.kind == 54 || n.kind == 56 || n.kind == 58 || n.kind == 60 || n.kind == 61 || n.kind == 64 || n.kind == 65 || n.kind == 66 || n.kind == 67 || n.kind == 68 || n.kind == 69 || n.kind == 70 || n.kind == 71 || n.kind == 72 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 78 || n.kind == 79 || n.kind == 80) || !finite(width) || !finite(height) || width < 0 || height < 0 || width > 4096 || height > 4096 {
 		n.err = errors.New("invalid visual size")
 		return n
 	}
@@ -1514,7 +2048,494 @@ func InputGroup(key string) *Node         { return &Node{kind: 61, key: key} }
 func Notification(key, title, message string) *Node {
 	return &Node{kind: 62, key: key, text: title, detail: message}
 }
-func FocusTrap(key string) *Node { return &Node{kind: 63, key: key} }
+func FocusTrap(key string) *Node       { return &Node{kind: 63, key: key} }
+func MessageScroller(key string) *Node { return &Node{kind: 64, key: key} }
+func Carousel(key string) *Node        { return &Node{kind: 65, key: key} }
+func Resizable(key string) *Node       { return &Node{kind: 66, key: key} }
+
+type TextViewFormat uint32
+
+const (
+	Markdown TextViewFormat = iota
+	HTML
+	Plain
+)
+
+func TextView(key, source string) *Node { return &Node{kind: 67, key: key, text: source} }
+func Editor(key, source, language string) *Node {
+	return &Node{kind: 68, key: key, text: source, detail: language}
+}
+
+type ChartKind uint32
+
+const (
+	LineChart ChartKind = iota
+	AreaChart
+	BarChart
+	PieChart
+)
+
+type ChartDatum struct {
+	Label string
+	Value float64
+}
+
+func Chart(key string) *Node     { return &Node{kind: 69, key: key} }
+func Table(key string) *Node     { return &Node{kind: 70, key: key} }
+func DataTable(key string) *Node { return &Node{kind: 71, key: key} }
+
+type PlotPoint struct{ X, Y float64 }
+
+func Plot(key string) *Node        { return &Node{kind: 72, key: key} }
+func Command(key string) *Node     { return &Node{kind: 73, key: key} }
+func VirtualList(key string) *Node { return &Node{kind: 74, key: key} }
+func Sidebar(key string) *Node     { return &Node{kind: 75, key: key} }
+func (a *App) VirtualListItemBounds(list, item *Node) (Rect, error) {
+	if e := a.check(); e != nil {
+		return Rect{}, e
+	}
+	if list == nil || item == nil || list.app != a || item.app != a || list.removed || item.removed || list.kind != 74 || item.kind != 20 {
+		return Rect{}, errors.New("invalid virtual list item")
+	}
+	var r C.cui_bridge_rect
+	if e := result(C.go_virtual_list_item_bounds(a.ptr, list.handle, item.handle, &r)); e != nil {
+		return Rect{}, e
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+func (a *App) CommandItemBounds(command, item *Node) (Rect, error) {
+	if e := a.check(); e != nil {
+		return Rect{}, e
+	}
+	if command == nil || item == nil || command.app != a || item.app != a || command.removed || item.removed || command.kind != 73 || item.kind != 20 {
+		return Rect{}, errors.New("invalid command item")
+	}
+	var r C.cui_bridge_rect
+	if e := result(C.go_command_item_bounds(a.ptr, command.handle, item.handle, &r)); e != nil {
+		return Rect{}, e
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+func (n *Node) Points(v []PlotPoint) *Node {
+	if n.err == nil {
+		n.err = n.SetPoints(v)
+	}
+	return n
+}
+func (n *Node) SetPoints(v []PlotPoint) error {
+	if n == nil || n.kind != 72 {
+		return errors.New("points require Plot")
+	}
+	if n.removed {
+		return errors.New("removed plot")
+	}
+	if len(v) > 256 {
+		return errors.New("too many plot points")
+	}
+	for _, p := range v {
+		if math.IsNaN(p.X) || math.IsNaN(p.Y) || math.IsInf(p.X, 0) || math.IsInf(p.Y, 0) || math.Abs(p.X) > 16384 || math.Abs(p.Y) > 16384 {
+			return errors.New("invalid plot point")
+		}
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			return e
+		}
+		points := make([]C.cui_bridge_plot_point, len(v))
+		for i, p := range v {
+			points[i] = C.cui_bridge_plot_point{x: C.double(p.X), y: C.double(p.Y)}
+		}
+		var ptr *C.cui_bridge_plot_point
+		if len(points) > 0 {
+			ptr = &points[0]
+		}
+		if e := result(C.go_plot_set_points(n.app.ptr, n.handle, ptr, C.uint32_t(len(points)))); e != nil {
+			return e
+		}
+		runtime.KeepAlive(points)
+	}
+	n.plotPoints = append([]PlotPoint(nil), v...)
+	n.hasPlotPoints = true
+	return nil
+}
+func (a *App) PlotPoint(n *Node, index uint32) (PlotPoint, error) {
+	if e := a.check(); e != nil {
+		return PlotPoint{}, e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 72 {
+		return PlotPoint{}, errors.New("invalid Plot")
+	}
+	var p C.cui_bridge_plot_point
+	if e := result(C.go_plot_get_point(a.ptr, n.handle, C.uint32_t(index), &p)); e != nil {
+		return PlotPoint{}, e
+	}
+	return PlotPoint{float64(p.x), float64(p.y)}, nil
+}
+
+type DataTableState struct{ Row, Column, SortColumn, SortDirection uint32 }
+
+type TableSelectionMode uint32
+
+const (
+	SelectRows TableSelectionMode = iota
+	SelectColumns
+	SelectCells
+)
+
+func (n *Node) SelectionMode(mode TableSelectionMode) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 71 || mode > SelectCells || n.removed {
+		n.err = errors.New("invalid data table selection mode")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := result(C.go_data_table_set_selection_mode(n.app.ptr, n.handle, C.uint32_t(mode))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.tableSelectionMode = uint32(mode)
+	n.hasTableSelectionMode = true
+	return n
+}
+
+func (n *Node) TableData(headers []string, rows [][]string) *Node {
+	if n.err == nil {
+		n.err = n.SetTable(headers, rows)
+	}
+	return n
+}
+func (n *Node) SetTable(headers []string, rows [][]string) error {
+	if n == nil || n.kind != 71 {
+		return errors.New("table data requires DataTable")
+	}
+	if n.removed {
+		return errors.New("removed data table")
+	}
+	if len(headers) == 0 || len(headers) > 16 || len(rows) > 32 {
+		return errors.New("invalid data table dimensions")
+	}
+	for _, s := range headers {
+		if e := valid(s); e != nil {
+			return e
+		}
+		if len(s) > 128 {
+			return errors.New("data table text exceeds 128 bytes")
+		}
+	}
+	for _, row := range rows {
+		if len(row) != len(headers) {
+			return errors.New("data table row width mismatch")
+		}
+		for _, s := range row {
+			if e := valid(s); e != nil {
+				return e
+			}
+			if len(s) > 128 {
+				return errors.New("data table text exceeds 128 bytes")
+			}
+		}
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			return e
+		}
+		ch := make([]*C.char, len(headers))
+		cc := make([]*C.char, len(headers)*len(rows))
+		defer func() {
+			for _, p := range ch {
+				if p != nil {
+					C.free(unsafe.Pointer(p))
+				}
+			}
+			for _, p := range cc {
+				if p != nil {
+					C.free(unsafe.Pointer(p))
+				}
+			}
+		}()
+		for i, s := range headers {
+			ch[i] = cs(s)
+		}
+		for r, row := range rows {
+			for c, s := range row {
+				cc[r*len(headers)+c] = cs(s)
+			}
+		}
+		var cells **C.char
+		if len(cc) > 0 {
+			cells = &cc[0]
+		}
+		if e := result(C.go_data_table_set(n.app.ptr, n.handle, (**C.char)(unsafe.Pointer(&ch[0])), C.uint32_t(len(ch)), cells, C.uint32_t(len(rows)))); e != nil {
+			return e
+		}
+		runtime.KeepAlive(ch)
+		runtime.KeepAlive(cc)
+	}
+	n.tableHeaders = append([]string(nil), headers...)
+	n.tableRows = make([][]string, len(rows))
+	for i, row := range rows {
+		n.tableRows[i] = append([]string(nil), row...)
+	}
+	n.hasTableData = true
+	return nil
+}
+func (a *App) DataTableCell(n *Node, row, col uint32) (string, error) {
+	if e := a.check(); e != nil {
+		return "", e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 71 {
+		return "", errors.New("invalid DataTable")
+	}
+	p := (*C.char)(C.malloc(129))
+	if p == nil {
+		return "", errors.New("out of memory")
+	}
+	defer C.free(unsafe.Pointer(p))
+	var required C.uint32_t
+	if e := result(C.go_data_table_get_cell(a.ptr, n.handle, C.uint32_t(row), C.uint32_t(col), p, 129, &required)); e != nil {
+		return "", e
+	}
+	return C.GoStringN(p, C.int(required-1)), nil
+}
+func (a *App) DataTableState(n *Node) (DataTableState, error) {
+	if e := a.check(); e != nil {
+		return DataTableState{}, e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 71 {
+		return DataTableState{}, errors.New("invalid DataTable")
+	}
+	var row, col, sortCol, sortDir C.uint32_t
+	if e := result(C.go_data_table_get_state(a.ptr, n.handle, &row, &col, &sortCol, &sortDir)); e != nil {
+		return DataTableState{}, e
+	}
+	return DataTableState{uint32(row), uint32(col), uint32(sortCol), uint32(sortDir)}, nil
+}
+func (a *App) DataTableCellBounds(n *Node, row, col uint32) (Rect, error) {
+	if e := a.check(); e != nil {
+		return Rect{}, e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 71 {
+		return Rect{}, errors.New("invalid DataTable")
+	}
+	var r C.cui_bridge_rect
+	if e := result(C.go_data_table_cell_bounds(a.ptr, n.handle, C.uint32_t(row), C.uint32_t(col), &r)); e != nil {
+		return Rect{}, e
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+func (a *App) DataTableHeaderBounds(n *Node, col uint32) (Rect, error) {
+	if e := a.check(); e != nil {
+		return Rect{}, e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 71 {
+		return Rect{}, errors.New("invalid DataTable")
+	}
+	var r C.cui_bridge_rect
+	if e := result(C.go_data_table_header_bounds(a.ptr, n.handle, C.uint32_t(col), &r)); e != nil {
+		return Rect{}, e
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+func (n *Node) ChartKind(v ChartKind) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 69 || v > PieChart {
+		n.err = errors.New("invalid chart kind")
+		return n
+	}
+	if v == PieChart {
+		for _, d := range n.chartData {
+			if d.Value < 0 {
+				n.err = errors.New("pie values must be nonnegative")
+				return n
+			}
+		}
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := result(C.go_chart_set_kind(n.app.ptr, n.handle, C.uint32_t(v))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.chartKind, n.hasChartKind = v, true
+	return n
+}
+func (n *Node) Data(v []ChartDatum) *Node {
+	if n.err == nil {
+		n.err = n.SetData(v)
+	}
+	return n
+}
+func (n *Node) SetData(v []ChartDatum) error {
+	if n == nil || n.kind != 69 {
+		return errors.New("data requires Chart")
+	}
+	if n.removed {
+		return errors.New("removed chart")
+	}
+	if len(v) > 64 {
+		return errors.New("too many chart data")
+	}
+	for _, d := range v {
+		if e := valid(d.Label); e != nil {
+			return e
+		}
+		if len(d.Label) > 128 || math.IsNaN(d.Value) || math.IsInf(d.Value, 0) || d.Value < -1e9 || d.Value > 1e9 || (n.chartKind == PieChart && d.Value < 0) {
+			return errors.New("invalid chart datum")
+		}
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			return e
+		}
+		data := make([]C.cui_bridge_chart_datum, len(v))
+		for i, d := range v {
+			data[i].label_utf8 = cs(d.Label)
+			data[i].value = C.double(d.Value)
+		}
+		defer func() {
+			for _, d := range data {
+				C.free(unsafe.Pointer(d.label_utf8))
+			}
+		}()
+		var ptr *C.cui_bridge_chart_datum
+		if len(data) > 0 {
+			ptr = &data[0]
+		}
+		if e := result(C.go_chart_set_data(n.app.ptr, n.handle, ptr, C.uint32_t(len(data)))); e != nil {
+			return e
+		}
+		runtime.KeepAlive(data)
+	}
+	n.chartData = append([]ChartDatum(nil), v...)
+	n.hasChartData = true
+	return nil
+}
+func (a *App) ChartDatum(n *Node, index uint32) (ChartDatum, error) {
+	if e := a.check(); e != nil {
+		return ChartDatum{}, e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 69 {
+		return ChartDatum{}, errors.New("invalid chart")
+	}
+	p := (*C.char)(C.malloc(129))
+	if p == nil {
+		return ChartDatum{}, errors.New("out of memory")
+	}
+	defer C.free(unsafe.Pointer(p))
+	var required C.uint32_t
+	var value C.double
+	if e := result(C.go_chart_get_datum(a.ptr, n.handle, C.uint32_t(index), p, 129, &required, &value)); e != nil {
+		return ChartDatum{}, e
+	}
+	return ChartDatum{Label: C.GoStringN(p, C.int(required-1)), Value: float64(value)}, nil
+}
+func (n *Node) Format(v TextViewFormat) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 67 || v > Plain {
+		n.err = errors.New("invalid TextView format")
+		return n
+	}
+	n.textViewFormat, n.hasTextViewFormat = uint32(v), true
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+		} else {
+			n.err = result(C.go_set_text_view_format(n.app.ptr, n.handle, C.uint32_t(v)))
+		}
+	}
+	return n
+}
+func (a *App) SelectText(n *Node, anchor, cursor uint32) error {
+	if e := a.check(); e != nil {
+		return e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 67 {
+		return errors.New("invalid TextView")
+	}
+	return result(C.go_text_view_select(a.ptr, n.handle, C.uint32_t(anchor), C.uint32_t(cursor)))
+}
+func (a *App) CopySelection(n *Node) (string, error) {
+	if e := a.check(); e != nil {
+		return "", e
+	}
+	if n == nil || n.app != a || n.removed || n.kind != 67 {
+		return "", errors.New("invalid TextView")
+	}
+	p := (*C.char)(C.malloc(4097))
+	if p == nil {
+		return "", errors.New("out of memory")
+	}
+	defer C.free(unsafe.Pointer(p))
+	var required C.uint32_t
+	if e := result(C.go_text_view_copy_selection(a.ptr, n.handle, p, 4097, &required)); e != nil {
+		return "", e
+	}
+	return C.GoStringN(p, C.int(required-1)), nil
+}
+func (n *Node) PanelSize(v float64) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 20 || math.IsNaN(v) || math.IsInf(v, 0) || v < 100 || v > 4096 {
+		n.err = errors.New("invalid resizable panel size")
+		return n
+	}
+	n.value, n.hasValue = v, true
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+		} else {
+			n.err = result(C.go_set_value(n.app.ptr, n.handle, C.double(v)))
+		}
+	}
+	return n
+}
+func (a *App) ResizableHandleBounds(group, before *Node) (Rect, error) {
+	if e := a.check(); e != nil {
+		return Rect{}, e
+	}
+	if group == nil || before == nil || group.app != a || before.app != a || group.removed || before.removed || group.kind != 66 || before.kind != 20 {
+		return Rect{}, errors.New("invalid resizable handle")
+	}
+	var r C.cui_bridge_rect
+	if e := result(C.go_resizable_handle_bounds(a.ptr, group.handle, before.handle, &r)); e != nil {
+		return Rect{}, e
+	}
+	return Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}, nil
+}
+func (n *Node) SetOffset(v float64) error {
+	if n == nil || n.kind != 64 {
+		return errors.New("offset requires MessageScroller")
+	}
+	if n.removed {
+		return errors.New("removed message scroller")
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+		return errors.New("invalid scroll offset")
+	}
+	if n.app == nil {
+		return errors.New("mount and step MessageScroller before setting offset")
+	}
+	if e := n.app.check(); e != nil {
+		return e
+	}
+	return result(C.go_set_value(n.app.ptr, n.handle, C.double(v)))
+}
 func (n *Node) Date(v Date) *Node {
 	if n.err != nil {
 		return n

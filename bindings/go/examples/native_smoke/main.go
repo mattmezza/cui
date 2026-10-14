@@ -4,6 +4,7 @@ import (
 	"cui.local/bindings/go/cui"
 	"log"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -13,6 +14,28 @@ func main() {
 		log.Fatal(e)
 	}
 	defer a.Close()
+	if e = a.SetClipboard("Go clipboard ✓"); e != nil {
+		log.Fatal(e)
+	}
+	clip, e := a.Clipboard()
+	if e != nil {
+		log.Fatal(e)
+	}
+	if clip != "Go clipboard ✓" {
+		log.Fatalf("clipboard mismatch: %q", clip)
+	}
+	for _, want := range []string{"", strings.Repeat("é", 32768)} {
+		if e = a.SetClipboard(want); e != nil {
+			log.Fatal(e)
+		}
+		clip, e = a.Clipboard()
+		if e != nil {
+			log.Fatal(e)
+		}
+		if clip != want {
+			log.Fatalf("clipboard round trip mismatch: got %d bytes, want %d", len(clip), len(want))
+		}
+	}
 	b := cui.Button("save").Text("Save")
 	hit := false
 	b.OnClick(func(cui.Event) { hit = true })

@@ -73,3 +73,14 @@ if(CUI_BRIDGE_NATIVE_TESTS)
   CUI_TEST_FONT=${CUI_TEST_FONT}
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_image_native_virtual.py)
 endif()
+
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME bridge_python_clipboard_native COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+  CUI_TEST_FONT=${CUI_TEST_FONT}
+  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_clipboard_native_virtual.py)
+endif()
+
+add_test(NAME bridge_python_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/sidebar_workspace.py --headless)

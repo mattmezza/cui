@@ -53,3 +53,13 @@ add_test(NAME node_models COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/models.test.cjs)
 add_test(NAME node_workspace COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/examples/workspace.cjs --headless)
+
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME node_clipboard_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_TEST_FONT=${CUI_TEST_FONT}
+  ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/clipboard-native.test.cjs)
+endif()
+
+add_test(NAME node_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/sidebar-workspace.cjs --headless)

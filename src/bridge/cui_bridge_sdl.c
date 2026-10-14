@@ -2,6 +2,7 @@
 #include "cui/cui_sdl3.h"
 #include "cui_bridge_internal.h"
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     cui_font *font;
@@ -64,4 +65,33 @@ cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *app,
         return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     return cui_font_register_fallbacks(native->font, paths, count) ? CUI_BRIDGE_OK
                                                                    : CUI_BRIDGE_CORE_ERROR;
+}
+cui_bridge_status cui_bridge_native_clipboard_set(cui_bridge_app *app, cui_str text) {
+    bridge_native *native = app->native;
+    if (!native || !native->host)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    cui_platform platform = cui_sdl3_clipboard_interface(native->host);
+    if (!(platform.capabilities & CUI_PLATFORM_CLIPBOARD) || !platform.clipboard_set)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    return platform.clipboard_set(platform.user, text) ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;
+}
+cui_bridge_status cui_bridge_native_clipboard_get(cui_bridge_app *app, char *out, uint32_t capacity,
+                                                  uint32_t *length) {
+    bridge_native *native = app->native;
+    if (!native || !native->host)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    cui_platform platform = cui_sdl3_clipboard_interface(native->host);
+    if (!(platform.capabilities & CUI_PLATFORM_CLIPBOARD) || !platform.clipboard_get)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    cui_str text = platform.clipboard_get(platform.user);
+    if (!text.data)
+        return CUI_BRIDGE_CORE_ERROR;
+    if (text.length > 65536 || text.length > UINT32_MAX)
+        return CUI_BRIDGE_CAPACITY;
+    if (capacity <= text.length)
+        return CUI_BRIDGE_CAPACITY;
+    memcpy(out, text.data, text.length);
+    out[text.length] = '\0';
+    *length = (uint32_t)text.length;
+    return CUI_BRIDGE_OK;
 }

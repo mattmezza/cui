@@ -15,14 +15,14 @@ import time
 from typing import Callable, Iterator
 
 
-def _utf8(value: str) -> bytes:
+def _utf8(value: str, limit: int = 4096) -> bytes:
     if not isinstance(value, str):
         raise TypeError("expected a string")
     if "\x00" in value:
         raise ValueError("NUL is not allowed in bridge strings")
     encoded = value.encode("utf-8")
-    if len(encoded) > 4096:
-        raise ValueError("bridge strings are limited to 4096 UTF-8 bytes")
+    if len(encoded) > limit:
+        raise ValueError(f"bridge strings are limited to {limit} UTF-8 bytes")
     return encoded
 
 
@@ -53,6 +53,12 @@ class _EventEx(C.Structure):
                                  ("text_length", C.c_uint32), ("selected", _Handle)]
 
 
+class _ChartDatum(C.Structure):
+    _fields_ = [("label", C.c_char_p), ("value", C.c_double)]
+
+class _PlotPoint(C.Structure):
+    _fields_ = [("x", C.c_double), ("y", C.c_double)]
+
 class _Time(C.Structure):
     _fields_ = [("hour", C.c_uint32), ("minute", C.c_uint32), ("second", C.c_uint32)]
 
@@ -82,6 +88,46 @@ class _API:
             fn.restype = restype
             fn.argtypes = list(argtypes)
             return fn
+        self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
+        self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
+        self.theme_count = bind("theme_preset_count", C.c_uint32)
+        self.theme_name = bind("theme_preset_name", C.c_int, C.c_uint32, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
+        self.set_theme = bind("set_theme_preset", C.c_int, C.c_void_p, C.c_uint32)
+        self.get_theme = bind("get_theme_preset", C.c_int, C.c_void_p, C.POINTER(C.c_uint32))
+        self.set_selection_mode = bind("data_table_set_selection_mode", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.command_bounds = bind("command_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
+        self.virtual_bounds = bind("virtual_list_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
+        self.set_chart = bind("chart_set_data", C.c_int, C.c_void_p, _Handle, C.POINTER(_ChartDatum), C.c_uint32)
+        self.set_chart_kind = bind("chart_set_kind", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.get_chart = bind("chart_get_datum", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32), C.POINTER(C.c_double))
+        self.set_plot = bind("plot_set_points", C.c_int, C.c_void_p, _Handle, C.POINTER(_PlotPoint), C.c_uint32)
+        self.get_plot = bind("plot_get_point", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.POINTER(_PlotPoint))
+        self.set_matrix = bind("data_table_set", C.c_int, C.c_void_p, _Handle, C.POINTER(C.c_char_p), C.c_uint32, C.POINTER(C.c_char_p), C.c_uint32)
+        self.get_matrix_cell = bind("data_table_get_cell", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
+        self.get_matrix_state = bind("data_table_get_state", C.c_int, C.c_void_p, _Handle, *([C.POINTER(C.c_uint32)]*4))
+        self.matrix_cell_bounds = bind("data_table_cell_bounds", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.POINTER(_Rect))
+        self.matrix_header_bounds = bind("data_table_header_bounds", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.POINTER(_Rect))
+        self.set_root_padding = bind("set_root_padding",C.c_int,C.c_void_p,_Handle,C.c_float)
+        self.settings_query = bind("settings_set_query",C.c_int,C.c_void_p,_Handle,C.c_char_p)
+        self.settings_page = bind("settings_get_page",C.c_int,C.c_void_p,_Handle,C.POINTER(_Handle))
+        self.settings_select = bind("settings_set_page",C.c_int,C.c_void_p,_Handle,_Handle)
+        self.settings_reset = bind("settings_reset_page",C.c_int,C.c_void_p,_Handle,_Handle)
+        self.settings_bounds = bind("settings_field_bounds",C.c_int,C.c_void_p,_Handle,_Handle,C.POINTER(_Rect))
+        self.dock_activate = bind("dock_activate",C.c_int,C.c_void_p,_Handle,_Handle)
+        self.dock_move = bind("dock_move_split",C.c_int,C.c_void_p,_Handle,_Handle,_Handle,C.c_uint32,C.c_double,C.c_uint32)
+        self.dock_active = bind("dock_get_active",C.c_int,C.c_void_p,_Handle,C.POINTER(_Handle))
+        self.dock_bounds = bind("dock_panel_bounds",C.c_int,C.c_void_p,_Handle,_Handle,C.POINTER(_Rect))
+        self.dock_serialize = bind("dock_serialize",C.c_int,C.c_void_p,_Handle,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
+        self.question_config = bind("questionnaire_set_question",C.c_int,C.c_void_p,_Handle,C.c_uint32,C.c_uint32)
+        self.question_state = bind("questionnaire_get_state",C.c_int,C.c_void_p,_Handle,C.POINTER(_Handle),C.POINTER(C.c_uint32))
+        self.question_choice = bind("questionnaire_choice_selected",C.c_int,C.c_void_p,_Handle,C.POINTER(C.c_uint32))
+        self.question_submit = bind("questionnaire_submit",C.c_int,C.c_void_p,_Handle)
+        self.question_next = bind("questionnaire_next",C.c_int,C.c_void_p,_Handle)
+        self.question_previous = bind("questionnaire_previous",C.c_int,C.c_void_p,_Handle)
+        self.speech_start = bind("speech_start",C.c_int,C.c_void_p,_Handle)
+        self.speech_finish = bind("speech_finish",C.c_int,C.c_void_p,_Handle)
+        self.speech_report = bind("speech_report",C.c_int,C.c_void_p,_Handle,C.c_char_p,C.c_uint32)
+        self.speech_transcript = bind("speech_transcript",C.c_int,C.c_void_p,_Handle,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.set_font_fallbacks = bind("set_font_fallbacks", C.c_int, C.c_void_p, C.POINTER(C.c_char_p), C.c_uint32)
         self.abi_version = bind("abi_version", C.c_uint32)
         self.options_size = bind("options_size", C.c_uint32)
@@ -131,6 +177,10 @@ class _API:
                                 C.c_uint32, C.POINTER(_Rect))
         self.day_bounds = bind("calendar_day_bounds", C.c_int, C.c_void_p, _Handle,
                               _Date, C.POINTER(_Rect))
+        self.resizable_bounds = bind("resizable_handle_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
+        self.set_text_format = bind("set_text_view_format", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.select_text = bind("text_view_select", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32)
+        self.copy_selection = bind("text_view_copy_selection", C.c_int, C.c_void_p, _Handle, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
         self.set_hover = bind("set_button_hover_rgba", C.c_int, C.c_void_p, _Handle,
                               C.c_uint8, C.c_uint8, C.c_uint8, C.c_uint8)
         self.queue_pointer = bind("queue_pointer", C.c_int, C.c_void_p, C.c_int,
@@ -161,7 +211,7 @@ _SIZE = {name: i for i, name in enumerate(("inherit", "xs", "sm", "base", "md", 
                                            "xl", "2xl", "3xl", "4xl", "5xl", "6xl",
                                            "7xl", "8xl", "9xl"))}
 _KIND = {"row": 1, "column": 2, "label": 3, "button": 4, "checkbox": 5,
-         "radio": 6, "switch": 7, "toggle": 8, "slider": 9, "progress": 10, "badge": 11, "input": 12, "textarea": 13, "number_input": 14, "collapsible": 15, "alert": 16, "radio_group": 17, "tabs": 18, "accordion": 19, "item": 20, "select": 21, "combobox": 22, "dropdown_button": 23, "dialog": 24, "alert_dialog": 25, "sheet": 26, "popover": 27, "tooltip": 28, "hover_card": 29, "avatar": 30, "bubble": 31, "empty_view": 32, "group_box": 33, "kbd": 34, "skeleton": 35, "spinner": 36, "tag": 37, "marker": 38, "shimmer": 39, "list_view": 40, "menu": 41, "pagination": 42, "rating": 43, "stepper": 44, "description_list": 45, "scrollable": 46, "status_bar": 47, "toolbar": 48, "title_bar": 49, "icon": 50, "message": 51, "attachment": 52, "image": 53, "tree": 54, "time_field": 55, "color_picker": 56, "calendar": 57, "date_picker": 58, "otp_input": 59, "form": 60, "input_group": 61, "notification": 62, "focus_trap": 63}
+         "radio": 6, "switch": 7, "toggle": 8, "slider": 9, "progress": 10, "badge": 11, "input": 12, "textarea": 13, "number_input": 14, "collapsible": 15, "alert": 16, "radio_group": 17, "tabs": 18, "accordion": 19, "item": 20, "select": 21, "combobox": 22, "dropdown_button": 23, "dialog": 24, "alert_dialog": 25, "sheet": 26, "popover": 27, "tooltip": 28, "hover_card": 29, "avatar": 30, "bubble": 31, "empty_view": 32, "group_box": 33, "kbd": 34, "skeleton": 35, "spinner": 36, "tag": 37, "marker": 38, "shimmer": 39, "list_view": 40, "menu": 41, "pagination": 42, "rating": 43, "stepper": 44, "description_list": 45, "scrollable": 46, "status_bar": 47, "toolbar": 48, "title_bar": 49, "icon": 50, "message": 51, "attachment": 52, "image": 53, "tree": 54, "time_field": 55, "color_picker": 56, "calendar": 57, "date_picker": 58, "otp_input": 59, "form": 60, "input_group": 61, "notification": 62, "focus_trap": 63, "message_scroller": 64, "carousel": 65, "resizable": 66, "text_view": 67, "editor": 68, "chart": 69, "table": 70, "data_table": 71, "plot": 72, "command": 73, "virtual_list": 74, "sidebar": 75, "root_view": 76, "speech": 77, "questionnaire": 78, "dock": 79, "settings": 80}
 _BOOLEAN = {"checkbox", "radio", "switch", "toggle"}
 _NUMERIC = {"slider", "progress", "number_input", "pagination", "rating"}
 _EDITABLE = {"input", "textarea", "number_input", "combobox"}
@@ -172,15 +222,15 @@ _DETAIL = {"alert", "select", "combobox", "dropdown_button", "empty_view", "item
 _VISUAL = {"avatar", "empty_view", "group_box", "skeleton", "spinner", "scrollable", "icon", "message"}
 _DISABLED = {"button", "slider", "pagination", "rating", "collapsible", "item"} | _BOOLEAN | _EDITABLE | (_GROUP - {"description_list", "status_bar", "title_bar"}) | _HOVER
 _NUMERIC |= {"attachment"}
-_EDITABLE |= {"otp_input", "input_group"}
-_GROUP |= {"tree", "form", "input_group"}
-_DETAIL |= {"attachment", "input_group", "notification"}
-_VISUAL |= {"attachment", "image", "tree", "color_picker", "date_picker", "form", "input_group"}
-_DISABLED |= {"tree", "time_field", "color_picker", "calendar", "date_picker", "otp_input", "toolbar", "form", "input_group"}
-_SELECTED = {"radio_group", "tabs", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "tree"}
+_EDITABLE |= {"command", "otp_input", "input_group", "editor"}
+_GROUP |= {"settings", "dock", "questionnaire", "sidebar", "command", "virtual_list", "table", "tree", "form", "input_group", "message_scroller", "carousel", "resizable"}
+_DETAIL |= {"input", "number_input", "attachment", "input_group", "notification", "editor"}
+_VISUAL |= {"settings", "dock", "questionnaire", "sidebar", "command", "virtual_list", "chart", "table", "data_table", "plot", "attachment", "image", "tree", "color_picker", "date_picker", "form", "input_group", "message_scroller", "carousel", "resizable", "text_view", "editor"}
+_DISABLED |= {"dock", "questionnaire", "speech", "sidebar", "command", "virtual_list", "chart", "data_table", "tree", "time_field", "color_picker", "calendar", "date_picker", "otp_input", "toolbar", "form", "input_group", "carousel", "resizable", "text_view", "editor"}
+_SELECTED = {"sidebar","radio_group", "tabs", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "tree", "carousel"}
 _SURFACE |= {"notification"}
-_CHANGE = _DISABLED - {"button", "accordion", "form"}
-_CONSTRUCTOR_CONTAINER = {"row", "column", "collapsible", "item", "dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
+_CHANGE = (_DISABLED - {"button", "accordion", "form"}) | {"message_scroller", "settings"}
+_CONSTRUCTOR_CONTAINER = {"root_view","row", "column", "collapsible", "item", "dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
 _CONTAINER = _CONSTRUCTOR_CONTAINER | _GROUP
 _VARIANT = {"primary": 0, "secondary": 1, "outline": 2, "ghost": 3}
 _ROUND = {"theme": 0, "none": 1, "small": 2, "large": 3, "custom": 4}
@@ -206,6 +256,8 @@ class Widget:
         self._text = text
         self._children: list[Widget] = []
         self._gap = 0.0
+        self._root_padding = 0.0
+        self._question_flags = None
         self._variant = "primary"
         self._size = "base"
         self._rounding = "theme"
@@ -221,6 +273,13 @@ class Widget:
         self._extent: tuple[float, float] | None = None
         self._visual: tuple[float, float] | None = None
         self._total = 5 if kind == "rating" else 6 if kind == "otp_input" else 10
+        self._chart_data = ()
+        self._chart_kind = 0
+        self._plot_points = ()
+        self._matrix = None
+        self._selection_mode = 0
+        self._text_format = 0
+        self._panel_size = None
         self._attachment = 0
         self._image = None
         self._time = (0, 0, 0)
@@ -383,7 +442,7 @@ class Widget:
         return self
 
     def current_text(self) -> str:
-        if self.kind not in _EDITABLE:
+        if self.kind not in _EDITABLE | {"text_view"}:
             raise ValueError("component has no editable text")
         if self._app is None:
             if self._disposed:
@@ -408,7 +467,7 @@ class Widget:
         return self
 
     def open(self, value: bool = True) -> "Widget":
-        if self.kind not in {"collapsible", "item", "date_picker", "focus_trap"} | _SURFACE or type(value) is not bool:
+        if self.kind not in {"collapsible", "item", "date_picker", "focus_trap", "sidebar"} | _SURFACE or type(value) is not bool:
             raise ValueError("open requires a disclosure component and bool")
         self._change("set_open", int(value))
         self._open = value
@@ -424,7 +483,7 @@ class Widget:
         return self
 
     def selected(self) -> "Widget | None":
-        if self.kind not in _SELECTED:
+        if self.kind not in _SELECTED | {"command"}:
             raise ValueError("component has no selection")
         if self._app is None:
             if self._disposed:
@@ -445,7 +504,7 @@ class Widget:
         return self
 
     def is_open(self) -> bool:
-        if self.kind not in _SURFACE | _HOVER | {"collapsible", "item", "date_picker", "focus_trap"}:
+        if self.kind not in _SURFACE | _HOVER | {"collapsible", "item", "date_picker", "focus_trap", "sidebar"}:
             raise ValueError("component has no open state")
         if self._app is None:
             if self._disposed:
@@ -494,7 +553,7 @@ class Widget:
         return self
 
     def scroll_offset(self) -> float:
-        if self.kind != "scrollable":
+        if self.kind not in {"scrollable", "message_scroller", "virtual_list"}:
             raise ValueError("component has no scroll offset")
         if self._app is None:
             if self._disposed:
@@ -579,6 +638,224 @@ class Widget:
         result = C.c_uint32()
         self._change("get_color",C.byref(result))
         return result.value
+
+    def _settings_child(self, child: "Widget") -> None:
+        if self.kind != "settings" or self._app is None or not isinstance(child, Widget) or child._app is not self._app:
+            raise ValueError("mounted same-app Settings child required")
+
+    def settings_query(self, query: str) -> "Widget":
+        if self.kind != "settings" or self._app is None: raise ValueError("mounted Settings required")
+        encoded = _utf8(query)
+        if len(encoded) > 256: raise ValueError("query exceeds 256 UTF-8 bytes")
+        self._change("settings_query", encoded); return self
+
+    def settings_page(self) -> "Widget | None":
+        if self.kind != "settings" or self._app is None: raise ValueError("mounted Settings required")
+        page = _Handle(); self._change("settings_page", C.byref(page))
+        return self._app._by_handle.get((page.slot, page.generation))
+
+    def settings_select(self, page: "Widget") -> "Widget":
+        self._settings_child(page); self._change("settings_select", page._handle); return self
+
+    def settings_reset(self, page: "Widget") -> "Widget":
+        self._settings_child(page); self._change("settings_reset", page._handle); return self
+
+    def settings_field_bounds(self, field: "Widget") -> tuple:
+        self._settings_child(field); rect = _Rect()
+        self._change("settings_bounds", field._handle, C.byref(rect))
+        return rect.x, rect.y, rect.width, rect.height
+
+    def _dock_panel(self, panel: "Widget") -> None:
+        if self.kind != "dock" or self._app is None or not isinstance(panel,Widget) or panel._app is not self._app or panel not in self._children: raise ValueError("mounted same-app Dock panel required")
+
+    def dock_activate(self, panel: "Widget") -> "Widget":
+        self._dock_panel(panel);self._change("dock_activate",panel._handle);return self
+
+    def dock_move_split(self, panel: "Widget", reference: "Widget", axis: str = "horizontal", ratio: float = .5, before: bool = False) -> "Widget":
+        self._dock_panel(panel);self._dock_panel(reference);axes={"horizontal":0,"vertical":1}
+        if axis not in axes or isinstance(ratio,bool) or not isinstance(ratio,(int,float)) or not math.isfinite(ratio) or not 0<ratio<1 or type(before) is not bool: raise ValueError("invalid dock split")
+        self._change("dock_move",panel._handle,reference._handle,axes[axis],ratio,int(before));return self
+
+    def dock_active(self) -> "Widget | None":
+        if self.kind != "dock" or self._app is None: raise ValueError("mounted Dock required")
+        active=_Handle();self._change("dock_active",C.byref(active));return self._app._by_handle.get((active.slot,active.generation))
+
+    def dock_panel_bounds(self, panel: "Widget") -> tuple:
+        self._dock_panel(panel);rect=_Rect();self._change("dock_bounds",panel._handle,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
+
+    def dock_serialize(self) -> str:
+        if self.kind != "dock" or self._app is None: raise ValueError("mounted Dock required")
+        needed=C.c_uint32()
+        try:self._change("dock_serialize",None,0,C.byref(needed))
+        except BridgeError as error:
+            if error.code!=5: raise
+        if not 1<=needed.value<=1048576: raise ValueError("invalid dock serialization size")
+        text=C.create_string_buffer(needed.value);self._change("dock_serialize",text,len(text),C.byref(needed));return text.value.decode()
+
+    def question(self, required: bool = False, multiple: bool = False) -> "Widget":
+        if self.kind != "item" or type(required) is not bool or type(multiple) is not bool: raise ValueError("question requires Item and bool flags")
+        self._change("question_config",int(required),int(multiple));self._question_flags=(required,multiple);return self
+
+    def questionnaire_state(self) -> dict:
+        if self.kind != "questionnaire" or self._app is None: raise ValueError("mounted Questionnaire required")
+        current=_Handle();complete=C.c_uint32();self._change("question_state",C.byref(current),C.byref(complete));return {"current":self._app._by_handle.get((current.slot,current.generation)),"complete":bool(complete.value)}
+
+    def choice_selected(self) -> bool:
+        if self.kind != "item" or self._app is None: raise ValueError("mounted Questionnaire choice Item required")
+        selected=C.c_uint32();self._change("question_choice",C.byref(selected));return bool(selected.value)
+
+    def questionnaire_next(self) -> "Widget":
+        if self.kind != "questionnaire" or self._app is None: raise ValueError("mounted Questionnaire required")
+        self._change("question_next");return self
+
+    def questionnaire_submit(self) -> "Widget":
+        if self.kind != "questionnaire" or self._app is None: raise ValueError("mounted Questionnaire required")
+        self._change("question_submit");return self
+
+    def questionnaire_previous(self) -> "Widget":
+        if self.kind != "questionnaire" or self._app is None: raise ValueError("mounted Questionnaire required")
+        self._change("question_previous");return self
+
+    def speech_start(self) -> "Widget":
+        if self.kind != "speech" or self._app is None: raise ValueError("mounted Speech required")
+        self._change("speech_start");return self
+
+    def speech_finish(self) -> "Widget":
+        if self.kind != "speech" or self._app is None: raise ValueError("mounted Speech required")
+        self._change("speech_finish");return self
+
+    def speech_report(self, text: str, final: bool = False) -> "Widget":
+        if self.kind != "speech" or self._app is None or type(final) is not bool: raise ValueError("mounted Speech and bool final required")
+        self._change("speech_report",_utf8(text),int(final));return self
+
+    def speech_transcript(self) -> str:
+        if self.kind != "speech" or self._app is None: raise ValueError("mounted Speech required")
+        text=C.create_string_buffer(4097);length=C.c_uint32();self._change("speech_transcript",text,len(text),C.byref(length));return text.value.decode()
+
+    def speech_active(self) -> bool:
+        if self.kind != "speech" or self._app is None: raise ValueError("mounted Speech required")
+        active=C.c_uint32();self._change("get_checked",C.byref(active));return bool(active.value)
+
+    def padding(self, value: float) -> "Widget":
+        if self.kind != "root_view" or isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or not 0<=value<=256: raise ValueError("root padding requires 0..256 pixels")
+        self._change("set_root_padding",value);self._root_padding=value;return self
+
+    def chart_data(self, data) -> "Widget":
+        if self.kind != "chart": raise ValueError("chart_data requires Chart")
+        copied = tuple(tuple(pair) for pair in data)
+        if len(copied)>64: raise ValueError("Chart accepts at most 64 data")
+        for pair in copied:
+            if len(pair)!=2 or len(_utf8(pair[0]))>128 or isinstance(pair[1],bool) or not isinstance(pair[1],(int,float)) or not math.isfinite(pair[1]) or abs(pair[1])>1e9 or (self._chart_kind==3 and pair[1]<0): raise ValueError("invalid chart datum")
+        native=(_ChartDatum*len(copied))(*[_ChartDatum(_utf8(label),value) for label,value in copied])
+        self._change("set_chart",native,len(copied));self._chart_data=copied;return self
+
+    def chart_kind(self, value: str) -> "Widget":
+        names={"line":0,"area":1,"bar":2,"pie":3}
+        if self.kind != "chart" or value not in names: raise ValueError("invalid chart kind")
+        if value=="pie" and any(v<0 for _,v in self._chart_data): raise ValueError("pie values must be nonnegative")
+        self._change("set_chart_kind",names[value]);self._chart_kind=names[value];return self
+
+    def current_datum(self, index: int) -> tuple[str,float]:
+        if self.kind != "chart" or isinstance(index,bool) or not isinstance(index,int) or not 0<=index<64: raise ValueError("invalid datum index")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("disposed widget")
+            return self._chart_data[index]
+        text=C.create_string_buffer(4097);needed=C.c_uint32();value=C.c_double()
+        self._change("get_chart",index,text,len(text),C.byref(needed),C.byref(value));return text.value.decode(),value.value
+
+    def plot_points(self, points) -> "Widget":
+        if self.kind != "plot": raise ValueError("plot_points requires Plot")
+        copied=tuple(tuple(pair) for pair in points)
+        if len(copied)>256 or any(len(p)!=2 or any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) or abs(v)>16384 for v in p) for p in copied): raise ValueError("invalid plot points")
+        native=(_PlotPoint*len(copied))(*[_PlotPoint(*p) for p in copied]);self._change("set_plot",native,len(copied));self._plot_points=copied;return self
+
+    def current_point(self, index: int) -> tuple[float,float]:
+        if self.kind != "plot" or isinstance(index,bool) or not isinstance(index,int) or not 0<=index<256: raise ValueError("invalid point index")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("disposed widget")
+            return self._plot_points[index]
+        point=_PlotPoint();self._change("get_plot",index,C.byref(point));return point.x,point.y
+
+    def table_data(self, headers, rows) -> "Widget":
+        if self.kind != "data_table": raise ValueError("table_data requires DataTable")
+        headers=tuple(headers);rows=tuple(tuple(row) for row in rows)
+        if not 1<=len(headers)<=16 or len(rows)>32 or any(len(row)!=len(headers) for row in rows): raise ValueError("invalid matrix dimensions")
+        if any(len(_utf8(v))>128 for v in headers) or any(len(_utf8(v))>128 for row in rows for v in row): raise ValueError("table strings are limited to 128 UTF-8 bytes")
+        native_headers=(C.c_char_p*len(headers))(*[_utf8(v) for v in headers]);flat=[_utf8(v) for row in rows for v in row];native_cells=(C.c_char_p*len(flat))(*flat)
+        self._change("set_matrix",native_headers,len(headers),native_cells,len(rows));self._matrix=headers,rows;return self
+
+    def current_cell(self, row: int, column: int) -> str:
+        if self.kind != "data_table" or any(isinstance(v,bool) or not isinstance(v,int) or not 0<=v<=0xffffffff for v in (row,column)): raise ValueError("invalid cell indices")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("disposed widget")
+            if self._matrix is None: raise RuntimeError("no matrix")
+            return self._matrix[1][row][column]
+        text=C.create_string_buffer(4097);needed=C.c_uint32();self._change("get_matrix_cell",row,column,text,len(text),C.byref(needed));return text.value.decode()
+
+    def selection_mode(self, value: str) -> "Widget":
+        modes={"row":0,"column":1,"cell":2}
+        if self.kind != "data_table" or value not in modes: raise ValueError("invalid table selection mode")
+        self._change("set_selection_mode",modes[value]);self._selection_mode=modes[value];return self
+
+    def table_state(self) -> dict:
+        if self.kind != "data_table" or self._app is None: raise ValueError("table_state requires mounted DataTable")
+        values=[C.c_uint32() for _ in range(4)];self._change("get_matrix_state",*[C.byref(v) for v in values]);return dict(zip(("row","column","sortColumn","sortDirection"),(v.value for v in values)))
+
+    def table_cell_bounds(self, row: int, column: int) -> tuple:
+        if self.kind != "data_table" or self._app is None or any(isinstance(v,bool) or not isinstance(v,int) or not 0<=v<=0xffffffff for v in (row,column)): raise ValueError("invalid mounted table cell")
+        rect=_Rect();self._change("matrix_cell_bounds",row,column,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
+
+    def table_header_bounds(self, column: int) -> tuple:
+        if self.kind != "data_table" or self._app is None or isinstance(column,bool) or not isinstance(column,int) or not 0<=column<=0xffffffff: raise ValueError("invalid mounted table header")
+        rect=_Rect();self._change("matrix_header_bounds",column,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
+
+    def item_bounds(self, item: "Widget") -> tuple:
+        if self.kind not in {"command","virtual_list"} or self._app is None or not isinstance(item,Widget) or item._app is not self._app or item not in self._children: raise ValueError("item_bounds requires mounted same-app child")
+        rect=_Rect();self._change("command_bounds" if self.kind=="command" else "virtual_bounds",item._handle,C.byref(rect));return rect.x,rect.y,rect.width,rect.height
+
+    def scroll_to(self, offset: float) -> "Widget":
+        if self.kind not in {"message_scroller", "virtual_list"} or isinstance(offset,bool) or not math.isfinite(offset) or not 0 <= offset <= 1000000:
+            raise ValueError("invalid message scroll offset")
+        if self._app is None: raise RuntimeError("scroll_to requires a mounted component and its first frame")
+        self._change("set_value", offset)
+        return self
+
+    def panel_size(self, size: float) -> "Widget":
+        if self.kind != "item" or not math.isfinite(size) or not 100 <= size <= 4096:
+            raise ValueError("panel_size requires a Resizable Item and 100..4096 pixels")
+        self._change("set_value",size)
+        self._panel_size = size
+        return self
+
+    def current_panel_size(self) -> float:
+        if self.kind != "item": raise ValueError("panel_size belongs to a Resizable Item")
+        if self._app is None:
+            if self._disposed: raise RuntimeError("Widget is disposed")
+            return self._panel_size or 0.0
+        result = C.c_double()
+        self._change("get_value",C.byref(result))
+        return result.value
+
+    def text_format(self, value: str) -> "Widget":
+        names = {"markdown": 0, "html": 1, "plain": 2}
+        if self.kind != "text_view" or value not in names: raise ValueError("invalid text format")
+        self._change("set_text_format",names[value])
+        self._text_format = names[value]
+        return self
+
+    def select_text(self, anchor: int, cursor: int) -> "Widget":
+        if self.kind != "text_view" or any(type(x) is not int or not 0 <= x <= 0xffffffff for x in (anchor,cursor)):
+            raise ValueError("selection requires rendered UTF-8 byte offsets")
+        if self._app is None: raise RuntimeError("selection requires a mounted TextView")
+        self._change("select_text",anchor,cursor)
+        return self
+
+    def selection_text(self) -> str:
+        if self.kind != "text_view" or self._app is None: raise RuntimeError("selection requires a mounted TextView")
+        buffer = C.create_string_buffer(4097)
+        required = C.c_uint32()
+        self._change("copy_selection",buffer,4097,C.byref(required))
+        return buffer.value.decode("utf-8")
 
     def hover_color(self, color: str | tuple[int, int, int, int]) -> "Widget":
         if self.kind != "button" or self._variant == "ghost":
@@ -859,6 +1136,59 @@ def notification(key: str, text: str = "") -> Widget:
 def focus_trap(key: str, text: str = "") -> Widget:
     return Widget("focus_trap", key, text)
 
+def message_scroller(key: str, text: str = "") -> Widget:
+    return Widget("message_scroller", key, text)
+
+
+def carousel(key: str, text: str = "") -> Widget:
+    return Widget("carousel", key, text)
+
+
+def resizable(key: str, text: str = "") -> Widget:
+    return Widget("resizable", key, text)
+
+
+def text_view(key: str, text: str = "") -> Widget:
+    return Widget("text_view", key, text)
+
+
+def editor(key: str, text: str = "") -> Widget:
+    return Widget("editor", key, text)
+
+
+def chart(key: str, text: str = "") -> Widget:
+    return Widget("chart", key, text)
+
+def table(key: str, text: str = "") -> Widget:
+    return Widget("table", key, text)
+
+def data_table(key: str, text: str = "") -> Widget:
+    return Widget("data_table", key, text)
+
+def plot(key: str, text: str = "") -> Widget:
+    return Widget("plot", key, text)
+
+def command(key: str, text: str = "") -> Widget:
+    return Widget("command", key, text)
+
+def virtual_list(key: str, text: str = "") -> Widget:
+    return Widget("virtual_list", key, text)
+
+def sidebar(key: str, text: str = "") -> Widget:
+    return Widget("sidebar", key, text)
+
+def root_view(key: str = "root") -> Widget:
+    return Widget("root_view", key)
+
+def speech(key: str) -> Widget:
+    return Widget("speech", key)
+
+def questionnaire(key: str, text: str = "") -> Widget:
+    return Widget("questionnaire", key, text)
+
+def dock(key: str, text: str = "") -> Widget:
+    return Widget("dock", key, text)
+
 class App:
     def __init__(self, *, backend: str = "none", width: float = 480, height: float = 240,
                  title: str = "CUI Bridge", font_path: str | None = None,
@@ -903,8 +1233,8 @@ class App:
         self._ensure_open()
         if self._root is not None:
             raise RuntimeError("App already has a root; dispose it before remounting")
-        if not isinstance(tree, Widget) or tree.kind not in ("row", "column"):
-            raise TypeError("root must be row() or column()")
+        if not isinstance(tree, Widget) or tree.kind not in ("row", "column", "root_view"):
+            raise TypeError("root must be row(), column() or root_view()")
         seen: set[int] = set()
         keys: set[str] = set()
         order: list[tuple[Widget, Widget | None, str]] = []
@@ -939,6 +1269,7 @@ class App:
                 node._app, node._handle = self, handle
                 created.append(node)
                 self._by_handle[(handle.slot, handle.generation)] = node
+                if node.kind == "root_view": node._change("set_root_padding",node._root_padding)
                 if node.kind == "otp_input": node._change("set_total",node._total)
                 if _KIND[node.kind] >= 3:
                     node._change("set_text", _utf8(node._text))
@@ -957,13 +1288,21 @@ class App:
                 if node.kind == "time_field": node._change("set_time",_Time(*node._time))
                 if node.kind in {"calendar", "date_picker"}: node._change("set_date",_Date(*node._date))
                 if node.kind == "color_picker": node._change("set_color",node._color)
+                if node.kind == "chart": node.chart_kind(("line","area","bar","pie")[node._chart_kind]);node.chart_data(node._chart_data)
+                if node.kind == "plot": node.plot_points(node._plot_points)
+                if node.kind == "data_table": node._change("set_selection_mode",node._selection_mode)
+                if node.kind == "sidebar" and node._open_set: node._change("set_open",int(node._open))
+                if node.kind == "data_table" and node._matrix is not None: node.table_data(*node._matrix)
+                if node.kind == "text_view": node._change("set_text_format",node._text_format)
+                if node._question_flags is not None: node._change("question_config",*[int(v) for v in node._question_flags])
+                if node._panel_size is not None: node._change("set_value",node._panel_size)
                 if node._visual is not None:
                     node._change("set_visual", *node._visual)
                 if node._extent is not None:
                     node._change("set_scroll_extent", *node._extent)
                 if node._step_status is not None:
                     node._change("set_step_status", node._step_status)
-                if node.kind in _DISABLED:
+                if node.kind in _DISABLED and (node.kind != "item" or node._disabled):
                     node._change("set_disabled", int(node._disabled))
                 if node.kind == "collapsible" or (node.kind == "item" and node._open_set):
                     node._change("set_open", int(node._open))
@@ -982,7 +1321,7 @@ class App:
                         raise ValueError("anchor belongs to another App or unmounted tree")
                     node._change("set_anchor", node._anchor._handle)
             for node, _, _ in order:
-                if node.kind in _SURFACE | {"date_picker", "focus_trap"} and node._open:
+                if node.kind in _SURFACE | {"date_picker", "focus_trap", "sidebar"} and node._open:
                     node._change("set_open", 1)
                 if node._selected is not None:
                     node._change("set_selected", node._selected._handle)
@@ -1069,6 +1408,36 @@ class App:
         self._api.check(self._api.day_bounds(self._ptr,node._handle,_Date(year,month,day),C.byref(rect)))
         return rect.x,rect.y,rect.width,rect.height
 
+    def clipboard_set(self, text: str) -> "App":
+        self._ensure_open();encoded=_utf8(text,65536);self._api.check(self._api.clipboard_set(self._ptr,encoded));return self
+
+    def clipboard_get(self) -> str:
+        self._ensure_open();text=C.create_string_buffer(65537);length=C.c_uint32();self._api.check(self._api.clipboard_get(self._ptr,text,len(text),C.byref(length)));return text.value.decode()
+
+    def theme_presets(self) -> tuple[str,...]:
+        self._ensure_open();names=[]
+        for index in range(self._api.theme_count()):
+            text=C.create_string_buffer(128);length=C.c_uint32();self._api.check(self._api.theme_name(index,text,len(text),C.byref(length)));names.append(text.value.decode())
+        return tuple(names)
+
+    def theme_preset(self, index: int) -> "App":
+        self._ensure_open()
+        if type(index) is not int or not 0<=index<=0xffffffff: raise ValueError("invalid theme index")
+        self._api.check(self._api.set_theme(self._ptr,index));return self
+
+    def current_theme_preset(self) -> int | None:
+        self._ensure_open();index=C.c_uint32();code=self._api.get_theme(self._ptr,C.byref(index))
+        if code==1: return None
+        self._api.check(code);return index.value
+
+    def resizable_handle_bounds(self, group: Widget, preceding: Widget) -> tuple[float,float,float,float]:
+        self._ensure_open()
+        if group._app is not self or preceding._app is not self:
+            raise ValueError("resizable nodes must belong to this App")
+        rect = _Rect()
+        self._api.check(self._api.resizable_bounds(self._ptr,group._handle,preceding._handle,C.byref(rect)))
+        return rect.x,rect.y,rect.width,rect.height
+
     def poll_events(self) -> Iterator[Event]:
         self._ensure_open()
         while True:
@@ -1149,3 +1518,25 @@ __all__ += ["attachment", "image", "tree", "time_field", "color_picker", "calend
 __all__ += ["form", "input_group", "notification"]
 
 __all__ += ["focus_trap"]
+
+__all__ += ["message_scroller", "carousel", "resizable", "text_view", "editor"]
+
+__all__ += ["chart", "table", "data_table", "plot"]
+
+__all__ += ["command", "virtual_list"]
+
+__all__ += ["sidebar"]
+
+__all__ += ["root_view"]
+
+__all__ += ["speech"]
+
+__all__ += ["questionnaire"]
+
+__all__ += ["dock"]
+
+
+def settings(key: str, text: str = "") -> Widget:
+    return Widget("settings", key, text)
+
+__all__ += ["settings"]

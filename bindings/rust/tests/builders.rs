@@ -813,3 +813,960 @@ fn font_fallback_validation() {
     );
     assert_eq!(app.font_fallbacks(&["bad\0path.ttf"]).err(), Some(Error(3)));
 }
+#[test]
+fn message_scroller_items_and_offset() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(500., 300.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let scroller = app
+        .build_child(root, Kind::MessageScroller, "chat")
+        .unwrap()
+        .visual_size(300., 100.)
+        .unwrap()
+        .finish();
+    for i in 0..12 {
+        let _item = app
+            .build_child(scroller, Kind::Item, &format!("message-{i}"))
+            .unwrap()
+            .text(&format!("Message {i}"))
+            .unwrap()
+            .detail_text("Ada")
+            .unwrap()
+            .step_status((i % 2) as u32)
+            .unwrap()
+            .finish();
+    }
+    app.step(0.016).unwrap();
+    assert!(app.bounds(scroller).unwrap().width > 0.);
+    assert!(app.current_value(scroller).unwrap() > 0.);
+    assert_eq!(app.value(scroller, -1.).err(), Some(Error(3)));
+    app.value(scroller, 0.).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.current_value(scroller).unwrap(), 0.);
+}
+#[test]
+fn carousel_selection_and_navigation() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(400., 250.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let carousel = app
+        .build_child(root, Kind::Carousel, "carousel")
+        .unwrap()
+        .visual_size(300., 120.)
+        .unwrap()
+        .finish();
+    let one = app
+        .build_child(carousel, Kind::Item, "one")
+        .unwrap()
+        .text("First")
+        .unwrap()
+        .finish();
+    let two = app
+        .build_child(carousel, Kind::Item, "two")
+        .unwrap()
+        .text("Second")
+        .unwrap()
+        .finish();
+    let panel = app
+        .build_child(two, Kind::Label, "panel")
+        .unwrap()
+        .text("Slide content")
+        .unwrap()
+        .finish();
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(carousel).unwrap(), Some(one));
+    app.select(carousel, two).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(carousel).unwrap(), Some(two));
+    assert!(app.bounds(panel).unwrap().width > 0.);
+}
+#[test]
+fn resizable_panel_drag() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(500., 300.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let group = app
+        .build_child(root, Kind::Resizable, "split")
+        .unwrap()
+        .visual_size(420., 160.)
+        .unwrap()
+        .finish();
+    let first = app
+        .build_child(group, Kind::Item, "first")
+        .unwrap()
+        .text("First")
+        .unwrap()
+        .value(240.)
+        .unwrap()
+        .finish();
+    let _second = app
+        .build_child(group, Kind::Item, "second")
+        .unwrap()
+        .text("Second")
+        .unwrap()
+        .finish();
+    let values = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = values.clone();
+    app.on_change_event(first, move |e| captured.borrow_mut().push(e.value))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let before = app.current_value(first).unwrap();
+    let h = app.resizable_handle_bounds(group, first).unwrap();
+    let x = h.x + h.width / 2.;
+    let y = h.y + h.height / 2.;
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.step(0.016).unwrap();
+    app.pointer(Phase::Move, x + 30., y).unwrap();
+    app.step(0.016).unwrap();
+    app.pointer(Phase::Up, x + 30., y).unwrap();
+    app.frame(0.016).unwrap();
+    assert!(app.current_value(first).unwrap() > before);
+    assert!(values.borrow().iter().any(|v| *v > before));
+    assert_eq!(app.value(first, 90.).err(), Some(Error(3)));
+}
+#[test]
+fn text_view_formats_selection_and_pointer_snapshot() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let view = app
+        .build_child(root, Kind::TextView, "document")
+        .unwrap()
+        .visual_size(320., 120.)
+        .unwrap()
+        .text("**Hello** world")
+        .unwrap()
+        .finish();
+    app.step(0.016).unwrap();
+    app.text_view_select(view, 0, 5).unwrap();
+    assert_eq!(app.text_view_selection(view).unwrap(), "Hello");
+    assert_eq!(app.text_view_select(view, 50, 51).err(), Some(Error(3)));
+    app.text_view_format(view, TextViewFormat::Html).unwrap();
+    app.text(view, "<b>HTML</b> text").unwrap();
+    app.text_view_select(view, 0, 4).unwrap();
+    assert_eq!(app.text_view_selection(view).unwrap(), "HTML");
+    app.text_view_format(view, TextViewFormat::Plain).unwrap();
+    app.text(view, "Plain text").unwrap();
+    app.text_view_select(view, 0, 0).unwrap();
+    let snapshots = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = snapshots.clone();
+    app.on_change_event(view, move |e| captured.borrow_mut().push(e.text.clone()))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let b = app.bounds(view).unwrap();
+    let x = b.x + 10.;
+    let y = b.y + 14.;
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Move, x + 50., y).unwrap();
+    app.pointer(Phase::Up, x + 50., y).unwrap();
+    app.frame(0.016).unwrap();
+    assert!(!snapshots.borrow().is_empty());
+    assert_eq!(
+        snapshots.borrow().last().unwrap(),
+        &app.text_view_selection(view).unwrap()
+    );
+    app.component_disabled(view, true).unwrap();
+    app.step(0.016).unwrap();
+    let count = snapshots.borrow().len();
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Move, x + 50., y).unwrap();
+    app.pointer(Phase::Up, x + 50., y).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(snapshots.borrow().len(), count);
+}
+#[test]
+fn editor_multiline_owned_text_and_disabled_input() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let editor = app
+        .build_child(root, Kind::Editor, "source")
+        .unwrap()
+        .text("first\nsecond")
+        .unwrap()
+        .detail_text("c")
+        .unwrap()
+        .visual_size(300., 120.)
+        .unwrap()
+        .finish();
+    let other = app
+        .build_child(root, Kind::Editor, "other")
+        .unwrap()
+        .visual_size(300., 120.)
+        .unwrap()
+        .finish();
+    let snapshots = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = snapshots.clone();
+    app.on_change_event(editor, move |e| captured.borrow_mut().push(e.text.clone()))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let b = app.bounds(editor).unwrap();
+    app.pointer(Phase::Down, b.x + 12., b.y + 16.).unwrap();
+    app.pointer(Phase::Up, b.x + 12., b.y + 16.).unwrap();
+    app.frame(0.016).unwrap();
+    app.queue_text("✓").unwrap();
+    app.frame(0.016).unwrap();
+    assert!(app.editable_text(editor).unwrap().contains('✓'));
+    assert_eq!(app.editable_text(other).unwrap(), "");
+    assert!(snapshots.borrow().iter().any(|s| s.contains('✓')));
+    app.component_disabled(editor, true).unwrap();
+    app.step(0.016).unwrap();
+    let before = app.editable_text(editor).unwrap();
+    let count = snapshots.borrow().len();
+    app.queue_text("X").unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.editable_text(editor).unwrap(), before);
+    assert_eq!(snapshots.borrow().len(), count);
+}
+#[test]
+fn chart_copies_caller_data_and_keeps_instances_separate() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let chart = app
+        .build_child(root, Kind::Chart, "revenue")
+        .unwrap()
+        .visual_size(300., 180.)
+        .unwrap()
+        .chart_kind(ChartKind::Bar)
+        .unwrap()
+        .finish();
+    let other = app.child(root, Kind::Chart, "cost").unwrap();
+    let mut owned = String::from("North");
+    app.chart_data(chart, &[(owned.as_str(), 10.), ("South", 20.)])
+        .unwrap();
+    owned.replace_range(.., "Changed");
+    assert_eq!(app.chart_datum(chart, 0).unwrap(), ("North".into(), 10.));
+    assert_eq!(app.chart_datum(chart, 1).unwrap(), ("South".into(), 20.));
+    assert_eq!(app.chart_datum(other, 0).err(), Some(Error(3)));
+    assert_eq!(
+        app.chart_data(chart, &[("bad\0label", 1.)]).err(),
+        Some(Error(3))
+    );
+    assert_eq!(
+        app.chart_data(chart, &[("invalid", f64::NAN)]).err(),
+        Some(Error(3))
+    );
+    app.step(0.016).unwrap();
+    assert!(app.bounds(chart).unwrap().width > 0.);
+}
+#[test]
+fn compositional_table_geometry_updates_and_removal() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let table = app
+        .build_child(root, Kind::Table, "scores")
+        .unwrap()
+        .visual_size(400., 0.)
+        .unwrap()
+        .finish();
+    assert_eq!(
+        app.child(table, Kind::Button, "invalid").err(),
+        Some(Error(8))
+    );
+    let header = app.child(table, Kind::Item, "header").unwrap();
+    let heading_name = app
+        .build_child(header, Kind::Item, "name")
+        .unwrap()
+        .text("Name")
+        .unwrap()
+        .finish();
+    let _heading_score = app
+        .build_child(header, Kind::Item, "score")
+        .unwrap()
+        .text("Score")
+        .unwrap()
+        .finish();
+    let row = app.child(table, Kind::Item, "alice").unwrap();
+    let _name = app
+        .build_child(row, Kind::Item, "alice-name")
+        .unwrap()
+        .text("Alice")
+        .unwrap()
+        .finish();
+    let score = app
+        .build_child(row, Kind::Item, "alice-score")
+        .unwrap()
+        .text("95")
+        .unwrap()
+        .finish();
+    app.step(0.016).unwrap();
+    assert!(app.bounds(table).unwrap().width > 0.);
+    assert!(app.bounds(row).unwrap().y > app.bounds(header).unwrap().y);
+    assert!(app.bounds(score).unwrap().x > app.bounds(row).unwrap().x);
+    app.text(score, "96").unwrap();
+    app.step(0.016).unwrap();
+    app.remove(row).unwrap();
+    assert_eq!(app.bounds(score).err(), Some(Error(4)));
+    assert!(app.bounds(heading_name).is_ok());
+}
+#[test]
+fn data_table_owned_cells_selection_and_sort_request() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let table = app
+        .build_child(root, Kind::DataTable, "results")
+        .unwrap()
+        .visual_size(320., 150.)
+        .unwrap()
+        .finish();
+    let mut name = String::from("Alice");
+    app.data_table(
+        table,
+        &["Name", "Score"],
+        &[&[name.as_str(), "95"], &["Bob", "87"]],
+    )
+    .unwrap();
+    name.replace_range(.., "Changed");
+    assert_eq!(app.data_table_cell(table, 0, 0).unwrap(), "Alice");
+    assert_eq!(app.data_table_cell(table, 1, 0).unwrap(), "Bob");
+    assert_eq!(app.data_table_cell(table, 2, 0).err(), Some(Error(3)));
+    assert_eq!(
+        app.data_table(table, &["Name", "Score"], &[&["short"]])
+            .err(),
+        Some(Error(3))
+    );
+    assert_eq!(app.data_table_cell(table, 1, 0).unwrap(), "Bob");
+    let values = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = values.clone();
+    app.on_change_event(table, move |e| captured.borrow_mut().push(e.clone()))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let cell = app.data_table_cell_bounds(table, 1, 0).unwrap();
+    let header = app.data_table_header_bounds(table, 0).unwrap();
+    assert!(cell.y > header.y);
+    let x = cell.x + cell.width / 2.;
+    let y = cell.y + cell.height / 2.;
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.data_table_state(table).unwrap().row, 2);
+    assert!(values.borrow().iter().any(|e| e.value == 2.
+        && e.text.contains("\"reason\":\"selection\"")
+        && e.text.contains("\"row\":2")));
+    let x = header.x + header.width / 2.;
+    let y = header.y + header.height / 2.;
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.frame(0.016).unwrap();
+    let sort = app.data_table_state(table).unwrap();
+    assert_eq!(sort.sort_column, 1);
+    assert_ne!(sort.sort_direction, 0);
+    assert!(values
+        .borrow()
+        .iter()
+        .any(|e| e.text.contains("\"reason\":\"sort\"") && e.text.contains("\"sortColumn\":1")));
+    app.data_table_selection_mode(table, DataTableSelectionMode::Cell)
+        .unwrap();
+    app.step(0.016).unwrap();
+    let second_column = app.data_table_cell_bounds(table, 0, 1).unwrap();
+    let cx = second_column.x + second_column.width / 2.;
+    let cy = second_column.y + second_column.height / 2.;
+    app.pointer(Phase::Down, cx, cy).unwrap();
+    app.pointer(Phase::Up, cx, cy).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.data_table_state(table).unwrap().column, 2);
+    assert!(values
+        .borrow()
+        .iter()
+        .any(|e| e.text.contains("\"column\":2")));
+    app.component_disabled(table, true).unwrap();
+    app.step(0.016).unwrap();
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(
+        app.data_table_state(table).unwrap().sort_direction,
+        sort.sort_direction
+    );
+}
+#[test]
+fn plot_copies_points_and_preserves_model_on_invalid_update() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let plot = app
+        .build_child(root, Kind::Plot, "samples")
+        .unwrap()
+        .visual_size(240., 120.)
+        .unwrap()
+        .finish();
+    let mut points = [PlotPoint { x: 20., y: 20. }, PlotPoint { x: 60., y: 60. }];
+    app.plot_points(plot, &points).unwrap();
+    points[0].x = 999.;
+    assert_eq!(points[0].x, 999.);
+    assert_eq!(
+        app.plot_point(plot, 0).unwrap(),
+        PlotPoint { x: 20., y: 20. }
+    );
+    assert_eq!(
+        app.plot_points(
+            plot,
+            &[PlotPoint {
+                x: f64::INFINITY,
+                y: 1.
+            }]
+        )
+        .err(),
+        Some(Error(3))
+    );
+    assert_eq!(app.plot_point(plot, 1).unwrap().x, 60.);
+    app.step(0.016).unwrap();
+    assert!(app.bounds(plot).unwrap().width > 0.);
+    app.remove(plot).unwrap();
+    assert_eq!(app.plot_point(plot, 0).err(), Some(Error(4)));
+}
+#[test]
+fn command_palette_filter_select_and_confirm() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let command = app
+        .build_child(root, Kind::Command, "actions")
+        .unwrap()
+        .visual_size(300., 150.)
+        .unwrap()
+        .finish();
+    assert_eq!(
+        app.child(command, Kind::Button, "invalid").err(),
+        Some(Error(8))
+    );
+    let open = app
+        .build_child(command, Kind::Item, "open")
+        .unwrap()
+        .text("Open")
+        .unwrap()
+        .finish();
+    let close = app
+        .build_child(command, Kind::Item, "close")
+        .unwrap()
+        .text("Close")
+        .unwrap()
+        .detail_text("exit")
+        .unwrap()
+        .finish();
+    let clicks = Rc::new(Cell::new(0));
+    let captured = clicks.clone();
+    app.on_click(close, move || captured.set(captured.get() + 1))
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(command).unwrap(), Some(open));
+    let b = app.command_item_bounds(command, close).unwrap();
+    let x = b.x + b.width / 2.;
+    let y = b.y + b.height / 2.;
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.selected(command).unwrap(), Some(close));
+    assert_eq!(clicks.get(), 1);
+    app.text(command, "exit").unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.editable_text(command).unwrap(), "exit");
+    assert_eq!(app.selected(command).unwrap(), Some(close));
+    app.component_disabled(close, true).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.selected(command).unwrap(), None);
+    app.remove(command).unwrap();
+    assert_eq!(
+        app.command_item_bounds(command, close).err(),
+        Some(Error(4))
+    );
+}
+#[test]
+fn virtual_list_wheel_scroll_and_visible_item_bounds() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let list = app
+        .build_child(root, Kind::VirtualList, "items")
+        .unwrap()
+        .visual_size(200., 96.)
+        .unwrap()
+        .finish();
+    let mut items = Vec::new();
+    for i in 0..20 {
+        let key = format!("item-{i}");
+        items.push(
+            app.build_child(list, Kind::Item, &key)
+                .unwrap()
+                .text(&key)
+                .unwrap()
+                .finish(),
+        );
+    }
+    let offsets = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = offsets.clone();
+    app.on_change_event(list, move |e| captured.borrow_mut().push(e.value))
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.virtual_list_item_bounds(list, items[0]).is_ok());
+    assert_eq!(
+        app.virtual_list_item_bounds(list, items[19]).err(),
+        Some(Error(8))
+    );
+    let b = app.bounds(list).unwrap();
+    app.scroll(b.x + 20., b.y + 20., 0., -1.).unwrap();
+    app.frame(0.016).unwrap();
+    let offset = app.current_value(list).unwrap();
+    assert!(offset > 0.);
+    assert!(offsets.borrow().iter().any(|v| *v > 0.));
+    app.value(list, 500.).unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.virtual_list_item_bounds(list, items[19]).is_ok());
+    app.component_disabled(list, true).unwrap();
+    app.step(0.016).unwrap();
+    let disabled_offset = app.current_value(list).unwrap();
+    app.scroll(b.x + 20., b.y + 20., 0., 1.).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.current_value(list).unwrap(), disabled_offset);
+}
+#[test]
+fn sidebar_navigation_and_open_state() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let sidebar = app
+        .build_child(root, Kind::Sidebar, "navigation")
+        .unwrap()
+        .visual_size(240., 180.)
+        .unwrap()
+        .finish();
+    assert_eq!(
+        app.child(sidebar, Kind::Button, "invalid").err(),
+        Some(Error(8))
+    );
+    let home = app
+        .build_child(sidebar, Kind::Item, "home")
+        .unwrap()
+        .text("Home")
+        .unwrap()
+        .finish();
+    let settings = app
+        .build_child(sidebar, Kind::Item, "settings")
+        .unwrap()
+        .text("Settings")
+        .unwrap()
+        .finish();
+    let changes = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = changes.clone();
+    app.on_change_event(sidebar, move |e| captured.borrow_mut().push(e.selected))
+        .unwrap();
+    let clicks = Rc::new(Cell::new(0));
+    let captured = clicks.clone();
+    app.on_click(settings, move || captured.set(captured.get() + 1))
+        .unwrap();
+    app.step(0.016).unwrap();
+    let b = app.bounds(settings).unwrap();
+    let x = b.x + b.width / 2.;
+    let y = b.y + b.height / 2.;
+    app.pointer(Phase::Down, x, y).unwrap();
+    app.pointer(Phase::Up, x, y).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.selected(sidebar).unwrap(), Some(settings));
+    assert!(changes.borrow().contains(&Some(settings)));
+    assert_eq!(clicks.get(), 1);
+    app.open(sidebar, false).unwrap();
+    app.step(0.016).unwrap();
+    assert!(!app.is_open(sidebar).unwrap());
+    app.open(sidebar, true).unwrap();
+    app.component_disabled(home, true).unwrap();
+    app.step(0.016).unwrap();
+    let b = app.bounds(home).unwrap();
+    app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.selected(sidebar).unwrap(), Some(settings));
+    app.remove(sidebar).unwrap();
+    assert_eq!(app.is_open(sidebar).err(), Some(Error(4)));
+}
+#[test]
+fn theme_presets_are_named_and_app_scoped() {
+    let _guard = NATIVE.lock().unwrap();
+    let names = App::theme_presets().unwrap();
+    assert!(names.len() >= 3);
+    assert!(names.iter().all(|name| !name.is_empty()));
+    let mut first = App::headless(320., 240.).unwrap();
+    let mut second = App::headless(320., 240.).unwrap();
+    assert_eq!(first.theme_preset().unwrap(), None);
+    assert_eq!(
+        first.set_theme_preset(names.len() as u32).err(),
+        Some(Error(3))
+    );
+    first.set_theme_preset(0).unwrap();
+    second.set_theme_preset(1).unwrap();
+    assert_eq!(first.theme_preset().unwrap(), Some(0));
+    assert_eq!(second.theme_preset().unwrap(), Some(1));
+    let root = first.root(Kind::Column, "root").unwrap();
+    first
+        .build_child(root, Kind::Button, "button")
+        .unwrap()
+        .text("Action")
+        .unwrap();
+    first.step(0.016).unwrap();
+    first.set_theme_preset(1).unwrap();
+    first.step(0.016).unwrap();
+    assert_eq!(first.theme_preset().unwrap(), Some(1));
+}
+#[test]
+fn root_view_padding_and_child_click() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(320., 240.).unwrap();
+    let root = app
+        .build_root(Kind::RootView, "root")
+        .unwrap()
+        .root_padding(20.)
+        .unwrap()
+        .finish();
+    assert_eq!(
+        app.child(root, Kind::RootView, "nested").err(),
+        Some(Error(8))
+    );
+    let clicks = Rc::new(Cell::new(0));
+    let captured = clicks.clone();
+    let button = app
+        .build_child(root, Kind::Button, "apply")
+        .unwrap()
+        .text("Apply")
+        .unwrap()
+        .on_click(move || captured.set(captured.get() + 1))
+        .unwrap()
+        .finish();
+    assert_eq!(app.root_padding(button, 5.).err(), Some(Error(8)));
+    assert_eq!(app.root_padding(root, -1.).err(), Some(Error(3)));
+    app.step(0.016).unwrap();
+    let rb = app.bounds(root).unwrap();
+    assert_eq!((rb.width, rb.height), (320., 240.));
+    let b = app.bounds(button).unwrap();
+    assert!(b.x >= 20.);
+    app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(clicks.get(), 1);
+    app.root_padding(root, 40.).unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.bounds(button).unwrap().x >= 40.);
+}
+#[test]
+fn clipboard_headless_and_input_validation() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(100., 100.).unwrap();
+    assert_eq!(app.clipboard_set("copy ✓").err(), Some(Error(9)));
+    assert_eq!(app.clipboard_get().err(), Some(Error(9)));
+    assert_eq!(app.clipboard_set("bad\0text").err(), Some(Error(3)));
+    assert_eq!(app.clipboard_set(&"a".repeat(65537)).err(), Some(Error(3)));
+}
+#[test]
+fn speech_host_report_lifecycle_and_copied_events() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(320., 240.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let speech = app.child(root, Kind::Speech, "speech").unwrap();
+    let events = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = events.clone();
+    app.on_change_event(speech, move |e| {
+        captured
+            .borrow_mut()
+            .push((e.value, e.checked, e.text.clone()))
+    })
+    .unwrap();
+    app.step(0.016).unwrap();
+    assert!(app.bounds(speech).unwrap().width > 0.);
+    assert_eq!(
+        app.speech_report(speech, "early", true).err(),
+        Some(Error(8))
+    );
+    app.speech_start(speech).unwrap();
+    assert_eq!(app.speech_start(speech).err(), Some(Error(8)));
+    app.speech_report(speech, "hel", false).unwrap();
+    app.step(0.016).unwrap();
+    app.speech_report(speech, "hello", true).unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.speech_transcript(speech).unwrap(), "hello");
+    assert!(app.is_checked(speech).unwrap());
+    assert!(events
+        .borrow()
+        .iter()
+        .any(|(v, _, text)| *v == 1. && text == "hel"));
+    assert!(events
+        .borrow()
+        .iter()
+        .any(|(v, _, text)| *v == 1. && text == "hello"));
+    app.speech_finish(speech).unwrap();
+    app.frame(0.016).unwrap();
+    assert!(events
+        .borrow()
+        .iter()
+        .any(|(v, checked, text)| *v == 2. && !checked && text == "hello"));
+    app.component_disabled(speech, true).unwrap();
+    assert_eq!(app.speech_start(speech).err(), Some(Error(8)));
+    app.remove(speech).unwrap();
+    assert_eq!(app.speech_start(speech).err(), Some(Error(4)));
+}
+#[test]
+fn questionnaire_choices_validation_navigation_and_snapshots() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(480., 400.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let form = app.child(root, Kind::Questionnaire, "survey").unwrap();
+    let color = app
+        .build_child(form, Kind::Item, "color")
+        .unwrap()
+        .text("Choose a color")
+        .unwrap()
+        .questionnaire_question(true, false)
+        .unwrap()
+        .finish();
+    let red = app
+        .build_child(color, Kind::Item, "red")
+        .unwrap()
+        .text("Red")
+        .unwrap()
+        .finish();
+    let blue = app
+        .build_child(color, Kind::Item, "blue")
+        .unwrap()
+        .text("Blue")
+        .unwrap()
+        .finish();
+    let shape = app
+        .build_child(form, Kind::Item, "shape")
+        .unwrap()
+        .text("Shape")
+        .unwrap()
+        .questionnaire_question(false, false)
+        .unwrap()
+        .finish();
+    let round = app
+        .build_child(shape, Kind::Item, "round")
+        .unwrap()
+        .text("Round")
+        .unwrap()
+        .finish();
+    let snapshots = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = snapshots.clone();
+    app.on_change_event(form, move |e| captured.borrow_mut().push(e.text.clone()))
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.questionnaire_state(form).unwrap().current, Some(color));
+    assert_eq!(app.questionnaire_submit(form).err(), Some(Error(8)));
+    assert_eq!(app.questionnaire_next(form).err(), Some(Error(8)));
+    assert_eq!(app.text(red, "Changed").err(), Some(Error(8)));
+    for choice in [red, blue] {
+        let b = app.bounds(choice).unwrap();
+        app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+            .unwrap();
+        app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+            .unwrap();
+        app.frame(0.016).unwrap();
+    }
+    assert!(!app.questionnaire_choice_selected(red).unwrap());
+    assert!(app.questionnaire_choice_selected(blue).unwrap());
+    assert!(snapshots
+        .borrow()
+        .iter()
+        .any(|s| s.contains("\"selected\":[1]")));
+    assert!(snapshots
+        .borrow()
+        .iter()
+        .any(|s| s.contains("\"selected\":[2]")));
+    app.questionnaire_next(form).unwrap();
+    assert_eq!(app.questionnaire_state(form).unwrap().current, Some(shape));
+    app.step(0.016).unwrap();
+    let b = app.bounds(round).unwrap();
+    app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.frame(0.016).unwrap();
+    app.questionnaire_previous(form).unwrap();
+    assert_eq!(app.questionnaire_state(form).unwrap().current, Some(color));
+    app.questionnaire_submit(form).unwrap();
+    app.questionnaire_submit(form).unwrap();
+    app.dispatch().unwrap();
+    assert!(app.questionnaire_state(form).unwrap().complete);
+    assert_eq!(
+        snapshots
+            .borrow()
+            .iter()
+            .filter(|s| s.contains("\"event\":3"))
+            .count(),
+        2
+    );
+    app.remove(form).unwrap();
+    assert_eq!(app.questionnaire_state(form).err(), Some(Error(4)));
+}
+
+#[test]
+fn dock_split_activation_serialization_and_frozen_panels() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(640., 480.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let dock = app
+        .build_child(root, Kind::Dock, "dock")
+        .unwrap()
+        .visual_size(480., 300.)
+        .unwrap()
+        .finish();
+    let first = app
+        .build_child(dock, Kind::Item, "one")
+        .unwrap()
+        .text("First")
+        .unwrap()
+        .finish();
+    let second = app
+        .build_child(dock, Kind::Item, "two")
+        .unwrap()
+        .text("Second")
+        .unwrap()
+        .finish();
+    app.build_child(first, Kind::Label, "content")
+        .unwrap()
+        .text("Panel body")
+        .unwrap();
+    let selected = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = selected.clone();
+    app.on_change_event(dock, move |e| captured.borrow_mut().push(e.selected))
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.dock_active(dock).unwrap(), Some(first));
+    assert!(app.dock_panel_bounds(dock, second).unwrap().width > 0.);
+    assert_eq!(app.text(second, "Later").err(), Some(Error(8)));
+    assert_eq!(app.remove(second).err(), Some(Error(8)));
+    let before = app.dock_serialize(dock).unwrap();
+    app.dock_move_split(dock, second, first, DockAxis::Horizontal, 0.4, false)
+        .unwrap();
+    assert_ne!(app.dock_serialize(dock).unwrap(), before);
+    app.step(0.016).unwrap();
+    app.dock_activate(dock, second).unwrap();
+    app.dispatch().unwrap();
+    assert_eq!(app.dock_active(dock).unwrap(), Some(second));
+    assert!(selected.borrow().contains(&Some(second)));
+    app.component_disabled(dock, true).unwrap();
+    assert_eq!(app.dock_activate(dock, first).err(), Some(Error(8)));
+    app.remove(dock).unwrap();
+    assert_eq!(app.dock_active(dock).err(), Some(Error(4)));
+}
+#[test]
+fn settings_pages_fields_filter_and_reset() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(900., 650.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let settings = app
+        .build_child(root, Kind::Settings, "settings")
+        .unwrap()
+        .visual_size(720., 500.)
+        .unwrap()
+        .finish();
+    let general = app
+        .build_child(settings, Kind::Item, "general")
+        .unwrap()
+        .text("General")
+        .unwrap()
+        .finish();
+    let group = app
+        .build_child(general, Kind::Item, "prefs")
+        .unwrap()
+        .text("Preferences")
+        .unwrap()
+        .finish();
+    let toggle = app
+        .build_child(group, Kind::Switch, "enable")
+        .unwrap()
+        .text("Enable")
+        .unwrap()
+        .finish();
+    let checkbox = app
+        .build_child(group, Kind::Checkbox, "confirm")
+        .unwrap()
+        .text("Confirm")
+        .unwrap()
+        .finish();
+    let input = app
+        .build_child(group, Kind::Input, "name")
+        .unwrap()
+        .detail_text("Name")
+        .unwrap()
+        .finish();
+    let number = app
+        .build_child(group, Kind::NumberInput, "count")
+        .unwrap()
+        .detail_text("Count")
+        .unwrap()
+        .finish();
+    let advanced = app
+        .build_child(settings, Kind::Item, "advanced")
+        .unwrap()
+        .text("Advanced")
+        .unwrap()
+        .finish();
+    app.child(advanced, Kind::Item, "other").unwrap();
+    let pages = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = pages.clone();
+    app.on_change_event(settings, move |e| captured.borrow_mut().push(e.selected))
+        .unwrap();
+    let inputs = Rc::new(std::cell::RefCell::new(Vec::new()));
+    let captured = inputs.clone();
+    app.on_change_event(input, move |e| captured.borrow_mut().push(e.text.clone()))
+        .unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.settings_page(settings).unwrap(), Some(general));
+    assert_eq!(app.text(general, "Changed").err(), Some(Error(8)));
+    let b = app.settings_field_bounds(settings, toggle).unwrap();
+    app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.frame(0.016).unwrap();
+    assert!(app.is_checked(toggle).unwrap());
+    let b = app.settings_field_bounds(settings, input).unwrap();
+    app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.frame(0.016).unwrap();
+    app.queue_text("Zoë").unwrap();
+    app.frame(0.016).unwrap();
+    assert_eq!(app.editable_text(input).unwrap(), "Zoë");
+    assert!(inputs.borrow().contains(&"Zoë".into()));
+    app.component_disabled(checkbox, true).unwrap();
+    app.step(0.016).unwrap();
+    let b = app.settings_field_bounds(settings, checkbox).unwrap();
+    app.pointer(Phase::Down, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.pointer(Phase::Up, b.x + b.width / 2., b.y + b.height / 2.)
+        .unwrap();
+    app.frame(0.016).unwrap();
+    assert!(!app.is_checked(checkbox).unwrap());
+    app.settings_set_page(settings, advanced).unwrap();
+    assert_eq!(app.settings_page(settings).unwrap(), Some(advanced));
+    app.settings_set_page(settings, general).unwrap();
+    app.dispatch().unwrap();
+    assert!(pages.borrow().contains(&Some(advanced)));
+    assert!(pages.borrow().contains(&Some(general)));
+    app.settings_reset_page(settings, general).unwrap();
+    app.dispatch().unwrap();
+    assert!(!app.is_checked(toggle).unwrap());
+    assert_eq!(app.editable_text(input).unwrap(), "");
+    app.value(number, 7.).unwrap();
+    app.step(0.016).unwrap();
+    app.settings_reset_page(settings, general).unwrap();
+    assert_eq!(app.current_value(number).unwrap(), 0.);
+    assert_eq!(
+        app.settings_query(settings, &"x".repeat(257)).err(),
+        Some(Error(5))
+    );
+    app.settings_query(settings, "Advanced").unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(
+        app.settings_field_bounds(settings, toggle).err(),
+        Some(Error(8))
+    );
+    app.remove(settings).unwrap();
+    assert_eq!(app.settings_page(settings).err(), Some(Error(4)));
+}

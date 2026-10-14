@@ -1,0 +1,64 @@
+[
+  {
+    "name": "Clay",
+    "version": "e6cc36941ab2af5d81107617039d6f527a1c660b",
+    "source": "https://github.com/nicbarker/clay",
+    "license": "Zlib",
+    "license_file": "third_party/clay/LICENSE",
+    "sha256": {
+      "third_party/clay/clay.h": "54aef6d5f96b14e296bebb6db4a755543e98fd7e6c188411afb2f22a4b4f7728",
+      "third_party/clay/LICENSE": "5dd30f9f52093076b7574458f5efb8242fe6cbbd4669d4a2914e7616810d0df8"
+    }
+  },
+  {
+    "name": "NanoSVG",
+    "version": "239e102ec2c691f2902e20ace2ed36ee4a35cfe6",
+    "source": "https://github.com/memononen/nanosvg",
+    "license": "Zlib",
+    "license_file": "third_party/nanosvg/LICENSE",
+    "sha256": {
+      "third_party/nanosvg/LICENSE": "e82bc3dd03400aecabe12201219ba14750dbc4b36faab58663a7a6068548d372",
+      "third_party/nanosvg/nanosvg.h": "99230b1f967ea52e1b002fea5c8882118501125cd6aa6e4c66b44eb97e2d6dc7",
+      "third_party/nanosvg/nanosvgrast.h": "79a9c5f4db19debf9f3a648a1589e96d92854f245a5cb4f3d823f263785234d8"
+    }
+  },
+  {
+    "name": "GPUI Kit icon assets / Lucide",
+    "version": "87d10ae5e1299d1be18670a37570c5402f952e34 / Lucide1.43.0",
+    "source": "https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34/crates/assets",
+    "license": "ISC AND MIT AND Apache-2.0",
+    "license_file": "third_party/gpui_icons/LICENSE",
+    "sha256": {
+      "third_party/gpui_icons/LICENSE": "b5cffdd1e4fe552cc8fd313f44b37934af270154aa40da8589ed38a170aeee79",
+      "third_party/gpui_icons/icons.json": "f808ffcbc065cf1d45e40fda99e6ade248c0408d28d34357b1f6729ce7dd7ce3"
+    }
+  },
+  {
+    "name": "GPUI Kit named palette data",
+    "version": "87d10ae5e1299d1be18670a37570c5402f952e34",
+    "source": "https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34/themes",
+    "license": "Apache-2.0",
+    "license_file": "third_party/gpui_themes/LICENSE",
+    "sha256": {
+      "third_party/gpui_themes/LICENSE": "d1b0449e5478c574ba4f686c2656df7fe77d66821a61f8b6ed3378a58ed9a811",
+      "third_party/gpui_themes/palettes.json": "03de5a483daab83ed983495963a560d70f8ea7db3fd079bf4a69a4df0e2f77c0"
+    }
+  },
+  {
+    "name": "Unicode grapheme and word properties and conformance fixtures",
+    "version": "17.0.0",
+    "source": "https://www.unicode.org/Public/17.0.0/ucd/",
+    "license": "Unicode-3.0",
+    "license_file": "third_party/unicode/17.0.0/LICENSE.txt",
+    "sha256": {
+      "third_party/unicode/17.0.0/GraphemeBreakProperty.txt": "d6b51d1d2ae5c33b451b7ed994b48f1f4dc62b2272a5831e7fd418514a6bae89",
+      "third_party/unicode/17.0.0/emoji-data.txt": "2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b",
+      "third_party/unicode/17.0.0/DerivedCoreProperties.txt": "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08",
+      "third_party/unicode/17.0.0/GraphemeBreakTest.txt": "e2d134d2c52919bace503ebb6a551c1855fe1a1faec18478c78fff254a1793ec",
+      "third_party/unicode/17.0.0/LICENSE.txt": "e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96",
+      "third_party/unicode/17.0.0/WordBreakProperty.txt": "72274cac1e6b919507db35655c3e175aa27274668a1ece95c28d2069f2ad9852",
+      "third_party/unicode/17.0.0/WordBreakTest.txt": "1de23a75f37904abc7d206239ee8d34f8fdf0fb4ab32a7174dfbabbde25419b2",
+      "third_party/unicode/17.0.0/PropList.txt": "130dcddcaadaf071008bdfce1e7743e04fdfbc910886f017d9f9ac931d8c64dd"
+    }
+  }
+]

@@ -1,7 +1,7 @@
 package cui
 
 /*
-#cgo CFLAGS: -std=c11 -Wall -Wextra -Werror -I${SRCDIR}/../../../include
+#cgo CFLAGS: -std=c11 -Wall -Wextra -Werror -I${SRCDIR}/../sdk/source/include
 #cgo linux LDFLAGS: -ldl -pthread
 #include "cui/cui_bridge.h"
 #if defined(_WIN32)
@@ -375,7 +375,11 @@ func New(o Options) (*App, error) {
 		o.Library = os.Getenv("CUI_BRIDGE_LIBRARY")
 	}
 	if o.Library == "" {
-		return nil, errors.New("CUI_BRIDGE_LIBRARY required")
+		var err error
+		o.Library, err = packagedLibrary(o.Native)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if o.Width == 0 {
 		o.Width = 480

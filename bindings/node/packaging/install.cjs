@@ -8,6 +8,23 @@ if (Number(process.versions.napi) < 8) throw new Error('CUI alpha addon requires
 if (process.platform !== 'linux') throw new Error('Alpha source package currently validates Linux only');
 const root = path.resolve(__dirname, '..');
 const source = path.join(root, '_source', 'bindings', 'node');
+const outputDirectory = path.join(root, 'native');
+const infoFile = path.join(outputDirectory, 'build-info.json');
+if (fs.existsSync(infoFile) && process.env.CUI_PACKAGE_BUILD_FROM_SOURCE !== '1') {
+  const info = JSON.parse(fs.readFileSync(infoFile, 'utf8'));
+  if (info.platform !== process.platform || info.arch !== process.arch || info.node_api !== 8)
+    throw new Error('Bundled CUI addon platform/architecture/Node-API mismatch; select matching artifact or explicitly rebuild from source');
+  if (process.env.CUI_PACKAGE_NATIVE === '1' && !info.native_requested)
+    throw new Error('Bundled CUI addon lacks SDL; select native artifact or explicitly rebuild from source');
+  const crypto = require('node:crypto');
+  for (const filename of ['cui.node','libcui_bridge.so']) {
+    const file = path.join(outputDirectory, filename);
+    if (!fs.existsSync(file) || crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== info.file_sha256[filename])
+      throw new Error('Bundled CUI native artifact is missing or failed integrity verification');
+  }
+  console.log(`Using bundled CUI addon (${info.platform}/${info.arch}, Node-API 8)`);
+  process.exit(0);
+}
 if (!fs.existsSync(path.join(source, 'CMakeLists.txt'))) throw new Error('Packaged CUI source tree is missing');
 if (process.env.CUI_PACKAGE_NATIVE === '1') {
   const check = spawnSync('pkg-config', ['--exists','sdl3 >= 3.2','freetype2','harfbuzz']);
@@ -29,7 +46,10 @@ try {
   fs.copyFileSync(path.join(build, 'cui-bridge-build', 'libcui_bridge.so'), path.join(output, 'libcui_bridge.so'));
   const dependencies = spawnSync('ldd',[path.join(output,'libcui_bridge.so')],{encoding:'utf8'});
   if (dependencies.status !== 0) throw new Error('Cannot inspect built Linux runtime dependencies');
-  fs.writeFileSync(path.join(output,'build-info.json'),JSON.stringify({alpha:true,
+  const crypto = require('node:crypto');
+  const hashes = Object.fromEntries(['cui.node','libcui_bridge.so'].map(filename => [filename,
+    crypto.createHash('sha256').update(fs.readFileSync(path.join(output,filename))).digest('hex')]));
+  fs.writeFileSync(path.join(output,'build-info.json'),JSON.stringify({alpha:true,node_api:8,file_sha256:hashes,
     native_requested:process.env.CUI_PACKAGE_NATIVE === '1', platform:process.platform,arch:process.arch,
     system_development_versions:process.env.CUI_PACKAGE_NATIVE === '1'
       ? spawnSync('pkg-config',['--modversion','sdl3','freetype2','harfbuzz'],{encoding:'utf8'}).stdout.trim().split('\n') : [],

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cui.local/bindings/go/cui"
+	"github.com/mattmezza/cui/bindings/go/cui"
 	"log"
 	"os"
 	"strings"

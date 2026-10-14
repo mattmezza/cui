@@ -1,8 +1,17 @@
 [package]
 name = "cui-builders"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2021"
 license = "MIT"
+description = "Alpha CUI builders over a source-built C bridge; tested subset"
 build = "build.rs"
+links = "cui_bridge"
+publish = false
+include = ["src/**", "build.rs", "Cargo.toml", "sdk/**", "packaging/**", "LICENSE", "examples/**", "tests/**"]
+
+[features]
+default = []
+native = []
+sdl = ["native"]
 
 [dependencies]

@@ -1,0 +1,2 @@
+Alpha packaged module artifacts add libcui_bridge.so here during source staging.
+The source checkout retains explicit CUI_BRIDGE_LIBRARY overrides until packaged.

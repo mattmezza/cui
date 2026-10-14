@@ -22,7 +22,8 @@
     "packaging",
     "_source",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "native"
   ],
   "os": [
     "linux"

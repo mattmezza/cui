@@ -139,7 +139,7 @@ impl ChangeEvent {
         }
     }
 }
-#[link(name = "cui_bridge")]
+#[cfg_attr(not(cui_bridge_static), link(name = "cui_bridge"))]
 extern "C" {
     fn cui_bridge_abi_version() -> u32;
     fn cui_bridge_theme_preset_count() -> u32;

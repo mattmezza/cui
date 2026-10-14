@@ -1,10 +1,10 @@
 package main
 
 import (
-	"cui.local/bindings/go/cui"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/mattmezza/cui/bindings/go/cui"
 	"os"
 )
 

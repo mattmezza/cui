@@ -3,7 +3,7 @@
 These packages contain the tested binding subset, not full GPUI or all CUI API
 parity. They are local alpha artifacts. No registry account ownership is assumed
 and these scripts never publish. npm retains `private: true`; the Rust crate has
-`publish = false`; the Go module retains the existing local module identity.
+`publish = false`; the Go module uses the canonical repository module path.
 
 ## Python wheel and npm tarball
 
@@ -82,3 +82,33 @@ Authoritative packaging references: [Python packaging flow](https://packaging.py
 [Cargo native build scripts](https://doc.rust-lang.org/cargo/reference/build-scripts.html),
 [Go module ZIP rules](https://go.dev/ref/mod#zip-files), and
 [Go embedded files](https://pkg.go.dev/embed).
+
+Go and Rust source distributions use tracked minimal SDK snapshots. Regenerate
+with `python scripts/generate_go_sdk.py`, then run the same command with `--check`
+when canonical CUI sources change. Per-file hashes and provenance receipts record
+source changes; packaging includes tracked files only. The Go module path is
+`github.com/mattmezza/cui/bindings/go`; public tags and registry publication have
+not been performed. Local proxy ZIPs validate the module layout.
+
+`python scripts/package_bindings.py go --output /tmp/cui-go` embeds a compiled
+Linux bridge in the module artifact. Applications built from that artifact carry
+the bridge and extract it into a private verified cache, without running a
+compiler. `--source-only` validates the public source module: its first App creation
+requires CMake and a C11 compiler. This is an alpha development fallback, not a
+production distribution guarantee. A public build-time cgo/static or explicit
+artifact embedding release path remains required. Cache receipts validate SDK,
+backend, ABI, OS, architecture and library hashes; writes use a process lock and
+atomic replacement.
+
+`python scripts/package_bindings.py rust --output /tmp/cui-rust` creates a crate
+with the SDK. Cargo compiles and statically links CUI during the developer build;
+`--features native` adds SDL support. The resulting executable needs no CUI
+checkout, CMake or compiler at runtime. Native system libraries remain required.
+The existing explicit shared-library environment override remains available.
+
+For Linux npm binaries, use `python scripts/package_bindings.py node --prebuilt`.
+The tarball carries its Node-API 8 addon and bridge with validated hashes;
+installation needs no compiler. `CUI_PACKAGE_BUILD_FROM_SOURCE=1` explicitly
+rebuilds the bundled source. Installed TypeScript declarations are checked with
+pinned TypeScript 5.8.3 in a clean strict consumer. Cross-platform binary matrices
+and registry ownership remain open release work.

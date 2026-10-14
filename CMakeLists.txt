@@ -377,6 +377,8 @@ add_test(NAME licenses COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}
 add_test(NAME grapheme_generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_grapheme.py --check)
 add_test(NAME word_generated COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_word.py --check)
 add_test(NAME distribution COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/amalgamate.py --check)
+add_test(NAME binding_sdk_freshness COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_go_sdk.py --check)
+add_test(NAME binding_package_display_guard COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_display_guard.py)
 install(TARGETS cui cui_software ARCHIVE DESTINATION lib)
 install(DIRECTORY include/cui DESTINATION include)
 add_executable(cui_bench tests/benchmarks/bench.c)

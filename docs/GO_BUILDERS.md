@@ -1,5 +1,9 @@
 # Go builders for the CUI bridge
 
+For installable local wheel, npm, Go module and Rust crate artifacts, see the
+[packaging guide](PACKAGING.md). Linux alpha packages are tested outside the
+checkout; registry publication and other platform packages remain pending.
+
 `bindings/go` is a cgo Go module for the portable CUI bridge ABI v1. Its builders cover the native bridge node kinds through Settings, from layout, controls, and overlays to data views and navigation; the sections below specify each implemented surface and its limits. Builders create a detached tree; `App.Mount` validates it and creates actual CUI nodes. `Step` submits the frame, `QueuePointer` and `QueueKey` send synthetic input, and `Dispatch` invokes Go callbacks after the native frame. Change events carry state and copied text captured when queued. Bridge node coverage does not imply full feature parity with the 78-component manifest.
 
 Requires Go 1.23 or newer, a C11 compiler, CMake, Ninja, `CGO_ENABLED=1`, and a built CUI bridge shared library. On Linux, build and test from the repository root:

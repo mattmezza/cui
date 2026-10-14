@@ -1,5 +1,9 @@
 # Build a native UI in Python, JavaScript or TypeScript
 
+For installable local wheel, npm, Go module and Rust crate artifacts, see the
+[packaging guide](PACKAGING.md). Linux alpha packages are tested outside the
+checkout; registry publication and other platform packages remain pending.
+
 The component builders let you author a UI tree in your language. CUI performs
 layout and input handling in C; the optional SDL adapter draws a native window.
 The bridge exposes tested API subsets for all 78 catalog families through native CUI renderers and app services,

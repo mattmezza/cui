@@ -1,5 +1,9 @@
 # Rust CUI builders
 
+For installable local wheel, npm, Go module and Rust crate artifacts, see the
+[packaging guide](PACKAGING.md). Linux alpha packages are tested outside the
+checkout; registry publication and other platform packages remain pending.
+
 The `cui-builders` crate is a native Rust authoring layer over `libcui_bridge`. Its `Kind` enum follows the public bridge kind list in [`cui_bridge.h`](../include/cui/cui_bridge.h), including the native components delivered through Settings. This is the current bridge scope, not full parity with all 78 CUI manifest entries. Its node handles are app-scoped; calls reject handles from another app, and the C bridge rejects removed nodes. The `App` contains an `Rc` marker and cannot be sent or shared across threads. C strings are checked for interior NUL and the bridge's 4096-byte limit before FFI. Rust callbacks execute during `dispatch()` after `step()` returns from C; no Rust closure is passed into native frames.
 
 Build from the repository root with CMake, Ninja, Rust 1.85.1 or newer (validated with 1.85.1 and 1.99). The crate uses no external dependencies:

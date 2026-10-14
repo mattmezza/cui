@@ -1,5 +1,9 @@
 # Python, Go, Rust, Node JavaScript and TypeScript with CUI
 
+For installable local wheel, npm, Go module and Rust crate artifacts, see the
+[packaging guide](PACKAGING.md). Linux alpha packages are tested outside the
+checkout; registry publication and other platform packages remain pending.
+
 For UI trees authored directly in Python, JavaScript or TypeScript, use
 [the component builders](BINDING_BUILDERS.md). They expose the real C bridge
 components in Python, JavaScript and TypeScript, with dedicated

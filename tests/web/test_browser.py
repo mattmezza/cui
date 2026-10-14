@@ -389,7 +389,7 @@ def main():
                 return page.evaluate('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).find(i=>{const e=cuiGallery.exports;return (role===null?e.gallery_semantic(i,0)!==27:e.gallery_semantic(i,0)===role)&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', {'name':name,'role':role})
             def wait_semantic(name, role):
                 page.wait_for_function('({name,role})=>Array.from({length:cuiGallery.exports.gallery_semantic_count()},(_,i)=>i).some(i=>{const e=cuiGallery.exports;return e.gallery_semantic(i,0)===role&&new TextDecoder().decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name;})', arg={'name':name,'role':role})
-            def click_semantic(name, role=None):
+            def semantic_point(name, role=None):
                 canvas.scroll_into_view_if_needed()
                 probe = '''({name,role})=>{
                     const e=cuiGallery.exports,canvas=document.querySelector('canvas');
@@ -423,7 +423,9 @@ def main():
                     polling = 50 if page.evaluate('Boolean(window.__cuiHeldFrames)') else 'raf'
                     target = page.wait_for_function(stable_probe, arg=arg, polling=polling).json_value()
                 assert target is not None, name
-                page.mouse.click(*target[1:3])
+                return target[1:3]
+            def click_semantic(name, role=None):
+                page.mouse.click(*semantic_point(name, role))
             def dropdown_select(control, value, role=None):
                 control_change('dropdown-'+control, value)
                 if role is not None:
@@ -1997,10 +1999,9 @@ def main():
                 page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===cuiGallery.exports.gallery_semantic(i,13)', arg=handle)
                 page.keyboard.press('Home')
                 page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,8)===100', arg=handle)
-                handle_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', handle)
-                rectangle = canvas.bounding_box()
-                x = rectangle['x'] + handle_bounds[0] + handle_bounds[2]/2
-                y = rectangle['y'] + handle_bounds[1] + handle_bounds[3]/2
+                # Home moves the handle; recheck viewport visibility and DOM occlusion
+                # before dragging, as toolbar height varies with relevant controls.
+                x, y = semantic_point(handle_name)
                 delta = 26 if edge in (0,2) else -26
                 page.mouse.move(x,y)
                 page.mouse.down()

@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#define BRIDGE_PHASE(label) do { fputs("bridge_core: " label "\n", stderr); fflush(stderr); } while (0)
 static cui_bridge_status click(cui_bridge_app *app, cui_bridge_node node) {
     cui_bridge_rect bounds = {0};
     cui_bridge_status status = cui_bridge_node_bounds(app, node, &bounds);
@@ -15,6 +16,7 @@ static cui_bridge_status click(cui_bridge_app *app, cui_bridge_node node) {
     return cui_bridge_step(app, .016f);
 }
 int main(void) {
+    BRIDGE_PHASE("start");
     cui_bridge_status status = CUI_BRIDGE_OK;
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -35,6 +37,7 @@ int main(void) {
     assert(!cui_bridge_create(&options, &status) && status == CUI_BRIDGE_INVALID_ARGUMENT);
     options.height = 200;
     cui_bridge_app *app = cui_bridge_create(&options, &status);
+    BRIDGE_PHASE("first app created");
     assert(app && status == CUI_BRIDGE_OK);
     cui_bridge_node root = {0}, save = {0}, duplicate = {73, 91};
     assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_ROW, "root", &root) ==
@@ -52,6 +55,7 @@ int main(void) {
     assert(cui_bridge_set_button_rounding(app, save, CUI_BRIDGE_ROUND_THEME, 0) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_button_hover_rgba(app, save, 90, 80, 70, 255) == CUI_BRIDGE_OK);
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    BRIDGE_PHASE("first frame rendered");
     cui_bridge_rect bounds = {0};
     assert(cui_bridge_node_bounds(app, save, &bounds) == CUI_BRIDGE_OK);
     assert(bounds.width > 0 && bounds.height > 0);
@@ -90,6 +94,7 @@ int main(void) {
     assert(cui_bridge_request_close(app) == CUI_BRIDGE_OK);
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_CLOSED);
     cui_bridge_destroy(app);
+    BRIDGE_PHASE("first app destroyed");
     options.max_nodes = 1;
     app = cui_bridge_create(&options, &status);
     assert(app && status == CUI_BRIDGE_OK);
@@ -101,6 +106,7 @@ int main(void) {
            CUI_BRIDGE_CAPACITY);
     assert(duplicate.slot == 73 && duplicate.generation == 91);
     cui_bridge_destroy(app);
+    BRIDGE_PHASE("capacity app destroyed");
     options.max_nodes = 256;
     app = cui_bridge_create(&options, &status);
     assert(app && status == CUI_BRIDGE_OK);
@@ -116,8 +122,11 @@ int main(void) {
     assert(cui_bridge_node_create(app, parent, CUI_BRIDGE_ROW, "too-deep", &duplicate) ==
            CUI_BRIDGE_CAPACITY);
     assert(duplicate.slot == 73 && duplicate.generation == 91);
+    BRIDGE_PHASE("depth 128 built");
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    BRIDGE_PHASE("depth 128 rendered");
     cui_bridge_destroy(app);
+    BRIDGE_PHASE("depth 128 destroyed");
     app = cui_bridge_create(&options, &status);
     assert(app && status == CUI_BRIDGE_OK);
     parent = (cui_bridge_node){0};
@@ -134,7 +143,10 @@ int main(void) {
     assert(cui_bridge_node_create(app, list, CUI_BRIDGE_ITEM, "deep-item", &item) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_text(app, item, "Label") == CUI_BRIDGE_OK);
     assert(cui_bridge_set_detail_text(app, item, "Value") == CUI_BRIDGE_OK);
+    BRIDGE_PHASE("deep list built");
     assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    BRIDGE_PHASE("deep list rendered");
     cui_bridge_destroy(app);
+    BRIDGE_PHASE("deep list destroyed");
     puts("bridge core ok");
 }

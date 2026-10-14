@@ -1,11 +1,15 @@
-Source composition integration after Next35 and the gallery scrollbar visibility change.
+Source composition integration after Next35 and conditional gallery scrollbar controls.
 Strict C11/native/headless CTest: 195/195 passed on Linux, native windows isolated
-with scripts/test_local.py. Includes Core colored paragraph wrap, Label, Empty,
-Icon semantic/decoration, hierarchical Core/Button tab order, malformed SVG transform,
-and software renderer/font snapshot tests. Hardware GPU and native macOS/Windows
-acceptance remain unverified. This is tested API/behavior coverage, not full parity.
-Actual Chromium Label masking/Unicode text and Empty pointer/keyboard/disabled
-native actions passed at 1280px and 390px. All78 displayed usage excerpts compile.
-The source contracts document remaining wrapping/style/SVG fidelity differences.
-Broader 66-command browser matrix and portable WASI assertions are running; this
-receipt must be updated with their actual terminal results before publication.
+with scripts/test_local.py. C-only ASAN/UBSAN: 166/166 passed; Python ctypes
+sanitizer coverage is not claimed. Final pinned Zig0.16.0/Wasmtime49 WASI suite:
+153/153 passed, including the corrected 32/64-bit capacity fixture.
+All 66 exact Pages workflow browser commands are covered: the initial matrix
+passed 65/66; the generic browser test exposed Empty status text outside the
+390px canvas. The preview height was fixed, a regression rejects the old height,
+and the complete generic browser command then passed. Its original failure log
+is retained. Source composition pointer/keyboard/disabled tests passed at1280
+and390px. All78 displayed usage excerpts compile. Dependency checksums, generated
+distribution, strict warnings and font-renderer snapshots are included.
+Hardware GPU and native macOS/Windows acceptance remain unverified. This is tested
+API/behavior coverage, not full parity. Unicode wrapping policy, text alignment,
+arbitrary inherited style and general SVG fidelity still have documented gaps.

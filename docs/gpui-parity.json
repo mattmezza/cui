@@ -1677,13 +1677,14 @@
         },
         {
           "name": "multiline and parent-width colored paragraph wrapping",
-          "status": "implemented",
+          "status": "tested",
           "evidence": [
             "tests/unit/test_contextual_wrap_source.c",
-            "docs/LABEL.md"
+            "docs/LABEL.md",
+            "docs/validation/next36-source-integration.txt"
           ],
           "limitations": [
-            "Integration portability/browser gates are being run; Unicode word boundaries and overlong-token policy still differ."
+            "Native/font, sanitizer, WASI and browser gates passed. Unicode word boundaries and overlong-token policy still differ from the reference."
           ]
         }
       ],

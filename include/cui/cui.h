@@ -39,6 +39,52 @@ typedef enum {
     CUI_ERROR_LAYOUT,
     CUI_ERROR_INVALID_ACTION
 } cui_error;
+/* Diagnostics are bounded value snapshots. Error state is sticky until clear_error.
+ * Paths contain outermost open box IDs (including anonymous zero IDs). */
+#define CUI_DIAGNOSTIC_PATH_MAX 16
+#define CUI_DIAGNOSTIC_OPERATION_MAX 48
+#define CUI_DIAGNOSTIC_MESSAGE_MAX 160
+#define CUI_DIAGNOSTIC_SUBSYSTEM_MAX 48
+typedef enum {
+    CUI_DIAGNOSTIC_NONE = 0,
+    CUI_DIAGNOSTIC_CAPACITY = 1,
+    CUI_DIAGNOSTIC_DUPLICATE_ID = 2,
+    CUI_DIAGNOSTIC_LIFECYCLE = 3,
+    CUI_DIAGNOSTIC_LAYOUT = 4,
+    CUI_DIAGNOSTIC_INVALID_ACTION = 5,
+    CUI_DIAGNOSTIC_ZERO_ID = 6,
+    CUI_DIAGNOSTIC_BOX_DEPTH = 7,
+    CUI_DIAGNOSTIC_ELEMENTS = 8,
+    CUI_DIAGNOSTIC_UNBALANCED_SCOPE = 9
+} cui_diagnostic_detail;
+typedef struct {
+    cui_error error;
+    cui_diagnostic_detail detail;
+    char operation[CUI_DIAGNOSTIC_OPERATION_MAX];
+    char message[CUI_DIAGNOSTIC_MESSAGE_MAX];
+    char subsystem[CUI_DIAGNOSTIC_SUBSYSTEM_MAX];
+    uint64_t frame_sequence;
+    cui_id id;
+    size_t used, requested, limit; /* Budget units follow subsystem; zero limit is unknown. */
+    cui_id path[CUI_DIAGNOSTIC_PATH_MAX];
+    size_t path_count;
+    bool path_truncated;
+} cui_diagnostic;
+/* Callback receives a borrowed snapshot; mutating/reentrant calls are rejected.
+ * Query snapshots only; callbacks must not destroy or otherwise reenter a host. */
+typedef void (*cui_diagnostic_fn)(void *, const cui_diagnostic *);
+void cui_set_diagnostic_callback(cui_context *, cui_diagnostic_fn, void *user);
+bool cui_first_diagnostic(const cui_context *, cui_diagnostic *out);
+bool cui_latest_diagnostic(const cui_context *, cui_diagnostic *out);
+/* For application/component failures. Captures the current open box path. */
+void cui_report_diagnostic(cui_context *, const cui_diagnostic *);
+typedef enum { CUI_DEBUG_LAYOUT_TEXT, CUI_DEBUG_LAYOUT_JSON } cui_debug_layout_format;
+/* Opt in before composition. Exports box nodes only, after end_frame and before
+ * the next begin_frame. required includes NUL; insufficient buffers are untouched.
+ * IDs are JSON strings to preserve all 64 bits. No allocation or file I/O. */
+void cui_set_layout_debug(cui_context *, bool enabled);
+bool cui_debug_layout_export(cui_context *, cui_debug_layout_format, char *buffer, size_t capacity,
+                             size_t *required);
 typedef enum {
     CUI_EVENT_POINTER_MOVE,
     CUI_EVENT_POINTER_DOWN,

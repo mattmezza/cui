@@ -1710,7 +1710,8 @@ static void test_bounds_tracking(void) {
     assert(!cui_needs_redraw(ui));
     begin(ui);
     assert(!cui_track_bounds(ui, 0, &bounds) && !cui_track_bounds(ui, 77, NULL));
-    assert(cui_last_error(ui) == CUI_OK);
+    assert(cui_last_error(ui) == CUI_ERROR_INVALID_ACTION);
+    cui_clear_error(ui);
     assert(cui_track_bounds(ui, 77, &bounds));
     assert(!cui_track_bounds(ui, 77, &other) && cui_last_error(ui) == CUI_ERROR_DUPLICATE_ID);
     cui_clear_error(ui);

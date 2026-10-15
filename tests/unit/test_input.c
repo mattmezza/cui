@@ -298,6 +298,38 @@ static void single_line_placeholder_clipping(void) {
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
+static void placeholder_alignment(void) {
+    cui_context *ui = cui_create((cui_config){.measure = measure});
+    char buffer[32] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_state state = {0};
+    cui_theme theme = cui_theme_light();
+    assert(ui && edit);
+    for (unsigned align = CUI_ALIGN_START; align <= CUI_ALIGN_END; ++align) {
+        for (unsigned focused = 0; focused < 2; ++focused) {
+            cui_focus(ui, focused ? 1 : 0);
+            assert(cui_begin_frame(ui, 400, 100, .016f));
+            assert(cui_input_ex(ui, 1, &theme, cui_string("Name"), edit, &state,
+                                (cui_input_options){.width = 240,
+                                                    .text_align = (cui_align)align,
+                                                    .placeholder = cui_string("Your name")})
+                       .error == CUI_EDIT_OK);
+            cui_draw_list list = cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK);
+            cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(1));
+            cui_rect text = text_bounds(list, "Your name");
+            float factor = align == CUI_ALIGN_CENTER ? .5f : align == CUI_ALIGN_END ? 1 : 0;
+            assert(fabsf(text.x - (viewport.x + (viewport.w - text.w) * factor)) < .001f);
+            if (focused) {
+                cui_rect caret = cui_bounds(ui, 1 ^ UINT64_C(0xb1642b97583fbd65));
+                assert(fabsf(caret.x - (viewport.x + (viewport.w - 1) * factor)) < .001f);
+            }
+        }
+    }
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 static void grow_resize_and_alignment(void) {
     cui_context *ui = cui_create((cui_config){.measure = measure});
     char buffer[32] = "abc";
@@ -807,6 +839,7 @@ int main(void) {
     size_metrics_and_centering();
     grow_resize_and_alignment();
     single_line_placeholder_clipping();
+    placeholder_alignment();
 #endif
     consumed_release_ends_selection();
     input_consumes_caret_keys();

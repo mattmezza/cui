@@ -2500,8 +2500,19 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
         cui_color placeholder = t->muted;
         if (options.disabled)
             placeholder.a = (uint8_t)lroundf(placeholder.a * .5f);
+        /* Align the placeholder by its own width while the empty text box
+         * continues to anchor the caret and hit testing. */
+        float placeholder_width =
+            cui_measure_text(ui, options.placeholder, metrics.font_size).width;
+        float placeholder_x =
+            cui_input_alignment(viewport_width, placeholder_width, options.text_align) -
+            cui_input_alignment(viewport_width, fmaxf(text_width, 1), options.text_align);
+        cui_begin_absolute_box(
+            ui, 0, (cui_box){0},
+            (cui_rect){placeholder_x, 0, placeholder_width, metrics.line_height});
         cui_text_line(ui, options.placeholder, metrics.font_size, placeholder, metrics.line_height,
                       (cui_text_style){0});
+        cui_end_box(ui);
     }
     if (focused) {
         cui_rect viewport = cui_bounds(ui, viewport_id);

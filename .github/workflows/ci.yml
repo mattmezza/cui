@@ -28,13 +28,18 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libfreetype-dev libharfbuzz-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb
-      - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON
+      # SDL is a FetchContent subproject: its install rules default to disabled.
+      # Configure the final prefix up front so its pkg-config metadata and loader
+      # paths agree with the independently built, extracted source consumer.
+      - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON -DSDL_INSTALL=ON -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/native-deps"
       - run: cmake --build build
       - name: Expose pinned SDL to the standalone bundle consumer
         run: |
           if [ -d build/_deps/sdl-build ]; then
             cmake --install build/_deps/sdl-build --prefix "$RUNNER_TEMP/native-deps"
           fi
+          PKG_CONFIG_PATH="$RUNNER_TEMP/native-deps/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+            pkg-config --print-errors --exists 'sdl3 >= 3.2' freetype2 harfbuzz
       - name: Test with an isolated display, including extracted native bundle
         run: python scripts/test_local.py --build-dir build
         env:

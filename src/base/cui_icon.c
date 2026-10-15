@@ -170,6 +170,20 @@ bool cui_icon_catalog_default(size_t index) {
 static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
     if (!name.data || !name.length)
         return NULL;
+    static const struct {
+        const char *alias, *path, *canonical;
+    } aliases[] = {
+        {"filter", "icons/filter.svg", "funnel"},
+        {"trash-2", "icons/trash-2.svg", "trash"},
+        {"more-vertical", "icons/more-vertical.svg", "ellipsis-vertical"}
+    };
+    for (size_t i = 0; i < sizeof aliases / sizeof aliases[0]; i++) {
+        if (cui_icon_string_equal(name, aliases[i].alias) ||
+            cui_icon_string_equal(name, aliases[i].path)) {
+            name = cui_string(aliases[i].canonical);
+            break;
+        }
+    }
     for (size_t i = 0; i < cui_icon_catalog_count(); i++)
         if (cui_icon_string_equal(name, cui_icon_assets[i].name) ||
             cui_icon_string_equal(name, cui_icon_assets[i].path))

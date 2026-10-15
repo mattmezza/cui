@@ -411,14 +411,25 @@ static void image_avatars(void) {
             overflow = true;
     assert(overflow);
     assert(cui_begin_frame(ui, 100, 100, .016f));
-    cui_avatar_ex(ui, 4000, &t, cui_string("Sam Patel"), (cui_avatar_options){.size = 40});
+    const cui_color background = {17, 39, 61, 255}, foreground = {219, 211, 203, 255};
+    cui_avatar_ex(ui, 4000, &t, cui_string("Sam Patel"),
+                  (cui_avatar_options){.size = 40, .custom_background = true,
+                      .custom_foreground = true, .background = background, .foreground = foreground});
     draw = cui_end_frame(ui);
-    bool initials = false;
-    for (size_t i = 0; i < draw.count; i++)
-        if (draw.commands[i].type == CUI_DRAW_TEXT && draw.commands[i].text.length == 2 &&
-            !memcmp(draw.commands[i].text.data, "SP", 2))
+    bool initials = false, surface = false;
+    for (size_t i = 0; i < draw.count; i++) {
+        const cui_draw_command *command = &draw.commands[i];
+        if (command->type == CUI_DRAW_RECT && command->bounds.w == 40) {
+            assert(!memcmp(&command->color, &background, sizeof background));
+            surface = true;
+        }
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 2 &&
+            !memcmp(command->text.data, "SP", 2)) {
+            assert(!memcmp(&command->color, &foreground, sizeof foreground));
             initials = true;
-    assert(initials);
+        }
+    }
+    assert(initials && surface);
     cui_destroy(ui);
 }
 int main(void) {

@@ -46,6 +46,20 @@ static cui_draw_list scene(cui_context *ui, cui_icon_state *state, cui_icon_opti
 }
 static void test_assets(void) {
     assert(cui_icon_catalog_count() == 1830);
+    const char *essential[] = {"pencil", "pen-line", "funnel", "filter", "archive",
+        "trash-2", "mail", "more-vertical", "paperclip", "send", "reply", "reply-all",
+        "forward", "download", "upload", "link", "log-out", "check-check"};
+    for (size_t i = 0; i < sizeof essential / sizeof essential[0]; i++) {
+        cui_icon_state icon = {0};
+        assert(cui_icon_set_name(&icon, cui_string(essential[i]), NULL, NULL));
+        assert(cui_icon_prepare(&icon, 24, 24, cui_icon_identity()) == CUI_ICON_OK);
+        assert(covered(cui_icon_state_bitmap(&icon)));
+        cui_icon_state_destroy(&icon);
+    }
+    cui_str alias, canonical;
+    assert(cui_icon_asset(cui_string("icons/filter.svg"), &alias));
+    assert(cui_icon_asset(cui_string("funnel"), &canonical));
+    assert(alias.data == canonical.data);
     cui_icon_state state;
     cui_icon_state_init(&state);
     size_t defaults = 0, embedded = 0;
@@ -65,11 +79,11 @@ static void test_assets(void) {
         cui_icon_state_collect(&state);
         assert(state.cache_versions == 1);
     }
-    assert(defaults == 106);
+    assert(defaults == 123);
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
     assert(embedded == 1830);
 #else
-    assert(embedded == 106);
+    assert(embedded == 123);
 #endif
     assert(!cui_icon_catalog_name(1830).length && !cui_icon_catalog_path(1830).length);
     assert(!cui_icon_asset(cui_string("missing"), &(cui_str){0}));

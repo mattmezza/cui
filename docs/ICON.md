@@ -33,8 +33,13 @@ returns. Returning false tries the embedded bundle. CUI performs no implicit
 filesystem or network access. Raw data uses `cui_icon_set_data`.
 
 The complete 1,830-name/path catalog remains available through
-`cui_icon_catalog_*`. The default build embeds the 106 frozen upstream default
-SVGs. Define `CUI_ICON_ALL_ASSETS=1` when compiling the implementation to embed all
+`cui_icon_catalog_*`. The default build embeds the 106 frozen upstream defaults plus 17 application essentials
+from the same pinned archive (123 SVGs total). These include `pencil`, `pen-line`,
+`funnel`, `archive`, `trash`, `mail`, `mail-open`, `paperclip`, `send`, `reply`,
+`reply-all`, `forward`, `download`, `upload`, `link`, `log-out`, and `check-check`.
+`filter`, `trash-2`, and `more-vertical` are accepted aliases for `funnel`, `trash`,
+and `ellipsis-vertical`, including their `icons/*.svg` path spellings. Aliases do
+not add catalog entries. Define `CUI_ICON_ALL_ASSETS=1` when compiling the implementation to embed all
 1,830; other catalog paths require a host loader in the default build.
 `cui_icon_asset` returns a borrowed static SVG string when embedded.
 
@@ -139,3 +144,22 @@ subject to the context's resource count and payload budget. Finish rendering bef
 `cui_begin_frame`: that call collects retired masks and eventually destroys omitted
 widgets. Context destruction releases all caches. Source/raster preparation errors
 are returned; context resource exhaustion also reports `CUI_ERROR_CAPACITY`.
+
+## Handling missing icons
+
+Check the result of `cui_icon_named` or `cui_icon`: `CUI_ICON_NOT_FOUND` means
+no host SVG or embedded asset was available; no icon is painted. A successful
+`cui_icon_set_name` only selects a catalog source and does not guarantee that its
+SVG is embedded. Check `cui_icon_prepare` (or the widget call) as well. For example:
+
+```c
+cui_icon_error error = cui_icon_named(ui, 42, &theme, cui_string("mail"),
+                                      (cui_icon_options){0});
+if (error != CUI_ICON_OK) {
+    /* Application policy: log error, report it in debug UI, or paint a fallback. */
+}
+```
+
+Use `cui_icon_catalog_default` to inspect the default bundle, provide a theme
+loader for other names, or enable the full bundle. CUI does not print diagnostics
+implicitly; applications retain control of logging and fallback presentation.

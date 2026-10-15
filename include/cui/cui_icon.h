@@ -52,7 +52,7 @@ bool cui_icon_set_path(cui_icon_state *, cui_str path, cui_icon_loader_fn, void 
 bool cui_icon_set_name(cui_icon_state *, cui_str name, cui_icon_loader_fn, void *user);
 bool cui_icon_set_empty(cui_icon_state *);
 void cui_icon_reload(cui_icon_state *);
-/* Complete catalog is always present; only 106 defaults embed SVG unless
+/* Complete catalog is always present; only 123 defaults embed SVG unless
  * CUI_ICON_ALL_ASSETS=1. Unknown catalog index returns an empty string. */
 size_t cui_icon_catalog_count(void);
 cui_str cui_icon_catalog_name(size_t);

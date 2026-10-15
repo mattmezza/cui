@@ -52,6 +52,9 @@ typedef struct {
     bool custom_ring, interactive, disabled;
     cui_bitmap image;
     cui_avatar_image *image_state;
+    /* Initials fallback only; flags permit explicit transparent/black colors. */
+    bool custom_background, custom_foreground;
+    cui_color background, foreground;
 } cui_avatar_options;
 /* Invalid/missing image/cache falls back to legacy initials. Returns activation
  * only when interactive; image name remains the supplied accessible name. */

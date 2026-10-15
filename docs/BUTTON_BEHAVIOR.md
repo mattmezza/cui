@@ -104,6 +104,23 @@ The original full label remains the semantic name. Leading/trailing artwork,
 text, custom slots and the caret retain their own layout allocation; custom
 content callbacks remain responsible for their internal layout. The content
 clip also contains their paint. FIT buttons retain intrinsic sizing.
+
+For fixed/grow Buttons, `content` children receive the current frame's inner width,
+including space reserved for padding and leading/trailing slots. Ordinary wrapped
+text and `cui_text_paragraph_colored(..., wrap=true)` wrap there just as they do
+inside a normal box. A custom mail row can use a grow-width row containing a
+fixed-width avatar and a grow-width column for the sender, subject and preview.
+The callback runs once during submission; resizing needs no previous-frame bounds
+or callback replay. Explicit fixed-width children and unwrapped text still obey
+those choices, and the Button clips overflowing paint. Nested scroll/clipping
+boxes retain their ordinary Core layout behavior.
+
+`test_button_content_layout.c` compares wrapped line counts with normal boxes for
+plain and paragraph text, fixed/grow widths, first-frame layout and resizing,
+avatar/text columns and leading/trailing slots. It also checks text bounds, avatar
+allocation and one callback invocation per submission. `test_button_content_font.c`
+repeats these cases with a caller-opened native font.
+
 `allow_content_overflow` is an explicit compatibility opt-out for the former
 wrapping/overflow behavior.
 

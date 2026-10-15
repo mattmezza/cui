@@ -465,6 +465,19 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     b.custom_border_edges = o.custom_border_edges;
     b.border_edges = o.border_edges;
     cui_begin_box(ui, id, b);
+    /* Clipping boxes retain natural child widths for scrolling. A percentage
+     * child establishes the resolved viewport width without compression by the
+     * clipping parent; its ordinary row can then shrink content for wrapping. */
+    bool bounded_content = o.content && b.width != 0 && !o.allow_content_overflow;
+    if (bounded_content)
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = 1,
+                                .width_percent = true,
+                                .height = b.height,
+                                .fixed_height = b.height > 0,
+                                .row = true,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER});
     cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
     /* Leave two representable steps for summed fractional child advances. */
@@ -477,7 +490,7 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
                   .row = true,
                   .height = b.height,
                   .fixed_height = b.height > 0,
-                  .clip = !o.allow_content_overflow,
+                  .clip = !o.allow_content_overflow && !bounded_content,
                   .align_x = CUI_ALIGN_CENTER,
                   .align_y = CUI_ALIGN_CENTER,
                   .gap = gap});
@@ -606,6 +619,8 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     cui_end_box(ui);
     cui_begin_box(ui, 0, (cui_box){.width = padding, .fixed_width = true, .height = 1});
     cui_end_box(ui);
+    if (bounded_content)
+        cui_end_box(ui);
     cui_end_box(ui);
 }
 void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,

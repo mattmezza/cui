@@ -59,7 +59,8 @@ Create/destroy the context in the host; queue input before begin. Width/height 0
 
 ## Header-only distribution
 
-`dist/` is reproducibly generated from modular sources and includes pinned Clay. In one C translation unit:
+`dist/` covers portable/headless composition, not a complete native window host.
+It is reproducibly generated from modular sources and includes pinned Clay. In one C translation unit:
 
 ```c
 #define CUI_IMPLEMENTATION
@@ -72,6 +73,35 @@ Create/destroy the context in the host; queue input before begin. Width/height 0
 
 Other translation units include those headers without implementation macros. Base includes the editor implementation; styled components include theme, overlay, virtual and plot implementations. Standalone optional models also have their own implementation macros. The single-TU test starts with the snippet above without a declaration pre-pass; multi-TU executables are also tested. Conventional static library targets use `include/cui/`. C++ and Zig host examples are in [examples/embedding](examples/embedding).
 
+For every portable implementation, including effects and the theme registry, use
+this alternative in one dedicated implementation file:
+
+```c
+#define CUI_IMPLEMENTATION_ALL
+#include "cui_all.h"
+```
+
+Other files include `cui_all.h` without the macro. The generated
+[implementation inventory](dist/implementations.json) lists individual headers,
+macros and source files. This umbrella excludes native adapters and the optional
+Rust regex provider, which are separately linked libraries. Component declarations,
+including Sidebar, are available through the umbrella.
+
+Compile the implementation file once into a static library and link your app
+sources against it. Keep implementation macros out of app headers so ordinary app
+edits do not rebuild the amalgamation. Regenerate only when vendored CUI changes;
+the modular CMake build already compiles separate source files in parallel.
+
+For a native SDL3 app, use the installed `cui-sdl3` pkg-config package and the
+[native starter](docs/NATIVE_APP_STARTER.md). CMake supplies the transitive static
+libraries and FreeType/HarfBuzz/SDL3 dependencies. If assembling sources manually,
+the adapter also needs `cui_text.h`, `cui_bidi.h`, `cui_sdl3.h`,
+`cui_accessibility.h`, `src/text/cui_text.c`, the bidi implementation,
+`backends/sdl3/cui_sdl3.c`, and its private software bitmap/shadow/shape headers.
+Include the portable effects implementation (`CUI_EFFECTS_IMPLEMENTATION`) for
+shadow support; `CUI_IMPLEMENTATION_ALL` includes it. Copying only `dist/` does
+not supply those native sources or third-party native libraries.
+
 `python scripts/amalgamate.py` regenerates; `make dist-check` checks exact reproducibility. `python tools/component_vendor/vendor.py /empty/destination --layer components` copies the layer dependency closure and licenses. This currently vendors all implemented controls in that layer; per-component source slicing is pending. No CLI is required to consume the library.
 
 ## Validation and scope
@@ -79,5 +109,9 @@ Other translation units include those headers without implementation macros. Bas
 `make check lint format-check dist-check`, `make bench`, and `make gallery` are available. Tests cover previous-frame ordered routing, nested capture/clips/focus scopes, Unicode scalar editing and history, randomized keyed virtualization, independent semantics, software pixels, shaped text, SDL cache/clipboard services, actual GPU readback, embedding, and gallery bounds. [Platform matrix](docs/PLATFORM_MATRIX.md) distinguishes runtime evidence from authored CI. Windows/macOS portable CI jobs are configured; results and limitations are recorded in the matrix. Fifteen headless modules also run in a pinned [WASI runner](docs/WASI.md); this is separate from browser support.
 
 Read [the nightly report](docs/NIGHTLY_REPORT.md), [full component reference](docs/COMPONENTS.md), [architecture](docs/ARCHITECTURE.md), [component authoring](docs/COMPONENT_AUTHORING.md), and [remaining maintainer actions](docs/MAINTAINER_ACTIONS.md). All performance figures include workload context in [PERFORMANCE.md](docs/PERFORMANCE.md); none compare to other frameworks.
+
+For a compact view of all 78 families, read [component status](docs/COMPONENT_STATUS.md).
+Run `python scripts/cui_status.py Input Icon Sidebar` to inspect selected families'
+features, evidence and limitations directly from the manifest.
 
 Original CUI source is MIT. Vendored Clay and Sokol are zlib-licensed. GPUI Kit 0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).

@@ -1,0 +1,370 @@
+{
+  "scope": "Portable C implementations; native adapters and Rust regex link separately.",
+  "umbrella": "CUI_IMPLEMENTATION_ALL",
+  "modules": [
+    {
+      "header": "cui_label.h",
+      "macro": "CUI_LABEL_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_label.c"
+      ]
+    },
+    {
+      "header": "cui_button_group.h",
+      "macro": "CUI_BUTTON_GROUP_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_button_group.c"
+      ]
+    },
+    {
+      "header": "cui_plot_motion.h",
+      "macro": "CUI_PLOT_MOTION_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_plot_motion.c"
+      ]
+    },
+    {
+      "header": "cui_radio_group.h",
+      "macro": "CUI_RADIO_GROUP_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_radio_group.c",
+        "src/components/cui_radio_group.c"
+      ]
+    },
+    {
+      "header": "cui_plot_view.h",
+      "macro": "CUI_PLOT_VIEW_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_plot.c"
+      ]
+    },
+    {
+      "header": "cui_editor.h",
+      "macro": "CUI_EDITOR_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_editor.c",
+        "src/components/cui_editor.c"
+      ]
+    },
+    {
+      "header": "cui_virtual_scroll.h",
+      "macro": "CUI_VIRTUAL_SCROLL_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_virtual_scroll.c",
+        "src/components/cui_virtual.c"
+      ]
+    },
+    {
+      "header": "cui_effects.h",
+      "macro": "CUI_EFFECTS_IMPLEMENTATION",
+      "sources": [
+        "src/effects/cui_effects.c"
+      ]
+    },
+    {
+      "header": "cui_questionnaire.h",
+      "macro": "CUI_QUESTIONNAIRE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_questionnaire.c",
+        "src/components/cui_questionnaire.c"
+      ]
+    },
+    {
+      "header": "cui_speech.h",
+      "macro": "CUI_SPEECH_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_speech.c",
+        "src/components/cui_speech.c"
+      ]
+    },
+    {
+      "header": "cui_chart.h",
+      "macro": "CUI_CHART_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_chart.c",
+        "src/components/cui_chart.c"
+      ]
+    },
+    {
+      "header": "cui_text_view.h",
+      "macro": "CUI_TEXT_VIEW_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_text_view.c",
+        "src/components/cui_text_view.c"
+      ]
+    },
+    {
+      "header": "cui_root.h",
+      "macro": "CUI_ROOT_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_root.c",
+        "src/components/cui_root.c"
+      ]
+    },
+    {
+      "header": "cui_command.h",
+      "macro": "CUI_COMMAND_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_command.c",
+        "src/components/cui_command.c"
+      ]
+    },
+    {
+      "header": "cui_carousel.h",
+      "macro": "CUI_CAROUSEL_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_carousel.c",
+        "src/components/cui_carousel.c"
+      ]
+    },
+    {
+      "header": "cui_settings.h",
+      "macro": "CUI_SETTINGS_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_settings.c",
+        "src/components/cui_settings.c"
+      ]
+    },
+    {
+      "header": "cui_sidebar.h",
+      "macro": "CUI_SIDEBAR_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_sidebar.c",
+        "src/components/cui_sidebar.c"
+      ]
+    },
+    {
+      "header": "cui_textarea.h",
+      "macro": "CUI_TEXTAREA_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_textarea.c",
+        "src/components/cui_textarea.c"
+      ]
+    },
+    {
+      "header": "cui_toolbar.h",
+      "macro": "CUI_TOOLBAR_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_toolbar.c",
+        "src/components/cui_toolbar.c"
+      ]
+    },
+    {
+      "header": "cui_icon.h",
+      "macro": "CUI_ICON_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_icon.c",
+        "src/components/cui_icon.c"
+      ]
+    },
+    {
+      "header": "cui_resizable.h",
+      "macro": "CUI_RESIZABLE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_resizable.c",
+        "src/components/cui_resizable.c"
+      ]
+    },
+    {
+      "header": "cui_chrome.h",
+      "macro": "CUI_CHROME_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_chrome.c",
+        "src/components/cui_chrome.c"
+      ]
+    },
+    {
+      "header": "cui_description.h",
+      "macro": "CUI_DESCRIPTION_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_description.c",
+        "src/components/cui_description.c"
+      ]
+    },
+    {
+      "header": "cui_media.h",
+      "macro": "CUI_MEDIA_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_media.c",
+        "src/components/cui_media.c"
+      ]
+    },
+    {
+      "header": "cui_message.h",
+      "macro": "CUI_MESSAGE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_message.c",
+        "src/components/cui_message.c"
+      ]
+    },
+    {
+      "header": "cui_status.h",
+      "macro": "CUI_STATUS_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_status.c",
+        "src/components/cui_status.c"
+      ]
+    },
+    {
+      "header": "cui_otp.h",
+      "macro": "CUI_OTP_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_otp.c",
+        "src/components/cui_otp.c"
+      ]
+    },
+    {
+      "header": "cui_form.h",
+      "macro": "CUI_FORM_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_form.c",
+        "src/components/cui_form.c"
+      ]
+    },
+    {
+      "header": "cui_surface.h",
+      "macro": "CUI_SURFACE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_surface.c",
+        "src/components/cui_surface.c"
+      ]
+    },
+    {
+      "header": "cui_table.h",
+      "macro": "CUI_TABLE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_table.c",
+        "src/components/cui_table.c"
+      ]
+    },
+    {
+      "header": "cui_scroll.h",
+      "macro": "CUI_SCROLL_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_scroll.c",
+        "src/components/cui_scroll.c"
+      ]
+    },
+    {
+      "header": "cui_tree.h",
+      "macro": "CUI_TREE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_tree.c",
+        "src/components/cui_tree.c"
+      ]
+    },
+    {
+      "header": "cui_picker.h",
+      "macro": "CUI_PICKER_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_picker.c",
+        "src/components/cui_picker.c"
+      ]
+    },
+    {
+      "header": "cui_numeric.h",
+      "macro": "CUI_NUMERIC_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_numeric.c",
+        "src/components/cui_numeric.c"
+      ]
+    },
+    {
+      "header": "cui_content.h",
+      "macro": "CUI_CONTENT_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_content.c",
+        "src/components/cui_content.c"
+      ]
+    },
+    {
+      "header": "cui_disclosure.h",
+      "macro": "CUI_DISCLOSURE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_disclosure.c",
+        "src/components/cui_disclosure.c"
+      ]
+    },
+    {
+      "header": "cui_choice.h",
+      "macro": "CUI_CHOICE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_choice.c",
+        "src/components/cui_choice.c"
+      ]
+    },
+    {
+      "header": "cui_plot.h",
+      "macro": "CUI_PLOT_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_plot.c"
+      ]
+    },
+    {
+      "header": "cui.h",
+      "macro": "CUI_IMPLEMENTATION",
+      "sources": [
+        "src/core/cui.c"
+      ]
+    },
+    {
+      "header": "cui_dock.h",
+      "macro": "CUI_DOCK_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_dock.c",
+        "src/components/cui_dock.c"
+      ]
+    },
+    {
+      "header": "cui_virtual.h",
+      "macro": "CUI_VIRTUAL_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_virtual.c"
+      ]
+    },
+    {
+      "header": "cui_overlay.h",
+      "macro": "CUI_OVERLAY_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_overlay.c"
+      ]
+    },
+    {
+      "header": "cui_edit.h",
+      "macro": "CUI_EDIT_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_edit.c"
+      ]
+    },
+    {
+      "header": "cui_base.h",
+      "macro": "CUI_BASE_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_base.c",
+        "src/base/cui_models.c"
+      ]
+    },
+    {
+      "header": "cui_theme_registry.h",
+      "macro": "CUI_THEME_REGISTRY_IMPLEMENTATION",
+      "sources": [
+        "src/theme/cui_theme_registry.c"
+      ]
+    },
+    {
+      "header": "cui_theme.h",
+      "macro": "CUI_THEME_IMPLEMENTATION",
+      "sources": [
+        "src/theme/cui_theme.c",
+        "src/theme/cui_theme_motion.c"
+      ]
+    },
+    {
+      "header": "cui_components.h",
+      "macro": "CUI_COMPONENTS_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_components.c"
+      ]
+    }
+  ]
+}

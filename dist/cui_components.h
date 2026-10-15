@@ -3093,7 +3093,8 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_begin_box(ui, 0, (cui_box){.width = inset});
     cui_end_box(ui);
     cui_begin_box(ui, viewport_id,
-                  (cui_box){.width = -1,
+                  (cui_box){.width = width > 0 ? viewport_width : -1,
+                            .fixed_width = width > 0,
                             .height = metrics.line_height,
                             .fixed_height = true,
                             .clip = true,
@@ -3144,21 +3145,14 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     free(visual_selection);
     free(visual_composition);
     if (text.length) {
-        if (visual)
-            cui_text_line(ui, text, metrics.font_size, foreground, metrics.line_height,
-                          (cui_text_style){0});
-        else
-            cui_text_with_line_height(ui, text, metrics.font_size, foreground, metrics.line_height);
+        cui_text_line(ui, text, metrics.font_size, foreground, metrics.line_height,
+                      (cui_text_style){0});
     } else if (options.placeholder.length) {
         cui_color placeholder = t->muted;
         if (options.disabled)
             placeholder.a = (uint8_t)lroundf(placeholder.a * .5f);
-        if (visual)
-            cui_text_line(ui, options.placeholder, metrics.font_size, placeholder,
-                          metrics.line_height, (cui_text_style){0});
-        else
-            cui_text_with_line_height(ui, options.placeholder, metrics.font_size, placeholder,
-                                      metrics.line_height);
+        cui_text_line(ui, options.placeholder, metrics.font_size, placeholder,
+                      metrics.line_height, (cui_text_style){0});
     }
     if (focused) {
         cui_rect viewport = cui_bounds(ui, viewport_id);

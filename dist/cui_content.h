@@ -53,6 +53,9 @@ typedef struct {
     bool custom_ring, interactive, disabled;
     cui_bitmap image;
     cui_avatar_image *image_state;
+    /* Initials fallback only; flags permit explicit transparent/black colors. */
+    bool custom_background, custom_foreground;
+    cui_color background, foreground;
 } cui_avatar_options;
 /* Invalid/missing image/cache falls back to legacy initials. Returns activation
  * only when interactive; image name remains the supplied accessible name. */
@@ -604,7 +607,8 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                   .padding = photo ? ring : 0,
                   .align_x = CUI_ALIGN_CENTER,
                   .align_y = CUI_ALIGN_CENTER,
-                  .background = photo ? (o.custom_ring ? o.ring : t->surface) : t->primary,
+                  .background = photo ? (o.custom_ring ? o.ring : t->surface)
+                                      : (o.custom_background ? o.background : t->primary),
                   .border = cui_focused(ui) == id ? t->primary : t->border,
                   .border_width = photo ? 0 : 1});
     cui_interaction interaction =
@@ -623,7 +627,8 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     else {
         char initials[9];
         size_t n = cui_avatar_initials(name, initials);
-        cui_text(ui, (cui_str){initials, n}, size * .38f, t->on_primary);
+        cui_text(ui, (cui_str){initials, n}, size * .38f,
+                 o.custom_foreground ? o.foreground : t->on_primary);
     }
     cui_end_box(ui);
     size_t count;

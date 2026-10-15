@@ -14,6 +14,8 @@ typedef struct {
     const char *data;
     size_t length;
 } cui_str;
+/* String-literal initializer; expression form: (cui_str)CUI_STR("text"). */
+#define CUI_STR(literal) { "" literal, sizeof(literal) - 1 }
 /* Full paragraph plus caller-selected line, in original UTF-8 bytes.
  * Hard paragraph separators are excluded; U+2028 retains paragraph context. */
 typedef struct {
@@ -371,14 +373,14 @@ typedef struct {
     bool row, clip;
     cui_color background, border;
     float border_width;
-    cui_align align_x, align_y;
+    cui_align align_x, align_y; /* Physical horizontal/vertical axes in rows and columns. */
     float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
     cui_corner_radii corner_radii;
     cui_border_edges border_edges;
     /* Flags preserve zero corners/edges. Radii are clamped to half the shorter
      * side by adapters; border widths use the same integer layout units as
      * border_width. Negative/nonfinite box values normalize to zero. */
-    bool custom_corners, custom_border_edges;
+    bool custom_corners, custom_border_edges; /* Replace uniform radius/width, including zero. */
     /* Explicit zero dimensions; otherwise zero retains the FIT convention. */
     bool fixed_width, fixed_height;
     /* Measure/layout descendants, including portals, without paint, input or
@@ -395,6 +397,9 @@ typedef struct {
     /* Interpret the corresponding dimension as a fraction of the parent inner extent in0..1.
      * Fraction flags take precedence over fixed flags and max caps. */
     bool width_percent, height_percent;
+    /* Replace uniform padding with physical edges, including explicit zero. */
+    cui_border_edges padding_edges;
+    bool custom_padding;
 } cui_box;
 /* Borrowed straight-alpha RGBA8 pixels, valid through renderer completion.
  * Increment revision whenever pixels change; stride includes row padding. */
@@ -7737,7 +7742,12 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                 b.width_percent),
                               cui_core_box_axis(b.height, b.fixed_height, b.max_height,
                                                 b.height_percent)},
-                   .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
+                   .padding = b.custom_padding
+                                  ? (Clay_Padding){cui_core_scalar(b.padding_edges.left),
+                                                   cui_core_scalar(b.padding_edges.right),
+                                                   cui_core_scalar(b.padding_edges.top),
+                                                   cui_core_scalar(b.padding_edges.bottom)}
+                                  : CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
                    .childGap = cui_core_scalar(b.gap),
                    .childAlignment = {.x = b.align_x == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER
                                            : b.align_x == CUI_ALIGN_END  ? CLAY_ALIGN_X_RIGHT

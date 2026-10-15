@@ -23,6 +23,10 @@ typedef struct {
     /* Borrowed for this call/frame; NULL inherits the styled component's theme
      * or keeps legacy behavior in a standalone Base call. Never retained. */
     const cui_scrollbar_style *scrollbar_style;
+    /* Measure FIT content on enabled axes when the corresponding explicit
+     * content dimension is nonpositive/nonfinite. Uses preceding-frame layout;
+     * the first frame starts at zero range. Explicit dimensions always win. */
+    bool auto_measure_content;
 } cui_scroll_options;
 typedef struct {
     cui_size viewport;
@@ -426,13 +430,32 @@ bool cui_base_scrollbar_overlay(cui_context *ui, cui_id id, float *x, float *y, 
 static float cui_scroll_component_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
 }
+static cui_id cui_scroll_content_id(cui_id id) {
+    return id ^ UINT64_C(0x2ebf107b4533ddf1);
+}
+static bool cui_scroll_auto_axis(cui_scroll_options o, bool vertical) {
+    float size = vertical ? o.content_height : o.content_width;
+    return o.auto_measure_content && (vertical ? o.vertical : o.horizontal) &&
+           (!isfinite(size) || size <= 0);
+}
+static cui_scroll_options cui_scroll_measured(cui_context *ui, cui_id id, cui_scroll_options o) {
+    if (o.auto_measure_content) {
+        cui_rect measured = cui_bounds(ui, cui_scroll_content_id(id));
+        if (cui_scroll_auto_axis(o, false))
+            o.content_width = measured.w;
+        if (cui_scroll_auto_axis(o, true))
+            o.content_height = measured.h;
+    }
+    return o;
+}
 bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_scroll_state *s,
                           cui_scroll_options o) {
     if (!ui || !id || !t || !s)
         return false;
     o = cui_scroll_resolve(t, o);
-    cui_scroll_geometry g = cui_scroll_layout(o);
-    cui_base_scrollable(ui, id, s, o);
+    cui_scroll_options measured = cui_scroll_measured(ui, id, o);
+    cui_scroll_geometry g = cui_scroll_layout(measured);
+    cui_base_scrollable(ui, id, s, measured);
     cui_begin_box(ui, id,
                   (cui_box){.width = cui_scroll_component_positive(o.width, 320),
                             .height = cui_scroll_component_positive(o.height, 240),
@@ -445,10 +468,10 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
                             .offset_x = -s->x,
                             .offset_y = -s->y});
     cui_begin_box(
-        ui, 0,
-        (cui_box){.width = fmaxf(g.viewport.width,
+        ui, o.auto_measure_content ? cui_scroll_content_id(id) : 0,
+        (cui_box){.width = cui_scroll_auto_axis(o, false) ? 0 : fmaxf(g.viewport.width,
                                  cui_scroll_component_positive(o.content_width, g.viewport.width)),
-                  .height = fmaxf(g.viewport.height, cui_scroll_component_positive(
+                  .height = cui_scroll_auto_axis(o, true) ? 0 : fmaxf(g.viewport.height, cui_scroll_component_positive(
                                                          o.content_height, g.viewport.height)),
                   .row = o.content_row,
                   .gap = isfinite(o.gap) && o.gap > 0 ? o.gap : 0});
@@ -509,7 +532,7 @@ void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scr
 }
 void cui_scrollable_end(cui_context *ui, cui_id id, const cui_theme *t, const cui_scroll_state *s,
                         cui_scroll_options o) {
-    o = cui_scroll_resolve(t, o);
+    o = cui_scroll_measured(ui, id, cui_scroll_resolve(t, o));
     cui_scroll_geometry g = cui_scroll_layout(o);
     cui_end_box(ui); /* content */
     cui_end_box(ui); /* viewport */
@@ -525,7 +548,7 @@ void cui_scrollable_end_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_s
                            cui_scroll_options o) {
     if (!ui || !id || !t || !s)
         return;
-    o = cui_scroll_resolve(t, o);
+    o = cui_scroll_measured(ui, id, cui_scroll_resolve(t, o));
     cui_base_scrollable_finish(ui, id, s, o);
     cui_set_box_scroll_offset(ui, id ^ UINT64_C(0x75b21b4d3cba0f89), -s->x, -s->y);
     cui_scrollable_end(ui, id, t, s, o);

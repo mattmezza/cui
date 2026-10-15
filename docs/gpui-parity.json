@@ -355,7 +355,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Caller-owned bounded RGBA circle/cover cache, source revision updates, named initials and interactive overlapping stacks with overflow, keyboard and touch cancellation are tested. Image acquisition/loading remains host-owned; explicit failure-state transitions, custom icon slots and complete typography/theme variants remain unverified."
+        "Caller-owned bounded RGBA circle/cover cache, source revision updates, named initials and interactive overlapping stacks with overflow, keyboard and touch cancellation are tested. Explicit initials fallback foreground/background overrides are tested. Image acquisition/loading remains host-owned; explicit failure-state transitions, custom icon slots and complete typography/theme variants remain unverified."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1388,7 +1388,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "106 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
+        "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
         "Icon is decorative by default; named image semantics must currently be supplied by the caller. Dedicated accessible/decorative API remains pending."
       ],
       "owner": "integrator",
@@ -3622,7 +3622,7 @@
       },
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
-        "Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
+        "Design sizes, centered field text, unwrapped single-line placeholders in fixed/grow inputs and fixed-width viewport bounds are tested. Grow-width populated long values can still expand internal viewport bounds; use explicit widths for reliable caret/hit geometry. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
         "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Bounded single-line pattern and grouped-number formatting are tested; multiline, token and multiple-selection masks, enabled NUL separators and full content-type/lifecycle behavior remain incomplete; the optional pinned whole-value Unicode regex provider is a separately tested subset; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
         "Opt-in hidden/revealed password and new-password purposes, scalar-bullet presentation, guarded clipboard, finalized focus generations, native SDL input hints and transient secure browser proxy pass headless/native/browser tests. Actual window-blur handler clears preedit DOM data. Physical OS autofill/privacy, all content purposes and complete accessibility remain unverified; see docs/PASSWORD_INPUT_STAGE2.md."
       ],
@@ -5266,7 +5266,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Shared contact-aware precise touch scrolling, threshold/cancel handling, nested ancestor handoff and drag-priority controls have headless and Chromium touch tests. Auto-measured/grow sizing, inertial fling, auto-hide, physical-device/native-system behavior and complete family touch coverage remain pending."
+        "Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Shared contact-aware precise touch scrolling, threshold/cancel handling, nested ancestor handoff and drag-priority controls have headless and Chromium touch tests. Opt-in ordinary-content auto-measurement uses preceding-frame extents, with wrapped-height, shrink/clamp and explicit-dimension precedence tests. Grow viewports, inertial fling, auto-hide, physical-device/native-system behavior and complete family touch coverage remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

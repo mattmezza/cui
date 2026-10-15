@@ -91,6 +91,25 @@ the final check that supplied libraries are compatible Mach-O artifacts.
 Do **not** run CTest in the macOS cross-build directory on Linux: it contains
 macOS executables. Host-only tooling checks are `python tests/test_macos_cross.py`.
 Transfer the resulting executable and required dylibs to an actual compatible
-Mac for launch, font, input, rendering and deployment validation. Signing,
-notarization, universal binaries and distributable `.app` bundles remain separate
+Mac for launch, font, input, rendering and deployment validation. Developer ID signing,
+notarization, universal binaries and public distribution remain separate
 release work; a successful cross compile alone validates none of these.
+
+## Deploy on your Mac
+
+The build produces `build-macos-arm64/cui_native_starter.app`. Transfer this
+bundle and the complete **target** dependency prefix to your Mac, preserving
+symlinks (for example, with a tar archive). On the Mac, with this checkout:
+
+```sh
+cmake -DAPP=/absolute/path/cui_native_starter.app \
+  -DDEPENDENCY_PREFIX=/absolute/path/macos-prefix \
+  -P scripts/deploy_macos_bundle.cmake
+python3 tests/packaging/verify_macos_app.py /absolute/path/cui_native_starter.app
+```
+
+Deployment copies target dylibs, adjusts their install names using macOS
+tools, and applies ad-hoc development signatures. Developer ID signing is a
+separate release step. Validate away from the dependency prefix,
+then follow [Mac desktop acceptance](MACOS.md#manual-mac-acceptance). A development
+bundle is produced; public release signing/notarization remain application work.

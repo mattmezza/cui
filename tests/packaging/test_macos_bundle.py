@@ -82,6 +82,37 @@ int main(void) {{
             font.unlink()
             self.assertNotEqual(subprocess.run([str(root / 'probe')], cwd='/').returncode, 0)
 
+    @unittest.skipIf(sys.platform == 'win32', 'uses a POSIX codesign test double')
+    def test_development_signing_orders_libraries_before_bundle_and_verifies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            app = root / 'Probe.app'
+            library = app / 'Contents/MacOS/libprobe.dylib'
+            library.parent.mkdir(parents=True)
+            library.touch()
+            log = root / 'calls.txt'
+            signer = root / 'codesign'
+            signer.write_text(f'''#!/bin/sh
+printf '%s\\n' "$*" >> '{log}'
+exit 0
+''')
+            signer.chmod(0o755)
+            script = root / 'sign.cmake'
+            script.write_text(f'''set(CMAKE_HOST_APPLE TRUE)
+set(CUI_CODESIGN "{signer}")
+include("{ROOT / 'cmake/CUISignMacOS.cmake'}")
+cui_sign_macos_development_bundle("{app}")
+''')
+            result = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(log.read_text().splitlines(), [
+                f'--force --sign - {library}', f'--force --sign - {app}',
+                f'--verify --deep --strict {app}'])
+            signer.write_text('#!/bin/sh\nexit 1\n')
+            result = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Development signing failed', result.stderr)
+
     def test_cross_deployment_is_rejected(self):
         _, result = self.configure(deploy=True)
         self.assertNotEqual(result.returncode, 0)

@@ -16,13 +16,14 @@ python tests/test_native_deps.py --prefix build/native-prefix
 PKG_CONFIG_PATH="$PWD/build/native-prefix/lib/pkgconfig" \
   cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=ON
 cmake --build build
-python scripts/test_local.py --build-dir build
 ```
 
 The dependency smoke test compiles and executes a consumer of SDL, FreeType,
 HarfBuzz, and the HarfBuzz FreeType integration. It never initializes video or
-opens a window. On Linux, run CUI's full native tests through the Xvfb wrapper
-shown above. GPU checks unsupported by the virtual display remain deferred.
+opens a window. On Linux, run CUI's full native tests with
+`python scripts/test_local.py --build-dir build` (the Xvfb wrapper). On macOS,
+follow [the native Mac workflow](../../docs/MACOS.md), which enables the safe
+headless test configuration before running that wrapper. GPU checks unsupported by the virtual display remain deferred.
 
 For cross compilation, pass an absolute `CMAKE_TOOLCHAIN_FILE` path to this
 superbuild, just as for CUI. The nested configurations receive that toolchain,

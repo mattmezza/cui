@@ -45,6 +45,19 @@ class IsolatedRunner(unittest.TestCase):
                 self.assertEqual(command[0], 'ctest')
                 (build / 'CMakeCache.txt').unlink()
 
+    def test_macos_native_headless_build_never_uses_cocoa(self):
+        with tempfile.TemporaryDirectory() as directory:
+            build = Path(directory)
+            (build / 'CMakeCache.txt').write_text(
+                'CUI_BUILD_NATIVE:BOOL=ON\nCUI_HEADLESS_NATIVE_TESTS:BOOL=ON\n')
+            command, env = runner.test_invocation(
+                build, [], 'darwin', {'SDL_VIDEODRIVER': 'cocoa', 'SDL_RENDER_DRIVER': 'metal'}, lambda _: None)
+            self.assertEqual(command[0], 'ctest')
+            self.assertEqual(env['SDL_VIDEODRIVER'], 'dummy')
+            self.assertEqual(env['SDL_RENDER_DRIVER'], 'software')
+            with self.assertRaises(RuntimeError):
+                runner.test_invocation(build, [], 'win32', {}, lambda _: None)
+
 
 if __name__ == '__main__':
     unittest.main()

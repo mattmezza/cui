@@ -28,3 +28,5 @@ set `CUI_MACOS_DEPLOY_DEPENDENCIES=OFF` to manage deployment yourself.
 Cross builds require a Darwin toolchain, SDK and target dependencies. They package
 resources without executing target binaries. Dependency deployment is disabled:
 stage target dylibs, repair install names, and sign/notarize on macOS separately.
+
+Keep `CUISignMacOS.cmake` beside the bundle helper when copying the helpers; native dependency deployment applies ad-hoc development signatures after fixing library paths.

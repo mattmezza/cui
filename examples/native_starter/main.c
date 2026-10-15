@@ -91,8 +91,8 @@ int main(int argc, char **argv) {
             }
             float width, height;
             cui_sdl3_size(host, &width, &height);
-            cui_draw_list list = starter_app_frame(
-                ui, &app, width, height, cui_sdl3_frame_delta(host), &clipboard);
+            cui_draw_list list =
+                starter_app_frame(ui, &app, width, height, cui_sdl3_frame_delta(host), &clipboard);
             /* poll synchronizes IME/caret state; apply this frame's cursor immediately. */
             (void)cui_sdl3_set_cursor(host, cui_pointer_cursor(ui));
             bool painted =

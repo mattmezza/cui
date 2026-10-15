@@ -102,8 +102,8 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
         opacity = isfinite(opacity) ? fminf(1, fmaxf(0, opacity)) : 0;
         color.a = (uint8_t)(color.a * opacity);
         cui_begin_absolute_box(ui, id ^ UINT64_C(0x334af02cb941785d),
-            (cui_box){.border = color, .border_width = 1, .clip = true},
-            (cui_rect){0, 0, width, height});
+                               (cui_box){.border = color, .border_width = 1, .clip = true},
+                               (cui_rect){0, 0, width, height});
         cui_end_box(ui);
     }
     cui_end_box(ui);
@@ -161,7 +161,8 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
         if (!options.debug_placeholder)
             return CUI_ICON_NOT_FOUND;
         cui_icon_state missing = {0};
-        if (!cui_icon_set_path(&missing, cui_string("__cui_missing_debug_placeholder__"), NULL, NULL)) {
+        if (!cui_icon_set_path(&missing, cui_string("__cui_missing_debug_placeholder__"), NULL,
+                               NULL)) {
             cui_icon_error error = missing.error;
             cui_icon_state_destroy(&missing);
             return error;

@@ -15,7 +15,6 @@
 #include "cui_form.h"
 #include "cui_icon.h"
 #include "cui_label.h"
-#include "cui_text_overflow.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
@@ -28,6 +27,7 @@
 #include "cui_status.h"
 #include "cui_surface.h"
 #include "cui_table.h"
+#include "cui_text_overflow.h"
 #include "cui_text_view.h"
 #include "cui_theme.h"
 #include "cui_toolbar.h"
@@ -3156,8 +3156,8 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
         cui_color placeholder = t->muted;
         if (options.disabled)
             placeholder.a = (uint8_t)lroundf(placeholder.a * .5f);
-        cui_text_line(ui, options.placeholder, metrics.font_size, placeholder,
-                      metrics.line_height, (cui_text_style){0});
+        cui_text_line(ui, options.placeholder, metrics.font_size, placeholder, metrics.line_height,
+                      (cui_text_style){0});
     }
     if (focused) {
         cui_rect viewport = cui_bounds(ui, viewport_id);

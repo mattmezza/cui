@@ -1,7 +1,6 @@
 /* Every portable implementation, including standalone optional models. */
 #define CUI_IMPLEMENTATION_ALL
 #include "cui_all.h"
-#include "cui_all.h"
 
 int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});

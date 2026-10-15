@@ -15811,11 +15811,9 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
         return NULL;
     static const struct {
         const char *alias, *path, *canonical;
-    } aliases[] = {
-        {"filter", "icons/filter.svg", "funnel"},
-        {"trash-2", "icons/trash-2.svg", "trash"},
-        {"more-vertical", "icons/more-vertical.svg", "ellipsis-vertical"}
-    };
+    } aliases[] = {{"filter", "icons/filter.svg", "funnel"},
+                   {"trash-2", "icons/trash-2.svg", "trash"},
+                   {"more-vertical", "icons/more-vertical.svg", "ellipsis-vertical"}};
     for (size_t i = 0; i < sizeof aliases / sizeof aliases[0]; i++) {
         if (cui_icon_string_equal(name, aliases[i].alias) ||
             cui_icon_string_equal(name, aliases[i].path)) {
@@ -15831,8 +15829,9 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
 }
 cui_icon_availability cui_icon_query(cui_str name) {
     const cui_icon_asset_record *asset = cui_icon_lookup(name);
-    return !asset ? CUI_ICON_UNKNOWN
-                  : asset->svg ? CUI_ICON_EMBEDDED : CUI_ICON_CATALOG_NOT_EMBEDDED;
+    return !asset       ? CUI_ICON_UNKNOWN
+           : asset->svg ? CUI_ICON_EMBEDDED
+                        : CUI_ICON_CATALOG_NOT_EMBEDDED;
 }
 bool cui_icon_asset(cui_str name, cui_str *svg) {
     if (!svg)
@@ -16252,8 +16251,8 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
         opacity = isfinite(opacity) ? fminf(1, fmaxf(0, opacity)) : 0;
         color.a = (uint8_t)(color.a * opacity);
         cui_begin_absolute_box(ui, id ^ UINT64_C(0x334af02cb941785d),
-            (cui_box){.border = color, .border_width = 1, .clip = true},
-            (cui_rect){0, 0, width, height});
+                               (cui_box){.border = color, .border_width = 1, .clip = true},
+                               (cui_rect){0, 0, width, height});
         cui_end_box(ui);
     }
     cui_end_box(ui);
@@ -16311,7 +16310,8 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
         if (!options.debug_placeholder)
             return CUI_ICON_NOT_FOUND;
         cui_icon_state missing = {0};
-        if (!cui_icon_set_path(&missing, cui_string("__cui_missing_debug_placeholder__"), NULL, NULL)) {
+        if (!cui_icon_set_path(&missing, cui_string("__cui_missing_debug_placeholder__"), NULL,
+                               NULL)) {
             cui_icon_error error = missing.error;
             cui_icon_state_destroy(&missing);
             return error;

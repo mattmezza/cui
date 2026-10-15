@@ -224,12 +224,13 @@ void cui_report_diagnostic(cui_context *ui, const cui_diagnostic *source) {
     d.subsystem[CUI_DIAGNOSTIC_SUBSYSTEM_MAX - 1] = 0;
     d.frame_sequence = ui->frame_sequence;
     if (!d.message[0]) {
-        const char *message = d.error == CUI_ERROR_CAPACITY       ? "Capacity exceeded"
-                              : d.error == CUI_ERROR_DUPLICATE_ID ? "Duplicate element identity"
-                              : d.error == CUI_ERROR_LIFECYCLE
-                                  ? "Invalid operation or unbalanced scope"
-                              : d.error == CUI_ERROR_LAYOUT ? "Layout resolution failed"
-                                                            : "Invalid action";
+        const char *message =
+            d.detail == CUI_DIAGNOSTIC_ZERO_ID  ? "This operation requires a nonzero ID"
+            : d.error == CUI_ERROR_CAPACITY     ? "Capacity exceeded"
+            : d.error == CUI_ERROR_DUPLICATE_ID ? "Duplicate element identity"
+            : d.error == CUI_ERROR_LIFECYCLE    ? "Invalid operation or unbalanced scope"
+            : d.error == CUI_ERROR_LAYOUT       ? "Layout resolution failed"
+                                                : "Invalid action";
         snprintf(d.message, sizeof d.message, "%s", message);
     }
     if (!d.subsystem[0])

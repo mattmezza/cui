@@ -46,6 +46,7 @@ static void zero_ids(cui_context *ui) {
         cui_diagnostic diagnostic;
         assert(cui_latest_diagnostic(ui, &diagnostic));
         assert(diagnostic.detail == CUI_DIAGNOSTIC_ZERO_ID);
+        assert(strstr(diagnostic.message, "nonzero ID"));
         assert(!strcmp(diagnostic.operation, "cui_avatar"));
         assert(cui_last_error(ui) == CUI_ERROR_INVALID_ACTION);
         cui_clear_error(ui);

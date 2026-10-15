@@ -46,9 +46,10 @@ static cui_draw_list scene(cui_context *ui, cui_icon_state *state, cui_icon_opti
 }
 static void test_assets(void) {
     assert(cui_icon_catalog_count() == 1830);
-    const char *essential[] = {"pencil", "pen-line", "funnel", "filter", "archive",
-        "trash-2", "mail", "more-vertical", "paperclip", "send", "reply", "reply-all",
-        "forward", "download", "upload", "link", "log-out", "check-check"};
+    const char *essential[] = {"pencil",  "pen-line",  "funnel",        "filter",    "archive",
+                               "trash-2", "mail",      "more-vertical", "paperclip", "send",
+                               "reply",   "reply-all", "forward",       "download",  "upload",
+                               "link",    "log-out",   "check-check"};
     for (size_t i = 0; i < sizeof essential / sizeof essential[0]; i++) {
         cui_icon_state icon = {0};
         assert(cui_icon_set_name(&icon, cui_string(essential[i]), NULL, NULL));

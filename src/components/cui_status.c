@@ -228,7 +228,9 @@ bool cui_begin_tag(cui_context *ui, cui_id id, const cui_theme *t, cui_tag_optio
     cui_tag_style s;
     if (ui && !id) {
         cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
-            .detail = CUI_DIAGNOSTIC_ZERO_ID, .operation = "cui_begin_tag", .id = id};
+                                     .detail = CUI_DIAGNOSTIC_ZERO_ID,
+                                     .operation = "cui_begin_tag",
+                                     .id = id};
         cui_report_diagnostic(ui, &diagnostic);
         return false;
     }

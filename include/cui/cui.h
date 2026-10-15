@@ -14,7 +14,7 @@ typedef struct {
     size_t length;
 } cui_str;
 /* String-literal initializer; expression form: (cui_str)CUI_STR("text"). */
-#define CUI_STR(literal) { "" literal, sizeof(literal) - 1 }
+#define CUI_STR(literal) {"" literal, sizeof(literal) - 1}
 /* Full paragraph plus caller-selected line, in original UTF-8 bytes.
  * Hard paragraph separators are excluded; U+2028 retains paragraph context. */
 typedef struct {
@@ -423,7 +423,7 @@ typedef struct {
     cui_color background, border;
     float border_width;
     cui_align align_x, align_y; /* Physical horizontal/vertical axes in rows and columns. */
-    float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
+    float offset_x, offset_y;   /* Child translation in clipped boxes; negative scrolls forward. */
     cui_corner_radii corner_radii;
     cui_border_edges border_edges;
     /* Flags preserve zero corners/edges. Radii are clamped to half the shorter

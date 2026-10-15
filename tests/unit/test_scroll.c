@@ -781,8 +781,11 @@ static void auto_content(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
     cui_theme theme = cui_theme_light();
     cui_scroll_state state = {0};
-    cui_scroll_options options = {.width = 200, .height = 100, .vertical = true,
-                                  .hide_scrollbars = true, .auto_measure_content = true};
+    cui_scroll_options options = {.width = 200,
+                                  .height = 100,
+                                  .vertical = true,
+                                  .hide_scrollbars = true,
+                                  .auto_measure_content = true};
     assert(ui);
     scene(ui, &theme, &state, options);
     state.y = 1000;
@@ -814,10 +817,11 @@ static void auto_content(void) {
             state.y = 1000;
         assert(cui_scrollable_begin(ui, 1, &theme, &state, options));
         cui_begin_box(ui, 100, (cui_box){.width = -1});
-        cui_text(ui, cui_string("one two three four five six seven eight nine ten "
-                                "one two three four five six seven eight nine ten "
-                                "one two three four five six seven eight nine ten"),
-                  20, (cui_color){255, 255, 255, 255});
+        cui_text(ui,
+                 cui_string("one two three four five six seven eight nine ten "
+                            "one two three four five six seven eight nine ten "
+                            "one two three four five six seven eight nine ten"),
+                 20, (cui_color){255, 255, 255, 255});
         cui_end_box(ui);
         cui_scrollable_end_ex(ui, 1, &theme, &state, options);
         cui_end_frame(ui);

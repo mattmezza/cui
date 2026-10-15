@@ -7,5 +7,5 @@
 #include "cui_components.h"
 
 /* Re-including implementation headers must also remain harmless. */
-#include "cui_components.h"
 #include "consumer.c"
+#include "cui_components.h"

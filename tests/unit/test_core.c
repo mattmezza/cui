@@ -800,8 +800,9 @@ static void test_padding_and_literal(void) {
     cui_context *ui = make();
     for (int custom = 0; custom < 2; custom++) {
         begin(ui);
-        cui_begin_box(ui, 10, (cui_box){.padding = 9, .custom_padding = custom,
-                                      .padding_edges = {0, 7, 3, 11}});
+        cui_begin_box(
+            ui, 10,
+            (cui_box){.padding = 9, .custom_padding = custom, .padding_edges = {0, 7, 3, 11}});
         cui_begin_box(ui, 11, (cui_box){.width = 20, .height = 10});
         cui_end_box(ui);
         cui_end_box(ui);
@@ -812,8 +813,8 @@ static void test_padding_and_literal(void) {
         assert(cui_last_error(ui) == CUI_OK);
     }
     begin(ui);
-    cui_begin_box(ui, 10, (cui_box){.custom_padding = true,
-                                  .padding_edges = {-1, NAN, INFINITY, 0}});
+    cui_begin_box(ui, 10,
+                  (cui_box){.custom_padding = true, .padding_edges = {-1, NAN, INFINITY, 0}});
     cui_begin_box(ui, 11, (cui_box){.width = 20, .height = 10});
     cui_end_box(ui);
     cui_end_box(ui);

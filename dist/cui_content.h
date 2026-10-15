@@ -524,7 +524,9 @@ void cui_avatar(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
         return;
     if (!id) {
         cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
-            .detail = CUI_DIAGNOSTIC_ZERO_ID, .operation = "cui_avatar", .id = id};
+                                     .detail = CUI_DIAGNOSTIC_ZERO_ID,
+                                     .operation = "cui_avatar",
+                                     .id = id};
         cui_report_diagnostic(ui, &diagnostic);
         return;
     }
@@ -603,27 +605,28 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         return false;
     if (!id) {
         cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
-            .detail = CUI_DIAGNOSTIC_ZERO_ID, .operation = "cui_avatar_ex", .id = id};
+                                     .detail = CUI_DIAGNOSTIC_ZERO_ID,
+                                     .operation = "cui_avatar_ex",
+                                     .id = id};
         cui_report_diagnostic(ui, &diagnostic);
         return false;
     }
     float size = fminf(cui_content_positive(o.size, 48), 512);
     float ring = isfinite(o.ring_width) ? fmaxf(0, fminf(o.ring_width, size * .25f)) : 0;
     bool photo = o.image_state && cui_avatar_image_prepare(o.image_state, o.image);
-    cui_begin_box(
-        ui, id,
-        (cui_box){.width = size,
-                  .height = size,
-                  .fixed_width = true,
-                  .fixed_height = true,
-                  .radius = size * .5f,
-                  .padding = photo ? ring : 0,
-                  .align_x = CUI_ALIGN_CENTER,
-                  .align_y = CUI_ALIGN_CENTER,
-                  .background = photo ? (o.custom_ring ? o.ring : t->surface)
-                                      : (o.custom_background ? o.background : t->primary),
-                  .border = cui_focused(ui) == id ? t->primary : t->border,
-                  .border_width = photo ? 0 : 1});
+    cui_begin_box(ui, id,
+                  (cui_box){.width = size,
+                            .height = size,
+                            .fixed_width = true,
+                            .fixed_height = true,
+                            .radius = size * .5f,
+                            .padding = photo ? ring : 0,
+                            .align_x = CUI_ALIGN_CENTER,
+                            .align_y = CUI_ALIGN_CENTER,
+                            .background = photo ? (o.custom_ring ? o.ring : t->surface)
+                                                : (o.custom_background ? o.background : t->primary),
+                            .border = cui_focused(ui) == id ? t->primary : t->border,
+                            .border_width = photo ? 0 : 1});
     cui_interaction interaction =
         cui_interact(ui, id, o.interactive ? CUI_ROLE_BUTTON : CUI_ROLE_IMAGE,
                      name.length ? name : cui_string("Anonymous"), o.disabled, false, 0);

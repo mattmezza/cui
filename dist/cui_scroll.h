@@ -469,12 +469,17 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
                             .offset_y = -s->y});
     cui_begin_box(
         ui, o.auto_measure_content ? cui_scroll_content_id(id) : 0,
-        (cui_box){.width = cui_scroll_auto_axis(o, false) ? 0 : fmaxf(g.viewport.width,
+        (cui_box){
+            .width = cui_scroll_auto_axis(o, false)
+                         ? 0
+                         : fmaxf(g.viewport.width,
                                  cui_scroll_component_positive(o.content_width, g.viewport.width)),
-                  .height = cui_scroll_auto_axis(o, true) ? 0 : fmaxf(g.viewport.height, cui_scroll_component_positive(
+            .height = cui_scroll_auto_axis(o, true)
+                          ? 0
+                          : fmaxf(g.viewport.height, cui_scroll_component_positive(
                                                          o.content_height, g.viewport.height)),
-                  .row = o.content_row,
-                  .gap = isfinite(o.gap) && o.gap > 0 ? o.gap : 0});
+            .row = o.content_row,
+            .gap = isfinite(o.gap) && o.gap > 0 ? o.gap : 0});
     return true;
 }
 void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scroll_state *s,

@@ -413,8 +413,11 @@ static void image_avatars(void) {
     assert(cui_begin_frame(ui, 100, 100, .016f));
     const cui_color background = {17, 39, 61, 255}, foreground = {219, 211, 203, 255};
     cui_avatar_ex(ui, 4000, &t, cui_string("Sam Patel"),
-                  (cui_avatar_options){.size = 40, .custom_background = true,
-                      .custom_foreground = true, .background = background, .foreground = foreground});
+                  (cui_avatar_options){.size = 40,
+                                       .custom_background = true,
+                                       .custom_foreground = true,
+                                       .background = background,
+                                       .foreground = foreground});
     draw = cui_end_frame(ui);
     bool initials = false, surface = false;
     for (size_t i = 0; i < draw.count; i++) {

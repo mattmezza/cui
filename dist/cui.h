@@ -15,7 +15,7 @@ typedef struct {
     size_t length;
 } cui_str;
 /* String-literal initializer; expression form: (cui_str)CUI_STR("text"). */
-#define CUI_STR(literal) { "" literal, sizeof(literal) - 1 }
+#define CUI_STR(literal) {"" literal, sizeof(literal) - 1}
 /* Full paragraph plus caller-selected line, in original UTF-8 bytes.
  * Hard paragraph separators are excluded; U+2028 retains paragraph context. */
 typedef struct {
@@ -71,8 +71,10 @@ typedef struct {
     size_t path_count;
     bool path_truncated;
 } cui_diagnostic;
-/* Callback receives a borrowed snapshot; mutating/reentrant calls are rejected.
- * Query snapshots only; callbacks must not destroy or otherwise reenter a host. */
+/* Callback receives a borrowed snapshot. first/latest_diagnostic, last_error,
+ * frame_active and other pure getters are safe. Context mutations (including
+ * destroy, begin/end_frame, resource_find and report) are rejected during it.
+ * Do not reenter host callbacks or retain the borrowed pointer. */
 typedef void (*cui_diagnostic_fn)(void *, const cui_diagnostic *);
 void cui_set_diagnostic_callback(cui_context *, cui_diagnostic_fn, void *user);
 bool cui_first_diagnostic(const cui_context *, cui_diagnostic *out);
@@ -82,7 +84,9 @@ void cui_report_diagnostic(cui_context *, const cui_diagnostic *);
 typedef enum { CUI_DEBUG_LAYOUT_TEXT, CUI_DEBUG_LAYOUT_JSON } cui_debug_layout_format;
 /* Opt in before composition. Exports box nodes only, after end_frame and before
  * the next begin_frame. required includes NUL; insufficient buffers are untouched.
- * IDs are JSON strings to preserve all 64 bits. No allocation or file I/O. */
+ * IDs are JSON strings to preserve all 64 bits. Requested dimensions retain
+ * fixed/percent flags and maxima; nonfinite requests export as null. Bounds and
+ * clips are resolved geometry. No allocation, file I/O or locale mutation. */
 void cui_set_layout_debug(cui_context *, bool enabled);
 bool cui_debug_layout_export(cui_context *, cui_debug_layout_format, char *buffer, size_t capacity,
                              size_t *required);
@@ -420,7 +424,7 @@ typedef struct {
     cui_color background, border;
     float border_width;
     cui_align align_x, align_y; /* Physical horizontal/vertical axes in rows and columns. */
-    float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
+    float offset_x, offset_y;   /* Child translation in clipped boxes; negative scrolls forward. */
     cui_corner_radii corner_radii;
     cui_border_edges border_edges;
     /* Flags preserve zero corners/edges. Radii are clamped to half the shorter
@@ -989,6 +993,7 @@ static inline bool cui_inset_shadow_bounds_checked(cui_inset_shadow_paint p, cui
 #include <float.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <locale.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6078,7 +6083,9 @@ typedef struct {
     uint32_t clay_id;
     cui_id id;
     size_t parent, focus_scope;
-    float requested_width, requested_height;
+    float requested_width, requested_height, requested_max_width, requested_max_height;
+    bool requested_fixed_width, requested_fixed_height, requested_width_percent,
+        requested_height_percent;
     bool hover_hitbox;
     size_t prepaint;
     bool clip, layout_only, inert;
@@ -6264,12 +6271,13 @@ void cui_report_diagnostic(cui_context *ui, const cui_diagnostic *source) {
     d.subsystem[CUI_DIAGNOSTIC_SUBSYSTEM_MAX - 1] = 0;
     d.frame_sequence = ui->frame_sequence;
     if (!d.message[0]) {
-        const char *message = d.error == CUI_ERROR_CAPACITY       ? "Capacity exceeded"
-                              : d.error == CUI_ERROR_DUPLICATE_ID ? "Duplicate element identity"
-                              : d.error == CUI_ERROR_LIFECYCLE
-                                  ? "Invalid operation or unbalanced scope"
-                              : d.error == CUI_ERROR_LAYOUT ? "Layout resolution failed"
-                                                            : "Invalid action";
+        const char *message =
+            d.detail == CUI_DIAGNOSTIC_ZERO_ID  ? "This operation requires a nonzero ID"
+            : d.error == CUI_ERROR_CAPACITY     ? "Capacity exceeded"
+            : d.error == CUI_ERROR_DUPLICATE_ID ? "Duplicate element identity"
+            : d.error == CUI_ERROR_LIFECYCLE    ? "Invalid operation or unbalanced scope"
+            : d.error == CUI_ERROR_LAYOUT       ? "Layout resolution failed"
+                                                : "Invalid action";
         snprintf(d.message, sizeof d.message, "%s", message);
     }
     if (!d.subsystem[0])
@@ -6347,7 +6355,7 @@ static bool cui_core_mutation(cui_context *ui) {
         cui_core_fail(cui_core_paint_context, CUI_ERROR_LIFECYCLE);
         return false;
     }
-    if (ui && ui->prepainting) {
+    if (ui && (ui->prepainting || ui->measuring_depth)) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
         return false;
     }
@@ -6356,7 +6364,9 @@ static bool cui_core_mutation(cui_context *ui) {
 static bool cui_core_active(cui_context *ui) {
     if (!ui)
         return false;
-    if (!cui_core_mutation(ui) || !ui->in_frame) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui->in_frame) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
         return false;
     }
@@ -6450,8 +6460,10 @@ cui_text_layout_status cui_get_text_geometry_line(cui_context *ui, cui_text_line
         return CUI_TEXT_LAYOUT_UNAVAILABLE;
     }
     cui_text_geometry result = {0};
+    ++ui->measuring_depth;
     cui_text_layout_status status = ui->config.text_geometry_line(
         ui->config.measure_user, source, fminf(size, 65535), style, &result);
+    --ui->measuring_depth;
     if (status != CUI_TEXT_LAYOUT_OK) {
         cui_release_text_geometry(&result);
         return status;
@@ -6482,8 +6494,10 @@ cui_text_layout_status cui_get_text_geometry(cui_context *ui, cui_str text, floa
     if (!ui->config.text_geometry)
         return CUI_TEXT_LAYOUT_UNAVAILABLE;
     cui_text_geometry result = {0};
+    ++ui->measuring_depth;
     cui_text_layout_status status =
         ui->config.text_geometry(ui->config.measure_user, text, fminf(size, 65535), style, &result);
+    --ui->measuring_depth;
     if (status != CUI_TEXT_LAYOUT_OK) {
         cui_release_text_geometry(&result);
         return status;
@@ -6503,10 +6517,14 @@ bool cui_measure_font_metrics(cui_context *ui, float size, cui_text_style style,
         !cui_core_text_style_valid(style))
         return false;
     cui_font_metrics result = {0};
-    if (!ui->config.font_metrics(ui->config.measure_user, fminf(size, 65535), style, &result) ||
-        !isfinite(result.ascent) || !isfinite(result.descent) || !isfinite(result.line_height) ||
-        result.ascent < 0 || result.descent < 0 || result.line_height <= 0 ||
-        result.ascent + result.descent <= 0 || !isfinite(result.ascent + result.descent))
+    ++ui->measuring_depth;
+    bool measured =
+        ui->config.font_metrics(ui->config.measure_user, fminf(size, 65535), style, &result);
+    --ui->measuring_depth;
+    if (!measured || !isfinite(result.ascent) || !isfinite(result.descent) ||
+        !isfinite(result.line_height) || result.ascent < 0 || result.descent < 0 ||
+        result.line_height <= 0 || result.ascent + result.descent <= 0 ||
+        !isfinite(result.ascent + result.descent))
         return false;
     *out = result;
     return true;
@@ -7858,6 +7876,12 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     ui->nodes[ui->node_count] = (cui_core_box_node){
         .requested_width = b.width,
         .requested_height = b.height,
+        .requested_max_width = b.max_width,
+        .requested_max_height = b.max_height,
+        .requested_fixed_width = b.fixed_width,
+        .requested_fixed_height = b.fixed_height,
+        .requested_width_percent = b.width_percent,
+        .requested_height_percent = b.height_percent,
         .clay_id = internal_id,
         .id = id,
         .parent = parent,
@@ -9282,9 +9306,22 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         return (cui_draw_list){0};
     ui->layout_debug_ready = false;
     ui->resolving_layout = true;
-    if (ui->depth || ui->overflow_depth || ui->scope_count || ui->focus_depth)
-        cui_core_detail(ui, CUI_ERROR_LIFECYCLE, CUI_DIAGNOSTIC_UNBALANCED_SCOPE, __func__, 0,
-                        ui->depth, 0, 0);
+    const size_t unbalanced_counts[] = {ui->depth + ui->overflow_depth, ui->scope_count,
+                                        ui->focus_depth, ui->tab_depth};
+    const char *unbalanced_names[] = {"box scopes", "ID scopes", "focus scopes", "tab groups"};
+    for (size_t i = 0; i < 4; ++i) {
+        if (!unbalanced_counts[i])
+            continue;
+        cui_diagnostic d = {.error = CUI_ERROR_LIFECYCLE,
+                            .detail = CUI_DIAGNOSTIC_UNBALANCED_SCOPE,
+                            .used = unbalanced_counts[i]};
+        if (i == 2)
+            d.id = ui->focus_scopes[ui->focus_stack[ui->focus_depth - 1]].id;
+        snprintf(d.operation, sizeof d.operation, "%s", __func__);
+        snprintf(d.subsystem, sizeof d.subsystem, "%s", unbalanced_names[i]);
+        snprintf(d.message, sizeof d.message, "Unclosed %s at end_frame", unbalanced_names[i]);
+        cui_report_diagnostic(ui, &d);
+    }
     ui->overflow_depth = 0;
     while (ui->depth)
         cui_end_box(ui);
@@ -9901,7 +9938,7 @@ void cui_invalidate(cui_context *ui) {
 }
 
 void *cui_resource_find(cui_context *ui, cui_id owner, cui_id namespace_id) {
-    if (!ui || !ui->in_frame || !owner || !namespace_id)
+    if (!ui || !ui->in_frame || !owner || !namespace_id || ui->reporting_diagnostic)
         return NULL;
     for (size_t i = 0; i < ui->config.max_resources; i++) {
         cui_core_resource *resource = &ui->resources[i];
@@ -10742,10 +10779,20 @@ void cui_set_layout_debug(cui_context *ui, bool enabled) {
 }
 /* Locale-independent JSON numbers without changing process locale. */
 static void cui_core_debug_number(char out[48], float value) {
-    snprintf(out, 48, "%.9g", (double)(isfinite(value) ? value : 0));
-    for (char *p = out; *p; ++p)
-        if (*p == ',')
-            *p = '.';
+    if (!isfinite(value)) {
+        snprintf(out, 48, "%s", "null");
+        return;
+    }
+    snprintf(out, 48, "%.9g", (double)value);
+    const char *decimal = localeconv()->decimal_point;
+    if (decimal && decimal[0] && strcmp(decimal, ".")) {
+        char *point = strstr(out, decimal);
+        if (point) {
+            size_t length = strlen(decimal);
+            *point = '.';
+            memmove(point + 1, point + length, strlen(point + length) + 1);
+        }
+    }
 }
 bool cui_debug_layout_export(cui_context *ui, cui_debug_layout_format format, char *buffer,
                              size_t capacity, size_t *required) {
@@ -10766,11 +10813,20 @@ bool cui_debug_layout_export(cui_context *ui, cui_debug_layout_format format, ch
         for (size_t i = 0; i < ui->node_count; ++i) {
             const cui_core_box_node *n = &ui->nodes[i];
             const cui_core_geometry *g = &ui->geometry[i];
-            char numbers[10][48], row[1024];
-            float values[] = {g->bounds.x,        g->bounds.y,        g->bounds.w, g->bounds.h,
-                              g->clip.x,          g->clip.y,          g->clip.w,   g->clip.h,
-                              n->requested_width, n->requested_height};
-            for (size_t k = 0; k < 10; ++k)
+            char numbers[12][48], row[1400];
+            float values[] = {g->bounds.x,
+                              g->bounds.y,
+                              g->bounds.w,
+                              g->bounds.h,
+                              g->clip.x,
+                              g->clip.y,
+                              g->clip.w,
+                              g->clip.h,
+                              n->requested_width,
+                              n->requested_height,
+                              n->requested_max_width,
+                              n->requested_max_height};
+            for (size_t k = 0; k < 12; ++k)
                 cui_core_debug_number(numbers[k], values[k]);
             int count;
             if (format == CUI_DEBUG_LAYOUT_JSON) {
@@ -10782,18 +10838,27 @@ bool cui_debug_layout_export(cui_context *ui, cui_debug_layout_format format, ch
                 count = snprintf(row, sizeof row,
                                  "%s{\"index\":%zu,\"id\":\"%" PRIu64 "\",\"parent\":%s,"
                                  "\"bounds\":[%s,%s,%s,%s],\"clip\":[%s,%s,%s,%s],"
-                                 "\"requested\":[%s,%s],\"clips\":%s,\"found\":%s}\n",
+                                 "\"requested\":[%s,%s],\"max\":[%s,%s],"
+                                 "\"fixed\":[%s,%s],\"percent\":[%s,%s],"
+                                 "\"clips\":%s,\"found\":%s}\n",
                                  i ? "," : "", i, (uint64_t)n->id, parent, numbers[0], numbers[1],
                                  numbers[2], numbers[3], numbers[4], numbers[5], numbers[6],
-                                 numbers[7], numbers[8], numbers[9], n->clip ? "true" : "false",
-                                 g->found ? "true" : "false");
+                                 numbers[7], numbers[8], numbers[9], numbers[10], numbers[11],
+                                 n->requested_fixed_width ? "true" : "false",
+                                 n->requested_fixed_height ? "true" : "false",
+                                 n->requested_width_percent ? "true" : "false",
+                                 n->requested_height_percent ? "true" : "false",
+                                 n->clip ? "true" : "false", g->found ? "true" : "false");
             } else {
-                count = snprintf(row, sizeof row,
-                                 "box %zu id=%" PRIu64 " parent=%zu bounds=[%s,%s,%s,%s] "
-                                 "clip=[%s,%s,%s,%s] requested=[%s,%s] clips=%d found=%d\n",
-                                 i, (uint64_t)n->id, n->parent, numbers[0], numbers[1], numbers[2],
-                                 numbers[3], numbers[4], numbers[5], numbers[6], numbers[7],
-                                 numbers[8], numbers[9], n->clip, g->found);
+                count = snprintf(
+                    row, sizeof row,
+                    "box %zu id=%" PRIu64 " parent=%zu bounds=[%s,%s,%s,%s] "
+                    "clip=[%s,%s,%s,%s] requested=[%s,%s] max=[%s,%s] "
+                    "fixed=[%d,%d] percent=[%d,%d] clips=%d found=%d\n",
+                    i, (uint64_t)n->id, n->parent, numbers[0], numbers[1], numbers[2], numbers[3],
+                    numbers[4], numbers[5], numbers[6], numbers[7], numbers[8], numbers[9],
+                    numbers[10], numbers[11], n->requested_fixed_width, n->requested_fixed_height,
+                    n->requested_width_percent, n->requested_height_percent, n->clip, g->found);
             }
             if (count < 0 || (size_t)count >= sizeof row || (size_t)count > SIZE_MAX - offset)
                 return false;

@@ -172,11 +172,9 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
         return NULL;
     static const struct {
         const char *alias, *path, *canonical;
-    } aliases[] = {
-        {"filter", "icons/filter.svg", "funnel"},
-        {"trash-2", "icons/trash-2.svg", "trash"},
-        {"more-vertical", "icons/more-vertical.svg", "ellipsis-vertical"}
-    };
+    } aliases[] = {{"filter", "icons/filter.svg", "funnel"},
+                   {"trash-2", "icons/trash-2.svg", "trash"},
+                   {"more-vertical", "icons/more-vertical.svg", "ellipsis-vertical"}};
     for (size_t i = 0; i < sizeof aliases / sizeof aliases[0]; i++) {
         if (cui_icon_string_equal(name, aliases[i].alias) ||
             cui_icon_string_equal(name, aliases[i].path)) {
@@ -192,8 +190,9 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
 }
 cui_icon_availability cui_icon_query(cui_str name) {
     const cui_icon_asset_record *asset = cui_icon_lookup(name);
-    return !asset ? CUI_ICON_UNKNOWN
-                  : asset->svg ? CUI_ICON_EMBEDDED : CUI_ICON_CATALOG_NOT_EMBEDDED;
+    return !asset       ? CUI_ICON_UNKNOWN
+           : asset->svg ? CUI_ICON_EMBEDDED
+                        : CUI_ICON_CATALOG_NOT_EMBEDDED;
 }
 bool cui_icon_asset(cui_str name, cui_str *svg) {
     if (!svg)

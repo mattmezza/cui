@@ -6,14 +6,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def embedded_names(archive):
+    """Single source for the default C bundle and website availability labels."""
+    return set(archive["default_names"]) | {"pencil", "pen-line", "funnel", "archive", "trash", "mail",
+        "mail-open", "paperclip", "send", "reply", "reply-all", "forward", "download", "upload",
+        "link", "log-out", "check-check"}
+
+
 def generate():
     archive = json.loads((ROOT / "third_party/gpui_icons/icons.json").read_text())
     names = sorted(archive["icons"])
-    defaults = set(archive["default_names"])
-    # Application essentials from the same pinned archive; never fetch assets.
-    defaults.update({"pencil", "pen-line", "funnel", "archive", "trash", "mail",
-                     "mail-open", "paperclip", "send", "reply", "reply-all", "forward",
-                     "download", "upload", "link", "log-out", "check-check"})
+    defaults = embedded_names(archive)
     missing = defaults.difference(names)
     if missing:
         raise ValueError(f"Unknown default icons: {sorted(missing)}")

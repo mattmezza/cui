@@ -1,6 +1,8 @@
 # Build your first native CUI app
 
-For the smallest standalone build, use the **native source bundle**. Given a C11
+For the smallest standalone build, use the **native source bundle**.
+[Download the archive](https://matteo.merola.co/cui/downloads/cui-native.tar.gz)
+and its [SHA-256 checksum](https://matteo.merola.co/cui/downloads/cui-native.tar.gz.sha256). Given a C11
 compiler, GNU Make, `ar`, pkg-config, SDL3 >= 3.2, FreeType and HarfBuzz development
 packages, unpack it and run:
 

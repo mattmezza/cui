@@ -73,3 +73,9 @@ prefix/ellipsis are shaped separately. The helper does not provide paragraph
 reflow, font fallback, or contextual shaping across the ellipsis boundary.
 Check its boolean result and the context diagnostic after submission. Give each
 repeated row a persistent ID scope as described in [IDs and lifetimes](IDS_AND_LIFETIMES.md).
+
+![Native constrained subject rows with fixed star actions and a deliberate missing-icon outline](screenshots/developer-usability.png)
+
+A real SDL3 software capture of an external application using these APIs.
+The [evaluation record](validation/developer-usability-agent.md) contains its
+source and observed limits; it is a correctness smoke test, not a blind usability study.

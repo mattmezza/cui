@@ -49,6 +49,60 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(DOCS.website_text('cui_begin_frame(ui, width, height, dt);'),
                          'cui_begin_frame(ui, width, height, dt);')
 
+    def test_versioned_exports_headers_tasks_and_history(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'docs').mkdir()
+            (root / 'include/cui').mkdir(parents=True)
+            (root / 'README.md').write_text('# Start\n\nBuild a C11 application.\n')
+            (root / 'docs/LAYOUT_GUIDE.md').write_text('# Layout\n\nConstrain long text beside a fixed star.\n')
+            (root / 'docs/NIGHTLY_REPORT.md').write_text('# Historical nightly\n\nObsolete experiment.\n')
+            header = root / 'include/cui/cui.h'
+            header.write_text('typedef void (*cui_callback)(int);\n/* description */\nbool cui_begin_frame(cui_context *ui, float w, float h, float dt);\n')
+            output = root / 'output'
+            pages = DOCS.build(root, output, 'web-default-icons')
+            info = json.loads((output / 'build-info.json').read_text())
+            self.assertEqual(info['build_profile'], 'web-default-icons')
+            self.assertEqual(info['headers_sha256']['include/cui/cui.h'], hashlib.sha256(header.read_bytes()).hexdigest())
+            self.assertEqual((output / 'headers/cui.h').read_bytes(), header.read_bytes())
+            symbols = json.loads((output / 'api-index.json').read_text())['symbols']
+            self.assertEqual([symbol['name'] for symbol in symbols], ['cui_begin_frame'])
+            self.assertIn('cui_context *ui', symbols[0]['declaration'])
+            self.assertIn('fixed star', (output / 'tasks/layout.md').read_text())
+            self.assertNotIn('Obsolete experiment', (output / 'llms-full.txt').read_text())
+            self.assertNotIn('Historical nightly', (output / 'llms.txt').read_text())
+            self.assertIn('Historical nightly', (output / 'docs-index.md').read_text())
+            self.assertTrue(next(page for page in pages if page['slug'] == 'nightly_report')['historical'])
+            layout = next(page for page in pages if page['title'] == 'Layout')
+            self.assertIn('star disappeared', layout['keywords'])
+            self.assertEqual(layout['markdown'], './markdown/docs/LAYOUT_GUIDE.md')
+
+    def test_canonical_application_snippets_compile(self):
+        import os
+        import re
+        import shlex
+        import shutil
+        import subprocess
+        compiler = shlex.split(os.environ.get('CC', 'cc'))
+        if not compiler or not shutil.which(compiler[0]):
+            self.skipTest('A C11 compiler is required for documentation compilation')
+        layout = (ROOT / 'docs/LAYOUT_GUIDE.md').read_text()
+        recipes = (ROOT / 'docs/APP_RECIPES.md').read_text()
+        snippets = re.findall(r'```c\n(.*?)```', layout, re.S)
+        self.assertGreaterEqual(len(snippets), 2)
+        sidebar = re.findall(r'```c\n(.*?)```', recipes, re.S)[0]
+        prefix = '#include "cui/cui_components.h"\n#include "cui/cui_sidebar.h"\n'
+        sources = [prefix + 'void doc_example(cui_context *ui, const cui_theme *theme, cui_str subject) {\n(void)theme; (void)subject;\n' + snippet + '\n}\n' for snippet in snippets]
+        sources.append(prefix + sidebar + '\nvoid callback_contract(void) { cui_sidebar_content_fn fn = folder_label; (void)fn; }\n')
+        with tempfile.TemporaryDirectory() as directory:
+            for index, source in enumerate(sources):
+                path = Path(directory) / f'example_{index}.c'
+                path.write_text(source)
+                result = subprocess.run([*compiler, '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+                    '-fsyntax-only', '-I' + str(ROOT / 'include'), str(path)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_render_links_and_assets(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'repo'
@@ -111,7 +165,7 @@ if (x < 2) puts("<script>");
             pages = DOCS.build(ROOT, Path(directory))
             sources = {p['source'] for p in pages}
             for path in (ROOT / 'docs').rglob('*.md'):
-                self.assertIn(DOCS.REPOSITORY + path.relative_to(ROOT).as_posix(), sources)
+                self.assertIn(DOCS.REPOSITORY.replace('/main/', '/' + DOCS.source_revision(ROOT) + '/') + path.relative_to(ROOT).as_posix(), sources)
             self.assertIn('getting-started', {p['slug'] for p in pages})
             self.assertTrue({'start-here', 'ai-agents', 'immediate-and-state'} <= {p['slug'] for p in pages})
             self.assertEqual(len(pages), len({p['slug'] for p in pages}))

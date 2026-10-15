@@ -60,6 +60,8 @@ class SharingTests(unittest.TestCase):
             self.assertTrue(head.fallback)
             if route['path']:
                 self.assertIn('<base href="../../">', markup)
+            if route['path'].startswith('docs/'):
+                self.assertIn('rel="alternate" type="text/markdown"', markup)
             if route['path'].startswith('components/'):
                 self.assertIn('coverage remains in progress', markup)
         image = (output / 'assets/cui-social.png').read_bytes()

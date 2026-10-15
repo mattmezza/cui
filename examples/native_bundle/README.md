@@ -23,6 +23,8 @@ SDL2 cannot replace SDL3. Install development packages through your system's
 package manager or explicitly build upstream releases before running `make`.
 The build performs no downloads. These are dynamically linked system libraries;
 shipping this source bundle is separate from deploying a binary and its libraries.
+Running the app requires an X11 display session. Automated Linux validation needs
+Xvfb (`xvfb-run`) and `xauth`, in addition to the build prerequisites.
 
 Each CUI source compiles separately into `build/vendor/`, then into static CUI
 archives. Editing `main.c` rebuilds `build/main.o` and relinks the executable;
@@ -46,7 +48,9 @@ the app. Override each face explicitly if needed:
 ```
 
 Only regular (400) and bold (700) are bundled; CUI does not synthesize other
-weights or italics. Inter's script coverage is finite: this pair supplies neither
+weights or italics. Register additional matching faces before using other styles;
+an unavailable style falls back to regular. Inter's script coverage is finite:
+this pair supplies neither
 universal Unicode coverage nor automatic font fallback. The archive retains
 font provenance and SHA-256 pins in `assets/fonts/manifest.json`, upstream
 dependency records in `upstream-dependencies.json`, and checksums for every payload
@@ -64,6 +68,10 @@ servers are unverified. Native automated tests must use the repository's invisib
 Xvfb wrapper (`python scripts/test_local.py --build-dir build`), never the desktop
 display. Browser tests run headless; virtual-display results do not establish GPU
 hardware coverage.
+
+The default is the existing SDL3 `SDL_Renderer` adapter. SDL chooses an available
+driver; distribution tests force its software driver under Xvfb. This does not
+require Sokol, Vulkan, or CUI's separate SDL_GPU adapter.
 
 The dependency map is:
 

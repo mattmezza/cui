@@ -34,7 +34,9 @@ def extract_and_check(archive, destination):
             assert not path.is_absolute() and '..' not in path.parts, member.name
             assert path.parts[0] == 'cui-native', member.name
             assert member.isfile() or member.isdir(), member.name
-        package.extractall(destination, filter='data')
+        # Only validated relative regular files/directories reach extraction.
+        # Avoid the filter argument added in newer Python security releases.
+        package.extractall(destination)
     bundle = destination / 'cui-native'
     for name in ('Makefile', 'main.c', 'README.md', 'sources.mk',
                  'assets/fonts/Inter-Regular.otf', 'assets/fonts/Inter-Bold.otf'):
@@ -87,7 +89,7 @@ def native_checks(bundle, work):
     fake.write_text('#!/bin/sh\necho "test: external prerequisite unavailable" >&2\nexit 1\n')
     fake.chmod(0o755)
     output = run([*make, f'PKG_CONFIG={fake}'], cwd=bundle, env=env, success=False)
-    assert 'pkg-config' in output.lower() or 'prerequisite' in output.lower(), output
+    assert all(name in output for name in ('pkg-config', 'SDL3', 'FreeType', 'HarfBuzz')), output
     assert not list((bundle / 'build').rglob('*.o')), 'prerequisites should fail before compiling'
     run(make, cwd=bundle, env=env)
     executable = bundle / 'build/native_starter'

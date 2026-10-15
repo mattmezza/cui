@@ -1,0 +1,35 @@
+Native source bundle validation, 2026-10-15
+
+Implementation batches: 0180bab1 (shared source metadata), 6655ee08 (native bundle).
+Host: Linux, GCC 16.2.1; pkg-config reports SDL3 3.4.18, FreeType 26.6.20,
+HarfBuzz 14.6.0. These are observed versions, not additional minimum constraints.
+Fonts: unmodified Inter 4.1 static OTF Regular/Bold; original OFL retained.
+
+PASS cmake -S . -B build -G Ninja
+PASS cmake --build build (repository warning policy includes -Werror)
+PASS python scripts/test_local.py --build-dir build: 202/202 CTest tests
+PASS final targeted native_bundle_contents/native_bundle_consumer: 2/2
+PASS ordinary default make -j2 in a fresh extraction outside the checkout
+PASS existing installed-package starter: copied outside the checkout, installed
+     CMake build, interaction test and three-frame native smoke through the
+     isolated display wrapper; installed Make interaction test with -Werror
+PASS scripts/check_licenses.py (pinned hashes and license files)
+PASS scripts/check_manifest.py (all 78 entries retained)
+PASS scripts/amalgamate.py --check (existing portable distribution preserved)
+PASS clang-format --dry-run --Werror examples/native_bundle/main.c
+PASS git diff --check
+
+Distribution tests compare two generated archives byte-for-byte, verify all
+payload SHA-256 values, unpack outside the checkout and compile without installed
+CUI packages. They check missing-prerequisite diagnostics, no-op make, app-only
+recompilation, header dependency recompilation, executable-relative font assets,
+regular/bold font failures, frame argument validation and capture failures.
+Three successful frames produce a nonuniform BMP under Xvfb/X11 with SDL's
+software renderer. No native tests used the maintainer's display session.
+
+Repository-wide format checking reports pre-existing violations in 12 unchanged
+C/H files. Formatting cleanup is outside this packaging change.
+Native Windows, macOS and Wayland runs remain unverified. GPU hardware checks
+remain deferred; software rendering under Xvfb does not establish GPU coverage.
+External platform/text libraries remain prerequisites and are not in the archive.
+Hosted CI changes are configured but have not been observed running locally.

@@ -32,7 +32,7 @@ The archive's README explains the dependency layers and font policy. Ordinary
 application edits compile only app objects and relink; compiler-generated header
 dependencies trigger the appropriate CUI recompilation when headers change.
 `make` never acquires dependencies. To produce the archive from this checkout,
-run `make native-dist` (Python 3 required), which writes `build/cui-native.tar.gz`.
+run `make native-dist` (Python 3.9+ for this workflow), which writes `build/cui-native.tar.gz`.
 The shared `cmake/sources.json` drives CMake, the portable header generator and
 native source selection. Native packaging tests generate twice, compare bytes,
 unpack outside the repository, verify checksums, build, check incremental rebuilds

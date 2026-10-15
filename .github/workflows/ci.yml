@@ -31,7 +31,10 @@ jobs:
       - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON
       - run: cmake --build build
       - name: Expose pinned SDL to the standalone bundle consumer
-        run: cmake --install build/_deps/sdl-build --prefix "$RUNNER_TEMP/native-deps"
+        run: |
+          if [ -d build/_deps/sdl-build ]; then
+            cmake --install build/_deps/sdl-build --prefix "$RUNNER_TEMP/native-deps"
+          fi
       - name: Test with an isolated display, including extracted native bundle
         run: python scripts/test_local.py --build-dir build
         env:

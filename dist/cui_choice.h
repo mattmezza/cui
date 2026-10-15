@@ -438,9 +438,10 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *, cui_id container, 
 #ifdef __cplusplus
 }
 #endif
+#define CUI_CHOICE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_CHOICE_IMPLEMENTATION) && !defined(CUI_CHOICE_IMPLEMENTATION_ONCE)
+#if defined(CUI_CHOICE_IMPLEMENTATION) && defined(CUI_CHOICE_DECLARATIONS_READY) && !defined(CUI_CHOICE_IMPLEMENTATION_ONCE)
 #define CUI_CHOICE_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_choice.c */

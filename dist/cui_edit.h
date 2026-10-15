@@ -445,9 +445,10 @@ cui_edit_result cui_edit_apply_events(cui_edit *edit, cui_context *ui, cui_id id
 #ifdef __cplusplus
 }
 #endif
+#define CUI_EDIT_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_EDIT_IMPLEMENTATION) && !defined(CUI_EDIT_IMPLEMENTATION_ONCE)
+#if defined(CUI_EDIT_IMPLEMENTATION) && defined(CUI_EDIT_DECLARATIONS_READY) && !defined(CUI_EDIT_IMPLEMENTATION_ONCE)
 #define CUI_EDIT_IMPLEMENTATION_ONCE
 /* src/base/cui_edit.c */
 /* SPDX-License-Identifier: MIT */

@@ -43,9 +43,10 @@ cui_radio_group_result cui_radio_group(cui_context *, cui_id, const cui_theme *,
 #ifdef __cplusplus
 }
 #endif
+#define CUI_RADIO_GROUP_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_RADIO_GROUP_IMPLEMENTATION) && !defined(CUI_RADIO_GROUP_IMPLEMENTATION_ONCE)
+#if defined(CUI_RADIO_GROUP_IMPLEMENTATION) && defined(CUI_RADIO_GROUP_DECLARATIONS_READY) && !defined(CUI_RADIO_GROUP_IMPLEMENTATION_ONCE)
 #define CUI_RADIO_GROUP_IMPLEMENTATION_ONCE
 /* src/base/cui_radio_group.c */
 /* SPDX-License-Identifier: MIT */

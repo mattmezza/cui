@@ -129,9 +129,10 @@ cui_textarea_result cui_textarea(cui_context *, cui_id, const cui_theme *, cui_s
 #ifdef __cplusplus
 }
 #endif
+#define CUI_TEXTAREA_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_TEXTAREA_IMPLEMENTATION) && !defined(CUI_TEXTAREA_IMPLEMENTATION_ONCE)
+#if defined(CUI_TEXTAREA_IMPLEMENTATION) && defined(CUI_TEXTAREA_DECLARATIONS_READY) && !defined(CUI_TEXTAREA_IMPLEMENTATION_ONCE)
 #define CUI_TEXTAREA_IMPLEMENTATION_ONCE
 #ifndef CUI_EDIT_IMPLEMENTATION
 #define CUI_EDIT_IMPLEMENTATION

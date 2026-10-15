@@ -31,9 +31,10 @@ bool cui_label_source(cui_context *, const cui_theme *, cui_label_options);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_LABEL_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_LABEL_IMPLEMENTATION) && !defined(CUI_LABEL_IMPLEMENTATION_ONCE)
+#if defined(CUI_LABEL_IMPLEMENTATION) && defined(CUI_LABEL_DECLARATIONS_READY) && !defined(CUI_LABEL_IMPLEMENTATION_ONCE)
 #define CUI_LABEL_IMPLEMENTATION_ONCE
 /* src/components/cui_label.c */
 /* SPDX-License-Identifier: MIT AND Unicode-3.0 */

@@ -265,9 +265,10 @@ void cui_end_hover_card(cui_context *ui);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_CONTENT_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_CONTENT_IMPLEMENTATION) && !defined(CUI_CONTENT_IMPLEMENTATION_ONCE)
+#if defined(CUI_CONTENT_IMPLEMENTATION) && defined(CUI_CONTENT_DECLARATIONS_READY) && !defined(CUI_CONTENT_IMPLEMENTATION_ONCE)
 #define CUI_CONTENT_IMPLEMENTATION_ONCE
 /* src/base/cui_content.c */
 /* SPDX-License-Identifier: MIT */

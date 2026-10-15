@@ -214,9 +214,10 @@ cui_attachment_group_result cui_attachment_group(cui_context *, cui_id,
 #ifdef __cplusplus
 }
 #endif
+#define CUI_MEDIA_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_MEDIA_IMPLEMENTATION) && !defined(CUI_MEDIA_IMPLEMENTATION_ONCE)
+#if defined(CUI_MEDIA_IMPLEMENTATION) && defined(CUI_MEDIA_DECLARATIONS_READY) && !defined(CUI_MEDIA_IMPLEMENTATION_ONCE)
 #define CUI_MEDIA_IMPLEMENTATION_ONCE
 /* src/base/cui_media.c */
 /* SPDX-License-Identifier: MIT */

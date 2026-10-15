@@ -149,9 +149,10 @@ bool cui_theme_bezier_sample(cui_theme_bezier, float progress, float *output);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_THEME_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_THEME_IMPLEMENTATION) && !defined(CUI_THEME_IMPLEMENTATION_ONCE)
+#if defined(CUI_THEME_IMPLEMENTATION) && defined(CUI_THEME_DECLARATIONS_READY) && !defined(CUI_THEME_IMPLEMENTATION_ONCE)
 #define CUI_THEME_IMPLEMENTATION_ONCE
 /* src/theme/cui_theme.c */
 /* SPDX-License-Identifier: MIT */

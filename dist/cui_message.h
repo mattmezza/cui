@@ -122,9 +122,10 @@ cui_message_scroller_result cui_message_scroller(cui_context *, cui_id, const cu
 #ifdef __cplusplus
 }
 #endif
+#define CUI_MESSAGE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_MESSAGE_IMPLEMENTATION) && !defined(CUI_MESSAGE_IMPLEMENTATION_ONCE)
+#if defined(CUI_MESSAGE_IMPLEMENTATION) && defined(CUI_MESSAGE_DECLARATIONS_READY) && !defined(CUI_MESSAGE_IMPLEMENTATION_ONCE)
 #define CUI_MESSAGE_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_message.c */

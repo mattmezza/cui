@@ -294,9 +294,10 @@ bool cui_text_view(cui_context *, cui_id, const cui_theme *, cui_text_view_state
 #ifdef __cplusplus
 }
 #endif
+#define CUI_TEXT_VIEW_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_TEXT_VIEW_IMPLEMENTATION) && !defined(CUI_TEXT_VIEW_IMPLEMENTATION_ONCE)
+#if defined(CUI_TEXT_VIEW_IMPLEMENTATION) && defined(CUI_TEXT_VIEW_DECLARATIONS_READY) && !defined(CUI_TEXT_VIEW_IMPLEMENTATION_ONCE)
 #define CUI_TEXT_VIEW_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_text_view.c */

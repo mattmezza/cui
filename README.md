@@ -70,7 +70,7 @@ Create/destroy the context in the host; queue input before begin. Width/height 0
 #include "cui_components.h"
 ```
 
-Other translation units include those headers without implementation macros. Base includes the editor implementation; styled components include theme implementation. Optional overlay, virtual, dock and plot models have their own implementation macros. Single-TU and multi-TU executables are tested. Conventional static library targets use `include/cui/`. C++ and Zig host examples are in [examples/embedding](examples/embedding).
+Other translation units include those headers without implementation macros. Base includes the editor implementation; styled components include theme, overlay, virtual and plot implementations. Standalone optional models also have their own implementation macros. The single-TU test starts with the snippet above without a declaration pre-pass; multi-TU executables are also tested. Conventional static library targets use `include/cui/`. C++ and Zig host examples are in [examples/embedding](examples/embedding).
 
 `python scripts/amalgamate.py` regenerates; `make dist-check` checks exact reproducibility. `python tools/component_vendor/vendor.py /empty/destination --layer components` copies the layer dependency closure and licenses. This currently vendors all implemented controls in that layer; per-component source slicing is pending. No CLI is required to consume the library.
 

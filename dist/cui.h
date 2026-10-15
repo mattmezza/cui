@@ -877,9 +877,10 @@ void cui_set_reduced_motion(cui_context *, bool);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_IMPLEMENTATION) && !defined(CUI_IMPLEMENTATION_ONCE)
+#if defined(CUI_IMPLEMENTATION) && defined(CUI_DECLARATIONS_READY) && !defined(CUI_IMPLEMENTATION_ONCE)
 #define CUI_IMPLEMENTATION_ONCE
 /* src/core/cui.c */
 /* SPDX-License-Identifier: MIT */

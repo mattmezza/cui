@@ -385,9 +385,10 @@ cui_plot_result cui_plot_element(cui_context *, cui_id, const cui_theme *,
 #ifdef __cplusplus
 }
 #endif
+#define CUI_PLOT_VIEW_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_PLOT_VIEW_IMPLEMENTATION) && !defined(CUI_PLOT_VIEW_IMPLEMENTATION_ONCE)
+#if defined(CUI_PLOT_VIEW_IMPLEMENTATION) && defined(CUI_PLOT_VIEW_DECLARATIONS_READY) && !defined(CUI_PLOT_VIEW_IMPLEMENTATION_ONCE)
 #define CUI_PLOT_VIEW_IMPLEMENTATION_ONCE
 #ifndef CUI_PLOT_IMPLEMENTATION
 #define CUI_PLOT_IMPLEMENTATION

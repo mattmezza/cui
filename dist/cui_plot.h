@@ -701,9 +701,10 @@ cui_plot_result cui_plot_mesh_coverage(cui_plot_point st, cui_plot_point dstdx,
 #ifdef __cplusplus
 }
 #endif
+#define CUI_PLOT_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_PLOT_IMPLEMENTATION) && !defined(CUI_PLOT_IMPLEMENTATION_ONCE)
+#if defined(CUI_PLOT_IMPLEMENTATION) && defined(CUI_PLOT_DECLARATIONS_READY) && !defined(CUI_PLOT_IMPLEMENTATION_ONCE)
 #define CUI_PLOT_IMPLEMENTATION_ONCE
 /* src/base/cui_plot.c */
 /* SPDX-License-Identifier: MIT */

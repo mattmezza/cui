@@ -68,9 +68,10 @@ uint64_t cui_virtual_item_id(uint64_t root, uint64_t key);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_VIRTUAL_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_VIRTUAL_IMPLEMENTATION) && !defined(CUI_VIRTUAL_IMPLEMENTATION_ONCE)
+#if defined(CUI_VIRTUAL_IMPLEMENTATION) && defined(CUI_VIRTUAL_DECLARATIONS_READY) && !defined(CUI_VIRTUAL_IMPLEMENTATION_ONCE)
 #define CUI_VIRTUAL_IMPLEMENTATION_ONCE
 /* src/base/cui_virtual.c */
 /* SPDX-License-Identifier: MIT */

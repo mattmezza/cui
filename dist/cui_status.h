@@ -292,9 +292,10 @@ bool cui_notifications_checked(cui_context *, cui_id, const cui_theme *, cui_not
 #ifdef __cplusplus
 }
 #endif
+#define CUI_STATUS_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_STATUS_IMPLEMENTATION) && !defined(CUI_STATUS_IMPLEMENTATION_ONCE)
+#if defined(CUI_STATUS_IMPLEMENTATION) && defined(CUI_STATUS_DECLARATIONS_READY) && !defined(CUI_STATUS_IMPLEMENTATION_ONCE)
 #define CUI_STATUS_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_status.c */

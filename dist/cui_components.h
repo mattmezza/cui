@@ -458,14 +458,23 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #endif
 #include "cui_radio_group.h"
 #include "cui_settings.h"
+#define CUI_COMPONENTS_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_COMPONENTS_IMPLEMENTATION) && !defined(CUI_COMPONENTS_IMPLEMENTATION_ONCE)
+#if defined(CUI_COMPONENTS_IMPLEMENTATION) && defined(CUI_COMPONENTS_DECLARATIONS_READY) && !defined(CUI_COMPONENTS_IMPLEMENTATION_ONCE)
 #define CUI_COMPONENTS_IMPLEMENTATION_ONCE
 #ifndef CUI_THEME_IMPLEMENTATION
 #define CUI_THEME_IMPLEMENTATION
 #endif
 #include "cui_theme.h"
+#ifndef CUI_OVERLAY_IMPLEMENTATION
+#define CUI_OVERLAY_IMPLEMENTATION
+#endif
+#include "cui_overlay.h"
+#ifndef CUI_VIRTUAL_IMPLEMENTATION
+#define CUI_VIRTUAL_IMPLEMENTATION
+#endif
+#include "cui_virtual.h"
 #ifndef CUI_PLOT_MOTION_IMPLEMENTATION
 #define CUI_PLOT_MOTION_IMPLEMENTATION
 #endif

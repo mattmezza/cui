@@ -126,9 +126,10 @@ bool cui_carousel_pagination_item(cui_context *, cui_id, const cui_theme *, cui_
 #ifdef __cplusplus
 }
 #endif
+#define CUI_CAROUSEL_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_CAROUSEL_IMPLEMENTATION) && !defined(CUI_CAROUSEL_IMPLEMENTATION_ONCE)
+#if defined(CUI_CAROUSEL_IMPLEMENTATION) && defined(CUI_CAROUSEL_DECLARATIONS_READY) && !defined(CUI_CAROUSEL_IMPLEMENTATION_ONCE)
 #define CUI_CAROUSEL_IMPLEMENTATION_ONCE
 /* src/base/cui_carousel.c */
 /* SPDX-License-Identifier: MIT */

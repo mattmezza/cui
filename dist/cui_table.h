@@ -232,9 +232,10 @@ void cui_table_end(cui_context *);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_TABLE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_TABLE_IMPLEMENTATION) && !defined(CUI_TABLE_IMPLEMENTATION_ONCE)
+#if defined(CUI_TABLE_IMPLEMENTATION) && defined(CUI_TABLE_DECLARATIONS_READY) && !defined(CUI_TABLE_IMPLEMENTATION_ONCE)
 #define CUI_TABLE_IMPLEMENTATION_ONCE
 /* src/base/cui_table.c */
 /* SPDX-License-Identifier: MIT */

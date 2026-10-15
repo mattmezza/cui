@@ -102,9 +102,10 @@ bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_s
 #ifdef __cplusplus
 }
 #endif
+#define CUI_NUMERIC_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_NUMERIC_IMPLEMENTATION) && !defined(CUI_NUMERIC_IMPLEMENTATION_ONCE)
+#if defined(CUI_NUMERIC_IMPLEMENTATION) && defined(CUI_NUMERIC_DECLARATIONS_READY) && !defined(CUI_NUMERIC_IMPLEMENTATION_ONCE)
 #define CUI_NUMERIC_IMPLEMENTATION_ONCE
 /* src/base/cui_numeric.c */
 /* SPDX-License-Identifier: MIT */

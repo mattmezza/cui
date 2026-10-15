@@ -104,9 +104,10 @@ cui_icon_error cui_icon_spinner(cui_context *, cui_id, const cui_theme *, cui_ic
 #ifdef __cplusplus
 }
 #endif
+#define CUI_ICON_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_ICON_IMPLEMENTATION) && !defined(CUI_ICON_IMPLEMENTATION_ONCE)
+#if defined(CUI_ICON_IMPLEMENTATION) && defined(CUI_ICON_DECLARATIONS_READY) && !defined(CUI_ICON_IMPLEMENTATION_ONCE)
 #define CUI_ICON_IMPLEMENTATION_ONCE
 /* src/base/cui_icon.c */
 /* SPDX-License-Identifier: MIT */

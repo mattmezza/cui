@@ -110,9 +110,10 @@ cui_input_group_result cui_input_group(cui_context *, cui_id group, cui_id input
 #ifdef __cplusplus
 }
 #endif
+#define CUI_FORM_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_FORM_IMPLEMENTATION) && !defined(CUI_FORM_IMPLEMENTATION_ONCE)
+#if defined(CUI_FORM_IMPLEMENTATION) && defined(CUI_FORM_DECLARATIONS_READY) && !defined(CUI_FORM_IMPLEMENTATION_ONCE)
 #define CUI_FORM_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_form.c */

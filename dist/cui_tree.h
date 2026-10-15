@@ -74,9 +74,10 @@ cui_tree_result cui_tree(cui_context *, cui_id, const cui_theme *, cui_tree_mode
 #ifdef __cplusplus
 }
 #endif
+#define CUI_TREE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_TREE_IMPLEMENTATION) && !defined(CUI_TREE_IMPLEMENTATION_ONCE)
+#if defined(CUI_TREE_IMPLEMENTATION) && defined(CUI_TREE_DECLARATIONS_READY) && !defined(CUI_TREE_IMPLEMENTATION_ONCE)
 #define CUI_TREE_IMPLEMENTATION_ONCE
 /* src/base/cui_tree.c */
 /* SPDX-License-Identifier: MIT */

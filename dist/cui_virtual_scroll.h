@@ -60,9 +60,10 @@ cui_virtual_widget_result cui_virtual_list_draw(cui_context *, cui_id, const cui
 #ifdef __cplusplus
 }
 #endif
+#define CUI_VIRTUAL_SCROLL_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_VIRTUAL_SCROLL_IMPLEMENTATION) && !defined(CUI_VIRTUAL_SCROLL_IMPLEMENTATION_ONCE)
+#if defined(CUI_VIRTUAL_SCROLL_IMPLEMENTATION) && defined(CUI_VIRTUAL_SCROLL_DECLARATIONS_READY) && !defined(CUI_VIRTUAL_SCROLL_IMPLEMENTATION_ONCE)
 #define CUI_VIRTUAL_SCROLL_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_virtual_scroll.c */

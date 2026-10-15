@@ -69,9 +69,10 @@ bool cui_accordion(cui_context *, cui_id container, const cui_theme *, const cui
 #ifdef __cplusplus
 }
 #endif
+#define CUI_DISCLOSURE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_DISCLOSURE_IMPLEMENTATION) && !defined(CUI_DISCLOSURE_IMPLEMENTATION_ONCE)
+#if defined(CUI_DISCLOSURE_IMPLEMENTATION) && defined(CUI_DISCLOSURE_DECLARATIONS_READY) && !defined(CUI_DISCLOSURE_IMPLEMENTATION_ONCE)
 #define CUI_DISCLOSURE_IMPLEMENTATION_ONCE
 /* src/base/cui_disclosure.c */
 /* SPDX-License-Identifier: MIT */

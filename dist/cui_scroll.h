@@ -79,9 +79,10 @@ void cui_scrollable_end_ex(cui_context *, cui_id, const cui_theme *, cui_scroll_
 #ifdef __cplusplus
 }
 #endif
+#define CUI_SCROLL_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_SCROLL_IMPLEMENTATION) && !defined(CUI_SCROLL_IMPLEMENTATION_ONCE)
+#if defined(CUI_SCROLL_IMPLEMENTATION) && defined(CUI_SCROLL_DECLARATIONS_READY) && !defined(CUI_SCROLL_IMPLEMENTATION_ONCE)
 #define CUI_SCROLL_IMPLEMENTATION_ONCE
 /* src/base/cui_scroll.c */
 /* SPDX-License-Identifier: MIT */

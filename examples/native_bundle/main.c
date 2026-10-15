@@ -132,9 +132,13 @@ int main(int argc, char **argv) {
             }
             break;
         }
+        if (rendered && !limit && !cui_needs_redraw(ui)) {
+            (void)cui_sdl3_wait_events(host, 250);
+            continue;
+        }
         float width, height;
         cui_sdl3_size(host, &width, &height);
-        cui_begin_frame(ui, width, height, .016f);
+        cui_begin_frame(ui, width, height, cui_sdl3_frame_delta(host));
         app_frame(ui, &theme, &clicked);
         cui_draw_list list = cui_end_frame(ui);
         if (cui_last_error(ui) != CUI_OK) {
@@ -167,8 +171,6 @@ int main(int argc, char **argv) {
             break;
         }
         ++rendered; /* Only successful renders count toward the requested bound. */
-        if (!limit || rendered < limit)
-            cui_sdl3_wait(16);
     }
 cleanup:
     cui_destroy(ui);

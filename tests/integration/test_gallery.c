@@ -30,7 +30,7 @@ int main(void) {
         state.contrast = contrast;
         for (int section = 0; section < 4; section++) {
             state.section = section;
-            cui_draw_list list = frame(ui, &state, 680, 740);
+            cui_draw_list list = frame(ui, &state, 680, 740, .016f);
             size_t count;
             const cui_semantic *semantics = cui_semantics(ui, &count);
             assert(count > 0);
@@ -60,7 +60,7 @@ int main(void) {
         }
     }
     cui_focus(ui, id(ui, "volume"));
-    cui_draw_list tiny = frame(ui, &state, 200, 120);
+    cui_draw_list tiny = frame(ui, &state, 200, 120, .016f);
     size_t count;
     cui_semantics(ui, &count);
     assert(count == 0);

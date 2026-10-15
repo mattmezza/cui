@@ -58,7 +58,7 @@ def bundle_files():
             add(record['license_file'])
             dependencies.append({**record, 'sha256': selected})
     files['upstream-dependencies.json'] = (json.dumps(dependencies, indent=2) + '\n').encode()
-    for name in ('Makefile', 'README.md', 'main.c'):
+    for name in ('Makefile', 'README.md', 'main.c', 'app.c', 'mail.c'):
         add('examples/native_bundle/' + name, name)
     lines = ['# Generated from cmake/sources.json; do not edit.']
     for name, paths in groups.items():

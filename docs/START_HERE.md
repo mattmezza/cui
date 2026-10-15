@@ -79,3 +79,5 @@ window build commands and examples; the [coverage table](BRIDGE_COMPONENTS.md)
 records supported controls and the limits of each binding. The full component
 catalog is still being bound and validated. The [C-host examples](LANGUAGE_BINDINGS.md)
 also demonstrate embedding an existing C-authored application.
+
+For composition, start with [Layout](LAYOUT_GUIDE.md), then [IDs and lifetimes](IDS_AND_LIFETIMES.md) and [Debugging](DEBUGGING.md). The [two-file native bundle](NATIVE_APP_STARTER.md) is the standalone consumer path; [agent guidance](AI_AGENTS.md) separates consumer and maintainer workflows.

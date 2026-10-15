@@ -38,7 +38,7 @@ def extract_and_check(archive, destination):
         # Avoid the filter argument added in newer Python security releases.
         package.extractall(destination)
     bundle = destination / 'cui-native'
-    for name in ('Makefile', 'main.c', 'README.md', 'sources.mk',
+    for name in ('Makefile', 'main.c', 'app.c', 'README.md', 'sources.mk',
                  'assets/fonts/Inter-Regular.otf', 'assets/fonts/Inter-Bold.otf'):
         assert (bundle / name).is_file(), name
     for name in ('include', 'src', 'backends', 'third_party'):
@@ -93,19 +93,42 @@ def native_checks(bundle, work):
     assert not list((bundle / 'build').rglob('*.o')), 'prerequisites should fail before compiling'
     run(make, cwd=bundle, env=env)
     executable = bundle / 'build/native_starter'
-    app = bundle / 'build/main.o'
+    app = bundle / 'build/app.o'
+    host = bundle / 'build/main.o'
     vendor = list((bundle / 'build/vendor').rglob('*.o')) + list((bundle / 'build/vendor').rglob('*.a'))
     assert executable.is_file() and app.is_file() and vendor
-    before = snapshot([app, executable, *vendor])
+    before = snapshot([app, host, executable, *vendor])
     run(make, cwd=bundle, env=env)
     assert snapshot(before) == before, 'no-op make rebuilt files'
     time.sleep(1.1)
-    with (bundle / 'main.c').open('a') as stream:
+    with (bundle / 'app.c').open('a') as stream:
         stream.write('\n/* incremental application rebuild test */\n')
     run(make, cwd=bundle, env=env)
     after = snapshot(before)
     assert after[app] > before[app] and after[executable] > before[executable]
+    assert after[host] == before[host], 'UI edit rebuilt unchanged host'
     assert all(after[p] == before[p] for p in vendor), 'application edit rebuilt vendored CUI'
+    # Custom consumer source sets and target names must build and run outside CUI.
+    (bundle / 'custom').mkdir()
+    shutil.copyfile(bundle / 'app.c', bundle / 'custom/view.c')
+    run([*make, 'APP_SOURCES=main.c custom/view.c', 'TARGET=build/custom_app'],
+        cwd=bundle, env=env)
+    custom_capture = work / 'custom.bmp'
+    run([bundle / 'build/custom_app', '--frames', '2', '--capture', custom_capture],
+        cwd=work, env=env, timeout=30)
+    useful_bmp(custom_capture)
+    run([*make, 'APP_SOURCES=main.c mail.c', 'TARGET=build/mail_demo'],
+        cwd=bundle, env=env)
+    # Core-only interaction test: no native window, real reducers and resolved bounds.
+    headless = work / 'mail_headless'
+    run(['cc', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+         '-Ivendor/include', ROOT / 'tests/packaging/mail_headless.c', 'mail.c',
+         'build/vendor/libcui.a', '-lm', '-o', headless], cwd=bundle, env=env)
+    run([headless], cwd=work, env=env)
+    mail_capture = work / 'mail.bmp'
+    run([bundle / 'build/mail_demo', '--frames', '3', '--capture', mail_capture],
+        cwd=work, env=env, timeout=30)
+    useful_bmp(mail_capture)
     # Exercise compiler-produced dependency files, including transitive public headers.
     dependencies = list((bundle / 'build/vendor').rglob('*.d'))
     assert dependencies, 'vendor compilations must emit dependency files'
@@ -129,6 +152,16 @@ def native_checks(bundle, work):
     capture = work / 'frame.bmp'
     run([executable, '--frames', '3', '--capture', capture], cwd=work, env=env, timeout=30)
     useful_bmp(capture)
+    output = run([executable, '--frames', '1', '--debug-layout', 'json'],
+                 cwd=work, env=env, timeout=30)
+    debug = json.loads(output)
+    assert debug, 'layout JSON must describe the submitted frame'
+    output = run([executable, '--frames', '1', '--debug-layout', 'text'],
+                 cwd=work, env=env, timeout=30)
+    assert output.strip(), 'layout text export is empty'
+    output = run([executable, '--frames', '1', '--debug-layout', 'invalid'],
+                 cwd=work, env=env, success=False, timeout=30)
+    assert '--debug-layout' in output
     for option in ('--font', '--bold-font'):
         missing = work / ('missing-' + option[2:] + '.otf')
         output = run([executable, '--frames', '3', option, missing], cwd=work,

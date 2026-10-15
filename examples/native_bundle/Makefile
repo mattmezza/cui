@@ -4,6 +4,10 @@ CC ?= cc
 AR ?= ar
 PKG_CONFIG ?= pkg-config
 CFLAGS ?= -O2 -g
+# Consumer sources may live in subdirectories; target stays beside bundled assets.
+APP_SOURCES ?= main.c app.c
+TARGET ?= build/native_starter
+APP_OBJECTS := $(APP_SOURCES:%.c=build/%.o)
 CPPFLAGS += -Ivendor/include -Ivendor/third_party/clay
 CFLAGS += -std=c11 -Wall -Wextra -Wpedantic
 
@@ -22,9 +26,10 @@ SDL3_OBJECTS := $(SDL3_SOURCES:%.c=build/%.o)
 OBJECTS := $(PORTABLE_OBJECTS) $(TEXT_OBJECTS) $(BIDI_OBJECTS) $(SDL3_OBJECTS)
 LIBRARIES := build/vendor/libcui_sdl3.a build/vendor/libcui_text.a build/vendor/libcui_bidi.a build/vendor/libcui.a
 
-all: build/native_starter
+all: $(TARGET)
 
-build/native_starter: build/main.o $(LIBRARIES)
+$(TARGET): $(APP_OBJECTS) $(LIBRARIES)
+	@mkdir -p $(dir $@)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 build/vendor/libcui.a: $(PORTABLE_OBJECTS)
@@ -46,5 +51,5 @@ build/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CPPFLAGS) $(NATIVE_CFLAGS) $(CFLAGS) $(UPSTREAM_WARNINGS) -MMD -MP -c $< -o $@
 
--include $(OBJECTS:.o=.d) build/main.d
+-include $(OBJECTS:.o=.d) $(APP_OBJECTS:.o=.d)
 .PHONY: all

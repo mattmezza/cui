@@ -38,6 +38,25 @@ native source selection. Native packaging tests generate twice, compare bytes,
 unpack outside the repository, verify checksums, build, check incremental rebuilds
 and render a bounded Xvfb capture through `scripts/test_local.py`.
 
+## Edit the two-file bundle app
+
+The archive's `main.c` is the host: it loads both font faces, creates the context,
+polls input, begins/ends each frame, renders and cleans up. `app.c` is the portable
+UI: `app_frame` submits boxes, text and the button. Its `bool *clicked` points to
+state owned by the host across frames. Change the greeting or button in `app.c`,
+then run `make`; only that application object and executable rebuild.
+
+```sh
+make APP_SOURCES="main.c app.c" TARGET=build/my_app
+./build/my_app
+```
+
+Add new relative `.c` paths to `APP_SOURCES`. Keep the executable directly in
+`build/` for automatic font discovery, or provide both font paths explicitly.
+The [bundle README](../examples/native_bundle/README.md) is the canonical consumer
+build contract. Read [Layout](LAYOUT_GUIDE.md), [IDs and lifetimes](IDS_AND_LIFETIMES.md)
+and [Debugging](DEBUGGING.md) before growing the application.
+
 The existing installed-library starter below remains useful for projects that
 prefer an installed CUI package and a larger three-page example.
 
@@ -90,7 +109,7 @@ export PKG_CONFIG_PATH="$PWD/build/prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_
 pkg-config --exists cui-sdl3
 cmake -S examples/native_starter -B build/starter -G Ninja
 cmake --build build/starter
-ctest --test-dir build/starter --output-on-failure
+python scripts/test_local.py --build-dir build/starter
 ./build/starter/native_starter --font /absolute/path/to/your/font.ttf
 ```
 

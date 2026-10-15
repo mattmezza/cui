@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+void app_frame(cui_context *ui, const cui_theme *theme, bool *clicked);
+
 /* The bundle places assets beside build/, independent of the working directory. */
 static char *font_path(const char *name) {
     const char *base = SDL_GetBasePath();
@@ -34,9 +36,22 @@ static bool frame_limit(const char *text, unsigned *out) {
     *out = (unsigned)value;
     return true;
 }
+/* Called synchronously at failure sites; never reenter the context here. */
+static void diagnostic(void *user, const cui_diagnostic *failure) {
+    (void)user;
+    fprintf(stderr,
+            "CUI %s/%s: %s (error=%d detail=%d id=%llu frame=%llu "
+            "used=%zu requested=%zu limit=%zu)\n",
+            failure->subsystem, failure->operation, failure->message, (int)failure->error,
+            (int)failure->detail, (unsigned long long)failure->id,
+            (unsigned long long)failure->frame_sequence, failure->used, failure->requested,
+            failure->limit);
+}
 int main(int argc, char **argv) {
     const char *regular = NULL, *bold = NULL, *capture = NULL;
     unsigned limit = 0;
+    bool debug_layout = false;
+    cui_debug_layout_format debug_format = CUI_DEBUG_LAYOUT_TEXT;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--font") && i + 1 < argc)
             regular = argv[++i];
@@ -49,9 +64,17 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "--frames requires an integer from 1 to %u.\n", UINT_MAX);
                 return 1;
             }
+        } else if (!strcmp(argv[i], "--debug-layout") && i + 1 < argc) {
+            const char *format = argv[++i];
+            if (strcmp(format, "text") && strcmp(format, "json")) {
+                fprintf(stderr, "--debug-layout requires text or json.\n");
+                return 1;
+            }
+            debug_layout = true;
+            debug_format = !strcmp(format, "json") ? CUI_DEBUG_LAYOUT_JSON : CUI_DEBUG_LAYOUT_TEXT;
         } else {
             fprintf(stderr, "Usage: native_starter [--font PATH] [--bold-font PATH] "
-                            "[--frames N] [--capture BMP]\n");
+                            "[--frames N] [--capture BMP] [--debug-layout text|json]\n");
             return 1;
         }
     }
@@ -94,6 +117,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Cannot create CUI context.\n");
         goto cleanup;
     }
+    cui_set_diagnostic_callback(ui, diagnostic, NULL);
+    cui_set_layout_debug(ui, debug_layout);
     cui_theme theme = cui_theme_light();
     bool clicked = false;
     unsigned rendered = 0;
@@ -110,28 +135,26 @@ int main(int argc, char **argv) {
         float width, height;
         cui_sdl3_size(host, &width, &height);
         cui_begin_frame(ui, width, height, .016f);
-        cui_begin_box(ui, cui_id_from(ui, "root"),
-                      (cui_box){.width = -1,
-                                .height = -1,
-                                .padding = 32,
-                                .gap = 18,
-                                .background = {245, 247, 250, 255}});
-        cui_text_ex(ui, cui_string("Hello from CUI"), 28, (cui_color){28, 35, 48, 255}, 0,
-                    (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD});
-        cui_text(ui, cui_string("Inter Regular and Bold, loaded before layout."), 17,
-                 (cui_color){55, 65, 80, 255});
-        if (cui_button(ui, cui_id_from(ui, "hello"), &theme, cui_string("Say hello"), false))
-            clicked = !clicked;
-        cui_text(
-            ui,
-            cui_string(clicked ? "Hello! Click again to reset." : "Click the button to say hello."),
-            17, (cui_color){55, 65, 80, 255});
-        cui_end_box(ui);
+        app_frame(ui, &theme, &clicked);
         cui_draw_list list = cui_end_frame(ui);
         if (cui_last_error(ui) != CUI_OK) {
             fprintf(stderr, "CUI layout failed (error %d).\n", (int)cui_last_error(ui));
             result = 3;
             break;
+        }
+        if (debug_layout) {
+            size_t required = 0;
+            (void)cui_debug_layout_export(ui, debug_format, NULL, 0, &required);
+            char *dump = required ? malloc(required) : NULL;
+            if (!dump || !cui_debug_layout_export(ui, debug_format, dump, required, &required)) {
+                free(dump);
+                fprintf(stderr, "Cannot export completed layout.\n");
+                result = 3;
+                break;
+            }
+            puts(dump);
+            free(dump);
+            debug_layout = false; /* Print the first completed frame once. */
         }
         (void)cui_sdl3_set_cursor(host, cui_pointer_cursor(ui));
         bool painted = capture && rendered + 1 == limit

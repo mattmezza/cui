@@ -27,7 +27,7 @@ Running the app requires an X11 display session. Automated Linux validation need
 Xvfb (`xvfb-run`) and `xauth`, in addition to the build prerequisites.
 
 Each CUI source compiles separately into `build/vendor/`, then into static CUI
-archives. Editing `main.c` rebuilds `build/main.o` and relinks the executable;
+archives. Editing `app.c` rebuilds `build/app.o` and relinks the executable;
 ordinary app edits leave CUI objects alone. `.d` files track header dependencies.
 Use `make CC=clang` to select another compiler in a fresh extraction. If changing
 compiler or flags after building, use a fresh extraction or remove your build
@@ -93,3 +93,50 @@ Application layout and component calls use public CUI APIs. The starter uses
 SDL's executable-path helper only to locate its bundled assets. Public CUI
 interfaces contain no SDL or Clay types. This bundle demonstrates a minimal
 native integration; it does not claim complete platform or component parity.
+
+## Two application files
+
+`main.c` owns fonts, the SDL3 host, event polling, frame boundaries, rendering and
+cleanup. `app.c` contains `app_frame` and only uses portable public CUI APIs.
+The host owns the `clicked` value across frames and passes its address into the
+application submission function. Edit the labels, root box and button in `app.c`
+then run `make` again. The button toggles the greeting; keyboard Tab and Enter
+exercise the same component interaction. No implementation macro is needed.
+
+To rename the executable or add ordinary C source files:
+
+```sh
+make APP_SOURCES="main.c app.c" TARGET=build/my_app
+./build/my_app
+```
+
+`APP_SOURCES` is a space-separated list of relative `.c` paths (subdirectories
+are supported; filenames with spaces are unsupported). Include the host and all
+application translation units, but leave vendor sources in generated
+`sources.mk`. `TARGET` names the linked executable. Keep it directly in `build/`
+to preserve the default executable-relative font paths; elsewhere, pass explicit
+`--font` and `--bold-font` paths. A new source set or target links from the
+selected objects; unchanged vendor objects are reused. Changing compiler or
+flags requires a fresh build directory. External dependency requirements remain
+unchanged.
+
+## Mail layout acceptance fixture
+
+```sh
+make APP_SOURCES="main.c mail.c" TARGET=build/mail_demo
+./build/mail_demo
+```
+
+`mail.c` exercises three independently scrollable panes, repeated scoped avatars
+and tags, long clipped subjects, fixed trailing star actions, message selection
+and a Compose/Discard preview path. The 720×420 host is a desktop fixture;
+narrower windows clip panes rather than provide responsive navigation. Compose
+has no editor, storage or delivery. State is process-local. This fixture does not
+claim a complete mail client or complete component parity.
+
+For geometry inspection use `--debug-layout text` or `--debug-layout json`.
+The first completed frame is exported once to stdout; JSON can be redirected to
+an application-owned file. Capture remains independent. Core/component reported
+failures go to stderr with subsystem, operation, bounded message, ID, frame and
+budget counters; font/SDL initialization and renderer failures retain their own
+host messages. The exporter covers box nodes rather than individual text nodes.

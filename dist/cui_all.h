@@ -48,6 +48,7 @@
 #include "cui_theme_registry.h"
 #include "cui_theme.h"
 #include "cui_components.h"
+#include "cui_text_overflow.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -239,4 +240,8 @@
 #define CUI_COMPONENTS_IMPLEMENTATION
 #endif
 #include "cui_components.h"
+#ifndef CUI_TEXT_OVERFLOW_IMPLEMENTATION
+#define CUI_TEXT_OVERFLOW_IMPLEMENTATION
+#endif
+#include "cui_text_overflow.h"
 #endif

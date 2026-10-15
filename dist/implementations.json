@@ -365,6 +365,13 @@
       "sources": [
         "src/components/cui_components.c"
       ]
+    },
+    {
+      "header": "cui_text_overflow.h",
+      "macro": "CUI_TEXT_OVERFLOW_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_text_overflow.c"
+      ]
     }
   ]
 }

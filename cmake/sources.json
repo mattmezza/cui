@@ -177,6 +177,9 @@
     ],
     "cui_components": [
       "src/components/cui_components.c"
+    ],
+    "cui_text_overflow": [
+      "src/components/cui_text_overflow.c"
     ]
   },
   "native": {

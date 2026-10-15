@@ -59,6 +59,14 @@ size_t cui_icon_catalog_count(void);
 cui_str cui_icon_catalog_name(size_t);
 cui_str cui_icon_catalog_path(size_t);
 bool cui_icon_catalog_default(size_t);
+typedef enum {
+    CUI_ICON_UNKNOWN,
+    CUI_ICON_CATALOG_NOT_EMBEDDED,
+    CUI_ICON_EMBEDDED
+} cui_icon_availability;
+/* Build-local availability; recognizes the same names, paths and aliases as
+ * cui_icon_asset. A custom loader may still provide a nonembedded asset. */
+cui_icon_availability cui_icon_query(cui_str name_or_path);
 bool cui_icon_asset(cui_str name_or_path, cui_str *svg);
 /* Portable headless preparation. Width scales SVG aspect; height positions it
  * around the layout center. Transform changes paint only, including overflow. */
@@ -89,6 +97,9 @@ typedef struct {
      * by options above; padding is unsupported and must be zero. Other box
      * paint/clip/inert/opacity fields apply around the unchanged SVG square. */
     const cui_box *style;
+    /* Opt-in outline inside the allocated box on NOT_FOUND. Keeps that error
+     * result and the existing decorative/named semantic contract. */
+    bool debug_placeholder;
 } cui_icon_options;
 /* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
@@ -15818,6 +15829,11 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
             return &cui_icon_assets[i];
     return NULL;
 }
+cui_icon_availability cui_icon_query(cui_str name) {
+    const cui_icon_asset_record *asset = cui_icon_lookup(name);
+    return !asset ? CUI_ICON_UNKNOWN
+                  : asset->svg ? CUI_ICON_EMBEDDED : CUI_ICON_CATALOG_NOT_EMBEDDED;
+}
 bool cui_icon_asset(cui_str name, cui_str *svg) {
     if (!svg)
         return false;
@@ -16231,6 +16247,15 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                 .width = paint.w, .height = paint.h, .fixed_width = true, .fixed_height = true});
         cui_end_box(ui);
     }
+    if (result == CUI_ICON_NOT_FOUND && options.debug_placeholder) {
+        float opacity = options.custom_opacity ? options.opacity : 1;
+        opacity = isfinite(opacity) ? fminf(1, fmaxf(0, opacity)) : 0;
+        color.a = (uint8_t)(color.a * opacity);
+        cui_begin_absolute_box(ui, id ^ UINT64_C(0x334af02cb941785d),
+            (cui_box){.border = color, .border_width = 1, .clip = true},
+            (cui_rect){0, 0, width, height});
+        cui_end_box(ui);
+    }
     cui_end_box(ui);
     return result;
 }
@@ -16282,8 +16307,19 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
             index = i;
             break;
         }
-    if (index == SIZE_MAX)
-        return CUI_ICON_NOT_FOUND;
+    if (index == SIZE_MAX) {
+        if (!options.debug_placeholder)
+            return CUI_ICON_NOT_FOUND;
+        cui_icon_state missing = {0};
+        if (!cui_icon_set_path(&missing, cui_string("__cui_missing_debug_placeholder__"), NULL, NULL)) {
+            cui_icon_error error = missing.error;
+            cui_icon_state_destroy(&missing);
+            return error;
+        }
+        cui_icon_error error = cui_icon(ui, id, theme, &missing, options);
+        cui_icon_state_destroy(&missing);
+        return error == CUI_ICON_OK ? CUI_ICON_NOT_FOUND : error;
+    }
     cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0xe8e2ea151d9d14b4));
     if (!resource)
         return CUI_ICON_ALLOCATION;

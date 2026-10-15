@@ -15,6 +15,7 @@
 #include "cui_form.h"
 #include "cui_icon.h"
 #include "cui_label.h"
+#include "cui_text_overflow.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"
@@ -470,6 +471,10 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #define CUI_THEME_IMPLEMENTATION
 #endif
 #include "cui_theme.h"
+#ifndef CUI_TEXT_OVERFLOW_IMPLEMENTATION
+#define CUI_TEXT_OVERFLOW_IMPLEMENTATION
+#endif
+#include "cui_text_overflow.h"
 #ifndef CUI_OVERLAY_IMPLEMENTATION
 #define CUI_OVERLAY_IMPLEMENTATION
 #endif

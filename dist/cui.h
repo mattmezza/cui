@@ -40,6 +40,52 @@ typedef enum {
     CUI_ERROR_LAYOUT,
     CUI_ERROR_INVALID_ACTION
 } cui_error;
+/* Diagnostics are bounded value snapshots. Error state is sticky until clear_error.
+ * Paths contain outermost open box IDs (including anonymous zero IDs). */
+#define CUI_DIAGNOSTIC_PATH_MAX 16
+#define CUI_DIAGNOSTIC_OPERATION_MAX 48
+#define CUI_DIAGNOSTIC_MESSAGE_MAX 160
+#define CUI_DIAGNOSTIC_SUBSYSTEM_MAX 48
+typedef enum {
+    CUI_DIAGNOSTIC_NONE = 0,
+    CUI_DIAGNOSTIC_CAPACITY = 1,
+    CUI_DIAGNOSTIC_DUPLICATE_ID = 2,
+    CUI_DIAGNOSTIC_LIFECYCLE = 3,
+    CUI_DIAGNOSTIC_LAYOUT = 4,
+    CUI_DIAGNOSTIC_INVALID_ACTION = 5,
+    CUI_DIAGNOSTIC_ZERO_ID = 6,
+    CUI_DIAGNOSTIC_BOX_DEPTH = 7,
+    CUI_DIAGNOSTIC_ELEMENTS = 8,
+    CUI_DIAGNOSTIC_UNBALANCED_SCOPE = 9
+} cui_diagnostic_detail;
+typedef struct {
+    cui_error error;
+    cui_diagnostic_detail detail;
+    char operation[CUI_DIAGNOSTIC_OPERATION_MAX];
+    char message[CUI_DIAGNOSTIC_MESSAGE_MAX];
+    char subsystem[CUI_DIAGNOSTIC_SUBSYSTEM_MAX];
+    uint64_t frame_sequence;
+    cui_id id;
+    size_t used, requested, limit; /* Budget units follow subsystem; zero limit is unknown. */
+    cui_id path[CUI_DIAGNOSTIC_PATH_MAX];
+    size_t path_count;
+    bool path_truncated;
+} cui_diagnostic;
+/* Callback receives a borrowed snapshot; mutating/reentrant calls are rejected.
+ * Query snapshots only; callbacks must not destroy or otherwise reenter a host. */
+typedef void (*cui_diagnostic_fn)(void *, const cui_diagnostic *);
+void cui_set_diagnostic_callback(cui_context *, cui_diagnostic_fn, void *user);
+bool cui_first_diagnostic(const cui_context *, cui_diagnostic *out);
+bool cui_latest_diagnostic(const cui_context *, cui_diagnostic *out);
+/* For application/component failures. Captures the current open box path. */
+void cui_report_diagnostic(cui_context *, const cui_diagnostic *);
+typedef enum { CUI_DEBUG_LAYOUT_TEXT, CUI_DEBUG_LAYOUT_JSON } cui_debug_layout_format;
+/* Opt in before composition. Exports box nodes only, after end_frame and before
+ * the next begin_frame. required includes NUL; insufficient buffers are untouched.
+ * IDs are JSON strings to preserve all 64 bits. No allocation or file I/O. */
+void cui_set_layout_debug(cui_context *, bool enabled);
+bool cui_debug_layout_export(cui_context *, cui_debug_layout_format, char *buffer, size_t capacity,
+                             size_t *required);
 typedef enum {
     CUI_EVENT_POINTER_MOVE,
     CUI_EVENT_POINTER_DOWN,
@@ -941,8 +987,10 @@ static inline bool cui_inset_shadow_bounds_checked(cui_inset_shadow_paint p, cui
 #endif
 
 #include <float.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #if defined(__GNUC__)
@@ -6030,6 +6078,7 @@ typedef struct {
     uint32_t clay_id;
     cui_id id;
     size_t parent, focus_scope;
+    float requested_width, requested_height;
     bool hover_hitbox;
     size_t prepaint;
     bool clip, layout_only, inert;
@@ -6180,6 +6229,10 @@ struct cui_context {
     bool reduced_motion;
     cui_core_resource *resources;
     size_t resource_bytes;
+    cui_diagnostic first_diagnostic, latest_diagnostic;
+    cui_diagnostic_fn diagnostic_callback;
+    void *diagnostic_user;
+    bool reporting_diagnostic, layout_debug, layout_debug_ready;
     cui_error error;
     bool in_frame, focus_visible, dirty;
 };
@@ -6202,15 +6255,84 @@ static bool cui_core_inert(const cui_context *ui) {
     return ui && ui->in_frame && ui->depth && !ui->overflow_depth && ui->opened[ui->depth - 1] &&
            ui->nodes[ui->node_stack[ui->depth - 1]].inert;
 }
-static void cui_core_fail(cui_context *ui, cui_error e) {
-    if (ui && ui->prepainting) {
+void cui_report_diagnostic(cui_context *ui, const cui_diagnostic *source) {
+    if (!ui || !source || source->error == CUI_OK || ui->reporting_diagnostic)
+        return;
+    cui_diagnostic d = *source;
+    d.operation[CUI_DIAGNOSTIC_OPERATION_MAX - 1] = 0;
+    d.message[CUI_DIAGNOSTIC_MESSAGE_MAX - 1] = 0;
+    d.subsystem[CUI_DIAGNOSTIC_SUBSYSTEM_MAX - 1] = 0;
+    d.frame_sequence = ui->frame_sequence;
+    if (!d.message[0]) {
+        const char *message = d.error == CUI_ERROR_CAPACITY       ? "Capacity exceeded"
+                              : d.error == CUI_ERROR_DUPLICATE_ID ? "Duplicate element identity"
+                              : d.error == CUI_ERROR_LIFECYCLE
+                                  ? "Invalid operation or unbalanced scope"
+                              : d.error == CUI_ERROR_LAYOUT ? "Layout resolution failed"
+                                                            : "Invalid action";
+        snprintf(d.message, sizeof d.message, "%s", message);
+    }
+    if (!d.subsystem[0])
+        snprintf(d.subsystem, sizeof d.subsystem, "%s", "core");
+    d.path_count = 0;
+    d.path_truncated = ui->depth > CUI_DIAGNOSTIC_PATH_MAX || ui->overflow_depth != 0;
+    for (size_t i = 0; i < ui->depth && i < CUI_DIAGNOSTIC_PATH_MAX; ++i) {
+        d.path[d.path_count++] = ui->opened[i] ? ui->nodes[ui->node_stack[i]].id : 0;
+    }
+    if (ui->prepainting) {
         ui->prepaint_failed = true;
-        if (e == CUI_ERROR_CAPACITY)
+        if (d.error == CUI_ERROR_CAPACITY)
             ui->prepaint_capacity = true;
     }
-    if (ui && ui->error == CUI_OK)
-        ui->error = e;
+    if (ui->error == CUI_OK) {
+        ui->error = d.error;
+        ui->first_diagnostic = d;
+    }
+    ui->latest_diagnostic = d;
+    if (ui->diagnostic_callback) {
+        ui->reporting_diagnostic = true;
+        ui->diagnostic_callback(ui->diagnostic_user, &d);
+        ui->reporting_diagnostic = false;
+    }
 }
+static void cui_core_fail_at(cui_context *ui, cui_error error, const char *operation) {
+    cui_diagnostic d = {.error = error, .detail = (cui_diagnostic_detail)error};
+    snprintf(d.operation, sizeof d.operation, "%s", operation);
+    cui_report_diagnostic(ui, &d);
+}
+#define cui_core_fail(ui, error) cui_core_fail_at((ui), (error), __func__)
+static void cui_core_detail(cui_context *ui, cui_error error, cui_diagnostic_detail detail,
+                            const char *operation, cui_id id, size_t used, size_t requested,
+                            size_t limit) {
+    cui_diagnostic d = {.error = error,
+                        .detail = detail,
+                        .id = id,
+                        .used = used,
+                        .requested = requested,
+                        .limit = limit};
+    snprintf(d.operation, sizeof d.operation, "%s", operation);
+    if (detail == CUI_DIAGNOSTIC_BOX_DEPTH || detail == CUI_DIAGNOSTIC_ELEMENTS)
+        snprintf(d.subsystem, sizeof d.subsystem, "%s",
+                 detail == CUI_DIAGNOSTIC_BOX_DEPTH ? "box stack" : "box elements");
+    if (detail == CUI_DIAGNOSTIC_ZERO_ID)
+        snprintf(d.message, sizeof d.message, "%s", "This operation requires a nonzero ID");
+    cui_report_diagnostic(ui, &d);
+}
+static void cui_core_capacity_at(cui_context *ui, const char *subsystem, const char *operation,
+                                 cui_id id, size_t used, size_t requested, size_t limit) {
+    cui_diagnostic d = {.error = CUI_ERROR_CAPACITY,
+                        .detail = CUI_DIAGNOSTIC_CAPACITY,
+                        .id = id,
+                        .used = used,
+                        .requested = requested,
+                        .limit = limit};
+    snprintf(d.operation, sizeof d.operation, "%s", operation);
+    snprintf(d.subsystem, sizeof d.subsystem, "%s", subsystem);
+    snprintf(d.message, sizeof d.message, "%s capacity exceeded", subsystem);
+    cui_report_diagnostic(ui, &d);
+}
+#define cui_core_capacity(ui, subsystem, id, used, requested, limit)                               \
+    cui_core_capacity_at((ui), (subsystem), __func__, (id), (used), (requested), (limit))
 static void cui_core_select_context(cui_context *ui) {
     Clay_SetCurrentContext(ui->clay);
 }
@@ -6219,6 +6341,8 @@ static void cui_core_clear_capture(cui_context *ui) {
     ui->capture_start_valid = false;
 }
 static bool cui_core_mutation(cui_context *ui) {
+    if (ui && ui->reporting_diagnostic)
+        return false;
     if (cui_core_paint_context) {
         cui_core_fail(cui_core_paint_context, CUI_ERROR_LIFECYCLE);
         return false;
@@ -6423,7 +6547,24 @@ static void cui_core_clay_error(Clay_ErrorData e) {
         e.errorType == CLAY_ERROR_TYPE_TEXT_MEASUREMENT_CAPACITY_EXCEEDED ||
         e.errorType == CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED)
         kind = CUI_ERROR_CAPACITY;
-    cui_core_fail(e.userData, kind);
+    cui_diagnostic d = {.error = kind, .detail = (cui_diagnostic_detail)kind};
+    snprintf(d.operation, sizeof d.operation, "%s", __func__);
+    const char *subsystem =
+        e.errorType == CLAY_ERROR_TYPE_ELEMENTS_CAPACITY_EXCEEDED ? "layout elements"
+        : e.errorType == CLAY_ERROR_TYPE_ARENA_CAPACITY_EXCEEDED  ? "layout arena"
+        : e.errorType == CLAY_ERROR_TYPE_TEXT_MEASUREMENT_CAPACITY_EXCEEDED
+            ? "text measurement cache"
+        : e.errorType == CLAY_ERROR_TYPE_HASH_MAP_CAPACITY_EXCEEDED ? "layout hash map"
+                                                                    : "layout engine";
+    snprintf(d.subsystem, sizeof d.subsystem, "%s", subsystem);
+    if (e.errorText.chars && e.errorText.length > 0) {
+        size_t length = (size_t)e.errorText.length;
+        if (length >= sizeof d.message)
+            length = sizeof d.message - 1;
+        memcpy(d.message, e.errorText.chars, length);
+        d.message[length] = 0;
+    }
+    cui_report_diagnostic(e.userData, &d);
 }
 cui_str cui_string(const char *s) {
     return (cui_str){s, s ? strlen(s) : 0};
@@ -7163,19 +7304,20 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
                         .accessibility_action = e.accessibility_action};
     }
     if (ui->queued_count == CUI_CORE_EVENT_MAX) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "event queue", 0, ui->queued_count, 1, CUI_CORE_EVENT_MAX);
         return false;
     }
     char *copy = NULL;
     if (e.text_data || e.text_length) {
         if (!e.text_data || e.text_length > ui->config.event_text_bytes - ui->queued_text_bytes) {
-            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            cui_core_capacity(ui, "event text bytes", 0, ui->queued_text_bytes, e.text_length,
+                              ui->config.event_text_bytes);
             return false;
         }
         if (e.text_length) {
             copy = malloc(e.text_length);
             if (!copy) {
-                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                cui_core_capacity(ui, "event text allocation", 0, 0, e.text_length, 0);
                 return false;
             }
             memcpy(copy, e.text_data, e.text_length);
@@ -7337,7 +7479,8 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 touch_cancellations[next] = before_capture;
                 ui->event_count++;
             } else {
-                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                cui_core_capacity(ui, "event dispatch", 0, ui->event_count, 1,
+                                  CUI_CORE_DISPATCH_MAX);
             }
         }
         if (suppressed) {
@@ -7673,7 +7816,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         return;
     if (ui->depth == CUI_CORE_STACK_MAX || ui->overflow_depth) {
         ui->overflow_depth++;
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_detail(ui, CUI_ERROR_CAPACITY, CUI_DIAGNOSTIC_BOX_DEPTH, __func__, id, ui->depth,
+                        1, CUI_CORE_STACK_MAX);
         return;
     }
     bool ok = ui->element_count < ui->config.max_elements &&
@@ -7681,14 +7825,16 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     if (id)
         for (size_t i = 0; i < ui->id_count; i++)
             if (ui->ids[i] == id || cui_core_folded(ui->ids[i]) == cui_core_folded(id)) {
-                cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
+                cui_core_detail(ui, CUI_ERROR_DUPLICATE_ID, CUI_DIAGNOSTIC_DUPLICATE_ID, __func__,
+                                id, 0, 0, 0);
                 ok = false;
                 break;
             }
     ui->opened[ui->depth++] = ok;
     if (!ok) {
         if (ui->element_count >= ui->config.max_elements)
-            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            cui_core_detail(ui, CUI_ERROR_CAPACITY, CUI_DIAGNOSTIC_ELEMENTS, __func__, id,
+                            ui->element_count, 1, ui->config.max_elements);
         return;
     }
     ui->element_count++;
@@ -7710,6 +7856,8 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     else if (parent != SIZE_MAX)
         layer = ui->nodes[parent].layer;
     ui->nodes[ui->node_count] = (cui_core_box_node){
+        .requested_width = b.width,
+        .requested_height = b.height,
         .clay_id = internal_id,
         .id = id,
         .parent = parent,
@@ -7771,6 +7919,11 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
         .border = {.color = {b.border.r, b.border.g, b.border.b, b.border.a}, .width = edges}});
 }
 bool cui_set_box_scroll_offset(cui_context *ui, cui_id id, float x, float y) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return false;
     if (!ui || !ui->in_frame || !id || !isfinite(x) || !isfinite(y) || cui_core_inert(ui))
@@ -8098,7 +8251,8 @@ static cui_str cui_core_copy_string(cui_context *ui, cui_str s) {
         return (cui_str){"", 0};
     if (!s.data || s.length > (size_t)INT32_MAX ||
         s.length >= ui->config.frame_bytes - ui->string_used) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "frame strings", 0, ui->string_used,
+                          s.length == SIZE_MAX ? SIZE_MAX : s.length + 1, ui->config.frame_bytes);
         return (cui_str){"", 0};
     }
     char *p = ui->strings + ui->string_used;
@@ -8117,7 +8271,7 @@ static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_h
             ui->text_styles[i].style.family == style.family)
             return (uint16_t)(i + 1);
     if (ui->text_style_count == ui->text_style_capacity) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "text styles", 0, ui->text_style_count, 1, ui->text_style_capacity);
         return 0;
     }
     ui->text_styles[ui->text_style_count++] = (cui_core_text_style){size, line_height, style};
@@ -8134,7 +8288,7 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
         return;
     if (ui->element_count == ui->config.max_elements) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "text elements", 0, ui->element_count, 1, ui->config.max_elements);
         return;
     }
     size = isfinite(size) ? fminf(65535, fmaxf(0, size)) : 0;
@@ -8158,7 +8312,8 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
     size_t line_bytes = source ? source->byte_end - source->byte_start + 1 : 0;
     if ((!original.data && original.length) || original.length > INT32_MAX ||
         paragraph_bytes > available || line_bytes > available - paragraph_bytes) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "text source bytes", 0, ui->string_used, paragraph_bytes + line_bytes,
+                          ui->config.frame_bytes);
         return;
     }
     uint16_t style = special ? cui_core_text_style_id(ui, size, line_height, text_style) : 0;
@@ -8216,7 +8371,7 @@ bool cui_text_context_line_colored(cui_context *ui, cui_text_line_source source,
         if (!cui_core_text_scalar(source.paragraph, &scan, &cp) || cp == 0x2028)
             return false;
     if (count > CUI_TEXT_COLOR_SPAN_MAX) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "text color spans", 0, 0, count, CUI_TEXT_COLOR_SPAN_MAX);
         return false;
     }
     if (!count)
@@ -8234,7 +8389,8 @@ bool cui_text_context_line_colored(cui_context *ui, cui_text_line_source source,
         _Alignof(cui_text_color_span);
     size_t available = ui->config.frame_bytes - ui->string_used;
     if (padding > available || count > (available - padding) / sizeof *colors) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "text color storage", 0, ui->string_used,
+                          count * sizeof *colors + padding, ui->config.frame_bytes);
         return false;
     }
     size_t before_bytes = ui->string_used, before_count = ui->text_source_count;
@@ -8294,12 +8450,14 @@ bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_c
     if (line_count >= ui->config.max_elements - ui->element_count ||
         ui->depth > CUI_CORE_STACK_MAX - 2 ||
         line_count > SIZE_MAX / sizeof(cui_core_paragraph_line)) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "paragraph preflight", 0, ui->element_count, line_count,
+                          ui->config.max_elements);
         return false;
     }
     cui_core_paragraph_line *lines = malloc(line_count * sizeof(*lines));
     cui_text_color_span *selected = count ? malloc(count * sizeof(*selected)) : NULL;
     if (!lines || (count && !selected)) {
+        cui_core_capacity(ui, "paragraph allocation", 0, 0, line_count * sizeof(*lines), 0);
         free(lines);
         free(selected);
         return false;
@@ -8342,7 +8500,8 @@ bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_c
         if (!i || lines[i].paragraph_start != lines[i - 1].paragraph_start) {
             size_t paragraph_bytes = lines[i].paragraph_end - lines[i].paragraph_start + 1;
             if (paragraph_bytes > SIZE_MAX - bytes) {
-                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                cui_core_capacity(ui, "paragraph size overflow", 0, bytes, paragraph_bytes,
+                                  SIZE_MAX);
                 free(lines);
                 free(selected);
                 return false;
@@ -8357,7 +8516,8 @@ bool cui_text_paragraph_colored(cui_context *ui, cui_str text, float size, cui_c
         size_t color_bytes = intersections * sizeof(*colors) + _Alignof(cui_text_color_span) - 1;
         if (color_bytes > SIZE_MAX - bytes ||
             bytes + color_bytes > ui->config.frame_bytes - ui->string_used - required) {
-            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            cui_core_capacity(ui, "paragraph frame storage", 0, ui->string_used + required, bytes,
+                              ui->config.frame_bytes);
             free(lines);
             free(selected);
             return false;
@@ -8458,7 +8618,7 @@ bool cui_push_id(cui_context *ui, const char *key) {
     if (!cui_core_active(ui))
         return false;
     if (ui->scope_count == CUI_CORE_STACK_MAX) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "ID scope stack", 0, ui->scope_count, 1, CUI_CORE_STACK_MAX);
         return false;
     }
     uint64_t h = cui_id_from(ui, key);
@@ -8486,6 +8646,11 @@ cui_rect cui_bounds(cui_context *ui, cui_id id) {
     return (cui_rect){d.boundingBox.x, d.boundingBox.y, d.boundingBox.width, d.boundingBox.height};
 }
 bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!ui || !id || !retained || !cui_core_active(ui))
         return false;
     for (size_t i = 0; i < ui->bounds_track_count; i++) {
@@ -8498,7 +8663,8 @@ bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
         }
     }
     if (ui->bounds_track_count == ui->config.max_elements) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "bounds tracks", id, ui->bounds_track_count, 1,
+                          ui->config.max_elements);
         return false;
     }
     ui->bounds_tracks[ui->bounds_track_count++] = (cui_core_bounds_track){id, retained};
@@ -8506,6 +8672,11 @@ bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained) {
 }
 cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str name, bool disabled,
                              bool checked, float value) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     cui_interaction out = {0};
     if (!cui_core_active(ui) || !id || cui_core_inert(ui))
         return out;
@@ -8519,7 +8690,7 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
             return out;
         }
     if (ui->semantic_count == ui->config.max_elements) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "semantics", id, ui->semantic_count, 1, ui->config.max_elements);
         return out;
     }
     if (disabled) {
@@ -8671,14 +8842,15 @@ static void *cui_core_frame_copy_parts(cui_context *ui, const void *data, size_t
     size_t alignment = _Alignof(max_align_t);
 #endif
     if (tail_bytes > SIZE_MAX - bytes) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "frame allocation size", 0, bytes, tail_bytes, SIZE_MAX);
         return NULL;
     }
     size_t total = bytes + tail_bytes;
     size_t padding = (alignment - ui->string_used % alignment) % alignment;
     size_t available = ui->config.frame_bytes - ui->string_used;
     if (padding > available || total > available - padding) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "frame allocation bytes", 0, ui->string_used, total,
+                          ui->config.frame_bytes);
         return NULL;
     }
     void *copy = ui->strings + ui->string_used + padding;
@@ -8724,7 +8896,16 @@ bool cui_set_prepaint_parts(cui_context *ui, cui_prepaint_options options, const
     if (ui->prepaint_count == ui->config.max_elements ||
         options.command_budget > ui->config.max_commands - ui->prepaint_reserved) {
         ui->prepaint_capacity = true;
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(
+            ui,
+            ui->prepaint_count == ui->config.max_elements ? "prepaint registrations"
+                                                          : "prepaint reserved commands",
+            node->id,
+            ui->prepaint_count == ui->config.max_elements ? ui->prepaint_count
+                                                          : ui->prepaint_reserved,
+            ui->prepaint_count == ui->config.max_elements ? 1 : options.command_budget,
+            ui->prepaint_count == ui->config.max_elements ? ui->config.max_elements
+                                                          : ui->config.max_commands);
         return false;
     }
     const void *payload = NULL;
@@ -8846,7 +9027,8 @@ bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *comm
             local = true;
     size_t needed = p->count + 1 + 2 * ((local || !deferred) + (late || deferred));
     if (needed > p->budget) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "prepaint writer commands", ui->nodes[p->node].id, p->count,
+                          needed - p->count, p->budget);
         return false;
     }
     if (c.type == CUI_DRAW_TEXT) {
@@ -8903,7 +9085,7 @@ static bool cui_core_prepaint_above(cui_context *ui, size_t candidate, size_t pr
     return a->layer > b->layer || (a->layer == b->layer && ao >= bo);
 }
 static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray commands) {
-    if (!ui->prepaint_count)
+    if (!ui->prepaint_count && !ui->layout_debug)
         return;
     cui_rect viewport = {0, 0, ui->config.width, ui->config.height};
     for (size_t i = 0; i < ui->node_count; i++) {
@@ -9030,7 +9212,8 @@ static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool
     if (!count)
         return true;
     if (count + 2 > ui->config.max_commands - ui->count) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "prepaint output commands", 0, ui->count, count + 2,
+                          ui->config.max_commands);
         ui->count = 0;
         ui->prepaint_capacity = true;
         return false;
@@ -9097,15 +9280,18 @@ static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray 
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
+    ui->layout_debug_ready = false;
     ui->resolving_layout = true;
     if (ui->depth || ui->overflow_depth || ui->scope_count || ui->focus_depth)
-        cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        cui_core_detail(ui, CUI_ERROR_LIFECYCLE, CUI_DIAGNOSTIC_UNBALANCED_SCOPE, __func__, 0,
+                        ui->depth, 0, 0);
     ui->overflow_depth = 0;
     while (ui->depth)
         cui_end_box(ui);
     Clay_RenderCommandArray a = Clay_EndLayout(ui->dt);
     if (!ui->prepaint_capacity)
         cui_core_prepaint_prepare(ui, a);
+    ui->layout_debug_ready = ui->layout_debug && !ui->prepaint_capacity;
     ui->count = 0;
     uint32_t underlay_background_id = 0;
     size_t conversion_clip_depth = 0;
@@ -9186,7 +9372,8 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                             (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0) +
                             node->shadow_count;
             if (needed > ui->config.max_commands - ui->count) {
-                cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                cui_core_capacity(ui, "box paint commands", node->id, ui->count, needed,
+                                  ui->config.max_commands);
                 ui->count = 0;
                 goto cui_core_commands_done;
             }
@@ -9255,7 +9442,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 mesh.color.a *= opacity;
                 cui_rect mesh_bounds;
                 if (!cui_core_mesh_bounds(mesh, &mesh_bounds)) {
-                    cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                    cui_core_capacity(ui, "mesh bounds", node->id, 0, 0, 0);
                     ui->count = 0;
                     goto cui_core_commands_done;
                 }
@@ -9386,7 +9573,9 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                         size_t available = ui->config.frame_bytes - ui->string_used;
                         if (padding > available ||
                             intersections > (available - padding) / sizeof(cui_text_color_span)) {
-                            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+                            cui_core_capacity(ui, "resolved text colors", 0, ui->string_used,
+                                              intersections * sizeof(cui_text_color_span) + padding,
+                                              ui->config.frame_bytes);
                             ui->count = 0;
                             goto cui_core_commands_done;
                         }
@@ -9434,7 +9623,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             continue;
         }
         if (ui->count == ui->config.max_commands) {
-            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            cui_core_capacity(ui, "draw commands", 0, ui->count, 1, ui->config.max_commands);
             ui->count = 0;
             break;
         }
@@ -9695,8 +9884,11 @@ cui_error cui_last_error(cui_context *ui) {
 void cui_clear_error(cui_context *ui) {
     if (!cui_core_mutation(ui))
         return;
-    if (ui)
+    if (ui) {
         ui->error = CUI_OK;
+        ui->first_diagnostic = (cui_diagnostic){0};
+        ui->latest_diagnostic = (cui_diagnostic){0};
+    }
 }
 bool cui_needs_redraw(cui_context *ui) {
     return ui && ui->dirty;
@@ -9746,12 +9938,16 @@ void *cui_resource_get(cui_context *ui, cui_id owner, cui_id namespace_id, size_
         }
     }
     if (free_slot == SIZE_MAX || bytes > ui->config.resource_bytes - ui->resource_bytes) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, free_slot == SIZE_MAX ? "resource slots" : "resource bytes", owner,
+                          free_slot == SIZE_MAX ? ui->config.max_resources : ui->resource_bytes,
+                          free_slot == SIZE_MAX ? 1 : bytes,
+                          free_slot == SIZE_MAX ? ui->config.max_resources
+                                                : ui->config.resource_bytes);
         return NULL;
     }
     void *payload = calloc(1, bytes);
     if (!payload) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "resource allocation", owner, ui->resource_bytes, bytes, 0);
         return NULL;
     }
     ui->resources[free_slot] =
@@ -10007,7 +10203,7 @@ bool cui_begin_focus_scope(cui_context *ui, cui_id id, bool modal) {
         return false;
     }
     if (ui->focus_depth == CUI_CORE_STACK_MAX || ui->focus_scope_count == CUI_CORE_STACK_MAX) {
-        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        cui_core_capacity(ui, "focus scopes", id, ui->focus_scope_count, 1, CUI_CORE_STACK_MAX);
         return false;
     }
     for (size_t i = 0; i < ui->focus_scope_count; i++)
@@ -10158,6 +10354,11 @@ bool cui_focus_restore(cui_context *ui, cui_id trigger) {
 }
 
 bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return false;
     if (!cui_core_active(ui) || !id || cui_core_inert(ui) || role < CUI_ROLE_NONE ||
@@ -10173,6 +10374,11 @@ bool cui_set_semantic_role(cui_context *ui, cui_id id, cui_role role) {
     return false;
 }
 bool cui_set_cursor(cui_context *ui, cui_id id, cui_cursor cursor) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return false;
     if (!cui_core_active(ui) || cursor < CUI_CURSOR_DEFAULT || cursor > CUI_CURSOR_HELP)
@@ -10185,6 +10391,11 @@ bool cui_set_cursor(cui_context *ui, cui_id id, cui_cursor cursor) {
     return false;
 }
 bool cui_set_touch_drag_priority(cui_context *ui, cui_id id, bool enabled) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return false;
     if (!cui_core_active(ui))
@@ -10197,6 +10408,11 @@ bool cui_set_touch_drag_priority(cui_context *ui, cui_id id, bool enabled) {
     return false;
 }
 bool cui_set_gestures(cui_context *ui, cui_id id, bool pan, bool zoom) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return false;
     if (!cui_core_active(ui))
@@ -10232,6 +10448,11 @@ cui_interaction cui_interaction_state(const cui_context *ui, cui_id id) {
     return result;
 }
 void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details details) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return;
     if (!cui_core_active(ui))
@@ -10247,6 +10468,11 @@ void cui_set_semantic_details(cui_context *ui, cui_id id, cui_semantic_details d
         }
 }
 void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui))
         return;
     if (!cui_core_active(ui))
@@ -10261,6 +10487,11 @@ void cui_set_tab_stop(cui_context *ui, cui_id id, bool enabled) {
 }
 
 void cui_set_tab_index(cui_context *ui, cui_id id, int index) {
+    if (ui && !id) {
+        cui_core_detail(ui, CUI_ERROR_INVALID_ACTION, CUI_DIAGNOSTIC_ZERO_ID, __func__, id, 0, 0,
+                        0);
+    }
+
     if (!cui_core_mutation(ui) || !cui_core_active(ui))
         return;
     for (size_t i = 0; i < ui->semantic_count; ++i)
@@ -10482,6 +10713,107 @@ bool cui_text_input_rect(const cui_context *ui, cui_rect *out) {
         *out = result;
     } else
         *out = ui->text_input_bounds;
+    return true;
+}
+
+void cui_set_diagnostic_callback(cui_context *ui, cui_diagnostic_fn callback, void *user) {
+    if (!ui || !cui_core_mutation(ui))
+        return;
+    ui->diagnostic_callback = callback;
+    ui->diagnostic_user = user;
+}
+bool cui_first_diagnostic(const cui_context *ui, cui_diagnostic *out) {
+    if (!ui || !out || ui->first_diagnostic.error == CUI_OK)
+        return false;
+    *out = ui->first_diagnostic;
+    return true;
+}
+bool cui_latest_diagnostic(const cui_context *ui, cui_diagnostic *out) {
+    if (!ui || !out || ui->latest_diagnostic.error == CUI_OK)
+        return false;
+    *out = ui->latest_diagnostic;
+    return true;
+}
+void cui_set_layout_debug(cui_context *ui, bool enabled) {
+    if (!ui || !cui_core_mutation(ui))
+        return;
+    ui->layout_debug = enabled;
+    ui->layout_debug_ready = false;
+}
+/* Locale-independent JSON numbers without changing process locale. */
+static void cui_core_debug_number(char out[48], float value) {
+    snprintf(out, 48, "%.9g", (double)(isfinite(value) ? value : 0));
+    for (char *p = out; *p; ++p)
+        if (*p == ',')
+            *p = '.';
+}
+bool cui_debug_layout_export(cui_context *ui, cui_debug_layout_format format, char *buffer,
+                             size_t capacity, size_t *required) {
+    if (!ui || !required || ui->in_frame || !ui->layout_debug_ready ||
+        (format != CUI_DEBUG_LAYOUT_TEXT && format != CUI_DEBUG_LAYOUT_JSON) ||
+        (!buffer && capacity))
+        return false;
+    size_t total = 0;
+    /* First pass measures so capacity failure leaves every buffer byte untouched. */
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        size_t offset = 0;
+        const char *head =
+            format == CUI_DEBUG_LAYOUT_JSON ? "{\"boxes\":[\n" : "CUI layout boxes\n";
+        size_t length = strlen(head);
+        if (pass)
+            memcpy(buffer + offset, head, length);
+        offset += length;
+        for (size_t i = 0; i < ui->node_count; ++i) {
+            const cui_core_box_node *n = &ui->nodes[i];
+            const cui_core_geometry *g = &ui->geometry[i];
+            char numbers[10][48], row[1024];
+            float values[] = {g->bounds.x,        g->bounds.y,        g->bounds.w, g->bounds.h,
+                              g->clip.x,          g->clip.y,          g->clip.w,   g->clip.h,
+                              n->requested_width, n->requested_height};
+            for (size_t k = 0; k < 10; ++k)
+                cui_core_debug_number(numbers[k], values[k]);
+            int count;
+            if (format == CUI_DEBUG_LAYOUT_JSON) {
+                char parent[48];
+                if (n->parent == SIZE_MAX)
+                    snprintf(parent, sizeof parent, "null");
+                else
+                    snprintf(parent, sizeof parent, "%zu", n->parent);
+                count = snprintf(row, sizeof row,
+                                 "%s{\"index\":%zu,\"id\":\"%" PRIu64 "\",\"parent\":%s,"
+                                 "\"bounds\":[%s,%s,%s,%s],\"clip\":[%s,%s,%s,%s],"
+                                 "\"requested\":[%s,%s],\"clips\":%s,\"found\":%s}\n",
+                                 i ? "," : "", i, (uint64_t)n->id, parent, numbers[0], numbers[1],
+                                 numbers[2], numbers[3], numbers[4], numbers[5], numbers[6],
+                                 numbers[7], numbers[8], numbers[9], n->clip ? "true" : "false",
+                                 g->found ? "true" : "false");
+            } else {
+                count = snprintf(row, sizeof row,
+                                 "box %zu id=%" PRIu64 " parent=%zu bounds=[%s,%s,%s,%s] "
+                                 "clip=[%s,%s,%s,%s] requested=[%s,%s] clips=%d found=%d\n",
+                                 i, (uint64_t)n->id, n->parent, numbers[0], numbers[1], numbers[2],
+                                 numbers[3], numbers[4], numbers[5], numbers[6], numbers[7],
+                                 numbers[8], numbers[9], n->clip, g->found);
+            }
+            if (count < 0 || (size_t)count >= sizeof row || (size_t)count > SIZE_MAX - offset)
+                return false;
+            if (pass)
+                memcpy(buffer + offset, row, (size_t)count);
+            offset += (size_t)count;
+        }
+        const char *tail = format == CUI_DEBUG_LAYOUT_JSON ? "]}\n" : "";
+        length = strlen(tail);
+        if (offset > SIZE_MAX - length - 1)
+            return false;
+        if (pass) {
+            memcpy(buffer + offset, tail, length);
+            buffer[offset + length] = 0;
+        }
+        total = offset + length + 1;
+        *required = total;
+        if (!buffer || capacity < total)
+            return false;
+    }
     return true;
 }
 

@@ -70,8 +70,10 @@ typedef struct {
     size_t path_count;
     bool path_truncated;
 } cui_diagnostic;
-/* Callback receives a borrowed snapshot; mutating/reentrant calls are rejected.
- * Query snapshots only; callbacks must not destroy or otherwise reenter a host. */
+/* Callback receives a borrowed snapshot. first/latest_diagnostic, last_error,
+ * frame_active and other pure getters are safe. Context mutations (including
+ * destroy, begin/end_frame, resource_find and report) are rejected during it.
+ * Do not reenter host callbacks or retain the borrowed pointer. */
 typedef void (*cui_diagnostic_fn)(void *, const cui_diagnostic *);
 void cui_set_diagnostic_callback(cui_context *, cui_diagnostic_fn, void *user);
 bool cui_first_diagnostic(const cui_context *, cui_diagnostic *out);
@@ -81,7 +83,9 @@ void cui_report_diagnostic(cui_context *, const cui_diagnostic *);
 typedef enum { CUI_DEBUG_LAYOUT_TEXT, CUI_DEBUG_LAYOUT_JSON } cui_debug_layout_format;
 /* Opt in before composition. Exports box nodes only, after end_frame and before
  * the next begin_frame. required includes NUL; insufficient buffers are untouched.
- * IDs are JSON strings to preserve all 64 bits. No allocation or file I/O. */
+ * IDs are JSON strings to preserve all 64 bits. Requested dimensions retain
+ * fixed/percent flags and maxima; nonfinite requests export as null. Bounds and
+ * clips are resolved geometry. No allocation, file I/O or locale mutation. */
 void cui_set_layout_debug(cui_context *, bool enabled);
 bool cui_debug_layout_export(cui_context *, cui_debug_layout_format, char *buffer, size_t capacity,
                              size_t *required);

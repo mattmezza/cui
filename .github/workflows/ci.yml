@@ -30,7 +30,13 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libfreetype-dev libharfbuzz-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb
       - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON
       - run: cmake --build build
-      - run: ctest --test-dir build --output-on-failure
+      - name: Expose pinned SDL to the standalone bundle consumer
+        run: cmake --install build/_deps/sdl-build --prefix "$RUNNER_TEMP/native-deps"
+      - name: Test with an isolated display, including extracted native bundle
+        run: python scripts/test_local.py --build-dir build
+        env:
+          PKG_CONFIG_PATH: ${{ runner.temp }}/native-deps/lib/pkgconfig
+          LD_LIBRARY_PATH: ${{ runner.temp }}/native-deps/lib
       - name: X11 compatibility smoke (software forced; GPU unverified)
         run: xvfb-run -a env SDL_RENDER_DRIVER=software ./build/cui_gallery --smoke 3
       - name: Independent Sokol OpenGL pixel readback (actual driver reported)

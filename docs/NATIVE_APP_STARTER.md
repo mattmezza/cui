@@ -1,5 +1,46 @@
 # Build your first native CUI app
 
+For the smallest standalone build, use the **native source bundle**. Given a C11
+compiler, GNU Make, `ar`, pkg-config, SDL3 >= 3.2, FreeType and HarfBuzz development
+packages, unpack it and run:
+
+```sh
+tar -xzf cui-native.tar.gz
+cd cui-native
+make
+./build/native_starter
+```
+
+This path includes CUI's portable sources, native SDL3 adapter, text/bidi
+implementation, generated assets, and Inter 4.1 Regular/Bold fonts with licenses.
+It requires no installed CUI package or repository checkout. The default renderer
+is SDL3's `SDL_Renderer`; Sokol and SDL_GPU are separate optional integrations.
+Linux X11 is the validated native target; Windows, macOS and Wayland native
+runtime support remains unverified. External system libraries remain prerequisites.
+
+Before building, check their visibility:
+
+```sh
+cc --version
+make --version
+ar --version
+pkg-config --atleast-version=3.2 sdl3
+pkg-config --modversion sdl3 freetype2 harfbuzz
+```
+
+The archive's README explains the dependency layers and font policy. Ordinary
+application edits compile only app objects and relink; compiler-generated header
+dependencies trigger the appropriate CUI recompilation when headers change.
+`make` never acquires dependencies. To produce the archive from this checkout,
+run `make native-dist` (Python 3 required), which writes `build/cui-native.tar.gz`.
+The shared `cmake/sources.json` drives CMake, the portable header generator and
+native source selection. Native packaging tests generate twice, compare bytes,
+unpack outside the repository, verify checksums, build, check incremental rebuilds
+and render a bounded Xvfb capture through `scripts/test_local.py`.
+
+The existing installed-library starter below remains useful for projects that
+prefer an installed CUI package and a larger three-page example.
+
 Start with [examples/native_starter](../examples/native_starter/README.md). It is
 an ordinary C11 desktop app: a left sidebar selects Home, Projects and Settings;
 an account menu stays at the sidebar bottom; Settings edits a name, toggles

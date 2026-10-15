@@ -254,5 +254,17 @@
       "backends/regex/licenses/rust-LICENSE-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
       "backends/regex/licenses/rust-LICENSE-APACHE": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a"
     }
+  },
+  {
+    "name": "Inter",
+    "version": "4.1",
+    "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+    "license": "OFL-1.1",
+    "license_file": "third_party/inter/LICENSE.txt",
+    "sha256": {
+      "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d",
+      "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+      "third_party/inter/LICENSE.txt": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+    }
   }
 ]

@@ -1,0 +1,19 @@
+{
+  "name": "Inter",
+  "version": "4.1",
+  "source": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+  "license": "OFL-1.1",
+  "license_file": "third_party/inter/LICENSE.txt",
+  "sha256": {
+    "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d",
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+    "third_party/inter/LICENSE.txt": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+  },
+  "archive_sha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+  "archive_members": {
+    "Inter-Regular.otf": "extras/otf/Inter-Regular.otf",
+    "Inter-Bold.otf": "extras/otf/Inter-Bold.otf",
+    "LICENSE.txt": "LICENSE.txt"
+  },
+  "modifications": "None; files copied byte-for-byte from the official release archive."
+}

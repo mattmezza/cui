@@ -12,6 +12,12 @@ The current [composed application](docs/COMPOSED_APPS.md) uses CUI navigation, a
 
 Build a real window with the [native app starter guide](docs/NATIVE_APP_STARTER.md): dependencies, CMake/Make/linker flags, sidebar pages and a bottom account menu.
 
+For a standalone native source bundle, run `make native-dist`. Unpack
+`build/cui-native.tar.gz` outside this checkout, then run `make` and
+`./build/native_starter`. The archive includes CUI sources and Inter Regular/Bold;
+the consumer needs a C11 compiler, GNU Make, `ar`, pkg-config, SDL3 >= 3.2,
+FreeType and HarfBuzz development packages. See the guide for platform limits.
+
 ## Build and run
 
 ```sh

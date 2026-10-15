@@ -46,3 +46,30 @@ a fixed trailing timestamp. Constrain the text column, clip long single-line
 subjects, and wrap the preview only when its row height may grow. Do not size a
 whole row from last frame's measured width: resize should resolve in this frame.
 See [IDs and lifetimes](IDS_AND_LIFETIMES.md) before repeating the row.
+
+## Single-line ellipsis with fixed trailing controls
+
+Use `cui_text_ellipsis` from `include/cui/cui_text_overflow.h` when a single-line
+subject must shorten visibly. It resolves width in the current frame, preserves
+extended grapheme boundaries, and keeps the full text as its semantic name.
+Unlike clipping, it paints a trailing ellipsis when enough space remains.
+
+```c
+cui_begin_box(ui, cui_id_from(ui, "mail-row"),
+    (cui_box){.width = -1, .row = true, .gap = 8});
+cui_text_ellipsis(ui, cui_id_from(ui, "subject"), subject,
+    (cui_text_ellipsis_options){.width = -1, .font_size = 16,
+                              .color = theme->text});
+cui_begin_box(ui, cui_id_from(ui, "star-slot"),
+    (cui_box){.width = 32, .height = 32, .fixed_width = true});
+/* Submit a star button/icon with another unique ID here. */
+cui_end_box(ui);
+cui_end_box(ui);
+```
+
+Constrain an ancestor's width. A positive helper width is fixed; negative grows;
+zero is invalid. Height uses natural font metrics. Newlines are rejected, and
+prefix/ellipsis are shaped separately. The helper does not provide paragraph
+reflow, font fallback, or contextual shaping across the ellipsis boundary.
+Check its boolean result and the context diagnostic after submission. Give each
+repeated row a persistent ID scope as described in [IDs and lifetimes](IDS_AND_LIFETIMES.md).

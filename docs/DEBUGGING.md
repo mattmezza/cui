@@ -39,7 +39,7 @@ longer needed; opt-in snapshots are a debugging aid, not an accessibility tree.
 | Missing or cut-off content | Clip ancestors, fixed height, max dimensions, capacity errors |
 | Wrong row activates after reorder | Persistent row key and local ID scope; duplicates |
 | First click seems ignored | Input targets exist only after a completed frame |
-| Missing icon | Exact registry name in `include/cui/cui_icon.h`; inspect lookup result; avoid guessed aliases |
+| Missing icon | `cui_icon_query` distinguishes unknown, catalog-not-embedded and embedded assets; inspect `CUI_ICON_NOT_FOUND`; optionally enable `debug_placeholder` |
 | Missing glyph or wrong weight | Font script coverage and registered style; no universal automatic fallback |
 | Native app fails before first frame | Font path, SDL3 error, pkg-config prerequisites and actual host display |
 
@@ -68,3 +68,27 @@ warning stream for every missing asset or every optional API.
 
 The option prints the first completed frame once, then continues the normal
 bounded or interactive run. JSON goes to stdout; diagnostics go to stderr.
+
+## Default context budgets
+
+Zero-valued capacity fields in `cui_config` select these defaults:
+
+| Field | Default | Budget |
+| --- | --- | --- |
+| `max_elements` | 4096 | Layout/component elements |
+| `max_commands` | 8192 | Draw commands |
+| `frame_bytes` | 262144 (256 KiB) | Copied frame data |
+| `max_resources` | 128 | Context-owned resource entries |
+| `resource_bytes` | 1048576 (1 MiB) | Context-owned resource storage |
+
+Use a diagnostic's subsystem and used/requested/limit counters to choose which
+budget needs attention. Raising draw-command capacity does not repair an
+unbalanced scope or duplicate ID. These are defaults for this revision, not
+promises that every application fits them.
+
+Missing-icon availability is separate from context error reporting. Read
+`cui_icon_query(cui_string("clock-3"))`: the default bundle reports
+`CUI_ICON_CATALOG_NOT_EMBEDDED`; a full-assets build reports `CUI_ICON_EMBEDDED`.
+Check the icon call's result, and use `.debug_placeholder = true` only when a
+visible development outline is useful. It retains `CUI_ICON_NOT_FOUND` and the
+full accessible name. See [Icon](ICON.md) for loader and asset limits.

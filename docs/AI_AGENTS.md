@@ -65,8 +65,27 @@ The built website publishes:
 | `llm.txt` / `llm-full.txt` | Aliases using the filenames requested for this website |
 | `markdown/…` | Plain Markdown documents generated from the same repository content |
 | `catalog.json` | All 78 entries, feature statuses and limitations |
+| `headers/<basename>.h` | Exact byte copies of this build's public headers; API authority |
+| `api-index.json` | Public symbol names and declarations with links to exported headers |
+| `build-info.json` | Source revision, build profile and header/document SHA-256 hashes |
+| `tasks/native-app.md`, `tasks/layout.md`, `tasks/debugging.md` | Focused guide bundles for common tasks |
+| `docs-index.md` | Full document index, including historical material |
+| `docs.json` | Document Markdown links, descriptions, keywords and historical flags |
 
-Start with the small index, then fetch relevant guides and public headers. Use the full bundle when your tool can accommodate it. Historical reports are labeled as historical; the current feature manifest and checkpoint take precedence.
+Start with `llms.txt` or a focused task bundle, then fetch the exact public header
+for a declaration. `api-index.json` supplies a `source_revision` and a `symbols`
+array with `name`, `declaration` and relative `header` links. `build-info.json`
+records `source_revision`, `build_profile`, `headers_sha256`,
+`documentation_sha256` and `api_authority`; use these to identify the exported
+revision rather than mixing headers from another release. Source links are pinned
+to that revision.
+
+Use the full bundle when your tool can accommodate it. `llms-full.txt` excludes
+documents marked historical, including development/validation reports. They
+remain available through `docs-index.md` and their `markdown/docs/*.md` exports;
+`docs.json` carries the `historical` flag. Historical reports are evidence for
+their recorded checkpoint, not current API or platform guarantees. The current
+headers and feature manifest take precedence.
 
 The index follows the [llms.txt proposal](https://llmstxt.org/). Publishing these files supplies readable documentation; it does not establish a search-ranking result or guarantee that an agent understands every API.
 

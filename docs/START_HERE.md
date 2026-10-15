@@ -18,7 +18,7 @@ From the repository root:
 ```sh
 cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF
 cmake --build build
-ctest --test-dir build --output-on-failure
+python scripts/test_local.py --build-dir build
 ./build/hello_world
 ```
 

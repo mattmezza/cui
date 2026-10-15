@@ -21,3 +21,16 @@ add_executable(test_starter_app test_app.c)
 target_link_libraries(test_starter_app PRIVATE starter_app)
 enable_testing()
 add_test(NAME starter_interactions COMMAND test_starter_app)
+
+option(CUI_MACOS_BUNDLE "Package the native starter as a macOS application" "${APPLE}")
+# Copied starters can point to the helper and pinned Inter resources explicitly.
+set(CUI_MACOS_BUNDLE_HELPER "${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/CUIMacOSBundle.cmake"
+    CACHE FILEPATH "Path to CUI macOS bundle helper")
+set(CUI_MACOS_FONT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/inter"
+    CACHE PATH "Pinned Inter resource directory for macOS bundles")
+if(EXISTS "${CUI_MACOS_BUNDLE_HELPER}")
+ include("${CUI_MACOS_BUNDLE_HELPER}")
+ cui_macos_bundle(native_starter FONT_DIR "${CUI_MACOS_FONT_DIR}")
+elseif(APPLE AND CUI_MACOS_BUNDLE)
+ message(FATAL_ERROR "Set CUI_MACOS_BUNDLE_HELPER to CUIMacOSBundle.cmake and CUI_MACOS_FONT_DIR to pinned Inter resources")
+endif()

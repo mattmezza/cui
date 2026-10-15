@@ -4,6 +4,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#include <stdint.h>
+#endif
+
+/* Finder supplies no --font argument. Resolve resources from the executable,
+ * independent of the working directory; command-line overrides still win. */
+static const char *bundle_font(void) {
+#ifdef __APPLE__
+    static char path[4096];
+    uint32_t size = (uint32_t)sizeof(path);
+    if (_NSGetExecutablePath(path, &size) == 0) {
+        char *slash = strrchr(path, '/');
+        const char suffix[] = "/../Resources/inter/Inter-Regular.otf";
+        if (slash && (size_t)(slash - path) + sizeof(suffix) <= sizeof(path)) {
+            strcpy(slash, suffix);
+            FILE *file = fopen(path, "rb");
+            if (file) {
+                fclose(file);
+                return path;
+            }
+        }
+    }
+#endif
+    return NULL;
+}
 static void changed(void *user, starter_event event, const starter_app *app) {
     (void)user;
     printf("event=%d page=%d signed_in=%d saves=%u name=%s notifications=%d\n", event, app->page,
@@ -25,6 +51,8 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+    if (!font_path)
+        font_path = bundle_font();
     if (!font_path || (capture && !limit)) {
         fprintf(stderr, "Supply --font; capture requires --frames.\n");
         return 1;

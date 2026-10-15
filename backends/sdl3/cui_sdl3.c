@@ -30,6 +30,7 @@ struct cui_sdl3 {
     SDL_Renderer *renderer;
     cui_font *font;
     cui_color ink;
+    float density_x, density_y, text_density;
     bool quit, glyph_ok, ime_composing, ime_commit_pending, input_suspended;
     cui_id ime_focus;
     cui_text_input_state input_state;
@@ -67,7 +68,7 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
         return NULL;
     }
     s->font = font;
-    s->window = SDL_CreateWindow(title, w, h, SDL_WINDOW_RESIZABLE);
+    s->window = SDL_CreateWindow(title, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (s->window)
         s->renderer = SDL_CreateRenderer(s->window, NULL);
     if (!s->renderer) {
@@ -408,10 +409,34 @@ bool cui_sdl3_accessibility_window(cui_sdl3 *s, cui_accessibility_window *out) {
     *out = result;
     return true;
 }
+/* Query every frame: moving a window between displays can change pixels without
+ * changing its logical size. Include renderer scale for offscreen/headless users. */
+static bool render_density(cui_sdl3 *s) {
+    int w, h;
+    SDL_RendererLogicalPresentation mode;
+    SDL_FRect rect;
+    float x, y;
+    if (!SDL_GetRenderLogicalPresentation(s->renderer, &w, &h, &mode) ||
+        !SDL_GetRenderLogicalPresentationRect(s->renderer, &rect) ||
+        !SDL_GetRenderScale(s->renderer, &x, &y))
+        return false;
+    if (mode != SDL_LOGICAL_PRESENTATION_DISABLED) {
+        if (w <= 0 || h <= 0)
+            return false;
+        x *= rect.w / w;
+        y *= rect.h / h;
+    }
+    if (!isfinite(x) || !isfinite(y) || x <= 0 || y <= 0 || x > 16 || y > 16)
+        return false;
+    s->density_x = x;
+    s->density_y = y;
+    s->text_density = fmaxf(x, y);
+    return true;
+}
 static bool fill_span(cui_sdl3 *s, const cui_draw_command *c, float left, float right, float y,
                       float height) {
-    float x0 = ceilf(c->bounds.x + left - .5f);
-    float x1 = ceilf(c->bounds.x + right - .5f);
+    float x0 = ceilf((c->bounds.x + left) * s->density_x - .5f) / s->density_x;
+    float x1 = ceilf((c->bounds.x + right) * s->density_x - .5f) / s->density_x;
     if (x1 <= x0)
         return true;
     SDL_FRect span = {x0, c->bounds.y + y, x1 - x0, height};
@@ -426,8 +451,9 @@ static bool rect(cui_sdl3 *s, const cui_draw_command *c) {
         SDL_FRect box = {c->bounds.x, c->bounds.y, c->bounds.w, c->bounds.h};
         return SDL_RenderFillRect(s->renderer, &box);
     }
-    for (int y = 0; y < (int)ceilf(c->bounds.h); y++) {
-        float h = fminf(1, c->bounds.h - y), left, right, il, ir;
+    for (int row = 0; row < (int)ceilf(c->bounds.h * s->density_y); row++) {
+        float y = row / s->density_y;
+        float h = fminf(1 / s->density_y, c->bounds.h - y), left, right, il, ir;
         if (!cui_shape_span(c, radii, edges, false, y + h / 2, &left, &right))
             continue;
         if (c->type == CUI_DRAW_BORDER &&
@@ -538,7 +564,8 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
         s->glyph_ok = false;
         return;
     }
-    SDL_FRect r = {(float)x, (float)y, (float)w, (float)h};
+    SDL_FRect r = {x / s->text_density, y / s->text_density, w / s->text_density,
+                   h / s->text_density};
     if (!SDL_SetTextureColorMod(t, s->ink.r, s->ink.g, s->ink.b) ||
         !SDL_SetTextureAlphaMod(t, s->ink.a) || !SDL_RenderTexture(s->renderer, t, NULL, &r))
         s->glyph_ok = false;
@@ -551,11 +578,12 @@ static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
 }
 static bool text_draw(cui_sdl3 *s, const cui_draw_command *c) {
     if (c->text_color_count)
-        return cui_font_draw_context_line_colored(
+        return cui_font_draw_context_line_colored_scaled(
             s->font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
-            c->color, c->text_colors, c->text_color_count, color_glyph, s);
-    return cui_font_draw_context_line(s->font, c->text, c->text_source, c->font_size, c->text_style,
-                                      c->bounds.x, c->bounds.y, glyph, s);
+            c->color, c->text_colors, c->text_color_count, s->text_density, color_glyph, s);
+    return cui_font_draw_context_line_scaled(s->font, c->text, c->text_source, c->font_size,
+                                             c->text_style, c->bounds.x, c->bounds.y,
+                                             s->text_density, glyph, s);
 }
 
 static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_only) {
@@ -564,9 +592,20 @@ static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_onl
     cui_bitmap_key key;
     if (!cui_bitmap_key_make(c, &key))
         return false;
-    size_t bytes = (size_t)key.width * key.height * 4;
-    if (bytes > BITMAP_BYTES)
+    /* Shadow preparation already supplies device-pixel rasters. Images need
+     * device resolution too, including their rounded clipping mask. */
+    if (!cui_shadow_type(c->type)) {
+        key.width = (unsigned)ceilf(c->bounds.w * s->density_x);
+        key.height = (unsigned)ceilf(c->bounds.h * s->density_y);
+        float density = fminf(s->density_x, s->density_y);
+        key.radii.top_left *= density;
+        key.radii.top_right *= density;
+        key.radii.bottom_left *= density;
+        key.radii.bottom_right *= density;
+    }
+    if (!key.height || key.width > BITMAP_BYTES / 4 / key.height)
         return false;
+    size_t bytes = (size_t)key.width * key.height * 4;
     bool shadow = cui_shadow_type(c->type);
     bitmap_entry *entry = NULL;
     for (size_t i = 0; i < BITMAP_SLOTS; i++)
@@ -666,6 +705,8 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
     if (!s || !list || (!list->commands && list->count) || !isfinite(list->width) ||
         !isfinite(list->height) || list->width < 0 || list->height < 0 || list->width > 16384 ||
         list->height > 16384)
+        return false;
+    if (!render_density(s))
         return false;
     s->frame++;
     s->shadow_frame = cui_shadow_present(list);

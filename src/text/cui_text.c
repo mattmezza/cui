@@ -262,9 +262,10 @@ cui_size cui_font_measure_styled(void *font, cui_str s, float size, cui_text_sty
 cui_size cui_font_measure(void *font, cui_str s, float size) {
     return cui_font_measure_styled(font, s, size, (cui_text_style){0});
 }
-bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style style, float x,
-                          float y, cui_glyph_fn emit, void *user) {
-    if (!isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f)
+static bool font_draw_styled_scaled(cui_font *font, cui_str s, float size, cui_text_style style,
+                                    float x, float y, float scale, cui_glyph_fn emit, void *user) {
+    if (!isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f || !isfinite(scale) ||
+        scale <= 0 || scale > 16)
         return false;
 #ifdef CUI_TEXT_BIDI
     text_lines *lines = NULL;
@@ -273,7 +274,7 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
         return false;
     bool result = true;
     for (text_lines *line = lines; line; line = line->next)
-        if (!cui_text_layout_draw(line->layout, x, y + line->y, emit, user))
+        if (!cui_text_layout_draw_scaled(line->layout, x, y + line->y, scale, emit, user))
             result = false;
     text_lines_destroy(lines);
     return result;
@@ -289,6 +290,10 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
     hb_glyph_position_t *p = hb_buffer_get_glyph_positions(b, &n);
     hb_glyph_info_t *g = hb_buffer_get_glyph_infos(b, NULL);
     float baseline = y + (float)f->face->size->metrics.ascender / 64;
+    if (FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)lroundf(size * scale * 64), 72, 72)) {
+        hb_buffer_destroy(b);
+        return false;
+    }
     bool ok = true;
     for (unsigned i = 0; i < n; i++) {
         if (fabsf(x) > 1e7f || fabsf(baseline) > 1e7f) {
@@ -301,8 +306,8 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
             continue;
         }
         FT_GlyphSlot slot = f->face->glyph;
-        emit(user, (int)lroundf(x + (float)p[i].x_offset / 64) + slot->bitmap_left,
-             (int)lroundf(baseline - (float)p[i].y_offset / 64) - slot->bitmap_top,
+        emit(user, (int)lroundf((x + (float)p[i].x_offset / 64) * scale) + slot->bitmap_left,
+             (int)lroundf((baseline - (float)p[i].y_offset / 64) * scale) - slot->bitmap_top,
              (int)slot->bitmap.width, (int)slot->bitmap.rows, slot->bitmap.pitch,
              slot->bitmap.buffer);
         x += (float)p[i].x_advance / 64;
@@ -311,6 +316,10 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
     hb_buffer_destroy(b);
     return ok;
 #endif
+}
+bool cui_font_draw_styled(cui_font *font, cui_str text, float size, cui_text_style style, float x,
+                          float y, cui_glyph_fn emit, void *user) {
+    return font_draw_styled_scaled(font, text, size, style, x, y, 1, emit, user);
 }
 bool cui_font_draw(cui_font *f, cui_str s, float size, float x, float y, cui_glyph_fn emit,
                    void *user) {
@@ -701,7 +710,10 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str paragraph, f
 
 static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_fn emit,
                              cui_color_glyph_fn colored, cui_color color,
-                             const cui_text_color_span *spans, size_t count, void *user) {
+                             const cui_text_color_span *spans, size_t count, float scale,
+                             void *user) {
+    if (!isfinite(scale) || scale <= 0 || scale > 16)
+        return false;
     if (!layout || (!emit && !colored) || !isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f ||
         fabsf(y) > 1e6f)
         return false;
@@ -715,7 +727,8 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
         cui_font *selected_face = layout->faces[layout->runs[run].face_index];
         if (selected_face != face) {
             face = selected_face;
-            if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * 64), 72, 72))
+            if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * scale * 64), 72,
+                                 72))
                 return false;
         }
         const cui_text_glyph *g = &layout->glyphs[i];
@@ -736,13 +749,13 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
                     ink = spans[span].color;
                     break;
                 }
-            colored(user, (int)lroundf(px) + slot->bitmap_left, (int)lroundf(py) - slot->bitmap_top,
-                    (int)slot->bitmap.width, (int)slot->bitmap.rows, slot->bitmap.pitch,
-                    slot->bitmap.buffer, ink);
+            colored(user, (int)lroundf(px * scale) + slot->bitmap_left,
+                    (int)lroundf(py * scale) - slot->bitmap_top, (int)slot->bitmap.width,
+                    (int)slot->bitmap.rows, slot->bitmap.pitch, slot->bitmap.buffer, ink);
         } else
-            emit(user, (int)lroundf(px) + slot->bitmap_left, (int)lroundf(py) - slot->bitmap_top,
-                 (int)slot->bitmap.width, (int)slot->bitmap.rows, slot->bitmap.pitch,
-                 slot->bitmap.buffer);
+            emit(user, (int)lroundf(px * scale) + slot->bitmap_left,
+                 (int)lroundf(py * scale) - slot->bitmap_top, (int)slot->bitmap.width,
+                 (int)slot->bitmap.rows, slot->bitmap.pitch, slot->bitmap.buffer);
     }
     return ok;
 }
@@ -751,7 +764,11 @@ bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_f
                           void *user) {
     if (!layout || !emit || !isfinite(x) || !isfinite(y))
         return false;
-    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, user);
+    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, 1, user);
+}
+bool cui_text_layout_draw_scaled(cui_text_layout *layout, float x, float y, float scale,
+                                 cui_glyph_fn emit, void *user) {
+    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, scale, user);
 }
 
 #ifdef CUI_TEXT_BIDI
@@ -1124,13 +1141,15 @@ cui_text_layout_status cui_font_text_geometry_line(void *font, cui_text_line_sou
     return CUI_TEXT_LAYOUT_UNAVAILABLE;
 #endif
 }
-bool cui_font_draw_context_line(cui_font *font, cui_str text, cui_text_line_source source,
-                                float size, cui_text_style style, float x, float y,
-                                cui_glyph_fn emit, void *user) {
+bool cui_font_draw_context_line_scaled(cui_font *font, cui_str text, cui_text_line_source source,
+                                       float size, cui_text_style style, float x, float y,
+                                       float scale, cui_glyph_fn emit, void *user) {
+    if (!isfinite(scale) || scale <= 0 || scale > 16)
+        return false;
     if (!source.paragraph.data) {
         if (source.paragraph.length || source.byte_start || source.byte_end)
             return false;
-        return cui_font_draw_styled(font, text, size, style, x, y, emit, user);
+        return font_draw_styled_scaled(font, text, size, style, x, y, scale, emit, user);
     }
 #ifdef CUI_TEXT_BIDI
     if (!emit || !cui_text_line_source_valid(source))
@@ -1148,7 +1167,7 @@ bool cui_font_draw_context_line(cui_font *font, cui_str text, cui_text_line_sour
         cui_text_line_source line = {source.paragraph, start, before};
         if (cui_font_text_geometry_line(font, line, size, style, &geometry) != CUI_TEXT_LAYOUT_OK)
             return false;
-        bool result = cui_text_layout_draw(geometry.session, x, top, emit, user);
+        bool result = cui_text_layout_draw_scaled(geometry.session, x, top, scale, emit, user);
         top += geometry.height;
         cui_release_text_geometry(&geometry);
         if (!result)
@@ -1159,18 +1178,25 @@ bool cui_font_draw_context_line(cui_font *font, cui_str text, cui_text_line_sour
     source.byte_start = start;
     if (cui_font_text_geometry_line(font, source, size, style, &geometry) != CUI_TEXT_LAYOUT_OK)
         return false;
-    bool result = cui_text_layout_draw(geometry.session, x, top, emit, user);
+    bool result = cui_text_layout_draw_scaled(geometry.session, x, top, scale, emit, user);
     cui_release_text_geometry(&geometry);
     return result;
 #else
-    return cui_font_draw_styled(font, text, size, style, x, y, emit, user);
+    return font_draw_styled_scaled(font, text, size, style, x, y, scale, emit, user);
 #endif
 }
 
-bool cui_font_draw_context_line_colored(cui_font *font, cui_text_line_source source, float size,
-                                        cui_text_style style, float x, float y, cui_color color,
-                                        const cui_text_color_span *spans, size_t count,
-                                        cui_color_glyph_fn emit, void *user) {
+bool cui_font_draw_context_line(cui_font *font, cui_str text, cui_text_line_source source,
+                                float size, cui_text_style style, float x, float y,
+                                cui_glyph_fn emit, void *user) {
+    return cui_font_draw_context_line_scaled(font, text, source, size, style, x, y, 1, emit, user);
+}
+
+bool cui_font_draw_context_line_colored_scaled(cui_font *font, cui_text_line_source source,
+                                               float size, cui_text_style style, float x, float y,
+                                               cui_color color, const cui_text_color_span *spans,
+                                               size_t count, float scale, cui_color_glyph_fn emit,
+                                               void *user) {
     if (!emit || (!spans && count) || count > CUI_TEXT_COLOR_SPAN_MAX || !isfinite(x) ||
         !isfinite(y))
         return false;
@@ -1185,7 +1211,16 @@ bool cui_font_draw_context_line_colored(cui_font *font, cui_text_line_source sou
     cui_text_geometry geometry = {0};
     if (cui_font_text_geometry_line(font, source, size, style, &geometry) != CUI_TEXT_LAYOUT_OK)
         return false;
-    bool result = text_layout_draw(geometry.session, x, y, NULL, emit, color, spans, count, user);
+    bool result =
+        text_layout_draw(geometry.session, x, y, NULL, emit, color, spans, count, scale, user);
     cui_release_text_geometry(&geometry);
     return result;
+}
+
+bool cui_font_draw_context_line_colored(cui_font *font, cui_text_line_source source, float size,
+                                        cui_text_style style, float x, float y, cui_color color,
+                                        const cui_text_color_span *spans, size_t count,
+                                        cui_color_glyph_fn emit, void *user) {
+    return cui_font_draw_context_line_colored_scaled(font, source, size, style, x, y, color, spans,
+                                                     count, 1, emit, user);
 }

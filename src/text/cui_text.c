@@ -812,7 +812,11 @@ static bool text_line_append(cui_font *font, cui_str paragraph, float size, cui_
         free(node);
         return false;
     }
-    (void)cui_text_layout_get(node->layout, &view);
+    if (!cui_text_layout_get(node->layout, &view)) {
+        cui_text_layout_destroy(node->layout);
+        free(node);
+        return false;
+    }
     node->y = bounds->height;
     bounds->height += view.height;
     if (view.width > bounds->width)
@@ -1067,7 +1071,10 @@ cui_text_layout_status cui_font_text_geometry(void *font, cui_str text, float si
                                                          0, SIZE_MAX, NULL, &layout);
     if (status != CUI_TEXT_LAYOUT_OK)
         return status;
-    (void)cui_text_layout_get(layout, &view);
+    if (!cui_text_layout_get(layout, &view)) {
+        cui_text_layout_destroy(layout);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
     *out = (cui_text_geometry){layout, &ops, view.width, view.height, text.length};
     return CUI_TEXT_LAYOUT_OK;
 }
@@ -1103,7 +1110,10 @@ cui_text_layout_status cui_font_text_geometry_line(void *font, cui_text_line_sou
     if (status != CUI_TEXT_LAYOUT_OK)
         return status;
     cui_text_layout_view view;
-    (void)cui_text_layout_get(layout, &view);
+    if (!cui_text_layout_get(layout, &view)) {
+        cui_text_layout_destroy(layout);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
     *out = (cui_text_geometry){layout, &ops, view.width, view.height, source.paragraph.length};
     return CUI_TEXT_LAYOUT_OK;
 #else

@@ -246,6 +246,48 @@ static cui_rect text_bounds(cui_draw_list list, const char *text) {
 static void pointer(cui_context *ui, cui_event_type type, float x, float y, unsigned modifiers) {
     assert(cui_queue_event(ui, (cui_event){.type = type, .x = x, .y = y, .modifiers = modifiers}));
 }
+static void single_line_placeholder_clipping(void) {
+    cui_context *ui = cui_create((cui_config){.measure = measure});
+    char buffer[128] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_input_state state = {0};
+    cui_theme theme = cui_theme_light();
+    const char *placeholder = "A long placeholder with several words that must stay on one line";
+    assert(ui && edit);
+    for (unsigned populated = 0; populated < 2; ++populated) {
+        if (populated)
+            assert(cui_edit_insert(edit, cui_string(placeholder)) == CUI_EDIT_OK);
+        cui_draw_list list =
+            styled_frame(ui, edit, &theme, &state,
+                         (cui_input_options){.width = 140, .placeholder = cui_string(placeholder)});
+        cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(1));
+        assert(fabsf(viewport.w - 118) < .001f);
+        unsigned lines = 0, clips = 0;
+        bool clipped = false;
+        for (size_t i = 0; i < list.count; ++i) {
+            const cui_draw_command *command = &list.commands[i];
+            if (command->type == CUI_DRAW_CLIP_PUSH) {
+                ++clips;
+                if (fabsf(command->bounds.w - viewport.w) < .001f)
+                    clipped = true;
+            } else if (command->type == CUI_DRAW_CLIP_POP) {
+                assert(clips);
+                --clips;
+            } else if (command->type == CUI_DRAW_TEXT) {
+                ++lines;
+                assert(clips && clipped);
+                assert(command->text.length == strlen(placeholder));
+                assert(!memcmp(command->text.data, placeholder, strlen(placeholder)));
+                assert(command->bounds.w > 140);
+                assert(fabsf(command->bounds.y - viewport.y) < .001f);
+            }
+        }
+        assert(lines == 1 && clips == 0 && state.scroll_x == 0);
+    }
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
 static void grow_resize_and_alignment(void) {
     cui_context *ui = cui_create((cui_config){.measure = measure});
     char buffer[32] = "abc";
@@ -754,6 +796,7 @@ int main(void) {
 #ifndef CUI_INPUT_BASE_ONLY
     size_metrics_and_centering();
     grow_resize_and_alignment();
+    single_line_placeholder_clipping();
 #endif
     consumed_release_ends_selection();
     input_consumes_caret_keys();

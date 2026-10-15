@@ -345,6 +345,8 @@ int main(int argc, char **argv) {
     event.key.key = SDLK_TAB;
     event.key.mod = SDL_KMOD_SHIFT;
     assert(SDL_PushEvent(&event));
+    /* An event wakeup must preserve the key for the normal dispatcher. */
+    assert(cui_sdl3_wait_events(s, 1000));
     assert(cui_sdl3_poll(s, ui));
     assert(cui_begin_frame(ui, 320, 160, 0));
     size_t count;
@@ -402,6 +404,22 @@ int main(int argc, char **argv) {
 #endif
         assert(cui_sdl3_set_decorated(s, true));
     }
+    assert(cui_sdl3_frame_delta(NULL) == 0);
+    assert(cui_sdl3_frame_delta(s) == 0);
+    Uint64 started = SDL_GetTicksNS();
+    SDL_Delay(30);
+    float elapsed = cui_sdl3_frame_delta(s);
+    double measured = (double)(SDL_GetTicksNS() - started) / 1e9;
+    assert(elapsed >= .025f && elapsed <= measured + .01);
+    /* The idle deadline expires with no event, instead of consuming CPU. */
+    SDL_FlushEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
+    started = SDL_GetTicksNS();
+    assert(!cui_sdl3_wait_events(s, 20));
+    assert(SDL_GetTicksNS() - started >= 15000000);
+    /* Idle time must not fast-forward a newly started animation. */
+    float resumed = cui_sdl3_frame_delta(s);
+    double waited_and_resumed = (double)(SDL_GetTicksNS() - started) / 1e9;
+    assert(resumed <= waited_and_resumed - .015);
     pointer_presence(s);
     assert(window.perform(window.user, CUI_WINDOW_CLOSE, 0, 0));
     assert(!cui_sdl3_poll(s, ui));

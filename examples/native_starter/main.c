@@ -57,9 +57,14 @@ int main(int argc, char **argv) {
         cui_platform clipboard = cui_sdl3_clipboard_interface(host);
         unsigned frame = 0;
         while ((!limit || frame < limit) && cui_sdl3_poll(host, ui)) {
+            if (frame && !limit && !cui_needs_redraw(ui)) {
+                (void)cui_sdl3_wait_events(host, 250);
+                continue;
+            }
             float width, height;
             cui_sdl3_size(host, &width, &height);
-            cui_draw_list list = starter_app_frame(ui, &app, width, height, .016f, &clipboard);
+            cui_draw_list list = starter_app_frame(
+                ui, &app, width, height, cui_sdl3_frame_delta(host), &clipboard);
             /* poll synchronizes IME/caret state; apply this frame's cursor immediately. */
             (void)cui_sdl3_set_cursor(host, cui_pointer_cursor(ui));
             bool painted =
@@ -71,7 +76,6 @@ int main(int argc, char **argv) {
                 break;
             }
             frame++;
-            cui_sdl3_wait(16);
         }
     }
     starter_app_destroy(&app);

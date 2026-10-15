@@ -38,7 +38,9 @@ struct cui_sdl3 {
     bitmap_entry bitmaps[BITMAP_SLOTS];
     size_t bitmap_bytes, shadow_bytes;
     size_t glyph_bytes;
-    uint64_t clock, hits, misses, frame;
+    uint64_t clock, hits, misses, frame, frame_ticks;
+    bool frame_clock_started, event_pending;
+    SDL_Event pending_event;
     char *clipboard;
     SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
 };
@@ -220,7 +222,11 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
         (void)SDL_SetTextInputArea(s->window, &area, 0);
     }
     SDL_Event e;
-    while (SDL_PollEvent(&e)) {
+    while (s->event_pending || SDL_PollEvent(&e)) {
+        if (s->event_pending) {
+            e = s->pending_event;
+            s->event_pending = false;
+        }
         cui_event v = {0};
         bool send = true, leave_after = false;
         switch (e.type) {
@@ -910,4 +916,25 @@ bool cui_sdl3_set_decorated(cui_sdl3 *s, bool decorated) {
     if (!s || !s->window || !driver || !strcmp(driver, "dummy") || !strcmp(driver, "offscreen"))
         return false;
     return SDL_SetWindowBordered(s->window, decorated);
+}
+
+float cui_sdl3_frame_delta(cui_sdl3 *s) {
+    if (!s)
+        return 0;
+    Uint64 now = SDL_GetTicksNS();
+    float dt = s->frame_clock_started ? (float)((double)(now - s->frame_ticks) / 1e9) : 0;
+    s->frame_ticks = now;
+    s->frame_clock_started = true;
+    return dt;
+}
+bool cui_sdl3_wait_events(cui_sdl3 *s, int timeout_ms) {
+    if (!s)
+        return false;
+    /* Retain the wakeup event for the ordinary input/IME dispatcher. Passing
+     * NULL to SDL's wait can leave a poll-cycle sentinel before later events. */
+    if (!s->event_pending)
+        s->event_pending = timeout_ms < 0 ? SDL_WaitEvent(&s->pending_event)
+                                        : SDL_WaitEventTimeout(&s->pending_event, timeout_ms);
+    s->frame_ticks = SDL_GetTicksNS();
+    return s->event_pending;
 }

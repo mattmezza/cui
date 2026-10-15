@@ -47,6 +47,19 @@ cui_platform cui_sdl3_clipboard_interface(cui_sdl3 *backend);
  * Native move/system-menu dispatch is not available through this interface. */
 cui_window_host cui_sdl3_window_interface(cui_sdl3 *backend);
 bool cui_sdl3_set_decorated(cui_sdl3 *backend, bool decorated);
+/* Seconds since the preceding call for this backend, including presentation.
+ * Idle event waits reset this clock so newly triggered animations do not advance
+ * by the preceding idle period. First call returns zero. Call once immediately
+ * before begin_frame. */
+float cui_sdl3_frame_delta(cui_sdl3 *backend);
+/* Wait for input, retaining the wakeup event for poll afterwards. timeout_ms
+ * is a caller deadline: zero polls, negative waits indefinitely. Returns true
+ * when an event is available. Only wait when Core has no redraw demand; external
+ * model/timer changes must invalidate Core. This does not synchronize IME state:
+ * poll once after rendering before waiting so the latest caret/focus is applied. */
+bool cui_sdl3_wait_events(cui_sdl3 *backend, int timeout_ms);
+/* Unconditional delay; prefer wait_events for idle UI and presentation sync for
+ * active frames. */
 void cui_sdl3_wait(unsigned milliseconds);
 cui_renderer cui_sdl3_interface(cui_sdl3 *backend);
 #ifdef __cplusplus

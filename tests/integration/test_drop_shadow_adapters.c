@@ -44,6 +44,12 @@ bool __wrap_SDL_RenderFillRect(SDL_Renderer *renderer, const SDL_FRect *rect) {
         draws++;
     return __real_SDL_RenderFillRect(renderer, rect);
 }
+bool __real_SDL_RenderFillRects(SDL_Renderer *renderer, const SDL_FRect *rects, int count);
+bool __wrap_SDL_RenderFillRects(SDL_Renderer *renderer, const SDL_FRect *rects, int count) {
+    if (renderer == capture_renderer)
+        draws++;
+    return __real_SDL_RenderFillRects(renderer, rects, count);
+}
 bool __wrap_SDL_RenderPresent(SDL_Renderer *renderer) {
     if (renderer != capture_renderer)
         return __real_SDL_RenderPresent(renderer);

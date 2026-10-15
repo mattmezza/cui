@@ -51,6 +51,11 @@ Boxes expose portable `align_x`/`align_y` start, center and end values. They ali
 children inside the available content area after sizing/padding; default start
 alignment preserves existing layout behavior. These are physical axes: `align_x`
 always means horizontal and `align_y` vertical, regardless of `row`.
+For a fixed or growing row, `.align_x = CUI_ALIGN_CENTER` centers the whole
+child group horizontally; `.align_y` aligns children vertically. For a column,
+`.align_y = CUI_ALIGN_CENTER` centers the group vertically and `.align_x`
+aligns children horizontally. Centering needs spare space on that axis: a FIT
+box or children that consume all available grow space leave none to distribute.
 
 `padding` is the uniform shorthand. Set `custom_padding` to replace it with
 `padding_edges` (left, right, top, bottom), preserving explicit zero edges.

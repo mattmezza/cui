@@ -59,6 +59,39 @@ IME, grapheme navigation, and native accessibility bridges.
 
 # InputGroup
 
+For a search field with a leading magnifier, use one inline custom addon. Retain
+the editor and `cui_input_group_state` in application state. The callback paints
+only the icon; the group handles clicking the prefix to focus the editor:
+
+```c
+#include "cui/cui_form.h"
+#include "cui/cui_icon.h"
+
+static void search_prefix(cui_context *ui, const cui_theme *theme, void *user,
+                          bool disabled, bool readonly, float width) {
+    (void)user; (void)disabled; (void)readonly; (void)width;
+    cui_icon_error error = cui_icon_named(ui, cui_id_from(ui, "search/icon"), theme,
+        cui_string("search"), (cui_icon_options){.size = CUI_ICON_CUSTOM, .custom_size = 16});
+    if (error != CUI_ICON_OK) { /* report the missing asset through your host */ }
+}
+
+void draw_search(cui_context *ui, const cui_theme *theme, cui_edit *query,
+                 cui_input_group_state *state) {
+    cui_input_group_addon prefix = {
+        .id = cui_id_from(ui, "search/prefix"), .width = 24,
+        .alignment = CUI_INPUT_GROUP_INLINE_START,
+        .kind = CUI_INPUT_GROUP_CUSTOM, .render = search_prefix
+    };
+    cui_input_group(ui, cui_id_from(ui, "search/group"), cui_id_from(ui, "search/input"),
+        theme, query, state, &prefix, 1, (cui_input_group_options){.width = 300,
+            .name = {"Search mail", 11}, .placeholder = {"Search mail", 11}});
+}
+```
+
+This uses the embedded `search` artwork and one shared input frame. The Form
+headless test checks icon placement and prefix-click focus followed by typing.
+Input's own options do not provide adornment slots; InputGroup owns that layout.
+
 `cui_input_group` composes exactly one retained `cui_edit` with up to 64 borrowed
 addons. `cui_input_group_state` retains input drag state, horizontal scroll, and
 measured viewport bounds. Programmatic editor updates use the ordinary Edit API;

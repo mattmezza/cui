@@ -1,5 +1,40 @@
 # Interaction and touch routing
 
+## Custom clickable rows
+
+Register interaction before opening the box, using the same stable, nonzero ID
+for both. The box supplies geometry; `cui_interact` supplies semantics and routed
+input. Register each ID once per frame. For an action row without child controls:
+
+```c
+bool mail_row(cui_context *ui, cui_id id, const cui_theme *theme,
+              cui_str sender, cui_str preview, bool selected) {
+    cui_interaction in = cui_interact(ui, id, CUI_ROLE_BUTTON, sender,
+                                      false, false, 0);
+    cui_color fill = in.pressed ? theme->accent
+                     : in.hovered ? theme->surface
+                     : selected ? theme->accent : theme->background;
+    cui_begin_box(ui, id, (cui_box){.width = -1, .padding = 8,
+        .background = fill, .border_width = in.focus_visible ? 1 : 0,
+        .border = theme->focus});
+    cui_text(ui, sender, theme->font_size, theme->text);
+    cui_text(ui, preview, theme->font_size, theme->muted);
+    cui_end_box(ui);
+    return in.activated;
+}
+/* During a frame: if (mail_row(...)) open_message(...); */
+```
+
+`hovered` paints hover, `pressed` paints the held pointer/keyboard state,
+`focus_visible` requests the keyboard focus indicator, and `activated` triggers
+the action once. Selection remains application state. Input uses completed-frame
+hit geometry, so submit the same IDs every frame and establish a frame before
+injecting pointer input. A button role provides ordinary Tab/Enter/Space action
+behavior. `CUI_ROLE_LISTITEM` describes passive list membership; it does not
+automatically add button keyboard behavior or list selection/navigation. Prefer
+an existing choice/list component when you need that interaction model. Keep
+nested interactive children out of this simple row recipe.
+
 Core accepts mouse, touch, and pen pointer events. Existing zero-initialized
 `cui_event` callers remain mouse callers. Touch adapters supply a stable
 `pointer_id` until up/cancel, paired with portable `pointer_device` (zero

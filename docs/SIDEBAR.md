@@ -85,6 +85,33 @@ enabled. `disable_caret` is an explicit additional option. The submenu rule sits
 at 14px and children start at 25px, including its 1px border and 10px inset; children
 have 4px gaps and 2px vertical padding.
 
+For an account tree, retain one state per expandable account in your application
+struct. Initialize it to zero once, rather than resetting it in the frame loop:
+
+```c
+typedef struct { cui_sidebar_item_state account; } mail_sidebar_state;
+
+void draw_accounts(cui_context *ui, const cui_theme *theme, mail_sidebar_state *state) {
+    const cui_sidebar_menu_item folders[] = {
+        {.id = cui_id_from(ui, "account/inbox"), .label = CUI_STR("Inbox"),
+         .icon = CUI_STR("inbox")},
+        {.id = cui_id_from(ui, "account/archive"), .label = CUI_STR("Archive"),
+         .icon = CUI_STR("archive")}
+    };
+    const cui_sidebar_menu_item account = {
+        .id = cui_id_from(ui, "account"), .label = CUI_STR("alice@example.com"),
+        .state = &state->account, .default_open = true, .click_to_toggle = true,
+        .children = folders, .child_count = sizeof folders / sizeof folders[0]
+    };
+    cui_sidebar_menu(ui, cui_id_from(ui, "accounts"), theme, &account, 1, false);
+}
+```
+
+Add `on_activate` and `user` to folder descriptors to select a mailbox. Descriptor
+arrays may be rebuilt each frame; their state pointers must remain valid. Omitting
+`state` does not create context-owned expansion state. `CUI_STR("Inbox")` also
+works in a static descriptor initializer; runtime strings use `cui_string`.
+
 Named icons use the actual context-owned Icon resource helper; no text glyphs
 or rectangle placeholders represent them. The four panel toggle icons and
 ChevronRight are in the default embedded bundle. The caret is 16px and rotates

@@ -58,6 +58,22 @@ Choose a font that exists on your machine; CUI does not discover an OS font by
 family name. If `cui-sdl3` is missing, inspect CUI's CMake output and confirm the
 SDL3/FreeType/HarfBuzz development packages are visible through pkg-config.
 
+The starter opens one regular face. CUI does **not** synthesize bold, semibold or
+italic. Register the matching files before measuring or drawing styled text;
+otherwise an unavailable style falls back to the regular face:
+
+```c
+/* font is the regular face returned by cui_font_open. Check both results. */
+bool bold_ok = cui_font_register_style(font,
+    (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD}, "/path/to/NotoSans-Bold.ttf");
+bool semibold_ok = cui_font_register_style(font,
+    (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD}, "/path/to/NotoSans-SemiBold.ttf");
+if (!bold_ok || !semibold_ok) { /* report missing assets to your host */ }
+```
+
+Ship these faces with your app or supply explicit paths; filenames vary between
+font families and installations. See [Text](TEXT.md) for registration and fallback.
+
 The example's CMake project consumes **installed** packages and does not build
 the repository as a subdirectory. You can copy the whole `native_starter` folder
 elsewhere and run `cmake -S /path/to/copied/folder -B /path/to/app-build -G Ninja`

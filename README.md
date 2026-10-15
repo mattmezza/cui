@@ -121,3 +121,5 @@ Run `python scripts/cui_status.py Input Icon Sidebar` to inspect selected famili
 features, evidence and limitations directly from the manifest.
 
 Original CUI source is MIT. Vendored Clay and Sokol are zlib-licensed. GPUI Kit 0.7.1 is a pinned functional reference, not linked or copied into the C runtime; see [upstream baseline](docs/upstream-baseline.md) and [dependency inventory](third_party/dependencies.json).
+
+For macOS development, see [native Mac builds and `.app` packaging](docs/MACOS.md) and [Linux-to-macOS cross compilation](docs/MACOS_CROSS.md). These workflows still require Mac runtime acceptance.

@@ -30,7 +30,12 @@ def test_invocation(build, extra, platform, environment, locate, runtime=None):
         native = [line.removeprefix('CUI_BUILD_NATIVE:BOOL=') for line in cache.read_text().splitlines()
                   if line.startswith('CUI_BUILD_NATIVE:BOOL=')] if cache.is_file() else []
         portable = native == ['OFF']
-        if not portable and env.get('GITHUB_ACTIONS') != 'true':
+        headless_macos = (platform == 'darwin' and cache.is_file() and
+                          'CUI_HEADLESS_NATIVE_TESTS:BOOL=ON' in cache.read_text().splitlines())
+        if headless_macos:
+            env['SDL_VIDEODRIVER'] = 'dummy'
+            env['SDL_RENDER_DRIVER'] = 'software'
+        if not portable and not headless_macos and env.get('GITHUB_ACTIONS') != 'true':
             raise RuntimeError('Native testing requires an isolated session; local desktop testing is disabled.')
     return command, env
 

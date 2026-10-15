@@ -10,7 +10,8 @@ import sys
 
 
 def commands(args):
-    cc = Path(args.cc).resolve()
+    # OSXCross wrappers can dispatch by symlink basename; preserve that name.
+    cc = Path(os.path.abspath(args.cc))
     sdk = Path(args.sdk).resolve()
     prefix = Path(args.prefix).resolve()
     if not cc.is_file() or not os.access(cc, os.X_OK):
@@ -26,7 +27,7 @@ def commands(args):
         if not any((directory / (name + ".pc")).is_file() for directory in pcdirs):
             raise ValueError(f"target prefix is missing {name}.pc")
     env = os.environ.copy()
-    for name in ("CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "LIBRARY_PATH", "SDKROOT", "CMAKE_PREFIX_PATH", "CMAKE_TOOLCHAIN_FILE", "CC", "CXX", "CFLAGS", "CPPFLAGS", "LDFLAGS", "PKG_CONFIG", "CMAKE_INCLUDE_PATH", "CMAKE_LIBRARY_PATH", "CMAKE_FRAMEWORK_PATH", "CMAKE_APPBUNDLE_PATH"):
+    for name in ("CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH", "LIBRARY_PATH", "SDKROOT", "CMAKE_PREFIX_PATH", "CMAKE_TOOLCHAIN_FILE", "CC", "CXX", "CFLAGS", "CXXFLAGS", "OBJCFLAGS", "OBJCXXFLAGS", "CPPFLAGS", "LDFLAGS", "PKG_CONFIG", "CMAKE_INCLUDE_PATH", "CMAKE_LIBRARY_PATH", "CMAKE_FRAMEWORK_PATH", "CMAKE_APPBUNDLE_PATH"):
         env.pop(name, None)
     env.update(PKG_CONFIG_PATH="", PKG_CONFIG_LIBDIR=os.pathsep.join(map(str, pcdirs)),
                PKG_CONFIG_SYSROOT_DIR="", MACOSX_DEPLOYMENT_TARGET=args.deployment_target)
@@ -36,6 +37,7 @@ def commands(args):
                  "-DCUI_MACOS_CC=" + str(cc), "-DCUI_MACOS_SDK=" + str(sdk),
                  "-DCUI_MACOS_PREFIX=" + str(prefix), "-DCUI_MACOS_ARCH=" + args.arch,
                  "-DCUI_MACOS_DEPLOYMENT_TARGET=" + args.deployment_target,
+                 "-DCUI_MACOS_DEPENDENCY_LICENSE_DIR=" + str(prefix / "share/licenses"),
                  "-DCMAKE_BUILD_TYPE=Release", "-DCUI_BUILD_NATIVE=ON", "-DCUI_REQUIRE_NATIVE=ON",
                  "-DCUI_BUILD_NATIVE_STARTER=ON", "-DCUI_BUILD_CPP_EXAMPLE=OFF", "-DCUI_FETCH_SDL=OFF",
                  "-DCUI_BUILD_ACCESSIBILITY=OFF"]

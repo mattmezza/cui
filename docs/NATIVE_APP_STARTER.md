@@ -18,7 +18,7 @@ implementation, generated assets, and Inter 4.1 Regular/Bold fonts with licenses
 It requires no installed CUI package or repository checkout. The default renderer
 is SDL3's `SDL_Renderer`; Sokol and SDL_GPU are separate optional integrations.
 Linux X11 is the validated native target; Windows, macOS and Wayland native
-runtime support remains unverified. External system libraries remain prerequisites.
+runtime support remains unverified. External system libraries remain prerequisites. See [macOS native builds and bundles](MACOS.md) and [Linux-to-macOS cross compilation](MACOS_CROSS.md) for the new workflows and their validation limits.
 
 Before building, check their visibility:
 

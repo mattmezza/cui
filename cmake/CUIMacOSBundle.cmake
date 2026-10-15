@@ -29,6 +29,28 @@ function(cui_macos_bundle target)
     target_sources(${target} PRIVATE "${path}")
     set_source_files_properties("${path}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/inter")
   endforeach()
+  # Preserve the licenses of CUI's vendored runtime sources in the app.
+  set(repo "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
+  foreach(entry "LICENSE" "third_party/clay/LICENSE" "third_party/sheenbidi/LICENSE" "third_party/unicode/17.0.0/LICENSE.txt")
+    if(EXISTS "${repo}/${entry}")
+      get_filename_component(owner "${entry}" DIRECTORY)
+      target_sources(${target} PRIVATE "${repo}/${entry}")
+      set_source_files_properties("${repo}/${entry}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/licenses/${owner}")
+    endif()
+  endforeach()
+  set(CUI_MACOS_DEPENDENCY_LICENSE_DIR "" CACHE PATH "Pinned native dependency license directory")
+  if(CUI_MACOS_DEPENDENCY_LICENSE_DIR)
+    if(NOT IS_DIRECTORY "${CUI_MACOS_DEPENDENCY_LICENSE_DIR}")
+      message(FATAL_ERROR "Missing dependency license directory: ${CUI_MACOS_DEPENDENCY_LICENSE_DIR}")
+    endif()
+    file(GLOB_RECURSE licenses LIST_DIRECTORIES FALSE "${CUI_MACOS_DEPENDENCY_LICENSE_DIR}/*")
+    foreach(license IN LISTS licenses)
+      file(RELATIVE_PATH relative "${CUI_MACOS_DEPENDENCY_LICENSE_DIR}" "${license}")
+      get_filename_component(owner "${relative}" DIRECTORY)
+      target_sources(${target} PRIVATE "${license}")
+      set_source_files_properties("${license}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/licenses/native/${owner}")
+    endforeach()
+  endif()
   set_target_properties(${target} PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "CUI Native Starter"
@@ -42,6 +64,9 @@ function(cui_macos_bundle target)
     endif()
     # Only run during installation, after the bundle and its resources exist.
     install(CODE "include(BundleUtilities)\nfixup_bundle(\"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_BUNDLE_DIR_NAME:${target}>\" \"\" \"$<TARGET_FILE_DIR:${target}>\")")
+    # No identity or keychain is used. Re-sign changed Mach-O files for local
+    # Apple Silicon development; Developer ID distribution is separate.
+    install(CODE "include(\"${CMAKE_CURRENT_FUNCTION_LIST_DIR}/CUISignMacOS.cmake\")\ncui_sign_macos_development_bundle(\"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_BUNDLE_DIR_NAME:${target}>\")")
   elseif(CMAKE_CROSSCOMPILING)
     message(STATUS "macOS cross bundle: runtime dylib deployment and signing are not performed")
   endif()

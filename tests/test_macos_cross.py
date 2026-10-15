@@ -2,6 +2,7 @@
 import argparse
 import importlib.util
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -40,6 +41,34 @@ class MacOSCrossTests(unittest.TestCase):
         self.assertIn("-DCUI_REQUIRE_NATIVE=ON", configure)
         self.assertIn("-DCUI_BUILD_CPP_EXAMPLE=OFF", configure)
         self.assertEqual(build[-2:], ["--target", "cui_native_starter"])
+
+    def test_compiler_symlink_name_is_preserved(self):
+        wrapper = self.root / "wrapper"
+        wrapper.write_text("#!/bin/sh\nexit 0\n")
+        wrapper.chmod(0o755)
+        self.cc.unlink()
+        self.cc.symlink_to(wrapper)
+        configure, _, _ = cross.commands(self.args)
+        self.assertIn("-DCUI_MACOS_CC=" + str(self.cc), configure)
+
+    def test_toolchain_selects_target_cxx(self):
+        cxx = self.root / "arm64-apple-darwin-clang++"
+        cxx.write_text("#!/bin/sh\nexit 0\n")
+        cxx.chmod(0o755)
+        toolchain = Path(__file__).resolve().parents[1] / "cmake/toolchains/macos-osxcross.cmake"
+        script = self.root / "check.cmake"
+        script.write_text(f'''set(CUI_MACOS_CC "{self.cc}")
+set(CUI_MACOS_SDK "{self.sdk}")
+set(CUI_MACOS_PREFIX "{self.prefix}")
+set(CUI_MACOS_ARCH arm64)
+set(CUI_MACOS_DEPLOYMENT_TARGET 11.0)
+include("{toolchain}")
+if(NOT CMAKE_CXX_COMPILER STREQUAL "{cxx}")
+ message(FATAL_ERROR "Host C++ compiler selected")
+endif()
+''')
+        result = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_no_sdk_is_an_error(self):
         self.args.sdk = str(self.root / "absent")

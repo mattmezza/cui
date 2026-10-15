@@ -14,6 +14,7 @@
 #include "cui_form.h"
 #include "cui_icon.h"
 #include "cui_label.h"
+#include "cui_text_overflow.h"
 #include "cui_numeric.h"
 #include "cui_otp.h"
 #include "cui_picker.h"

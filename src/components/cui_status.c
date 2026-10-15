@@ -226,6 +226,12 @@ bool cui_tag_named_palette(cui_status_color name, bool dark, cui_tag_palette *ou
 bool cui_begin_tag(cui_context *ui, cui_id id, const cui_theme *t, cui_tag_options o,
                    cui_tag_style *out) {
     cui_tag_style s;
+    if (ui && !id) {
+        cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
+            .detail = CUI_DIAGNOSTIC_ZERO_ID, .operation = "cui_begin_tag", .id = id};
+        cui_report_diagnostic(ui, &diagnostic);
+        return false;
+    }
     if (!ui || !cui_tag_resolve(t, o, cui_hovered(ui, id), &s))
         return false;
     /* Separate horizontal/vertical padding using inner composition, since the

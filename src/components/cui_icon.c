@@ -97,6 +97,15 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                 .width = paint.w, .height = paint.h, .fixed_width = true, .fixed_height = true});
         cui_end_box(ui);
     }
+    if (result == CUI_ICON_NOT_FOUND && options.debug_placeholder) {
+        float opacity = options.custom_opacity ? options.opacity : 1;
+        opacity = isfinite(opacity) ? fminf(1, fmaxf(0, opacity)) : 0;
+        color.a = (uint8_t)(color.a * opacity);
+        cui_begin_absolute_box(ui, id ^ UINT64_C(0x334af02cb941785d),
+            (cui_box){.border = color, .border_width = 1, .clip = true},
+            (cui_rect){0, 0, width, height});
+        cui_end_box(ui);
+    }
     cui_end_box(ui);
     return result;
 }
@@ -148,8 +157,19 @@ cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme
             index = i;
             break;
         }
-    if (index == SIZE_MAX)
-        return CUI_ICON_NOT_FOUND;
+    if (index == SIZE_MAX) {
+        if (!options.debug_placeholder)
+            return CUI_ICON_NOT_FOUND;
+        cui_icon_state missing = {0};
+        if (!cui_icon_set_path(&missing, cui_string("__cui_missing_debug_placeholder__"), NULL, NULL)) {
+            cui_icon_error error = missing.error;
+            cui_icon_state_destroy(&missing);
+            return error;
+        }
+        cui_icon_error error = cui_icon(ui, id, theme, &missing, options);
+        cui_icon_state_destroy(&missing);
+        return error == CUI_ICON_OK ? CUI_ICON_NOT_FOUND : error;
+    }
     cui_icon_resource *resource = cui_icon_resource_get(ui, id, UINT64_C(0xe8e2ea151d9d14b4));
     if (!resource)
         return CUI_ICON_ALLOCATION;

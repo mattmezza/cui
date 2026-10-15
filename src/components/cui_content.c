@@ -93,6 +93,12 @@ bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options
 void cui_avatar(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float size) {
     if (!ui || !t)
         return;
+    if (!id) {
+        cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
+            .detail = CUI_DIAGNOSTIC_ZERO_ID, .operation = "cui_avatar", .id = id};
+        cui_report_diagnostic(ui, &diagnostic);
+        return;
+    }
     size = cui_content_positive(size, 48);
     char initials[9];
     size_t n = cui_avatar_initials(name, initials);
@@ -164,8 +170,14 @@ bool cui_avatar_image_prepare(cui_avatar_image *s, cui_bitmap source) {
 }
 bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_avatar_options o) {
-    if (!ui || !id || !t)
+    if (!ui || !t)
         return false;
+    if (!id) {
+        cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
+            .detail = CUI_DIAGNOSTIC_ZERO_ID, .operation = "cui_avatar_ex", .id = id};
+        cui_report_diagnostic(ui, &diagnostic);
+        return false;
+    }
     float size = fminf(cui_content_positive(o.size, 48), 512);
     float ring = isfinite(o.ring_width) ? fmaxf(0, fminf(o.ring_width, size * .25f)) : 0;
     bool photo = o.image_state && cui_avatar_image_prepare(o.image_state, o.image);

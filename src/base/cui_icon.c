@@ -190,6 +190,11 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
             return &cui_icon_assets[i];
     return NULL;
 }
+cui_icon_availability cui_icon_query(cui_str name) {
+    const cui_icon_asset_record *asset = cui_icon_lookup(name);
+    return !asset ? CUI_ICON_UNKNOWN
+                  : asset->svg ? CUI_ICON_EMBEDDED : CUI_ICON_CATALOG_NOT_EMBEDDED;
+}
 bool cui_icon_asset(cui_str name, cui_str *svg) {
     if (!svg)
         return false;

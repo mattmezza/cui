@@ -792,6 +792,37 @@ static void test_invalid_portal_at_depth_limit(void) {
     cui_destroy(ui);
 }
 
+static const cui_str literal_initializer = CUI_STR("a\0b");
+static void test_padding_and_literal(void) {
+    cui_str expression = (cui_str)CUI_STR("hello");
+    assert(literal_initializer.length == 3 && literal_initializer.data[2] == 'b');
+    assert(expression.length == 5 && memcmp(expression.data, "hello", 5) == 0);
+    cui_context *ui = make();
+    for (int custom = 0; custom < 2; custom++) {
+        begin(ui);
+        cui_begin_box(ui, 10, (cui_box){.padding = 9, .custom_padding = custom,
+                                      .padding_edges = {0, 7, 3, 11}});
+        cui_begin_box(ui, 11, (cui_box){.width = 20, .height = 10});
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_end_frame(ui);
+        cui_rect parent = cui_bounds(ui, 10), child = cui_bounds(ui, 11);
+        assert(child.x == (custom ? 0 : 9) && child.y == (custom ? 3 : 9));
+        assert(parent.w == (custom ? 27 : 38) && parent.h == (custom ? 24 : 28));
+        assert(cui_last_error(ui) == CUI_OK);
+    }
+    begin(ui);
+    cui_begin_box(ui, 10, (cui_box){.custom_padding = true,
+                                  .padding_edges = {-1, NAN, INFINITY, 0}});
+    cui_begin_box(ui, 11, (cui_box){.width = 20, .height = 10});
+    cui_end_box(ui);
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    cui_rect parent = cui_bounds(ui, 10);
+    assert(parent.w == 20 && parent.h == 10);
+    cui_destroy(ui);
+}
+
 static void test_child_alignment(void) {
     cui_context *ui = make();
     begin(ui);
@@ -3475,6 +3506,7 @@ int main(void) {
     test_focus_scopes();
     test_portals();
     test_floating_ancestral_clips();
+    test_padding_and_literal();
     test_child_alignment();
     test_invalid_portal_at_depth_limit();
     test_scope_dismissal();

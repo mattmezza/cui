@@ -1745,7 +1745,12 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
                                                 b.width_percent),
                               cui_core_box_axis(b.height, b.fixed_height, b.max_height,
                                                 b.height_percent)},
-                   .padding = CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
+                   .padding = b.custom_padding
+                                  ? (Clay_Padding){cui_core_scalar(b.padding_edges.left),
+                                                   cui_core_scalar(b.padding_edges.right),
+                                                   cui_core_scalar(b.padding_edges.top),
+                                                   cui_core_scalar(b.padding_edges.bottom)}
+                                  : CLAY_PADDING_ALL(cui_core_scalar(b.padding)),
                    .childGap = cui_core_scalar(b.gap),
                    .childAlignment = {.x = b.align_x == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER
                                            : b.align_x == CUI_ALIGN_END  ? CLAY_ALIGN_X_RIGHT

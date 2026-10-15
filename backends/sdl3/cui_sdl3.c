@@ -414,14 +414,21 @@ bool cui_sdl3_accessibility_window(cui_sdl3 *s, cui_accessibility_window *out) {
     *out = result;
     return true;
 }
+/* Bound stack use while preserving SDL rectangle rasterization and blend rules. */
+#define RECT_SPAN_BATCH 128
 static bool fill_span(cui_sdl3 *s, const cui_draw_command *c, float left, float right, float y,
-                      float height) {
+                      float height, SDL_FRect spans[RECT_SPAN_BATCH], int *count) {
     float x0 = ceilf(c->bounds.x + left - .5f);
     float x1 = ceilf(c->bounds.x + right - .5f);
     if (x1 <= x0)
         return true;
-    SDL_FRect span = {x0, c->bounds.y + y, x1 - x0, height};
-    return SDL_RenderFillRect(s->renderer, &span);
+    spans[(*count)++] = (SDL_FRect){x0, c->bounds.y + y, x1 - x0, height};
+    if (*count < RECT_SPAN_BATCH)
+        return true;
+    if (!SDL_RenderFillRects(s->renderer, spans, *count))
+        return false;
+    *count = 0;
+    return true;
 }
 static bool rect(cui_sdl3 *s, const cui_draw_command *c) {
     SDL_SetRenderDrawColor(s->renderer, c->color.r, c->color.g, c->color.b, c->color.a);
@@ -432,18 +439,21 @@ static bool rect(cui_sdl3 *s, const cui_draw_command *c) {
         SDL_FRect box = {c->bounds.x, c->bounds.y, c->bounds.w, c->bounds.h};
         return SDL_RenderFillRect(s->renderer, &box);
     }
+    SDL_FRect spans[RECT_SPAN_BATCH];
+    int count = 0;
     for (int y = 0; y < (int)ceilf(c->bounds.h); y++) {
         float h = fminf(1, c->bounds.h - y), left, right, il, ir;
         if (!cui_shape_span(c, radii, edges, false, y + h / 2, &left, &right))
             continue;
         if (c->type == CUI_DRAW_BORDER &&
             cui_shape_span(c, radii, edges, true, y + h / 2, &il, &ir)) {
-            if (!fill_span(s, c, left, il, (float)y, h) || !fill_span(s, c, ir, right, (float)y, h))
+            if (!fill_span(s, c, left, il, (float)y, h, spans, &count) ||
+                !fill_span(s, c, ir, right, (float)y, h, spans, &count))
                 return false;
-        } else if (!fill_span(s, c, left, right, (float)y, h))
+        } else if (!fill_span(s, c, left, right, (float)y, h, spans, &count))
             return false;
     }
-    return true;
+    return count == 0 || SDL_RenderFillRects(s->renderer, spans, count);
 }
 static void evict(cui_sdl3 *s, glyph_entry *e) {
     if (e->coverage)

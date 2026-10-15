@@ -33,3 +33,9 @@ Single-line inputs render both their value and placeholder as one unwrapped line
 including when the host supplies only a measurement callback. The content viewport
 clips overflow; focused values scroll horizontally to keep the caret visible.
 A long placeholder does not increase the input height or wrap into extra lines.
+
+Known layout limitation: a grow-width input (`width = -1`) containing a long
+value can report a content-sized viewport even inside a narrower fixed parent.
+Ancestor clipping still limits painting, but viewport-based hit geometry and
+caret scrolling may be inaccurate. Use an explicit input width for this case.
+Long placeholders in empty grow-width inputs retain the constrained viewport.

@@ -255,12 +255,22 @@ static void single_line_placeholder_clipping(void) {
     cui_theme theme = cui_theme_light();
     const char *placeholder = "A long placeholder with several words that must stay on one line";
     assert(ui && edit);
-    for (unsigned populated = 0; populated < 2; ++populated) {
-        if (populated)
+    for (unsigned populated = 0; populated < 3; ++populated) {
+        if (populated == 1)
             assert(cui_edit_insert(edit, cui_string(placeholder)) == CUI_EDIT_OK);
-        cui_draw_list list =
-            styled_frame(ui, edit, &theme, &state,
-                         (cui_input_options){.width = 140, .placeholder = cui_string(placeholder)});
+        if (populated == 2) {
+            assert(cui_edit_select(edit, 0, strlen(placeholder)) == CUI_EDIT_OK);
+            assert(cui_edit_insert(edit, cui_string("")) == CUI_EDIT_OK);
+        }
+        assert(cui_begin_frame(ui, 400, 200, .016f));
+        cui_begin_box(ui, 100, (cui_box){.width = 140, .fixed_width = true});
+        assert(cui_input_ex(ui, 1, &theme, cui_string("Name"), edit, &state,
+                            (cui_input_options){.width = populated == 2 ? -1 : 140,
+                                                .placeholder = cui_string(placeholder)})
+                   .error == CUI_EDIT_OK);
+        cui_end_box(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
         cui_rect viewport = cui_bounds(ui, cui_input_viewport_id(1));
         assert(fabsf(viewport.w - 118) < .001f);
         unsigned lines = 0, clips = 0;

@@ -69,3 +69,12 @@ and `cui_slider_options`. It emits typed synchronous requests with copied source
 events. Invalid arguments return false without changing state. Disabled/read-only
 transitions cancel an active drag; no callback means no requests. State and user
 callbacks must survive the call. Submit it inside a box with its own stable ID.
+
+## Real optional decoder example
+
+The [silent FFmpeg example](../examples/video_player/README.md) decodes on a worker,
+retains bounded frame leases and demonstrates confirmed play/pause/seek/rate
+requests. Its strict external harness runs portable controls, software decoded
+pixels and private-Xvfb native decoded captures. It supplies no built-in codec or
+universal format/browser/audio support; see its exact evidence and version/license
+recording before using it as a host-adapter starting point.

@@ -6,8 +6,11 @@ it, rather than putting decoding, transport and UI in one component.
 
 The portable timeline and borrowed CPU RGBA surface are now available in
 `cui/cui_video.h`; [the implementation guide](VIDEO_GUIDE.md) describes their
-actual behavior and tests. Decoder integration, audio, frame leases/queues,
-automatic scheduling and the full controls component below remain planned.
+actual behavior and tests. The next-batch [controlled player](VIDEO_PLAYER.md) and optional
+[FFmpeg example](../examples/video_player/README.md) implement requests, a bounded
+host-owned queue and actual silent local-file decoding. They do not change the
+78-component baseline. Audio, browser playback, general decoder-adapter ABI and
+production buffering/scheduling remain planned.
 
 ## Existing foundation and its limit
 

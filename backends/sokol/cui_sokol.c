@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sokol.h"
+#include "../../src/core/cui_text_paint_internal.h"
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #define SOKOL_GLCORE
@@ -573,6 +574,8 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
         return fail(r, "CUI Sokol render cannot run inside an active host pass");
     if (r->rendered)
         return fail(r, "Host must commit before rendering this CUI adapter again");
+    if (!cui_text_paints_supported(list, false))
+        return false;
     cui_draw_list prepared;
     if (!cui_shadow_prepare(&r->shadows, list, r->config.target.width / list->width,
                             r->config.target.height / list->height, 0, 0, &prepared))

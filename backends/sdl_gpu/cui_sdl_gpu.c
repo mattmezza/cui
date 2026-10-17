@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl_gpu.h"
+#include "../../src/core/cui_text_paint_internal.h"
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #include "shaders/generated.h"
@@ -523,6 +524,8 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
         physical_h <= 0)
         return false;
     bool shadow_frame = cui_shadow_present(list);
+    if (!cui_text_paints_supported(list, false))
+        return false;
     cui_draw_list prepared;
     if (!cui_shadow_prepare(&r->shadows, list, physical_w / list->width, physical_h / list->height,
                             0, 0, &prepared) ||

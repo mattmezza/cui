@@ -635,17 +635,27 @@
     },
     {
       "api_symbols": [
+        "cui_spinner_ex",
+        "cui_spinner_options_default",
         "cui_spinner",
         "cui_loading_phase"
       ],
-      "state_types": [],
-      "state_ownership": "Caller owns elapsed time/phase and reduced-motion preference.",
-      "interaction": "Presentation only; no action callback.",
-      "usage": "Derive phase from elapsed time and schedule redraws while loading.",
+      "state_types": [
+        "cui_loading_motion",
+        "cui_spinner_options",
+        "cui_loading_motion_result"
+      ],
+      "state_ownership": "Caller owns persistent motion state, the monotonic host clock and reduced-motion preference.",
+      "interaction": "Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.",
+      "usage": "Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon.",
       "docs": [
+        "docs/SPINNER.md",
         "docs/CONTENT.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_spinner_paint_fn",
+        "cui_loading_ease_fn"
+      ],
       "scope": "styled frame component",
       "name": "Spinner",
       "public_header": "include/cui/cui_content.h",

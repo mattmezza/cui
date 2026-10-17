@@ -465,13 +465,13 @@ API: `cui_skeleton`, `cui_loading_phase`. [Public header](../include/cui/cui_con
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns elapsed time/phase and reduced-motion preference.
+**State:** Caller owns persistent motion state, the monotonic host clock and reduced-motion preference.
 
-**Interaction:** Presentation only; no action callback.
+**Interaction:** Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.
 
-**Usage:** Derive phase from elapsed time and schedule redraws while loading.
+**Usage:** Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon.
 
-API: `cui_spinner`, `cui_loading_phase`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
 
 ## Stepper
 

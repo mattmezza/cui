@@ -171,6 +171,7 @@ jobs:
         run: |
           uv run tests/web/test_text_gradient.py
           uv run tests/web/test_gradient_gallery.py
+          uv run tests/web/test_spinner_gallery.py
       - name: Verify independent Plot and Chart motion policies
         run: uv run tests/web/test_plot_chart_owner_motion.py
       - name: Verify portable theme host preferences with real browser events

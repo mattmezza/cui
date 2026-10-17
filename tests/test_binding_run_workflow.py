@@ -22,7 +22,7 @@ def validate(text):
         'cmake -S tools/native-deps', 'python tests/test_native_deps.py --prefix',
         '-DCUI_REQUIRE_NATIVE=ON', '-DCUI_BUILD_NATIVE=ON',
         '-DCUI_BUILD_BRIDGE=ON', '-DCUI_SANITIZE=OFF',
-        '--target cui_bridge', 'xvfb xauth xdotool', 'LD_RUN_PATH:',
+        '--target cui_bridge', 'xvfb xauth xdotool', 'LD_RUN_PATH=$RUNNER_TEMP/cui-run-deps/lib',
         'rustup run 1.85.1 python scripts/test_binding_run.py',
         '--source-root "$PWD"', '--build-dir "$RUNNER_TEMP/cui-binding-run"',
         '--library "$RUNNER_TEMP/cui-run-native/libcui_bridge.so"',
@@ -55,6 +55,23 @@ class WorkflowTests(unittest.TestCase):
             with self.subTest(after=after):
                 self.assertTrue(validate(source.replace(before, after)))
 
+    def test_runner_paths_are_initialized_inside_a_step(self):
+        source = WORKFLOW.read_text()
+        job_header = source.split('    steps:', 1)[0]
+        self.assertNotIn('${{ runner.', job_header)
+        for name in ('PKG_CONFIG_PATH', 'LD_RUN_PATH'):
+            self.assertRegex(source, name + r'=\$RUNNER_TEMP/[^\n]+ >> "\$GITHUB_ENV"')
+
+    def test_filtered_bridge_jobs_build_portable_runner(self):
+        source = (ROOT / '.github/workflows/ci.yml').read_text()
+        for job in ('node-builders', 'go-rust-builders'):
+            with self.subTest(job=job):
+                section = source.split('  ' + job + ':', 1)[1]
+                section = re.split(r'\n  [a-zA-Z][\w-]*:', section, maxsplit=1)[0]
+                build = re.search(r'cmake --build [^\n]+--target ([^\n]+)', section)
+                self.assertIsNotNone(build)
+                self.assertIn('test_bridge_portable_run', build.group(1).split())
+
     def test_every_literal_run_block_is_valid_bash(self):
         # This workflow deliberately uses only multiline literal shell blocks.
         lines = WORKFLOW.read_text().splitlines()
@@ -69,7 +86,7 @@ class WorkflowTests(unittest.TestCase):
                     break
                 body.append(candidate[indent + 2:])
             scripts.append('\n'.join(body))
-        self.assertEqual(len(scripts), 5)
+        self.assertEqual(len(scripts), 6)
         for script in scripts:
             result = subprocess.run(['bash', '-n'], input=script, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)

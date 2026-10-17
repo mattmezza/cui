@@ -32,15 +32,22 @@ static inline bool cui_typography_token_valid(cui_typography_token token) {
 /* Copy a validated role token. Failure preserves *out. Only the selected role
  * must be configured; zero-initialized unused roles remain invalid. */
 static inline bool cui_typography_resolve(const cui_typography_roles *roles,
-                                           cui_typography_role role, cui_typography_token *out) {
+                                          cui_typography_role role, cui_typography_token *out) {
     if (!roles || !out)
         return false;
     cui_typography_token token;
     switch (role) {
-    case CUI_TYPOGRAPHY_BODY: token = roles->body; break;
-    case CUI_TYPOGRAPHY_HEADING: token = roles->heading; break;
-    case CUI_TYPOGRAPHY_CODE: token = roles->code; break;
-    default: return false;
+    case CUI_TYPOGRAPHY_BODY:
+        token = roles->body;
+        break;
+    case CUI_TYPOGRAPHY_HEADING:
+        token = roles->heading;
+        break;
+    case CUI_TYPOGRAPHY_CODE:
+        token = roles->code;
+        break;
+    default:
+        return false;
     }
     if (!cui_typography_token_valid(token))
         return false;
@@ -51,15 +58,15 @@ static inline bool cui_typography_resolve(const cui_typography_roles *roles,
  * cluster-start color semantics. Same capacity/error contract as paragraph API.
  * Tokens are copied by value; the helper does not retain the token or role map. */
 static inline bool cui_typography_text_colored(cui_context *ui, cui_str text,
-                                                cui_typography_token token, cui_color color,
-                                                const cui_text_color_span *spans, size_t count) {
+                                               cui_typography_token token, cui_color color,
+                                               const cui_text_color_span *spans, size_t count) {
     if (!cui_typography_token_valid(token))
         return false;
     return cui_text_paragraph_colored_aligned(ui, text, token.size, color, token.line_height,
-                                               token.style, token.wrap, spans, count, token.align);
+                                              token.style, token.wrap, spans, count, token.align);
 }
-static inline bool cui_typography_text(cui_context *ui, cui_str text,
-                                        cui_typography_token token, cui_color color) {
+static inline bool cui_typography_text(cui_context *ui, cui_str text, cui_typography_token token,
+                                       cui_color color) {
     return cui_typography_text_colored(ui, text, token, color, NULL, 0);
 }
 #ifdef __cplusplus

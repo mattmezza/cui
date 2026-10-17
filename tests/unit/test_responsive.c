@@ -1,9 +1,15 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_responsive.h"
-#include <stdio.h>
 #include <float.h>
+#include <stdio.h>
 #include <stdlib.h>
-#define CHECK(x) do { if (!(x)) { fprintf(stderr, "%d: %s\n", __LINE__, #x); exit(1); } } while (0)
+#define CHECK(x)                                                                                   \
+    do {                                                                                           \
+        if (!(x)) {                                                                                \
+            fprintf(stderr, "%d: %s\n", __LINE__, #x);                                             \
+            exit(1);                                                                               \
+        }                                                                                          \
+    } while (0)
 int main(void) {
     const float thresholds[] = {640, 768, 1024, 1280, 1536};
     for (int i = 0; i < 5; ++i) {

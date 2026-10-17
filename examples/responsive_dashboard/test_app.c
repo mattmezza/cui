@@ -1,17 +1,25 @@
 /* SPDX-License-Identifier: MIT */
 #include "app.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#define CHECK(x) do { if (!(x)) { fprintf(stderr, "%d: %s\n", __LINE__, #x); exit(1); } } while (0)
+#define CHECK(x)                                                                                   \
+    do {                                                                                           \
+        if (!(x)) {                                                                                \
+            fprintf(stderr, "%d: %s\n", __LINE__, #x);                                             \
+            exit(1);                                                                               \
+        }                                                                                          \
+    } while (0)
 static cui_context *ui;
 static dashboard_app app;
 static float width;
 static unsigned navigations, accounts;
 static void callback(void *user, dashboard_event event, unsigned page, bool signed_in) {
     CHECK(user == &app && page == app.page && signed_in == app.signed_in);
-    if (event == DASH_NAVIGATED) ++navigations;
-    else ++accounts;
+    if (event == DASH_NAVIGATED)
+        ++navigations;
+    else
+        ++accounts;
 }
 static void frame(void) {
     CHECK(cui_begin_frame(ui, 1500, 800, .016f));
@@ -29,7 +37,8 @@ static void click_at(float x, float y) {
     cui_event up = down;
     up.type = CUI_EVENT_POINTER_UP;
     CHECK(cui_queue_event(ui, down) && cui_queue_event(ui, up));
-    frame(); frame();
+    frame();
+    frame();
 }
 static void click(cui_id id) {
     cui_rect b = cui_bounds(ui, id);
@@ -42,20 +51,26 @@ int main(void) {
     dashboard_init(&app, callback, &app);
     const float widths[] = {360, 800, 1400, 360, 1024, 767, 1280, 800, 360};
     for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
-        width = widths[i]; frame(); frame();
+        width = widths[i];
+        frame();
+        frame();
         cui_rect main = cui_bounds(ui, DASH_MAIN), a = cui_bounds(ui, DASH_SUMMARY);
         cui_rect b = cui_bounds(ui, DASH_ACTIVITY);
         CHECK(a.w > 0 && b.w > 0);
         CHECK(a.x >= main.x && b.x + b.w <= main.x + main.w + 1);
         CHECK(a.y + a.h <= b.y + 1 || a.x + a.w <= b.x + 1);
-        if (width < 532 + 24) CHECK(b.y >= a.y + a.h);
-        else CHECK(b.x >= a.x + a.w && fabsf(a.y - b.y) < 1);
+        if (width < 532 + 24)
+            CHECK(b.y >= a.y + a.h);
+        else
+            CHECK(b.x >= a.x + a.w && fabsf(a.y - b.y) < 1);
         if (width >= 1024) {
             cui_rect nav = cui_bounds(ui, DASH_NAV);
             CHECK(main.x >= nav.x + nav.w);
         }
     }
-    width = 360; frame(); frame();
+    width = 360;
+    frame();
+    frame();
     click(DASH_MENU);
     CHECK(app.drawer_open);
     cui_rect hidden = cui_bounds(ui, DASH_REPORTS);
@@ -65,21 +80,30 @@ int main(void) {
     CHECK(navigations == 1);
     click(DASH_ACCOUNT);
     CHECK(app.signed_in && accounts == 1);
-    width = 1400; frame(); frame();
+    width = 1400;
+    frame();
+    frame();
     click(DASH_HOME);
     CHECK(app.page == 0 && navigations == 2 && app.signed_in);
-    width = 800; frame(); frame();
+    width = 800;
+    frame();
+    frame();
     click(DASH_MENU);
     CHECK(app.drawer_open);
     frame();
     cui_rect nav = cui_bounds(ui, DASH_NAV), main = cui_bounds(ui, DASH_MAIN);
     CHECK(main.y >= nav.y + nav.h);
     /* Crossing while open preserves the same disclosure/account/page state. */
-    width = 1400; frame(); frame();
+    width = 1400;
+    frame();
+    frame();
     CHECK(app.drawer_open && app.signed_in && app.page == 0);
-    width = 360; frame(); frame();
+    width = 360;
+    frame();
+    frame();
     CHECK(app.drawer_open && app.signed_in && app.page == 0);
-    nav = cui_bounds(ui, DASH_NAV); main = cui_bounds(ui, DASH_MAIN);
+    nav = cui_bounds(ui, DASH_NAV);
+    main = cui_bounds(ui, DASH_MAIN);
     CHECK(main.y >= nav.y + nav.h);
     click(DASH_MENU);
     CHECK(!app.drawer_open && accounts == 1 && navigations == 2);

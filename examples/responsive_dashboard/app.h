@@ -11,8 +11,15 @@ typedef struct {
     void *user;
 } dashboard_app;
 enum {
-    DASH_ROOT = 8100, DASH_MENU, DASH_NAV, DASH_HOME, DASH_REPORTS,
-    DASH_ACCOUNT, DASH_MAIN, DASH_SUMMARY, DASH_ACTIVITY
+    DASH_ROOT = 8100,
+    DASH_MENU,
+    DASH_NAV,
+    DASH_HOME,
+    DASH_REPORTS,
+    DASH_ACCOUNT,
+    DASH_MAIN,
+    DASH_SUMMARY,
+    DASH_ACTIVITY
 };
 /* No allocation. Application state survives container and breakpoint changes. */
 void dashboard_init(dashboard_app *, dashboard_callback, void *);

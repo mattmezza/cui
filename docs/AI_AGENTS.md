@@ -2,6 +2,24 @@
 
 Give an agent your application requirements and the repository's current API and tests. CUI is a portable C11 library with optional host/renderer adapters. The live gallery covers 78 entries, while the feature manifest still records incomplete reference behavior.
 
+## Install the CUI skill
+
+```sh
+npx skills add mattmezza/cui --skill cui
+```
+
+The repository distributes `skills/cui/SKILL.md` with Python 3.9+ standard-library
+helpers and generated offline references. Ask your agent to use the CUI skill to
+build your app. It covers native C11, browser/WASM, embedding and language
+builders, including backend selection, fonts, responsive layout and limitations.
+The skill checks prerequisites without installing packages. Setup pins a source
+commit; subsequent discovery must use that project's `--source` path to avoid
+mixing API revisions. See the skill for search, API lookup, vendoring, existing
+example setup and integrity-check commands. Python helpers need no pip packages.
+
+Maintainers regenerate resources with `python scripts/generate_agent_skill.py`;
+CI checks freshness and exercises an installed copy outside the repository.
+
 ## Consumer setup prompt
 
 ```text

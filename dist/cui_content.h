@@ -224,6 +224,9 @@ typedef struct {
     cui_loading_ease_fn ease;
     void *ease_user;
 } cui_skeleton_options;
+/* Source Loader, 16 logical pixels, theme foreground, .8-second quadratic loop.
+ * Preset source sizes are 12/14/16/24; size is also an explicit custom pixel size.
+ * Parent boxes provide layout/padding/opacity/clip; see docs/SPINNER.md. */
 cui_spinner_options cui_spinner_options_default(void);
 cui_skeleton_options cui_skeleton_options_default(void);
 /* Paint-only, source-compatible semantics: neither adds a focus stop or busy

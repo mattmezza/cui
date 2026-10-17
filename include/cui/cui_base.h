@@ -16,6 +16,36 @@ bool cui_base_toggle(cui_context *, cui_id, cui_str, bool *value, bool disabled)
 bool cui_base_radio(cui_context *, cui_id, cui_str, int *value, int option, bool disabled);
 typedef enum { CUI_CHECK_UNCHECKED, CUI_CHECK_CHECKED, CUI_CHECK_MIXED } cui_check_state;
 bool cui_base_check(cui_context *, cui_id, cui_str, cui_check_state *, bool disabled);
+typedef void (*cui_check_change_fn)(void *user, cui_check_state requested,
+                                   const cui_activation_snapshot *event);
+typedef struct {
+    bool disabled, required, invalid, skip_tab, no_pointer_focus, custom_role, controlled;
+    int tab_index;
+    cui_role role;
+    cui_check_change_fn on_change;
+    void *change_user;
+} cui_check_options;
+/* Extended Base: pointer focuses by default. Callback emits requests without
+ * writing *value; owner may accept synchronously or reject. controlled=true
+ * without a callback is read-only. Event is copied and
+ * borrowed for the call only. Without callback retains synchronous mutation.
+ * Return true for accepted activation, including a rejected controlled request. */
+bool cui_base_check_ex(cui_context *, cui_id, cui_str, cui_check_state *, cui_check_options);
+typedef void (*cui_check_box_style_fn)(void *user, cui_box *);
+typedef struct {
+    cui_check_box_style_fn instance, checked, mixed, disabled;
+    void *user;
+} cui_check_box_styles;
+typedef void (*cui_check_content_fn)(cui_context *, void *);
+/* Application-owned Base state refinement, applied over the supplied box in
+ * instance -> checked/mixed -> disabled order. No allocation or theme lookup. */
+bool cui_check_box_style(cui_check_state, bool disabled, cui_check_box_styles, cui_box *);
+/* Unstyled indicator part. Draws the projected box and arbitrary child content;
+ * owns no interaction/semantics. Root behavior remains cui_base_check_ex. */
+bool cui_base_check_indicator(cui_context *, cui_id, cui_check_state, bool disabled,
+                              cui_box, cui_check_box_styles, cui_check_content_fn, void *);
+
+
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);
 typedef struct {

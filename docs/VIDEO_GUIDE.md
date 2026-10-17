@@ -86,14 +86,10 @@ existing CPU bitmap draws; the new tests prove software output, not every backen
 
 ## Optional controls
 
-The playback surface submits no buttons or timeline hit targets. Compose existing
-buttons and sliders around it, mapping play/pause to `cui_video_set_playing`,
-seek requests to `cui_video_seek`, speed to `cui_video_set_rate`, and loop preference
-to `cui_video_set_loop`. Display the model's position, known duration and ended
-state. Check each result, retain stable IDs and keep host capabilities separate
-from UI wishes. Native fullscreen, volume, audio mute and captions need host APIs;
-they are not fictitious fields on this model. A reusable full-control component
-and its accessibility/keyboard tests remain a separate component-layer slice.
+The surface submits no timeline/button hit targets. The next-batch controlled
+Styled composition is documented in [VIDEO_PLAYER.md](VIDEO_PLAYER.md). It emits
+requests against a read-only playback view, with optional controls and explicit
+host capabilities. The timeline/surface below remain usable independently.
 
 ## Headless evidence
 

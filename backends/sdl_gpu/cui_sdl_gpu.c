@@ -524,7 +524,7 @@ bool cui_sdl_gpu_render(cui_sdl_gpu *r, const cui_draw_list *list, cui_color cle
         physical_h <= 0)
         return false;
     bool shadow_frame = cui_shadow_present(list);
-    if (!cui_text_paints_supported(list, false))
+    if (!cui_text_tracking_supported(list, false) || !cui_text_paints_supported(list, false))
         return false;
     cui_draw_list prepared;
     if (!cui_shadow_prepare(&r->shadows, list, physical_w / list->width, physical_h / list->height,

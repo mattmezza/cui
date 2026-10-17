@@ -574,7 +574,7 @@ bool cui_sokol_render(cui_sokol *r, const cui_draw_list *list, cui_color clear) 
         return fail(r, "CUI Sokol render cannot run inside an active host pass");
     if (r->rendered)
         return fail(r, "Host must commit before rendering this CUI adapter again");
-    if (!cui_text_paints_supported(list, false))
+    if (!cui_text_tracking_supported(list, false) || !cui_text_paints_supported(list, false))
         return false;
     cui_draw_list prepared;
     if (!cui_shadow_prepare(&r->shadows, list, r->config.target.width / list->width,

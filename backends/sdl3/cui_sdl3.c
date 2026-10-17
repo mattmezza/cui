@@ -785,7 +785,8 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
         !isfinite(list->height) || list->width < 0 || list->height < 0 || list->width > 16384 ||
         list->height > 16384)
         return false;
-    if (!cui_text_paints_supported(list, true))
+    if (!cui_text_tracking_supported(list, cui_font_text_capabilities() != 0) ||
+        !cui_text_paints_supported(list, true))
         return false;
     if (!render_density(s))
         return false;

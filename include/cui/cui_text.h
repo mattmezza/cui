@@ -44,6 +44,8 @@ bool cui_font_register_fallbacks(cui_font *font, const char *const *paths, size_
 /* Selected-face metrics suitable for cui_config.font_metrics. Failure preserves out. */
 bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font_metrics *out);
 cui_size cui_font_measure(void *font, cui_str text, float size);
+/* Capability bits for cui_config.text_capabilities; tracking requires Bidi build. */
+uint32_t cui_font_text_capabilities(void);
 cui_size cui_font_measure_styled(void *font, cui_str text, float size, cui_text_style style);
 /* Optional owned visual session factory for cui_config.text_geometry; shares font user. */
 cui_text_layout_status cui_font_text_geometry(void *font, cui_str text, float size,
@@ -82,7 +84,7 @@ typedef struct {
     uint32_t glyph_id;
     size_t cluster_byte; /* Original paragraph UTF-8 byte offset; clusters may repeat. */
     float x, y;          /* Positioned baseline-relative origin, y grows down. */
-    float x_advance, y_advance;
+    float x_advance, y_advance; /* Original shaped advances; tracking is in positions/clusters. */
 } cui_text_glyph;
 typedef struct {
     size_t byte_start, byte_length, glyph_start, glyph_count;

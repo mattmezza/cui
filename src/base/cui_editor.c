@@ -141,7 +141,7 @@ static void cui_editor_reveal_all_folds(cui_editor_state *editor) {
 }
 static bool cui_editor_style_equal(cui_text_style a, cui_text_style b) {
     return a.family == b.family && a.weight == b.weight && a.italic == b.italic &&
-           a.monospace == b.monospace;
+           a.monospace == b.monospace && a.letter_spacing == b.letter_spacing;
 }
 static void cui_editor_cursor_sync(cui_context *ui, cui_editor_state *editor, cui_text_style style,
                                    float font) {
@@ -893,7 +893,8 @@ cui_textarea_result cui_base_editor(cui_context *ui, cui_id id, cui_str name, cu
         cui_edit_get_content(s->edit).token_count || !s->view.lines || !s->view.capacity ||
         !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
         metrics.line_height <= 0 || o.textarea.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
-        o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD || (name.length && !name.data) ||
+        o.textarea.text_style.weight > CUI_TEXT_WEIGHT_BOLD ||
+        !isfinite(o.textarea.text_style.letter_spacing) || (name.length && !name.data) ||
         (o.language.length && !o.language.data))
         return (cui_textarea_result){.error = CUI_TEXTAREA_INVALID};
     size_t selection_capacity = cui_edit_selection_capacity(s->edit);

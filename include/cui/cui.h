@@ -516,6 +516,10 @@ typedef struct {
     cui_text_weight weight;
     bool italic, monospace;
     uint32_t family; /* Application-defined font-family ID; zero selects default. */
+    /* Logical pixels between intact visual shaping clusters, never after a line.
+     * Requires CUI_TEXT_CAP_LETTER_SPACING; zero preserves natural shaping.
+     * Finite signed values; negative gaps must not reverse cluster progression. */
+    float letter_spacing;
 } cui_text_style;
 enum { CUI_TEXT_COLOR_SPAN_MAX = 4096 };
 typedef struct {
@@ -617,6 +621,7 @@ typedef cui_text_layout_status (*cui_text_geometry_fn)(void *, cui_str, float, c
                                                        cui_text_geometry *);
 typedef cui_text_layout_status (*cui_text_geometry_line_fn)(void *, cui_text_line_source, float,
                                                             cui_text_style, cui_text_geometry *);
+enum { CUI_TEXT_CAP_LETTER_SPACING = 1u << 0 };
 typedef struct {
     float width, height;
     size_t max_elements, max_commands, frame_bytes;
@@ -631,7 +636,11 @@ typedef struct {
     cui_text_geometry_fn
         text_geometry; /* Optional single-line visual factory; shares measure_user. */
     cui_text_geometry_line_fn text_geometry_line; /* Optional contextual line factory. */
+    /* Provider promises consistent measurement, contextual geometry and drawing.
+     * Zero keeps existing providers compatible; unsupported tracking fails. */
+    uint32_t text_capabilities;
 } cui_config;
+uint32_t cui_text_capabilities(const cui_context *);
 cui_str cui_string(const char *s);
 cui_context *cui_create(cui_config config);
 void cui_destroy(cui_context *ui);

@@ -91,7 +91,7 @@ SOURCES = (
     "src/components/cui_choice.c",
     "backends/software/cui_software.c",
 )
-SUITES = ("release_accessors", "unicode_wrap_source", "text_alignment_source", "contextual_wrap_source", "svg_transform_validation", "button_tab_order_source", "icon_accessibility_source", "label_source", "empty_source", "tab_order_source", "bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts", "plot_chart_prepaint", "pointer_presence", "input_acceptance", "chart_source_point_axis", "input_normalization", "chart_radar_tooltip_title", "chart_typed_tooltip", "pointer_activation_blocker", "button_activation_blocker", "pointer_blocker_scroll_scope", "password_engine", "chart_tooltip_appearance", "button_group", "button_callback_events", "password_present", "password_start", "password_input", "secure_focus", "secure_focus_generation", "drop_shadow", "input_format_engine", "input_format_control", "input_number_engine", "input_number_control", "shadow_covering", "button_label_layout", "input_pointer_selection", "button_passive_lifecycle", "inset_shadow", "button_numeric", "shadow_presets", "input_matcher", "button_click_event", "notification_shadows", "popover_appearance", "button_artwork", "activation_snapshot", "tabs_source_shadows", "button_click_snapshot", "notification_source_motion")
+SUITES = ("responsive", "typography_tokens", "release_accessors", "unicode_wrap_source", "text_alignment_source", "contextual_wrap_source", "svg_transform_validation", "button_tab_order_source", "icon_accessibility_source", "label_source", "empty_source", "tab_order_source", "bootstrap", "core", "base", "components", "render", "effects", "edit", "editor", "overlay", "virtual", "virtual_styled", "dock", "dock_styled", "plot", "plot_styled", "content", "disclosure", "choice", "numeric", "picker", "tree", "input", "table", "scroll", "surface", "form", "otp", "status", "message", "media", "description", "chrome", "resizable", "icon", "toolbar", "sidebar", "textarea", "touch_textarea", "touch_page_host", "controlled_siblings", "settings", "carousel", "command", "root", "text_view", "chart", "speech", "questionnaire", "questionnaire_styled", "control_family_audit", "radio_group", "checkbox_motion", "contextual_text", "alert_bubble_slots", "pointer_focus_policy", "status_motion", "button_behavior", "advanced_family_audit", "table_selection_contracts", "core_prepaint_contract_fixture", "theme_registry", "prepaint", "plot_chart_owner_motion", "input_reference_contracts", "plot_chart_prepaint", "pointer_presence", "input_acceptance", "chart_source_point_axis", "input_normalization", "chart_radar_tooltip_title", "chart_typed_tooltip", "pointer_activation_blocker", "button_activation_blocker", "pointer_blocker_scroll_scope", "password_engine", "chart_tooltip_appearance", "button_group", "button_callback_events", "password_present", "password_start", "password_input", "secure_focus", "secure_focus_generation", "drop_shadow", "input_format_engine", "input_format_control", "input_number_engine", "input_number_control", "shadow_covering", "button_label_layout", "input_pointer_selection", "button_passive_lifecycle", "inset_shadow", "button_numeric", "shadow_presets", "input_matcher", "button_click_event", "notification_shadows", "popover_appearance", "button_artwork", "activation_snapshot", "tabs_source_shadows", "button_click_snapshot", "notification_source_motion")
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
@@ -104,6 +104,8 @@ def source_fingerprint(root: pathlib.Path) -> str:
     paths += [str(path.relative_to(root)) for folder in ("include/cui", "dist")
               for path in (root / folder).glob("*.h")]
     paths += ["src/base/cui_textarea_geometry.h", "src/theme/cui_theme_json.h", "src/theme/cui_theme_equal.h", "src/theme/cui_theme_palette.inc", "src/theme/cui_theme_legacy_fields.inc"]
+    paths += [f"examples/{name}/{file}" for name in ("responsive_dashboard", "typography")
+              for file in ("app.c", "app.h", "test_app.c")]
     paths += ["web/touch_page_host.h", "examples/native_starter/app.c", "examples/native_starter/app.h", "examples/native_starter/test_app.c", "examples/system_theme/main.c", "tests/integration/test_system_theme_app.c"]
     paths += ["src/text/cui_bidi.c", "tests/unit/test_bidi.c", "tests/unit/test_radio_group_base.c", "tests/unit/test_accepted_activation.c", "tests/unit/test_button_group_base.c"]
     paths += [str(path.relative_to(root)) for path in (root / "third_party/sheenbidi").rglob("*") if path.is_file()]
@@ -164,6 +166,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=pathlib.Path, default=pathlib.Path(__file__).resolve().parents[1])
     parser.add_argument("--build-dir", type=pathlib.Path, help="defaults to ROOT/build/wasi")
+    parser.add_argument("--suite", action="append", help="run only this suite; repeat for multiple suites")
     parser.add_argument("--zig", default="zig", help="path to Zig 0.16.0")
     # Theme/variant matrices repeatedly construct full contexts; keep a finite
     # suite budget large enough for those allocation-heavy behavioral tests.
@@ -232,6 +235,8 @@ def main() -> int:
         targets += [("accepted_activation_core_only", ["tests/unit/test_accepted_activation.c", "src/core/cui.c"], False, [])]
         targets += [("button_group_base_only", ["tests/unit/test_button_group_base.c", "src/core/cui.c", "src/base/cui_button_group.c"], False, [])]
         targets += [("radio_group_base_only", ["tests/unit/test_radio_group_base.c", "src/core/cui.c", "src/base/cui_radio_group.c"], False, [])]
+        targets += [("responsive_dashboard", ["examples/responsive_dashboard/app.c", "examples/responsive_dashboard/test_app.c"], True, [])]
+        targets += [("typography_example", ["examples/typography/app.c", "examples/typography/test_app.c"], True, [])]
         targets += [("native_starter", ["examples/native_starter/app.c", "examples/native_starter/test_app.c"], True, [])]
         targets += [("system_theme_app", ["tests/integration/test_system_theme_app.c"], True, [])]
         targets += [("bidi", ["tests/unit/test_bidi.c", "src/text/cui_bidi.c"], False,
@@ -269,6 +274,11 @@ def main() -> int:
         targets += [("distribution_single", ["tests/distribution/single.c"], False, distribution_flags),
                     ("distribution_multi", ["tests/distribution/implementation.c", "tests/distribution/consumer.c"], False, distribution_flags)]
         targets += [("theme_registry_distribution", ["tests/distribution/theme_registry.c"], False, distribution_flags)]
+        if args.suite:
+            unknown = set(args.suite) - {name for name, *_ in targets}
+            if unknown:
+                parser.error("unknown suites: " + ", ".join(sorted(unknown)))
+            targets = [target for target in targets if target[0] in args.suite]
         failures = []
         for name, sources, link_library, extra in targets:
             started = time.monotonic()

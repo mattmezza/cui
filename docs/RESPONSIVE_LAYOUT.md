@@ -4,6 +4,11 @@ Use `cui/cui_responsive.h` to make layout decisions from a container's current
 logical width. Named mobile-first breakpoints resemble familiar utility-class
 systems: BASE, SM (640), MD (768), LG (1024), XL (1280), and 2XL (1536).
 This header-only utility needs no backend, allocation, or additional library.
+Like Tailwind's `md:` and `lg:` variants, `at_least(query, MD/LG)` applies a
+policy at that width and above. BASE is the unprefixed/mobile policy. Unlike a
+global browser viewport query, each query uses the logical width you pass: the
+window, a sidebar, or the remaining main-content area. C layout properties remain
+normal designated initializers; no class strings or generated styles are needed.
 
 ```c
 #include "cui/cui_responsive.h"
@@ -62,3 +67,40 @@ drawer should additionally use the existing modal/overlay scope APIs.
 This helper supplies width policies, not CSS media-query or browser-layout parity.
 The example and tests cover live container resizing, boundary crossings,
 navigation/account callbacks, state preservation, and clicks at removed targets.
+
+## Build and run
+
+Portable assertions, including repeated resizing without a window:
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF
+cmake --build build --target test_responsive test_responsive_dashboard
+python scripts/test_local.py --build-dir build -R '^responsive(_dashboard)?$'
+```
+
+Interactive native example (requires the existing SDL3, FreeType and HarfBuzz
+adapters). Run from the repository root or supply an absolute `--font` path:
+
+```sh
+cmake -S . -B build-native -G Ninja -DCUI_REQUIRE_NATIVE=ON -DCUI_BUILD_RESPONSIVE_DASHBOARD=ON
+cmake --build build-native --target cui_responsive_dashboard
+./build-native/cui_responsive_dashboard --font third_party/inter/Inter-Regular.otf
+```
+
+Resize the window through 360, 800 and 1400 logical units, open/close Menu,
+choose Reports, and sign in. Page/account/disclosure state survives resizing.
+The callback runner owns native event dispatch, including redraw during resize;
+the application submits one frame using the current logical container dimensions.
+On macOS the target follows the existing bundle configuration and locates its
+bundled Inter font. `--frames N --capture PATH.bmp` provides a finite smoke run;
+automated runs must use an isolated display rather than the desktop session.
+
+The WASI harness also registers the responsive policy and dashboard interaction
+suites. With the pinned Zig/wasmtime tools:
+
+```sh
+uv run scripts/test_wasi.py --suite responsive --suite responsive_dashboard
+```
+
+Omit `--suite` to exercise all portable suites. WASI validates portable layout and
+interactions; it does not emulate a browser or native resize event loop.

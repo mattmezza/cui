@@ -180,7 +180,9 @@
     ],
     "cui_text_overflow": [
       "src/components/cui_text_overflow.c"
-    ]
+    ],
+    "cui_responsive": [],
+    "cui_typography": []
   },
   "native": {
     "text": [

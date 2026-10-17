@@ -32,15 +32,18 @@ GUIDES.update({'DESIGN_SIZES', 'DATE_LOCALE_YEAR', 'SIDEBAR_CLIPPING',
 
 GUIDES.update({"BINDING_BUILDERS", "GO_BUILDERS", "RUST_BUILDERS", "BRIDGE_COMPONENTS",
                "LAYOUT_GUIDE", "IDS_AND_LIFETIMES", "DEBUGGING", "APP_RECIPES", "ONBOARDING_BENCHMARK",
-               "PACKAGING", "SDK_TEXT_PARITY", "UNICODE_WRAP", "TEXT_ALIGNMENT", "RELEASE_ACCESSORS"})
+               "PACKAGING", "SDK_TEXT_PARITY", "UNICODE_WRAP", "TEXT_ALIGNMENT", "RELEASE_ACCESSORS",
+               "RESPONSIVE_LAYOUT", "TYPOGRAPHY_TOKENS", "TYPOGRAPHY_ROADMAP", "VIDEO_PLAN"})
 
 TASKS = {
     'native-app': ('Build a native application', ['START_HERE', 'NATIVE_APP_STARTER', 'IMMEDIATE_AND_STATE', 'IDS_AND_LIFETIMES']),
-    'layout': ('Understand and repair layouts', ['LAYOUT_GUIDE', 'APP_RECIPES', 'BUTTON_BEHAVIOR', 'CORE']),
+    'layout': ('Understand and repair layouts', ['LAYOUT_GUIDE', 'RESPONSIVE_LAYOUT', 'APP_RECIPES', 'BUTTON_BEHAVIOR', 'CORE']),
     'debugging': ('Diagnose errors and missing output', ['DEBUGGING', 'IDS_AND_LIFETIMES', 'ICON', 'LAYOUT_GUIDE']),
 }
 SEARCH_TERMS = {
     'LAYOUT_GUIDE': 'star disappeared grow fit fixed min width max_width clipping nowrap overflow',
+    'RESPONSIVE_LAYOUT': 'responsive container breakpoint tailwind mobile sidebar drawer stack sm md lg xl resize',
+    'TYPOGRAPHY_TOKENS': 'font family heading body code mono weight italic line height size typography',
     'DEBUGGING': 'capacity error unclosed box unbalanced missing end blank icon diagnostic',
     'ICON': 'blank icon missing icon embedded catalog loader not found',
     'IDS_AND_LIFETIMES': 'zero id duplicate id anonymous stable row identity lifetime borrowed',

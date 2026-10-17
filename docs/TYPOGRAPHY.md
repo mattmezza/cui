@@ -27,9 +27,9 @@ if (cui_typography_resolve(&roles, CUI_TYPOGRAPHY_HEADING, &title)) {
 Here `roles` and `ink` are application-owned values; call inside an active frame.
 Resolution validates only the selected role and preserves output on failure.
 See the token guide for a full role initializer, color spans, exact native-face
-registration, and wide/narrow composed tests. Tracking, variable axes, arbitrary
-numeric weights and gradient text remain future work; adding a convenience token
-does not make those provider/layout/renderer contracts available.
+registration, and wide/narrow composed tests. Use `cui_typography_text_painted`
+for [linear gradient glyph paint](TEXT_GRADIENT.md) on supported renderers.
+Tracking, variable axes and arbitrary numeric weights remain future work.
 
 Family IDs are application-defined `uint32_t` keys. Zero retains the default
 family. Register regular and variant faces for a named family on the same

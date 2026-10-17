@@ -807,7 +807,8 @@ static cui_bridge_status after_frame(void *user) {
     napi_value result, receiver;
     cui_bridge_status status = CUI_BRIDGE_OK;
     if (napi_get_undefined(context->env, &receiver) != napi_ok ||
-        napi_call_function(context->env, receiver, context->callback, 0, NULL, &result) != napi_ok) {
+        napi_call_function(context->env, receiver, context->callback, 0, NULL, &result) !=
+            napi_ok) {
         bool pending = false;
         napi_value exception;
         if (napi_is_exception_pending(context->env, &pending) == napi_ok && pending &&
@@ -822,7 +823,8 @@ static napi_value run_app(napi_env env, napi_callback_info info) {
     napi_value v[2];
     js_app *app;
     napi_valuetype type;
-    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app)) return NULL;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app))
+        return NULL;
     if (napi_typeof(env, v[1], &type) != napi_ok || type != napi_function)
         return fail(env, "run requires an after-frame callback");
     typedef cui_bridge_status (*runner_fn)(cui_bridge_app *, cui_bridge_status (*)(void *), void *);
@@ -833,12 +835,17 @@ static napi_value run_app(napi_env env, napi_callback_info info) {
 #else
     void *symbol = dlsym(RTLD_DEFAULT, "cui_bridge_run");
 #endif
-    if (!symbol) return fail(env, "native callback runner unavailable in this bridge");
+    if (!symbol)
+        return fail(env, "native callback runner unavailable in this bridge");
     memcpy(&runner, &symbol, sizeof runner);
     run_context context = {env, v[1], NULL};
     cui_bridge_status code = runner(app->bridge, after_frame, &context);
-    if (context.exception) { (void)napi_throw(env, context.exception); return NULL; }
-    if (code != CUI_BRIDGE_OK && code != CUI_BRIDGE_CLOSED) return status(env, code);
+    if (context.exception) {
+        (void)napi_throw(env, context.exception);
+        return NULL;
+    }
+    if (code != CUI_BRIDGE_OK && code != CUI_BRIDGE_CLOSED)
+        return status(env, code);
     return undefined(env);
 }
 static napi_value poll(napi_env env, napi_callback_info info) {

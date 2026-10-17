@@ -523,6 +523,25 @@ typedef struct {
     size_t byte_start, byte_end; /* Paragraph-relative; sorted, nonoverlapping. */
     cui_color color;             /* A shaped cluster takes the color at its first byte. */
 } cui_text_color_span;
+/* Spatial text paint. Linear endpoints are normalized to the selected anchor
+ * on submission, resolved to global logical coordinates in draw commands.
+ * Stops interpolate premultiplied RGBA in encoded sRGB; endpoint colors extend.
+ * Duplicate positions form hard edges (later stop wins at the boundary).
+ * Core copies 2..8 sorted stops; draw-list storage lasts until next begin_frame. */
+typedef enum { CUI_TEXT_PAINT_SOLID, CUI_TEXT_PAINT_LINEAR } cui_text_paint_kind;
+typedef enum { CUI_TEXT_ANCHOR_BLOCK, CUI_TEXT_ANCHOR_LINE } cui_text_paint_anchor;
+typedef struct {
+    float position;
+    cui_color color;
+} cui_text_gradient_stop;
+typedef struct {
+    cui_text_paint_kind kind;
+    cui_color color; /* Solid only. */
+    float x0, y0, x1, y1;
+    cui_text_paint_anchor anchor;
+    const cui_text_gradient_stop *stops;
+    size_t stop_count;
+} cui_text_paint;
 typedef struct {
     cui_draw_type type;
     cui_rect bounds;
@@ -538,6 +557,7 @@ typedef struct {
     cui_text_line_source text_source;       /* Frame-owned; zero = legacy text. */
     const cui_text_color_span *text_colors; /* Frame-owned. */
     size_t text_color_count;
+    cui_text_paint text_paint;    /* Linear text only; solid uses command.color. */
     cui_drop_shadow_paint shadow; /* Value-owned; color includes ancestor opacity. */
 } cui_draw_command;
 typedef struct {
@@ -741,6 +761,13 @@ typedef enum { CUI_TEXT_ALIGN_LEFT, CUI_TEXT_ALIGN_CENTER, CUI_TEXT_ALIGN_RIGHT 
 bool cui_text_paragraph_colored_aligned(cui_context *, cui_str, float font_size, cui_color,
                                         float line_height, cui_text_style, bool wrap,
                                         const cui_text_color_span *, size_t, cui_text_align);
+/* Full paragraph paint; no color-span overrides. Block anchor is the complete
+ * resolved paragraph container, including hard/empty rows; line uses each visual
+ * row's advance box. Paint changes preserve shaping/caret/selection geometry.
+ * Linear endpoints must be finite in 0..1 and distinct. Invalid input publishes
+ * no layout. Prepaint text-gradient emission is currently rejected explicitly. */
+bool cui_text_paragraph_painted(cui_context *, cui_str, float font_size, float line_height,
+                                cui_text_style, bool wrap, cui_text_align, cui_text_paint);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);
@@ -997,6 +1024,74 @@ static inline bool cui_inset_shadow_bounds_checked(cui_inset_shadow_paint p, cui
         return false;
     p.layer.offset_x = p.layer.offset_y = p.layer.spread = p.layer.sigma = 0;
     return cui_drop_shadow_bounds_checked(p, out);
+}
+#endif
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_TEXT_PAINT_INTERNAL_H
+#define CUI_TEXT_PAINT_INTERNAL_H
+
+#include <math.h>
+static inline bool cui_text_paint_valid(cui_text_paint p, bool resolved) {
+    if (p.kind == CUI_TEXT_PAINT_SOLID)
+        return p.stop_count == 0;
+    if (p.kind != CUI_TEXT_PAINT_LINEAR || !p.stops || p.stop_count < 2 || p.stop_count > 8 ||
+        p.anchor < CUI_TEXT_ANCHOR_BLOCK || p.anchor > CUI_TEXT_ANCHOR_LINE || !isfinite(p.x0) ||
+        !isfinite(p.y0) || !isfinite(p.x1) || !isfinite(p.y1))
+        return false;
+    if (!resolved && (p.x0 < 0 || p.x0 > 1 || p.y0 < 0 || p.y0 > 1 || p.x1 < 0 || p.x1 > 1 ||
+                      p.y1 < 0 || p.y1 > 1 || (p.x0 == p.x1 && p.y0 == p.y1)))
+        return false;
+    float previous = 0;
+    for (size_t i = 0; i < p.stop_count; ++i) {
+        float at = p.stops[i].position;
+        if (!isfinite(at) || at < previous || at > 1)
+            return false;
+        previous = at;
+    }
+    return true;
+}
+static inline cui_color cui_text_paint_sample(cui_text_paint p, double x, double y) {
+    if (p.kind == CUI_TEXT_PAINT_SOLID)
+        return p.color;
+    double dx = (double)p.x1 - p.x0, dy = (double)p.y1 - p.y0;
+    double length = dx * dx + dy * dy;
+    double t = length > 0 ? ((x - p.x0) * dx + (y - p.y0) * dy) / length : 1;
+    size_t right = 0;
+    while (right < p.stop_count && p.stops[right].position <= t)
+        ++right;
+    if (!right)
+        return p.stops[0].color;
+    if (right == p.stop_count)
+        return p.stops[right - 1].color;
+    cui_text_gradient_stop a = p.stops[right - 1], b = p.stops[right];
+    double f = (t - a.position) / (b.position - a.position);
+    double alpha = a.color.a + (b.color.a - a.color.a) * f;
+    if (alpha <= 0)
+        return (cui_color){0};
+    cui_color result;
+#define CUI_PAINT_CHANNEL(ch)                                                                      \
+    (uint8_t)lround(((1 - f) * a.color.ch * a.color.a + f * b.color.ch * b.color.a) / alpha)
+    result.r = CUI_PAINT_CHANNEL(r);
+    result.g = CUI_PAINT_CHANNEL(g);
+    result.b = CUI_PAINT_CHANNEL(b);
+#undef CUI_PAINT_CHANNEL
+    result.a = (uint8_t)lround(alpha);
+    return result;
+}
+static inline bool cui_text_paints_supported(const cui_draw_list *list, bool linear) {
+    for (size_t i = 0; i < list->count; ++i) {
+        const cui_draw_command *c = &list->commands[i];
+        if (c->text_paint.kind == CUI_TEXT_PAINT_SOLID) {
+            if (c->text_paint.stop_count)
+                return false;
+            continue;
+        }
+        if (!linear || c->type != CUI_DRAW_TEXT || c->text_color_count ||
+            !cui_text_paint_valid(c->text_paint, true))
+            return false;
+    }
+    return true;
 }
 #endif
 
@@ -7973,6 +8068,7 @@ typedef struct {
     size_t wrap_cluster_count;
     cui_text_align alignment;
     uint32_t alignment_box;
+    cui_text_paint paint;
 } cui_core_text_source;
 struct cui_context {
     int tab_path[32];
@@ -10752,6 +10848,41 @@ bool cui_text_paragraph_colored_aligned(cui_context *ui, cui_str text, float siz
     return cui_core_paragraph_colored(ui, text, size, color, line_height, style, wrap, colors,
                                       count, alignment, true);
 }
+bool cui_text_paragraph_painted(cui_context *ui, cui_str text, float size, float line_height,
+                                cui_text_style style, bool wrap, cui_text_align alignment,
+                                cui_text_paint paint) {
+    if (!cui_text_paint_valid(paint, false) || !ui || !cui_core_active(ui))
+        return false;
+    if (paint.kind == CUI_TEXT_PAINT_SOLID)
+        return cui_text_paragraph_colored_aligned(ui, text, size, paint.color, line_height, style,
+                                                  wrap, NULL, 0, alignment);
+    size_t prior_bytes = ui->string_used;
+    size_t padding =
+        (_Alignof(cui_text_gradient_stop) - ui->string_used % _Alignof(cui_text_gradient_stop)) %
+        _Alignof(cui_text_gradient_stop);
+    size_t bytes = paint.stop_count * sizeof(cui_text_gradient_stop);
+    size_t available = ui->config.frame_bytes - ui->string_used;
+    if (padding > available || bytes > available - padding) {
+        cui_core_capacity(ui, "text gradient stops", 0, ui->string_used, padding + bytes,
+                          ui->config.frame_bytes);
+        return false;
+    }
+    cui_text_gradient_stop *copy = (void *)(ui->strings + ui->string_used + padding);
+    memcpy(copy, paint.stops, bytes);
+    float opacity = ui->depth ? ui->nodes[ui->node_stack[ui->depth - 1]].opacity : 1;
+    for (size_t i = 0; i < paint.stop_count; ++i)
+        copy[i].color.a = (uint8_t)(copy[i].color.a * opacity);
+    ui->string_used += padding + bytes;
+    paint.stops = copy;
+    size_t first = ui->text_source_count;
+    bool ok = cui_text_paragraph_colored_aligned(ui, text, size, (cui_color){255, 255, 255, 255},
+                                                 line_height, style, wrap, NULL, 0, alignment);
+    for (size_t i = first; i < ui->text_source_count; ++i)
+        ui->text_sources[i].paint = paint;
+    if (!ok && first == ui->text_source_count)
+        ui->string_used = prior_bytes;
+    return ok;
+}
 void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                  cui_text_style style) {
     cui_core_text(ui, t, size, c, line_height, style, false, NULL, NULL, 0, NULL, 0);
@@ -11180,7 +11311,8 @@ bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *comm
     if (ui->prepaint_failed)
         return false;
     cui_draw_command c = command ? *command : (cui_draw_command){.type = (cui_draw_type)-1};
-    if (!command || !cui_core_prepaint_command(&c) || (deferred && !p->info.modal_allowed)) {
+    if (!command || c.text_paint.kind != CUI_TEXT_PAINT_SOLID || c.text_paint.stop_count ||
+        !cui_core_prepaint_command(&c) || (deferred && !p->info.modal_allowed)) {
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
     }
@@ -11684,6 +11816,21 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                                                                     : 0;
                         d.bounds.x = box.boundingBox.x + spare * factor;
                     }
+                }
+                d.text_paint = record->paint;
+                if (d.text_paint.kind == CUI_TEXT_PAINT_LINEAR) {
+                    cui_rect anchor = d.bounds;
+                    if (record->paint.anchor == CUI_TEXT_ANCHOR_BLOCK) {
+                        Clay_ElementData box =
+                            Clay_GetElementData((Clay_ElementId){.id = record->alignment_box});
+                        if (box.found)
+                            anchor = (cui_rect){box.boundingBox.x, box.boundingBox.y,
+                                                box.boundingBox.width, box.boundingBox.height};
+                    }
+                    d.text_paint.x0 = anchor.x + record->paint.x0 * anchor.w;
+                    d.text_paint.y0 = anchor.y + record->paint.y0 * anchor.h;
+                    d.text_paint.x1 = anchor.x + record->paint.x1 * anchor.w;
+                    d.text_paint.y1 = anchor.y + record->paint.y1 * anchor.h;
                 }
                 d.text_source = record->source;
                 d.text_colors = record->colors;

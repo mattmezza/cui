@@ -4,6 +4,12 @@ Audit baseline: `integration/density-reconcile`, commit `b96c6844`. This is a
 proposal; the declarations below are illustrative and are not shipped APIs.
 No font dependency, production code or renderer was changed for this audit.
 
+Subsequent implementation added [body/heading/code tokens](TYPOGRAPHY_TOKENS.md)
+and [linear gradient text](TEXT_GRADIENT.md) for software, SDL and Canvas. Those
+guides and current public headers define the shipped APIs. The proposed broader
+authoring declarations below remain design notes, especially tracking, numeric
+weights/stretch and variable axes.
+
 ## What applications can use today
 
 | Request | Current support and evidence | Remaining work |
@@ -14,7 +20,7 @@ No font dependency, production code or renderer was changed for this audit.
 | Size and line height | Float logical sizes; explicit line height or zero for natural measurement. Core interns family, size, style and line height. | Named reusable typography tokens and clear defaults across components. |
 | Wrap and alignment | `cui_text_ex` wraps within a constrained parent; `cui_text_line` is unwrapped. Paragraph APIs preserve strict UTF-8, hard breaks, grapheme-safe wrapping and optional left/center/right alignment. | One convenient options API, logical start/end alignment and explicit overflow/ellipsis policy. |
 | Letter spacing | No public tracking field in `cui_text_style`, measurement callbacks or draw commands. | Shared shaping/advance/caret/wrap contract before a paint-only implementation. |
-| Gradient text | Contextual color spans exist, with cluster-start color selection after shaping. Draw commands carry solid colors/spans. | A continuous spatial text paint model; per-letter spans are not a continuous gradient. |
+| Gradient text | Copied linear stops, block/line anchors and real per-pixel glyph masks in software, SDL and Canvas. See `TEXT_GRADIENT.md`. | GPU implementation, radial/conic paints, color-span combinations and broader native acceptance. |
 
 Named-family fallback currently resolves exact family/style, named-family regular,
 default-family style, then opened regular. This is variant fallback; missing glyph
@@ -39,8 +45,9 @@ report unavailable for that functionality. See `include/cui/cui_text.h` and
 Canvas is a separate host implementation: `web/gallery.js:canvasFont` maps IDs to
 CSS font stacks and weights 400/500/600/700; measure uses `measureText`, draw uses
 `fillText`. Browser system fonts and shaping are distinct from native
-FreeType/HarfBuzz. The gallery renderer does not currently implement a portable
-gradient-text command. A browser demo alone cannot prove native text capability.
+FreeType/HarfBuzz. The gallery now consumes the portable linear text paint using
+a full contextual line mask; native software/SDL have separate pixel checks.
+A browser demo alone cannot prove native text capability.
 
 ## Recommended authoring model
 

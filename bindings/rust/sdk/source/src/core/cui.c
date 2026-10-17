@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui.h"
 #include "cui_drop_shadow_bounds_internal.h"
+#include "cui_text_paint_internal.h"
 #include "cui_unicode_grapheme.h"
 #include <float.h>
 #include <inttypes.h>
@@ -113,6 +114,7 @@ typedef struct {
     size_t wrap_cluster_count;
     cui_text_align alignment;
     uint32_t alignment_box;
+    cui_text_paint paint;
 } cui_core_text_source;
 struct cui_context {
     int tab_path[32];
@@ -2892,6 +2894,41 @@ bool cui_text_paragraph_colored_aligned(cui_context *ui, cui_str text, float siz
     return cui_core_paragraph_colored(ui, text, size, color, line_height, style, wrap, colors,
                                       count, alignment, true);
 }
+bool cui_text_paragraph_painted(cui_context *ui, cui_str text, float size, float line_height,
+                                cui_text_style style, bool wrap, cui_text_align alignment,
+                                cui_text_paint paint) {
+    if (!cui_text_paint_valid(paint, false) || !ui || !cui_core_active(ui))
+        return false;
+    if (paint.kind == CUI_TEXT_PAINT_SOLID)
+        return cui_text_paragraph_colored_aligned(ui, text, size, paint.color, line_height, style,
+                                                  wrap, NULL, 0, alignment);
+    size_t prior_bytes = ui->string_used;
+    size_t padding =
+        (_Alignof(cui_text_gradient_stop) - ui->string_used % _Alignof(cui_text_gradient_stop)) %
+        _Alignof(cui_text_gradient_stop);
+    size_t bytes = paint.stop_count * sizeof(cui_text_gradient_stop);
+    size_t available = ui->config.frame_bytes - ui->string_used;
+    if (padding > available || bytes > available - padding) {
+        cui_core_capacity(ui, "text gradient stops", 0, ui->string_used, padding + bytes,
+                          ui->config.frame_bytes);
+        return false;
+    }
+    cui_text_gradient_stop *copy = (void *)(ui->strings + ui->string_used + padding);
+    memcpy(copy, paint.stops, bytes);
+    float opacity = ui->depth ? ui->nodes[ui->node_stack[ui->depth - 1]].opacity : 1;
+    for (size_t i = 0; i < paint.stop_count; ++i)
+        copy[i].color.a = (uint8_t)(copy[i].color.a * opacity);
+    ui->string_used += padding + bytes;
+    paint.stops = copy;
+    size_t first = ui->text_source_count;
+    bool ok = cui_text_paragraph_colored_aligned(ui, text, size, (cui_color){255, 255, 255, 255},
+                                                 line_height, style, wrap, NULL, 0, alignment);
+    for (size_t i = first; i < ui->text_source_count; ++i)
+        ui->text_sources[i].paint = paint;
+    if (!ok && first == ui->text_source_count)
+        ui->string_used = prior_bytes;
+    return ok;
+}
 void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                  cui_text_style style) {
     cui_core_text(ui, t, size, c, line_height, style, false, NULL, NULL, 0, NULL, 0);
@@ -3320,7 +3357,8 @@ bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *comm
     if (ui->prepaint_failed)
         return false;
     cui_draw_command c = command ? *command : (cui_draw_command){.type = (cui_draw_type)-1};
-    if (!command || !cui_core_prepaint_command(&c) || (deferred && !p->info.modal_allowed)) {
+    if (!command || c.text_paint.kind != CUI_TEXT_PAINT_SOLID || c.text_paint.stop_count ||
+        !cui_core_prepaint_command(&c) || (deferred && !p->info.modal_allowed)) {
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
     }
@@ -3824,6 +3862,21 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                                                                     : 0;
                         d.bounds.x = box.boundingBox.x + spare * factor;
                     }
+                }
+                d.text_paint = record->paint;
+                if (d.text_paint.kind == CUI_TEXT_PAINT_LINEAR) {
+                    cui_rect anchor = d.bounds;
+                    if (record->paint.anchor == CUI_TEXT_ANCHOR_BLOCK) {
+                        Clay_ElementData box =
+                            Clay_GetElementData((Clay_ElementId){.id = record->alignment_box});
+                        if (box.found)
+                            anchor = (cui_rect){box.boundingBox.x, box.boundingBox.y,
+                                                box.boundingBox.width, box.boundingBox.height};
+                    }
+                    d.text_paint.x0 = anchor.x + record->paint.x0 * anchor.w;
+                    d.text_paint.y0 = anchor.y + record->paint.y0 * anchor.h;
+                    d.text_paint.x1 = anchor.x + record->paint.x1 * anchor.w;
+                    d.text_paint.y1 = anchor.y + record->paint.y1 * anchor.h;
                 }
                 d.text_source = record->source;
                 d.text_colors = record->colors;

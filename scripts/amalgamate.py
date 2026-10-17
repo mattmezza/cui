@@ -43,6 +43,7 @@ def generate(name,sources):
         code=code.replace('#include "cui_unicode_grapheme.h"', (ROOT/'src/core/cui_unicode_grapheme.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_drop_shadow_bounds_internal.h"', '#include "../core/cui_drop_shadow_bounds_internal.h"']:
             code=code.replace(private_include, (ROOT/'src/core/cui_drop_shadow_bounds_internal.h').read_text(encoding='utf-8'))
+        code=code.replace('#include "cui_text_paint_internal.h"', (ROOT/'src/core/cui_text_paint_internal.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_design_metrics.h"', '#include "../base/cui_design_metrics.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_design_metrics.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:

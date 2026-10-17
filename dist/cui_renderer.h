@@ -9,7 +9,8 @@ enum {
     CUI_RENDER_IMAGE = 16,
     CUI_RENDER_MESH = 32,
     CUI_RENDER_DROP_SHADOW = 64,
-    CUI_RENDER_INSET_SHADOW = 128
+    CUI_RENDER_INSET_SHADOW = 128,
+    CUI_RENDER_TEXT_LINEAR_GRADIENT = 256
 };
 typedef struct {
     void *user;

@@ -522,6 +522,25 @@ typedef struct {
     size_t byte_start, byte_end; /* Paragraph-relative; sorted, nonoverlapping. */
     cui_color color;             /* A shaped cluster takes the color at its first byte. */
 } cui_text_color_span;
+/* Spatial text paint. Linear endpoints are normalized to the selected anchor
+ * on submission, resolved to global logical coordinates in draw commands.
+ * Stops interpolate premultiplied RGBA in encoded sRGB; endpoint colors extend.
+ * Duplicate positions form hard edges (later stop wins at the boundary).
+ * Core copies 2..8 sorted stops; draw-list storage lasts until next begin_frame. */
+typedef enum { CUI_TEXT_PAINT_SOLID, CUI_TEXT_PAINT_LINEAR } cui_text_paint_kind;
+typedef enum { CUI_TEXT_ANCHOR_BLOCK, CUI_TEXT_ANCHOR_LINE } cui_text_paint_anchor;
+typedef struct {
+    float position;
+    cui_color color;
+} cui_text_gradient_stop;
+typedef struct {
+    cui_text_paint_kind kind;
+    cui_color color; /* Solid only. */
+    float x0, y0, x1, y1;
+    cui_text_paint_anchor anchor;
+    const cui_text_gradient_stop *stops;
+    size_t stop_count;
+} cui_text_paint;
 typedef struct {
     cui_draw_type type;
     cui_rect bounds;
@@ -537,6 +556,7 @@ typedef struct {
     cui_text_line_source text_source;       /* Frame-owned; zero = legacy text. */
     const cui_text_color_span *text_colors; /* Frame-owned. */
     size_t text_color_count;
+    cui_text_paint text_paint;    /* Linear text only; solid uses command.color. */
     cui_drop_shadow_paint shadow; /* Value-owned; color includes ancestor opacity. */
 } cui_draw_command;
 typedef struct {
@@ -740,6 +760,13 @@ typedef enum { CUI_TEXT_ALIGN_LEFT, CUI_TEXT_ALIGN_CENTER, CUI_TEXT_ALIGN_RIGHT 
 bool cui_text_paragraph_colored_aligned(cui_context *, cui_str, float font_size, cui_color,
                                         float line_height, cui_text_style, bool wrap,
                                         const cui_text_color_span *, size_t, cui_text_align);
+/* Full paragraph paint; no color-span overrides. Block anchor is the complete
+ * resolved paragraph container, including hard/empty rows; line uses each visual
+ * row's advance box. Paint changes preserve shaping/caret/selection geometry.
+ * Linear endpoints must be finite in 0..1 and distinct. Invalid input publishes
+ * no layout. Prepaint text-gradient emission is currently rejected explicitly. */
+bool cui_text_paragraph_painted(cui_context *, cui_str, float font_size, float line_height,
+                                cui_text_style, bool wrap, cui_text_align, cui_text_paint);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);

@@ -52,7 +52,9 @@ BASE/SM/MD/LG/XL/2XL thresholds. They select ordinary C box properties or whethe
 to submit a subtree; they do not implement CSS or own application state.
 Typography roles copy caller-owned body/heading/code tokens containing supported
 family/style, size, line-height, alignment and wrapping options. They do not load
-fonts, synthesize faces, or add tracking/variable axes/gradient text paint.
+fonts, synthesize faces, or add tracking/variable axes. The additional
+`cui_typography_text_painted` helper supports [linear gradient text](TEXT_GRADIENT.md)
+on renderers advertising the corresponding capability.
 Use the same font mapping for measurement and rendering; see [Typography](TYPOGRAPHY.md).
 
 The native dashboard launcher uses the SDL3 callback runner; consult the current

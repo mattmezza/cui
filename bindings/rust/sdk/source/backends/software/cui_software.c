@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_software.h"
+#include "../../src/core/cui_text_paint_internal.h"
 #include "cui_shadow.h"
 #include "cui_shape.h"
 #include <math.h>
@@ -13,6 +14,7 @@ struct cui_software {
     cui_font *font;
     cui_rect clip;
     cui_color ink;
+    cui_text_paint text_paint;
 };
 static cui_rect intersect(cui_rect a, cui_rect b) {
     float x = fmaxf(a.x, b.x), y = fmaxf(a.y, b.y), r = fminf(a.x + a.w, b.x + b.w),
@@ -221,7 +223,9 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
         return;
     for (int j = 0; j < h; j++)
         for (int i = 0; i < w; i++) {
-            cui_color c = r->ink;
+            cui_color c = r->text_paint.kind == CUI_TEXT_PAINT_LINEAR
+                              ? cui_text_paint_sample(r->text_paint, x + i + .5, y + j + .5)
+                              : r->ink;
             c.a = (uint8_t)((unsigned)c.a * data[j * pitch + i] / 255);
             blend(r, x + i, y + j, c);
         }
@@ -233,6 +237,11 @@ static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
     glyph(user, x, y, w, h, pitch, data);
 }
 static bool text_draw(cui_software *r, const cui_draw_command *c) {
+    r->text_paint = c->text_paint;
+    if (!cui_text_paint_valid(c->text_paint, true))
+        return false;
+    if (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR && c->text_color_count)
+        return false;
     if (c->text_color_count)
         return cui_font_draw_context_line_colored(
             r->font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
@@ -244,6 +253,8 @@ static bool text_draw(cui_software *r, const cui_draw_command *c) {
 #endif
 bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list || (!list->commands && list->count))
+        return false;
+    if (!cui_text_paints_supported(list, true))
         return false;
     cui_draw_list prepared;
     if (!cui_shadow_prepare(&r->shadows, list, 1, 1, 0, 0, &prepared))
@@ -341,7 +352,8 @@ cui_renderer cui_software_interface(cui_software *r) {
                           CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE |
                               CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW | CUI_RENDER_INSET_SHADOW
 #ifdef CUI_HAS_TEXT
-                              | (r && r->font ? CUI_RENDER_TEXT : 0)
+                              |
+                              (r && r->font ? CUI_RENDER_TEXT | CUI_RENDER_TEXT_LINEAR_GRADIENT : 0)
 #endif
                               ,
                           render, destroy};

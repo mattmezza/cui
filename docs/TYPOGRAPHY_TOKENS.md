@@ -41,6 +41,11 @@ ancestor where needed. A constrained parent width is required to demonstrate
 wrapping. Explicit line height sets spacing, not glyph stretching. Check the
 helper result and the existing end-frame error contract for layout failures.
 
+`cui_typography_text_painted(ui, text, token, paint)` uses the same token geometry
+with a solid or copied linear text paint. See [gradient text](TEXT_GRADIENT.md)
+for stops, directions, paragraph/line anchors, renderer capabilities and lifetime.
+This helper does not combine gradient paint with byte color spans.
+
 ## Native font registration and composed example
 
 `examples/typography/app.c` composes a centered heading, wrapped body, an italic
@@ -83,9 +88,9 @@ family files to exercise the intended body/heading/code configuration.
 
 ## Extending typography later
 
-These tokens expose supported properties only. Tracking, numeric weight/stretch,
-variable axes and gradient paint require complete provider, measurement, geometry,
-cache and renderer contracts before authoring fields can be added. A future
+These tokens expose supported properties only. Tracking, numeric weight/stretch
+and variable axes require complete provider, measurement, geometry and cache
+contracts before authoring fields can be added. A future
 extended layout/paint descriptor can have a new token type and helpers while
 keeping these functions as wrappers for zero tracking and solid/span paint.
 Current source callers need no migration to use this convenience header; font

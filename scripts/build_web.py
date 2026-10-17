@@ -25,7 +25,7 @@ SOURCES = ["src/components/cui_text_overflow.c", "web/modules/cui_shadow_bridge.
            'src/base/cui_resizable.c', 'src/components/cui_resizable.c',
            'src/base/cui_icon.c', 'src/components/cui_icon.c',
            'src/base/cui_toolbar.c', 'src/components/cui_toolbar.c',
-           'src/base/cui_media.c', 'src/components/cui_media.c', 'src/base/cui_message.c', 'src/components/cui_message.c', 'src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
+           'src/base/cui_video.c', 'src/base/cui_media.c', 'src/components/cui_media.c', 'src/base/cui_message.c', 'src/components/cui_message.c', 'src/core/cui.c', 'src/base/cui_base.c', 'src/base/cui_models.c',
            'src/base/cui_overlay.c', 'src/base/cui_virtual.c', 'src/base/cui_virtual_scroll.c', 'src/components/cui_virtual.c', 'src/base/cui_dock.c', 'src/components/cui_dock.c', 'src/base/cui_plot.c', 'src/components/cui_plot.c', 'src/components/cui_plot_motion.c', 'src/base/cui_edit.c', 'src/base/cui_editor.c', 'src/components/cui_editor.c',
            'src/base/cui_scroll.c', 'src/components/cui_scroll.c',
            'src/base/cui_status.c', 'src/components/cui_status.c',

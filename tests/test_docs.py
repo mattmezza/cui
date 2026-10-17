@@ -230,7 +230,8 @@ if (x < 2) puts("<script>");
                 'cui_responsive.h': ('cui_responsive_query', 'cui_responsive_at_least',
                                      'cui_responsive_value', 'cui_responsive_fits'),
                 'cui_typography.h': ('cui_typography_token_valid', 'cui_typography_resolve',
-                                     'cui_typography_text', 'cui_typography_text_colored'),
+                                     'cui_typography_text', 'cui_typography_text_colored',
+                                     'cui_typography_text_painted'),
             }
             for header, names in groups.items():
                 self.assertEqual((output / 'headers' / header).read_bytes(),
@@ -275,6 +276,7 @@ if (x < 2) puts("<script>");
                                 'cui_video_finish', 'cui_video_surface'),
                 'cui_sdl3.h': ('cui_sdl3_run',),
                 'cui_bridge.h': ('cui_bridge_run',),
+                'cui.h': ('cui_text_paragraph_painted',),
             }
             for header, names in groups.items():
                 self.assertEqual((output / 'headers' / header).read_bytes(),
@@ -283,7 +285,7 @@ if (x < 2) puts("<script>");
                     self.assertEqual(symbols[name]['header'], './headers/' + header)
             index = (output / 'llms.txt').read_text()
             full = (output / 'llms-full.txt').read_text()
-            for guide in ('LIVE_RESIZE', 'LINUX_LIVE_RESIZE', 'BINDING_NATIVE_RUN', 'VIDEO_GUIDE'):
+            for guide in ('LIVE_RESIZE', 'LINUX_LIVE_RESIZE', 'BINDING_NATIVE_RUN', 'VIDEO_GUIDE', 'TEXT_GRADIENT'):
                 self.assertIn('./markdown/docs/' + guide + '.md', index)
                 self.assertIn(DOCS.markdown_for_agents(ROOT / 'docs' / (guide + '.md'), ROOT).strip(), full)
                 self.assertEqual(next(page for page in pages if page['slug'] == guide.lower())['category'], 'Guides')

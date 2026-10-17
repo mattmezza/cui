@@ -70,6 +70,13 @@ static inline bool cui_typography_text(cui_context *ui, cui_str text, cui_typogr
                                        cui_color color) {
     return cui_typography_text_colored(ui, text, token, color, NULL, 0);
 }
+static inline bool cui_typography_text_painted(cui_context *ui, cui_str text,
+                                               cui_typography_token token, cui_text_paint paint) {
+    if (!cui_typography_token_valid(token))
+        return false;
+    return cui_text_paragraph_painted(ui, text, token.size, token.line_height, token.style,
+                                      token.wrap, token.align, paint);
+}
 #ifdef __cplusplus
 }
 #endif

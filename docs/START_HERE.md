@@ -63,6 +63,19 @@ cui_draw_list draw_counter(cui_context *ui, const cui_theme *theme,
 
 Stable IDs connect this frame's controls to the previous frame's hit regions. Keep domain state outside this function. Frame-owned draw data remains borrowed until the next frame; render it before advancing the context.
 
+## Adapt a real application
+
+Use [responsive containers](RESPONSIVE_LAYOUT.md) for named mobile-first width
+policies, container-local pane fitting, and a runnable dashboard with
+navigation/account callbacks. Keep one application state while switching between
+stacked content, a Menu disclosure and a persistent sidebar. The guide explains
+native launch and headless geometry/interaction tests.
+
+Use [reusable typography tokens](TYPOGRAPHY_TOKENS.md) for body/heading/code
+roles and per-call overrides; [Typography](TYPOGRAPHY.md) explains actual family
+and variant registration. These shipped helpers compose existing CUI layout/text
+APIs. They do not imply a CSS engine or advanced typography roadmap completion.
+
 ## Learn the interaction model
 
 Read [state and callbacks](IMMEDIATE_AND_STATE.md) for immediate frame composition, retained values/models, return-value events and controlled callbacks. Component headers and the gallery Usage section show the concrete types for each control. Each code block in website documentation has a Copy button.

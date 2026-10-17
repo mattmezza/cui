@@ -93,7 +93,15 @@ class DocumentationTests(unittest.TestCase):
         self.assertGreaterEqual(len(snippets), 2)
         sidebar = re.findall(r'```c\n(.*?)```', recipes, re.S)[0]
         prefix = '#include "cui/cui_components.h"\n#include "cui/cui_sidebar.h"\n'
-        sources = [prefix + 'void doc_example(cui_context *ui, const cui_theme *theme, cui_str subject) {\n(void)theme; (void)subject;\n' + snippet + '\n}\n' for snippet in snippets]
+        sources = []
+        for snippet in snippets:
+            # Header-only helpers must be included at file scope, not inside
+            # the function used to syntax-check a frame-composition fragment.
+            headers = '\n'.join(re.findall(r'^#include[^\n]*', snippet, re.M))
+            body = re.sub(r'^#include[^\n]*\n?', '', snippet, flags=re.M)
+            sources.append(prefix + headers + '\nvoid doc_example(cui_context *ui, '
+                           'const cui_theme *theme, cui_str subject, float main_width) {\n'
+                           '(void)theme; (void)subject; (void)main_width;\n' + body + '\n}\n')
         sources.append(prefix + sidebar + '\nvoid callback_contract(void) { cui_sidebar_content_fn fn = folder_label; (void)fn; }\n')
         with tempfile.TemporaryDirectory() as directory:
             for index, source in enumerate(sources):
@@ -211,6 +219,40 @@ if (x < 2) puts("<script>");
             self.assertIn('## Current component feature manifest', full)
             self.assertIn('"name": "Questionnaire"', full)
             self.assertIn('"name": "TextView"', full)
+
+    def test_responsive_and_typography_api_and_agent_guides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            pages = DOCS.build(ROOT, output)
+            symbols = {entry['name']: entry for entry in
+                       json.loads((output / 'api-index.json').read_text())['symbols']}
+            groups = {
+                'cui_responsive.h': ('cui_responsive_query', 'cui_responsive_at_least',
+                                     'cui_responsive_value', 'cui_responsive_fits'),
+                'cui_typography.h': ('cui_typography_token_valid', 'cui_typography_resolve',
+                                     'cui_typography_text', 'cui_typography_text_colored'),
+            }
+            for header, names in groups.items():
+                self.assertEqual((output / 'headers' / header).read_bytes(),
+                                 (ROOT / 'include/cui' / header).read_bytes())
+                for name in names:
+                    self.assertIn(name, symbols)
+                    self.assertEqual(symbols[name]['header'], './headers/' + header)
+                    declaration = symbols[name]['declaration']
+                    self.assertIn('static inline', declaration)
+                    self.assertTrue(declaration.endswith(';'))
+                    self.assertNotIn('{', declaration)
+            index = (output / 'llms.txt').read_text()
+            full = (output / 'llms-full.txt').read_text()
+            layout = (output / 'tasks/layout.md').read_text()
+            native = (output / 'tasks/native-app.md').read_text()
+            for guide in ('RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS'):
+                self.assertIn('./markdown/docs/' + guide + '.md', index)
+                self.assertIn(DOCS.markdown_for_agents(ROOT / 'docs' / (guide + '.md'), ROOT).strip(), full)
+                page = next(page for page in pages if page['slug'] == guide.lower())
+                self.assertEqual(page['category'], 'Guides')
+            self.assertIn('cui_responsive_query', layout)
+            self.assertIn('cui_typography_resolve', native)
 
     def test_collisions_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

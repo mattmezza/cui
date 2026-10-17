@@ -47,6 +47,39 @@ subjects, and wrap the preview only when its row height may grow. Do not size a
 whole row from last frame's measured width: resize should resolve in this frame.
 See [IDs and lifetimes](IDS_AND_LIFETIMES.md) before repeating the row.
 
+## Container-responsive layouts
+
+Use [responsive containers](RESPONSIVE_LAYOUT.md) for Tailwind-style named
+breakpoints in C. Query the current available **logical** width every frame;
+window framebuffer density is a separate host concern. A main pane can use its
+own query after subtracting sidebar/padding/gaps.
+
+```c
+#include "cui/cui_responsive.h"
+
+cui_responsive size = cui_responsive_query(main_width, NULL);
+if (size.valid) {
+    bool row = cui_responsive_fits(size, 260, 260, 12);
+    float padding = cui_responsive_value(size, CUI_BREAKPOINT_MD, 12, 24);
+    cui_begin_box(ui, 200, (cui_box){.width = -1, .row = row,
+                                   .padding = padding, .gap = 12});
+    /* Submit the same application-backed cards in either arrangement. */
+    cui_end_box(ui);
+}
+```
+
+The selector arguments are query, threshold, base value, expanded value. Use
+`cui_responsive_at_least(size, CUI_BREAKPOINT_LG)` to choose a persistent sidebar;
+conditionally submit a closed drawer's controls so hidden input/semantics do not
+remain active. Keep one state tree across breakpoint changes. Width policies
+supply no CSS parser, automatic drawer/modal scope, or host event loop. The
+[dashboard fixture](../examples/responsive_dashboard/app.c) demonstrates the
+working composition; its guide includes native and headless run commands.
+
+Text can use [body/heading/code role tokens](TYPOGRAPHY_TOKENS.md) inside these
+containers. Wrapping still requires a constrained parent and matching measurement
+and renderer fonts; tokens do not replace those contracts.
+
 ## Single-line ellipsis with fixed trailing controls
 
 Use `cui_text_ellipsis` from `include/cui/cui_text_overflow.h` when a single-line

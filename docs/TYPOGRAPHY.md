@@ -8,6 +8,29 @@ Use `cui_text_line` for unwrapped text with the same controls. The basic
 Font size and line height are independent: use the selected face's actual font
 metrics when alignment requires its ascent, descent, or leading.
 
+For reusable application styles, use the shipped header-only
+[`cui_typography_roles` and `cui_typography_token` helpers](TYPOGRAPHY_TOKENS.md).
+They resolve caller-owned body, heading and code defaults into a copy that can be
+overridden locally; they do not mutate the theme or a global current style:
+
+```c
+#include "cui/cui_typography.h"
+
+cui_typography_token title;
+if (cui_typography_resolve(&roles, CUI_TYPOGRAPHY_HEADING, &title)) {
+    title.align = CUI_TEXT_ALIGN_CENTER;
+    bool submitted = cui_typography_text(ui, cui_string("Workspace"), title, ink);
+    (void)submitted; /* Handle failure and end-frame diagnostics in the host. */
+}
+```
+
+Here `roles` and `ink` are application-owned values; call inside an active frame.
+Resolution validates only the selected role and preserves output on failure.
+See the token guide for a full role initializer, color spans, exact native-face
+registration, and wide/narrow composed tests. Tracking, variable axes, arbitrary
+numeric weights and gradient text remain future work; adding a convenience token
+does not make those provider/layout/renderer contracts available.
+
 Family IDs are application-defined `uint32_t` keys. Zero retains the default
 family. Register regular and variant faces for a named family on the same
 `cui_font` used by the context's measurement callbacks and renderer:

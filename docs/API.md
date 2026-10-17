@@ -29,3 +29,33 @@ Queue input before begin. Events are interpreted against the prior frame, then c
 UI context and optional font objects require single-thread ownership. Independent contexts may be interleaved on that thread; Clay's internal current-context pointer prohibits concurrent UI calls. Host asynchronous work must hand results back on the UI thread. Optional renderers own GPU resources with their device's thread affinity; borrowed host device/window/font must outlive the renderer.
 
 The default text measurer is approximate and unsuitable for international text. FreeType/HarfBuzz handles individual shaped runs; paragraph bidi, font fallback, grapheme selection, full IME and line breaking are not complete. UTF-8 editor offsets are byte indices constrained to scalar boundaries, not grapheme boundaries.
+
+## Responsive layout and typography roles
+
+Two header-only utilities compose existing Core behavior without global style
+state or new host dependencies:
+
+| Header | Shipped API | Guide |
+| --- | --- | --- |
+| `cui/cui_responsive.h` | `cui_responsive_query`, `cui_responsive_at_least`, `cui_responsive_value`, `cui_responsive_fits` | [Responsive containers](RESPONSIVE_LAYOUT.md) |
+| `cui/cui_typography.h` | `cui_typography_token_valid`, `cui_typography_resolve`, `cui_typography_text`, `cui_typography_text_colored` | [Reusable typography tokens](TYPOGRAPHY_TOKENS.md) |
+
+Responsive queries use the caller's current logical container width and named
+BASE/SM/MD/LG/XL/2XL thresholds. They select ordinary C box properties or whether
+to submit a subtree; they do not implement CSS or own application state.
+Typography roles copy caller-owned body/heading/code tokens containing supported
+family/style, size, line-height, alignment and wrapping options. They do not load
+fonts, synthesize faces, or add tracking/variable axes/gradient text paint.
+Use the same font mapping for measurement and rendering; see [Typography](TYPOGRAPHY.md).
+
+The native dashboard launcher uses the SDL3 callback runner; consult the current
+`cui_sdl3.h` and [native application guide](NATIVE_APP_STARTER.md) for host
+lifecycle and live-resize constraints. Portable width policy and text roles do
+not provide a native event pump themselves.
+
+For SDL3 applications, prefer `cui_sdl3_run` for callback-driven composition during
+OS-managed modal resize. Manual `cui_sdl3_poll` loops remain supported, but their
+next frame can wait until the operating system releases its modal event pump.
+Inside runner callbacks, `cui_sdl3_poll` synchronizes IME/cursor state without
+recursively pumping events. See [Live resize](LIVE_RESIZE.md) for lifecycle,
+threading, frame scheduling and scoped native validation details.

@@ -10,6 +10,8 @@ My application requirements: [describe the screens, interactions and host].
 
 Start by reading README.md, docs/START_HERE.md,
 docs/IMMEDIATE_AND_STATE.md, docs/INTERFACES.md and docs/gpui-parity.json.
+For adaptive layouts read docs/RESPONSIVE_LAYOUT.md and docs/LAYOUT_GUIDE.md.
+For reusable text styles read docs/TYPOGRAPHY_TOKENS.md and docs/TYPOGRAPHY.md.
 Use the current public headers as the API authority; do not invent symbols.
 Check the feature status and limitations for every component you choose.
 
@@ -92,3 +94,32 @@ The index follows the [llms.txt proposal](https://llmstxt.org/). Publishing thes
 ## Ask for evidence
 
 For a UI change, request the triggering interaction, expected result, meaningful test and actual running screenshot. For a host integration, request a buildable example, its memory/lifetime contract and the observed backend. For another language, distinguish a tested FFI or WASM example from a proposed binding.
+
+## Keep API documentation synchronized
+
+When changing a public API, update both the human guide and agent-facing
+references in the same change. Add or refresh a guide when composition requires
+more than a signature, update examples and meaningful tests, and verify the
+website exports the exact public header plus its `api-index.json` declaration.
+Header-only inline APIs belong in that index too. The generated `llms.txt`,
+`llms-full.txt` and focused task bundles must expose the relevant guide; do not
+edit generated website files instead of the repository sources.
+
+For responsive UI, query current container widths in logical units and preserve
+one application state across breakpoint changes. Omit hidden control subtrees or
+use the documented input/semantic suppression contracts. For typography, resolve
+caller-owned roles and register actual faces on the shared measurement/render
+font owner. Report unsupported tracking, variable-axis or gradient-paint requests
+as roadmap work rather than inventing token fields.
+
+The responsive dashboard's native launcher depends on the SDL3 callback runner.
+Consult `cui_sdl3.h` and the native starter guide for the shipped runner/manual
+pump and live-resize contract. A passing portable layout test validates neither a
+native event loop nor a browser rendering backend.
+
+For SDL3 applications, prefer `cui_sdl3_run` for callback-driven composition during
+OS-managed modal resize. Manual `cui_sdl3_poll` loops remain supported, but their
+next frame can wait until the operating system releases its modal event pump.
+Inside runner callbacks, `cui_sdl3_poll` synchronizes IME/cursor state without
+recursively pumping events. See [Live resize](LIVE_RESIZE.md) for lifecycle,
+threading, frame scheduling and scoped native validation details.

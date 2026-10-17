@@ -14,6 +14,79 @@ import tempfile
 import time
 
 
+
+class XErrorEvent(ctypes.Structure):
+    _fields_ = [('type', ctypes.c_int), ('display', ctypes.c_void_p),
+                ('resourceid', ctypes.c_ulong), ('serial', ctypes.c_ulong),
+                ('error_code', ctypes.c_ubyte), ('request_code', ctypes.c_ubyte),
+                ('minor_code', ctypes.c_ubyte)]
+
+
+class WindowProbe:
+    """Ignore only BadWindow from the exact window lookup request in flight.
+
+    Xlib's error handler is process-global. This single-threaded driver restores
+    it after each synchronous request; target resize requests remain unguarded.
+    """
+    def __init__(self, x, connection):
+        self.x, self.connection = x, connection
+        x.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        x.XSetErrorHandler.argtypes = [ctypes.c_void_p]
+        x.XSetErrorHandler.restype = ctypes.c_void_p
+
+    def _request(self, opcode, target, function, *args):
+        x = self.x
+        # Deliver unrelated earlier errors to the original handler first.
+        x.XSync(self.connection, 0)
+        errors = []
+        callback_type = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p,
+                                         ctypes.POINTER(XErrorEvent))
+
+        def on_error(connection, event):
+            e = event.contents
+            errors.append((connection, e.error_code, e.request_code, e.resourceid))
+            return 0
+
+        callback = callback_type(on_error)
+        previous = x.XSetErrorHandler(ctypes.cast(callback, ctypes.c_void_p))
+        try:
+            result = function(self.connection, target, *args)
+            x.XSync(self.connection, 0)
+        finally:
+            x.XSetErrorHandler(previous)
+        for connection, code, request, resource in errors:
+            if (connection, code, request, resource) != (self.connection, 3, opcode, target):
+                raise RuntimeError(f'Unexpected X11 error {code}, request {request}, resource {resource:#x}')
+        return 0 if errors else result
+
+    def find(self, parent, title):
+        window = ctypes.c_ulong
+        root, owner = window(), window()
+        children = ctypes.POINTER(window)()
+        count = ctypes.c_uint()
+        if not self._request(15, parent, self.x.XQueryTree, ctypes.byref(root),
+                             ctypes.byref(owner), ctypes.byref(children), ctypes.byref(count)):
+            return None
+        try:
+            for i in range(count.value):
+                child = int(children[i])
+                name = ctypes.c_void_p()
+                try:
+                    named = self._request(20, child, self.x.XFetchName, ctypes.byref(name))
+                    if named and name.value and ctypes.string_at(name).decode(errors='replace') == title:
+                        return child
+                finally:
+                    if name.value:
+                        self.x.XFree(name)
+                found = self.find(child, title)
+                if found:
+                    return found
+        finally:
+            if children:
+                self.x.XFree(children)
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--executable', required=True, type=Path)
@@ -44,6 +117,7 @@ def main():
     connection = x.XOpenDisplay(None)
     if not connection:
         return 77
+    probe = WindowProbe(x, connection)
     try:
         with tempfile.TemporaryDirectory(prefix='cui-resize-') as temporary:
             folder = Path(temporary)
@@ -69,37 +143,12 @@ def main():
                     if line.startswith('FRAME '):
                         records.append((time.monotonic(), line.split()))
 
-            def find(parent):
-                root, owner = window(), window()
-                children = ctypes.POINTER(window)()
-                count = ctypes.c_uint()
-                if not x.XQueryTree(connection, parent, ctypes.byref(root), ctypes.byref(owner),
-                                    ctypes.byref(children), ctypes.byref(count)):
-                    return None
-                found = None
-                try:
-                    for i in range(count.value):
-                        name = ctypes.c_void_p()
-                        if x.XFetchName(connection, children[i], ctypes.byref(name)) and name.value:
-                            try:
-                                if ctypes.string_at(name).decode(errors='replace') == title:
-                                    found = int(children[i]); break
-                            finally:
-                                x.XFree(name)
-                        found = find(children[i])
-                        if found:
-                            break
-                finally:
-                    if children:
-                        x.XFree(children)
-                return found
-
             try:
                 deadline = time.monotonic() + 15
                 target = None
                 while time.monotonic() < deadline and child.poll() is None:
                     drain(.05)
-                    target = find(x.XDefaultRootWindow(connection))
+                    target = probe.find(x.XDefaultRootWindow(connection), title)
                     if target and records:
                         break
                 if child.poll() == 77:

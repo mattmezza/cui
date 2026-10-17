@@ -21,6 +21,26 @@ function shareRoute(path,raw,title,description){
  for(const [selector,value] of [['meta[name=description]',description],['meta[property="og:title"]',title],['meta[property="og:description"]',description],['meta[property="og:url"]',canonical],['meta[name="twitter:title"]',title],['meta[name="twitter:description"]',description]])document.querySelector(selector)?.setAttribute('content',value);
 }
 const canvas = $('preview'), ctx = canvas.getContext('2d');
+const textPaintControl=document.createElement('select');
+textPaintControl.id='text-paint';textPaintControl.setAttribute('aria-label','Typography paint');
+textPaintControl.hidden=true;
+for(const [value,label] of [['0','Solid text'],['1','Linear gradient text']]){
+ const option=document.createElement('option');option.value=value;option.textContent=label;textPaintControl.append(option);
+}
+$('text-weight').after(textPaintControl);
+const gradientSnippet=`cui_text_gradient_stop stops[] = {
+    {0, {244, 40, 90, 255}}, {1, {30, 90, 250, 255}},
+};
+cui_text_paint paint = {.kind = CUI_TEXT_PAINT_LINEAR, .x1 = 1,
+    .anchor = CUI_TEXT_ANCHOR_BLOCK, .stops = stops, .stop_count = 2};
+/* Inside an active frame; Core copies the stops. Check the return value. */
+bool ok = cui_text_paragraph_painted(ui, cui_string("WiiW: Build with CUI"),
+    24, 30, (cui_text_style){0}, true, CUI_TEXT_ALIGN_LEFT, paint);`;
+function typographyUsage(){
+ if(selected?.name==='Theme'&&textPaintControl.value==='1')$('snippet').textContent=gradientSnippet;
+ else if(selected?.name==='Theme')$('snippet').textContent=snippets.Theme;
+}
+
 const decoder = new TextDecoder(), encoder = new TextEncoder();
 const textBaselineOffsets=new Map();
 function canvasFont(size,weight=0,italic=false,monospace=false,familyId=0){
@@ -365,7 +385,7 @@ function render(){
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
- wasm.gallery_typography_options(Number($('text-family').value),Number($('text-size').value),Number($('text-weight').value),Number($('text-italic').checked));
+ wasm.gallery_typography_options(Number($('text-family').value),Number($('text-size').value),Number($('text-weight').value),Number($('text-italic').checked),Number(textPaintControl.value));
  wasm.gallery_effects_options(Number($('effect-angle').value),Number($('effect-opacity').value),Number($('effect-blur').value));
  wasm.gallery_plot_mode(Number($('plot-mode').value));
  wasm.gallery_virtual_mode(Number($('virtual-axis').value));
@@ -658,7 +678,7 @@ function selectComponent(){
  $('component-state').textContent=usage?.state_ownership||'Retain application values between frames.';
  $('component-events').textContent=usage?.interaction||'Use the linked guide for the example callbacks.';
  $('component-usage-note').textContent=usage?.usage||'';
- $('component-guides').replaceChildren();for(const path of usage?.docs||[]){const doc=documents.find(d=>d.source.endsWith('/'+path));if(doc){const a=document.createElement('a');a.href='#docs/'+doc.slug;a.textContent=doc.title;$('component-guides').append(a,document.createTextNode(' '));}}
+ $('component-guides').replaceChildren();for(const path of new Set([...(usage?.docs||[]),...(selected.name==='Theme'?['docs/TEXT_GRADIENT.md']:[])])){const doc=documents.find(d=>d.source.endsWith('/'+path));if(doc){const a=document.createElement('a');a.href='#docs/'+doc.slug;a.textContent=doc.title;$('component-guides').append(a,document.createTextNode(' '));}}
 
  $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
  $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental; native IME candidate UI and a complete platform accessibility bridge vary by host.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}
@@ -686,7 +706,7 @@ function selectComponent(){
  $('control-size').disabled=false;
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
- for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control'])$(id).hidden=selected.name!=='Theme';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
+ for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
  $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
@@ -900,6 +920,7 @@ async function copyCode(button,code){
  setTimeout(()=>button.textContent=original,1800);
 }
 $('copy-quickstart').addEventListener('click',()=>copyCode($('copy-quickstart'),$('quickstart-code').textContent));
+textPaintControl.addEventListener('change',()=>{typographyUsage();requestFrame();});
 $('copy-snippet').addEventListener('click',()=>copyCode($('copy-snippet'),$('snippet').textContent));
 $('theme').addEventListener('change',()=>{const mode=$('theme').value;themeChoice=mode==='3'?'system':mode==='2'?'high-contrast':mode==='1'?darkDefault:lightDefault;syncTheme();});
 $('palette-trigger').addEventListener('click',()=>$('palette-menu').hidden?openPalette():closePalette(true));

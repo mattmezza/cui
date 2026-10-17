@@ -92,3 +92,24 @@ the new browser module with the gallery, and inline the private paint helper whe
 generating the Core amalgamation. Regenerate distribution/SDK artifacts together
 with the public draw-command layout change. Test native builds through
 `python scripts/test_local.py --build-dir <build>`; browser tests stay headless.
+
+## Public gallery example
+
+Open **Theme** in the public gallery, then change **Typography paint** from
+**Solid text** to **Linear gradient text**. The typography sample uses the real
+Core painted-paragraph API with copied pink-to-blue stops; the browser receives
+the resolved axis and stops from WASM. The font family, size, weight and italic
+controls continue to apply. The gradient's paragraph wraps within the sample
+container. The solid sample keeps its existing single-line presentation.
+
+The component's copy button supplies the painted-paragraph C example while the
+gradient is selected. Its **Gradient text** guide link opens this guide. This
+uses the existing Theme entry and preserves all 78 catalog families. It does not
+reuse byte color spans as a gradient substitute.
+
+`tests/web/test_gradient_gallery.py --directory <built-gallery>` loads the real
+compiled gallery, changes the public paint control, checks serialized paint
+stops and resolved coordinates, and reads actual glyph interiors. It exercises
+desktop and 390px viewports at device pixel ratios 1 and 2, copyable code, the
+return to solid paint and guide navigation. The guide must be included in the
+public documentation generator before this integration test runs.

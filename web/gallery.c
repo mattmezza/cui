@@ -169,7 +169,9 @@ static uint32_t typography_family;
 static float typography_size = 24;
 static int typography_weight;
 static bool typography_italic;
-void gallery_typography_options(uint32_t family, float size, int weight, int italic) {
+static bool typography_gradient;
+void gallery_typography_options(uint32_t family, float size, int weight, int italic, int gradient) {
+    typography_gradient = gradient != 0;
     typography_family = family;
     typography_size = isfinite(size) && size >= 8 && size <= 128 ? size : 24;
     typography_weight = weight >= 0 && weight <= 3 ? weight : 0;
@@ -4111,11 +4113,24 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_begin_box(
             ui, cui_id_from(ui, "typography-sample"),
             (cui_box){.width = width - 48, .height = typography_size * 1.5f, .clip = true});
-        cui_text_ex(ui, cui_string("WiiW: Build with CUI"), typography_size, t.text,
-                    typography_size * 1.25f,
-                    (cui_text_style){.family = typography_family,
-                                     .weight = (cui_text_weight)typography_weight,
-                                     .italic = typography_italic});
+        const cui_text_style typography_style = {.family = typography_family,
+                                                 .weight = (cui_text_weight)typography_weight,
+                                                 .italic = typography_italic};
+        if (typography_gradient) {
+            const cui_text_gradient_stop stops[] = {{0, {244, 40, 90, 255}},
+                                                    {1, {30, 90, 250, 255}}};
+            cui_text_paragraph_painted(ui, cui_string("WiiW: Build with CUI"), typography_size,
+                                       typography_size * 1.25f, typography_style, true,
+                                       CUI_TEXT_ALIGN_LEFT,
+                                       (cui_text_paint){.kind = CUI_TEXT_PAINT_LINEAR,
+                                                        .x1 = 1,
+                                                        .anchor = CUI_TEXT_ANCHOR_BLOCK,
+                                                        .stops = stops,
+                                                        .stop_count = 2});
+        } else {
+            cui_text_ex(ui, cui_string("WiiW: Build with CUI"), typography_size, t.text,
+                        typography_size * 1.25f, typography_style);
+        }
         cui_end_box(ui);
 
         break;

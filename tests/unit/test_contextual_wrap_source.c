@@ -52,10 +52,10 @@ static void wrapped_ranges(void) {
     valid_draw(&list.commands[0]);
     valid_draw(&list.commands[1]);
     assert(list.commands[0].text_source.byte_start == 0 &&
-           list.commands[0].text_source.byte_end == 4);
+           list.commands[0].text_source.byte_end == 5);
     assert(list.commands[1].text_source.byte_start == 5 &&
            list.commands[1].text_source.byte_end == 10);
-    assert(list.commands[0].text_color_count == 1 && list.commands[0].text_colors[0].byte_end == 4);
+    assert(list.commands[0].text_color_count == 1 && list.commands[0].text_colors[0].byte_end == 5);
     assert(list.commands[1].text_color_count == 2 &&
            list.commands[1].text_colors[0].byte_start == 5);
     assert(list.commands[1].text_colors[1].byte_start == 7 &&
@@ -166,10 +166,12 @@ static void failures(void) {
     list = cui_end_frame(ui);
     assert(list.count == 1);
     cui_destroy(ui);
-    ui = cui_create((cui_config){.measure_styled = measure,
-                                 .measure_user = &(unsigned){0},
-                                 .max_elements = 64,
-                                 .frame_bytes = 48 + 2 * sizeof(cui_text_color_span)});
+    ui = cui_create((cui_config){
+        .measure_styled = measure,
+        .measure_user = &(unsigned){0},
+        .max_elements = 64,
+        .frame_bytes = 48 + 17 * (2 * sizeof(size_t) + sizeof(float) + sizeof(uint32_t)) +
+                       2 * sizeof(cui_text_color_span)});
     assert(ui && cui_begin_frame(ui, 200, 300, 0));
     cui_begin_box(ui, 1, (cui_box){.width = 40});
     cui_text_color_span all = {0, 17, {255, 0, 0, 255}};
@@ -191,6 +193,7 @@ static void renderer_snapshot(const char *path) {
     assert(renderer);
     cui_context *ui = cui_create((cui_config){.measure_styled = font_measure,
                                               .measure_user = font,
+                                              .text_geometry_line = cui_font_text_geometry_line,
                                               .max_elements = 128,
                                               .frame_bytes = 16384});
     assert(ui);

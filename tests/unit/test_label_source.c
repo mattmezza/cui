@@ -31,6 +31,84 @@ static cui_size scalar_measure(void *user, cui_str value, float size, cui_text_s
         n += ((unsigned char)value.data[i] & 0xc0u) != 0x80u;
     return (cui_size){(float)n * 10, 12};
 }
+static void equal_color(cui_color actual, cui_color expected) {
+    assert(actual.r == expected.r && actual.g == expected.g && actual.b == expected.b &&
+           actual.a == expected.a);
+}
+static void check_prepared_draw(const cui_draw_command *draw) {
+    assert(draw->type == CUI_DRAW_TEXT && draw->text.length == prepared.text_length);
+    assert(draw->text_source.paragraph.length == prepared.text_length);
+    assert(draw->text_source.byte_start == 0 && draw->text_source.byte_end == prepared.text_length);
+    assert(!memcmp(draw->text.data, text, prepared.text_length));
+    assert(!memcmp(draw->text_source.paragraph.data, text, prepared.text_length));
+    assert(draw->text_color_count == prepared.span_count);
+    for (size_t i = 0; i < prepared.span_count; ++i) {
+        assert(draw->text_colors[i].byte_start == spans[i].byte_start);
+        assert(draw->text_colors[i].byte_end == spans[i].byte_end);
+        equal_color(draw->text_colors[i].color, spans[i].color);
+    }
+    assert(draw->font_size == theme.font_size && draw->bounds.h == 20);
+}
+static void caller_foreground(void) {
+    cui_context *ui = cui_create(
+        (cui_config){.measure_styled = scalar_measure, .max_elements = 64, .frame_bytes = 8192});
+    assert(ui);
+    cui_label_options o = {.primary = cui_string("Failure"), .color = theme.danger};
+    prepare(o);
+    assert(prepared.span_count == 1 && spans[0].byte_start == 0 && spans[0].byte_end == 7);
+    equal_color(color_at(0), theme.text); /* A color value alone does not override defaults. */
+    assert(cui_begin_frame(ui, 400, 200, 0) && cui_label_source(ui, &theme, o));
+    cui_draw_list list = cui_end_frame(ui);
+    assert(list.count == 1);
+    check_prepared_draw(&list.commands[0]);
+    equal_color(list.commands[0].color, theme.text);
+    o = options("Échec", "écho", "");
+    prepare(o);
+    assert(prepared.span_count == 2 && spans[0].byte_end == 6 && spans[1].byte_start == 6);
+    equal_color(color_at(0), theme.text);
+    equal_color(color_at(6), theme.muted); /* Separator is secondary styling. */
+    assert(cui_begin_frame(ui, 400, 200, 0) && cui_label_source(ui, &theme, o));
+    list = cui_end_frame(ui);
+    assert(list.count == 1);
+    check_prepared_draw(&list.commands[0]);
+    o.custom_color = true;
+    o.color = theme.danger; /* Caller-selected error presentation, no validation state. */
+    o.highlight = cui_string("ec é");
+    prepare(o);
+    assert(prepared.text_length == 12 && prepared.span_count == 3);
+    assert(spans[0].byte_start == 0 && spans[0].byte_end == 4);
+    assert(spans[1].byte_start == 4 && spans[1].byte_end == 9);
+    assert(spans[2].byte_start == 9 && spans[2].byte_end == 12);
+    equal_color(color_at(0), theme.danger);
+    equal_color(color_at(4), theme.info);
+    equal_color(color_at(6), theme.info); /* Highlight crosses primary, space, secondary. */
+    equal_color(color_at(7), theme.info);
+    equal_color(color_at(9), theme.muted);
+    assert(cui_begin_frame(ui, 400, 200, 0) && cui_label_source(ui, &theme, o));
+    list = cui_end_frame(ui);
+    assert(list.count == 1);
+    check_prepared_draw(&list.commands[0]);
+    equal_color(list.commands[0].color, theme.danger);
+    o = options("É\n秘密", "token", "秘密 token");
+    o.custom_color = true;
+    o.color = theme.danger;
+    o.masked = true;
+    o.semantic_id = 777;
+    prepare(o);
+    assert(prepared.text_length == 30 && prepared.span_count == 0);
+    assert(!memcmp(text, "••••••••••", 30));
+    assert(cui_begin_frame(ui, 400, 200, 0) && cui_label_source(ui, &theme, o));
+    list = cui_end_frame(ui);
+    assert(list.count == 1);
+    check_prepared_draw(&list.commands[0]);
+    equal_color(list.commands[0].color, theme.danger);
+    assert(list.commands[0].bounds.w == 100 && cui_bounds(ui, 777).h == 20);
+    size_t count = 0;
+    const cui_semantic *semantics = cui_semantics(ui, &count);
+    assert(count == 1 && semantics[0].name.length == 30 && semantics[0].details.secret);
+    assert(!memcmp(semantics[0].name.data, "••••••••••", 30));
+    cui_destroy(ui);
+}
 static void wrapping(void) {
     cui_context *ui = cui_create(
         (cui_config){.measure_styled = scalar_measure, .max_elements = 128, .frame_bytes = 16384});
@@ -42,7 +120,7 @@ static void wrapping(void) {
     cui_end_box(ui);
     cui_draw_list list = cui_end_frame(ui);
     assert(list.count == 3 && cui_bounds(ui, 100).h == 60);
-    assert(list.commands[0].text.length == 4 && !memcmp(list.commands[0].text.data, "Éé", 4));
+    assert(list.commands[0].text.length == 5 && !memcmp(list.commands[0].text.data, "Éé ", 5));
     assert(list.commands[0].text_color_count == 2);
     assert(list.commands[0].text_colors[0].color.r == 1 &&
            list.commands[0].text_colors[1].color.r == 3);
@@ -91,8 +169,11 @@ static void wrapping(void) {
     cui_destroy(ui);
 }
 int main(void) {
-    theme = (cui_theme){
-        .text = {1, 0, 0, 255}, .muted = {2, 0, 0, 255}, .info = {3, 0, 0, 255}, .font_size = 16};
+    theme = (cui_theme){.text = {1, 0, 0, 255},
+                        .muted = {2, 0, 0, 255},
+                        .info = {3, 0, 0, 255},
+                        .danger = {201, 31, 47, 173},
+                        .font_size = 16};
     cui_label_options o = options("É🙂", "世界 É", "é");
     prepare(o);
     assert(prepared.text_length == strlen("É🙂 世界 É"));
@@ -174,5 +255,6 @@ int main(void) {
     assert(list.commands[0].bounds.h == 20);
     cui_destroy(ui);
     wrapping();
+    caller_foreground();
     return 0;
 }

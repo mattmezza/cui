@@ -19,13 +19,16 @@ static cui_context *create(size_t bytes) {
     return cui_create(
         (cui_config){.max_elements = 128, .frame_bytes = bytes, .measure_styled = measure});
 }
-static void rows(cui_text_align alignment, bool wrap) {
+static void rows(cui_text_align alignment, bool wrap, bool edges) {
     cui_context *ui = create(16384);
     assert(ui);
     for (int frame = 0; frame < 2; ++frame) {
         float width = frame ? 100 : 50;
         assert(cui_begin_frame(ui, 200, 200, 0));
-        cui_begin_box(ui, 1, (cui_box){.width = width, .padding = 5});
+        cui_begin_box(ui, 1, (cui_box){.width = width, .padding = 5,
+                                       .custom_padding = edges,
+                                       .padding_edges = {.left = 3, .right = 7,
+                                                         .top = 4, .bottom = 6}});
         char text[] = "AA BB\n\nאב\nZ\n";
         cui_text_color_span span = {0, sizeof(text) - 1, {255, 0, 0, 255}};
         assert(cui_text_paragraph_colored_aligned(ui, cui_string(text), 16, (cui_color){0}, 20,
@@ -40,7 +43,7 @@ static void rows(cui_text_align alignment, bool wrap) {
         for (size_t i = 0; i < draw.count; ++i) {
             const cui_draw_command *d = &draw.commands[i];
             assert(d->type == CUI_DRAW_TEXT && cui_text_line_source_valid(d->text_source));
-            near(d->bounds.x, 5 + (width - 10 - d->bounds.w) * factor);
+            near(d->bounds.x, (edges ? 3 : 5) + (width - 10 - d->bounds.w) * factor);
             assert(d->text_color_count == 1 && d->text_colors[0].color.r == 255);
             assert(d->text_colors[0].byte_start == d->text_source.byte_start);
             assert(d->text_colors[0].byte_end == d->text_source.byte_end);
@@ -137,8 +140,10 @@ static void label(void) {
 }
 int main(void) {
     for (int a = CUI_TEXT_ALIGN_LEFT; a <= CUI_TEXT_ALIGN_RIGHT; ++a) {
-        rows((cui_text_align)a, true);
-        rows((cui_text_align)a, false);
+        rows((cui_text_align)a, true, false);
+        rows((cui_text_align)a, false, false);
+        rows((cui_text_align)a, true, true);
+        rows((cui_text_align)a, false, true);
     }
     validation();
     oversized();

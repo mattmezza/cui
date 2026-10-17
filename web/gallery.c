@@ -5545,7 +5545,27 @@ float gallery_command(unsigned i, unsigned field) {
         return c->text_style.italic;
     case 24:
         return c->text_style.monospace;
+    case 25:
+        return c->text_paint.kind;
+    case 26:
+        return c->text_paint.x0;
+    case 27:
+        return c->text_paint.y0;
+    case 28:
+        return c->text_paint.x1;
+    case 29:
+        return c->text_paint.y1;
+    case 30:
+        return (float)c->text_paint.stop_count;
     default:
+        if (field >= 31 && field < 71) {
+            size_t stop = (field - 31) / 5;
+            if (stop >= c->text_paint.stop_count || !c->text_paint.stops)
+                return 0;
+            cui_text_gradient_stop s = c->text_paint.stops[stop];
+            const float values[] = {s.position, s.color.r, s.color.g, s.color.b, s.color.a};
+            return values[(field - 31) % 5];
+        }
         return 0;
     }
 }

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
+import {paintGradientText} from "./modules/cui_text_paint.js";
 import {selectedUsage} from "./modules/cui_usage.js";
 let shadowRenderer;
 let iconCatalog=null,apiIndex=null;
@@ -417,7 +418,7 @@ function render(){
    continue;
   }
   ctx.fillStyle=ctx.strokeStyle=`rgba(${f(5)},${f(6)},${f(7)},${f(8)/255})`;
-  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24),familyId=wasm.gallery_command_family(i)>>>0;ctx.font=canvasFont(size,weight,italic,monospace,familyId);const baseline=textBaselineOffset(size,weight,italic,monospace,familyId);ctx.textBaseline=baseline===null?'top':'alphabetic';ctx.fillText(stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i)),x,y+(baseline??0));}
+  if(type===2){const size=f(11),weight=f(22),italic=!!f(23),monospace=!!f(24),familyId=wasm.gallery_command_family(i)>>>0;ctx.font=canvasFont(size,weight,italic,monospace,familyId);const baseline=textBaselineOffset(size,weight,italic,monospace,familyId);ctx.textBaseline=baseline===null?'top':'alphabetic';const text=stringAt(wasm.gallery_command_text(i),wasm.gallery_command_length(i));if(f(25)===1){const paint={x0:f(26),y0:f(27),x1:f(28),y1:f(29),stops:Array.from({length:f(30)},(_,s)=>Array.from({length:5},(_,v)=>f(31+s*5+v)))};paintGradientText(ctx,text,x,y+(baseline??0),paint);}else if(f(25)===0)ctx.fillText(text,x,y+(baseline??0));else throw Error('Unsupported CUI text paint');}
   else if(w>0&&h>0){
    const radii=(f(12)?[f(13),f(14),f(16),f(15)]:[f(9),f(9),f(9),f(9)]).map(r=>Math.min(Math.max(0,r),Math.min(w,h)/2));
    if(type===5){paintBitmap(i,x,y,w,h,radii);continue;}

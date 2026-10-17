@@ -245,7 +245,8 @@ typedef struct {
     bool ok;
 } native_gallery;
 static bool native_init(void *user, int argc, char **argv, cui_sdl3 **host, cui_context **ui) {
-    (void)argc; (void)argv;
+    (void)argc;
+    (void)argv;
     native_gallery *app = user;
     *host = app->host;
     *ui = app->ui;
@@ -261,9 +262,10 @@ static int native_frame(void *user, cui_sdl3 *host, cui_context *ui) {
     cui_sdl3_size(host, &w, &h);
     cui_draw_list list = frame(ui, app->state, w, h, cui_sdl3_frame_delta(host));
     cui_theme theme = app->state->contrast ? cui_theme_high_contrast()
-                      : app->state->dark ? cui_theme_dark() : cui_theme_light();
-    const char *shot = app->capture && app->smoke && app->frames + 1 >= app->smoke
-                           ? app->capture : NULL;
+                      : app->state->dark   ? cui_theme_dark()
+                                           : cui_theme_light();
+    const char *shot =
+        app->capture && app->smoke && app->frames + 1 >= app->smoke ? app->capture : NULL;
     (void)cui_sdl3_set_cursor(host, cui_pointer_cursor(ui));
     if (!cui_sdl3_render_capture(host, &list, theme.background, shot)) {
         fprintf(stderr, "Render: %s\n", cui_sdl3_error());
@@ -381,10 +383,10 @@ int main(int argc, char **argv) {
         } else {
             printf("video=%s; renderer=%s; SDL_Renderer compatibility adapter\n",
                    cui_sdl3_video_driver(), cui_sdl3_driver(s));
-            native_gallery app = {.host = s, .ui = ui, .state = &state,
-                                  .smoke = smoke, .capture = capture};
+            native_gallery app = {
+                .host = s, .ui = ui, .state = &state, .smoke = smoke, .capture = capture};
             ok = cui_sdl3_run(argc, argv,
-                             (cui_sdl3_app){&app, native_init, native_frame, native_quit}) == 0 &&
+                              (cui_sdl3_app){&app, native_init, native_frame, native_quit}) == 0 &&
                  app.ok;
         }
     }

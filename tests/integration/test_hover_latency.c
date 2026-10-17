@@ -7,8 +7,8 @@ static void frame(cui_context *ui) {
     cui_begin_box(ui, 100, (cui_box){.width = 320, .height = 160});
     for (int row = 0; row < 4; ++row) {
         cui_begin_box(ui, (cui_id)(row + 1), (cui_box){.width = 320, .height = 40});
-        (void)cui_interact(ui, (cui_id)(row + 1), CUI_ROLE_BUTTON, cui_string("row"), false,
-                           false, 0);
+        (void)cui_interact(ui, (cui_id)(row + 1), CUI_ROLE_BUTTON, cui_string("row"), false, false,
+                           0);
         cui_end_box(ui);
     }
     cui_end_box(ui);

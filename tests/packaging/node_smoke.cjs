@@ -6,7 +6,8 @@ const path = require('node:path');
 assert(!process.env.CUI_NODE_ADDON);
 const cui = require('@cui/native');
 let clicks = 0;
-const widget = cui.button('save').label('Save ✓').on_click(() => ++clicks);
+// Unicode fallback is covered separately; this probe accepts a supplied Latin font.
+const widget = cui.button('save').label('Save changes').on_click(() => ++clicks);
 const options = process.env.CUI_PACKAGE_SMOKE_BACKEND === 'sdl'
   ? {backend:'sdl', fontPath:process.env.CUI_PACKAGE_SMOKE_FONT} : {};
 const app = new cui.App(options);

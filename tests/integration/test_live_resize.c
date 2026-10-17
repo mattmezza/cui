@@ -6,12 +6,13 @@ int main(void) {
     cui_bridge_status status;
     cui_bridge_options options = {.struct_size = cui_bridge_options_size(),
                                   .abi_version = cui_bridge_abi_version(),
-                                  .width = 320, .height = 160};
+                                  .width = 320,
+                                  .height = 160};
     cui_bridge_app *app = cui_bridge_create(&options, &status);
     assert(app && status == CUI_BRIDGE_OK);
     cui_bridge_node root;
-    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_ROW,
-                                   "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_ROW, "root", &root) ==
+           CUI_BRIDGE_OK);
     assert(cui_bridge_run(app, NULL, NULL) == CUI_BRIDGE_BACKEND_UNAVAILABLE);
     assert(cui_bridge_step(app, 0) == CUI_BRIDGE_OK);
     cui_bridge_destroy(app);
@@ -24,7 +25,11 @@ int main(void) {
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
-typedef struct { cui_bridge_app *app; const char *mode; unsigned calls; } probe;
+typedef struct {
+    cui_bridge_app *app;
+    const char *mode;
+    unsigned calls;
+} probe;
 static cui_bridge_status after_frame(void *user) {
     probe *p = user;
     p->calls++;
@@ -42,7 +47,9 @@ static cui_bridge_status after_frame(void *user) {
     return CUI_BRIDGE_OK;
 }
 static Uint32 SDLCALL close_timer(void *user, SDL_TimerID timer, Uint32 interval) {
-    (void)user; (void)timer; (void)interval;
+    (void)user;
+    (void)timer;
+    (void)interval;
     SDL_Event event = {.type = SDL_EVENT_QUIT};
     assert(SDL_PushEvent(&event));
     return 0;
@@ -53,14 +60,15 @@ int main(int argc, char **argv) {
     cui_bridge_options options = {.struct_size = cui_bridge_options_size(),
                                   .abi_version = cui_bridge_abi_version(),
                                   .backend = CUI_BRIDGE_BACKEND_SDL,
-                                  .width = 320, .height = 160,
+                                  .width = 320,
+                                  .height = 160,
                                   .font_path_utf8 = argv[2]};
     probe p = {.mode = argv[1]};
     p.app = cui_bridge_create(&options, &status);
     assert(p.app && status == CUI_BRIDGE_OK);
     cui_bridge_node root;
-    assert(cui_bridge_node_create(p.app, (cui_bridge_node){0}, CUI_BRIDGE_ROW,
-                                   "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(p.app, (cui_bridge_node){0}, CUI_BRIDGE_ROW, "root", &root) ==
+           CUI_BRIDGE_OK);
     bool no_callback = !strcmp(p.mode, "none");
     if (no_callback)
         assert(SDL_AddTimer(50, close_timer, NULL));
@@ -79,9 +87,14 @@ int main(int argc, char **argv) {
 #include <SDL3/SDL.h>
 #include <assert.h>
 #include <stddef.h>
-typedef struct { cui_sdl3 *host; cui_context *ui; unsigned frames; } probe;
+typedef struct {
+    cui_sdl3 *host;
+    cui_context *ui;
+    unsigned frames;
+} probe;
 static bool init(void *user, int argc, char **argv, cui_sdl3 **host, cui_context **ui) {
-    (void)argc; (void)argv;
+    (void)argc;
+    (void)argv;
     probe *p = user;
     *host = p->host = cui_sdl3_create("resize probe", 320, 160, NULL);
     *ui = p->ui = cui_create((cui_config){0});
@@ -98,8 +111,7 @@ static int frame(void *user, cui_sdl3 *host, cui_context *ui) {
         assert(cui_needs_redraw(ui));
     }
     assert(cui_begin_frame(ui, w, h, 0));
-    cui_begin_box(ui, 1, (cui_box){.width = -1, .height = -1,
-                                  .background = {30, 100, 200, 255}});
+    cui_begin_box(ui, 1, (cui_box){.width = -1, .height = -1, .background = {30, 100, 200, 255}});
     cui_end_box(ui);
     cui_draw_list draw = cui_end_frame(ui);
     assert(cui_bounds(ui, 1).w == w && cui_bounds(ui, 1).h == h);

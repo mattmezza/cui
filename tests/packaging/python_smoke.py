@@ -10,7 +10,9 @@ assert not os.environ.get("CUI_BRIDGE_LIBRARY")
 assert not os.environ.get("PYTHONPATH")
 backend = os.environ.get("CUI_PACKAGE_SMOKE_BACKEND", "none")
 seen = []
-widget = button("save").label("Save ✓").on_click(lambda event: seen.append(event.frame_sequence))
+# This UI/install probe accepts any caller-supplied Latin font. Contextual Unicode
+# and explicit fallback coverage are checked by test_installed_text.py.
+widget = button("save").label("Save changes").on_click(lambda event: seen.append(event.frame_sequence))
 kwargs = {"backend": backend, "title": "CUI Package Native Smoke"}
 if backend == "sdl":
     kwargs["font_path"] = os.environ["CUI_PACKAGE_SMOKE_FONT"]

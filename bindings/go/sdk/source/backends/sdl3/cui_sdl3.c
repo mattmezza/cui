@@ -1030,8 +1030,7 @@ static callback_app *starting_app;
 static SDL_AppResult SDLCALL app_init(void **state, int argc, char **argv) {
     callback_app *app = starting_app;
     *state = app;
-    if (!app->app.init(app->app.user, argc, argv, &app->host, &app->ui) ||
-        !app->host || !app->ui)
+    if (!app->app.init(app->app.user, argc, argv, &app->host, &app->ui) || !app->host || !app->ui)
         return SDL_APP_FAILURE;
     app->host->callback_mode = true;
     return SDL_APP_CONTINUE;
@@ -1063,7 +1062,8 @@ static void SDLCALL app_quit(void *state, SDL_AppResult result) {
     app->app.quit(app->app.user, result == SDL_APP_SUCCESS);
 }
 int cui_sdl3_run(int argc, char **argv, cui_sdl3_app callbacks) {
-    if (!SDL_IsMainThread() || starting_app || !callbacks.init || !callbacks.frame || !callbacks.quit)
+    if (!SDL_IsMainThread() || starting_app || !callbacks.init || !callbacks.frame ||
+        !callbacks.quit)
         return 1;
     callback_app app = {.app = callbacks};
     starting_app = &app;

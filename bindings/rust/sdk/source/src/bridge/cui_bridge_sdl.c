@@ -56,8 +56,7 @@ cui_bridge_status cui_bridge_native_render(cui_bridge_app *app, const cui_draw_l
         return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     (void)cui_sdl3_set_cursor(native->host, cui_pointer_cursor(app->ui));
     bool rendered = cui_sdl3_render(native->host, list, app->theme.background);
-    return rendered ? CUI_BRIDGE_OK
-                                                                      : CUI_BRIDGE_CORE_ERROR;
+    return rendered ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;
 }
 cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *app,
                                                        const char *const *paths, uint32_t count) {
@@ -104,7 +103,8 @@ typedef struct {
     cui_bridge_status status;
 } bridge_run;
 static bool bridge_run_init(void *user, int argc, char **argv, cui_sdl3 **host, cui_context **ui) {
-    (void)argc; (void)argv;
+    (void)argc;
+    (void)argv;
     bridge_run *run = user;
     bridge_native *native = run->app->native;
     *host = native ? native->host : NULL;
@@ -137,9 +137,8 @@ static void bridge_run_quit(void *user, bool success) {
 }
 cui_bridge_status cui_bridge_native_run(cui_bridge_app *app, cui_bridge_run_callback callback,
                                         void *user) {
-    bridge_run run = {.app = app, .callback = callback, .user = user,
-                      .status = CUI_BRIDGE_OK};
-    int result = cui_sdl3_run(0, NULL,
-                             (cui_sdl3_app){&run, bridge_run_init, bridge_run_frame, bridge_run_quit});
+    bridge_run run = {.app = app, .callback = callback, .user = user, .status = CUI_BRIDGE_OK};
+    int result = cui_sdl3_run(
+        0, NULL, (cui_sdl3_app){&run, bridge_run_init, bridge_run_frame, bridge_run_quit});
     return result && run.status == CUI_BRIDGE_OK ? CUI_BRIDGE_CORE_ERROR : run.status;
 }

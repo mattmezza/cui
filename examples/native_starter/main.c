@@ -45,7 +45,7 @@ typedef struct {
     unsigned limit, frame;
 } starter_host;
 static bool initialize(void *user, int argc, char **argv, cui_sdl3 **out_host,
-                        cui_context **out_ui) {
+                       cui_context **out_ui) {
     starter_host *state = user;
     const char *font_path = NULL, *capture = NULL;
     unsigned limit = 0;
@@ -104,8 +104,8 @@ static int iterate(void *user, cui_sdl3 *host, cui_context *ui) {
     float width, height;
     cui_sdl3_size(host, &width, &height);
     cui_platform clipboard = cui_sdl3_clipboard_interface(host);
-    cui_draw_list list = starter_app_frame(ui, &state->app, width, height,
-                                           cui_sdl3_frame_delta(host), &clipboard);
+    cui_draw_list list =
+        starter_app_frame(ui, &state->app, width, height, cui_sdl3_frame_delta(host), &clipboard);
     (void)cui_sdl3_set_cursor(host, cui_pointer_cursor(ui));
     const char *shot = state->capture && state->frame + 1 == state->limit ? state->capture : NULL;
     if (!cui_sdl3_render_capture(host, &list, (cui_color){245, 245, 245, 255}, shot) ||

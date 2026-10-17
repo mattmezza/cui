@@ -393,3 +393,6 @@ Copied lifecycle events distinguish start, transcript and finish.
 The [coverage guide](BRIDGE_COMPONENTS.md) documents capacities and unsupported
 features for every family. [Validation receipts](validation/component-builders-expanded-78.txt)
 record the combined checks and their platform limits.
+
+For native callback loops, live resizing, callback failure containment and the
+manual-loop compatibility contract, see [binding native runners](BINDING_NATIVE_RUN.md).

@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #include <cui/cui_bridge.h>
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 #include <float.h>
 #include <math.h>
 #include <node_api.h>
@@ -790,6 +795,52 @@ static napi_value step(napi_env env, napi_callback_info info) {
     }
     return undefined(env);
 }
+typedef struct {
+    napi_env env;
+    napi_value callback, exception;
+} run_context;
+static cui_bridge_status after_frame(void *user) {
+    run_context *context = user;
+    napi_escapable_handle_scope scope;
+    if (napi_open_escapable_handle_scope(context->env, &scope) != napi_ok)
+        return CUI_BRIDGE_INVALID_STATE;
+    napi_value result, receiver;
+    cui_bridge_status status = CUI_BRIDGE_OK;
+    if (napi_get_undefined(context->env, &receiver) != napi_ok ||
+        napi_call_function(context->env, receiver, context->callback, 0, NULL, &result) != napi_ok) {
+        bool pending = false;
+        napi_value exception;
+        if (napi_is_exception_pending(context->env, &pending) == napi_ok && pending &&
+            napi_get_and_clear_last_exception(context->env, &exception) == napi_ok)
+            (void)napi_escape_handle(context->env, scope, exception, &context->exception);
+        status = CUI_BRIDGE_INVALID_STATE;
+    }
+    (void)napi_close_escapable_handle_scope(context->env, scope);
+    return status;
+}
+static napi_value run_app(napi_env env, napi_callback_info info) {
+    napi_value v[2];
+    js_app *app;
+    napi_valuetype type;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app)) return NULL;
+    if (napi_typeof(env, v[1], &type) != napi_ok || type != napi_function)
+        return fail(env, "run requires an after-frame callback");
+    typedef cui_bridge_status (*runner_fn)(cui_bridge_app *, cui_bridge_status (*)(void *), void *);
+    runner_fn runner = NULL;
+#if defined(_WIN32)
+    HMODULE module = GetModuleHandleA("cui_bridge.dll");
+    FARPROC symbol = module ? GetProcAddress(module, "cui_bridge_run") : NULL;
+#else
+    void *symbol = dlsym(RTLD_DEFAULT, "cui_bridge_run");
+#endif
+    if (!symbol) return fail(env, "native callback runner unavailable in this bridge");
+    memcpy(&runner, &symbol, sizeof runner);
+    run_context context = {env, v[1], NULL};
+    cui_bridge_status code = runner(app->bridge, after_frame, &context);
+    if (context.exception) { (void)napi_throw(env, context.exception); return NULL; }
+    if (code != CUI_BRIDGE_OK && code != CUI_BRIDGE_CLOSED) return status(env, code);
+    return undefined(env);
+}
 static napi_value poll(napi_env env, napi_callback_info info) {
     napi_value v[1], result, x;
     js_app *app;
@@ -1495,6 +1546,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("key", key_input, 0);
     EXPORT("step", step, 0);
     EXPORT("poll", poll, 0);
+    EXPORT("run", run_app, 0);
     EXPORT("bounds", bounds, 0);
     EXPORT("dropdownBounds", dropdown_bounds, 0);
     EXPORT("numericBounds", numeric_bounds, 0);

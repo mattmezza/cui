@@ -121,6 +121,31 @@ static char bridge_error_buf[80];
 #define DECL_VOID(name, ret, params, args) static void (*fp_##name) params; static void go_##name params { fp_##name args; }
 API(DECL, DECL_VOID)
 #undef DECL
+typedef cui_bridge_status (*run_after_fn)(void *);
+typedef cui_bridge_status (*run_fn)(cui_bridge_app *, run_after_fn, void *);
+extern int goBridgeAfterFrame(uintptr_t user);
+#if defined(CUI_GO_STATIC)
+extern cui_bridge_status cui_bridge_run(cui_bridge_app *, run_after_fn, void *) __attribute__((weak));
+#endif
+static cui_bridge_status go_after_frame(void *user) {
+ return (cui_bridge_status)goBridgeAfterFrame((uintptr_t)user);
+}
+static cui_bridge_status go_run(cui_bridge_app *app, uintptr_t user) {
+ run_fn runner = NULL;
+#if defined(CUI_GO_STATIC)
+ if (!bridge_lib) runner = cui_bridge_run;
+#endif
+ if (bridge_lib) {
+#if defined(_WIN32)
+  FARPROC symbol = GetProcAddress((HMODULE)bridge_lib, "cui_bridge_run");
+#else
+  void *symbol = dlsym(bridge_lib, "cui_bridge_run");
+#endif
+  if (symbol) memcpy(&runner, &symbol, sizeof runner);
+ }
+ if (!runner) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+ return runner(app, go_after_frame, (void *)user);
+}
 static int bridge_initialized;
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
@@ -188,19 +213,20 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/cgo"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 	"unsafe"
 )
 
 type App struct {
-	ptr    *C.cui_bridge_app
-	thread C.bridge_thread_token
-	root   *Node
-	nodes  map[uint64]*Node
-	closed bool
+	ptr     *C.cui_bridge_app
+	thread  C.bridge_thread_token
+	root    *Node
+	nodes   map[uint64]*Node
+	closed  bool
+	running bool
 }
 type Options struct {
 	Native                   bool
@@ -829,7 +855,9 @@ func (a *App) Close() error {
 	C.go_destroy(a.ptr)
 	a.ptr = nil
 	a.closed = true
-	runtime.UnlockOSThread()
+	if !a.running {
+		runtime.UnlockOSThread()
+	}
 	return nil
 }
 func (a *App) RequestClose() error {
@@ -1437,6 +1465,9 @@ func (a *App) Mount(root *Node) error {
 	return nil
 }
 func (a *App) Step(dt float32) error {
+	if a != nil && a.running {
+		return errors.New("Step is unavailable during Run")
+	}
 	if err := a.check(); err != nil {
 		return err
 	}
@@ -1523,36 +1554,43 @@ func (a *App) Dispatch() (int, error) {
 		}
 	}
 }
+
+// Run owns native event pumping, including live resize. dt is retained for
+// compatibility; native scheduling supplies actual frame timing.
 func (a *App) Run(dt float32) error {
-	if a == nil || a.root == nil {
+	if err := a.check(); err != nil {
+		return err
+	}
+	if a.root == nil {
 		return errors.New("mount a tree first")
 	}
 	if !finite(dt) || dt <= 0 {
 		return errors.New("Run requires positive finite dt")
 	}
-	frame := time.Duration(float64(dt) * float64(time.Second))
-	if frame <= 0 {
-		return errors.New("dt too small")
+	if a.running {
+		return errors.New("app is already running")
 	}
-	for {
-		start := time.Now()
-		err := a.Step(dt)
-		if err != nil {
-			if errors.Is(err, ErrClosed) {
-				return nil
-			}
-			return err
-		}
-		if _, err := a.Dispatch(); err != nil {
-			return err
-		}
+	state := &runState{app: a}
+	handle := cgo.NewHandle(state)
+	defer handle.Delete()
+	a.running = true
+	defer func() {
+		a.running = false
 		if a.closed {
-			return nil
+			runtime.UnlockOSThread()
 		}
-		if rest := frame - time.Since(start); rest > 0 {
-			time.Sleep(rest)
-		}
+	}()
+	code := C.go_run(a.ptr, C.uintptr_t(handle))
+	if state.panicked {
+		panic(state.panicValue)
 	}
+	if state.err != nil && !errors.Is(state.err, ErrClosed) {
+		return state.err
+	}
+	if code == C.CUI_BRIDGE_CLOSED {
+		return nil
+	}
+	return result(code)
 }
 func (n *Node) Remove() error {
 	if n == nil || n.app == nil {

@@ -29,6 +29,8 @@ export class App {
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;
   text_input(text: string): this;
   step(dt?: number): number;
+  /** Blocking native runner; dispatches handlers after paint. */
+  run(): this;
   start(fps?: number): this;
   stop(): this;
   close(): this;

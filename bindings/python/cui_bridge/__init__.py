@@ -11,7 +11,6 @@ from dataclasses import dataclass
 import math
 import os
 from pathlib import Path
-import time
 from typing import Callable, Iterator
 
 
@@ -1341,6 +1340,8 @@ class App:
         return self
 
     def step(self, dt: float = 1 / 60) -> None:
+        if getattr(self, "_running", False):
+            raise RuntimeError("step is unavailable during run")
         self._ensure_open()
         self._api.check(self._api.step(self._ptr, dt))
 
@@ -1474,17 +1475,42 @@ class App:
         return count
 
     def run(self, dt: float = 1 / 60) -> None:
-        """Simple native loop; callers may instead integrate step/dispatch into their loop."""
+        """Run the native event loop; dispatch after paint, including live resize.
+
+        dt is retained for source compatibility and validated; native scheduling
+        supplies actual frame timing. Older bridges fail clearly without fallback.
+        """
         self._ensure_open()
-        while True:
+        if not math.isfinite(dt) or dt <= 0:
+            raise ValueError("run requires positive finite dt")
+        if getattr(self, "_running", False):
+            raise RuntimeError("app is already running")
+        try:
+            runner = self._api.lib.cui_bridge_run
+        except AttributeError as exc:
+            raise RuntimeError("native callback runner unavailable in this bridge") from exc
+        callback_type = C.CFUNCTYPE(C.c_int, C.c_void_p)
+        runner.restype = C.c_int
+        runner.argtypes = [C.c_void_p, callback_type, C.c_void_p]
+        failure = []
+        @callback_type
+        def after_frame(_user):
             try:
-                self.step(dt)
-            except BridgeError as exc:
-                if exc.code == 2:
-                    return
-                raise
-            self.dispatch()
-            time.sleep(dt)
+                self.dispatch()
+                return 0
+            except BaseException as exc:
+                failure.append((exc, exc.__traceback__))
+                return 3  # Stop C first; foreign exceptions must never cross C.
+        self._running = True
+        try:
+            status = runner(self._ptr, after_frame, None)
+        finally:
+            self._running = False
+        if failure:
+            exc, traceback = failure[0]
+            raise exc.with_traceback(traceback)
+        if status != 2:  # CLOSED is normal runner termination.
+            self._api.check(status)
 
     def request_close(self) -> None:
         self._ensure_open()

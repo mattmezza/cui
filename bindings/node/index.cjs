@@ -406,7 +406,12 @@ class App {
     return this;
   }
   step(dt = 1 / 60) {
-    this._alive(); native.step(this.handle, dt);
+    this._alive();
+    if (this.running) throw new Error("step is unavailable during run");
+    native.step(this.handle, dt);
+    return this._dispatch();
+  }
+  _dispatch() {
     let event; let delivered = 0;
     while ((event = native.poll(this.handle)) !== undefined) {
       const node = this.nodes.get(keyFor(event));
@@ -417,9 +422,17 @@ class App {
     }
     return delivered;
   }
+  run() {
+    this._alive();
+    if (this.running || this.timer) throw new Error('app is already running');
+    this.running = true;
+    try { native.run(this.handle, () => this._dispatch()); }
+    finally { this.running = false; }
+    return this;
+  }
   start(fps = 60) {
     this._alive(); positive(fps, 'fps');
-    if (this.timer) throw new Error('app is already running');
+    if (this.timer || this.running) throw new Error('app is already running');
     const interval = 1000 / fps;
     this.timer = setInterval(() => { try { this.step(1 / fps); } catch (error) {
       this.stop();

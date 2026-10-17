@@ -580,7 +580,63 @@ pub struct App {
     raw: *mut c_void,
     id: u64,
     callbacks: HashMap<(RawNode, u32), Rc<RefCell<Callback>>>,
+    running: bool,
     _local: PhantomData<Rc<()>>,
+}
+type NativeRunner =
+    unsafe extern "C" fn(*mut c_void, extern "C" fn(*mut c_void) -> u32, *mut c_void) -> u32;
+struct RunContext<'a> {
+    after_frame: &'a mut dyn FnMut(&mut App) -> Result<()>,
+    app: *mut App,
+    error: Option<Error>,
+    panic: Option<Box<dyn std::any::Any + Send>>,
+}
+extern "C" fn run_after_frame(user: *mut c_void) -> u32 {
+    let context = unsafe { &mut *user.cast::<RunContext>() };
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let app = unsafe { &mut *context.app };
+        app.dispatch()?;
+        (context.after_frame)(app)
+    }));
+    match outcome {
+        Ok(Ok(_)) => 0,
+        Ok(Err(error)) => {
+            context.error = Some(error);
+            3
+        }
+        Err(payload) => {
+            context.panic = Some(payload);
+            3
+        }
+    }
+}
+#[cfg(cui_bridge_static)]
+fn native_runner() -> Option<NativeRunner> {
+    extern "C" {
+        fn cui_bridge_run(
+            app: *mut c_void,
+            callback: extern "C" fn(*mut c_void) -> u32,
+            user: *mut c_void,
+        ) -> u32;
+    }
+    Some(cui_bridge_run)
+}
+#[cfg(all(not(cui_bridge_static), target_os = "linux"))]
+fn native_runner() -> Option<NativeRunner> {
+    #[link(name = "dl")]
+    extern "C" {
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    }
+    let symbol = unsafe { dlsym(std::ptr::null_mut(), b"cui_bridge_run\0".as_ptr().cast()) };
+    if symbol.is_null() {
+        None
+    } else {
+        Some(unsafe { std::mem::transmute::<*mut c_void, NativeRunner>(symbol) })
+    }
+}
+#[cfg(all(not(cui_bridge_static), not(target_os = "linux")))]
+fn native_runner() -> Option<NativeRunner> {
+    None
 }
 impl Drop for App {
     fn drop(&mut self) {
@@ -676,6 +732,7 @@ impl App {
             raw,
             id,
             callbacks: HashMap::new(),
+            running: false,
             _local: PhantomData,
         })
     }
@@ -1347,6 +1404,9 @@ impl App {
         })
     }
     pub fn step(&mut self, dt: f32) -> Result<()> {
+        if self.running {
+            return Err(Error(8));
+        }
         check(unsafe { cui_bridge_step(self.raw, dt) })
     }
     pub fn dispatch(&mut self) -> Result<usize> {
@@ -1390,6 +1450,44 @@ impl App {
             }
         }
         Ok(count)
+    }
+    /// Own the native event loop, including live resize. Panics from callbacks
+    /// resume only after the native runner has returned and released its host.
+    pub fn run(&mut self) -> Result<()> {
+        self.run_with(|_| Ok(()))
+    }
+    /// Optional after-frame hook for app updates or requesting close.
+    pub fn run_with(&mut self, mut after_frame: impl FnMut(&mut App) -> Result<()>) -> Result<()> {
+        if self.running {
+            return Err(Error(8));
+        }
+        let runner = native_runner().ok_or(Error(9))?;
+        let mut context = RunContext {
+            after_frame: &mut after_frame,
+            app: self as *mut App,
+            error: None,
+            panic: None,
+        };
+        self.running = true;
+        let status = unsafe {
+            runner(
+                self.raw,
+                run_after_frame,
+                (&mut context as *mut RunContext).cast(),
+            )
+        };
+        self.running = false;
+        if let Some(payload) = context.panic {
+            std::panic::resume_unwind(payload);
+        }
+        if let Some(error) = context.error {
+            return Err(error);
+        }
+        if status == 2 {
+            Ok(())
+        } else {
+            check(status)
+        }
     }
     pub fn frame(&mut self, dt: f32) -> Result<usize> {
         self.step(dt)?;

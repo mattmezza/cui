@@ -134,7 +134,10 @@ if (!bold_ok || !semibold_ok) { /* report missing assets to your host */ }
 ```
 
 Ship these faces with your app or supply explicit paths; filenames vary between
-font families and installations. See [Text](TEXT.md) for registration and fallback.
+font families and installations. For a single-executable distribution, compile
+font bytes into static arrays and open them with `cui_font_open_memory` instead.
+See [embedding fonts](TEXT.md#embed-fonts-in-a-native-executable) for a complete
+header-generation example, buffer lifetime rules, and style/fallback registration.
 
 The example's CMake project consumes **installed** packages and does not build
 the repository as a subdirectory. You can copy the whole `native_starter` folder

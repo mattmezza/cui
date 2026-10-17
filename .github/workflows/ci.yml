@@ -98,6 +98,8 @@ jobs:
       - run: pip install clang-format==23.1.2
       - run: python scripts/format.py --check
       - run: python scripts/check_manifest.py
+      - run: python scripts/test_release_metadata.py --tag v0.1.0-alpha.1
+      - run: python scripts/test_release_metadata.py --self-test
       - run: python scripts/check_licenses.py
       - run: python scripts/amalgamate.py --check
       - run: python tests/test_test_runner.py

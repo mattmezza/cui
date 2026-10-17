@@ -52,8 +52,8 @@ static FT_GlyphSlot raster_glyph(cui_font *font, FT_UInt glyph, float size) {
     FT_GlyphSlot slot = font->face->glyph;
     /* FreeType's negative-pitch layout is left untouched on the uncached path. */
     if (slot->bitmap.pitch < 0 ||
-        (slot->bitmap.rows && (size_t)slot->bitmap.pitch >
-                                  GLYPH_CACHE_BITMAP_MAX / slot->bitmap.rows))
+        (slot->bitmap.rows &&
+         (size_t)slot->bitmap.pitch > GLYPH_CACHE_BITMAP_MAX / slot->bitmap.rows))
         return slot;
     size_t bytes = (size_t)slot->bitmap.pitch * slot->bitmap.rows;
     unsigned char *pixels = bytes ? malloc(bytes) : NULL;

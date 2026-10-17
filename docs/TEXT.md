@@ -64,3 +64,59 @@ caller-laid-out line and may overflow its parent, so use a clipping ancestor
 when overflow must remain hidden. For strict UTF-8 paragraphs with explicit hard
 breaks and optional color spans, `cui_text_paragraph_colored` selects word wrapping
 with its `wrap` argument.
+
+## Embed fonts in a native executable
+
+`cui_font_open_memory(const void *data, size_t size)` opens the first face in
+an in-memory font using the native `cui_text` adapter. It performs no font file
+I/O and does not copy the bytes. This supports fonts compiled directly into
+an executable, with no font files to install beside it.
+
+For example, generate a C header from a font you have permission to redistribute:
+
+```sh
+python3 - <<'PYFONT'
+from pathlib import Path
+font = Path("assets/App-Regular.ttf").read_bytes()
+with Path("app_font.h").open("w") as out:
+    out.write("static const unsigned char app_font[] = {\n")
+    for start in range(0, len(font), 16):
+        out.write(",".join(str(b) for b in font[start:start + 16]) + ",\n")
+    out.write("};\n")
+PYFONT
+```
+
+Include the generated header in one C source file:
+
+```c
+#include "cui/cui_text.h"
+#include "app_font.h"
+
+/* During application initialization: */
+cui_font *font = cui_font_open_memory(app_font, sizeof app_font);
+if (!font) {
+    /* Report initialization failure. */
+    return 1;
+}
+/* Use font for native measurement and rendering as with cui_font_open(). */
+/* After destroying the UI and any retained text layouts: */
+cui_font_close(font);
+```
+
+The buffer is borrowed and must stay immutable and valid until the actual face
+is released. A layout can retain a face after `cui_font_close`, so a dynamically
+allocated buffer must also outlive those layouts. A `static const` array stays
+valid for the entire process and needs no separate cleanup. NULL, zero-length,
+oversized, or invalid font data returns NULL.
+
+Embed bold, italic, and fallback fonts as separate arrays, open each with
+`cui_font_open_memory`, and register their handles with `cui_font_set_style` or
+`cui_font_set_fallbacks`. These registrations borrow handles; keep the faces
+alive while registered and close them separately after use. File-based and
+memory-based faces can be mixed.
+
+Embedding increases executable size; large multilingual fallback sets may be
+better shipped separately. Check each font's redistribution and embedding
+license. Embedding assets is independent of static linking: link CUI and its
+native dependencies statically as well if your distribution requires that.
+This API concerns native fonts; browser font loading continues to use the web host.

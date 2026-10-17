@@ -12,6 +12,11 @@ typedef void (*cui_glyph_fn)(void *user, int x, int y, int width, int height, in
 /* The font file remains caller-owned. Face operations are UI-thread confined.
  */
 cui_font *cui_font_open(const char *path);
+/* Open face zero from borrowed, immutable font bytes without copying or file I/O.
+ * data must remain valid until the face is actually released, including layouts
+ * retaining it after font_close. Static embedded arrays satisfy this lifetime.
+ * NULL, empty, oversized or invalid font data returns NULL. UI-thread confined. */
+cui_font *cui_font_open_memory(const void *data, size_t size);
 /* Release the caller/owner reference; live layouts may retain the actual face.
  * A closed caller handle must not be used again. NULL is accepted. */
 void cui_font_close(cui_font *font);

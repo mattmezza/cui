@@ -129,6 +129,25 @@ cui_font *cui_font_open(const char *path) {
     }
     return f;
 }
+cui_font *cui_font_open_memory(const void *data, size_t size) {
+    if (!data || !size || size > LONG_MAX)
+        return NULL;
+    cui_font *f = calloc(1, sizeof(*f));
+    if (!f)
+        return NULL;
+    f->references = 1;
+    if (FT_Init_FreeType(&f->library) ||
+        FT_New_Memory_Face(f->library, data, (FT_Long)size, 0, &f->face)) {
+        cui_font_close(f);
+        return NULL;
+    }
+    f->shaper = hb_ft_font_create_referenced(f->face);
+    if (!f->shaper) {
+        cui_font_close(f);
+        return NULL;
+    }
+    return f;
+}
 void cui_font_close(cui_font *f) {
     if (!f || --f->references)
         return;

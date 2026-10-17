@@ -97,6 +97,46 @@ static void layout(cui_context *ui, cui_font *root, cui_font *first, cui_font *s
         }
     assert(found == 2 && cui_last_error(ui) == CUI_OK);
 }
+static void memory_font(const char *path) {
+    const unsigned char invalid[] = {0, 1, 2, 3};
+    assert(!cui_font_open_memory(NULL, 1));
+    assert(!cui_font_open_memory(invalid, 0));
+    assert(!cui_font_open_memory(invalid, sizeof invalid));
+    assert(!cui_font_open_memory(invalid, SIZE_MAX));
+    FILE *file = fopen(path, "rb");
+    assert(file && !fseek(file, 0, SEEK_END));
+    long length = ftell(file);
+    assert(length > 0 && !fseek(file, 0, SEEK_SET));
+    unsigned char *bytes = malloc((size_t)length);
+    assert(bytes && fread(bytes, 1, (size_t)length, file) == (size_t)length);
+    assert(!fclose(file));
+    cui_font *memory = cui_font_open_memory(bytes, (size_t)length);
+    cui_font *disk = cui_font_open(path);
+    assert(memory && disk);
+    matches(memory, (cui_text_style){0}, disk);
+    cui_text_style style = {.family = 42};
+    assert(cui_font_set_style(disk, style, memory));
+    matches(disk, style, memory);
+    assert(cui_font_set_style(disk, style, NULL));
+    cui_font *fallbacks[] = {memory};
+    assert(cui_font_set_fallbacks(disk, fallbacks, 1));
+    assert(cui_font_set_fallbacks(disk, NULL, 0));
+    cui_text_layout *layout = NULL;
+    cui_text_layout_status status =
+        cui_font_layout_line(memory, cui_string("WiiW"), 24, (cui_text_style){0}, CUI_BIDI_AUTO_LTR,
+                             0, SIZE_MAX, NULL, &layout);
+    assert(status == CUI_TEXT_LAYOUT_OK || status == CUI_TEXT_LAYOUT_UNAVAILABLE);
+    cui_font_close(memory);
+    if (status == CUI_TEXT_LAYOUT_OK) {
+        glyph_probe probe = {UINT64_C(1469598103934665603), 0};
+        assert(cui_text_layout_draw(layout, 0, 0, glyph, &probe));
+        glyph_probe expected = draw(disk, (cui_text_style){0});
+        assert(probe.hash == expected.hash && probe.glyphs == expected.glyphs);
+        cui_text_layout_destroy(layout);
+    }
+    cui_font_close(disk);
+    free(bytes);
+}
 int main(void) {
     const char *const regular_paths[] = {"/usr/share/fonts/noto/NotoSans-Regular.ttf",
                                          "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -111,6 +151,7 @@ int main(void) {
              "faces");
         return 77;
     }
+    memory_font(regular);
     cui_font *root = cui_font_open(regular), *mono = cui_font_open(family),
              *other = cui_font_open(regular);
     assert(root && mono && other);

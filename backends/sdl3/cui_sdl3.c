@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
+#include "../../src/core/cui_text_paint_internal.h"
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #include <SDL3/SDL.h>
@@ -31,6 +32,7 @@ struct cui_sdl3 {
     SDL_Renderer *renderer;
     cui_font *font;
     cui_color ink;
+    cui_text_paint text_paint;
     float density_x, density_y, text_density;
     bool quit, glyph_ok, ime_composing, ime_commit_pending, input_suspended;
     cui_id ime_focus;
@@ -604,6 +606,37 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
     cui_sdl3 *s = user;
     if (!w || !h || !data || !s->glyph_ok)
         return;
+    if (s->text_paint.kind == CUI_TEXT_PAINT_LINEAR) {
+        if (w < 0 || h < 0 || (size_t)w > GLYPH_CACHE_BYTES / 4 / (size_t)h) {
+            s->glyph_ok = false;
+            return;
+        }
+        SDL_Surface *surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_RGBA32);
+        if (!surface) {
+            s->glyph_ok = false;
+            return;
+        }
+        for (int j = 0; j < h; ++j) {
+            unsigned char *row = (unsigned char *)surface->pixels + j * surface->pitch;
+            for (int i = 0; i < w; ++i) {
+                cui_color color = cui_text_paint_sample(
+                    s->text_paint, (x + i + .5) / s->text_density, (y + j + .5) / s->text_density);
+                row[i * 4] = color.r;
+                row[i * 4 + 1] = color.g;
+                row[i * 4 + 2] = color.b;
+                row[i * 4 + 3] = (uint8_t)((unsigned)color.a * data[j * pitch + i] / 255);
+            }
+        }
+        SDL_Texture *texture = SDL_CreateTextureFromSurface(s->renderer, surface);
+        SDL_DestroySurface(surface);
+        SDL_FRect bounds = {x / s->text_density, y / s->text_density, w / s->text_density,
+                            h / s->text_density};
+        if (!texture || !SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND) ||
+            !SDL_RenderTexture(s->renderer, texture, NULL, &bounds))
+            s->glyph_ok = false;
+        SDL_DestroyTexture(texture);
+        return;
+    }
     SDL_Texture *t = cached_glyph(s, w, h, pitch, data);
     if (!t) {
         s->glyph_ok = false;
@@ -622,6 +655,7 @@ static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
     glyph(user, x, y, w, h, pitch, data);
 }
 static bool text_draw(cui_sdl3 *s, const cui_draw_command *c) {
+    s->text_paint = c->text_paint;
     if (c->text_color_count)
         return cui_font_draw_context_line_colored_scaled(
             s->font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
@@ -750,6 +784,8 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
     if (!s || !list || (!list->commands && list->count) || !isfinite(list->width) ||
         !isfinite(list->height) || list->width < 0 || list->height < 0 || list->width > 16384 ||
         list->height > 16384)
+        return false;
+    if (!cui_text_paints_supported(list, true))
         return false;
     if (!render_density(s))
         return false;
@@ -930,9 +966,9 @@ static void destroy(void *s) {
 cui_renderer cui_sdl3_interface(cui_sdl3 *s) {
     const char *name = cui_sdl3_driver(s);
     return (cui_renderer){s, name,
-                          (s && s->font ? CUI_RENDER_TEXT : 0) | CUI_RENDER_ROUNDED |
-                              CUI_RENDER_CLIP | CUI_RENDER_IMAGE | CUI_RENDER_DROP_SHADOW |
-                              CUI_RENDER_INSET_SHADOW |
+                          (s && s->font ? CUI_RENDER_TEXT | CUI_RENDER_TEXT_LINEAR_GRADIENT : 0) |
+                              CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE |
+                              CUI_RENDER_DROP_SHADOW | CUI_RENDER_INSET_SHADOW |
                               (s && strcmp(name, "software") ? CUI_RENDER_ACCELERATED : 0),
                           render, destroy};
 }

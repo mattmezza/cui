@@ -56,6 +56,9 @@ static Uint32 SDLCALL close_timer(void *user, SDL_TimerID timer, Uint32 interval
 }
 int main(int argc, char **argv) {
     assert(argc == 3 || argc == 4);
+    if (!strcmp(argv[1], "unicode") &&
+        (argc != 4 || !argv[3][0] || strstr(argv[3], "-NOTFOUND")))
+        return 77;
     cui_bridge_status status;
     cui_bridge_options options = {.struct_size = cui_bridge_options_size(),
                                   .abi_version = cui_bridge_abi_version(),

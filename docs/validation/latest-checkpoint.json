@@ -1,48 +1,53 @@
 {
-  "source": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
-  "compiled_source": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
+  "source": "2ce92c1b30fe8967803c02cf6fff5c179ce5e730",
+  "compiled_source": "81a7fe892e4c5910979688a2ebe4682b8b529da2",
   "published_source": "3b28a2c26f9e0ed448fc72055b198fdeff8f39a5",
   "gallery_url": "https://matteo.merola.co/cui/",
-  "summary": "Next23 portable bounded Theme registry, semantic/legacy imports, motion projection, native import rendering and standalone header plus Chart appearance hover gate and Core timing audit fixture pass native117/117, sanitizer115/115 (GPU/Sokol not registered), WASI94/94, browser78 and all78 compiled excerpts. Actual preference, Chart, Attachment62 and site design/composed-app checks pass. Initial WASI93/94 missing test include path corrected; complete94/94 rerun retained. Current-frame prepaint, native OS observation and consumer owner motion are active separate work. Published3b28a2c passes six CI jobs and Pages,355/355 files match actual HTTPS, Attachment62 passes. Full family verification remains0/78.",
+  "summary": "Frozen pre-responsive baseline81a7fe89 passes portable Debug190/190, Release190/190, C-only ASan/UBSan181/181, WASI156/156 and all68 Pages browser commands (including78 catalog stories and compiled usage excerpts). Later responsive, native callback runner, Retina, video, gradient text and Checkbox changes are under separate integration validation; baseline counts do not validate those additions. Full family verification remains0/78. No current batch release or website publication has occurred.",
   "checks": [
     {
-      "name": "native",
-      "passed": 117,
-      "total": 117
+      "name": "portable_debug",
+      "source": "81a7fe892e4c5910979688a2ebe4682b8b529da2",
+      "passed": 190,
+      "total": 190
     },
     {
-      "name": "sanitizers_gpu_sokol_unregistered",
-      "passed": 115,
-      "total": 115
+      "name": "portable_release",
+      "source": "81a7fe892e4c5910979688a2ebe4682b8b529da2",
+      "passed": 190,
+      "total": 190
+    },
+    {
+      "name": "portable_asan_ubsan",
+      "source": "81a7fe892e4c5910979688a2ebe4682b8b529da2",
+      "passed": 181,
+      "total": 181
     },
     {
       "name": "WASI",
-      "passed": 94,
-      "total": 94
+      "source": "81a7fe892e4c5910979688a2ebe4682b8b529da2",
+      "passed": 156,
+      "total": 156
     },
     {
-      "name": "browser_stories",
-      "passed": 78,
-      "total": 78
-    },
-    {
-      "name": "compiled_usage_excerpts",
-      "passed": 78,
-      "total": 78
-    },
-    {
-      "name": "attachment_size_containment",
-      "passed": 62,
-      "total": 62
+      "name": "pages_browser_commands",
+      "source": "81a7fe892e4c5910979688a2ebe4682b8b529da2",
+      "passed": 68,
+      "total": 68
     }
   ],
-  "portable_test_source": "137e1c57acc1056d8bc945a1ee2e78e95f315d2d",
-  "portable_source_sha256": "554cdcd16bd2be962940b1f9ba0c3438f1288a401b0bf2b38ca2578a94fcd6b0",
-  "publication": {
+  "integration_validation": {
+    "source": "2ce92c1b30fe8967803c02cf6fff5c179ce5e730",
+    "status": "in_progress",
+    "notes": "Native gradient/Core tests pass, sustained Linux X11 private-Xvfb resize proof passes24 presentations over6 widths, and Python/Node/Go/Rust native callback runner10/10 cases pass at eb4797dc. Full refreshed native, WASI and70-command Pages gates are in progress. Physical window manager dragging, Wayland and current macOS runtime acceptance remain deferred."
+  },
+  "historical_publication": {
     "pages_run": 38430968688,
     "framework_run": 38430968598,
     "artifact_https_files_matched": 355,
     "published_attachment_passed": 62,
     "published_attachment_total": 62
-  }
+  },
+  "evidence_directory": "/home/matteo/.cache/cui-validation",
+  "evidence_location_note": "Local full logs are retained outside the checkout. Published CI evidence will be recorded after hosted execution."
 }

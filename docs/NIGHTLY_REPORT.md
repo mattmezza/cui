@@ -1,38 +1,10 @@
 # Nightly report — live development checkpoint
 
-Current publication is `67d86ed4`: six framework jobs and Pages pass; all445 HTTPS artifact files match and public Attachment62/62 passes. Main strict168/168 CTest passes. Hosted Windows/MSVC and macOS/AppleClang each145/145 portable checks pass with native adapters disabled. Next32 independently passes strict172/172, sanitizer167/167, pinned WASI135/135 and all54 exact Pages browser commands. See [Next32 evidence](validation/gallery-next32.txt).
-
-Next33 production `5d253e73` passes native185/185, sanitizer174/174, WASI140/140 and all61 exact Pages browser commands: optional Unicode regex/Input gallery, copied release click payloads, typed Button artwork, Notification shadows and Popover appearance policies are bounded tested additions. The ledger now has354 features,306 tested subsets,4 implemented and44 not_started; all78 families remain and none is fullyverified. Final metadata/publication is separate. Automated local native windows now run only under invisible Xvfb; runner3/3 and actual isolated SDL/Sokol2/2 pass. Later source snapshots/Tabs/Notification motion pass native192/192 before this display rule; their remaining proofs continue without using the desktop. The reports below describe historical revisions, not current completion.
-
-Historical checkpoint carried from Main:
-
-Published `a3ea0c1` passes all six framework jobs and Pages, with all435 HTTPS artifact files matching and actual public Attachment62/62. See [publication receipt](validation/published-a3ea0c1.txt).
-
-Next32 portable production passes strict native172/172, sanitizer167/167 and WASI135/135. Input pointer selection, passive Button lifecycle, numeric sizes/open/caret, inset shadows and shadow presets are tested subsets. The original Theme shape and adjacent shadow sample pass all78 actual gallery stories/78 compiled snippets and dedicated DPR1/2 inset pixels. The complete54-command browser matrix passes before publication. Ledger348features:300tested subsets,4implemented,44not_started;0fullyverified families. No user dependency installation is required.
-
-The checkpoints below preserve historical revisions and their validation scopes.
-
-Next31 frozen production `4241a56` passes strict native162/162, ASan/UBSan154/154 and pinned WASI129/129. Attachment62/62 passes after correcting exact-fit Button rounding. Source-pattern and number formatting, current-frame bounded Button labels, selected copyable usage examples and secure touch/IME corrections are integrated. The complete49-command browser matrix passes with corrected hosta32343d, including all78 stories/78 snippets; this batch is not yet published. See [Next31 evidence](validation/gallery-next31.txt). No full family is verified.
-
-Frozen Next30 production `0f4bead` passes native151/151, sanitizer143/143 and WASI121/121. Secure password Inputs, controlled joined Button collections and bounded layered shadows are integrated into the actual gallery. Final password/button/IME tests and Attachment62/62 pass. Source-pattern formatting, inset shadows and other audited family contracts remain incomplete; all78 stories,78 compiled snippets and eight layered-shadow pixel/preclear cases pass. See [Next30 evidence](validation/gallery-next30.txt).
-
-Published `5474ec7` fixes the native SDL GPU assertion: acquired swapchain command buffers are submitted safely, and resource preparation occurs before acquisition. All six CI jobs and Pages pass; all411 public artifact files match. MAIN strict native CTest132/132 passes. The same actual Vulkan fault fixture reproduces the previous assertion and passes on the fix. See [publication evidence](validation/published-5474ec7.txt) and [renderer regression details](validation/sdl-gpu-lifecycle-hotfix.txt).
-
-Published `3ffa19dc` passes all six framework CI jobs and Pages. All411 public files match the artifact; Attachment62/62 passes across all14 sizes, densities, orientations, mobile pixels and real touch actions. See [publication evidence](validation/published-3ffa19d.txt). Prior publication checkpoints remain recorded. The subsequent native GPU failure path is corrected by the published5474ec7 hotfix above.
-
-Frozen Next27 production `6e36b5a` passes native127/127, sanitizer122/122, WASI103/103, the complete78-story browser run and78 snippet compilations. Native includes the five GPU/Sokol/accessibility tests absent from this sanitizer configuration. Expanded sizes, Attachment62/62, source point-axis pixels, nested Tabs wheel/touch ownership, Chart real/controlled timing and existing native browser IME pass. New validated Input example passes desktop/390px typing, Unicode, rejected IME/cancel/recovery and text containment. Preserved first-run failures and corrected scheduling/focus/documentation assertions are described in [Next27 evidence](validation/gallery-next27.txt); production remains frozen throughout proof.
-
-Line/Area point-axis layout and single-line CR/LF normalization are explicit opt-ins. Whole-value validation examples and guide links are live in the compiled next gallery. Applied Tabs scroll deltas now consume their events; refused deltas defer to eligible ancestors. Source-complete chart content/styles/long-press, masked Input/regex/content types, ButtonGroup and several Button contracts remain incomplete. Subsequent isolated workers address these concrete audited gaps.
-
-The ledger records294 tested subsets,4 implemented and44 not_started (342 total), with **0 fully verified families**. These evidence counts are not a completion percentage. No user dependency installation is required.
-
-Frozen Next28 portable source `8e701b3` passes native132/132, sanitizer127/127 and WASI108/108. Native includes five GPU/Sokol/accessibility tests absent from this sanitizer configuration. The actual gallery passes all78 stories and78 snippet compilations, plus copied custom Chart tooltip rows on desktop/390px, runtime opt-out, canvas pixels and clipboard code. Radar titles and disabled/loading Button activation barriers have separate actual WASM tests; overlapping disabled siblings preserve wheel/touch scroll scope queries. These are tested subsets: source-complete tooltip appearance, shadows and other remaining family contracts are still pending. See [Next28 integration evidence](validation/gallery-next28.txt).
-
-Frozen Next29 portable source `d0fd181` passes native134/134, sanitizer129/129, WASI110/110, all78 gallery stories and78 compiled snippets. Both automatic and copied tooltips support checked opt-in typography/line boxes, popover colors, boxed/bare placement and the corrected filled sigma-zero outside ring. Actual WASM verifies original-radius geometry, source-over translucent/progress pixels and stationary resize; the actual gallery tests desktop/390px choices and guide navigation. Password presentation engine Stage1 is headless-tested; secure Input integration is still in progress. Gaussian shadow layers, arbitrary child layout, mobile long-press and the other audited source contracts remain unfinished. See [Next29 evidence](validation/gallery-next29.txt).
+Repository: https://github.com/mattmezza/cui. Branch `integration/next38-responsive`. Evidence/source commit before this report update: `2ce92c1b30fe8967803c02cf6fff5c179ce5e730`. See swarm-status.md for branch promotion and push/CI observations.
 
 ## Working architecture
 
-Explicit C11 contexts, pinned Clay layout, stable scoped IDs, bounded frame strings, ordered previous-frame hit routing, capture/focus/modal scopes, independent semantics and draw lists. Unstyled controlled primitives feed theme-driven components. UTF-8 scalar editing with bounded undo/redo, retained keyed Fenwick virtualization, split/tab docking with transactional persistence and plot scales/clipped geometry are substantive headless models. Optional FreeType/HarfBuzz shapes runs. Software, SDL_Renderer compatibility, SDL_GPU Vulkan and independent Sokol GLCORE are separate renderers; actual hardware/runtime selection is reported.
+Explicit C11 contexts, pinned Clay layout, stable scoped IDs, bounded frame strings, ordered previous-frame hit routing, capture/focus/modal scopes, independent semantics and draw lists. Unstyled controlled primitives feed theme-driven components. UTF-8 editing with contextual native shaping, grapheme/word movement and bounded undo/redo, retained keyed Fenwick virtualization, split/tab docking with transactional persistence and plot scales/clipped geometry are substantive headless models. Optional FreeType/HarfBuzz shapes runs. Software, SDL_Renderer compatibility, SDL_GPU Vulkan and independent Sokol GLCORE are separate renderers; actual hardware/runtime selection is reported.
 
 GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay e6cc36941ab2af5d81107617039d6f527a1c660b. See upstream-baseline.md and DECISIONS.md. Source code and generated one/few headers are tested independently.
 
@@ -42,15 +14,15 @@ GPUI Kit baseline 0.7.1 commit `87d10ae5e1299d1be18670a37570c5402f952e34`; Clay 
 |---|---:|
 | not_started | 0 |
 | scaffolded | 0 |
-| implemented | 2 |
-| tested | 76 |
+| implemented | 1 |
+| tested | 77 |
 | verified | 0 |
 
 Every non-verified family remains incomplete; tested means only its documented subset has tests. **No full family is verified.** Full feature backlog: [gpui-parity.json](gpui-parity.json), [COMPONENTS.md](COMPONENTS.md).
 
 ## Validation evidence
 
-Historical published source `3b28a2c` succeeds in all six framework CI jobs and Pages, with all 355 HTTPS files matching. Its combined Next22 native112/WASI91/browser78 evidence is recorded in [gallery-next22.txt](validation/gallery-next22.txt). Historical Next23 native117/sanitizer115 and targeted browser checks are recorded in [gallery-next23.txt](validation/gallery-next23.txt). Counts are tied to exact compiled source; older evidence is retained below as historical records.
+Frozen pre-responsive baseline81a7fe89 passes portable Debug190/190, Release190/190, C-only ASan/UBSan181/181, WASI156/156 and all68 Pages browser commands (including78 catalog stories and compiled usage excerpts). Later responsive, native callback runner, Retina, video, gradient text and Checkbox changes are under separate integration validation; baseline counts do not validate those additions. Full family verification remains0/78. No current batch release or website publication has occurred.
 
 Latest stored logs (including the preserved initial WASI failure and corrected rerun):
 
@@ -158,7 +130,12 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [combined-sharing-31847cc.txt](validation/combined-sharing-31847cc.txt)
 - [combined-sheet-8777cc4.txt](validation/combined-sheet-8777cc4.txt)
 - [command-failing-before-76c36ba.txt](validation/command-failing-before-76c36ba.txt)
+- [component-builders-expanded-59.txt](validation/component-builders-expanded-59.txt)
+- [component-builders-expanded-78.txt](validation/component-builders-expanded-78.txt)
+- [component-builders-expanded.txt](validation/component-builders-expanded.txt)
+- [component-builders.txt](validation/component-builders.txt)
 - [core-ancestry-before-fb4464b.txt](validation/core-ancestry-before-fb4464b.txt)
+- [core-msvc-alignment.txt](validation/core-msvc-alignment.txt)
 - [cursor-x11.txt](validation/cursor-x11.txt)
 - [deployed-42.txt](validation/deployed-42.txt)
 - [design-scale-7da1a00.txt](validation/design-scale-7da1a00.txt)
@@ -170,6 +147,21 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [failing-before-41de104.txt](validation/failing-before-41de104.txt)
 - [failing-before-c965b3d.txt](validation/failing-before-c965b3d.txt)
 - [failing-before-d564c70.txt](validation/failing-before-d564c70.txt)
+- [fallback-ime-touch-next17.txt](validation/fallback-ime-touch-next17.txt)
+- [gallery-feedback-next20.txt](validation/gallery-feedback-next20.txt)
+- [gallery-next21.txt](validation/gallery-next21.txt)
+- [gallery-next22.txt](validation/gallery-next22.txt)
+- [gallery-next23.txt](validation/gallery-next23.txt)
+- [gallery-next24.txt](validation/gallery-next24.txt)
+- [gallery-next26.txt](validation/gallery-next26.txt)
+- [gallery-next27.txt](validation/gallery-next27.txt)
+- [gallery-next28.txt](validation/gallery-next28.txt)
+- [gallery-next29.txt](validation/gallery-next29.txt)
+- [gallery-next30.txt](validation/gallery-next30.txt)
+- [gallery-next31.txt](validation/gallery-next31.txt)
+- [gallery-next32.txt](validation/gallery-next32.txt)
+- [gallery-next33.txt](validation/gallery-next33.txt)
+- [gallery-polish-next19.txt](validation/gallery-polish-next19.txt)
 - [gcc-56.txt](validation/gcc-56.txt)
 - [gcc-57.txt](validation/gcc-57.txt)
 - [gcc-58.txt](validation/gcc-58.txt)
@@ -219,6 +211,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [input-current-frame-final-tests.txt](validation/input-current-frame-final-tests.txt)
 - [language-examples-5c8b3bc.txt](validation/language-examples-5c8b3bc.txt)
 - [limited-stack-c8d5893.txt](validation/limited-stack-c8d5893.txt)
+- [macos-build-workflow-linux.txt](validation/macos-build-workflow-linux.txt)
 - [nary-multicursor-plot-86d8f9e.txt](validation/nary-multicursor-plot-86d8f9e.txt)
 - [native-18e1ec4.txt](validation/native-18e1ec4.txt)
 - [native-1c1322e.txt](validation/native-1c1322e.txt)
@@ -281,7 +274,12 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [native-recovery.txt](validation/native-recovery.txt)
 - [native-root-overlay-5ccee5a.txt](validation/native-root-overlay-5ccee5a.txt)
 - [native-semantic-ancestry-fb4464b.txt](validation/native-semantic-ancestry-fb4464b.txt)
+- [native-source-bundle.txt](validation/native-source-bundle.txt)
+- [native-starter-actions-next18.txt](validation/native-starter-actions-next18.txt)
 - [native-textview-0773cd4.txt](validation/native-textview-0773cd4.txt)
+- [native-xlib-sanitizer-next22.txt](validation/native-xlib-sanitizer-next22.txt)
+- [next35-bindings-integration.txt](validation/next35-bindings-integration.txt)
+- [next36-source-integration.txt](validation/next36-source-integration.txt)
 - [pages-157961a-failure.txt](validation/pages-157961a-failure.txt)
 - [pages-9e72440-failure.txt](validation/pages-9e72440-failure.txt)
 - [pages-a96fd34-failure.txt](validation/pages-a96fd34-failure.txt)
@@ -294,6 +292,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [portable-stack-quality.txt](validation/portable-stack-quality.txt)
 - [progress-dock-plot-6747044.txt](validation/progress-dock-plot-6747044.txt)
 - [published-04e044e.txt](validation/published-04e044e.txt)
+- [published-0b667d0.txt](validation/published-0b667d0.txt)
 - [published-0cbfcbb.txt](validation/published-0cbfcbb.txt)
 - [published-0e61b2f.txt](validation/published-0e61b2f.txt)
 - [published-15885d6.txt](validation/published-15885d6.txt)
@@ -303,8 +302,12 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [published-30deb99.txt](validation/published-30deb99.txt)
 - [published-3386332.txt](validation/published-3386332.txt)
 - [published-3aecd89.txt](validation/published-3aecd89.txt)
+- [published-3b28a2c.txt](validation/published-3b28a2c.txt)
+- [published-3ffa19d.txt](validation/published-3ffa19d.txt)
+- [published-44819c1.txt](validation/published-44819c1.txt)
 - [published-49d4bfe.txt](validation/published-49d4bfe.txt)
 - [published-4fa4dad.txt](validation/published-4fa4dad.txt)
+- [published-5474ec7.txt](validation/published-5474ec7.txt)
 - [published-54e3410.txt](validation/published-54e3410.txt)
 - [published-55a0b6a.txt](validation/published-55a0b6a.txt)
 - [published-55e904a.txt](validation/published-55e904a.txt)
@@ -314,21 +317,32 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [published-5eb21f6.txt](validation/published-5eb21f6.txt)
 - [published-611631b.txt](validation/published-611631b.txt)
 - [published-65da7b2.txt](validation/published-65da7b2.txt)
+- [published-67d86ed4.txt](validation/published-67d86ed4.txt)
+- [published-6b43336.txt](validation/published-6b43336.txt)
 - [published-917f17d.txt](validation/published-917f17d.txt)
 - [published-9220c22.txt](validation/published-9220c22.txt)
+- [published-99ea53f.txt](validation/published-99ea53f.txt)
 - [published-9c87b99.txt](validation/published-9c87b99.txt)
 - [published-a136c07.txt](validation/published-a136c07.txt)
 - [published-a17b9d3.txt](validation/published-a17b9d3.txt)
+- [published-a3ea0c1.txt](validation/published-a3ea0c1.txt)
 - [published-a4737f6.txt](validation/published-a4737f6.txt)
 - [published-a70afe9.txt](validation/published-a70afe9.txt)
 - [published-ab46d9d.txt](validation/published-ab46d9d.txt)
+- [published-b378635.txt](validation/published-b378635.txt)
+- [published-badef38.txt](validation/published-badef38.txt)
+- [published-cdf5199.txt](validation/published-cdf5199.txt)
 - [published-d552763.txt](validation/published-d552763.txt)
+- [published-ddd0ae3.txt](validation/published-ddd0ae3.txt)
 - [published-e49dc95.txt](validation/published-e49dc95.txt)
 - [published-e6a5395.txt](validation/published-e6a5395.txt)
 - [published-edea484.txt](validation/published-edea484.txt)
 - [published-f6c8cf8.txt](validation/published-f6c8cf8.txt)
+- [published-fbbc40b.txt](validation/published-fbbc40b.txt)
 - [published-ff475e6.txt](validation/published-ff475e6.txt)
 - [published-picker-1b453ab.txt](validation/published-picker-1b453ab.txt)
+- [python-node-native.txt](validation/python-node-native.txt)
+- [python-node-next21.txt](validation/python-node-next21.txt)
 - [quality-0e4ee4a.txt](validation/quality-0e4ee4a.txt)
 - [quality-18e1ec4.txt](validation/quality-18e1ec4.txt)
 - [quality-1ceb567.txt](validation/quality-1ceb567.txt)
@@ -379,6 +393,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [questionnaire-root-before.txt](validation/questionnaire-root-before.txt)
 - [questionnaire-root-quality.txt](validation/questionnaire-root-quality.txt)
 - [questionnaire-root-tests.txt](validation/questionnaire-root-tests.txt)
+- [radar-title-integrated-next28.txt](validation/radar-title-integrated-next28.txt)
 - [radio-failing-before-3d05c2a.txt](validation/radio-failing-before-3d05c2a.txt)
 - [release-headless.txt](validation/release-headless.txt)
 - [release-resumed.txt](validation/release-resumed.txt)
@@ -433,6 +448,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [sanitizers-textview-0773cd4.txt](validation/sanitizers-textview-0773cd4.txt)
 - [sanitizers.txt](validation/sanitizers.txt)
 - [scroll-presentation.txt](validation/scroll-presentation.txt)
+- [sdl-gpu-lifecycle-hotfix.txt](validation/sdl-gpu-lifecycle-hotfix.txt)
 - [sheet-motion.txt](validation/sheet-motion.txt)
 - [site-sharing.txt](validation/site-sharing.txt)
 - [snippets-22061e5.txt](validation/snippets-22061e5.txt)
@@ -442,6 +458,7 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [text-multi-click-before.txt](validation/text-multi-click-before.txt)
 - [text-multi-click-native.txt](validation/text-multi-click-native.txt)
 - [text-multi-click-quality.txt](validation/text-multi-click-quality.txt)
+- [theme-import-stack.txt](validation/theme-import-stack.txt)
 - [theme-textview.txt](validation/theme-textview.txt)
 - [touch-mesh-chart-f7343a5.txt](validation/touch-mesh-chart-f7343a5.txt)
 - [typed-dock-block-editor-726a730.txt](validation/typed-dock-block-editor-726a730.txt)
@@ -517,9 +534,9 @@ Latest stored logs (including the preserved initial WASI failure and corrected r
 - [web-build-94503eb.txt](validation/web-build-94503eb.txt)
 - [website-feedback-new.txt](validation/website-feedback-new.txt)
 
-Commands: `cmake -S . -B build -G Ninja -DCUI_GPU_TESTS=ON`; `cmake --build build`; `ctest --test-dir build --output-on-failure`. ASan/UBSan config uses `-DCUI_SANITIZE=ON`; portable Clang 21.1.8 is supplied by Zig 0.16.0 with `-DCMAKE_LINK_DEPENDS_USE_LINKER=FALSE` to avoid a Zig/CMake linker dependency-file crash. This workaround is not required by ordinary GCC builds.
+Commands: `cmake -S . -B build -G Ninja -DCUI_GPU_TESTS=ON`; `cmake --build build`; `python scripts/test_local.py --build-dir build`. ASan/UBSan config uses `-DCUI_SANITIZE=ON`; portable Clang 21.1.8 is supplied by Zig 0.16.0 with `-DCMAKE_LINK_DEPENDS_USE_LINKER=FALSE` to avoid a Zig/CMake linker dependency-file crash. This workaround is not required by ordinary GCC builds.
 
-Linux Xorg actual runtime: SDL_Renderer OpenGL; SDL_GPU Vulkan reported Intel(R) Graphics (ARL), Intel open-source Mesa driver. Actual Vulkan and Sokol GLCORE pixel readback verifies nested clip/alpha/geometry; Sokol text cache/readback/eviction passed under ASan/UBSan. SDL dummy/software tests verify cache/clipboard/event service contracts; dummy is not OS platform evidence. C++ and Zig C-ABI consumer executables ran. Portable wasm32-wasi behavioral/embedding modules ran in pinned Wasmtime. Real Chromium browser tests separately exercise the WebAssembly gallery, including pointer/keyboard behavior, text input, popups and mobile-width bounds. These are separate validation paths. Native font/cache tests require a discovered real font.
+Historical Linux Xorg hardware evidence (not a current virtual-display hardware check): SDL_Renderer OpenGL; SDL_GPU Vulkan reported Intel(R) Graphics (ARL), Intel open-source Mesa driver. Actual Vulkan and Sokol GLCORE pixel readback verifies nested clip/alpha/geometry; Sokol text cache/readback/eviction passed under ASan/UBSan. SDL dummy/software tests verify cache/clipboard/event service contracts; dummy is not OS platform evidence. C++ and Zig C-ABI consumer executables ran. Portable wasm32-wasi behavioral/embedding modules ran in pinned Wasmtime. Real Chromium browser tests separately exercise the WebAssembly gallery, including pointer/keyboard behavior, text input, popups and mobile-width bounds. These are separate validation paths. Native font/cache tests require a discovered real font.
 
 ## Captures and performance
 
@@ -533,7 +550,7 @@ Linux Xorg and headless: tested partial. Wayland: untested. Windows/macOS: hoste
 
 ## Risks and next tasks
 
-1. Single-line Input now has caret/selection painting, scalar pointer placement, scrolling, host clipboard and bounded history. Complete multiline presentation, IME, graphemes, shaping clusters, paragraph bidi and font fallback before claiming Editor.
+1. Input and Editor have tested contextual shaping, grapheme/word movement, caret/selection, paragraph bidi and font fallback paths. Complete the frozen source behavior audit, IME/platform integration and remaining inherited styling before claiming a verified family.
 2. Nested/context menus, multiple selection, custom row delegates, pickers and disclosure/tabs have tested styled slices. Complete reference-specific behavior; dialogs, alerts and sheets now have tested styled composition and nested focus, with advanced surface behavior pending.
 3. Tree, table and scroll widgets now use clipped virtual viewports and keyboard models. Complete reference-default audits, variable heights and advanced integration; table pinning/multiple selection and grouped headers now have tested implementations; Dock and Plot remain partial model stories.
 4. Complete independent renderer/resource lifecycle/device-loss contracts, broader GPU shader formats, OS accessibility and native platform adapters.
@@ -543,7 +560,7 @@ Licensing: original code MIT, Clay and Sokol zlib; optional renderer dependencie
 
 ## Browser gallery
 
-[Open the GitHub Pages gallery](https://matteo.merola.co/cui/). All 78 entries remain navigable; only implemented stories have live previews. Models are marked as partial and no family is promoted to verified by a screenshot. Deployment is gated by Chromium behavior tests and preserves the existing account domain.
+[Open the GitHub Pages gallery](https://matteo.merola.co/cui/). All 78 entries remain navigable; live stories have scoped behavior tests. Incomplete contracts remain marked as partial and no family is promoted to verified by a screenshot. Deployment is gated by Chromium behavior tests and preserves the existing account domain.
 
 Build with `python scripts/build_web.py` using pinned Zig 0.16.0, then serve `build/web` over HTTP. See WEB_GALLERY.md for dependency and browser-test commands.
 
@@ -552,7 +569,7 @@ Build with `python scripts/build_web.py` using pinned Zig 0.16.0, then serve `bu
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build --output-on-failure
+python scripts/test_local.py --build-dir build
 ./build/cui_gallery
 ./build/cui_gpu_demo --font /path/to/font.ttf
 ./build/cui_sokol_demo --smoke 3
@@ -568,37 +585,37 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 |---|---|---|
 | Accordion | tested | Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending. |
 | AlertDialog | tested | Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending. |
-| Alert | tested | Severity text, title/message, banner sizing and controlled dismissal tested. Independent success/warning theme colors, rich content/action slots and native accessibility announcement pending. |
+| Alert | tested | Semantic default/info/success/warning/error colors, optional title and borderless banner, rich title/content/action slots and bounded announcement request semantics tested. Native OS announcement delivery remains a platform integration gap. |
 | Attachment | tested | Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity. |
-| Avatar | tested | Named UTF-8 initials fallback, circular themed surface and explicit size tested. Image loading/failure state, avatar groups, custom icon slots and exact typographic centering pending. |
+| Avatar | tested | Caller-owned bounded RGBA circle/cover cache, source revision updates, named initials and interactive overlapping stacks with overflow, keyboard and touch cancellation are tested. Explicit initials fallback foreground/background overrides are tested. Image acquisition/loading remains host-owned; explicit failure-state transitions, custom icon slots and complete typography/theme variants remain unverified. |
 | Badge | tested | Count, zero hiding, overflow, dot, configurable SVG icon, four sizes, colors and arbitrary content composition are headless tested; source corner geometry is covered on the first frame.; Generic inherited style refinement remains ordinary Core composition; browser-specific interaction and visual evidence is recorded separately. |
-| Bubble | tested | Seven themed composable surface variants tested. Parent owns alignment/wrapping; built-in reactions, footer and complete message slot API pending. |
-| Button | tested | Nine variants and source XS/S/M/L metrics, centered labels, SVG icon slots and icon-only buttons, controlled selected/loading/disabled states, text adornments and presentation callbacks are tested. Theme SVG providers can replace bundled artwork. Compact/custom variants, all upstream styling/tooltip interactions, exact loading presentation and native accessibility remain partial. |
-| Checkbox | tested | Styled checked/unchecked geometry, four sizes, disabled colors, labels, custom content, and keyboard activation tested. Checkbox also exposes mixed state. Spring mark animation, wrapped inherited text styling, tooltip integration and exact pointer focus behavior remain pending; not full parity. |
-| Clipboard | tested | SDL native/dummy roundtrip and optional capability adapter tested; core input paste/cut integration pending. |
+| Bubble | tested | Seven themed surfaces, start/end alignment, custom content and measured top/bottom reaction slots tested in native and actual WASM. Parent still owns message composition; complete inherited styling audit remains pending. |
+| Button | tested | Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied.; Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md.; Numeric sizing, independent open presentation, passive lifecycle, release-derived click payload and typed loading artwork have bounded tests. Press snapshots, previous keyboard hitbox evidence, exact focus styles, ordered tab indices, event-local capture/bubble propagation, action tooltips, arbitrary shadow/gradient refinement and full accessibility remain incomplete. |
+| Checkbox | tested | Checked/unchecked/mixed state, caller-owned reversible springs, finite wake deadlines, reduced-motion snaps, wrapped labels/custom children and BaseTooltip keyboard/pointer lifecycle tested across all14 design sizes and densities. NULL state retains legacy immediate rendering. Radio alias ignores Checkbox-specific added fields. Complete inherited styling and native accessibility delivery remain partial. |
+| Clipboard | tested | SDL clipboard roundtrip and Input mock-host cut/paste/undo, readonly and capability failures are tested. A reusable dynamic-value Clipboard widget with copied callback and timed Copy/Check icon remains absent; browser examples are application composition. |
 | Collapsible | tested | Controlled expansion, disabled/keyboard behavior, custom content, measured reversible reveal, dynamic content height, inert painted exits and reduced motion tested. Styled animation consumes theme response/damping/epsilon/travel, including under/overdamping and immediate snap. Complete inherited styling audit remains pending. |
 | DropdownButton | tested | Split actions, optional halves, tooltip, inner style inheritance, shared ghost state, corner anchors, joined geometry and eight semantic variants/four sizes tested. Remaining inherited Button style/metadata surface is under reference audit. |
-| Empty | tested | Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending. |
+| Empty | tested | Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending.; Named header/media/title/description/content/appended child slots now work with native controls; this does not establish complete visual/style parity. |
 | Focus Trap | tested | Core nested modal scopes and overlay state tested. No OS accessibility bridge or full modal relationship semantics. |
 | GroupBox | tested | Composable title/content, themed border/layout and group semantic snapshot tested. Complete upstream audit and native accessibility bridge pending. |
 | HoverCard | tested | Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending. |
-| Icon | tested | 106 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.; Icon is decorative by default; named image semantics must currently be supplied by the caller. Dedicated accessible/decorative API remains pending. |
+| Icon | tested | 123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.; Icon is decorative by default; named image semantics must currently be supplied by the caller. Dedicated accessible/decorative API remains pending. |
 | Image | tested | Actual host-provided RGBA frames, five fits, grayscale/opacity, loading/failure/animation timing and Attachment lifecycle/actions are tested headlessly and in Chromium. Built-in encoded file/network decoding, shared resource cache, full inherited text styling and exact effects remain pending; not full parity. |
 | Kbd | tested | Platform modifier formatting and styled UTF-8-safe hint tested. Action/keybinding lookup and grouped shortcut composition pending. |
-| Label | implemented | Text wrapper renders, but control association and standalone semantic labeling pending. |
+| Label | tested | Secondary text, Unicode lowercase highlighting, scalar masking, control association, copied colored wrapping and left/center/right alignment have scoped tests. Full inherited typography/style refinement and exhaustive native/platform visual acceptance remain incomplete. |
 | Marker | tested | Text wrapping, inherited font styling and arbitrary separator styling remain incomplete. Custom child widths/layout are application supplied. Default shimmer now uses alpha-aware Oklab and the source lightness fallback. |
-| Message | tested | Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending. |
+| Message | tested | Compact incoming/outgoing gallery examples use real photo avatars, headers/body/footer, bounded bubbles and explicit action callbacks. Native/headless/browser checks cover optional avatars and contact scrolling. Built-in Image/TextView/Attachment body variants, inherited font weights, broader style slots and jump-button tooltip/variants remain incomplete. |
 | MessageScroller | tested | Built-in Image/TextView/Attachment content is pending; custom content callbacks are supported. Exact inherited font weight, rounded avatar clipping, arbitrary style refinements and jump-button tooltip/variants remain incomplete. Browser stories are pending. |
 | Notification | tested | Native OS delivery adapters remain absent; portable host callbacks are opt-in. Shadows approximate blur with bounded rounded layers; intent icons are text symbols and title font weight is not independently styled. Custom content and action descriptors remain borrowed through lifecycle callbacks. |
 | Pagination | tested | Independent bounded one-based page model, keyboard/pointer first/last/next/previous, ellipsis window and SIZE_MAX bounds tested. Responsive wrapping, configurable label slots and arbitrary page budgets pending. |
 | Progress | tested | ProgressCircle supports bounded caller-owned antialiased RGBA rendering; arbitrary vector/style refinement and the subpixel source path seam are not reproduced.; Arbitrary easing and theme motion-token overrides remain unsupported. |
-| Radio | tested | Styled checked/unchecked geometry, four sizes, disabled colors, labels, custom content, and keyboard activation tested. Checkbox also exposes mixed state. Spring mark animation, wrapped inherited text styling, tooltip integration and exact pointer focus behavior remain pending; not full parity. |
+| Radio | tested | Bounded controlled RadioGroup supplies same-frame single selection, one Tab stop, arrow/Home/End roving, disabled/removal cleanup and collection semantics. Headless/base-only, sanitizer and browser contact tests cover all14 design metrics. Spring marks, richer child composition, integrated tooltip and full styling/OS accessibility acceptance remain open. |
 | Rating | tested | Independent keyboard/pointer half-step values, controlled clearing, readonly/disabled and range semantics tested. SVG masks/custom icons/color and hover preview pending. |
 | Shimmer | tested | Single-line text only; inherited styled runs, wrapping, ellipsis and font weight await rich text infrastructure. Caller supplies elapsed time and schedules base-plan deadlines. |
-| Skeleton | tested | Placeholder dimensions/radii, secondary opacity, phase pulse and reduced motion tested. Loading owner semantics and richer placeholder layouts pending. |
-| Spinner | tested | Themed eight-dot ring, explicit clock phase, redraw invalidation, reduced motion and status snapshot tested. Scheduler deadlines and alternative icon geometry pending. |
+| Skeleton | tested | Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition. |
+| Spinner | tested | Source-audited default SVG Loader, custom content, caller-clocked duration/easing, bounded finite wake deadlines, idle quiescence and reduced-motion snaps tested in native/software and real WASM. Spinner is decorative; the application owns loading announcements. Complete inherited styling remains pending. |
 | Stepper | tested | Controlled current index, explicit pending/active/completed/error states, pointer/keyboard navigation and semantic snapshots tested. Validation callbacks, connectors/custom icons and exact density variants pending. |
-| Switch | tested | Controlled activation tested; native switch geometry, theme variants and touch pending. |
+| Switch | tested | Native track/thumb, controlled callbacks, keyboard/pointer/disabled state, label focus/wrapping, reversible spring deadlines and reduced motion are tested. Tooltip, custom slots, left labels and custom colors need complete styling assertions; full reference behavior and rendering remain unverified. |
 | Tag | tested | Frozen Tag has no built-in close action; interactive children are application composition. Semantic secondary colors are independently configurable. Exact inherited typography remains incomplete. |
 | Toggle | tested | Ghost/Outline variants, four sizes, controlled requests, disabled input, custom content, tooltip composition and segmented multi-select groups have headless coverage. Convenience groups retain exclusive/allow-empty/keyboard policies through the shared painter. Full inherited text/icon styling and source-level visual acceptance remain pending; not full parity. |
 | Tooltip | tested | Delayed pointer/focus opening, collision placement, viewport portals, Escape suppression, disabled omission and trigger description tested. configurable layer policy and native accessibility bridge pending. |
@@ -608,7 +625,7 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | DatePicker | tested | Real collision-placed calendar portal, date/range selection, trapped Tab and same-frame focus restoration tested. Editable date masks, custom formats/locales, clear controls, presets and responsive scrolling remain pending. |
 | Editor | tested | Styled multiline caret/selection/scroll, gutter/wrap, host syntax colors, ASCII-insensitive retained search and atomic replacement, visible match highlights, caller-owned folding and completion have headless/browser tests.; Unicode17 grapheme and word keyboard editing passes pinned conformance fixtures; explicit scalar APIs remain compatible.; Measured multicursor interaction supports cursor creation, rectangular Alt-drag selection, grapheme navigation, wraps/folds, readonly behavior, atomic typing, multirange indentation, synchronous host clipboard distribution and full-selection Undo/Redo. Grouped typing/backspace/forward-delete undo, the 1,000-change boundary, caller-owned preferred columns and history eviction have headless coverage. Multicursor IME, parsers/LSP, diagnostics and bidi remain incomplete. Folds require host refresh after edits; browser clipboard does not yet expose the synchronous native seam.; 200,000-line document correctness is tested; performance targets and viewport-only incremental layout are not yet validated in this release. |
 | Form | tested | Validation, submission and responsive column counts are application-owned as in the frozen reference.; Feature-level reference audit remains in progress; inherited Input text/IME/native accessibility limitations remain. |
-| Input | tested | Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard, bounded history, whole-value acceptance and opt-in CR/LF normalization have tests. The validated gallery example covers Unicode and rejected IME recovery on desktop/390px. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.; Design sizes and centered field text are tested. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md. |
+| Input | tested | Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.; Design sizes, centered field text, unwrapped single-line placeholders in fixed/grow inputs and fixed-width viewport bounds are tested. Grow-width populated long values can still expand internal viewport bounds; use explicit widths for reliable caret/hit geometry. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.; Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Bounded single-line pattern and grouped-number formatting are tested; multiline, token and multiple-selection masks, enabled NUL separators and full content-type/lifecycle behavior remain incomplete; the optional pinned whole-value Unicode regex provider is a separately tested subset; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.; Opt-in hidden/revealed password and new-password purposes, scalar-bullet presentation, guarded clipboard, finalized focus generations, native SDL input hints and transient secure browser proxy pass headless/native/browser tests. Actual window-blur handler clears preedit DOM data. Physical OS autofill/privacy, all content purposes and complete accessibility remain unverified; see docs/PASSWORD_INPUT_STAGE2.md. |
 | Input Group | tested | Reference audit remains in progress; actual gallery composition and state tests exist.; Uses retained single-line Input; multiline, IME, grapheme and native accessibility limitations remain. |
 | NumberInput | tested | Independent headless and styled finite numeric editing, draft validation, CJK normalization, locale-aware ASCII parsing/formatting, bounds, steps, readonly/disabled and semantics tested. Thousands separators, full custom pattern/appearance, caret/selection painting, pointer positioning and IME pending.; Source XS/S/M/L/custom size metrics and centered field text are tested; native shaping/IME/menu and remaining detailed editing behavior are still partial. See docs/INPUT.md and docs/NUMERIC.md. |
 | OtpInput | tested | Actual gallery integration and feature-level audit remain in progress.; Host schedules caret blink deadlines. OS OTP autofill and IME bridges are absent. Frozen source does not provide bulk paste or caret-arrow editing; CUI does not infer these features. |
@@ -627,22 +644,22 @@ No dependency installation needed on the present host. Optional system CMake/Cla
 | Popover | tested | Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.; Current side-based flip/clamp differs from upstream anchor-only clamp. Complete anchor/offset/arrow, right-click trigger and accessible trigger relationships are pending. |
 | Resizable | tested | Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Browser/native audit pending. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native GPUI drag payload adapter. |
 | Root View | tested | Per-window plugin snapshots, ordered render stages, field-specific style overrides, factory rollback, automatic Sheet/Dialog/Notification layers and Sheet-aware notification placement are tested. Window creation, entity observations, global selection/copy service, tooltip/native-menu/touch-selection hosts and automatic chrome remain incomplete; see docs/ROOT.md. |
-| Scrollable | tested | Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Shared contact-aware precise touch scrolling, threshold/cancel handling, nested ancestor handoff and drag-priority controls have headless and Chromium touch tests. Auto-measured/grow sizing, inertial fling, auto-hide, physical-device/native-system behavior and complete family touch coverage remain pending. |
+| Scrollable | tested | Actual clipped two-axis content, nested wheel routing and keyboard/pointer scrollbars tested. Shared contact-aware precise touch scrolling, threshold/cancel handling, nested ancestor handoff and drag-priority controls have headless and Chromium touch tests. Opt-in ordinary-content auto-measurement uses preceding-frame extents, with wrapped-height, shrink/clamp and explicit-dimension precedence tests. Grow viewports, inertial fling, auto-hide, physical-device/native-system behavior and complete family touch coverage remain pending. |
 | Settings | tested | Searchable pages/groups, atomic filtered reset, source-size Input/NumberInput, checked Menu dropdown composition and reset tooltip are tested. Unicode search, virtualization, rich descriptions, unconstrained oversized Menu layout and complete host styling remain partial; see docs/SETTINGS.md. |
 | Sheet | tested | Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending. |
 | Sidebar | tested | Variable-height bounded navigation, nested items, independent carets, callbacks and animated Icon/Offcanvas collapse are tested. Full font-weight styling, intrinsic virtual measurement and host popup placement remain partial; see docs/SIDEBAR.md. |
 | StatusBar | tested | Pinned end regions, adaptive center alignment, themed spacing and callback composition tested headlessly. Independent region clipping, inherited rich font styles and full Styled refinement remain partial; browser/native audit pending. |
-| Tabs | tested | Stable-ID selection, keyboard navigation, five variants, custom body slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom body width caps preserve short content and clip oversized bodies from the first frame. Applied wheel/Shift-wheel and touch deltas consume their event; boundary refusals defer to ancestors, with actual nested browser checks. Structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source. |
-| Theme | tested | 38 pinned named palettes, token derivation, themed button surfaces and CSS/WASM palette equality are tested. Website system appearance, persistence and live OS changes are tested. Native OS preference adapters, complete upstream theme tokens, gradient brushes, font and syntax themes remain partial; Aurora gradients use their first stop. See docs/THEME_PRESETS.md. |
+| Tabs | tested | Stable-ID selection, keyboard navigation, five variants, custom body slots/close composition, measured UTF-8 ellipsis, wheel scrolling, overflow menu, application-applied drag requests, explicit/selected reveal and interactive scrollbars tested. Custom body width caps preserve short content and clip oversized bodies from the first frame. Structured per-item slots and text shaping remain incomplete. Cross-strip drag/autoscroll are not APIs in the frozen source. |
+| Theme | tested | 38 pinned palettes, caller-owned bounded registry, transactional supported legacy/semantic imports, explicit host appearance/high-contrast/reduced-motion projection, semantic typography/shadow snapshots and native font-backed import rendering are tested. SDL actual system-theme queries and queued change notifications, explicit overrides and a native follow-system application have tests. Physical OS setting changes, native high contrast and native reduced-motion observation remain unverified; applications pass those preferences explicitly. Semantic font/spacing/shadow and motion snapshots require explicit consumer integration. Unsupported source gradients, syntax/highlight and nonrepresentable fields reject by default, or return an observable partial import when opted in. Registry name ordering uses ASCII case folding. See docs/THEME_REGISTRY_GUIDE.md and docs/THEME_PRESETS.md.; Bounded DROP/INSET/preset primitives and Theme sample are tested across all five consumers. Popover/Notification/raised-Tab consumed shadows and broader source style/color contracts remain separately incomplete. |
 | TitleBar | tested | Source geometry/gradient/window SVGs and mock-host pointer/keyboard routing tested. SDL decoration/query/close contracts tested on X11; minimize/maximize remain OS-asynchronous. Native drag/menu, macOS traffic-light placement/preferences and Windows control hit areas remain host integration gaps. Portable double-click thresholds substitute OS preferences; browser story pending. |
 | Toolbar | tested | Source audit corrects initial left/center/right-slot assumption: Toolbar provides ordered sized/unsized children and labelled groups. Scoped wrapping arrow navigation, ordinary Tab, nested consumption and hosted Input caret tested. Callbacks receive explicit preparation metrics; custom-box replacement substitutes full Styled refinement; caller owns icon paint/tooltips. Browser/native visual audit pending. |
 | Tree | tested | Actual bounded keyed hierarchy, controlled expand/select, ordered parent/child navigation, fractional virtual viewport and clipped wheel routing tested. Variable row heights, drag/drop, custom row slots, full context actions and native accessibility remain pending. |
 | VirtualList | tested | Styled visible-window rendering, both orientations, variable extents, scrollbars/keyboard and Auto/Infer sizing are headless tested. Intrinsic measurement is an explicit host callback; row selection/controls remain application-owned and scroll positions use float coordinates. |
-| Chart | tested | Seven chart families, bounded geometry, explicit Sankey topology, measured axes, opt-in source Line/Area point-axis geometry, theme colors, independent motion and current-frame hover/tooltip paint have scoped tests. Complete tooltip content/style, native shadows and mobile long-press remain unfinished; see docs/CHART.md and docs/PLOT_CHART_CURRENT_FRAME.md. |
+| Chart | tested | Seven chart families, bounded geometry, Sankey topology, measured axes, theme colors and current-frame hover have scoped tests. Full source layout, inset shadows, arbitrary current-frame child layout and native mobile long-press remain unfinished; see docs/CHART.md.; Copied typed title/rows and opt-in appearance pass both consumers: rem typography, inherited line boxes, popover roles, mixed/transparent slots, boxed/bare placement and filled sigma-zero outside ring. The gallery exposes choices and copied callback usage. Inset shadows, arbitrary retained current-frame content, source wrapping and mobile long-press remain incomplete.; Value-owned motion and independent pointer clocks pass headless and actual WASM tests. Existing zero/AUTO Chart options retain legacy manual-hover compatibility; explicit CURRENT_FRAME rejects arbitrary layout tooltip callbacks. Legacy composition remains available; this does not certify complete layout/tooltip parity.; Bounded source-derived three-layer boxed-tooltip drop shadows pass both tooltip consumers and all five renderer consumers, including physical fractional clip masks and original corner radii. Uniform physical scales only for shadow frames; inset and native platform shader pixel identity are outside this proof. See docs/DROP_SHADOW.md. |
 | Command | tested | Grouped filtering, original item paths, wrapping keyboard selection, pointer confirmation, virtual rows, actual Input/Scroll and Dialog cancellation are tested. Unicode matching, arbitrary intrinsic wrapping, native Action/window lifecycle and deferred callbacks remain explicit host boundaries; see docs/COMMAND.md. |
-| DataTable | tested | Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling, multi-level group headers, whole-row/trailing callbacks and actual scrollbars tested. Complete reference-default, remote adapter and behavior audit remains in progress. |
-| Plot | tested | Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.; Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.; Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Legacy hosts provide bounds and pointer occlusion. Opt-in CURRENT_FRAME resolves Core bounds/clipping/occlusion and restricted deferred paint; callers still own state and marks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Bounded multi-contour fills now support holes, even-odd/nonzero rules and crossings; extended strokes cover closed paths, caps, joins and dash splitting with native/sanitizer/WASI geometry tests. Exact Lyon topology, unbounded geometry, variable-width/automatic curved routing, broader scale/legend/selection behavior, source-complete retained child layout, mobile long-press and styled native mesh integration remain incomplete. |
-| Table | tested | Real themed rows/cells, static header/body/footer sections, captions and validated spans plus associated data-table behavior tested. Exhaustive alignment/sizing/style composition and complete upstream scope remain pending. |
+| DataTable | tested | Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling, multi-level group headers, whole-row/trailing callbacks and actual scrollbars tested. Complete reference-default, remote adapter and behavior audit remains in progress.; Append-only named/indexed checked Table parts and all14 design row/cell sizes tested; child typography remains host-owned. DataTable source Desc/Asc/Default cycle is opt-in with legacy Asc-first preserved; selection-only opt-outs retain sort/resize/custom action activation and controlled stable keys. Exact edge padding, span metadata, dedicated source palette and axis-specific scrollbar projection remain incomplete. See TABLE_BEHAVIOR.md. |
+| Plot | tested | Styled bitmap/axis composition and source-audited scales/paths are partial APIs, not complete GPUI Plot parity.; Software output is bounded and non-antialiased; applications own interaction, buffers and plot state.; Source scales/shapes, styled appearance/hover/tooltip composition and cached software fill/stroke with two-stop sRGB gradients are tested. Hosts explicitly provide current bounds, pointer occlusion, frame serials and mark callbacks. Oklab gradients, source-projected slash/checker patterns, floating-point paint caches, bounded concave fills and adaptive open butt/miter strokes have tests. Bounded multi-contour fills now support holes, even-odd/nonzero rules and crossings; extended strokes cover closed paths, caps, joins and dash splitting with native/sanitizer/WASI geometry tests. Exact Lyon topology, unbounded geometry, variable-width/automatic curved routing, broader scale/legend/selection behavior, automatic prepaint and styled native mesh integration remain incomplete.; Explicit value-owned appearance/enter/exit policies and independent owner pointer clocks have headless and actual WASM pixel tests. Legacy defaults remain; automatic current-frame geometry and arbitrary layout tooltip consumption are separate gaps. |
+| Table | tested | Real themed rows/cells, static header/body/footer sections, captions and validated spans plus associated data-table behavior tested. Exhaustive alignment/sizing/style composition and complete upstream scope remain pending.; Append-only named/indexed checked Table parts and all14 design row/cell sizes tested; child typography remains host-owned. DataTable source Desc/Asc/Default cycle is opt-in with legacy Asc-first preserved; selection-only opt-outs retain sort/resize/custom action activation and controlled stable keys. Exact edge padding, span metadata, dedicated source palette and axis-specific scrollbar projection remain incomplete. See TABLE_BEHAVIOR.md. |
 | TextView | tested | Bounded Markdown/HTML subset, styled Unicode selection, links, tables, images, streaming fade and reveal are tested. Complete parser semantics, source-copy reconstruction, plugins, shared touch/window selection, BiDi and adaptive tables remain unfinished; see docs/TEXT_VIEW.md. |
 
 ## Publishing/CI checkpoint

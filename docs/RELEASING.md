@@ -31,8 +31,8 @@ publish packages staged from a dirty checkout just because packaging allows it.
 
 The audited tree repeats versions in Python project metadata, wheel backend NAME
 and METADATA, npm, Cargo, the Go packaging function, and CI artifact filenames.
-The Go `.info` timestamp is also hardcoded to `2026-10-14T00:00:00Z`; replace it
-with the frozen revision's truthful timestamp before publishing a proxy bundle.
+The Go `.info` timestamp is derived from the packaged Git revision. Verify it
+against the frozen revision before publishing a proxy bundle.
 Future version bumps must audit these literals or centralize their generation.
 The checker below requires Python 3.11 or newer and deliberately checks the
 existing format rather than rewriting binding manifests:

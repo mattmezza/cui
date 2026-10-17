@@ -108,7 +108,11 @@ def package_go(package, output, temporary, source_only=True):
     proxy = output / module / "@v"
     proxy.mkdir(parents=True, exist_ok=True)
     shutil.copy2(package / "go.mod", proxy / (version + ".mod"))
-    (proxy / (version + ".info")).write_text(json.dumps({"Version": version, "Time": "2026-10-14T00:00:00Z"}))
+    revision_time = subprocess.check_output(
+        ["git", "show", "-s", "--format=%cI", "HEAD"], cwd=ROOT, text=True).strip()
+    # A module proxy must describe the packaged commit, including its actual
+    # timestamp, rather than the date of the original packaging implementation.
+    (proxy / (version + ".info")).write_text(json.dumps({"Version": version, "Time": revision_time}))
     with zipfile.ZipFile(proxy / (version + ".zip"), "w", zipfile.ZIP_DEFLATED) as archive:
         for file in sorted(package.rglob("*")):
             if not file.is_file(): continue

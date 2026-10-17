@@ -14,6 +14,13 @@ import re
 import shutil
 from urllib.parse import quote, unquote, urlsplit
 
+# Also works when documentation tests load this script by file path.
+import importlib.util
+_API_SPEC = importlib.util.spec_from_file_location('cui_agent_resources', Path(__file__).with_name('agent_resources.py'))
+_API_MODULE = importlib.util.module_from_spec(_API_SPEC)
+_API_SPEC.loader.exec_module(_API_MODULE)
+public_api = _API_MODULE.public_api
+
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
@@ -247,21 +254,14 @@ def publish_agent_docs(root, output, paths, documents, profile):
     revision = source_revision(root)
     headers = sorted((root / 'include/cui').glob('*.h'))
     hashes = {}
-    symbols = []
-    # Header-only utilities define their functions inline. Index their signatures
-    # alongside ordinary prototypes without exporting implementation bodies.
-    declaration = re.compile(r'^(?:[A-Za-z_]\w*[ \t*]+)+(cui_[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*[;{]', re.M)
+    symbols = [{**symbol, 'header': './headers/' + Path(symbol['header']).name}
+               for symbol in public_api(root)]
     for header in headers:
         relative = header.relative_to(root).as_posix()
         target = output / 'headers' / header.name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(header, target)
         hashes[relative] = hashlib.sha256(header.read_bytes()).hexdigest()
-        clean = re.sub(r'/\*.*?\*/|//[^\n]*', '', header.read_text(), flags=re.S)
-        for match in declaration.finditer(clean):
-            signature = match[0].rstrip().removesuffix('{').rstrip().removesuffix(';') + ';'
-            symbols.append({'name': match[1], 'declaration': re.sub(r'\s+', ' ', signature).strip(),
-                            'header': './headers/' + header.name})
     documentation_hashes = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                             for path in paths}
     metadata = {'source_revision': revision, 'build_profile': profile, 'headers_sha256': hashes,

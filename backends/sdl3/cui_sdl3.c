@@ -3,6 +3,7 @@
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,7 +41,9 @@ struct cui_sdl3 {
     size_t bitmap_bytes, shadow_bytes;
     size_t glyph_bytes;
     uint64_t clock, hits, misses, frame, frame_ticks;
-    bool frame_clock_started, event_pending;
+    bool frame_clock_started, event_pending, callback_mode;
+    bool motion_pending;
+    cui_event motion;
     SDL_Event pending_event;
     char *clipboard;
     SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
@@ -174,7 +177,13 @@ static size_t cui_sdl3_scalar_byte(const char *text, size_t scalar) {
     }
     return byte;
 }
-bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
+static void flush_motion(cui_sdl3 *s, cui_context *ui) {
+    if (s->motion_pending) {
+        (void)cui_queue_event(ui, s->motion);
+        s->motion_pending = false;
+    }
+}
+static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided, bool pump) {
     if (!s || !ui)
         return false;
     bool reset_input = false;
@@ -223,11 +232,19 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
         (void)SDL_SetTextInputArea(s->window, &area, 0);
     }
     SDL_Event e;
-    while (s->event_pending || SDL_PollEvent(&e)) {
-        if (s->event_pending) {
+    while (provided || (pump && (s->event_pending || SDL_PollEvent(&e)))) {
+        if (provided) {
+            e = *provided;
+            provided = NULL;
+        } else if (s->event_pending) {
             e = s->pending_event;
             s->event_pending = false;
         }
+        SDL_Window *target = SDL_GetWindowFromEvent(&e);
+        if (target && target != s->window)
+            continue;
+        if (e.type != SDL_EVENT_MOUSE_MOTION)
+            flush_motion(s, ui);
         cui_event v = {0};
         bool send = true, leave_after = false;
         switch (e.type) {
@@ -362,6 +379,8 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             v.type = CUI_EVENT_CANCEL;
             leave_after = true;
             break;
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_EXPOSED:
             cui_invalidate(ui);
@@ -372,7 +391,11 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             break;
         }
         if (send) {
-            cui_queue_event(ui, v);
+            if (v.type == CUI_EVENT_POINTER_MOVE && v.pointer_type == CUI_POINTER_MOUSE) {
+                s->motion = v;
+                s->motion_pending = true;
+            } else
+                cui_queue_event(ui, v);
             if (v.pointer_type == CUI_POINTER_MOUSE &&
                 (v.type == CUI_EVENT_POINTER_MOVE || v.type == CUI_EVENT_POINTER_DOWN ||
                  v.type == CUI_EVENT_POINTER_UP)) {
@@ -381,11 +404,18 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
                     (v.x < 0 || v.y < 0 || v.x >= width || v.y >= height))
                     leave_after = true;
             }
-            if (leave_after)
+            if (leave_after) {
+                flush_motion(s, ui);
                 cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_LEAVE});
+            }
         }
     }
+    if (pump)
+        flush_motion(s, ui);
     return !s->quit;
+}
+bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
+    return poll_events(s, ui, NULL, s && !s->callback_mode);
 }
 void cui_sdl3_size(cui_sdl3 *s, float *w, float *h) {
     int x, y;
@@ -987,4 +1017,65 @@ bool cui_sdl3_wait_events(cui_sdl3 *s, int timeout_ms) {
                                           : SDL_WaitEventTimeout(&s->pending_event, timeout_ms);
     s->frame_ticks = SDL_GetTicksNS();
     return s->event_pending;
+}
+
+/* SDL owns modal-loop iteration; application drawing never runs in our watch. */
+typedef struct {
+    cui_sdl3_app app;
+    cui_sdl3 *host;
+    cui_context *ui;
+    bool iterating, idle;
+} callback_app;
+static callback_app *starting_app;
+static SDL_AppResult SDLCALL app_init(void **state, int argc, char **argv) {
+    callback_app *app = starting_app;
+    *state = app;
+    if (!app->app.init(app->app.user, argc, argv, &app->host, &app->ui) ||
+        !app->host || !app->ui)
+        return SDL_APP_FAILURE;
+    app->host->callback_mode = true;
+    return SDL_APP_CONTINUE;
+}
+static SDL_AppResult SDLCALL app_event(void *state, SDL_Event *event) {
+    callback_app *app = state;
+    /* SDL lifecycle events may originate on worker threads. Leave lifecycle
+     * termination to SDL itself; never mutate Core or paint on that thread. */
+    if (!SDL_IsMainThread())
+        return SDL_APP_CONTINUE;
+    return poll_events(app->host, app->ui, event, false) ? SDL_APP_CONTINUE : SDL_APP_SUCCESS;
+}
+static SDL_AppResult SDLCALL app_frame(void *state) {
+    callback_app *app = state;
+    if (app->iterating || !SDL_IsMainThread())
+        return SDL_APP_CONTINUE;
+    app->iterating = true;
+    flush_motion(app->host, app->ui);
+    if (app->idle)
+        app->host->frame_ticks = SDL_GetTicksNS();
+    int result = app->app.frame(app->app.user, app->host, app->ui);
+    app->iterating = false;
+    app->idle = !cui_needs_redraw(app->ui);
+    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, app->idle ? "waitevent" : "0");
+    return result < 0 ? SDL_APP_FAILURE : result > 0 ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
+}
+static void SDLCALL app_quit(void *state, SDL_AppResult result) {
+    callback_app *app = state;
+    app->app.quit(app->app.user, result == SDL_APP_SUCCESS);
+}
+int cui_sdl3_run(int argc, char **argv, cui_sdl3_app callbacks) {
+    if (!SDL_IsMainThread() || starting_app || !callbacks.init || !callbacks.frame || !callbacks.quit)
+        return 1;
+    callback_app app = {.app = callbacks};
+    starting_app = &app;
+    const char *rate = SDL_GetHint(SDL_HINT_MAIN_CALLBACK_RATE);
+    char *saved_rate = rate ? SDL_strdup(rate) : NULL;
+    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "0");
+    int result = SDL_EnterAppMainCallbacks(argc, argv, app_init, app_frame, app_event, app_quit);
+    starting_app = NULL;
+    if (saved_rate)
+        SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, saved_rate);
+    else
+        SDL_ResetHint(SDL_HINT_MAIN_CALLBACK_RATE);
+    SDL_free(saved_rate);
+    return result;
 }

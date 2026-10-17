@@ -22,6 +22,20 @@ void cui_sdl3_destroy(cui_sdl3 *backend);
  * No reduced-motion/high-contrast detection. Null arguments leave output intact. */
 bool cui_sdl3_appearance(cui_sdl3 *backend, cui_platform_appearance *out);
 bool cui_sdl3_poll(cui_sdl3 *backend, cui_context *ui);
+/* Callback-main host for live native resize. Call once from main; init creates
+ * backend/Core and returns them through out parameters. frame composes/presents
+ * one frame (0 continue, positive success, negative failure). quit releases app
+ * resources, including backend/Core. All three callbacks run on the main thread.
+ * Do not pump/wait for events or nest run inside a callback. SDL owns scheduling.
+ * Native modal resize can call frame while the OS event pump is suspended. */
+typedef struct {
+    void *user;
+    bool (*init)(void *, int, char **, cui_sdl3 **, cui_context **);
+    int (*frame)(void *, cui_sdl3 *, cui_context *);
+    void (*quit)(void *, bool success);
+} cui_sdl3_app;
+int cui_sdl3_run(int argc, char **argv, cui_sdl3_app app);
+
 /* Apply after end_frame for immediate feedback. poll also applies the previous
  * frame hint. Returns false if the host driver does not support system cursors. */
 bool cui_sdl3_set_cursor(cui_sdl3 *backend, cui_cursor cursor);

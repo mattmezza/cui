@@ -236,6 +236,49 @@ static void register_matching_font_styles(cui_font *font, const char *path) {
     (void)cui_font_register_style(font, (cui_text_style){.monospace = true},
                                   "/usr/share/fonts/noto/NotoSansMono-Regular.ttf");
 }
+typedef struct {
+    cui_sdl3 *host;
+    cui_context *ui;
+    gallery_state *state;
+    unsigned frames, smoke;
+    const char *capture;
+    bool ok;
+} native_gallery;
+static bool native_init(void *user, int argc, char **argv, cui_sdl3 **host, cui_context **ui) {
+    (void)argc; (void)argv;
+    native_gallery *app = user;
+    *host = app->host;
+    *ui = app->ui;
+    return true;
+}
+static int native_frame(void *user, cui_sdl3 *host, cui_context *ui) {
+    native_gallery *app = user;
+    if (!cui_sdl3_poll(host, ui))
+        return 1;
+    if (!cui_needs_redraw(ui) && app->frames && !app->smoke)
+        return 0;
+    float w, h;
+    cui_sdl3_size(host, &w, &h);
+    cui_draw_list list = frame(ui, app->state, w, h, cui_sdl3_frame_delta(host));
+    cui_theme theme = app->state->contrast ? cui_theme_high_contrast()
+                      : app->state->dark ? cui_theme_dark() : cui_theme_light();
+    const char *shot = app->capture && app->smoke && app->frames + 1 >= app->smoke
+                           ? app->capture : NULL;
+    (void)cui_sdl3_set_cursor(host, cui_pointer_cursor(ui));
+    if (!cui_sdl3_render_capture(host, &list, theme.background, shot)) {
+        fprintf(stderr, "Render: %s\n", cui_sdl3_error());
+        return -1;
+    }
+    app->frames++;
+    if (app->smoke && app->frames < app->smoke)
+        cui_invalidate(ui);
+    return app->smoke && app->frames >= app->smoke ? 1 : 0;
+}
+static void native_quit(void *user, bool success) {
+    native_gallery *app = user;
+    app->ok = success;
+    cui_sdl3_destroy(app->host);
+}
 int main(int argc, char **argv) {
     bool headless = false, dark = false;
     unsigned smoke = 0, width = 1100, height = 740;
@@ -338,28 +381,11 @@ int main(int argc, char **argv) {
         } else {
             printf("video=%s; renderer=%s; SDL_Renderer compatibility adapter\n",
                    cui_sdl3_video_driver(), cui_sdl3_driver(s));
-            unsigned frames = 0;
-            while (cui_sdl3_poll(s, ui)) {
-                if (cui_needs_redraw(ui) || frames == 0 || smoke) {
-                    float w, h;
-                    cui_sdl3_size(s, &w, &h);
-                    cui_draw_list list = frame(ui, &state, w, h, cui_sdl3_frame_delta(s));
-                    cui_theme t = state.contrast ? cui_theme_high_contrast()
-                                  : state.dark   ? cui_theme_dark()
-                                                 : cui_theme_light();
-                    const char *shot = capture && smoke && frames + 1 >= smoke ? capture : NULL;
-                    if (!cui_sdl3_render_capture(s, &list, t.background, shot)) {
-                        fprintf(stderr, "Render: %s\n", cui_sdl3_error());
-                        ok = false;
-                        break;
-                    }
-                    frames++;
-                    if (smoke && frames >= smoke)
-                        break;
-                } else
-                    (void)cui_sdl3_wait_events(s, 250);
-            }
-            cui_sdl3_destroy(s);
+            native_gallery app = {.host = s, .ui = ui, .state = &state,
+                                  .smoke = smoke, .capture = capture};
+            ok = cui_sdl3_run(argc, argv,
+                             (cui_sdl3_app){&app, native_init, native_frame, native_quit}) == 0 &&
+                 app.ok;
         }
     }
     if (cui_last_error(ui) != CUI_OK) {

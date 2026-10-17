@@ -5,6 +5,128 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+typedef struct {
+    unsigned char *coverage;
+    size_t ink;
+} density_pixels;
+static void density_glyph(void *user, int x, int y, int w, int h, int pitch,
+                          const unsigned char *data) {
+    density_pixels *p = user;
+    for (int row = 0; row < h; row++)
+        for (int col = 0; col < w; col++) {
+            assert(x + col >= 0 && x + col < 320 && y + row >= 0 && y + row < 160);
+            unsigned char *dest = &p->coverage[(y + row) * 320 + x + col];
+            unsigned alpha = data[row * pitch + col];
+            *dest = (unsigned char)(alpha + *dest * (255 - alpha) / 255);
+            p->ink += alpha > 0;
+        }
+}
+static void density_render(cui_sdl3 *s, cui_font *font) {
+    int count;
+    SDL_Window **windows = SDL_GetWindows(&count);
+    assert(windows && count == 1);
+    assert(SDL_GetWindowFlags(windows[0]) & SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    SDL_Renderer *renderer = SDL_GetRenderer(windows[0]);
+    SDL_free(windows);
+    assert(renderer);
+    cui_draw_command text = {.type = CUI_DRAW_TEXT,
+                             .bounds = {3, 5, 100, 25},
+                             .text = cui_string("Retina fi"),
+                             .font_size = 17,
+                             .color = {255, 255, 255, 255}};
+    size_t first_ink = 0;
+    for (int pass = 0; pass < 4; pass++) {
+        int logical_scale = pass == 1 ? 2 : 1;
+        float scale = pass == 2 ? 1.5f : (float)logical_scale;
+        assert(SDL_SetRenderLogicalPresentation(renderer, 320 / logical_scale, 160 / logical_scale,
+                                                SDL_LOGICAL_PRESENTATION_STRETCH));
+        assert(SDL_SetRenderScale(renderer, pass == 2 ? 1.5f : 1, pass == 2 ? 1.5f : 1));
+        cui_draw_list list = {&text, 1, 320.0f / scale, 160.0f / scale};
+        assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-density.bmp"));
+        SDL_Surface *surface = SDL_LoadBMP("sdl-density.bmp");
+        assert(surface && surface->w == 320 && surface->h == 160);
+        /* Fractional destinations can interpolate coverage in the software renderer. */
+        density_pixels pixels = {calloc(320 * 160, 1), 0};
+        assert(pixels.coverage);
+        assert(cui_font_draw_context_line_scaled(font, text.text, (cui_text_line_source){0}, 17,
+                                                 (cui_text_style){0}, 3, 5, (float)scale,
+                                                 density_glyph, &pixels));
+        assert(pixels.ink);
+        if (!pass)
+            first_ink = pixels.ink;
+        else if (scale > 1)
+            assert(pixels.ink > first_ink);
+        else
+            assert(pixels.ink == first_ink);
+        size_t rendered_ink = 0;
+        for (int y = 0; y < surface->h; y++)
+            for (int x = 0; x < surface->w; x++) {
+                Uint8 r, g, b, a;
+                assert(SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a));
+                if (scale == 1 || scale == 2)
+                    assert(abs((int)r - pixels.coverage[y * 320 + x]) <= 2);
+                assert(r == g && g == b);
+                rendered_ink += r > 0;
+            }
+        assert(rendered_ink >= pixels.ink / 2);
+        free(pixels.coverage);
+        SDL_DestroySurface(surface);
+        cui_draw_command clipped[] = {{.type = CUI_DRAW_CLIP_PUSH, .bounds = {0, 0, 20, 80}},
+                                      text,
+                                      {.type = CUI_DRAW_CLIP_POP}};
+        list.commands = clipped;
+        list.count = 3;
+        assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-density.bmp"));
+        surface = SDL_LoadBMP("sdl-density.bmp");
+        assert(surface);
+        for (int y = 0; y < surface->h; y++)
+            for (int x = (int)(20 * scale); x < surface->w; x++) {
+                Uint8 r, g, b, a;
+                assert(SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a) && !r && !g && !b);
+            }
+        SDL_DestroySurface(surface);
+        if (scale == 2) {
+            unsigned char image[32 * 32 * 4];
+            for (int i = 0; i < 32 * 32; i++) {
+                image[i * 4] = (unsigned char)((i % 32) * 7);
+                image[i * 4 + 1] = image[i * 4 + 2] = 0;
+                image[i * 4 + 3] = 255;
+            }
+            cui_draw_command artwork = {.type = CUI_DRAW_IMAGE,
+                                        .bounds = {0, 0, 16, 16},
+                                        .bitmap = {.bitmap = {image, 32, 32, 128, 1},
+                                                   .source = {0, 0, 32, 32},
+                                                   .opacity = 1}};
+            list.commands = &artwork;
+            list.count = 1;
+            assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-density.bmp"));
+            surface = SDL_LoadBMP("sdl-density.bmp");
+            assert(surface);
+            for (int x = 0; x < 32; x++) {
+                Uint8 r, g, b, a;
+                assert(SDL_ReadSurfacePixel(surface, x, 16, &r, &g, &b, &a) && r == x * 7);
+            }
+            SDL_DestroySurface(surface);
+            artwork = (cui_draw_command){.type = CUI_DRAW_RECT,
+                                         .bounds = {0, 0, 16, 16},
+                                         .radius = 8,
+                                         .color = {255, 255, 255, 255}};
+            assert(cui_sdl3_render_capture(s, &list, (cui_color){0, 0, 0, 255}, "sdl-density.bmp"));
+            surface = SDL_LoadBMP("sdl-density.bmp");
+            assert(surface);
+            unsigned covered[2] = {0};
+            for (int y = 0; y < 2; y++)
+                for (int x = 0; x < 32; x++) {
+                    Uint8 r, g, b, a;
+                    assert(SDL_ReadSurfacePixel(surface, x, y, &r, &g, &b, &a));
+                    covered[y] += r > 0;
+                }
+            assert(covered[1] > covered[0]);
+            SDL_DestroySurface(surface);
+        }
+    }
+    remove("sdl-density.bmp");
+}
 static void bitmap_pixels(cui_sdl3 *s) {
     unsigned char pixels[] = {255, 0, 0, 255, 0, 255, 0, 128};
     cui_draw_command c = {
@@ -420,6 +542,7 @@ int main(int argc, char **argv) {
     float resumed = cui_sdl3_frame_delta(s);
     double waited_and_resumed = (double)(SDL_GetTicksNS() - started) / 1e9;
     assert(resumed <= waited_and_resumed - .015);
+    density_render(s, font);
     pointer_presence(s);
     assert(window.perform(window.user, CUI_WINDOW_CLOSE, 0, 0));
     assert(!cui_sdl3_poll(s, ui));

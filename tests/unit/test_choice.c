@@ -5,6 +5,16 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+/* Choice scenarios submit small bounded scenes, including the full theme/variant
+ * matrices. Production arena defaults make repeated WASI calloc dominate this
+ * behavior suite. Preserve each explicitly configured capacity and every case. */
+static cui_context *choice_create(cui_config config) {
+    if (!config.max_elements)
+        config.max_elements = 512;
+    if (!config.max_commands)
+        config.max_commands = 1024;
+    return cui_create(config);
+}
 static cui_choice_item items[] = {
     {10, {"First", 5}, false}, {20, {"Disabled", 8}, true}, {30, {"Last", 4}, false}};
 static cui_id selected = 10;
@@ -68,7 +78,7 @@ static bool popup_scene(cui_context *ui, cui_choice_popup *state, cui_id *value,
     return changed;
 }
 static void test_lists_and_popups(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_id value = 0;
     cui_list_state list = {0};
@@ -187,7 +197,7 @@ static cui_combobox_result combo_scene(cui_context *ui, cui_edit *query, cui_cho
     return result;
 }
 static void test_combobox(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     char text[64] = "";
     cui_edit *query = cui_edit_create((cui_edit_config){
@@ -257,7 +267,7 @@ static cui_combobox_result combo_order_scene(cui_context *ui, bool multi, cui_ed
 static void test_combobox_text_enter_order(void) {
     for (unsigned multi = 0; multi < 2; multi++) {
         for (unsigned enter_first = 0; enter_first < 2; enter_first++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             char text[32] = "";
             cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
@@ -328,7 +338,7 @@ static void assert_multi_group(cui_context *ui, cui_id id, cui_id labelled_by) {
     assert(!"Multi selection group is missing");
 }
 static void test_multi_select(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     bool chosen[3] = {false, false, false};
     cui_choice_popup popup;
@@ -391,7 +401,7 @@ static cui_combobox_result combo_multi_scene(cui_context *ui, cui_edit *query,
     return result;
 }
 static void test_multi_combobox(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     char text[64] = "";
     cui_edit *query = cui_edit_create((cui_edit_config){
@@ -501,7 +511,7 @@ static bool tree_scene(cui_context *ui, cui_menu_tree_state *state, cui_id *acti
     return activated;
 }
 static void test_menu_tree(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
     assert(ui);
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 1100);
@@ -587,7 +597,7 @@ static void test_menu_tree(void) {
 }
 
 static void test_menu_depth_bound(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
     assert(ui);
     cui_menu_entry chain[CUI_MENU_DEPTH_MAX + 1];
     for (size_t i = 0; i < CUI_MENU_DEPTH_MAX + 1; i++)
@@ -636,7 +646,7 @@ static void secondary(cui_context *ui, cui_event_type type, float x, float y) {
         ui, (cui_event){.type = type, .x = x, .y = y, .pointer_button = CUI_POINTER_SECONDARY}));
 }
 static void test_context_menu(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
     assert(ui);
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 1200);
@@ -701,7 +711,7 @@ static void guarded_context_scene(cui_context *ui, cui_menu_tree_state *state, b
 }
 static void test_context_modal_guard(void) {
     for (unsigned nested = 0; nested < 2; nested++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
         assert(ui);
         cui_menu_tree_state state;
         cui_menu_tree_init(&state, 1200);
@@ -771,7 +781,7 @@ static bool custom_choices_scene(cui_context *ui, unsigned mode, cui_edit *query
 }
 static void test_custom_choice_rows(void) {
     for (unsigned mode = 0; mode < 5; mode++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
         assert(ui);
         char text[32] = "";
         cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
@@ -873,7 +883,7 @@ static void test_choice_scrolling(void) {
     for (size_t i = 0; i < 12; i++)
         scroll_items[i] = (cui_choice_item){1000 + i, cui_string("Scroll option"), i == 2};
     for (unsigned mode = 0; mode < 6; mode++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
         assert(ui);
         char text[32] = "";
         cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
@@ -944,7 +954,7 @@ static void test_choice_scrolling(void) {
 
 static void test_list_scroll_modal_guard(void) {
     for (unsigned nested = 0; nested < 2; nested++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
         assert(ui);
         cui_theme theme = cui_theme_light();
         cui_list_state state = {0};
@@ -975,7 +985,7 @@ static void test_list_scroll_modal_guard(void) {
 static void test_scroll_activation_order(void) {
     for (unsigned mode = 0; mode < 6; mode++) {
         for (unsigned order = 0; order < 3; order++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
             assert(ui);
             char text[32] = "";
             cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
@@ -1049,7 +1059,7 @@ static void test_custom_tabs(void) {
                           cui_theme_terminal()};
     for (size_t t = 0; t < 4; t++) {
         for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
             assert(ui);
             cui_id value = 10;
             tab_prefix_count = tab_suffix_count = 0;
@@ -1112,7 +1122,7 @@ static void nested_lists_scene(cui_context *ui, cui_list_state *parent, cui_list
     assert(cui_last_error(ui) == CUI_OK);
 }
 static void test_nested_list_wheel_routing(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
     assert(ui);
     cui_list_state parent = {0}, child = {0};
     nested_lists_scene(ui, &parent, &child);
@@ -1156,7 +1166,7 @@ static void test_combo_editor_paint_and_hit(void) {
                           cui_theme_terminal()};
     for (unsigned multi = 0; multi < 2; multi++) {
         for (size_t t = 0; t < 4; t++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
             assert(ui);
             char text[256] = "";
             cui_edit *query = cui_edit_create((cui_edit_config){.buffer = text,
@@ -1323,7 +1333,7 @@ static void test_closable_tab_composition(void) {
                           cui_theme_terminal()};
     for (size_t t = 0; t < 4; t++) {
         for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
             assert(ui);
             close_tabs_model model = {.count = 3, .selected = 10, .theme = themes[t]};
             memcpy(model.entries, items, sizeof(items));
@@ -1394,7 +1404,7 @@ static void marker_positions(cui_draw_list list, float *marker, float *label) {
     assert(*marker >= 0 && *label >= 0);
 }
 static void test_menu_configuration(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 540});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 540});
     assert(ui);
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 1300);
@@ -1460,7 +1470,7 @@ static void test_dropdown_button(void) {
              variant++)
             for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_XSMALL;
                  size++) {
-                cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+                cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
                 assert(ui);
                 cui_menu_tree_state state;
                 cui_menu_tree_init(&state, 2200);
@@ -1548,7 +1558,7 @@ static void test_dropdown_button(void) {
                 cui_destroy(ui);
             }
 
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -1594,7 +1604,7 @@ static cui_color dropdown_surface(cui_context *ui, cui_id id) {
     return (cui_color){0};
 }
 static void test_dropdown_inheritance_and_ghost_pair(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -1649,7 +1659,7 @@ static void test_dropdown_inheritance_and_ghost_pair(void) {
     cui_destroy(ui);
 }
 static void test_dropdown_optional_halves(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -1689,7 +1699,7 @@ static void test_dropdown_optional_halves(void) {
     cui_destroy(ui);
 }
 static void test_dropdown_anchor_corners(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -1727,7 +1737,7 @@ static void test_dropdown_anchor_corners(void) {
     cui_destroy(ui);
 }
 static void test_dropdown_action_tooltip(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -1782,7 +1792,7 @@ static void test_tab_max_width(void) {
     const cui_choice_item entries[] = {
         {10, {"A", 1}, false}, {20, {"A long \xc3\xa9\xc3\xa9\xc3\xa9 tab label", 23}, false}};
     for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_id value = 10;
         assert(cui_begin_frame(ui, 640, 480, .016f));
@@ -1851,7 +1861,7 @@ static bool tab_scroll_scene(cui_context *ui, cui_tab_scroll_state *scroll, cui_
 }
 static void test_tab_scrolling(void) {
     for (int vertical = 0; vertical < 2; vertical++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_tab_scroll_state scroll = {0};
         cui_id value = 10;
@@ -1938,7 +1948,7 @@ static bool tab_overflow_scene(cui_context *ui, cui_tab_scroll_state *scroll,
     return changed;
 }
 static void test_tab_overflow_menu(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_tab_scroll_state scroll = {0};
     cui_tab_overflow overflow;
@@ -2009,7 +2019,7 @@ static bool tab_drag_scene(cui_context *ui, cui_choice_item *entries, size_t cou
 }
 static void test_tab_drag_reorder(void) {
     for (int vertical = 0; vertical < 2; vertical++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_choice_item entries[] = {
             {10, {"First", 5}, false}, {20, {"Second", 6}, false}, {30, {"Third", 5}, false}};
@@ -2098,7 +2108,7 @@ static cui_size counting_tab_measure(void *user, cui_str text, float font_size) 
 }
 static void test_long_tab_label_measurement(void) {
     unsigned calls = 0;
-    cui_context *ui = cui_create((cui_config){
+    cui_context *ui = choice_create((cui_config){
         .width = 640, .height = 480, .measure = counting_tab_measure, .measure_user = &calls});
     assert(ui);
     char label[4096];
@@ -2126,7 +2136,7 @@ static void test_dropdown_colored_outline(void) {
         CUI_DROPDOWN_BUTTON_WARNING, CUI_DROPDOWN_BUTTON_SUCCESS,   CUI_DROPDOWN_BUTTON_INFO};
     for (size_t t = 0; t < 4; t++)
         for (size_t v = 0; v < sizeof(variants) / sizeof(variants[0]); v++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_menu_tree_state state;
             cui_menu_tree_init(&state, 2200);
@@ -2188,7 +2198,7 @@ static void test_dropdown_colored_outline(void) {
         }
 }
 static void test_dropdown_inner_button_presentation(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -2264,7 +2274,7 @@ static void test_tab_reveal_requests(void) {
     assert(!cui_tab_scroll_reveal(&geometry, 140, 20, 100) && geometry.offset == 130);
     assert(cui_tab_scroll_reveal(&geometry, 20, 200, 100) && geometry.offset == 20);
     assert(!cui_tab_scroll_reveal(&geometry, NAN, 20, 100) && geometry.offset == 20);
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_tab_scroll_state scroll = {0};
     cui_id value = 10;
@@ -2351,7 +2361,7 @@ static void nested_tabs_scene(cui_context *ui, cui_tab_scroll_state *tabs, cui_s
 static void test_tabs_nested_scroll_consumption(void) {
     for (int vertical = 0; vertical < 2; vertical++) {
         for (int precise = 0; precise < 2; precise++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_tab_scroll_state tabs = {0};
             cui_scroll_state parent = {0};
@@ -2389,7 +2399,7 @@ static void test_tabs_nested_scroll_consumption(void) {
             cui_destroy(ui);
         }
     }
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_tab_scroll_state tabs = {0};
     cui_scroll_state parent = {0};
@@ -2404,7 +2414,7 @@ static void test_tabs_nested_scroll_consumption(void) {
 }
 static void test_tab_scrollbars(void) {
     for (int vertical = 0; vertical < 2; vertical++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_tab_scroll_state scroll = {0};
         for (int frame = 0; frame < 3; frame++)
@@ -2483,7 +2493,7 @@ static void test_tab_scrollbars(void) {
 }
 static void test_tab_scrollbar_skin(void) {
     for (unsigned vertical = 0; vertical < 2; vertical++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         cui_tab_scroll_state state = {0};
         tab_test_skin = (cui_scrollbar_style){.visibility = CUI_SCROLLBAR_VISIBLE,
                                               .thickness = 13,
@@ -2510,7 +2520,7 @@ static void test_dropdown_presentation_variants(void) {
     for (size_t t = 0; t < 4; t++)
         for (size_t vi = 0; vi < 4; vi++) {
             cui_dropdown_button_variant v = variants[vi];
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_menu_tree_state state;
             cui_menu_tree_init(&state, 2200);
@@ -2620,7 +2630,7 @@ static void menu_wheel(cui_context *ui, cui_rect panel, float dy) {
         ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = panel.x + 5, .y = panel.y + 15, .dy = dy}));
 }
 static void test_menu_scrollbar_skin(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 3300);
     cui_id action = 0;
@@ -2663,7 +2673,7 @@ static void test_hierarchical_menu_scroll(void) {
     scrolling_menu[0].child_count = 12;
     scrolling_menu[2].disabled = true;
     scrolling_child[2].kind = CUI_MENU_SEPARATOR;
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 3300);
@@ -2738,7 +2748,7 @@ static void test_hierarchical_menu_scroll(void) {
     cui_destroy(ui);
 }
 static void test_menu_pointer_drag_scroll(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 3300);
@@ -2803,7 +2813,7 @@ static void test_dropdown_configurable_palettes(void) {
         CUI_DROPDOWN_BUTTON_DANGER,  CUI_DROPDOWN_BUTTON_WARNING, CUI_DROPDOWN_BUTTON_SUCCESS,
         CUI_DROPDOWN_BUTTON_INFO};
     for (size_t kind = 0; kind < CUI_THEME_BUTTON_COUNT; kind++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         cui_theme_button_colors colors = {
@@ -2864,7 +2874,7 @@ static void test_custom_tab_width_caps(void) {
     const cui_choice_item entries[] = {{10, {"Short", 5}, false}, {20, {"Long", 4}, false}};
     cui_theme theme = cui_theme_light();
     for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_id selected = 10;
         cui_tab_scroll_state scroll = {0};
@@ -2926,7 +2936,7 @@ static void test_structured_tab_parts(void) {
                              {0}};
     cui_theme theme = cui_theme_light();
     for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_id selected = 10;
         cui_tabs_options options = {.variant = (cui_tab_variant)variant,
@@ -3043,7 +3053,7 @@ static bool multi_notification_frame(cui_context *ui, multi_notification_owner *
     return activated;
 }
 static void test_multi_notification_owner(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     multi_notification_owner owner = {.selected = {true, false, false}};
     cui_list_state state = {.active = 10};
@@ -3074,7 +3084,7 @@ static void test_multi_notification_owner(void) {
 }
 
 static void test_list_confirmation_contract(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     const cui_choice_item entries[] = {{10, {"Enabled", 7}, false}, {20, {"Disabled", 8}, true}};
     cui_list_state state = {.active = 10};
@@ -3146,7 +3156,7 @@ static void test_tab_reference_size_metrics(void) {
     const float icons[] = {16, 14, 16, 10};
     for (int variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++)
         for (int size = CUI_TAB_MEDIUM; size <= CUI_TAB_XSMALL; size++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_theme theme = cui_theme_light();
             cui_tab_metrics metrics =
@@ -3202,7 +3212,7 @@ static void test_tab_reference_size_metrics(void) {
 }
 static void test_tab_independent_palette(void) {
     for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_SEGMENTED; variant++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         theme.tab_foreground = (cui_color){11, 22, 33, 255};
@@ -3323,7 +3333,7 @@ static cui_color tab_label_color(cui_draw_list draw, size_t length) {
 static void test_tab_shared_indicator(void) {
     const cui_tab_variant variants[] = {CUI_TAB_PILL, CUI_TAB_UNDERLINE, CUI_TAB_SEGMENTED};
     for (size_t v = 0; v < 3; v++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         theme.text = (cui_color){0, 0, 0, 255};
@@ -3386,7 +3396,7 @@ static void test_tab_shared_indicator(void) {
         assert(fabsf(animation.spring.left - unscrolled_left + 20) < .01f);
         cui_destroy(ui);
     }
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     theme.text = (cui_color){255, 0, 0, 255};
@@ -3431,7 +3441,7 @@ static void tab_tail_scene(cui_context *ui, cui_tab_scroll_state *scroll,
     assert(cui_last_error(ui) == CUI_OK);
 }
 static void test_tab_scroll_tail(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_tab_scroll_state scroll = {0};
     cui_tabs_options options = {.last_empty_space = custom_tab_tail,
@@ -3481,7 +3491,7 @@ static void test_tab_scroll_tail(void) {
     cui_destroy(ui);
 }
 static void test_first_tab_border_policy(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     const cui_choice_item entries[] = {{10, {"First", 5}, false}, {20, {"Second", 6}, false}};
@@ -3527,7 +3537,7 @@ static void dropdown_loading_body(cui_context *ui, void *user) {
 static void test_dropdown_loading_subtree_opacity(void) {
     for (int variant = CUI_DROPDOWN_BUTTON_DEFAULT; variant <= CUI_DROPDOWN_BUTTON_CUSTOM;
          variant++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         cui_menu_tree_state state;
@@ -3575,7 +3585,7 @@ static void test_dropdown_loading_subtree_opacity(void) {
     }
     assert(CUI_DROPDOWN_BUTTON_DEFAULT == 0 && CUI_DROPDOWN_BUTTON_PRIMARY == 1 &&
            CUI_DROPDOWN_BUTTON_INFO == 8 && CUI_DROPDOWN_BUTTON_LINK == 9);
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     cui_theme theme = cui_theme_light();
     theme.buttons[CUI_THEME_BUTTON_DEFAULT].normal = (cui_color){12, 34, 56, 255};
     cui_menu_tree_state state;
@@ -3586,7 +3596,7 @@ static void test_dropdown_loading_subtree_opacity(void) {
     cui_destroy(ui);
 }
 static void test_dropdown_loading_keeps_content(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     cui_menu_tree_state state;
@@ -3626,7 +3636,7 @@ static void test_dropdown_reference_metrics(void) {
     const float heights[] = {32, 24, 32, 20}, padding[] = {10, 8, 12, 4};
     const float fonts[] = {14, 14, 16, 12}, gaps[] = {8, 4, 8, 4}, carets[] = {16, 14, 16, 12};
     for (int size = CUI_DROPDOWN_BUTTON_MEDIUM; size <= CUI_DROPDOWN_BUTTON_XSMALL; size++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         cui_menu_tree_state state;
@@ -3741,7 +3751,7 @@ static cui_draw_list list_palette_scene(cui_context *ui, cui_theme *theme, cui_l
     return draw;
 }
 static void test_list_source_palette(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme theme = cui_theme_light();
     theme.list_active = (cui_color){11, 22, 33, 255};
@@ -3782,7 +3792,7 @@ static void test_list_source_palette(void) {
     cui_destroy(ui);
 }
 static void test_toggle_group_shared_renderer(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     bool values[] = {true, false, false};
     toggles(ui, values, (cui_toggle_group_options){0});
@@ -3851,7 +3861,7 @@ static void test_searchable_reference_metrics(void) {
                                 cui_theme_terminal()};
     for (unsigned mode = 0; mode < 4; mode++)
         for (int size = CUI_LIST_MEDIUM; size <= CUI_LIST_CUSTOM; size++) {
-            cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+            cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
             assert(ui);
             cui_theme theme = themes[mode];
             cui_choice_popup popup;
@@ -3930,7 +3940,7 @@ static cui_draw_list bounded_search_scene(cui_context *ui, cui_choice_popup *pop
     return draw;
 }
 static void test_searchable_popup_height_cap(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_choice_popup popup;
     cui_choice_popup_init(&popup, 9800);
@@ -3965,7 +3975,7 @@ static void test_searchable_popup_height_cap(void) {
 }
 static void test_list_reference_metrics(void) {
     for (unsigned multi = 0; multi < 2; multi++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         theme.font_size = 20;
@@ -4014,7 +4024,7 @@ static void test_menu_reference_metrics(void) {
     for (size_t t = 0; t < 4; t++)
         for (int size = CUI_MENU_MEDIUM; size <= CUI_MENU_XSMALL; size++)
             for (unsigned scale = 1; scale <= 2; scale++) {
-                cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+                cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
                 assert(ui);
                 cui_menu_tree_state state;
                 cui_menu_tree_init(&state, 4300);
@@ -4072,7 +4082,7 @@ static void test_menu_reference_metrics(void) {
             }
 }
 static void test_menu_check_glyphs(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 9700);
@@ -4179,7 +4189,7 @@ static cui_draw_list choice_indicator_scene(cui_context *ui, unsigned mode, cui_
     return draw;
 }
 static void test_combobox_arrow_open(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     cui_choice_popup popup;
     cui_choice_popup_init(&popup, 9800);
     char buffer[32] = "";
@@ -4200,7 +4210,7 @@ static void test_combobox_arrow_open(void) {
 }
 static void test_choice_trailing_checks(void) {
     for (unsigned mode = 0; mode < 5; mode++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_choice_popup popup;
         cui_choice_popup_init(&popup, 9800);
@@ -4272,7 +4282,7 @@ static void resizing_tab_prefix(cui_context *ui, void *user) {
 }
 static void test_tab_current_frame_baseline(void) {
     for (cui_tab_variant variant = CUI_TAB_DEFAULT; variant <= CUI_TAB_UNDERLINE; variant++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         const cui_choice_item entries[] = {{10, {"One", 3}, false}, {20, {"Two", 3}, false}};
@@ -4312,7 +4322,7 @@ static void test_tab_current_frame_baseline(void) {
     }
 }
 static void test_tabs_toolbar_consumption(void) {
-    cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
+    cui_context *ui = choice_create((cui_config){.width = 400, .height = 200});
     cui_theme t = cui_theme_light();
     cui_id selection = 10;
     for (unsigned phase = 0; phase < 3; phase++) {
@@ -4339,7 +4349,7 @@ static void test_tabs_toolbar_consumption(void) {
     cui_destroy(ui);
 }
 static void test_dropdown_real_artwork(void) {
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     cui_theme t = cui_theme_light();
     cui_menu_tree_state state;
     cui_menu_tree_init(&state, 2200);
@@ -4364,7 +4374,7 @@ static void test_dropdown_real_artwork(void) {
     cui_destroy(ui);
 }
 static void test_menu_popup_paint_composition(void) {
-    cui_context *ui = cui_create((cui_config){.width = 320, .height = 240});
+    cui_context *ui = choice_create((cui_config){.width = 320, .height = 240});
     cui_theme theme = cui_theme_light();
     bool checked = true;
     cui_menu_entry rows[] = {
@@ -4427,7 +4437,7 @@ static void test_design_scale_rows_and_triggers(void) {
         for (int size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; size++) {
             /* This two-item fixture does not need production-sized arenas on
                each of its 56 theme/size iterations. */
-            cui_context *ui = cui_create((cui_config){
+            cui_context *ui = choice_create((cui_config){
                 .width = 1800, .height = 1600, .max_elements = 256, .max_commands = 512});
             assert(ui);
             cui_design_metrics m;
@@ -4474,7 +4484,7 @@ static void test_select_trigger_center(void) {
     for (unsigned density = 0; density < 2; density++) {
         for (int scale = CUI_DESIGN_XS; scale <= CUI_DESIGN_4XL; scale++) {
             for (unsigned chosen = 0; chosen < 2; chosen++) {
-                cui_context *ui = cui_create((cui_config){.width = 900, .height = 900});
+                cui_context *ui = choice_create((cui_config){.width = 900, .height = 900});
                 assert(ui);
                 cui_theme theme = cui_theme_light();
                 theme.font_size *= density ? .875f : 1;
@@ -4515,7 +4525,7 @@ static void test_tabs_dropdown_design_scale(void) {
             cui_design_size size = (cui_design_size)n;
             cui_design_metrics m;
             assert(cui_design_measure(size, densities[d], &m));
-            cui_context *ui = cui_create((cui_config){.width = 1800, .height = 1800});
+            cui_context *ui = choice_create((cui_config){.width = 1800, .height = 1800});
             assert(ui);
             cui_menu_tree_state menu;
             cui_menu_tree_init(&menu, 2010);
@@ -4544,7 +4554,7 @@ static void test_tabs_dropdown_design_scale(void) {
 
 static void test_tab_overflow_square_both_axes(void) {
     for (int axis = 0; axis < 2; axis++) {
-        cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+        cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
         assert(ui);
         cui_theme theme = cui_theme_light();
         cui_tab_scroll_state scroll = {0};
@@ -4649,7 +4659,7 @@ int main(void) {
     test_tab_scrollbars();
     test_tabs_nested_scroll_consumption();
     test_tab_scrollbar_skin();
-    cui_context *ui = cui_create((cui_config){.width = 640, .height = 480});
+    cui_context *ui = choice_create((cui_config){.width = 640, .height = 480});
     assert(ui);
     cui_theme themes[] = {cui_theme_light(), cui_theme_dark(), cui_theme_high_contrast(),
                           cui_theme_terminal()};

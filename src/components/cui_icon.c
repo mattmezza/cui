@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_icon.h"
 #include "../base/cui_design_metrics.h"
+#include "../base/cui_icon_layout.h"
 #include <math.h>
 #include <string.h>
 static bool cui_icon_options_valid(cui_icon_options o) {
@@ -27,12 +28,13 @@ static bool cui_icon_options_valid(cui_icon_options o) {
         for (size_t i = 0; i < sizeof(nonnegative) / sizeof(nonnegative[0]); ++i)
             if (!isfinite(nonnegative[i]) || nonnegative[i] < 0)
                 return false;
-        if (b->padding != 0 || !isfinite(b->offset_x) || !isfinite(b->offset_y) ||
-            !isfinite(b->opacity) || b->align_x < CUI_ALIGN_START || b->align_x > CUI_ALIGN_END ||
+        if (!isfinite(b->offset_x) || !isfinite(b->offset_y) || !isfinite(b->opacity) ||
+            b->align_x < CUI_ALIGN_START || b->align_x > CUI_ALIGN_END ||
             b->align_y < CUI_ALIGN_START || b->align_y > CUI_ALIGN_END)
             return false;
     }
-    return true;
+    float width = 0, height = 0;
+    return cui_icon_layout_resolve(o, &width, &height);
 }
 cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_icon_state *state,
                         cui_icon_options options) {
@@ -64,6 +66,8 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     if (!isfinite(width) || !isfinite(height) || width < 0 || height < 0 || width > 4096 ||
         height > 4096)
         return CUI_ICON_INVALID;
+    if (!cui_icon_layout_resolve(options, &width, &height))
+        return CUI_ICON_INVALID;
     cui_color color = options.custom_color             ? options.color
                       : options.custom_inherited_color ? options.inherited_color
                                                        : theme->text;
@@ -75,6 +79,9 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     box.fixed_width = box.fixed_height = true;
     box.width_percent = box.height_percent = false;
     box.max_width = box.max_height = 0;
+    /* SVG is a leaf painted over its full border box, not its content inset. */
+    box.padding = 0;
+    box.custom_padding = false;
     cui_begin_box(ui, id, box);
     if (!options.decorative && options.accessible_name.length) {
         cui_interact(ui, id, CUI_ROLE_IMAGE, options.accessible_name, false, false, 0);
@@ -140,23 +147,13 @@ static cui_icon_resource *cui_icon_resource_get(cui_context *ui, cui_id id, cui_
     }
     return resource;
 }
-static bool cui_icon_name_equal(cui_str first, cui_str second) {
-    return first.length == second.length && first.data && second.data &&
-           !memcmp(first.data, second.data, first.length);
-}
 cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                               cui_icon_options options) {
     if (!ui || !id || !theme || !name.data || !name.length || !cui_icon_options_valid(options) ||
         (options.design_size &&
          (!isfinite(theme->font_size) || theme->font_size <= 0 || theme->font_size / 16 > 32)))
         return CUI_ICON_INVALID;
-    size_t index = SIZE_MAX;
-    for (size_t i = 0; i < cui_icon_catalog_count(); i++)
-        if (cui_icon_name_equal(name, cui_icon_catalog_name(i)) ||
-            cui_icon_name_equal(name, cui_icon_catalog_path(i))) {
-            index = i;
-            break;
-        }
+    size_t index = cui_icon_catalog_index_internal(name);
     if (index == SIZE_MAX) {
         if (!options.debug_placeholder)
             return CUI_ICON_NOT_FOUND;

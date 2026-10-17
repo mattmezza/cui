@@ -682,6 +682,7 @@ float gallery_carousel_stats(int field) {
            : field == 3 ? carousel_state.target
                         : 0;
 }
+static int icon_layout;
 static int icon_choice, icon_size = CUI_ICON_MEDIUM, icon_rotate, icon_color, icon_loaded = -1;
 static cui_icon_state icon_state;
 static unsigned empty_created;
@@ -2811,7 +2812,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_icon_set_name(&icon_state, cui_string(names[icon_choice]), NULL, NULL);
             icon_loaded = icon_choice;
         }
-        cui_icon_options options = {.size = (cui_icon_size)icon_size, .design_size = design_size};
+        cui_box icon_style = {.padding = icon_layout == 1   ? 4
+                                         : icon_layout == 2 ? 24
+                                                            : 0,
+                              .max_width = icon_layout == 3 ? 8 : 0};
+        cui_icon_options options = {
+            .size = (cui_icon_size)icon_size, .design_size = design_size, .style = &icon_style};
         if (icon_rotate) {
             options.custom_transform = true;
             options.transform = cui_icon_rotation(.785398163f);
@@ -5477,7 +5483,8 @@ void gallery_resizable_options(int vertical, int disabled) {
 float gallery_resizable_size(unsigned index) {
     return index < resizable_state.count ? resizable_state.slots[index].size : 0;
 }
-void gallery_icon_options(int choice, int size, int rotate, int color) {
+void gallery_icon_options(int choice, int size, int rotate, int color, int layout) {
+    icon_layout = layout >= 0 && layout <= 3 ? layout : 0;
     icon_choice = choice >= 0 && choice < 3 ? choice : 0;
     icon_size = size >= CUI_ICON_INHERITED && size <= CUI_ICON_LARGE ? size : CUI_ICON_MEDIUM;
     icon_rotate = rotate != 0;

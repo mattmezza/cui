@@ -21,8 +21,8 @@ The audit covered all reference branches:
   existing owned source state. Data is copied; masks are immutable across source
   replacements until collection after renderer completion. CUI does not expose
   Rust Entity or Arc cloning; initialized state must not be copied.
-- `same_layout` excludes source/color/transform. CUI layout likewise uses resolved
-  size only; transformation changes absolute paint bounds rather than semantic size.
+- `same_layout` excludes source/color/transform. CUI layout uses the resolved
+  numeric border-box size; transformation changes absolute paint bounds rather than semantic size.
 - `into_svg` inherits text size unless either style dimension exists; explicit
   size replaces both dimensions. Existing width/height/custom flags preserve
   these rules, including an explicit zero and a missing opposite dimension.
@@ -40,8 +40,8 @@ The audit covered all reference branches:
   center-relative transforms preserve layout and allow paint overflow.
 - Source `Styled` accepts generic refinements. New optional `style` supports Core
   box decoration (background, border, radius, clip, opacity, inert/layout-only,
-  offsets), while explicit icon dimensions remain authoritative. Padding must be
-  zero. This does not reproduce arbitrary GPUI flex properties, margins, every
+  offsets), while explicit icon dimensions remain authoritative. Uniform or per-edge padding participates in the border-box sizing floor.
+  SVG paint covers the complete resulting bounds, without a content inset. This does not reproduce arbitrary GPUI flex properties, margins, every
   SVG feature or automatic ambient style inheritance. Callers supply inherited
   metrics/colors explicitly; no global ambient style stack is introduced.
 
@@ -59,3 +59,27 @@ ineligibility, invalid preflight atomicity and owned custom-SVG replacement
 lifecycle. Existing icon tests cover catalog assets, raster geometry, affine
 transforms, parser limits, explicit-zero dimensions and loader caching. The
 the new test is registered in CMake and generated distribution headers include the API.
+
+## Numeric styled bounds
+
+`cui_icon_options.constraints` optionally supplies `cui_icon_constraints` with
+explicit per-axis minimum and maximum flags. Zero is a valid explicit maximum.
+Unset descriptor maxima use positive `style.max_width`/`max_height`; zero legacy
+style caps remain unbounded. Minimum constraints win over maxima, then sums of
+padding and border edges floor the resulting axes. A cap smaller than the
+padding/border sum therefore does not shrink the final box below that sum.
+Explicit Icon size still replaces both style dimensions before constraints.
+
+The resolver runs before parsing/rasterization or semantics. It accepts finite
+nonnegative enabled constraints/selected padding/border edges up to 4096 and
+rejects a resulting dimension above 4096. Descriptor and style pointers are
+borrowed synchronously. These numeric constraints do not imply percentage, flex,
+grid, margin or automatic ambient style support.
+
+`tests/unit/test_icon_style_source.c` covers padding/border floors, numeric caps,
+explicit zero and conflicting min/max, full-box paint, unchanged named semantic
+bounds, aliases and immutable simultaneous raster versions from one caller-owned
+state. `tests/web/test_icon_style.py` compiles the assertion-enabled contract into
+a dedicated real-WASM fixture and checks visible software-rendered SVG pixels,
+clipping and named semantics at desktop/390 and DPR1/2. This is not a proof of
+resvg equivalence or density-aware native SVG rasterization.

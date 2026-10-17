@@ -21,6 +21,13 @@ function shareRoute(path,raw,title,description){
  for(const [selector,value] of [['meta[name=description]',description],['meta[property="og:title"]',title],['meta[property="og:description"]',description],['meta[property="og:url"]',canonical],['meta[name="twitter:title"]',title],['meta[name="twitter:description"]',description]])document.querySelector(selector)?.setAttribute('content',value);
 }
 const canvas = $('preview'), ctx = canvas.getContext('2d');
+const iconLayoutControl=document.createElement('select');iconLayoutControl.id='icon-layout';
+iconLayoutControl.hidden=true;iconLayoutControl.setAttribute('aria-label','Icon box styling');
+for(const [value,label] of [['0','Default icon box'],['1','Padding 4px'],['2','Padding 24px floor'],['3','Maximum width 8px']]){
+ const option=document.createElement('option');option.value=value;option.textContent=label;iconLayoutControl.append(option);
+}
+$('icon-size').after(iconLayoutControl);iconLayoutControl.addEventListener('change',requestFrame);
+
 for(const [id,label,choices] of [
  ['spinner-size','Spinner size',[['12','Extra small · 12px'],['14','Small · 14px'],['16','Medium · 16px'],['24','Large · 24px'],['64','Custom · 64px']]],
  ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right']]],
@@ -382,7 +389,7 @@ function render(){
  wasm.gallery_description_options(Number($('description-columns').value),Number($('description-vertical').checked),Number($('description-plain').checked),Number($('description-size').value));
  wasm.gallery_status_options(Number($('status-right').checked),Number($('status-custom').checked));
  wasm.gallery_resizable_options(Number($('resizable-vertical').checked),Number($('resizable-disabled').checked));
- wasm.gallery_icon_options(Number($('icon-choice').value),Number($('icon-size').value),Number($('icon-rotate').checked),Number($('icon-color').checked));
+ wasm.gallery_icon_options(Number($('icon-choice').value),Number($('icon-size').value),Number($('icon-rotate').checked),Number($('icon-color').checked),Number(iconLayoutControl.value));
  wasm.gallery_toolbar_options(Number($('toolbar-size').value),Number($('toolbar-grouped').checked),Number($('toolbar-input').checked));
  wasm.gallery_settings_options(Number($('settings-size').value),Number($('settings-variant').value));
  wasm.gallery_carousel_options(Number($('carousel-axis').value),Number($('carousel-loop').checked));
@@ -736,7 +743,7 @@ function selectComponent(){
  for(const id of ['resizable-vertical-control','resizable-disabled-control'])$(id).hidden=selected.name!=='Resizable';
  $('date-locale').hidden=!['Calendar','DatePicker'].includes(selected.name);$('date-locale').value='-1';
  $('resizable-vertical').checked=false;$('resizable-disabled').checked=false;
- for(const id of ['icon-choice','icon-size','icon-rotate-control','icon-color-control'])$(id).hidden=selected.name!=='Icon';
+ for(const id of ['icon-choice','icon-size','icon-rotate-control','icon-color-control','icon-layout'])$(id).hidden=selected.name!=='Icon';
  $('icon-choice').value='0';$('icon-size').value='3';$('icon-rotate').checked=false;$('icon-color').checked=false;
  for(const id of ['toolbar-size','toolbar-grouped-control','toolbar-input-control'])$(id).hidden=selected.name!=='Toolbar';
  $('toolbar-size').value='2';$('toolbar-grouped').checked=true;$('toolbar-input').checked=true;

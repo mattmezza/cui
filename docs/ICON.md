@@ -185,3 +185,50 @@ if (error != CUI_ICON_OK) {
 Use `cui_icon_catalog_default` to inspect the default bundle, provide a theme
 loader for other names, or enable the full bundle. CUI does not print diagnostics
 implicitly; applications retain control of logging and fallback presentation.
+
+## Numeric box styling
+
+Use `options.style` for uniform/per-edge padding, borders, backgrounds, radius,
+opacity and clipping. Padding does **not** inset SVG paint: the frozen GPUI SVG
+paints its full final border-box bounds. Numeric width/height constraints apply
+before a final minimum of the padding-plus-border sums. For example, a 16px Icon
+with 24px padding on each edge occupies and paints a 48px square. Padding 4px
+leaves that same 16px Icon's size and paint unchanged.
+
+```c
+cui_box style = {.padding = 4, .max_width = 32};
+cui_icon_constraints limits = {
+    .custom_min_width = true, .min_width = 20,
+    .custom_max_height = true, .max_height = 0,
+};
+cui_icon_options options = {
+    .size = CUI_ICON_MEDIUM, .rem_size = 16,
+    .style = &style, .constraints = &limits,
+};
+/* During an active frame; state is retained until draw lists finish rendering. */
+cui_icon_error error = cui_icon(ui, id, &theme, &state, options);
+```
+
+The explicit zero height maximum above is finally floored to the 8px vertical
+padding sum. Descriptor flags distinguish explicit zero from an unset constraint.
+Enabled descriptor maxima replace the corresponding positive legacy style caps;
+minimum constraints win if larger than a maximum. Explicit preset/custom Icon
+size overrides dimension options first, then constraints apply. Selected edge
+values and enabled constraints must be finite [0,4096], and final dimensions
+must not exceed 4096. Invalid numeric styling rejects before resource preparation.
+Style/constraint pointers are synchronous and never retained.
+
+Transforms change only SVG paint, around the resolved box center. Backgrounds,
+layout, hit bounds and opt-in named image semantics remain untransformed. Parent
+clipping and opacity continue to apply. You may submit one caller-owned Icon
+state repeatedly with different sizes/colors/transforms in the same frame:
+immutable raster versions remain valid together until renderer consumption.
+Collect only afterward. The context-owned named cache accepts the same canonical
+aliases as `cui_icon_set_name`, `cui_icon_query` and `cui_icon_asset`.
+
+The gallery's **Icon box styling** control demonstrates padding and numeric caps
+inside the existing Icon family. This batch does not add generic Styled margins,
+flex/grid/percentage constraints, automatic ambient text inheritance, full resvg
+features or a native raster-density key. DPR browser checks establish portable
+bitmap presentation, not density-aware native Icon rasterization. These remaining
+gaps preclude a full-family parity claim.

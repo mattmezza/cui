@@ -667,6 +667,12 @@ configure_file(cmake/cui.pc.in cui.pc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cui.pc DESTINATION lib/pkgconfig)
 install(FILES LICENSE DESTINATION share/cui/licenses RENAME CUI-LICENSE)
 install(FILES third_party/clay/LICENSE DESTINATION share/cui/licenses RENAME CLAY-LICENSE)
+# Core compiles the SVG decoder, icon assets and named palette data too.
+install(FILES third_party/nanosvg/LICENSE DESTINATION share/cui/licenses RENAME NANOSVG-LICENSE)
+install(FILES third_party/gpui_icons/LICENSE DESTINATION share/cui/licenses RENAME GPUI-ICONS-LICENSE)
+install(FILES third_party/gpui_themes/LICENSE DESTINATION share/cui/licenses RENAME GPUI-THEMES-LICENSE)
+# Source dependency inventory supplies the pinned versions and license hashes.
+install(FILES third_party/dependencies.json DESTINATION share/cui/licenses RENAME DEPENDENCIES.json)
 install(FILES third_party/unicode/17.0.0/LICENSE.txt DESTINATION share/cui/licenses RENAME UNICODE-LICENSE)
 function(cui_adapter_package target name description requires private_requires)
  set(CUI_ADAPTER_NAME ${name})

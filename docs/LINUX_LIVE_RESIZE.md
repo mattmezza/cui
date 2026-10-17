@@ -45,7 +45,7 @@ and use the isolated wrapper:
 ```sh
 cmake -S . -B build -G Ninja -DCUI_REQUIRE_NATIVE=ON
 cmake --build build --target test_continuous_resize
-python scripts/test_local.py --build-dir build -R '^continuous_resize$' -V
+python scripts/test_local.py --build-dir build -R '^linux_continuous_resize$' -V
 ```
 
 The Python driver requires the wrapper's `CUI_TEST_VIRTUAL_DISPLAY=1`, a private
@@ -53,7 +53,7 @@ X11 DISPLAY and no Wayland display; unsupported platforms/drivers return 77.
 The child independently checks the isolation flag. The driver selects X11 and
 SDL software rendering. libX11 is loaded dynamically through Python's standard
 `ctypes`; no Python package or new production dependency is introduced. CTest
-should apply `SKIP_RETURN_CODE 77` and a finite timeout. Temporary screenshots and
+applies `SKIP_RETURN_CODE 77` and a finite timeout. Temporary screenshots and
 the child are cleaned up on success or failure.
 
 Never replace the wrapper with `DISPLAY=:0` or the user's Wayland session.

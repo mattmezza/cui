@@ -14,6 +14,13 @@
 
 Optional unavailable integrations are explicit. Compilation will be recorded separately from runtime tests. SDL_GPU SPIR-V shader support currently confines that adapter to Vulkan-capable devices; D3D12/Metal formats are pending. Sokol GLCORE is tested on Linux Xorg; its other backends and platforms are pending.
 
+Linux X11 also has [continuous external resize evidence](LINUX_LIVE_RESIZE.md)
+under private Xvfb/software rendering: intermediate captures follow window size,
+responsive sidebar/card changes and retained application state while a resize
+burst is ongoing. This does not establish physical window-manager dragging or
+Wayland behavior. Linux resize support is a separate acceptance scope from the
+Cocoa/Windows callback scheduling contract.
+
 The optional pinned Unicode regex archive is currently validated on Linux native and WASI only. Portable Core/Base/Components need neither that archive nor Rust. Developing on Linux does not prevent macOS support: hosted macOS runners can compile/test the native integration once implemented. Full platform acceptance also requires actual macOS window/render/input/accessibility and hardware/session testing, which can use a remotely accessible Mac rather than the maintainer's laptop.
 
 Linux hosted GCC and Clang passed their configured native/sanitizer checks on CI run38225532353 plus Xvfb gallery smoke and Sokol pixel/cache tests. The CI GL driver reported **llvmpipe**, a software driver; this is API/readback coverage and is separate from the actual Intel/Mesa hardware evidence on the development Xorg host. Saved [previous CI summary](validation/ci-01865d5.txt) and [latest published-source job metadata](validation/ci-3ef6c49.json) record exact source and outcomes.

@@ -102,6 +102,20 @@ RGBA frames. It checks pause/resume, rates, seek/end/restart, looping/generation
 unknown duration, zero duration, invalid-input atomicity and overflow. Software
 rendering checks contain letterboxing, cover crop, fill, opacity, changed frame
 revision and stale-frame rejection. No codec or window is needed. The test must
-link `src/base/cui_video.c`, `cui`, and `cui_software`; use the repository's isolated
-CTest wrapper for execution. Public module/build registration is a separate
-integration step for this foundation.
+link `cui` and `cui_software`; the timeline and surface implementation are included
+in the portable `cui` target:
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF
+cmake --build build --target test_video
+python scripts/test_local.py --build-dir build -R '^video$'
+```
+
+The same model and software pixel assertions run under WASI with the pinned tools:
+
+```sh
+uv run scripts/test_wasi.py --suite video
+```
+
+The generated `dist/cui_video.h` module and Go/Rust source SDKs expose the same
+API. These are C APIs; language-specific video builders are not yet provided.

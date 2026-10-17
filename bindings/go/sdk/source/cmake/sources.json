@@ -89,6 +89,9 @@
       "src/base/cui_description.c",
       "src/components/cui_description.c"
     ],
+    "cui_video": [
+      "src/base/cui_video.c"
+    ],
     "cui_media": [
       "src/base/cui_media.c",
       "src/components/cui_media.c"

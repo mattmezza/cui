@@ -4,6 +4,11 @@ Audit baseline: `b96c6844`. No decoder dependency has been selected or installed
 This document proposes a reusable playback surface, with controls composed above
 it, rather than putting decoding, transport and UI in one component.
 
+The portable timeline and borrowed CPU RGBA surface are now available in
+`cui/cui_video.h`; [the implementation guide](VIDEO_GUIDE.md) describes their
+actual behavior and tests. Decoder integration, audio, frame leases/queues,
+automatic scheduling and the full controls component below remain planned.
+
 ## Existing foundation and its limit
 
 `include/cui/cui_media.h` already defines borrowed image frames (RGBA-sized

@@ -12,7 +12,10 @@ typedef struct {
     uint64_t generation;
     bool duration_known, seekable, playing, ended, loop;
 } cui_video;
-typedef struct { double duration; bool duration_known, seekable, loop; } cui_video_config;
+typedef struct {
+    double duration;
+    bool duration_known, seekable, loop;
+} cui_video_config;
 /* Known duration may be zero. Unknown duration requires duration=0. */
 bool cui_video_init(cui_video *, cui_video_config);
 bool cui_video_set_playing(cui_video *, bool);
@@ -41,7 +44,7 @@ typedef struct {
  * Timestamp is validated but does not schedule or drop frames automatically.
  * Same pixels changed in place require bitmap.revision increment. */
 bool cui_video_surface(cui_context *, cui_id, const cui_video *, const cui_video_frame *,
-                        cui_video_surface_options);
+                       cui_video_surface_options);
 #ifdef __cplusplus
 }
 #endif

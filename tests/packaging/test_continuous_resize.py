@@ -22,7 +22,8 @@ def main():
     if not sys.platform.startswith('linux') or os.environ.get('CUI_TEST_VIRTUAL_DISPLAY') != '1':
         print('SKIP: requires scripts/test_local.py private Linux Xvfb')
         return 77
-    if not os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY'):
+    current_display = os.environ.get('DISPLAY', '')
+    if not current_display or current_display.split('.')[0] == ':0' or os.environ.get('WAYLAND_DISPLAY'):
         print('SKIP: requires private X11 display without Wayland')
         return 77
     library = ctypes.util.find_library('X11')

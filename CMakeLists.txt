@@ -218,6 +218,10 @@ if(TARGET cui_text)
  set_tests_properties(theme_registry_native PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 # Portable layout policy and typography role helpers.
+add_executable(test_video tests/unit/test_video.c)
+target_link_libraries(test_video PRIVATE cui cui_software)
+cui_warnings(test_video)
+add_test(NAME video COMMAND test_video)
 foreach(name responsive typography_tokens)
  add_executable(test_${name} tests/unit/test_${name}.c)
  target_link_libraries(test_${name} PRIVATE cui)
@@ -1089,6 +1093,16 @@ if(TARGET cui_sdl3)
   add_test(NAME ${probe} COMMAND test_${probe})
   set_tests_properties(${probe} PROPERTIES TIMEOUT 20)
  endforeach()
+ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(test_continuous_resize tests/integration/test_continuous_resize.c examples/responsive_dashboard/app.c)
+  target_link_libraries(test_continuous_resize PRIVATE cui_sdl3)
+  cui_warnings(test_continuous_resize)
+  add_test(NAME linux_continuous_resize COMMAND ${Python3_EXECUTABLE}
+   ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_continuous_resize.py
+   --executable $<TARGET_FILE:test_continuous_resize>
+   --font ${CMAKE_CURRENT_SOURCE_DIR}/third_party/inter/Inter-Regular.otf)
+  set_tests_properties(linux_continuous_resize PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
+ endif()
 endif()
 
 if(TARGET cui_bridge AND TARGET cui_sdl3 AND CUI_TEST_FONT)

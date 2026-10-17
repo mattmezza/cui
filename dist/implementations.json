@@ -182,6 +182,13 @@
       ]
     },
     {
+      "header": "cui_video.h",
+      "macro": "CUI_VIDEO_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_video.c"
+      ]
+    },
+    {
       "header": "cui_media.h",
       "macro": "CUI_MEDIA_IMPLEMENTATION",
       "sources": [

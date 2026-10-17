@@ -24,6 +24,7 @@
 #include "cui_resizable.h"
 #include "cui_chrome.h"
 #include "cui_description.h"
+#include "cui_video.h"
 #include "cui_media.h"
 #include "cui_message.h"
 #include "cui_status.h"
@@ -144,6 +145,10 @@
 #define CUI_DESCRIPTION_IMPLEMENTATION
 #endif
 #include "cui_description.h"
+#ifndef CUI_VIDEO_IMPLEMENTATION
+#define CUI_VIDEO_IMPLEMENTATION
+#endif
+#include "cui_video.h"
 #ifndef CUI_MEDIA_IMPLEMENTATION
 #define CUI_MEDIA_IMPLEMENTATION
 #endif

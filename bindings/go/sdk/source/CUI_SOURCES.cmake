@@ -41,6 +41,7 @@ set(CUI_SOURCES
  src/components/cui_chrome.c
  src/base/cui_description.c
  src/components/cui_description.c
+ src/base/cui_video.c
  src/base/cui_media.c
  src/components/cui_media.c
  src/base/cui_message.c

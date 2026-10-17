@@ -28,7 +28,14 @@ Queue input before begin. Events are interpreted against the prior frame, then c
 
 UI context and optional font objects require single-thread ownership. Independent contexts may be interleaved on that thread; Clay's internal current-context pointer prohibits concurrent UI calls. Host asynchronous work must hand results back on the UI thread. Optional renderers own GPU resources with their device's thread affinity; borrowed host device/window/font must outlive the renderer.
 
-The default text measurer is approximate and unsuitable for international text. FreeType/HarfBuzz handles individual shaped runs; paragraph bidi, font fallback, grapheme selection, full IME and line breaking are not complete. UTF-8 editor offsets are byte indices constrained to scalar boundaries, not grapheme boundaries.
+The default text measurer is approximate and unsuitable for international text.
+The native text adapter supplies contextual geometry, explicit font fallback and
+optional bidirectional analysis; register matching measurement and paint callbacks.
+Editing offsets are UTF-8 byte indices. Explicit legacy scalar operations remain
+available, while interactive editing uses grapheme/Unicode-word operations.
+Consumer and platform coverage remains partial: see [editing](EDITING.md),
+[contextual text](CONTEXTUAL_NATIVE_TEXT.md), [Unicode wrapping](UNICODE_WRAP.md)
+and [the platform matrix](PLATFORM_MATRIX.md) for the tested contracts.
 
 ## Responsive layout and typography roles
 
@@ -59,3 +66,13 @@ next frame can wait until the operating system releases its modal event pump.
 Inside runner callbacks, `cui_sdl3_poll` synchronizes IME/cursor state without
 recursively pumping events. See [Live resize](LIVE_RESIZE.md) for lifecycle,
 threading, frame scheduling and scoped native validation details.
+
+## Decoded video frames
+
+`cui/cui_video.h` exposes a caller-owned timeline and a borrowed RGBA frame surface.
+The host supplies elapsed time and already-decoded frames, handles decoder/audio
+synchronization, and retains pixels until renderer consumption completes.
+Generation checks reject frames retired by a seek, restart or loop.
+See [the video guide](VIDEO_GUIDE.md) for ownership, commands and reproducible
+headless tests; [the video plan](VIDEO_PLAN.md) identifies controls and adapters
+that remain unimplemented.

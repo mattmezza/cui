@@ -263,6 +263,31 @@ if (x < 2) puts("<script>");
             with self.assertRaises(ValueError):
                 DOCS.build(root, root / 'out')
 
+    def test_native_runner_and_video_exports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            pages = DOCS.build(ROOT, output)
+            symbols = {entry['name']: entry for entry in
+                       json.loads((output / 'api-index.json').read_text())['symbols']}
+            groups = {
+                'cui_video.h': ('cui_video_init', 'cui_video_set_playing', 'cui_video_set_rate',
+                                'cui_video_set_loop', 'cui_video_seek', 'cui_video_advance',
+                                'cui_video_finish', 'cui_video_surface'),
+                'cui_sdl3.h': ('cui_sdl3_run',),
+                'cui_bridge.h': ('cui_bridge_run',),
+            }
+            for header, names in groups.items():
+                self.assertEqual((output / 'headers' / header).read_bytes(),
+                                 (ROOT / 'include/cui' / header).read_bytes())
+                for name in names:
+                    self.assertEqual(symbols[name]['header'], './headers/' + header)
+            index = (output / 'llms.txt').read_text()
+            full = (output / 'llms-full.txt').read_text()
+            for guide in ('LIVE_RESIZE', 'LINUX_LIVE_RESIZE', 'BINDING_NATIVE_RUN', 'VIDEO_GUIDE'):
+                self.assertIn('./markdown/docs/' + guide + '.md', index)
+                self.assertIn(DOCS.markdown_for_agents(ROOT / 'docs' / (guide + '.md'), ROOT).strip(), full)
+                self.assertEqual(next(page for page in pages if page['slug'] == guide.lower())['category'], 'Guides')
+
 
 if __name__ == '__main__':
     unittest.main()

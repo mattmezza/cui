@@ -59,3 +59,10 @@ and a null callback. These tests run through `scripts/test_local.py` in private
 Xvfb. Cocoa/Windows source inspection supports the scheduling contract; actual
 macOS/Windows drag responsiveness remains host acceptance, not a Linux runtime
 claim. Hardware/GPU display migration remains deferred.
+
+Linux additionally has a [continuous X11 resize test](LINUX_LIVE_RESIZE.md): an
+external process resizes an already-running responsive dashboard through repeated
+breakpoint crossings. Captures and geometry prove intermediate presentation while
+the resize burst is ongoing, including sidebar/card adaptation and retained app
+state. This is stronger than a final-size assertion, but does not establish
+physical window-manager dragging or Wayland behavior.

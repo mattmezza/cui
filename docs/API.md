@@ -76,5 +76,8 @@ The host supplies elapsed time and already-decoded frames, handles decoder/audio
 synchronization, and retains pixels until renderer consumption completes.
 Generation checks reject frames retired by a seek, restart or loop.
 See [the video guide](VIDEO_GUIDE.md) for ownership, commands and reproducible
-headless tests; [the video plan](VIDEO_PLAN.md) identifies controls and adapters
-that remain unimplemented.
+headless tests. [Controlled playback controls](VIDEO_PLAYER.md) add typed host
+requests and optional controls above the surface. The
+[optional FFmpeg example](../examples/video_player/README.md) demonstrates silent
+local-file decoding; audio, browser playback and general decoder integration
+remain planned in [the video roadmap](VIDEO_PLAN.md).

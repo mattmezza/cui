@@ -2731,9 +2731,9 @@ static bool dock_lifecycle_fill(cui_dock_lifecycle *state, const cui_dock_lifecy
     bool has_displayed = cui_dock_displayed_panel(region->model, node, region->panel_visible,
                                                   region->visibility_user, &displayed);
     cui_dock_node_info current;
-    if (!cui_dock_node_get(region->model, node, &current) ||
-        current.kind != info.kind || current.panel_count != info.panel_count ||
-        current.has_active != info.has_active || current.active_panel != info.active_panel)
+    if (!cui_dock_node_get(region->model, node, &current) || current.kind != info.kind ||
+        current.panel_count != info.panel_count || current.has_active != info.has_active ||
+        current.active_panel != info.active_panel)
         return false;
     for (size_t i = 0; i < info.panel_count; i++) {
         uint64_t key;

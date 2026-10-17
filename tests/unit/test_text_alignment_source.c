@@ -25,10 +25,11 @@ static void rows(cui_text_align alignment, bool wrap, bool edges) {
     for (int frame = 0; frame < 2; ++frame) {
         float width = frame ? 100 : 50;
         assert(cui_begin_frame(ui, 200, 200, 0));
-        cui_begin_box(ui, 1, (cui_box){.width = width, .padding = 5,
-                                       .custom_padding = edges,
-                                       .padding_edges = {.left = 3, .right = 7,
-                                                         .top = 4, .bottom = 6}});
+        cui_begin_box(ui, 1,
+                      (cui_box){.width = width,
+                                .padding = 5,
+                                .custom_padding = edges,
+                                .padding_edges = {.left = 3, .right = 7, .top = 4, .bottom = 6}});
         char text[] = "AA BB\n\nאב\nZ\n";
         cui_text_color_span span = {0, sizeof(text) - 1, {255, 0, 0, 255}};
         assert(cui_text_paragraph_colored_aligned(ui, cui_string(text), 16, (cui_color){0}, 20,

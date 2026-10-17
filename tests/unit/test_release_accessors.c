@@ -1,16 +1,25 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_dock.h"
-#include "cui/cui_table.h"
 #include "cui/cui_radio_group.h"
+#include "cui/cui_table.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define CHECK(x) do { if (!(x)) { fprintf(stderr, "%d: %s\n", __LINE__, #x); exit(1); } } while (0)
+#define CHECK(x)                                                                                   \
+    do {                                                                                           \
+        if (!(x)) {                                                                                \
+            fprintf(stderr, "%d: %s\n", __LINE__, #x);                                             \
+            exit(1);                                                                               \
+        }                                                                                          \
+    } while (0)
 #ifdef CUI_TEST_ALLOCATOR
 void *__real_malloc(size_t);
 static bool fail_malloc;
 void *__wrap_malloc(size_t size) {
-    if (fail_malloc) { fail_malloc = false; return NULL; }
+    if (fail_malloc) {
+        fail_malloc = false;
+        return NULL;
+    }
     return __real_malloc(size);
 }
 #endif
@@ -67,15 +76,22 @@ static void dock_outputs_and_capture(void) {
     CHECK(!cui_dock_panel_find(model, 11, NULL, NULL));
     cui_dock_destroy(model);
 }
-typedef struct { cui_table_model *model; cui_table_column *column; unsigned calls; } table_mutation;
+typedef struct {
+    cui_table_model *model;
+    cui_table_column *column;
+    unsigned calls;
+} table_mutation;
 static void shrink_header(cui_context *ui, const cui_theme *theme, void *user, cui_id key) {
-    (void)ui; (void)theme; (void)key;
+    (void)ui;
+    (void)theme;
+    (void)key;
     table_mutation *mutation = user;
     mutation->calls++;
     CHECK(cui_table_bind(mutation->model, NULL, 0, mutation->column, 1) == CUI_TABLE_OK);
 }
 static cui_str shrink_label(void *user, size_t row, cui_id column) {
-    (void)row; (void)column;
+    (void)row;
+    (void)column;
     table_mutation *mutation = user;
     mutation->calls++;
     CHECK(cui_table_bind(mutation->model, NULL, 0, mutation->column, 1) == CUI_TABLE_OK);
@@ -85,13 +101,14 @@ static void table_callbacks(void) {
     cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
     cui_table_model *model = cui_table_create(4);
     CHECK(ui && model);
-    cui_table_row rows[] = {{.key=1}, {.key=2}};
+    cui_table_row rows[] = {{.key = 1}, {.key = 2}};
     cui_table_column columns[] = {cui_table_column_default(10, cui_string("A")),
                                   cui_table_column_default(20, cui_string("B"))};
     cui_table_state state = {0};
     cui_theme theme = cui_theme_light();
     cui_table_options options = cui_table_options_default();
-    options.width = 500; options.height = 300;
+    options.width = 500;
+    options.height = 300;
     table_mutation mutation = {model, columns, 0};
     options.render_header = shrink_header;
     options.render_userdata = &mutation;
@@ -101,14 +118,16 @@ static void table_callbacks(void) {
     CHECK(!cui_table_get_row(model, 2, &row_output) && row_output.key == 123);
     CHECK(!cui_table_get_column(model, 2, &col_output) && col_output.key == 456);
     CHECK(cui_begin_frame(ui, 600, 400, .016f));
-    CHECK(cui_data_table(ui, 100, &theme, model, &state, options, NULL, NULL, NULL).error == CUI_TABLE_OK);
+    CHECK(cui_data_table(ui, 100, &theme, model, &state, options, NULL, NULL, NULL).error ==
+          CUI_TABLE_OK);
     cui_end_frame(ui);
     CHECK(cui_last_error(ui) == CUI_OK && mutation.calls == 1 && cui_table_rows(model) == 0);
     options.render_header = NULL;
     mutation.calls = 0;
     CHECK(cui_table_bind(model, rows, 2, columns, 2) == CUI_TABLE_OK);
     CHECK(cui_begin_frame(ui, 600, 400, .016f));
-    CHECK(cui_data_table(ui, 100, &theme, model, &state, options, shrink_label, NULL, &mutation).error == CUI_TABLE_OK);
+    CHECK(cui_data_table(ui, 100, &theme, model, &state, options, shrink_label, NULL, &mutation)
+              .error == CUI_TABLE_OK);
     cui_end_frame(ui);
     CHECK(cui_last_error(ui) == CUI_OK && mutation.calls == 1);
     cui_table_destroy(model);
@@ -123,12 +142,19 @@ static void radio_metrics(void) {
     cui_id selected = 42;
     CHECK(cui_begin_frame(ui, 600, 400, .016f));
     CHECK(!cui_radio_group(ui, 100, &theme, &item, 1, &selected, &state,
-                          (cui_radio_group_options){.design_size = (cui_design_size)999}).valid);
+                           (cui_radio_group_options){.design_size = (cui_design_size)999})
+               .valid);
     CHECK(selected == 42 && !state.had_focus);
     CHECK(cui_radio_group(ui, 100, &theme, &item, 1, &selected, &state,
-                         (cui_radio_group_options){.design_size = CUI_DESIGN_XS}).valid);
+                          (cui_radio_group_options){.design_size = CUI_DESIGN_XS})
+              .valid);
     cui_end_frame(ui);
     CHECK(cui_last_error(ui) == CUI_OK);
     cui_destroy(ui);
 }
-int main(void) { dock_outputs_and_capture(); table_callbacks(); radio_metrics(); return 0; }
+int main(void) {
+    dock_outputs_and_capture();
+    table_callbacks();
+    radio_metrics();
+    return 0;
+}

@@ -1,8 +1,8 @@
 # CUI v1.0 readiness
 
-CUI is a working alpha. A live gallery and passing tests demonstrate useful functionality; they do not establish production readiness or complete component parity. This assessment is dated 13 October 2026.
+CUI is a working alpha. A live gallery and passing tests demonstrate useful functionality; they do not establish production readiness or complete component parity. This assessment is dated 17 October 2026.
 
-The catalog contains all 78 families: 76 tested subsets, two implemented families and zero fully verified families. The feature ledger contains 327 entries: 278 tested, four implemented and 45 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.
+The catalog contains all 78 families: 77 tested subsets, one implemented family and zero fully verified families. The feature ledger contains 360 entries: 315 tested, four implemented and 41 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.
 
 ## Release gates
 

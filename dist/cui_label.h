@@ -17,6 +17,7 @@ typedef struct {
     bool custom_color;
     cui_color color;
     cui_id semantic_id, control; /* Optional label node and controls/focus_target. */
+    cui_text_align alignment;    /* Physical left (default), center or right. */
 } cui_label_options;
 typedef struct {
     size_t text_length, span_count;
@@ -859,7 +860,8 @@ bool cui_label_prepare(const cui_theme *theme, cui_label_options o, char *text, 
                        cui_text_color_span *spans, size_t span_capacity,
                        cui_label_prepared *result) {
     size_t pn = 0, sn = 0, hn = 0;
-    if (!theme || !result || o.match > CUI_LABEL_MATCH_PREFIX || o.match < CUI_LABEL_MATCH_FULL ||
+    if (o.alignment < CUI_TEXT_ALIGN_LEFT || o.alignment > CUI_TEXT_ALIGN_RIGHT || !theme ||
+        !result || o.match > CUI_LABEL_MATCH_PREFIX || o.match < CUI_LABEL_MATCH_FULL ||
         !isfinite(o.font_size) || o.font_size < 0 || !isfinite(o.line_height) ||
         o.line_height < 0 || o.style.weight > CUI_TEXT_WEIGHT_BOLD ||
         o.style.weight < CUI_TEXT_WEIGHT_NORMAL || !decode(o.primary, NULL, &pn) ||
@@ -961,10 +963,17 @@ bool cui_label_source(cui_context *ui, const cui_theme *theme, cui_label_options
     if (!isfinite(font) || font <= 0)
         goto done;
     if (o.semantic_id)
-        cui_begin_box(ui, o.semantic_id, (cui_box){0});
-    ok = cui_text_paragraph_colored(ui, display, font, o.custom_color ? o.color : theme->text,
-                                    o.line_height ? o.line_height : 20, o.style, !o.no_wrap, spans,
-                                    prepared.span_count);
+        cui_begin_box(ui, o.semantic_id,
+                      (cui_box){.width = o.alignment == CUI_TEXT_ALIGN_LEFT ? 0 : -1});
+    if (o.alignment == CUI_TEXT_ALIGN_LEFT)
+        ok = cui_text_paragraph_colored(ui, display, font, o.custom_color ? o.color : theme->text,
+                                        o.line_height ? o.line_height : 20, o.style, !o.no_wrap,
+                                        spans, prepared.span_count);
+    else
+        ok = cui_text_paragraph_colored_aligned(
+            ui, display, font, o.custom_color ? o.color : theme->text,
+            o.line_height ? o.line_height : 20, o.style, !o.no_wrap, spans, prepared.span_count,
+            o.alignment);
     if (ok && o.semantic_id) {
         (void)cui_interact(ui, o.semantic_id, CUI_ROLE_LABEL, display, false, false, 0);
         cui_set_semantic_details(ui, o.semantic_id,

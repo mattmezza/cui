@@ -2080,6 +2080,15 @@ void Clay__OpenElementWithId(Clay_ElementId elementId) {
     }
 }
 
+/* CUI local patch: opt-in current-frame text layout hooks; upstream default
+ * behavior is unchanged when these macros are absent. See PIN.md. */
+#ifdef CLAY_CUSTOM_TEXT_MIN_WIDTH
+static float CLAY_CUSTOM_TEXT_MIN_WIDTH(Clay_String *, Clay_Dimensions *, void *);
+#endif
+#ifdef CLAY_CUSTOM_TEXT_WRAP
+static bool CLAY_CUSTOM_TEXT_WRAP(Clay_Context *, Clay_LayoutElement *, float, void *);
+#endif
+
 void Clay__OpenTextElement(Clay_String text, Clay_TextElementConfig textConfig) {
     Clay_Context* context = Clay_GetCurrentContext();
     if (context->layoutElements.length == context->layoutElements.capacity - 1 || context->booleanWarnings.maxElementsExceeded) {
@@ -2105,7 +2114,16 @@ void Clay__OpenTextElement(Clay_String text, Clay_TextElementConfig textConfig) 
     Clay_Dimensions textDimensions = { .width = textMeasured->unwrappedDimensions.width, .height = textConfig.lineHeight > 0 ? (float)textConfig.lineHeight : textMeasured->unwrappedDimensions.height };
     textElement->dimensions = textDimensions;
     textElement->minDimensions = CLAY__INIT(Clay_Dimensions) { .width = textMeasured->minWidth, .height = textDimensions.height };
+
     textElement->textElementData = CLAY__INIT(Clay__TextElementData) { .text = text, .preferredDimensions = textMeasured->unwrappedDimensions };
+#ifdef CLAY_CUSTOM_TEXT_MIN_WIDTH
+    float customMinimum = CLAY_CUSTOM_TEXT_MIN_WIDTH(&text, &textDimensions, context->measureTextUserData);
+    if (customMinimum >= 0) {
+        textElement->minDimensions.width = customMinimum;
+        textElement->dimensions = textDimensions;
+        textElement->textElementData.preferredDimensions.width = textDimensions.width;
+    }
+#endif
     parentElement->children.length++;
 }
 
@@ -2589,6 +2607,9 @@ void Clay__CalculateFinalLayout(float deltaTime, bool useStoredBoundingBoxes, bo
         Clay__MeasureTextCacheItem *measureTextCacheItem = Clay__MeasureTextCached(&textElementData->text, &containerElement->textConfig);
         float lineWidth = 0;
         float lineHeight = containerElement->textConfig.lineHeight > 0 ? (float)containerElement->textConfig.lineHeight : textElementData->preferredDimensions.height;
+#ifdef CLAY_CUSTOM_TEXT_WRAP
+        if (CLAY_CUSTOM_TEXT_WRAP(context, containerElement, lineHeight, context->measureTextUserData)) continue;
+#endif
         int32_t lineLengthChars = 0;
         int32_t lineStartOffset = 0;
         if (!measureTextCacheItem->containsNewlines && textElementData->preferredDimensions.width <= containerElement->dimensions.width) {

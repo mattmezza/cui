@@ -944,7 +944,7 @@ bool cui_sdl3_wait_events(cui_sdl3 *s, int timeout_ms) {
      * NULL to SDL's wait can leave a poll-cycle sentinel before later events. */
     if (!s->event_pending)
         s->event_pending = timeout_ms < 0 ? SDL_WaitEvent(&s->pending_event)
-                                        : SDL_WaitEventTimeout(&s->pending_event, timeout_ms);
+                                          : SDL_WaitEventTimeout(&s->pending_event, timeout_ms);
     s->frame_ticks = SDL_GetTicksNS();
     return s->event_pending;
 }

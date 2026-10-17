@@ -190,7 +190,8 @@ void cui_table_caption(cui_context *ui, cui_id id, const cui_theme *t, cui_str t
 static void header_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
                         cui_table_state *s, cui_table_options o, size_t c, float header) {
     cui_table_column col;
-    cui_table_get_column(m, c, &col);
+    if (!cui_table_get_column(m, c, &col))
+        return;
     cui_id cid = cui_table_header_id(id, col.key);
     cui_begin_box(ui, cid,
                   (cui_box){.width = col.width,
@@ -257,8 +258,10 @@ static void body_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_table_
                       cui_table_label_fn label, cui_table_cell_fn render, void *data) {
     cui_table_row rr;
     cui_table_column col;
-    cui_table_get_row(m, r, &rr);
-    cui_table_get_column(m, c, &col);
+    if (!cui_table_get_row(m, r, &rr))
+        return;
+    if (!cui_table_get_column(m, c, &col))
+        return;
     cui_id cid = cui_table_cell_id(id, rr.key, col.key);
     bool selected = (o.selection_mode == CUI_TABLE_SELECT_ROW || !col.nonselectable) &&
                     cui_table_is_selected(s, o, rr.key, col.key);
@@ -296,7 +299,8 @@ static float group_width(cui_table_model *m, size_t start, size_t span) {
     float width = 0;
     cui_table_column column;
     for (size_t c = start; c < start + span; c++) {
-        cui_table_get_column(m, c, &column);
+        if (!cui_table_get_column(m, c, &column))
+            return 0;
         width += column.width;
     }
     return width;
@@ -501,7 +505,8 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
     }
     for (size_t r = rows.begin; r < rows.end && !o.loading; r++) {
         cui_table_row rr;
-        cui_table_get_row(m, r, &rr);
+        if (!cui_table_get_row(m, r, &rr))
+            break;
         cui_id rid = cui_table_row_id(id, rr.key);
         cui_begin_box(ui, rid, (cui_box){.width = width, .height = row, .row = true});
         cui_table_submit_row(ui, id, m, s, o, r);

@@ -8,15 +8,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Debug, Release]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
-      - run: cmake --build build --config Debug
-      - run: ctest --test-dir build -C Debug --output-on-failure
+      - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      - run: cmake --build build --config ${{ matrix.build_type }}
+      - run: ctest --test-dir build -C ${{ matrix.build_type }} --output-on-failure
   linux-native:
     runs-on: ubuntu-latest
     strategy:

@@ -1650,13 +1650,16 @@ bool cui_dock_displayed_panel(const cui_dock *model, cui_dock_node node,
     if (!panel || !cui_dock_node_get(model, node, &info) || info.kind != CUI_DOCK_TABS ||
         !info.has_active)
         return false;
-    if (!visible || visible(user, model, info.active_panel)) {
+    cui_dock_node owner;
+    if ((!visible || visible(user, model, info.active_panel)) &&
+        cui_dock_panel_find(model, info.active_panel, &owner, NULL) && owner == node) {
         *panel = info.active_panel;
         return true;
     }
     for (size_t i = 0; i < info.panel_count; ++i) {
         uint64_t key;
-        if (cui_dock_panel_at(model, node, i, &key) && visible(user, model, key)) {
+        if (visible && cui_dock_panel_at(model, node, i, &key) && visible(user, model, key) &&
+            cui_dock_panel_find(model, key, &owner, NULL) && owner == node) {
             *panel = key;
             return true;
         }

@@ -724,12 +724,22 @@ bool cui_text_context_line_colored(cui_context *, cui_text_line_source, float, c
                                    cui_text_style, const cui_text_color_span *, size_t);
 /* Complete strict UTF-8 text with hard paragraphs, U+2028 visual breaks, and
  * empty lines. Color spans use original text bytes and may cross separators.
- * wrap=true uses available parent width (word wrapping); false preserves lines.
+ * wrap=true uses current parent width and the pinned GPUI candidate/fallback
+ * policy, with Unicode17 grapheme-safe boundaries and preserved whitespace.
+ * Contextual geometry supplies shaped advances/clusters when available; without
+ * it the host measures individual graphemes. false preserves unwrapped lines.
  * Invalid input and preflight capacity failures publish no layout. Final layout
  * errors remain observable through the normal Core error/draw-list contract. */
 bool cui_text_paragraph_colored(cui_context *, cui_str, float font_size, cui_color,
                                 float line_height, cui_text_style, bool wrap,
                                 const cui_text_color_span *, size_t);
+typedef enum { CUI_TEXT_ALIGN_LEFT, CUI_TEXT_ALIGN_CENTER, CUI_TEXT_ALIGN_RIGHT } cui_text_align;
+/* Opt-in physical alignment of each visual row within current available parent
+ * width, including nowrap rows. Empty rows retain line height. Oversized rows
+ * may receive negative offsets; alignment preserves original-byte source/spans. */
+bool cui_text_paragraph_colored_aligned(cui_context *, cui_str, float font_size, cui_color,
+                                        float line_height, cui_text_style, bool wrap,
+                                        const cui_text_color_span *, size_t, cui_text_align);
 bool cui_has_text_geometry_line(const cui_context *);
 cui_text_layout_status cui_get_text_geometry_line(cui_context *, cui_text_line_source, float,
                                                   cui_text_style, cui_text_geometry *);

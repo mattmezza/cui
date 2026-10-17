@@ -1629,7 +1629,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Secondary text, Unicode lowercase highlighting, scalar masking, semantic control association, multiline and parent-width wrapping are tested. Clay ASCII-space breaks, overlong tokens, general text alignment and arbitrary style refinement still differ from the reference."
+        "Secondary text, Unicode lowercase highlighting, scalar masking, control association, copied colored wrapping and left/center/right alignment have scoped tests. Full inherited typography/style refinement and exhaustive native/platform visual acceptance remain incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1659,9 +1659,15 @@
           ]
         },
         {
-          "name": "disabled/error presentation",
-          "status": "not_started",
-          "evidence": []
+          "name": "caller-selected foreground",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_label_source.c",
+            "docs/LABEL.md"
+          ],
+          "limitations": [
+            "The frozen Label API has no built-in disabled/error states; callers choose foreground colors."
+          ]
         },
         {
           "name": "secondary text, Unicode highlights and scalar mask privacy",
@@ -1672,7 +1678,7 @@
             "docs/LABEL.md"
           ],
           "limitations": [
-            "Multiline and automatic parent-width wrapping are available; full Unicode line-break/fallback wrapping still differs."
+            "Scalar masking preserves privacy in draw and semantic output; arbitrary inherited rich typography remains incomplete."
           ]
         },
         {
@@ -1680,11 +1686,23 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_contextual_wrap_source.c",
-            "docs/LABEL.md",
-            "docs/validation/next36-source-integration.txt"
+            "tests/unit/test_unicode_wrap_source.c",
+            "tests/web/test_unicode_wrap_core.py",
+            "docs/UNICODE_WRAP.md"
           ],
           "limitations": [
-            "Native/font, sanitizer, WASI and browser gates passed. Unicode word boundaries and overlong-token policy still differ from the reference."
+            "Pinned reference wrap candidates are implemented with grapheme/shaping-cluster fallback; this is not a general Unicode line-break algorithm."
+          ]
+        },
+        {
+          "name": "left, center and right paragraph alignment",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_text_alignment_source.c",
+            "docs/TEXT_ALIGNMENT.md"
+          ],
+          "limitations": [
+            "Alignment uses final current-frame content width; exhaustive inherited rich font styling remains outside this feature."
           ]
         }
       ],

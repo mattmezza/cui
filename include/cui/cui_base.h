@@ -47,6 +47,39 @@ bool cui_base_check_indicator(cui_context *, cui_id, cui_check_state, bool disab
 
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);
+/* Controlled double-precision slider. Submit inside a box with the same ID.
+ * Emits requests only; value is never mutated. State is presentation/capture only.
+ * begin/update/commit is one pointer gesture; cancel restores its starting value.
+ * Keyboard changes emit begin/update/commit per key, with no hidden acceleration.
+ * Missing callback is read-only. Disabled/read-only/source reset cancels a drag.
+ * Semantic numeric values are normalized0..1 (Core's numeric ABI is float); name
+ * and value_description carry application time units for accessibility. */
+typedef enum { CUI_SLIDER_BEGIN, CUI_SLIDER_UPDATE, CUI_SLIDER_COMMIT,
+               CUI_SLIDER_CANCEL } cui_slider_phase;
+typedef struct {
+    cui_slider_phase phase;
+    double value;
+    cui_event event; /* Copied, borrowed only for the synchronous callback. */
+} cui_slider_request;
+typedef void (*cui_slider_request_fn)(void *, const cui_slider_request *);
+typedef struct {
+    cui_id id;
+    double preview, start;
+    bool dragging;
+} cui_slider_state;
+typedef struct {
+    double minimum, maximum, step;
+    bool disabled, readonly;
+    cui_str value_description;
+    cui_slider_request_fn on_request;
+    void *user;
+} cui_slider_options;
+/* false: invalid arguments, unchanged state and no submission. true: submitted.
+ * Callbacks may commit/reject externally; each call uses one copied snapshot.
+ * Callback must not destroy context/state during submission. */
+bool cui_base_slider_controlled(cui_context *, cui_id, cui_str, double value,
+                                cui_slider_state *, cui_slider_options);
+
 typedef struct {
     float fraction, start, length;
     bool animating;

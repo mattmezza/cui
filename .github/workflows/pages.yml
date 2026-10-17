@@ -40,6 +40,8 @@ jobs:
         run: uv run tests/web/test_input_regex_gallery.py --directory build/web --default-directory build/web-default
       - name: Verify Core Unicode reflow with Chromium Canvas measurements
         run: uv run tests/web/test_unicode_wrap_core.py
+      - name: Verify Icon box styling and retained raster snapshots
+        run: uv run tests/web/test_icon_style.py
       - name: Verify copied Button activation evidence with real input
         run: uv run tests/web/test_button_click_snapshot.py
       - name: Verify exact Notification transition motion and reduced deadlines

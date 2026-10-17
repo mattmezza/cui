@@ -1021,6 +1021,12 @@ foreach(probe label_source empty_source tab_order_source button_tab_order_source
  add_test(NAME ${probe} COMMAND test_${probe})
 endforeach()
 target_include_directories(test_tab_order_source PRIVATE third_party/clay)
+if(TARGET cui_software)
+ add_executable(test_icon_style_source tests/unit/test_icon_style_source.c)
+ target_link_libraries(test_icon_style_source PRIVATE cui_software cui)
+ cui_warnings(test_icon_style_source)
+ add_test(NAME icon_style_source COMMAND test_icon_style_source)
+endif()
 
 if(TARGET cui_text AND TARGET cui_software AND CUI_TEST_FONT)
  add_executable(test_contextual_wrap_source_font tests/unit/test_contextual_wrap_source.c)

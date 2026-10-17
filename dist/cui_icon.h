@@ -73,6 +73,12 @@ bool cui_icon_asset(cui_str name_or_path, cui_str *svg);
 cui_icon_error cui_icon_prepare(cui_icon_state *, float width, float height, cui_icon_transform);
 cui_bitmap cui_icon_state_bitmap(const cui_icon_state *);
 cui_rect cui_icon_state_paint_bounds(const cui_icon_state *);
+/* Numeric border-box constraints. Explicit maxima include zero. Minima win
+ * over maxima; padding+border sums finally floor each resolved dimension. */
+typedef struct {
+    float min_width, min_height, max_width, max_height;
+    bool custom_min_width, custom_min_height, custom_max_width, custom_max_height;
+} cui_icon_constraints;
 typedef struct {
     cui_icon_size size;
     float custom_size, inherited_text_size;
@@ -94,12 +100,16 @@ typedef struct {
     cui_str accessible_name;
     bool decorative;
     /* Optional layout decoration. width/height and sizing flags remain governed
-     * by options above; padding is unsupported and must be zero. Other box
-     * paint/clip/inert/opacity fields apply around the unchanged SVG square. */
+     * by options above; uniform/per-edge padding and positive maximum caps apply.
+     * SVG paints the complete resolved box, without a padding inset. Other box
+     * paint/clip/inert/opacity fields apply; generic flex/percentage sizing does not. */
     const cui_box *style;
     /* Opt-in outline inside the allocated box on NOT_FOUND. Keeps that error
      * result and the existing decorative/named semantic contract. */
     bool debug_placeholder;
+    /* Optional synchronous numeric constraints; copied values are not retained.
+     * Explicit descriptor maxima replace corresponding legacy style maxima. */
+    const cui_icon_constraints *constraints;
 } cui_icon_options;
 /* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */
@@ -122,6 +132,44 @@ cui_icon_error cui_icon_spinner(cui_context *, cui_id, const cui_theme *, cui_ic
 #define CUI_ICON_IMPLEMENTATION_ONCE
 /* src/base/cui_icon.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_ICON_LAYOUT_H
+#define CUI_ICON_LAYOUT_H
+
+#include <math.h>
+/* Shared canonical lookup; SIZE_MAX means unknown. */
+size_t cui_icon_catalog_index_internal(cui_str);
+static inline bool cui_icon_extent_valid(float x) {
+    return isfinite(x) && x >= 0 && x <= 4096;
+}
+static inline bool cui_icon_layout_resolve(cui_icon_options o, float *width, float *height) {
+    cui_icon_constraints c = o.constraints ? *o.constraints : (cui_icon_constraints){0};
+    if ((c.custom_min_width && !cui_icon_extent_valid(c.min_width)) ||
+        (c.custom_min_height && !cui_icon_extent_valid(c.min_height)) ||
+        (c.custom_max_width && !cui_icon_extent_valid(c.max_width)) ||
+        (c.custom_max_height && !cui_icon_extent_valid(c.max_height)))
+        return false;
+    const cui_box b = o.style ? *o.style : (cui_box){0};
+    float maxw = c.custom_max_width ? c.max_width : b.max_width > 0 ? b.max_width : 4096;
+    float maxh = c.custom_max_height ? c.max_height : b.max_height > 0 ? b.max_height : 4096;
+    float minw = c.custom_min_width ? c.min_width : 0;
+    float minh = c.custom_min_height ? c.min_height : 0;
+    cui_border_edges p = b.custom_padding
+                             ? b.padding_edges
+                             : (cui_border_edges){b.padding, b.padding, b.padding, b.padding};
+    cui_border_edges e = b.custom_border_edges ? b.border_edges
+                                               : (cui_border_edges){b.border_width, b.border_width,
+                                                                    b.border_width, b.border_width};
+    const float edges[] = {p.left, p.right, p.top, p.bottom, e.left, e.right, e.top, e.bottom};
+    for (size_t i = 0; i < 8; i++)
+        if (!cui_icon_extent_valid(edges[i]))
+            return false;
+    *width = fmaxf(fmaxf(minw, fminf(*width, maxw)), p.left + p.right + e.left + e.right);
+    *height = fmaxf(fmaxf(minh, fminf(*height, maxh)), p.top + p.bottom + e.top + e.bottom);
+    return cui_icon_extent_valid(*width) && cui_icon_extent_valid(*height);
+}
+#endif
 
 #include <math.h>
 #include <stdlib.h>
@@ -15827,6 +15875,10 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
             return &cui_icon_assets[i];
     return NULL;
 }
+size_t cui_icon_catalog_index_internal(cui_str name) {
+    const cui_icon_asset_record *asset = cui_icon_lookup(name);
+    return asset ? (size_t)(asset - cui_icon_assets) : SIZE_MAX;
+}
 cui_icon_availability cui_icon_query(cui_str name) {
     const cui_icon_asset_record *asset = cui_icon_lookup(name);
     return !asset       ? CUI_ICON_UNKNOWN
@@ -16150,6 +16202,44 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
 }
 #endif
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_ICON_LAYOUT_H
+#define CUI_ICON_LAYOUT_H
+
+#include <math.h>
+/* Shared canonical lookup; SIZE_MAX means unknown. */
+size_t cui_icon_catalog_index_internal(cui_str);
+static inline bool cui_icon_extent_valid(float x) {
+    return isfinite(x) && x >= 0 && x <= 4096;
+}
+static inline bool cui_icon_layout_resolve(cui_icon_options o, float *width, float *height) {
+    cui_icon_constraints c = o.constraints ? *o.constraints : (cui_icon_constraints){0};
+    if ((c.custom_min_width && !cui_icon_extent_valid(c.min_width)) ||
+        (c.custom_min_height && !cui_icon_extent_valid(c.min_height)) ||
+        (c.custom_max_width && !cui_icon_extent_valid(c.max_width)) ||
+        (c.custom_max_height && !cui_icon_extent_valid(c.max_height)))
+        return false;
+    const cui_box b = o.style ? *o.style : (cui_box){0};
+    float maxw = c.custom_max_width ? c.max_width : b.max_width > 0 ? b.max_width : 4096;
+    float maxh = c.custom_max_height ? c.max_height : b.max_height > 0 ? b.max_height : 4096;
+    float minw = c.custom_min_width ? c.min_width : 0;
+    float minh = c.custom_min_height ? c.min_height : 0;
+    cui_border_edges p = b.custom_padding
+                             ? b.padding_edges
+                             : (cui_border_edges){b.padding, b.padding, b.padding, b.padding};
+    cui_border_edges e = b.custom_border_edges ? b.border_edges
+                                               : (cui_border_edges){b.border_width, b.border_width,
+                                                                    b.border_width, b.border_width};
+    const float edges[] = {p.left, p.right, p.top, p.bottom, e.left, e.right, e.top, e.bottom};
+    for (size_t i = 0; i < 8; i++)
+        if (!cui_icon_extent_valid(edges[i]))
+            return false;
+    *width = fmaxf(fmaxf(minw, fminf(*width, maxw)), p.left + p.right + e.left + e.right);
+    *height = fmaxf(fmaxf(minh, fminf(*height, maxh)), p.top + p.bottom + e.top + e.bottom);
+    return cui_icon_extent_valid(*width) && cui_icon_extent_valid(*height);
+}
+#endif
+
 #include <math.h>
 #include <string.h>
 static bool cui_icon_options_valid(cui_icon_options o) {
@@ -16176,12 +16266,13 @@ static bool cui_icon_options_valid(cui_icon_options o) {
         for (size_t i = 0; i < sizeof(nonnegative) / sizeof(nonnegative[0]); ++i)
             if (!isfinite(nonnegative[i]) || nonnegative[i] < 0)
                 return false;
-        if (b->padding != 0 || !isfinite(b->offset_x) || !isfinite(b->offset_y) ||
-            !isfinite(b->opacity) || b->align_x < CUI_ALIGN_START || b->align_x > CUI_ALIGN_END ||
+        if (!isfinite(b->offset_x) || !isfinite(b->offset_y) || !isfinite(b->opacity) ||
+            b->align_x < CUI_ALIGN_START || b->align_x > CUI_ALIGN_END ||
             b->align_y < CUI_ALIGN_START || b->align_y > CUI_ALIGN_END)
             return false;
     }
-    return true;
+    float width = 0, height = 0;
+    return cui_icon_layout_resolve(o, &width, &height);
 }
 cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_icon_state *state,
                         cui_icon_options options) {
@@ -16213,6 +16304,8 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     if (!isfinite(width) || !isfinite(height) || width < 0 || height < 0 || width > 4096 ||
         height > 4096)
         return CUI_ICON_INVALID;
+    if (!cui_icon_layout_resolve(options, &width, &height))
+        return CUI_ICON_INVALID;
     cui_color color = options.custom_color             ? options.color
                       : options.custom_inherited_color ? options.inherited_color
                                                        : theme->text;
@@ -16224,6 +16317,9 @@ cui_icon_error cui_icon(cui_context *ui, cui_id id, const cui_theme *theme, cui_
     box.fixed_width = box.fixed_height = true;
     box.width_percent = box.height_percent = false;
     box.max_width = box.max_height = 0;
+    /* SVG is a leaf painted over its full border box, not its content inset. */
+    box.padding = 0;
+    box.custom_padding = false;
     cui_begin_box(ui, id, box);
     if (!options.decorative && options.accessible_name.length) {
         cui_interact(ui, id, CUI_ROLE_IMAGE, options.accessible_name, false, false, 0);
@@ -16289,23 +16385,13 @@ static cui_icon_resource *cui_icon_resource_get(cui_context *ui, cui_id id, cui_
     }
     return resource;
 }
-static bool cui_icon_name_equal(cui_str first, cui_str second) {
-    return first.length == second.length && first.data && second.data &&
-           !memcmp(first.data, second.data, first.length);
-}
 cui_icon_error cui_icon_named(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                               cui_icon_options options) {
     if (!ui || !id || !theme || !name.data || !name.length || !cui_icon_options_valid(options) ||
         (options.design_size &&
          (!isfinite(theme->font_size) || theme->font_size <= 0 || theme->font_size / 16 > 32)))
         return CUI_ICON_INVALID;
-    size_t index = SIZE_MAX;
-    for (size_t i = 0; i < cui_icon_catalog_count(); i++)
-        if (cui_icon_name_equal(name, cui_icon_catalog_name(i)) ||
-            cui_icon_name_equal(name, cui_icon_catalog_path(i))) {
-            index = i;
-            break;
-        }
+    size_t index = cui_icon_catalog_index_internal(name);
     if (index == SIZE_MAX) {
         if (!options.debug_placeholder)
             return CUI_ICON_NOT_FOUND;

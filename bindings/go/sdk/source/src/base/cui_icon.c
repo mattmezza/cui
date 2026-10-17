@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_icon.h"
+#include "cui_icon_layout.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -187,6 +188,10 @@ static const cui_icon_asset_record *cui_icon_lookup(cui_str name) {
             cui_icon_string_equal(name, cui_icon_assets[i].path))
             return &cui_icon_assets[i];
     return NULL;
+}
+size_t cui_icon_catalog_index_internal(cui_str name) {
+    const cui_icon_asset_record *asset = cui_icon_lookup(name);
+    return asset ? (size_t)(asset - cui_icon_assets) : SIZE_MAX;
 }
 cui_icon_availability cui_icon_query(cui_str name) {
     const cui_icon_asset_record *asset = cui_icon_lookup(name);

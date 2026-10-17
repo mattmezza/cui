@@ -66,10 +66,11 @@ lists expires at the next frame as with other Icon commands.
 
 Compose a parent `cui_box` for placement, padding, backgrounds, borders, opacity
 and clipping. Supported Icon style fields can also be supplied inside a custom
-callback. Icon `.style.padding` currently rejects nonzero values; arbitrary
-inherited source Icon styling therefore remains an explicit parity limitation.
+callback. Icon padding and borders floor the allocated dimensions while the SVG
+paints the complete box; see the Icon guide for numeric constraints. Arbitrary
+inherited source Icon styling remains an explicit parity limitation.
 This guide does not claim complete Icon styling or complete renderer/platform
-parity from Spinner tests. Parent composition is the supported CUI padding path.
+parity from Spinner tests. Parent composition also supports content-inset padding.
 Explicit transparent color remains transparent; it is not a fallback sentinel.
 
 ## Source boundary and legacy API

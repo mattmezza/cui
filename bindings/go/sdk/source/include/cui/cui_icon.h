@@ -72,6 +72,12 @@ bool cui_icon_asset(cui_str name_or_path, cui_str *svg);
 cui_icon_error cui_icon_prepare(cui_icon_state *, float width, float height, cui_icon_transform);
 cui_bitmap cui_icon_state_bitmap(const cui_icon_state *);
 cui_rect cui_icon_state_paint_bounds(const cui_icon_state *);
+/* Numeric border-box constraints. Explicit maxima include zero. Minima win
+ * over maxima; padding+border sums finally floor each resolved dimension. */
+typedef struct {
+    float min_width, min_height, max_width, max_height;
+    bool custom_min_width, custom_min_height, custom_max_width, custom_max_height;
+} cui_icon_constraints;
 typedef struct {
     cui_icon_size size;
     float custom_size, inherited_text_size;
@@ -93,12 +99,16 @@ typedef struct {
     cui_str accessible_name;
     bool decorative;
     /* Optional layout decoration. width/height and sizing flags remain governed
-     * by options above; padding is unsupported and must be zero. Other box
-     * paint/clip/inert/opacity fields apply around the unchanged SVG square. */
+     * by options above; uniform/per-edge padding and positive maximum caps apply.
+     * SVG paints the complete resolved box, without a padding inset. Other box
+     * paint/clip/inert/opacity fields apply; generic flex/percentage sizing does not. */
     const cui_box *style;
     /* Opt-in outline inside the allocated box on NOT_FOUND. Keeps that error
      * result and the existing decorative/named semantic contract. */
     bool debug_placeholder;
+    /* Optional synchronous numeric constraints; copied values are not retained.
+     * Explicit descriptor maxima replace corresponding legacy style maxima. */
+    const cui_icon_constraints *constraints;
 } cui_icon_options;
 /* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */

@@ -46,6 +46,8 @@ def generate(name,sources):
         code=code.replace('#include "cui_text_paint_internal.h"', (ROOT/'src/core/cui_text_paint_internal.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_design_metrics.h"', '#include "../base/cui_design_metrics.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_design_metrics.h').read_text(encoding='utf-8'))
+        for private_include in ['#include "cui_icon_layout.h"', '#include "../base/cui_icon_layout.h"']:
+            code=code.replace(private_include, (ROOT/'src/base/cui_icon_layout.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_textarea_geometry.h').read_text(encoding='utf-8'))
         if name=='cui_theme_registry':

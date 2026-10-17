@@ -379,6 +379,13 @@
       "sources": [
         "src/components/cui_text_overflow.c"
       ]
+    },
+    {
+      "header": "cui_video_controls.h",
+      "macro": "CUI_VIDEO_CONTROLS_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_video_controls.c"
+      ]
     }
   ]
 }

@@ -54,8 +54,12 @@ bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum
  * Missing callback is read-only. Disabled/read-only/source reset cancels a drag.
  * Semantic numeric values are normalized0..1 (Core's numeric ABI is float); name
  * and value_description carry application time units for accessibility. */
-typedef enum { CUI_SLIDER_BEGIN, CUI_SLIDER_UPDATE, CUI_SLIDER_COMMIT,
-               CUI_SLIDER_CANCEL } cui_slider_phase;
+typedef enum {
+    CUI_SLIDER_BEGIN,
+    CUI_SLIDER_UPDATE,
+    CUI_SLIDER_COMMIT,
+    CUI_SLIDER_CANCEL
+} cui_slider_phase;
 typedef struct {
     cui_slider_phase phase;
     double value;
@@ -77,8 +81,8 @@ typedef struct {
 /* false: invalid arguments, unchanged state and no submission. true: submitted.
  * Callbacks may commit/reject externally; each call uses one copied snapshot.
  * Callback must not destroy context/state during submission. */
-bool cui_base_slider_controlled(cui_context *, cui_id, cui_str, double value,
-                                cui_slider_state *, cui_slider_options);
+bool cui_base_slider_controlled(cui_context *, cui_id, cui_str, double value, cui_slider_state *,
+                                cui_slider_options);
 
 typedef struct {
     float fraction, start, length;

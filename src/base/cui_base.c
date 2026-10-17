@@ -298,7 +298,7 @@ static double cui_slider_limit(double value, cui_slider_options o) {
     return fmax(o.minimum, fmin(o.maximum, value));
 }
 static void cui_slider_emit(cui_slider_options o, cui_slider_phase phase, double value,
-                             cui_event event) {
+                            cui_event event) {
     if (o.on_request) {
         cui_slider_request request = {.phase = phase, .value = value, .event = event};
         o.on_request(o.user, &request);
@@ -317,8 +317,12 @@ bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double
     double span = o.maximum - o.minimum;
     float ratio = span > 0 ? (float)((value - o.minimum) / span) : 0;
     cui_interact(ui, id, CUI_ROLE_SLIDER, name, o.disabled, false, ratio);
-    cui_set_semantic_details(ui, id, (cui_semantic_details){.minimum = 0, .maximum = 1,
-        .readonly = readonly, .description = o.value_description, .touch_drag_priority = true});
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.minimum = 0,
+                                                    .maximum = 1,
+                                                    .readonly = readonly,
+                                                    .description = o.value_description,
+                                                    .touch_drag_priority = true});
     state->id = id;
     if (o.disabled || readonly || span == 0) {
         if (state->dragging)
@@ -357,20 +361,23 @@ bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double
             state->dragging = false;
             cui_slider_emit(o, CUI_SLIDER_COMMIT, state->preview, e);
         } else if (state->dragging && (e.type == CUI_EVENT_CANCEL ||
-                   (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE))) {
+                                       (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE))) {
             state->dragging = false;
             state->preview = state->start;
             cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, e);
         } else if (!state->dragging && e.type == CUI_EVENT_KEY_DOWN) {
             double increment = o.step > 0 ? o.step : span / 100;
             double next = value;
-            if (e.key == CUI_KEY_HOME) next = o.minimum;
-            else if (e.key == CUI_KEY_END) next = o.maximum;
+            if (e.key == CUI_KEY_HOME)
+                next = o.minimum;
+            else if (e.key == CUI_KEY_END)
+                next = o.maximum;
             else if (e.key == CUI_KEY_LEFT || e.key == CUI_KEY_DOWN)
                 next = cui_slider_limit(value - increment, o);
             else if (e.key == CUI_KEY_RIGHT || e.key == CUI_KEY_UP)
                 next = cui_slider_limit(value + increment, o);
-            else continue;
+            else
+                continue;
             cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e);
             cui_slider_emit(o, CUI_SLIDER_UPDATE, next, e);
             cui_slider_emit(o, CUI_SLIDER_COMMIT, next, e);

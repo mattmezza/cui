@@ -84,4 +84,5 @@ set(CUI_SOURCES
  src/theme/cui_theme_motion.c
  src/components/cui_components.c
  src/components/cui_text_overflow.c
+ src/components/cui_video_controls.c
 )

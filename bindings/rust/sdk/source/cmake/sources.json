@@ -185,7 +185,10 @@
       "src/components/cui_text_overflow.c"
     ],
     "cui_responsive": [],
-    "cui_typography": []
+    "cui_typography": [],
+    "cui_video_controls": [
+      "src/components/cui_video_controls.c"
+    ]
   },
   "native": {
     "text": [

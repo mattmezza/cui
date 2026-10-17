@@ -18,6 +18,9 @@ def generate(name,sources):
     lines += [f'#if defined({macro}) && defined({ready}) && !defined({macro}_ONCE)',f'#define {macro}_ONCE']
     if name in {"cui_choice", "cui_surface", "cui_form", "cui_status", "cui_message", "cui_text_view", "cui_questionnaire", "cui_virtual_scroll", "cui_editor"}:
         lines += ['#include "cui_components.h"']
+    if name == "cui_video_controls":
+        for module in ["cui_components", "cui_video"]:
+            lines += [f'#ifndef {module.upper()}_IMPLEMENTATION', f'#define {module.upper()}_IMPLEMENTATION', '#endif', f'#include "{module}.h"']
     if name == "cui_plot_view":
         lines += ['#ifndef CUI_PLOT_IMPLEMENTATION', '#define CUI_PLOT_IMPLEMENTATION', '#endif', '#include "cui_plot.h"']
     if name == "cui_plot_motion":

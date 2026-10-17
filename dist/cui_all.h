@@ -50,6 +50,7 @@
 #include "cui_theme.h"
 #include "cui_components.h"
 #include "cui_text_overflow.h"
+#include "cui_video_controls.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -249,4 +250,8 @@
 #define CUI_TEXT_OVERFLOW_IMPLEMENTATION
 #endif
 #include "cui_text_overflow.h"
+#ifndef CUI_VIDEO_CONTROLS_IMPLEMENTATION
+#define CUI_VIDEO_CONTROLS_IMPLEMENTATION
+#endif
+#include "cui_video_controls.h"
 #endif

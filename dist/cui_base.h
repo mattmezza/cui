@@ -48,6 +48,43 @@ bool cui_base_check_indicator(cui_context *, cui_id, cui_check_state, bool disab
 
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);
+/* Controlled double-precision slider. Submit inside a box with the same ID.
+ * Emits requests only; value is never mutated. State is presentation/capture only.
+ * begin/update/commit is one pointer gesture; cancel restores its starting value.
+ * Keyboard changes emit begin/update/commit per key, with no hidden acceleration.
+ * Missing callback is read-only. Disabled/read-only/source reset cancels a drag.
+ * Semantic numeric values are normalized0..1 (Core's numeric ABI is float); name
+ * and value_description carry application time units for accessibility. */
+typedef enum {
+    CUI_SLIDER_BEGIN,
+    CUI_SLIDER_UPDATE,
+    CUI_SLIDER_COMMIT,
+    CUI_SLIDER_CANCEL
+} cui_slider_phase;
+typedef struct {
+    cui_slider_phase phase;
+    double value;
+    cui_event event; /* Copied, borrowed only for the synchronous callback. */
+} cui_slider_request;
+typedef void (*cui_slider_request_fn)(void *, const cui_slider_request *);
+typedef struct {
+    cui_id id;
+    double preview, start;
+    bool dragging;
+} cui_slider_state;
+typedef struct {
+    double minimum, maximum, step;
+    bool disabled, readonly;
+    cui_str value_description;
+    cui_slider_request_fn on_request;
+    void *user;
+} cui_slider_options;
+/* false: invalid arguments, unchanged state and no submission. true: submitted.
+ * Callbacks may commit/reject externally; each call uses one copied snapshot.
+ * Callback must not destroy context/state during submission. */
+bool cui_base_slider_controlled(cui_context *, cui_id, cui_str, double value, cui_slider_state *,
+                                cui_slider_options);
+
 typedef struct {
     float fraction, start, length;
     bool animating;
@@ -483,6 +520,105 @@ bool cui_base_slider(cui_context *ui, cui_id id, cui_str name, float *value, flo
     *value = next;
     cui_update_semantic(ui, id, false, next);
     return old != next;
+}
+
+static double cui_slider_limit(double value, cui_slider_options o) {
+    value = fmax(o.minimum, fmin(o.maximum, value));
+    if (o.step > 0 && value != o.maximum) {
+        double units = (value - o.minimum) / o.step;
+        if (isfinite(units))
+            value = o.minimum + round(units) * o.step;
+    }
+    return fmax(o.minimum, fmin(o.maximum, value));
+}
+static void cui_slider_emit(cui_slider_options o, cui_slider_phase phase, double value,
+                            cui_event event) {
+    if (o.on_request) {
+        cui_slider_request request = {.phase = phase, .value = value, .event = event};
+        o.on_request(o.user, &request);
+    }
+}
+bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double value,
+                                cui_slider_state *state, cui_slider_options o) {
+    if (!ui || !cui_frame_is_submitting(ui) || !id || !state || (name.length && !name.data) ||
+        (o.value_description.length && !o.value_description.data) || !isfinite(value) ||
+        !isfinite(o.minimum) || !isfinite(o.maximum) || o.maximum < o.minimum ||
+        !isfinite(o.maximum - o.minimum) || value < o.minimum || value > o.maximum ||
+        !isfinite(o.step) || o.step < 0 || (state->id && state->id != id) ||
+        (state->dragging && (!isfinite(state->preview) || !isfinite(state->start))))
+        return false;
+    bool readonly = o.readonly || !o.on_request;
+    double span = o.maximum - o.minimum;
+    float ratio = span > 0 ? (float)((value - o.minimum) / span) : 0;
+    cui_interact(ui, id, CUI_ROLE_SLIDER, name, o.disabled, false, ratio);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.minimum = 0,
+                                                    .maximum = 1,
+                                                    .readonly = readonly,
+                                                    .description = o.value_description,
+                                                    .touch_drag_priority = true});
+    state->id = id;
+    if (o.disabled || readonly || span == 0) {
+        if (state->dragging)
+            cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, (cui_event){0});
+        state->dragging = false;
+        state->preview = value;
+        return true;
+    }
+    if (!cui_frame_paint_enabled(ui))
+        return true;
+    cui_rect bounds = cui_bounds(ui, id);
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    if (!state->dragging)
+        state->preview = value;
+    for (size_t i = 0; i < count; ++i) {
+        cui_event e = events[i];
+        if (cui_event_target(ui, i) != id || cui_event_consumed(ui, i))
+            continue;
+        if ((e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_UP) &&
+            e.pointer_button != CUI_POINTER_PRIMARY)
+            continue;
+        if (e.type == CUI_EVENT_POINTER_DOWN && bounds.w > 0) {
+            state->dragging = true;
+            state->start = value;
+            cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e);
+        }
+        if (state->dragging && bounds.w > 0 &&
+            (e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_MOVE ||
+             e.type == CUI_EVENT_POINTER_UP)) {
+            double fraction = fmax(0, fmin(1, ((double)e.x - bounds.x) / bounds.w));
+            state->preview = cui_slider_limit(o.minimum + span * fraction, o);
+            cui_slider_emit(o, CUI_SLIDER_UPDATE, state->preview, e);
+        }
+        if (state->dragging && e.type == CUI_EVENT_POINTER_UP) {
+            state->dragging = false;
+            cui_slider_emit(o, CUI_SLIDER_COMMIT, state->preview, e);
+        } else if (state->dragging && (e.type == CUI_EVENT_CANCEL ||
+                                       (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE))) {
+            state->dragging = false;
+            state->preview = state->start;
+            cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, e);
+        } else if (!state->dragging && e.type == CUI_EVENT_KEY_DOWN) {
+            double increment = o.step > 0 ? o.step : span / 100;
+            double next = value;
+            if (e.key == CUI_KEY_HOME)
+                next = o.minimum;
+            else if (e.key == CUI_KEY_END)
+                next = o.maximum;
+            else if (e.key == CUI_KEY_LEFT || e.key == CUI_KEY_DOWN)
+                next = cui_slider_limit(value - increment, o);
+            else if (e.key == CUI_KEY_RIGHT || e.key == CUI_KEY_UP)
+                next = cui_slider_limit(value + increment, o);
+            else
+                continue;
+            cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e);
+            cui_slider_emit(o, CUI_SLIDER_UPDATE, next, e);
+            cui_slider_emit(o, CUI_SLIDER_COMMIT, next, e);
+            state->preview = next;
+        }
+    }
+    return true;
 }
 
 static bool cui_input_readonly_event(cui_event event) {

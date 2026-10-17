@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Build the optional next-batch example in an external CMake harness."""
+"""Build the optional decoded-video example in an external CMake harness."""
 import argparse
 from pathlib import Path
 import subprocess
@@ -50,17 +50,18 @@ pkg_check_modules(VIDEO_FFMPEG REQUIRED IMPORTED_TARGET libavformat=63.1.102 lib
 find_package(Threads REQUIRED)
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(EXAMPLE {qexample})
-add_library(video_controls STATIC "${{EXAMPLE}}/../../src/components/cui_video_controls.c")
-target_link_libraries(video_controls PUBLIC cui)
 add_library(video_decoder STATIC "${{EXAMPLE}}/decoder.c")
-target_link_libraries(video_decoder PUBLIC video_controls PkgConfig::VIDEO_FFMPEG Threads::Threads)
+target_link_libraries(video_decoder PUBLIC cui PkgConfig::VIDEO_FFMPEG Threads::Threads)
 add_executable(video_player "${{EXAMPLE}}/main.c")
 target_link_libraries(video_player PRIVATE video_decoder cui_sdl3)
 add_executable(test_video_decoder "${{EXAMPLE}}/test_decoder.c")
 target_link_libraries(test_video_decoder PRIVATE video_decoder cui_software)
 foreach(name slider_controlled video_controls)
- add_executable(test_${{name}} "${{EXAMPLE}}/../../tests/unit/test_${{name}}.c")
- target_link_libraries(test_${{name}} PRIVATE video_controls cui_software)
+ # Root CMake owns portable tests; reuse its strict target and avoid CMP0002.
+ if(NOT TARGET test_${{name}})
+  add_executable(test_${{name}} "${{EXAMPLE}}/../../tests/unit/test_${{name}}.c")
+  target_link_libraries(test_${{name}} PRIVATE cui cui_software)
+ endif()
  add_test(NAME next_${{name}} COMMAND test_${{name}})
 endforeach()
 add_test(NAME next_video_fixture COMMAND ${{Python3_EXECUTABLE}} "${{EXAMPLE}}/make_fixture.py" "${{CMAKE_BINARY_DIR}}/fixture.mkv")

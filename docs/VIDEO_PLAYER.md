@@ -1,7 +1,7 @@
-# Controlled video controls (next batch)
+# Controlled video controls
 
 `cui_video_controls.h` adds optional Styled controls above the portable video
-surface. This extension is independent of the frozen78-component baseline.
+surface. This extension is independent of the frozen 78-component baseline.
 It does not decode, play audio, change native fullscreen, or acknowledge commands.
 
 ```c
@@ -36,7 +36,7 @@ Keyboard changes emit all three accepted phases per key. Gesture preview is not
 a second authoritative playback timeline. Removing a timeline/source invalidates
 its local preview; it does not issue a stale cancellation request.
 
-The slider uses normalized0..1 Core numeric semantics because that ABI is float;
+The slider uses normalized 0..1 Core numeric semantics because that ABI is float;
 the accessible description gives position/duration in seconds. It retains double
 seconds in requests. Space/Enter use existing Button behavior; focused timeline
 arrows use `seek_step`, Home/End use bounds. Shortcuts never inspect global keys.
@@ -50,8 +50,8 @@ requires a known positive duration and a seekable timeline. Loading/buffering/er
 views disable playback/seek/rate; fullscreen remains a separate host capability.
 Fullscreen display follows only the confirmed `view.fullscreen` value.
 Volume/mute/captions have no invented state; supply separate host-backed controls
-when those features exist. This first bar has no auto-hide timer or overflow menu. Buttons use44-unit touch
-targets and flow into additional rows within the selected width (at least160
+when those features exist. This first bar has no auto-hide timer or overflow menu.
+Buttons use 44-unit touch targets and flow into additional rows within the selected width (at least 160
 logical units).
 
 `cui_video_player` composes surface and optional controls. A null frame reserves

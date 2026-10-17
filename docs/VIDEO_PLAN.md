@@ -1,12 +1,13 @@
 # Video architecture proposal
 
-Audit baseline: `b96c6844`. No decoder dependency has been selected or installed.
-This document proposes a reusable playback surface, with controls composed above
-it, rather than putting decoding, transport and UI in one component.
+Original architecture audit baseline: `b96c6844`, before selecting a decoder
+dependency. The current portable surface and controls are implemented separately
+from the optional FFmpeg example below. The remaining architecture proposals do
+not establish shipped capabilities.
 
 The portable timeline and borrowed CPU RGBA surface are now available in
 `cui/cui_video.h`; [the implementation guide](VIDEO_GUIDE.md) describes their
-actual behavior and tests. The next-batch [controlled player](VIDEO_PLAYER.md) and optional
+actual behavior and tests. The [controlled player](VIDEO_PLAYER.md) and optional
 [FFmpeg example](../examples/video_player/README.md) implement requests, a bounded
 host-owned queue and actual silent local-file decoding. They do not change the
 78-component baseline. Audio, browser playback, general decoder-adapter ABI and
@@ -22,8 +23,8 @@ is useful precedent for ownership and frame presentation; it is not a streaming
 video decoder, audio clock, seek engine, recorder or editor.
 
 `cui_bitmap` in `include/cui/cui.h` is borrowed straight-alpha RGBA8 with stride
-and revision. It remains valid through renderer completion. A first video surface
-can reuse `cui_paint_bitmap` and image-fit geometry with decoded RGBA frames. It
+and revision. It remains valid through renderer completion. The current video
+surface reuses `cui_paint_bitmap` and image-fit geometry with decoded RGBA frames. It
 must not preload an entire movie into the animated-image frame array (currently
 bounded at 4096 entries). Dynamic streaming requires bounded queues and explicit
 frame release, buffering and end-of-stream behavior.
@@ -85,6 +86,7 @@ Then compose accessible controls against the fake controller. Only after the
 interfaces work should a separate decision compare decoder adapters against
 supported platforms, license/distribution constraints, pinned versions, codec
 availability, audio synchronization and package size. No dependency is necessary
-to review or test the first two deliverables. A real local-file adapter must prove
-play/pause/seek/audio synchronization and cleanup before claiming video support.
+to review or test the first two deliverables. The optional silent local-file
+example proves decoded play/pause/seek and cleanup. Audio-capable playback still
+requires audio synchronization acceptance.
 Recording, casting and editing each need separate acceptance criteria and scope.

@@ -1,6 +1,6 @@
 # Optional silent local-video player
 
-This next-batch example decodes **actual encoded video** on a worker using an
+This example decodes **actual encoded video** on a worker using an
 explicitly optional FFmpeg host dependency. Core/Base/Components remain codec
 independent. It uses the callback runner, controlled playback requests and
 borrowed RGBA surfaces. No audio, networking, hardware decoding, subtitles,
@@ -17,15 +17,17 @@ python examples/video_player/build.py --build-dir /tmp/cui-video-example --test
 The build helper writes an external CMake harness; it changes no repository
 CMake/module registration and installs nothing. It requires C11 threads, pkg-config,
 CMake/Ninja, the existing native CUI dependencies and these audited FFmpeg library
-versions: libavformat/libavcodec63.1.102, libavutil61.1.102, libswscale10.1.102.
+versions: libavformat/libavcodec 63.1.102, libavutil 61.1.102, libswscale 10.1.102.
 Other versions require a deliberate compatibility audit/update; they are not
-silently accepted. Native automated tests always run through `test_local.py` on
+silently accepted. The default test font is
+`/usr/share/fonts/noto/NotoSans-Regular.ttf`; use `--font /path/to/font.ttf` when it
+is elsewhere. Native automated tests always run through `test_local.py` on
 private Xvfb. They cannot fall back to a desktop display. The interactive command
 above is for an explicit human launch.
 
 The helper records complete `ffmpeg -version`, `-buildconf`, `-L` and library
-versions in `BUILD_DIR/ffmpeg-build-audit.txt`. This machine's binary reports
-FFmpeg n9.0.2, GCC16, shared libraries, `--enable-gpl --enable-version3` and GPLv3
+versions in `BUILD_DIR/ffmpeg-build-audit.txt`. The audited validation host's binary
+reports FFmpeg n9.0.2, GCC 16, shared libraries, `--enable-gpl --enable-version3` and GPLv3
 or later. It enables many optional external codecs and disables magicyuv decoding.
 The example does not vendor, download, package or redistribute those libraries.
 Its MIT source license does not change the linked FFmpeg build's licensing.
@@ -43,7 +45,7 @@ Mutex critical sections copy state and manage slots, never decode or convert.
 FFmpeg protocols are restricted to `file`. This example is not a hardened loader
 for untrusted media or a network player.
 
-Exactly three reusable slots bound RGBA storage, each at most4096x4096 pixels.
+Exactly three reusable slots bound RGBA storage, each at most 4096x4096 pixels.
 Slots transition FREE -> WRITING -> QUEUED -> LEASED -> FREE. The UI acquires the
 latest due queued frame and may drop older queued frames. One paused lease is
 retained unchanged, while the worker fills the other slots and waits. Replacement
@@ -80,7 +82,7 @@ must not be called color-managed or HDR playback.
 
 ## Evidence and boundaries
 
-`make_fixture.py` encodes20 real64x32 red/blue frames into FFV1/Matroska using the
+`make_fixture.py` encodes 20 real 64x32 red/blue frames into FFV1/Matroska using the
 installed executable. `test_decoder.c` decodes that file, verifies actual RGBA and
 software-render pixels, pause lease stability, seek generation/content, stale
 frame rejection, exactly-once release, bounded slots, EOF and missing-file cleanup.

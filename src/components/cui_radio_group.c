@@ -9,12 +9,6 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
     if (!t)
         return r;
     float density = t->font_size / 16;
-    cui_design_metrics design;
-    if (o.design_size != CUI_DESIGN_INHERIT && !cui_design_measure(o.design_size, density, &design))
-        return r;
-    r = cui_base_radio_group(ui, id, items, count, selected, state, o);
-    if (!r.valid)
-        return r;
     float size = (o.size == CUI_CONTROL_XSMALL  ? 12
                   : o.size == CUI_CONTROL_SMALL ? 14
                   : o.size == CUI_CONTROL_LARGE ? 18
@@ -25,9 +19,15 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
                                                 : 14) *
                  density;
     if (o.design_size != CUI_DESIGN_INHERIT) {
+        cui_design_metrics design;
+        if (!cui_design_measure(o.design_size, density, &design))
+            return r;
         size = design.indicator_size;
         font = design.font_size;
     }
+    r = cui_base_radio_group(ui, id, items, count, selected, state, o);
+    if (!r.valid)
+        return r;
     cui_begin_box(ui, id, (cui_box){.row = !o.vertical, .gap = o.gap > 0 ? o.gap : 12 * density});
     for (size_t i = 0; i < count; i++) {
         bool disabled = o.disabled || items[i].disabled, checked = *selected == items[i].id;

@@ -196,6 +196,30 @@ static cui_progress_circle_state progress_circle_state = {progress_circle_pixels
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
 static cui_loading_motion spinner_motion, skeleton_motion;
+static float spinner_size = 16;
+static int spinner_icon, spinner_color, spinner_easing;
+void gallery_spinner_options(float size, int icon, int color, int easing) {
+    spinner_size = isfinite(size) && size >= 1 && size <= 128 ? size : 16;
+    spinner_icon = icon >= 0 && icon <= 2 ? icon : 0;
+    spinner_color = color >= 0 && color <= 2 ? color : 0;
+    spinner_easing = easing == 1;
+}
+static float gallery_spinner_linear(float phase, void *user) {
+    (void)user;
+    return phase;
+}
+static bool gallery_spinner_icon(cui_context *context, cui_id id, const cui_theme *theme,
+                                 float size, cui_color color, float radians, void *user) {
+    return cui_icon_named(context, id, theme, cui_string(user),
+                          (cui_icon_options){.size = CUI_ICON_CUSTOM,
+                                             .custom_size = size,
+                                             .custom_color = true,
+                                             .color = color,
+                                             .custom_transform = true,
+                                             .transform = cui_icon_rotation(radians)}) ==
+           CUI_ICON_OK;
+}
+
 static float host_seconds, host_dt = 1.0f / 60;
 static cui_draw_list draw;
 static const cui_semantic *semantics;
@@ -4267,7 +4291,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     }
     case 19: {
         cui_spinner_options options = cui_spinner_options_default();
-        options.size = 32;
+        options.size = spinner_size;
+        options.custom_color = spinner_color != 0;
+        options.color = (cui_color){220, 40, 90, spinner_color == 2 ? 0 : 255};
+        options.ease = spinner_easing ? gallery_spinner_linear : NULL;
+        if (spinner_icon) {
+            options.paint = gallery_spinner_icon;
+            options.paint_user = spinner_icon == 1 ? "loader-circle" : "arrow-right";
+        }
         options.now_seconds = cui_frame_time(ui);
         options.reduced_motion = reduced_motion;
         cui_loading_motion_result motion;

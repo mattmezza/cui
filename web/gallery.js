@@ -21,6 +21,18 @@ function shareRoute(path,raw,title,description){
  for(const [selector,value] of [['meta[name=description]',description],['meta[property="og:title"]',title],['meta[property="og:description"]',description],['meta[property="og:url"]',canonical],['meta[name="twitter:title"]',title],['meta[name="twitter:description"]',description]])document.querySelector(selector)?.setAttribute('content',value);
 }
 const canvas = $('preview'), ctx = canvas.getContext('2d');
+for(const [id,label,choices] of [
+ ['spinner-size','Spinner size',[['12','Extra small · 12px'],['14','Small · 14px'],['16','Medium · 16px'],['24','Large · 24px'],['64','Custom · 64px']]],
+ ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right']]],
+ ['spinner-color','Spinner color',[['0','Theme foreground'],['1','Custom pink'],['2','Transparent']]],
+ ['spinner-easing','Spinner easing',[['0','Source ease in out'],['1','Linear']]],
+]){
+ const control=document.createElement('select');control.id=id;control.hidden=true;control.setAttribute('aria-label',label);
+ for(const [value,name] of choices){const option=document.createElement('option');option.value=value;option.textContent=name;control.append(option);}
+ if(id==='spinner-size')control.value='16';
+ $('text-weight').after(control);control.addEventListener('change',requestFrame);
+}
+
 const textPaintControl=document.createElement('select');
 textPaintControl.id='text-paint';textPaintControl.setAttribute('aria-label','Typography paint');
 textPaintControl.hidden=true;
@@ -133,7 +145,7 @@ const snippets = {
  Empty:'const cui_empty_slot title = {.text = cui_string("No projects yet")};\nconst cui_empty_slot description = {.text = cui_string("Create your first project.")};\nconst cui_empty_header header = {.title = &title, .description = &description};\ncui_empty_ex(ui, id, &theme, (cui_empty_options){\n    .header = &header, .accessible_name = cui_string("Empty workspace")});\n/* content.children accepts a borrowed callback that submits native controls;\n   see the Empty guide for a complete action-button example. */',
  GroupBox:'cui_begin_group_box(ui, id, &theme, cui_string("Preferences"), 320);\ncui_label(ui, &theme, cui_string("Your settings"));\ncui_end_group_box(ui);',
  Skeleton:'cui_skeleton(ui, id, &theme, 240, 20, 6,\n    cui_loading_phase(now_seconds, 1.2f), false, reduced_motion);',
- Spinner:'cui_spinner(ui, id, &theme, 24,\n    cui_loading_phase(now_seconds, .8f), reduced_motion);',
+ Spinner:'/* Retain one zero-initialized motion per spinner between frames. */\ncui_loading_motion motion = {0};\ncui_spinner_options options = cui_spinner_options_default();\noptions.now_seconds = now_seconds;\noptions.reduced_motion = reduced_motion;\ncui_loading_motion_result result;\nif (cui_spinner_ex(ui, id, &theme, &motion, options, &result))\n    next_wake = result.next_wake_seconds; /* Same clock domain. */',
  Tooltip:'/* Paint trigger before calling the tooltip. */\ncui_tooltip(ui, id, &theme, &hover, cui_string("Helpful detail"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport});',
  HoverCard:'/* Paint trigger before opening the card. */\nif (cui_begin_hover_card(ui, id, &theme, &hover, cui_string("Profile"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport})) {\n    cui_label(ui, &theme, cui_string("Alex Morgan"));\n    cui_end_hover_card(ui);\n}',
  'Focus Trap':'if (cui_begin_focus_scope(ui, scope_id, true)) {\n    /* Paint focusable children here. */\n    cui_end_focus_scope(ui);\n}',
@@ -396,6 +408,7 @@ function render(){
  wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
  wasm.gallery_progress_mode(Number($('progress-mode').value));
  wasm.gallery_progress_shape(Number($('progress-shape').value));
+ wasm.gallery_spinner_options(Number($('spinner-size').value),Number($('spinner-icon').value),Number($('spinner-color').value),Number($('spinner-easing').value));
  wasm.gallery_shimmer_mode(Number($('shimmer-mode').value));
  wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
  wasm.gallery_tag_options(Number($('tag-variant').value),Number($('tag-color').value),Number($('tag-outline').checked),Number($('tag-pill').checked));
@@ -671,6 +684,7 @@ function selectComponent(){
  $('snippet').textContent=(selected.example?'/* Retain app across frames. Include examples/composed_apps/app.h. */\ncomposed_app *app = composed_app_create(on_app_event, user);\n/* Between frames, before cui_begin_frame: */\ncomposed_app_set_theme(app, &theme);\n/* Between cui_begin_frame and cui_end_frame: */\ncomposed_app_scene(ui, app, width, height);\n/* At shutdown, after rendering the last draw list: */\ncomposed_app_destroy(app);':snippets[selected.name])||(live?`/* See the public ${selected.public_header || 'component'} API. */`:'/* No complete styled browser example yet. */');
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
 
+ for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing'])$(id).hidden=selected.name!=='Spinner';
  $('icon-catalog-panel').hidden=selected.name!=='Icon';if(selected.name==='Icon')loadIconCatalog();
  loadComponentApi(selected);
  const usage=selected.usage;
@@ -678,7 +692,7 @@ function selectComponent(){
  $('component-state').textContent=usage?.state_ownership||'Retain application values between frames.';
  $('component-events').textContent=usage?.interaction||'Use the linked guide for the example callbacks.';
  $('component-usage-note').textContent=usage?.usage||'';
- $('component-guides').replaceChildren();for(const path of new Set([...(usage?.docs||[]),...(selected.name==='Theme'?['docs/TEXT_GRADIENT.md']:[])])){const doc=documents.find(d=>d.source.endsWith('/'+path));if(doc){const a=document.createElement('a');a.href='#docs/'+doc.slug;a.textContent=doc.title;$('component-guides').append(a,document.createTextNode(' '));}}
+ $('component-guides').replaceChildren();for(const path of new Set([...(usage?.docs||[]),...(selected.name==='Theme'?['docs/TEXT_GRADIENT.md']:selected.name==='Spinner'?['docs/SPINNER.md']:[])])){const doc=documents.find(d=>d.source.endsWith('/'+path));if(doc){const a=document.createElement('a');a.href='#docs/'+doc.slug;a.textContent=doc.title;$('component-guides').append(a,document.createTextNode(' '));}}
 
  $('features').replaceChildren();for(const feature of selected.features){const row=document.createElement('tr'),name=document.createElement('td'),status=document.createElement('td');name.textContent=feature.name;status.textContent=feature.status.replaceAll('_',' ');status.className=feature.status;row.append(name,status);$('features').append(row);}
  $('limitations').replaceChildren();for(const message of [...selected.limitations,...(live?['Canvas text uses the browser system font; native FreeType / HarfBuzz rendering is separate.','Browser semantics are experimental; native IME candidate UI and a complete platform accessibility bridge vary by host.']:[])]){const li=document.createElement('li');li.textContent=message;$('limitations').append(li);}

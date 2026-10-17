@@ -283,6 +283,7 @@ def publish_agent_docs(root, output, paths, documents, profile):
 
     complete_index = introduction + '\n## All documentation\n\n'
     curated = {'API', 'CORE', 'INTERFACES', 'ICON', 'AI_AGENTS', 'LAYOUT_GUIDE', 'IDS_AND_LIFETIMES', 'DEBUGGING', 'APP_RECIPES', 'THEME_GUIDE', 'PLATFORM_MATRIX', 'IMMEDIATE_AND_STATE', 'LANGUAGE_BINDINGS'}
+    curated.update({'PACKAGING', 'RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS'})
     for group in ('Getting started', 'Guides', 'Components', 'Development'):
         entries = [(path, doc) for path, doc in zip(paths, documents) if doc['category'] == group]
         if not entries:
@@ -295,7 +296,7 @@ def publish_agent_docs(root, output, paths, documents, profile):
             label = doc['title'].replace('[', '\\[').replace(']', '\\]')
             entry = f'- [{label}]({url}): {doc["description"]}\n'
             complete_index += entry
-            if group == 'Getting started' or (path.stem in curated and not doc['historical']):
+            if group == 'Getting started' or ((path.stem in curated or relative.startswith('bindings/')) and not doc['historical']):
                 index += entry
             markdown = markdown_for_agents(path, root)
             destination = output / 'markdown' / relative

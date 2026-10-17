@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_sdl3.h"
 #include "../../backends/software/cui_shape.h"
+#include "cui/cui_sdl3.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
 #include <math.h>
@@ -60,7 +60,8 @@ static void old_rect(const cui_draw_command *c) {
 static void compare(cui_sdl3 *backend, cui_draw_command shape, bool clipped) {
     cui_draw_command commands[] = {
         {.type = CUI_DRAW_CLIP_PUSH, .bounds = {19.25f, 17.75f, 170.5f, 245.25f}},
-        shape, {.type = CUI_DRAW_CLIP_POP}};
+        shape,
+        {.type = CUI_DRAW_CLIP_POP}};
     cui_draw_list list = {clipped ? commands : &commands[1], clipped ? 3 : 1, 256, 384};
     expected_count = 0;
     old_rect(&shape);
@@ -79,8 +80,8 @@ static void compare(cui_sdl3 *backend, cui_draw_command shape, bool clipped) {
     assert(a && b && a->w == b->w && a->h == b->h && a->format == b->format);
     int bytes = SDL_BYTESPERPIXEL(a->format) * a->w;
     for (int y = 0; y < a->h; y++)
-        assert(memcmp((char *)a->pixels + y * a->pitch,
-                      (char *)b->pixels + y * b->pitch, (size_t)bytes) == 0);
+        assert(memcmp((char *)a->pixels + y * a->pitch, (char *)b->pixels + y * b->pitch,
+                      (size_t)bytes) == 0);
     SDL_DestroySurface(a);
     SDL_DestroySurface(b);
 }
@@ -88,9 +89,12 @@ int main(void) {
     cui_sdl3 *backend = cui_sdl3_create("Rounded strip parity", 256, 384, NULL);
     assert(backend);
     cui_draw_command shape = {.type = CUI_DRAW_RECT,
-        .bounds = {8.25f, 6.75f, 221.5f, 340.25f}, .color = {210, 121, 37, 128},
-        .custom_corners = true, .corner_radii = {37, 0, 63.5f, 12.25f},
-        .custom_border_edges = true, .border_edges = {2.25f, 9, 17.5f, 4}};
+                              .bounds = {8.25f, 6.75f, 221.5f, 340.25f},
+                              .color = {210, 121, 37, 128},
+                              .custom_corners = true,
+                              .corner_radii = {37, 0, 63.5f, 12.25f},
+                              .custom_border_edges = true,
+                              .border_edges = {2.25f, 9, 17.5f, 4}};
     for (int type = 0; type < 2; type++) {
         shape.type = type ? CUI_DRAW_BORDER : CUI_DRAW_RECT;
         for (int alpha = 0; alpha < 3; alpha++) {

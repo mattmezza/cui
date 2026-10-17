@@ -1118,3 +1118,12 @@ if(TARGET cui_bridge AND NOT TARGET cui_sdl3)
  cui_warnings(test_bridge_portable_run)
  add_test(NAME bridge_portable_run COMMAND test_bridge_portable_run)
 endif()
+
+if(TARGET test_bridge_run)
+ find_file(CUI_TEST_SYMBOL_FONT NAMES AdwaitaMono-Regular.ttf DejaVuSans.ttf
+  PATHS /usr/share/fonts/Adwaita /usr/share/fonts/truetype/dejavu /usr/share/fonts/TTF)
+ if(CUI_TEST_SYMBOL_FONT)
+  add_test(NAME bridge_run_unicode_fallback COMMAND test_bridge_run unicode ${CUI_TEST_FONT} ${CUI_TEST_SYMBOL_FONT})
+  set_tests_properties(bridge_run_unicode_fallback PROPERTIES TIMEOUT 20)
+ endif()
+endif()

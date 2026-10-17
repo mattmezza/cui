@@ -55,7 +55,7 @@ static Uint32 SDLCALL close_timer(void *user, SDL_TimerID timer, Uint32 interval
     return 0;
 }
 int main(int argc, char **argv) {
-    assert(argc == 3);
+    assert(argc == 3 || argc == 4);
     cui_bridge_status status;
     cui_bridge_options options = {.struct_size = cui_bridge_options_size(),
                                   .abi_version = cui_bridge_abi_version(),
@@ -69,6 +69,16 @@ int main(int argc, char **argv) {
     cui_bridge_node root;
     assert(cui_bridge_node_create(p.app, (cui_bridge_node){0}, CUI_BRIDGE_ROW, "root", &root) ==
            CUI_BRIDGE_OK);
+    cui_bridge_node button;
+    assert(cui_bridge_node_create(p.app, root, CUI_BRIDGE_BUTTON, "save", &button) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(p.app, button, "Save changes") == CUI_BRIDGE_OK);
+    if (!strcmp(p.mode, "unicode")) {
+        assert(argc == 4);
+        const char *fallbacks[] = {argv[3]};
+        assert(cui_bridge_set_font_fallbacks(p.app, fallbacks, 1) == CUI_BRIDGE_OK);
+        assert(cui_bridge_set_text(p.app, button, "Save ✓") == CUI_BRIDGE_OK);
+    }
     bool no_callback = !strcmp(p.mode, "none");
     if (no_callback)
         assert(SDL_AddTimer(50, close_timer, NULL));

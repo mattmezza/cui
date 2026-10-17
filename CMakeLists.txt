@@ -1063,6 +1063,10 @@ endif()
 add_test(NAME macos_bundle_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_macos_bundle.py)
 add_test(NAME macos_cross_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_macos_cross.py)
 add_test(NAME native_build_requirements COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_native_requirements.py)
+add_test(NAME install_vendor_notices COMMAND ${Python3_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_install_notices.py
+ --build-dir ${CMAKE_CURRENT_BINARY_DIR} --source-root ${CMAKE_CURRENT_SOURCE_DIR}
+ --config $<CONFIG>)
 set_tests_properties(macos_bundle_contract macos_cross_contract native_build_requirements PROPERTIES TIMEOUT 60)
 
 # Cross-built executables and bridge libraries cannot run on the build host.

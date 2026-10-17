@@ -201,7 +201,7 @@ typedef struct {
 /* Refine initialized defaults. Order: instance, checked/mixed, then disabled.
  * Application callbacks own hover/active/focus refinements via existing queries. */
 typedef void (*cui_checkbox_style_fn)(cui_context *, void *, cui_check_state, bool disabled,
-                                     cui_checkbox_paint *);
+                                      cui_checkbox_paint *);
 typedef struct {
     cui_checkbox_style_fn instance, checked, mixed, disabled;
     void *user;
@@ -243,8 +243,8 @@ bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, boo
 /* Frozen-source controlled facade: no callback leaves the value unchanged.
  * Pointer activation preserves focus; keyboard focus and
  * tab ordering remain available. Legacy checkbox/ex retain pointer-focus policy. */
-bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str,
-                          cui_check_state *, cui_checkbox_options);
+bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
+                         cui_checkbox_options);
 
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {

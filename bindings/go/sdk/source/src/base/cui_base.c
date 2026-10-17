@@ -156,6 +156,67 @@ bool cui_base_check(cui_context *ui, cui_id id, cui_str name, cui_check_state *v
     cui_update_semantic(ui, id, *v == CUI_CHECK_CHECKED, (float)*v);
     return true;
 }
+bool cui_base_check_ex(cui_context *ui, cui_id id, cui_str name, cui_check_state *value,
+                       cui_check_options o) {
+    if (!ui || !cui_frame_is_submitting(ui) || !id || !value || *value < CUI_CHECK_UNCHECKED ||
+        *value > CUI_CHECK_MIXED || (name.length && !name.data) ||
+        (o.custom_role && (o.role < CUI_ROLE_NONE || o.role > CUI_ROLE_RADIOGROUP)))
+        return false;
+    cui_check_state before = *value;
+    cui_check_state requested =
+        before == CUI_CHECK_CHECKED ? CUI_CHECK_UNCHECKED : CUI_CHECK_CHECKED;
+    cui_interact(ui, id, o.custom_role ? o.role : CUI_ROLE_CHECKBOX, name, o.disabled,
+                 before == CUI_CHECK_CHECKED, (float)before);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.required = o.required,
+                                                    .invalid = o.invalid,
+                                                    .no_pointer_focus = o.no_pointer_focus,
+                                                    .pointer_activatable = true,
+                                                    .focusable = true});
+    cui_set_tab_index(ui, id, o.tab_index);
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    bool activated = false;
+    size_t count = 0;
+    cui_frame_events(ui, &count);
+    for (size_t e = 0; !o.disabled && e < count; ++e) {
+        cui_activation_snapshot event;
+        if (cui_event_accepted_activation(ui, e) != id ||
+            !cui_event_activation_snapshot(ui, e, &event))
+            continue;
+        activated = true;
+        if (o.on_change)
+            o.on_change(o.change_user, requested, &event);
+        else if (!o.controlled)
+            *value = requested;
+    }
+    cui_update_semantic(ui, id, *value == CUI_CHECK_CHECKED, (float)*value);
+    return activated;
+}
+bool cui_check_box_style(cui_check_state value, bool disabled, cui_check_box_styles styles,
+                         cui_box *box) {
+    if (!box || value < CUI_CHECK_UNCHECKED || value > CUI_CHECK_MIXED)
+        return false;
+    cui_check_box_style_fn layers[] = {styles.instance,
+                                       value == CUI_CHECK_CHECKED ? styles.checked
+                                       : value == CUI_CHECK_MIXED ? styles.mixed
+                                                                  : NULL,
+                                       disabled ? styles.disabled : NULL};
+    for (size_t i = 0; i < sizeof layers / sizeof layers[0]; ++i)
+        if (layers[i])
+            layers[i](styles.user, box);
+    return true;
+}
+bool cui_base_check_indicator(cui_context *ui, cui_id id, cui_check_state value, bool disabled,
+                              cui_box box, cui_check_box_styles styles,
+                              cui_check_content_fn content, void *user) {
+    if (!ui || !cui_frame_is_submitting(ui) || !cui_check_box_style(value, disabled, styles, &box))
+        return false;
+    cui_begin_box(ui, id, box);
+    if (content)
+        content(ui, user);
+    cui_end_box(ui);
+    return cui_last_error(ui) == CUI_OK;
+}
 bool cui_base_radio(cui_context *ui, cui_id id, cui_str name, int *value, int option,
                     bool disabled) {
     if (!value)

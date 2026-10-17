@@ -17,7 +17,7 @@ bool cui_base_radio(cui_context *, cui_id, cui_str, int *value, int option, bool
 typedef enum { CUI_CHECK_UNCHECKED, CUI_CHECK_CHECKED, CUI_CHECK_MIXED } cui_check_state;
 bool cui_base_check(cui_context *, cui_id, cui_str, cui_check_state *, bool disabled);
 typedef void (*cui_check_change_fn)(void *user, cui_check_state requested,
-                                   const cui_activation_snapshot *event);
+                                    const cui_activation_snapshot *event);
 typedef struct {
     bool disabled, required, invalid, skip_tab, no_pointer_focus, custom_role, controlled;
     int tab_index;
@@ -42,9 +42,8 @@ typedef void (*cui_check_content_fn)(cui_context *, void *);
 bool cui_check_box_style(cui_check_state, bool disabled, cui_check_box_styles, cui_box *);
 /* Unstyled indicator part. Draws the projected box and arbitrary child content;
  * owns no interaction/semantics. Root behavior remains cui_base_check_ex. */
-bool cui_base_check_indicator(cui_context *, cui_id, cui_check_state, bool disabled,
-                              cui_box, cui_check_box_styles, cui_check_content_fn, void *);
-
+bool cui_base_check_indicator(cui_context *, cui_id, cui_check_state, bool disabled, cui_box,
+                              cui_check_box_styles, cui_check_content_fn, void *);
 
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);

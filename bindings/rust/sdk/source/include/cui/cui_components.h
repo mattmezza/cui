@@ -193,6 +193,27 @@ typedef struct {
     double next_wake_seconds; /* Absolute Core frame time; zero when quiescent. */
 } cui_checkbox_state;
 typedef struct {
+    cui_box root, indicator;
+    cui_color foreground, label;
+    float label_font_size, label_line_height;
+    cui_text_style label_style;
+} cui_checkbox_paint;
+/* Refine initialized defaults. Order: instance, checked/mixed, then disabled.
+ * Application callbacks own hover/active/focus refinements via existing queries. */
+typedef void (*cui_checkbox_style_fn)(cui_context *, void *, cui_check_state, bool disabled,
+                                      cui_checkbox_paint *);
+typedef struct {
+    cui_checkbox_style_fn instance, checked, mixed, disabled;
+    void *user;
+} cui_checkbox_styles;
+typedef struct {
+    cui_check_state value;
+    float width, height, checked_progress, mixed_progress;
+    cui_color foreground;
+    bool disabled;
+} cui_checkbox_indicator_info;
+typedef void (*cui_checkbox_indicator_fn)(cui_context *, void *, cui_checkbox_indicator_info);
+typedef struct {
     cui_control_size size;
     bool disabled, required, invalid, skip_tab, hide_focus_ring;
     cui_str accessibility_label;
@@ -205,10 +226,26 @@ typedef struct {
     cui_str tooltip;
     cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled are supplied. */
     bool reduced_motion;
+    /* Checkbox-only source seams. Radio alias ignores every extension below. */
+    cui_check_change_fn on_change;
+    void *change_user;
+    int tab_index;
+    bool custom_role;
+    cui_role role;
+    cui_checkbox_styles styles;
+    cui_checkbox_indicator_fn indicator;
+    void *indicator_user;
+    bool source_behavior; /* Styled no-pointer-focus; use cui_checkbox_source. */
 } cui_checkbox_options;
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
 bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+/* Frozen-source controlled facade: no callback leaves the value unchanged.
+ * Pointer activation preserves focus; keyboard focus and
+ * tab ordering remain available. Legacy checkbox/ex retain pointer-focus policy. */
+bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
+                         cui_checkbox_options);
+
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {
     double position, velocity, target, updated_at, next_wake_seconds;

@@ -17,6 +17,35 @@ bool cui_base_toggle(cui_context *, cui_id, cui_str, bool *value, bool disabled)
 bool cui_base_radio(cui_context *, cui_id, cui_str, int *value, int option, bool disabled);
 typedef enum { CUI_CHECK_UNCHECKED, CUI_CHECK_CHECKED, CUI_CHECK_MIXED } cui_check_state;
 bool cui_base_check(cui_context *, cui_id, cui_str, cui_check_state *, bool disabled);
+typedef void (*cui_check_change_fn)(void *user, cui_check_state requested,
+                                    const cui_activation_snapshot *event);
+typedef struct {
+    bool disabled, required, invalid, skip_tab, no_pointer_focus, custom_role, controlled;
+    int tab_index;
+    cui_role role;
+    cui_check_change_fn on_change;
+    void *change_user;
+} cui_check_options;
+/* Extended Base: pointer focuses by default. Callback emits requests without
+ * writing *value; owner may accept synchronously or reject. controlled=true
+ * without a callback is read-only. Event is copied and
+ * borrowed for the call only. Without callback retains synchronous mutation.
+ * Return true for accepted activation, including a rejected controlled request. */
+bool cui_base_check_ex(cui_context *, cui_id, cui_str, cui_check_state *, cui_check_options);
+typedef void (*cui_check_box_style_fn)(void *user, cui_box *);
+typedef struct {
+    cui_check_box_style_fn instance, checked, mixed, disabled;
+    void *user;
+} cui_check_box_styles;
+typedef void (*cui_check_content_fn)(cui_context *, void *);
+/* Application-owned Base state refinement, applied over the supplied box in
+ * instance -> checked/mixed -> disabled order. No allocation or theme lookup. */
+bool cui_check_box_style(cui_check_state, bool disabled, cui_check_box_styles, cui_box *);
+/* Unstyled indicator part. Draws the projected box and arbitrary child content;
+ * owns no interaction/semantics. Root behavior remains cui_base_check_ex. */
+bool cui_base_check_indicator(cui_context *, cui_id, cui_check_state, bool disabled, cui_box,
+                              cui_check_box_styles, cui_check_content_fn, void *);
+
 bool cui_base_slider(cui_context *, cui_id, cui_str, float *value, float minimum, float maximum,
                      float step, bool disabled);
 typedef struct {
@@ -323,6 +352,67 @@ bool cui_base_check(cui_context *ui, cui_id id, cui_str name, cui_check_state *v
     *v = *v == CUI_CHECK_CHECKED ? CUI_CHECK_UNCHECKED : CUI_CHECK_CHECKED;
     cui_update_semantic(ui, id, *v == CUI_CHECK_CHECKED, (float)*v);
     return true;
+}
+bool cui_base_check_ex(cui_context *ui, cui_id id, cui_str name, cui_check_state *value,
+                       cui_check_options o) {
+    if (!ui || !cui_frame_is_submitting(ui) || !id || !value || *value < CUI_CHECK_UNCHECKED ||
+        *value > CUI_CHECK_MIXED || (name.length && !name.data) ||
+        (o.custom_role && (o.role < CUI_ROLE_NONE || o.role > CUI_ROLE_RADIOGROUP)))
+        return false;
+    cui_check_state before = *value;
+    cui_check_state requested =
+        before == CUI_CHECK_CHECKED ? CUI_CHECK_UNCHECKED : CUI_CHECK_CHECKED;
+    cui_interact(ui, id, o.custom_role ? o.role : CUI_ROLE_CHECKBOX, name, o.disabled,
+                 before == CUI_CHECK_CHECKED, (float)before);
+    cui_set_semantic_details(ui, id,
+                             (cui_semantic_details){.required = o.required,
+                                                    .invalid = o.invalid,
+                                                    .no_pointer_focus = o.no_pointer_focus,
+                                                    .pointer_activatable = true,
+                                                    .focusable = true});
+    cui_set_tab_index(ui, id, o.tab_index);
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    bool activated = false;
+    size_t count = 0;
+    cui_frame_events(ui, &count);
+    for (size_t e = 0; !o.disabled && e < count; ++e) {
+        cui_activation_snapshot event;
+        if (cui_event_accepted_activation(ui, e) != id ||
+            !cui_event_activation_snapshot(ui, e, &event))
+            continue;
+        activated = true;
+        if (o.on_change)
+            o.on_change(o.change_user, requested, &event);
+        else if (!o.controlled)
+            *value = requested;
+    }
+    cui_update_semantic(ui, id, *value == CUI_CHECK_CHECKED, (float)*value);
+    return activated;
+}
+bool cui_check_box_style(cui_check_state value, bool disabled, cui_check_box_styles styles,
+                         cui_box *box) {
+    if (!box || value < CUI_CHECK_UNCHECKED || value > CUI_CHECK_MIXED)
+        return false;
+    cui_check_box_style_fn layers[] = {styles.instance,
+                                       value == CUI_CHECK_CHECKED ? styles.checked
+                                       : value == CUI_CHECK_MIXED ? styles.mixed
+                                                                  : NULL,
+                                       disabled ? styles.disabled : NULL};
+    for (size_t i = 0; i < sizeof layers / sizeof layers[0]; ++i)
+        if (layers[i])
+            layers[i](styles.user, box);
+    return true;
+}
+bool cui_base_check_indicator(cui_context *ui, cui_id id, cui_check_state value, bool disabled,
+                              cui_box box, cui_check_box_styles styles,
+                              cui_check_content_fn content, void *user) {
+    if (!ui || !cui_frame_is_submitting(ui) || !cui_check_box_style(value, disabled, styles, &box))
+        return false;
+    cui_begin_box(ui, id, box);
+    if (content)
+        content(ui, user);
+    cui_end_box(ui);
+    return cui_last_error(ui) == CUI_OK;
 }
 bool cui_base_radio(cui_context *ui, cui_id id, cui_str name, int *value, int option,
                     bool disabled) {

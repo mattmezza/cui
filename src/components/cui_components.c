@@ -1038,22 +1038,31 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
                      cui_check_state *value, cui_checkbox_options options) {
     cui_design_metrics design;
     if (!ui || !t || !value || *value < CUI_CHECK_UNCHECKED || *value > CUI_CHECK_MIXED ||
-        (options.custom_role && (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
+        (options.custom_role &&
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
         !cui_components_design(t, options.design_size, &design))
         return false;
     cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
-    bool extended = options.source_behavior || options.on_change || options.custom_role || options.tab_index;
+    bool extended =
+        options.source_behavior || options.on_change || options.custom_role || options.tab_index;
     bool changed;
     if (extended) {
-        changed = cui_base_check_ex(ui, id, name, value, (cui_check_options){
-            .disabled = options.disabled, .required = options.required, .invalid = options.invalid,
-            .skip_tab = options.skip_tab, .no_pointer_focus = options.source_behavior,
-            .controlled = options.source_behavior,
-            .tab_index = options.tab_index, .custom_role = options.custom_role, .role = options.role,
-            .on_change = options.on_change, .change_user = options.change_user});
+        changed = cui_base_check_ex(ui, id, name, value,
+                                    (cui_check_options){.disabled = options.disabled,
+                                                        .required = options.required,
+                                                        .invalid = options.invalid,
+                                                        .skip_tab = options.skip_tab,
+                                                        .no_pointer_focus = options.source_behavior,
+                                                        .controlled = options.source_behavior,
+                                                        .tab_index = options.tab_index,
+                                                        .custom_role = options.custom_role,
+                                                        .role = options.role,
+                                                        .on_change = options.on_change,
+                                                        .change_user = options.change_user});
     } else {
         changed = cui_base_check(ui, id, name, value, options.disabled);
-        cui_set_semantic_details(ui, id,
+        cui_set_semantic_details(
+            ui, id,
             (cui_semantic_details){.required = options.required, .invalid = options.invalid});
         cui_set_tab_stop(ui, id, !options.skip_tab);
     }
@@ -1129,17 +1138,26 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
         outer.border_width = 2;
     }
     cui_checkbox_paint paint = {.root = outer,
-        .indicator = {.width = size, .height = size, .background = background,
-            .border = border, .border_width = 1, .radius = fminf(t->radius, 4 * density),
-            .align_x = CUI_ALIGN_CENTER, .align_y = CUI_ALIGN_CENTER},
-        .foreground = foreground, .label = options.disabled ? t->muted : t->text,
-        .label_font_size = font, .label_line_height = options.source_behavior ? font * 1.25f : 0};
+                                .indicator = {.width = size,
+                                              .height = size,
+                                              .background = background,
+                                              .border = border,
+                                              .border_width = 1,
+                                              .radius = fminf(t->radius, 4 * density),
+                                              .align_x = CUI_ALIGN_CENTER,
+                                              .align_y = CUI_ALIGN_CENTER},
+                                .foreground = foreground,
+                                .label = options.disabled ? t->muted : t->text,
+                                .label_font_size = font,
+                                .label_line_height = options.source_behavior ? font * 1.25f : 0};
     cui_checkbox_style_fn layers[] = {options.styles.instance,
-        *value == CUI_CHECK_CHECKED ? options.styles.checked :
-        *value == CUI_CHECK_MIXED ? options.styles.mixed : NULL,
-        options.disabled ? options.styles.disabled : NULL};
+                                      *value == CUI_CHECK_CHECKED ? options.styles.checked
+                                      : *value == CUI_CHECK_MIXED ? options.styles.mixed
+                                                                  : NULL,
+                                      options.disabled ? options.styles.disabled : NULL};
     for (size_t i = 0; i < sizeof layers / sizeof layers[0]; ++i)
-        if (layers[i]) layers[i](ui, options.styles.user, *value, options.disabled, &paint);
+        if (layers[i])
+            layers[i](ui, options.styles.user, *value, options.disabled, &paint);
     foreground = paint.foreground;
     bounded = paint.root.fixed_width && isfinite(paint.root.width) && paint.root.width > 0;
     width = bounded ? paint.root.width : width;
@@ -1154,18 +1172,21 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
     size = fmaxf(0, fminf(paint.indicator.width, paint.indicator.height));
     if (options.indicator) {
         options.indicator(ui, options.indicator_user,
-            (cui_checkbox_indicator_info){.value = *value, .width = paint.indicator.width,
-                .height = paint.indicator.height, .checked_progress = checked,
-                .mixed_progress = mixed, .foreground = foreground, .disabled = options.disabled});
+                          (cui_checkbox_indicator_info){.value = *value,
+                                                        .width = paint.indicator.width,
+                                                        .height = paint.indicator.height,
+                                                        .checked_progress = checked,
+                                                        .mixed_progress = mixed,
+                                                        .foreground = foreground,
+                                                        .disabled = options.disabled});
     } else if (options.state) {
         float glyph = fmaxf(0, size - 4 * density);
         if (checked > 0) {
             cui_color color = foreground;
             color.a = (uint8_t)(color.a * checked);
-            cui_begin_absolute_box(
-                ui, 0, (cui_box){0},
-                (cui_rect){(paint.indicator.width - glyph) / 2,
-                           (paint.indicator.height - glyph) / 2, glyph, glyph});
+            cui_begin_absolute_box(ui, 0, (cui_box){0},
+                                   (cui_rect){(paint.indicator.width - glyph) / 2,
+                                              (paint.indicator.height - glyph) / 2, glyph, glyph});
             cui_checkmark(ui, glyph, color);
             cui_end_box(ui);
         }
@@ -1173,10 +1194,10 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
             cui_color color = foreground;
             color.a = (uint8_t)(color.a * mixed);
             float bar = fmaxf(0, size - 6 * density);
-            cui_begin_absolute_box(
-                ui, 0, (cui_box){.background = color, .radius = density},
-                (cui_rect){(paint.indicator.width - bar) / 2,
-                           (paint.indicator.height - 2 * density) / 2, bar, 2 * density});
+            cui_begin_absolute_box(ui, 0, (cui_box){.background = color, .radius = density},
+                                   (cui_rect){(paint.indicator.width - bar) / 2,
+                                              (paint.indicator.height - 2 * density) / 2, bar,
+                                              2 * density});
             cui_end_box(ui);
         }
     } else if (*value == CUI_CHECK_CHECKED) {
@@ -1192,14 +1213,15 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
     cui_end_box(ui);
     cui_end_box(ui);
     if (label.length || options.content) {
-        cui_begin_box(ui, 0,
-                      (cui_box){.width = bounded ? fmaxf(0, width - indicator_width - paint.root.gap) : 0,
-                                .fixed_width = bounded,
-                                .clip = options.source_behavior && bounded,
-                                .gap = 4 * density});
+        cui_begin_box(
+            ui, 0,
+            (cui_box){.width = bounded ? fmaxf(0, width - indicator_width - paint.root.gap) : 0,
+                      .fixed_width = bounded,
+                      .clip = options.source_behavior && bounded,
+                      .gap = 4 * density});
         if (label.length) {
-            cui_text_ex(ui, label, paint.label_font_size, paint.label,
-                         paint.label_line_height, paint.label_style);
+            cui_text_ex(ui, label, paint.label_font_size, paint.label, paint.label_line_height,
+                        paint.label_style);
         }
         if (options.content)
             options.content(ui, options.content_user);
@@ -1229,7 +1251,7 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
     return changed;
 }
 bool cui_checkbox_source(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
-                          cui_check_state *value, cui_checkbox_options options) {
+                         cui_check_state *value, cui_checkbox_options options) {
     options.source_behavior = true;
     return cui_checkbox_ex(ui, id, theme, label, value, options);
 }

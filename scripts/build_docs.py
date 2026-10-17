@@ -286,7 +286,7 @@ def publish_agent_docs(root, output, paths, documents, profile):
 
     complete_index = introduction + '\n## All documentation\n\n'
     curated = {'API', 'CORE', 'INTERFACES', 'ICON', 'AI_AGENTS', 'LAYOUT_GUIDE', 'IDS_AND_LIFETIMES', 'DEBUGGING', 'APP_RECIPES', 'THEME_GUIDE', 'PLATFORM_MATRIX', 'IMMEDIATE_AND_STATE', 'LANGUAGE_BINDINGS'}
-    curated.update({'PACKAGING', 'RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS', 'LIVE_RESIZE', 'BINDING_NATIVE_RUN', 'LINUX_LIVE_RESIZE', 'VIDEO_GUIDE', 'TEXT_GRADIENT'})
+    curated.update({'PACKAGING', 'RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS', 'LIVE_RESIZE', 'BINDING_NATIVE_RUN', 'LINUX_LIVE_RESIZE', 'VIDEO_GUIDE', 'TEXT_GRADIENT', 'CHECKBOX_BEHAVIOR'})
     for group in ('Getting started', 'Guides', 'Components', 'Development'):
         entries = [(path, doc) for path, doc in zip(paths, documents) if doc['category'] == group]
         if not entries:

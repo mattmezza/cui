@@ -194,6 +194,27 @@ typedef struct {
     double next_wake_seconds; /* Absolute Core frame time; zero when quiescent. */
 } cui_checkbox_state;
 typedef struct {
+    cui_box root, indicator;
+    cui_color foreground, label;
+    float label_font_size, label_line_height;
+    cui_text_style label_style;
+} cui_checkbox_paint;
+/* Refine initialized defaults. Order: instance, checked/mixed, then disabled.
+ * Application callbacks own hover/active/focus refinements via existing queries. */
+typedef void (*cui_checkbox_style_fn)(cui_context *, void *, cui_check_state, bool disabled,
+                                      cui_checkbox_paint *);
+typedef struct {
+    cui_checkbox_style_fn instance, checked, mixed, disabled;
+    void *user;
+} cui_checkbox_styles;
+typedef struct {
+    cui_check_state value;
+    float width, height, checked_progress, mixed_progress;
+    cui_color foreground;
+    bool disabled;
+} cui_checkbox_indicator_info;
+typedef void (*cui_checkbox_indicator_fn)(cui_context *, void *, cui_checkbox_indicator_info);
+typedef struct {
     cui_control_size size;
     bool disabled, required, invalid, skip_tab, hide_focus_ring;
     cui_str accessibility_label;
@@ -206,10 +227,26 @@ typedef struct {
     cui_str tooltip;
     cui_hover_options tooltip_options; /* viewport required; trigger/dt/disabled are supplied. */
     bool reduced_motion;
+    /* Checkbox-only source seams. Radio alias ignores every extension below. */
+    cui_check_change_fn on_change;
+    void *change_user;
+    int tab_index;
+    bool custom_role;
+    cui_role role;
+    cui_checkbox_styles styles;
+    cui_checkbox_indicator_fn indicator;
+    void *indicator_user;
+    bool source_behavior; /* Styled no-pointer-focus; use cui_checkbox_source. */
 } cui_checkbox_options;
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
 bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+/* Frozen-source controlled facade: no callback leaves the value unchanged.
+ * Pointer activation preserves focus; keyboard focus and
+ * tab ordering remain available. Legacy checkbox/ex retain pointer-focus policy. */
+bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
+                         cui_checkbox_options);
+
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {
     double position, velocity, target, updated_at, next_wake_seconds;
@@ -1693,13 +1730,35 @@ static cui_color cui_checkbox_mix(cui_color from, cui_color to, float amount) {
 bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
                      cui_check_state *value, cui_checkbox_options options) {
     cui_design_metrics design;
-    if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
+    if (!ui || !t || !value || *value < CUI_CHECK_UNCHECKED || *value > CUI_CHECK_MIXED ||
+        (options.custom_role &&
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
+        !cui_components_design(t, options.design_size, &design))
         return false;
     cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
-    bool changed = cui_base_check(ui, id, name, value, options.disabled);
-    cui_set_semantic_details(
-        ui, id, (cui_semantic_details){.required = options.required, .invalid = options.invalid});
-    cui_set_tab_stop(ui, id, !options.skip_tab);
+    bool extended =
+        options.source_behavior || options.on_change || options.custom_role || options.tab_index;
+    bool changed;
+    if (extended) {
+        changed = cui_base_check_ex(ui, id, name, value,
+                                    (cui_check_options){.disabled = options.disabled,
+                                                        .required = options.required,
+                                                        .invalid = options.invalid,
+                                                        .skip_tab = options.skip_tab,
+                                                        .no_pointer_focus = options.source_behavior,
+                                                        .controlled = options.source_behavior,
+                                                        .tab_index = options.tab_index,
+                                                        .custom_role = options.custom_role,
+                                                        .role = options.role,
+                                                        .on_change = options.on_change,
+                                                        .change_user = options.change_user});
+    } else {
+        changed = cui_base_check(ui, id, name, value, options.disabled);
+        cui_set_semantic_details(
+            ui, id,
+            (cui_semantic_details){.required = options.required, .invalid = options.invalid});
+        cui_set_tab_stop(ui, id, !options.skip_tab);
+    }
     float density = t->font_size / 16;
     float size = (options.size == CUI_CONTROL_XSMALL  ? 12
                   : options.size == CUI_CONTROL_SMALL ? 14
@@ -1771,29 +1830,56 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
         outer.border = t->focus;
         outer.border_width = 2;
     }
-    cui_begin_box(ui, id, outer);
-    cui_begin_box(ui, 0, (cui_box){.width = size, .fixed_width = true, .gap = 0});
+    cui_checkbox_paint paint = {.root = outer,
+                                .indicator = {.width = size,
+                                              .height = size,
+                                              .background = background,
+                                              .border = border,
+                                              .border_width = 1,
+                                              .radius = fminf(t->radius, 4 * density),
+                                              .align_x = CUI_ALIGN_CENTER,
+                                              .align_y = CUI_ALIGN_CENTER},
+                                .foreground = foreground,
+                                .label = options.disabled ? t->muted : t->text,
+                                .label_font_size = font,
+                                .label_line_height = options.source_behavior ? font * 1.25f : 0};
+    cui_checkbox_style_fn layers[] = {options.styles.instance,
+                                      *value == CUI_CHECK_CHECKED ? options.styles.checked
+                                      : *value == CUI_CHECK_MIXED ? options.styles.mixed
+                                                                  : NULL,
+                                      options.disabled ? options.styles.disabled : NULL};
+    for (size_t i = 0; i < sizeof layers / sizeof layers[0]; ++i)
+        if (layers[i])
+            layers[i](ui, options.styles.user, *value, options.disabled, &paint);
+    foreground = paint.foreground;
+    bounded = paint.root.fixed_width && isfinite(paint.root.width) && paint.root.width > 0;
+    width = bounded ? paint.root.width : width;
+    float indicator_width = fmaxf(0, paint.indicator.width);
+    cui_begin_box(ui, id, paint.root);
+    cui_begin_box(ui, 0, (cui_box){.width = indicator_width, .fixed_width = true, .gap = 0});
     if (label.length || options.content) {
         cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
         cui_end_box(ui);
     }
-    cui_begin_box(ui, 0,
-                  (cui_box){.width = size,
-                            .height = size,
-                            .background = background,
-                            .border = border,
-                            .border_width = 1,
-                            .radius = fminf(t->radius, 4 * density),
-                            .align_x = CUI_ALIGN_CENTER,
-                            .align_y = CUI_ALIGN_CENTER});
-    if (options.state) {
+    cui_begin_box(ui, 0, paint.indicator);
+    size = fmaxf(0, fminf(paint.indicator.width, paint.indicator.height));
+    if (options.indicator) {
+        options.indicator(ui, options.indicator_user,
+                          (cui_checkbox_indicator_info){.value = *value,
+                                                        .width = paint.indicator.width,
+                                                        .height = paint.indicator.height,
+                                                        .checked_progress = checked,
+                                                        .mixed_progress = mixed,
+                                                        .foreground = foreground,
+                                                        .disabled = options.disabled});
+    } else if (options.state) {
         float glyph = fmaxf(0, size - 4 * density);
         if (checked > 0) {
             cui_color color = foreground;
             color.a = (uint8_t)(color.a * checked);
-            cui_begin_absolute_box(
-                ui, 0, (cui_box){0},
-                (cui_rect){(size - glyph) / 2, (size - glyph) / 2, glyph, glyph});
+            cui_begin_absolute_box(ui, 0, (cui_box){0},
+                                   (cui_rect){(paint.indicator.width - glyph) / 2,
+                                              (paint.indicator.height - glyph) / 2, glyph, glyph});
             cui_checkmark(ui, glyph, color);
             cui_end_box(ui);
         }
@@ -1801,16 +1887,17 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
             cui_color color = foreground;
             color.a = (uint8_t)(color.a * mixed);
             float bar = fmaxf(0, size - 6 * density);
-            cui_begin_absolute_box(
-                ui, 0, (cui_box){.background = color, .radius = density},
-                (cui_rect){(size - bar) / 2, (size - 2 * density) / 2, bar, 2 * density});
+            cui_begin_absolute_box(ui, 0, (cui_box){.background = color, .radius = density},
+                                   (cui_rect){(paint.indicator.width - bar) / 2,
+                                              (paint.indicator.height - 2 * density) / 2, bar,
+                                              2 * density});
             cui_end_box(ui);
         }
     } else if (*value == CUI_CHECK_CHECKED) {
-        cui_checkmark(ui, size - 4 * density, foreground);
+        cui_checkmark(ui, fmaxf(0, size - 4 * density), foreground);
     } else if (*value == CUI_CHECK_MIXED) {
         cui_begin_box(ui, 0,
-                      (cui_box){.width = size - 6 * density,
+                      (cui_box){.width = fmaxf(0, size - 6 * density),
                                 .height = 2 * density,
                                 .radius = density,
                                 .background = foreground});
@@ -1819,12 +1906,16 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
     cui_end_box(ui);
     cui_end_box(ui);
     if (label.length || options.content) {
-        cui_begin_box(ui, 0,
-                      (cui_box){.width = bounded ? width - size - 8 * density : 0,
-                                .fixed_width = bounded,
-                                .gap = 4 * density});
-        if (label.length)
-            cui_text(ui, label, font, options.disabled ? t->muted : t->text);
+        cui_begin_box(
+            ui, 0,
+            (cui_box){.width = bounded ? fmaxf(0, width - indicator_width - paint.root.gap) : 0,
+                      .fixed_width = bounded,
+                      .clip = options.source_behavior && bounded,
+                      .gap = 4 * density});
+        if (label.length) {
+            cui_text_ex(ui, label, paint.label_font_size, paint.label, paint.label_line_height,
+                        paint.label_style);
+        }
         if (options.content)
             options.content(ui, options.content_user);
         cui_end_box(ui);
@@ -1851,6 +1942,11 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
         options.state->tooltip = (cui_hover_state){0};
     }
     return changed;
+}
+bool cui_checkbox_source(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                         cui_check_state *value, cui_checkbox_options options) {
+    options.source_behavior = true;
+    return cui_checkbox_ex(ui, id, theme, label, value, options);
 }
 bool cui_checkbox(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool *value,
                   bool disabled) {

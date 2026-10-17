@@ -219,6 +219,10 @@ static cui_notification_entry *bridge_notification_entry(cui_bridge_app *app, cu
 }
 
 #ifndef CUI_BRIDGE_WITH_SDL
+cui_bridge_status cui_bridge_native_run(cui_bridge_app *app, cui_bridge_run_callback callback, void *user) {
+    (void)app; (void)callback; (void)user;
+    return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *app, const char *title,
                                            const char *font_path, cui_config *config) {
     (void)app;
@@ -979,6 +983,11 @@ cui_bridge_status cui_bridge_settings_field_bounds(cui_bridge_app *app, cui_brid
 void cui_bridge_destroy(cui_bridge_app *app) {
     if (!app)
         return;
+    if (app->running) {
+        app->destroy_requested = true;
+        app->closed = true;
+        return;
+    }
     if (app->nodes)
         for (uint32_t i = 1; i <= app->max_nodes; i++)
             bridge_free_node_resources(&app->nodes[i]);
@@ -4549,7 +4558,26 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
     cui_end_box(app->ui);
     node->disabled = previous_disabled;
 }
+cui_bridge_status cui_bridge_run(cui_bridge_app *app, cui_bridge_run_callback callback, void *user) {
+    cui_bridge_status status = bridge_ready(app);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!app->root || app->stepping || app->running)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (app->backend != CUI_BRIDGE_BACKEND_SDL)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    app->running = true;
+    status = cui_bridge_native_run(app, callback, user);
+    app->running = false;
+    if (app->destroy_requested) {
+        cui_bridge_destroy(app);
+        return CUI_BRIDGE_CLOSED;
+    }
+    return status;
+}
 cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
+    if (app && app->run_dispatching)
+        return CUI_BRIDGE_INVALID_STATE;
     cui_bridge_status status = bridge_ready(app);
     if (status != CUI_BRIDGE_OK)
         return status;

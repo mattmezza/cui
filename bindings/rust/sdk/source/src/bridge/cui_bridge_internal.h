@@ -141,6 +141,7 @@ struct cui_bridge_app {
     cui_bridge_status frame_error;
     bool render_disabled;
     bool stepping, closed;
+    bool running, run_dispatching, destroy_requested;
     float width, height;
     double now_seconds;
     cui_notification_state *notifications;
@@ -152,6 +153,7 @@ struct cui_bridge_app {
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *, const char *, const char *,
                                            cui_config *);
 void cui_bridge_native_destroy(cui_bridge_app *);
+cui_bridge_status cui_bridge_native_run(cui_bridge_app *, cui_bridge_run_callback, void *);
 cui_bridge_status cui_bridge_native_poll(cui_bridge_app *);
 cui_bridge_status cui_bridge_native_render(cui_bridge_app *, const cui_draw_list *);
 cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *, const char *const *,

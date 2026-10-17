@@ -3,6 +3,7 @@
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,7 @@ struct cui_sdl3 {
     SDL_Renderer *renderer;
     cui_font *font;
     cui_color ink;
+    float density_x, density_y, text_density;
     bool quit, glyph_ok, ime_composing, ime_commit_pending, input_suspended;
     cui_id ime_focus;
     cui_text_input_state input_state;
@@ -39,7 +41,9 @@ struct cui_sdl3 {
     size_t bitmap_bytes, shadow_bytes;
     size_t glyph_bytes;
     uint64_t clock, hits, misses, frame, frame_ticks;
-    bool frame_clock_started, event_pending;
+    bool frame_clock_started, event_pending, callback_mode;
+    bool motion_pending;
+    cui_event motion;
     SDL_Event pending_event;
     char *clipboard;
     SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
@@ -69,7 +73,7 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
         return NULL;
     }
     s->font = font;
-    s->window = SDL_CreateWindow(title, w, h, SDL_WINDOW_RESIZABLE);
+    s->window = SDL_CreateWindow(title, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (s->window)
         s->renderer = SDL_CreateRenderer(s->window, NULL);
     if (!s->renderer) {
@@ -173,7 +177,13 @@ static size_t cui_sdl3_scalar_byte(const char *text, size_t scalar) {
     }
     return byte;
 }
-bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
+static void flush_motion(cui_sdl3 *s, cui_context *ui) {
+    if (s->motion_pending) {
+        (void)cui_queue_event(ui, s->motion);
+        s->motion_pending = false;
+    }
+}
+static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided, bool pump) {
     if (!s || !ui)
         return false;
     bool reset_input = false;
@@ -222,11 +232,19 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
         (void)SDL_SetTextInputArea(s->window, &area, 0);
     }
     SDL_Event e;
-    while (s->event_pending || SDL_PollEvent(&e)) {
-        if (s->event_pending) {
+    while (provided || (pump && (s->event_pending || SDL_PollEvent(&e)))) {
+        if (provided) {
+            e = *provided;
+            provided = NULL;
+        } else if (s->event_pending) {
             e = s->pending_event;
             s->event_pending = false;
         }
+        SDL_Window *target = SDL_GetWindowFromEvent(&e);
+        if (target && target != s->window)
+            continue;
+        if (e.type != SDL_EVENT_MOUSE_MOTION)
+            flush_motion(s, ui);
         cui_event v = {0};
         bool send = true, leave_after = false;
         switch (e.type) {
@@ -361,6 +379,8 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             v.type = CUI_EVENT_CANCEL;
             leave_after = true;
             break;
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
         case SDL_EVENT_WINDOW_RESIZED:
         case SDL_EVENT_WINDOW_EXPOSED:
             cui_invalidate(ui);
@@ -371,7 +391,11 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
             break;
         }
         if (send) {
-            cui_queue_event(ui, v);
+            if (v.type == CUI_EVENT_POINTER_MOVE && v.pointer_type == CUI_POINTER_MOUSE) {
+                s->motion = v;
+                s->motion_pending = true;
+            } else
+                cui_queue_event(ui, v);
             if (v.pointer_type == CUI_POINTER_MOUSE &&
                 (v.type == CUI_EVENT_POINTER_MOVE || v.type == CUI_EVENT_POINTER_DOWN ||
                  v.type == CUI_EVENT_POINTER_UP)) {
@@ -380,11 +404,18 @@ bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
                     (v.x < 0 || v.y < 0 || v.x >= width || v.y >= height))
                     leave_after = true;
             }
-            if (leave_after)
+            if (leave_after) {
+                flush_motion(s, ui);
                 cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_LEAVE});
+            }
         }
     }
+    if (pump)
+        flush_motion(s, ui);
     return !s->quit;
+}
+bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
+    return poll_events(s, ui, NULL, s && !s->callback_mode);
 }
 void cui_sdl3_size(cui_sdl3 *s, float *w, float *h) {
     int x, y;
@@ -414,12 +445,35 @@ bool cui_sdl3_accessibility_window(cui_sdl3 *s, cui_accessibility_window *out) {
     *out = result;
     return true;
 }
-/* Bound stack use while preserving SDL rectangle rasterization and blend rules. */
+/* Query every frame: moving a window between displays can change pixels without
+ * changing its logical size. Include renderer scale for offscreen/headless users. */
+static bool render_density(cui_sdl3 *s) {
+    int w, h;
+    SDL_RendererLogicalPresentation mode;
+    SDL_FRect rect;
+    float x, y;
+    if (!SDL_GetRenderLogicalPresentation(s->renderer, &w, &h, &mode) ||
+        !SDL_GetRenderLogicalPresentationRect(s->renderer, &rect) ||
+        !SDL_GetRenderScale(s->renderer, &x, &y))
+        return false;
+    if (mode != SDL_LOGICAL_PRESENTATION_DISABLED) {
+        if (w <= 0 || h <= 0)
+            return false;
+        x *= rect.w / w;
+        y *= rect.h / h;
+    }
+    if (!isfinite(x) || !isfinite(y) || x <= 0 || y <= 0 || x > 16 || y > 16)
+        return false;
+    s->density_x = x;
+    s->density_y = y;
+    s->text_density = fmaxf(x, y);
+    return true;
+}
 #define RECT_SPAN_BATCH 128
 static bool fill_span(cui_sdl3 *s, const cui_draw_command *c, float left, float right, float y,
                       float height, SDL_FRect spans[RECT_SPAN_BATCH], int *count) {
-    float x0 = ceilf(c->bounds.x + left - .5f);
-    float x1 = ceilf(c->bounds.x + right - .5f);
+    float x0 = ceilf((c->bounds.x + left) * s->density_x - .5f) / s->density_x;
+    float x1 = ceilf((c->bounds.x + right) * s->density_x - .5f) / s->density_x;
     if (x1 <= x0)
         return true;
     spans[(*count)++] = (SDL_FRect){x0, c->bounds.y + y, x1 - x0, height};
@@ -441,8 +495,9 @@ static bool rect(cui_sdl3 *s, const cui_draw_command *c) {
     }
     SDL_FRect spans[RECT_SPAN_BATCH];
     int count = 0;
-    for (int y = 0; y < (int)ceilf(c->bounds.h); y++) {
-        float h = fminf(1, c->bounds.h - y), left, right, il, ir;
+    for (int row = 0; row < (int)ceilf(c->bounds.h * s->density_y); row++) {
+        float y = row / s->density_y;
+        float h = fminf(1 / s->density_y, c->bounds.h - y), left, right, il, ir;
         if (!cui_shape_span(c, radii, edges, false, y + h / 2, &left, &right))
             continue;
         if (c->type == CUI_DRAW_BORDER &&
@@ -554,7 +609,8 @@ static void glyph(void *user, int x, int y, int w, int h, int pitch, const unsig
         s->glyph_ok = false;
         return;
     }
-    SDL_FRect r = {(float)x, (float)y, (float)w, (float)h};
+    SDL_FRect r = {x / s->text_density, y / s->text_density, w / s->text_density,
+                   h / s->text_density};
     if (!SDL_SetTextureColorMod(t, s->ink.r, s->ink.g, s->ink.b) ||
         !SDL_SetTextureAlphaMod(t, s->ink.a) || !SDL_RenderTexture(s->renderer, t, NULL, &r))
         s->glyph_ok = false;
@@ -567,11 +623,12 @@ static void color_glyph(void *user, int x, int y, int w, int h, int pitch,
 }
 static bool text_draw(cui_sdl3 *s, const cui_draw_command *c) {
     if (c->text_color_count)
-        return cui_font_draw_context_line_colored(
+        return cui_font_draw_context_line_colored_scaled(
             s->font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
-            c->color, c->text_colors, c->text_color_count, color_glyph, s);
-    return cui_font_draw_context_line(s->font, c->text, c->text_source, c->font_size, c->text_style,
-                                      c->bounds.x, c->bounds.y, glyph, s);
+            c->color, c->text_colors, c->text_color_count, s->text_density, color_glyph, s);
+    return cui_font_draw_context_line_scaled(s->font, c->text, c->text_source, c->font_size,
+                                             c->text_style, c->bounds.x, c->bounds.y,
+                                             s->text_density, glyph, s);
 }
 
 static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_only) {
@@ -580,9 +637,20 @@ static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_onl
     cui_bitmap_key key;
     if (!cui_bitmap_key_make(c, &key))
         return false;
-    size_t bytes = (size_t)key.width * key.height * 4;
-    if (bytes > BITMAP_BYTES)
+    /* Shadow preparation already supplies device-pixel rasters. Images need
+     * device resolution too, including their rounded clipping mask. */
+    if (!cui_shadow_type(c->type)) {
+        key.width = (unsigned)ceilf(c->bounds.w * s->density_x);
+        key.height = (unsigned)ceilf(c->bounds.h * s->density_y);
+        float density = fminf(s->density_x, s->density_y);
+        key.radii.top_left *= density;
+        key.radii.top_right *= density;
+        key.radii.bottom_left *= density;
+        key.radii.bottom_right *= density;
+    }
+    if (!key.height || key.width > BITMAP_BYTES / 4 / key.height)
         return false;
+    size_t bytes = (size_t)key.width * key.height * 4;
     bool shadow = cui_shadow_type(c->type);
     bitmap_entry *entry = NULL;
     for (size_t i = 0; i < BITMAP_SLOTS; i++)
@@ -682,6 +750,8 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
     if (!s || !list || (!list->commands && list->count) || !isfinite(list->width) ||
         !isfinite(list->height) || list->width < 0 || list->height < 0 || list->width > 16384 ||
         list->height > 16384)
+        return false;
+    if (!render_density(s))
         return false;
     s->frame++;
     s->shadow_frame = cui_shadow_present(list);
@@ -947,4 +1017,65 @@ bool cui_sdl3_wait_events(cui_sdl3 *s, int timeout_ms) {
                                           : SDL_WaitEventTimeout(&s->pending_event, timeout_ms);
     s->frame_ticks = SDL_GetTicksNS();
     return s->event_pending;
+}
+
+/* SDL owns modal-loop iteration; application drawing never runs in our watch. */
+typedef struct {
+    cui_sdl3_app app;
+    cui_sdl3 *host;
+    cui_context *ui;
+    bool iterating, idle;
+} callback_app;
+static callback_app *starting_app;
+static SDL_AppResult SDLCALL app_init(void **state, int argc, char **argv) {
+    callback_app *app = starting_app;
+    *state = app;
+    if (!app->app.init(app->app.user, argc, argv, &app->host, &app->ui) ||
+        !app->host || !app->ui)
+        return SDL_APP_FAILURE;
+    app->host->callback_mode = true;
+    return SDL_APP_CONTINUE;
+}
+static SDL_AppResult SDLCALL app_event(void *state, SDL_Event *event) {
+    callback_app *app = state;
+    /* SDL lifecycle events may originate on worker threads. Leave lifecycle
+     * termination to SDL itself; never mutate Core or paint on that thread. */
+    if (!SDL_IsMainThread())
+        return SDL_APP_CONTINUE;
+    return poll_events(app->host, app->ui, event, false) ? SDL_APP_CONTINUE : SDL_APP_SUCCESS;
+}
+static SDL_AppResult SDLCALL app_frame(void *state) {
+    callback_app *app = state;
+    if (app->iterating || !SDL_IsMainThread())
+        return SDL_APP_CONTINUE;
+    app->iterating = true;
+    flush_motion(app->host, app->ui);
+    if (app->idle)
+        app->host->frame_ticks = SDL_GetTicksNS();
+    int result = app->app.frame(app->app.user, app->host, app->ui);
+    app->iterating = false;
+    app->idle = !cui_needs_redraw(app->ui);
+    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, app->idle ? "waitevent" : "0");
+    return result < 0 ? SDL_APP_FAILURE : result > 0 ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
+}
+static void SDLCALL app_quit(void *state, SDL_AppResult result) {
+    callback_app *app = state;
+    app->app.quit(app->app.user, result == SDL_APP_SUCCESS);
+}
+int cui_sdl3_run(int argc, char **argv, cui_sdl3_app callbacks) {
+    if (!SDL_IsMainThread() || starting_app || !callbacks.init || !callbacks.frame || !callbacks.quit)
+        return 1;
+    callback_app app = {.app = callbacks};
+    starting_app = &app;
+    const char *rate = SDL_GetHint(SDL_HINT_MAIN_CALLBACK_RATE);
+    char *saved_rate = rate ? SDL_strdup(rate) : NULL;
+    SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "0");
+    int result = SDL_EnterAppMainCallbacks(argc, argv, app_init, app_frame, app_event, app_quit);
+    starting_app = NULL;
+    if (saved_rate)
+        SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, saved_rate);
+    else
+        SDL_ResetHint(SDL_HINT_MAIN_CALLBACK_RATE);
+    SDL_free(saved_rate);
+    return result;
 }

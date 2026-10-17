@@ -33,10 +33,10 @@ GUIDES.update({'DESIGN_SIZES', 'DATE_LOCALE_YEAR', 'SIDEBAR_CLIPPING',
 GUIDES.update({"BINDING_BUILDERS", "GO_BUILDERS", "RUST_BUILDERS", "BRIDGE_COMPONENTS",
                "LAYOUT_GUIDE", "IDS_AND_LIFETIMES", "DEBUGGING", "APP_RECIPES", "ONBOARDING_BENCHMARK",
                "PACKAGING", "SDK_TEXT_PARITY", "UNICODE_WRAP", "TEXT_ALIGNMENT", "RELEASE_ACCESSORS",
-               "RESPONSIVE_LAYOUT", "TYPOGRAPHY_TOKENS", "TYPOGRAPHY_ROADMAP", "VIDEO_PLAN"})
+               "RESPONSIVE_LAYOUT", "TYPOGRAPHY_TOKENS", "TYPOGRAPHY_ROADMAP", "VIDEO_PLAN", "LIVE_RESIZE"})
 
 TASKS = {
-    'native-app': ('Build a native application', ['START_HERE', 'NATIVE_APP_STARTER', 'IMMEDIATE_AND_STATE', 'IDS_AND_LIFETIMES']),
+    'native-app': ('Build a native application', ['START_HERE', 'NATIVE_APP_STARTER', 'LIVE_RESIZE', 'RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS', 'IMMEDIATE_AND_STATE', 'IDS_AND_LIFETIMES']),
     'layout': ('Understand and repair layouts', ['LAYOUT_GUIDE', 'RESPONSIVE_LAYOUT', 'APP_RECIPES', 'BUTTON_BEHAVIOR', 'CORE']),
     'debugging': ('Diagnose errors and missing output', ['DEBUGGING', 'IDS_AND_LIFETIMES', 'ICON', 'LAYOUT_GUIDE']),
 }
@@ -248,7 +248,9 @@ def publish_agent_docs(root, output, paths, documents, profile):
     headers = sorted((root / 'include/cui').glob('*.h'))
     hashes = {}
     symbols = []
-    declaration = re.compile(r'^(?:[A-Za-z_]\w*[ \t*]+)+(cui_[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*;', re.M)
+    # Header-only utilities define their functions inline. Index their signatures
+    # alongside ordinary prototypes without exporting implementation bodies.
+    declaration = re.compile(r'^(?:[A-Za-z_]\w*[ \t*]+)+(cui_[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*[;{]', re.M)
     for header in headers:
         relative = header.relative_to(root).as_posix()
         target = output / 'headers' / header.name
@@ -257,7 +259,8 @@ def publish_agent_docs(root, output, paths, documents, profile):
         hashes[relative] = hashlib.sha256(header.read_bytes()).hexdigest()
         clean = re.sub(r'/\*.*?\*/|//[^\n]*', '', header.read_text(), flags=re.S)
         for match in declaration.finditer(clean):
-            symbols.append({'name': match[1], 'declaration': re.sub(r'\s+', ' ', match[0]).strip(),
+            signature = match[0].rstrip().removesuffix('{').rstrip().removesuffix(';') + ';'
+            symbols.append({'name': match[1], 'declaration': re.sub(r'\s+', ' ', signature).strip(),
                             'header': './headers/' + header.name})
     documentation_hashes = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                             for path in paths}
@@ -283,7 +286,7 @@ def publish_agent_docs(root, output, paths, documents, profile):
 
     complete_index = introduction + '\n## All documentation\n\n'
     curated = {'API', 'CORE', 'INTERFACES', 'ICON', 'AI_AGENTS', 'LAYOUT_GUIDE', 'IDS_AND_LIFETIMES', 'DEBUGGING', 'APP_RECIPES', 'THEME_GUIDE', 'PLATFORM_MATRIX', 'IMMEDIATE_AND_STATE', 'LANGUAGE_BINDINGS'}
-    curated.update({'PACKAGING', 'RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS'})
+    curated.update({'PACKAGING', 'RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS', 'LIVE_RESIZE'})
     for group in ('Getting started', 'Guides', 'Components', 'Development'):
         entries = [(path, doc) for path, doc in zip(paths, documents) if doc['category'] == group]
         if not entries:

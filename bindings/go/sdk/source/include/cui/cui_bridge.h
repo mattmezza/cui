@@ -482,6 +482,17 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_text_view_copy_selection(cui_bridge_
                                                                      uint32_t capacity,
                                                                      uint32_t *required_capacity);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt);
+/* Main-thread native callback loop; SDL owns modal live-resize scheduling.
+ * after_frame dispatches application events after each completed step, returning
+ * OK to continue or another status to stop. Do not nest run/step from this callback (INVALID_STATE). Destroy during a
+ * callback requests close and defers release until run exits; do not reuse app
+ * afterwards. Foreign exceptions must be caught before returning through C. Window close returns CLOSED. Native resources are released
+ * on return; app remains valid for destroy. Portable builds return BACKEND_UNAVAILABLE.
+ * Existing step/manual loops remain supported, without modal-resize iteration. */
+typedef cui_bridge_status (*cui_bridge_run_callback)(void *user);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_run(cui_bridge_app *, cui_bridge_run_callback,
+                                                void *user);
+
 CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_event(cui_bridge_app *app,
                                                        cui_bridge_event *out_event);
 /* CHANGE snapshots retain their value from the triggering frame. Text is copied

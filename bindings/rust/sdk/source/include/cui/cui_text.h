@@ -56,6 +56,15 @@ typedef void (*cui_color_glyph_fn)(void *, int, int, int, int, int, const unsign
 bool cui_font_draw_context_line_colored(cui_font *, cui_text_line_source, float, cui_text_style,
                                         float, float, cui_color, const cui_text_color_span *,
                                         size_t, cui_color_glyph_fn, void *);
+/* Density-aware paint keeps shaping, metrics and input coordinates in logical units.
+ * Callback coordinates and bitmap dimensions are in pixels (logical * scale).
+ * scale must be finite, positive and <= 16. Existing draw APIs use scale 1. */
+bool cui_font_draw_context_line_scaled(cui_font *, cui_str, cui_text_line_source, float,
+                                       cui_text_style, float, float, float, cui_glyph_fn, void *);
+bool cui_font_draw_context_line_colored_scaled(cui_font *, cui_text_line_source, float,
+                                               cui_text_style, float, float, cui_color,
+                                               const cui_text_color_span *, size_t, float,
+                                               cui_color_glyph_fn, void *);
 bool cui_font_draw(cui_font *font, cui_str text, float size, float x, float y, cui_glyph_fn emit,
                    void *user);
 bool cui_font_draw_styled(cui_font *font, cui_str text, float size, cui_text_style style, float x,
@@ -110,6 +119,7 @@ bool cui_text_layout_get(const cui_text_layout *layout, cui_text_layout_view *ou
 void cui_text_layout_destroy(cui_text_layout *layout);
 /* Paint positioned glyphs with their selected run faces and saved size. Coordinates
  * specify the line's top-left; partial raster failure may already have emitted. */
+bool cui_text_layout_draw_scaled(cui_text_layout *, float, float, float, cui_glyph_fn, void *);
 bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_fn emit, void *user);
 /* Cluster-edge foundation, not full editing caret support. Original paragraph
  * byte offsets must be exact shaped-cluster boundaries; interior ligature/mark

@@ -71,9 +71,11 @@ bool cui_tag_resolve(const cui_theme *theme, cui_tag_options options, bool hover
                      cui_tag_style *style);
 /* Pair end only after a successful begin. Children are application submitted;
  * text children should use the returned foreground/font size. */
+/* Requires a unique nonzero ID; false on zero, before opening any boxes. */
 bool cui_begin_tag(cui_context *ui, cui_id id, const cui_theme *theme, cui_tag_options options,
                    cui_tag_style *style);
 void cui_end_tag(cui_context *ui, cui_id id, const cui_tag_style *style);
+/* Requires a unique nonzero ID; zero reports CUI_ERROR_INVALID_ACTION. */
 bool cui_tag(cui_context *ui, cui_id id, const cui_theme *theme, cui_str text,
              cui_tag_options options);
 typedef enum { CUI_MARKER_PLAIN, CUI_MARKER_SEPARATOR, CUI_MARKER_BORDER } cui_marker_variant;

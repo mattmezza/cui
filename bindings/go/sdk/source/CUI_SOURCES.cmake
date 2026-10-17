@@ -1,85 +1,86 @@
-# Generated from canonical CMake cui target; do not edit.
+# Generated from canonical cmake/sources.json; do not edit.
 set(CUI_SOURCES
- src/core/cui.c
- src/effects/cui_effects.c
- src/base/cui_base.c
+ src/components/cui_label.c
  src/base/cui_button_group.c
- src/base/cui_models.c
- src/base/cui_edit.c
+ src/components/cui_plot_motion.c
+ src/base/cui_radio_group.c
+ src/components/cui_radio_group.c
+ src/components/cui_plot.c
  src/base/cui_editor.c
  src/components/cui_editor.c
- src/base/cui_overlay.c
- src/base/cui_virtual.c
  src/base/cui_virtual_scroll.c
  src/components/cui_virtual.c
- src/base/cui_dock.c
- src/components/cui_dock.c
- src/base/cui_plot.c
- src/components/cui_plot.c
- src/components/cui_plot_motion.c
- src/theme/cui_theme.c
- src/theme/cui_theme_registry.c
- src/theme/cui_theme_motion.c
- src/components/cui_components.c
- src/components/cui_label.c
+ src/effects/cui_effects.c
+ src/base/cui_questionnaire.c
+ src/components/cui_questionnaire.c
+ src/base/cui_speech.c
+ src/components/cui_speech.c
+ src/base/cui_chart.c
+ src/components/cui_chart.c
+ src/base/cui_text_view.c
+ src/components/cui_text_view.c
+ src/base/cui_root.c
+ src/components/cui_root.c
+ src/base/cui_command.c
+ src/components/cui_command.c
+ src/base/cui_carousel.c
+ src/components/cui_carousel.c
+ src/base/cui_settings.c
+ src/components/cui_settings.c
+ src/base/cui_sidebar.c
+ src/components/cui_sidebar.c
+ src/base/cui_textarea.c
+ src/components/cui_textarea.c
+ src/base/cui_toolbar.c
+ src/components/cui_toolbar.c
+ src/base/cui_icon.c
+ src/components/cui_icon.c
+ src/base/cui_resizable.c
+ src/components/cui_resizable.c
+ src/base/cui_chrome.c
+ src/components/cui_chrome.c
+ src/base/cui_description.c
+ src/components/cui_description.c
+ src/base/cui_media.c
+ src/components/cui_media.c
+ src/base/cui_message.c
+ src/components/cui_message.c
+ src/base/cui_status.c
+ src/components/cui_status.c
+ src/base/cui_otp.c
+ src/components/cui_otp.c
+ src/base/cui_form.c
+ src/components/cui_form.c
+ src/base/cui_surface.c
+ src/components/cui_surface.c
+ src/base/cui_table.c
+ src/components/cui_table.c
+ src/base/cui_scroll.c
+ src/components/cui_scroll.c
+ src/base/cui_tree.c
+ src/components/cui_tree.c
+ src/base/cui_picker.c
+ src/components/cui_picker.c
+ src/base/cui_numeric.c
+ src/components/cui_numeric.c
  src/base/cui_content.c
  src/components/cui_content.c
  src/base/cui_disclosure.c
  src/components/cui_disclosure.c
  src/base/cui_choice.c
  src/components/cui_choice.c
- src/base/cui_radio_group.c
- src/components/cui_radio_group.c
- src/base/cui_numeric.c
- src/components/cui_numeric.c
- src/base/cui_picker.c
- src/components/cui_picker.c
- src/base/cui_tree.c
- src/components/cui_tree.c
- src/base/cui_table.c
- src/components/cui_table.c
- src/base/cui_scroll.c
- src/components/cui_scroll.c
- src/base/cui_surface.c
- src/components/cui_surface.c
- src/base/cui_form.c
- src/components/cui_form.c
- src/base/cui_otp.c
- src/components/cui_otp.c
- src/base/cui_status.c
- src/components/cui_status.c
- src/base/cui_message.c
- src/components/cui_message.c
- src/base/cui_media.c
- src/components/cui_media.c
- src/base/cui_description.c
- src/components/cui_description.c
- src/base/cui_chrome.c
- src/components/cui_chrome.c
- src/base/cui_resizable.c
- src/components/cui_resizable.c
- src/base/cui_icon.c
- src/components/cui_icon.c
- src/base/cui_toolbar.c
- src/components/cui_toolbar.c
- src/base/cui_sidebar.c
- src/components/cui_sidebar.c
- src/base/cui_textarea.c
- src/components/cui_textarea.c
- src/base/cui_settings.c
- src/components/cui_settings.c
- src/base/cui_carousel.c
- src/components/cui_carousel.c
- src/base/cui_command.c
- src/components/cui_command.c
- src/base/cui_root.c
- src/components/cui_root.c
- src/base/cui_text_view.c
- src/components/cui_text_view.c
- src/base/cui_chart.c
- src/components/cui_chart.c
- src/base/cui_speech.c
- src/components/cui_speech.c
- src/base/cui_questionnaire.c
- src/components/cui_questionnaire.c
+ src/base/cui_plot.c
+ src/core/cui.c
+ src/base/cui_dock.c
+ src/components/cui_dock.c
+ src/base/cui_virtual.c
+ src/base/cui_overlay.c
+ src/base/cui_edit.c
+ src/base/cui_base.c
+ src/base/cui_models.c
+ src/theme/cui_theme_registry.c
+ src/theme/cui_theme.c
+ src/theme/cui_theme_motion.c
+ src/components/cui_components.c
+ src/components/cui_text_overflow.c
 )

@@ -52,12 +52,20 @@ bool cui_icon_set_path(cui_icon_state *, cui_str path, cui_icon_loader_fn, void 
 bool cui_icon_set_name(cui_icon_state *, cui_str name, cui_icon_loader_fn, void *user);
 bool cui_icon_set_empty(cui_icon_state *);
 void cui_icon_reload(cui_icon_state *);
-/* Complete catalog is always present; only 106 defaults embed SVG unless
+/* Complete catalog is always present; only 123 defaults embed SVG unless
  * CUI_ICON_ALL_ASSETS=1. Unknown catalog index returns an empty string. */
 size_t cui_icon_catalog_count(void);
 cui_str cui_icon_catalog_name(size_t);
 cui_str cui_icon_catalog_path(size_t);
 bool cui_icon_catalog_default(size_t);
+typedef enum {
+    CUI_ICON_UNKNOWN,
+    CUI_ICON_CATALOG_NOT_EMBEDDED,
+    CUI_ICON_EMBEDDED
+} cui_icon_availability;
+/* Build-local availability; recognizes the same names, paths and aliases as
+ * cui_icon_asset. A custom loader may still provide a nonembedded asset. */
+cui_icon_availability cui_icon_query(cui_str name_or_path);
 bool cui_icon_asset(cui_str name_or_path, cui_str *svg);
 /* Portable headless preparation. Width scales SVG aspect; height positions it
  * around the layout center. Transform changes paint only, including overflow. */
@@ -88,6 +96,9 @@ typedef struct {
      * by options above; padding is unsupported and must be zero. Other box
      * paint/clip/inert/opacity fields apply around the unchanged SVG square. */
     const cui_box *style;
+    /* Opt-in outline inside the allocated box on NOT_FOUND. Keeps that error
+     * result and the existing decorative/named semantic contract. */
+    bool debug_placeholder;
 } cui_icon_options;
 /* Decorative by default, or named noninteractive image; never a focus stop. Theme supplies fallback
  * size/color; explicit inherited overrides bridge hosts with their own text scopes. */

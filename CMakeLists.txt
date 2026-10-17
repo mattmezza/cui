@@ -50,7 +50,7 @@ if(CUI_BUILD_BIDI)
  target_include_directories(cui_sheenbidi_objects PRIVATE third_party/sheenbidi/Headers third_party/sheenbidi/Source)
  cui_warnings(cui_sheenbidi_objects)
  if(NOT MSVC)
-  # Unmodified pinned upstream has these warnings; CUI wrapper remains strict.
+  # Pinned upstream sources need these warning exceptions; CUI wrapper remains strict.
   target_compile_options(cui_sheenbidi_objects PRIVATE -Wno-unused-parameter -Wno-unused-value -Wno-unused-function -Wno-implicit-fallthrough)
  endif()
  add_library(cui_bidi STATIC ${CUI_BIDI_SOURCES} $<TARGET_OBJECTS:cui_sheenbidi_objects>)

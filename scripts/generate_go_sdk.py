@@ -32,10 +32,14 @@ def snapshot():
         if name.startswith(("third_party/clay/", "third_party/nanosvg/", "third_party/gpui_icons/", "third_party/gpui_themes/", "third_party/sheenbidi/")):
             files[name] = (ROOT / name).read_bytes()
     files["third_party/dependencies.json"] = (json.dumps(dependencies, indent=2) + "\n").encode()
-    cmake = (ROOT / "CMakeLists.txt").read_text()
-    sources = re.search(r"add_library\(cui STATIC ([^)]+)\)", cmake).group(1).split()
-    sources += re.search(r"target_sources\(cui PRIVATE ([^)]+)\)", cmake).group(1).split()
-    files["CUI_SOURCES.cmake"] = ("# Generated from canonical CMake cui target; do not edit.\nset(CUI_SOURCES\n" +
+    metadata_bytes = (ROOT / "cmake/sources.json").read_bytes()
+    metadata = json.loads(metadata_bytes)
+    sources = list(dict.fromkeys(source for paths in metadata["modules"].values() for source in paths))
+    for source in sources:
+        if source not in files:
+            raise RuntimeError("Canonical portable source is not tracked: " + source)
+    files["cmake/sources.json"] = metadata_bytes
+    files["CUI_SOURCES.cmake"] = ("# Generated from canonical cmake/sources.json; do not edit.\nset(CUI_SOURCES\n" +
         "\n".join(" " + source for source in sources) + "\n)\n").encode()
     files["CMakeLists.txt"] = CMAKE.encode()
     rows = [hashlib.sha256(data).hexdigest() + "  " + name for name, data in sorted(files.items())]
@@ -138,7 +142,7 @@ def main():
             target = SDK / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-        canonical = ["src", "include", "backends/sdl3", "backends/software", "third_party", "CMakeLists.txt", "LICENSE"]
+        canonical = ["src", "include", "backends/sdl3", "backends/software", "third_party", "cmake", "scripts/generate_go_sdk.py", "CMakeLists.txt", "LICENSE"]
         diff = subprocess.check_output(["git", "diff", "HEAD", "--", *canonical], cwd=ROOT)
         receipt = {"source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                    "canonical_tracked_sources_dirty": bool(diff), "tracked_diff_sha256": hashlib.sha256(diff).hexdigest(),

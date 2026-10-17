@@ -9,5 +9,5 @@ Local patch: Source/API/SBParagraph.c explicitly consumes each assertion-only
 remain intact. NDEBUG removes assertions without leaving an unused local under
 GCC 16 Release warnings. No upstream version bump or runtime algorithm change.
 
-Patched SHA-256: `947795f64e5d8c17c01a996e6ea05d50ae7e1c68b26b90da7222d051e4062fac`.
+Patched SHA-256: `4e94023c95941609db1abe93de8ed6f75f095ded4a56a745f11df1f3a3b54cbe`.
 The integrator updates third_party/dependencies.json alongside this receipt.

@@ -13,6 +13,8 @@ typedef struct {
     const char *data;
     size_t length;
 } cui_str;
+/* String-literal initializer; expression form: (cui_str)CUI_STR("text"). */
+#define CUI_STR(literal) {"" literal, sizeof(literal) - 1}
 /* Full paragraph plus caller-selected line, in original UTF-8 bytes.
  * Hard paragraph separators are excluded; U+2028 retains paragraph context. */
 typedef struct {
@@ -37,6 +39,56 @@ typedef enum {
     CUI_ERROR_LAYOUT,
     CUI_ERROR_INVALID_ACTION
 } cui_error;
+/* Diagnostics are bounded value snapshots. Error state is sticky until clear_error.
+ * Paths contain outermost open box IDs (including anonymous zero IDs). */
+#define CUI_DIAGNOSTIC_PATH_MAX 16
+#define CUI_DIAGNOSTIC_OPERATION_MAX 48
+#define CUI_DIAGNOSTIC_MESSAGE_MAX 160
+#define CUI_DIAGNOSTIC_SUBSYSTEM_MAX 48
+typedef enum {
+    CUI_DIAGNOSTIC_NONE = 0,
+    CUI_DIAGNOSTIC_CAPACITY = 1,
+    CUI_DIAGNOSTIC_DUPLICATE_ID = 2,
+    CUI_DIAGNOSTIC_LIFECYCLE = 3,
+    CUI_DIAGNOSTIC_LAYOUT = 4,
+    CUI_DIAGNOSTIC_INVALID_ACTION = 5,
+    CUI_DIAGNOSTIC_ZERO_ID = 6,
+    CUI_DIAGNOSTIC_BOX_DEPTH = 7,
+    CUI_DIAGNOSTIC_ELEMENTS = 8,
+    CUI_DIAGNOSTIC_UNBALANCED_SCOPE = 9
+} cui_diagnostic_detail;
+typedef struct {
+    cui_error error;
+    cui_diagnostic_detail detail;
+    char operation[CUI_DIAGNOSTIC_OPERATION_MAX];
+    char message[CUI_DIAGNOSTIC_MESSAGE_MAX];
+    char subsystem[CUI_DIAGNOSTIC_SUBSYSTEM_MAX];
+    uint64_t frame_sequence;
+    cui_id id;
+    size_t used, requested, limit; /* Budget units follow subsystem; zero limit is unknown. */
+    cui_id path[CUI_DIAGNOSTIC_PATH_MAX];
+    size_t path_count;
+    bool path_truncated;
+} cui_diagnostic;
+/* Callback receives a borrowed snapshot. first/latest_diagnostic, last_error,
+ * frame_active and other pure getters are safe. Context mutations (including
+ * destroy, begin/end_frame, resource_find and report) are rejected during it.
+ * Do not reenter host callbacks or retain the borrowed pointer. */
+typedef void (*cui_diagnostic_fn)(void *, const cui_diagnostic *);
+void cui_set_diagnostic_callback(cui_context *, cui_diagnostic_fn, void *user);
+bool cui_first_diagnostic(const cui_context *, cui_diagnostic *out);
+bool cui_latest_diagnostic(const cui_context *, cui_diagnostic *out);
+/* For application/component failures. Captures the current open box path. */
+void cui_report_diagnostic(cui_context *, const cui_diagnostic *);
+typedef enum { CUI_DEBUG_LAYOUT_TEXT, CUI_DEBUG_LAYOUT_JSON } cui_debug_layout_format;
+/* Opt in before composition. Exports box nodes only, after end_frame and before
+ * the next begin_frame. required includes NUL; insufficient buffers are untouched.
+ * IDs are JSON strings to preserve all 64 bits. Requested dimensions retain
+ * fixed/percent flags and maxima; nonfinite requests export as null. Bounds and
+ * clips are resolved geometry. No allocation, file I/O or locale mutation. */
+void cui_set_layout_debug(cui_context *, bool enabled);
+bool cui_debug_layout_export(cui_context *, cui_debug_layout_format, char *buffer, size_t capacity,
+                             size_t *required);
 typedef enum {
     CUI_EVENT_POINTER_MOVE,
     CUI_EVENT_POINTER_DOWN,
@@ -370,14 +422,14 @@ typedef struct {
     bool row, clip;
     cui_color background, border;
     float border_width;
-    cui_align align_x, align_y;
-    float offset_x, offset_y; /* Child translation in clipped boxes; negative scrolls forward. */
+    cui_align align_x, align_y; /* Physical horizontal/vertical axes in rows and columns. */
+    float offset_x, offset_y;   /* Child translation in clipped boxes; negative scrolls forward. */
     cui_corner_radii corner_radii;
     cui_border_edges border_edges;
     /* Flags preserve zero corners/edges. Radii are clamped to half the shorter
      * side by adapters; border widths use the same integer layout units as
      * border_width. Negative/nonfinite box values normalize to zero. */
-    bool custom_corners, custom_border_edges;
+    bool custom_corners, custom_border_edges; /* Replace uniform radius/width, including zero. */
     /* Explicit zero dimensions; otherwise zero retains the FIT convention. */
     bool fixed_width, fixed_height;
     /* Measure/layout descendants, including portals, without paint, input or
@@ -394,6 +446,9 @@ typedef struct {
     /* Interpret the corresponding dimension as a fraction of the parent inner extent in0..1.
      * Fraction flags take precedence over fixed flags and max caps. */
     bool width_percent, height_percent;
+    /* Replace uniform padding with physical edges, including explicit zero. */
+    cui_border_edges padding_edges;
+    bool custom_padding;
 } cui_box;
 /* Borrowed straight-alpha RGBA8 pixels, valid through renderer completion.
  * Increment revision whenever pixels change; stride includes row padding. */

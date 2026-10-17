@@ -674,8 +674,8 @@ SB_INTERNAL SBParagraphRef SBParagraphCreateWithAlgorithm(SBAlgorithmRef algorit
     SBUInteger paragraphOffset, SBUInteger suggestedLength, SBLevel baseLevel)
 {
     SBUInteger stringLength = algorithm->codepointSequence.stringLength;
-
-    (void)stringLength; /* Also used by SBAssert in debug builds. */
+    /* NDEBUG removes SBAssert; retain its range input without a Release warning. */
+    (void)stringLength;
 
     /* The specified range MUST be valid */
     SBAssert(SBUIntegerVerifyRange(stringLength, paragraphOffset, suggestedLength) && suggestedLength > 0);
@@ -688,8 +688,8 @@ SB_INTERNAL SBParagraphRef SBParagraphCreateWithCodepointSequence(
     SBUInteger paragraphOffset, SBUInteger suggestedLength, SBLevel baseLevel)
 {
     SBUInteger stringLength = codepointSequence->stringLength;
-
-    (void)stringLength; /* Also used by SBAssert in debug builds. */
+    /* NDEBUG removes SBAssert; retain its range input without a Release warning. */
+    (void)stringLength;
 
     /* The specified range MUST be valid */
     SBAssert(SBUIntegerVerifyRange(stringLength, paragraphOffset, suggestedLength) && suggestedLength > 0);

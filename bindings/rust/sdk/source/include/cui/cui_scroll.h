@@ -22,6 +22,10 @@ typedef struct {
     /* Borrowed for this call/frame; NULL inherits the styled component's theme
      * or keeps legacy behavior in a standalone Base call. Never retained. */
     const cui_scrollbar_style *scrollbar_style;
+    /* Measure FIT content on enabled axes when the corresponding explicit
+     * content dimension is nonpositive/nonfinite. Uses preceding-frame layout;
+     * the first frame starts at zero range. Explicit dimensions always win. */
+    bool auto_measure_content;
 } cui_scroll_options;
 typedef struct {
     cui_size viewport;

@@ -126,9 +126,10 @@ cui_id cui_sidebar_part_id(cui_id, unsigned part);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_SIDEBAR_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_SIDEBAR_IMPLEMENTATION) && !defined(CUI_SIDEBAR_IMPLEMENTATION_ONCE)
+#if defined(CUI_SIDEBAR_IMPLEMENTATION) && defined(CUI_SIDEBAR_DECLARATIONS_READY) && !defined(CUI_SIDEBAR_IMPLEMENTATION_ONCE)
 #define CUI_SIDEBAR_IMPLEMENTATION_ONCE
 /* src/base/cui_sidebar.c */
 /* SPDX-License-Identifier: MIT */

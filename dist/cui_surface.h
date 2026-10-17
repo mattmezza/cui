@@ -125,9 +125,10 @@ void cui_alert_dialog(cui_context *, const cui_theme *, cui_surface_state *, cui
 #ifdef __cplusplus
 }
 #endif
+#define CUI_SURFACE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_SURFACE_IMPLEMENTATION) && !defined(CUI_SURFACE_IMPLEMENTATION_ONCE)
+#if defined(CUI_SURFACE_IMPLEMENTATION) && defined(CUI_SURFACE_DECLARATIONS_READY) && !defined(CUI_SURFACE_IMPLEMENTATION_ONCE)
 #define CUI_SURFACE_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_surface.c */

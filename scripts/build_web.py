@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build the static browser gallery with pinned Zig 0.16.0. No Node build toolchain."""
 from site_language import website_data
+from icon_assets import embedded_names
 import argparse
 import hashlib
 import json
@@ -10,7 +11,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = ["web/modules/cui_shadow_bridge.c", "src/base/cui_button_group.c", 'examples/composed_apps/app.c', 'src/effects/cui_effects.c', 'src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
+SOURCES = ["src/components/cui_text_overflow.c", "web/modules/cui_shadow_bridge.c", "src/base/cui_button_group.c", 'examples/composed_apps/app.c', 'src/effects/cui_effects.c', 'src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
            'src/base/cui_chart.c', 'src/components/cui_chart.c',
            'src/base/cui_text_view.c', 'src/components/cui_text_view.c',
            'src/base/cui_root.c', 'src/components/cui_root.c',
@@ -76,7 +77,12 @@ def main():
     javascript = (ROOT / 'web/gallery.js').read_text(encoding='utf-8').replace('__CUI_WASM_VERSION__', wasm_version)
     (out / 'gallery.js').write_text(javascript, encoding='utf-8', newline='\n')
     shutil.copyfile(ROOT / 'third_party/gpui_themes/presets.json', out / 'themes.json')
-    subprocess.run(['uv', 'run', str(ROOT / 'scripts/build_docs.py'), '--output', str(out)], check=True)
+    subprocess.run(['uv', 'run', str(ROOT / 'scripts/build_docs.py'), '--output', str(out), '--profile', 'web-default-icons' + ('-regex' if args.regex_library else '')], check=True)
+    icon_archive = json.loads((ROOT / 'third_party/gpui_icons/icons.json').read_text())
+    defaults = embedded_names(icon_archive)
+    icons = [{'name': name, 'embedded': name in defaults} for name in sorted(icon_archive['icons'])]
+    (out / 'icons.json').write_text(json.dumps({'source_commit': icon_archive['source_commit'],
+        'icons': icons}, indent=2) + '\n')
     manifest = website_data(json.loads((ROOT / 'docs/gpui-parity.json').read_text(encoding='utf-8')))
     usage = json.loads((ROOT / 'docs/component-usage.json').read_text(encoding='utf-8'))['components']
     if [c['name'] for c in usage] != [c['name'] for c in manifest['components']]:
@@ -88,6 +94,17 @@ def main():
     notices += '\n\nGPUI Kit theme presets\n======================\n' + (ROOT / 'third_party/gpui_themes/LICENSE').read_text(encoding='utf-8')
     notices += '\n\nUnicode 17 grapheme data\n========================\n' + (ROOT / 'third_party/unicode/17.0.0/LICENSE.txt').read_text(encoding='utf-8')
     (out / 'LICENSE.txt').write_text(notices, encoding='utf-8')
+    downloads = out / 'downloads'
+    downloads.mkdir(exist_ok=True)
+    archive = downloads / 'cui-native.tar.gz'
+    subprocess.run([sys.executable, str(ROOT / 'scripts/native_bundle.py'), '--output', str(archive)], check=True)
+    checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+    (downloads / 'cui-native.tar.gz.sha256').write_text(checksum + '  cui-native.tar.gz\n')
+    info = json.loads((out / 'build-info.json').read_text())
+    info['build_options'] = {'CUI_ICON_ALL_ASSETS': False, 'CUI_GALLERY_REGEX': bool(args.regex_library),
+                             'target': 'wasm32-wasi', 'zig': version}
+    info['downloads'] = {'downloads/cui-native.tar.gz': {'sha256': checksum, 'bytes': archive.stat().st_size}}
+    (out / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
     subprocess.run([sys.executable, str(ROOT / 'scripts/build_sharing.py'), '--output', str(out)], check=True)
     (out / '.nojekyll').touch()
     print(f'Gallery built at {out}; serve over HTTP, e.g. python -m http.server -d {out}')

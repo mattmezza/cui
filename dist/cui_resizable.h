@@ -107,9 +107,10 @@ cui_resizable_error cui_resizable(cui_context *, cui_id, const cui_theme *, cui_
 #ifdef __cplusplus
 }
 #endif
+#define CUI_RESIZABLE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_RESIZABLE_IMPLEMENTATION) && !defined(CUI_RESIZABLE_IMPLEMENTATION_ONCE)
+#if defined(CUI_RESIZABLE_IMPLEMENTATION) && defined(CUI_RESIZABLE_DECLARATIONS_READY) && !defined(CUI_RESIZABLE_IMPLEMENTATION_ONCE)
 #define CUI_RESIZABLE_IMPLEMENTATION_ONCE
 /* src/base/cui_resizable.c */
 /* SPDX-License-Identifier: MIT */

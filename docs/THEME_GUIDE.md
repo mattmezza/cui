@@ -2,6 +2,14 @@
 
 A `cui_theme` C struct carries surface/background, text/muted, primary/on-primary, border/focus/destructive colors and typography/spacing/radius/control height. `cui_theme_light`, `dark`, `high_contrast`, and `terminal` return runtime values. Pass the theme to every styled call; copying and adjusting a token is an explicit per-component override.
 
+Prefer component option overrides for local changes: Button has `custom_colors`
+and Avatar has explicit fallback colors. A theme copy remains useful when a whole
+subtree shares an override. The public struct stays flat for compatibility;
+grouping its fields would break existing designated initializers and bindings.
+Button variant names describe presentation, while `CUI_THEME_BUTTON_*` names
+describe shared palettes; see [the mapping](BUTTON.md). In particular, Ghost has
+no dedicated theme palette enum.
+
 The website follows your system light/dark preference by default. Its header palette button selects Follow System, a built-in theme, or one of the pinned named GPUI palette adaptations; an explicit choice persists across visits. The Theme preview shows six actual semantic color tokens alongside typography and controls. It is a design-system demonstration, rather than a separate input widget. Native applications choose a `cui_theme` and pass it into styled component calls; system appearance is supplied by the host. High contrast and the terminal theme demonstrate alternative presentation over the same base behavior.
 
 Motion uses host frame time and component state; Switch, Shimmer, disclosure, loading indicators and indeterminate Progress expose reduced-motion handling. A comprehensive typography/shadow/motion token system, native theme-file loader and automatic global density provider remain pending. The gallery density selector adjusts its example theme.

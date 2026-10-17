@@ -88,9 +88,10 @@ bool cui_root_render(cui_context *, cui_id, cui_root *, const cui_theme *, cui_r
 #ifdef __cplusplus
 }
 #endif
+#define CUI_ROOT_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_ROOT_IMPLEMENTATION) && !defined(CUI_ROOT_IMPLEMENTATION_ONCE)
+#if defined(CUI_ROOT_IMPLEMENTATION) && defined(CUI_ROOT_DECLARATIONS_READY) && !defined(CUI_ROOT_IMPLEMENTATION_ONCE)
 #define CUI_ROOT_IMPLEMENTATION_ONCE
 /* src/base/cui_root.c */
 /* SPDX-License-Identifier: MIT */

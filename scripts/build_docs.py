@@ -5,6 +5,9 @@
 # ///
 """Render repository documentation for the static website, without runtime Markdown."""
 import argparse
+import hashlib
+from functools import lru_cache
+import subprocess
 import json
 from pathlib import Path
 import re
@@ -27,7 +30,43 @@ GUIDES.update({'DESIGN_SIZES', 'DATE_LOCALE_YEAR', 'SIDEBAR_CLIPPING',
                'PLOT_INTERACTIONS', 'CONTENT_STYLING', 'AVATAR_MESSAGE_EXAMPLES', 'SCROLLBAR_APPEARANCE', 'RADIO_GROUP', 'CHECKBOX_BEHAVIOR', 'CONTEXTUAL_NATIVE_TEXT', 'ALERT_BUBBLE_GUIDE', 'STATUS_MOTION_GUIDE', 'BUTTON_BEHAVIOR', 'TABLE_BEHAVIOR', 'CHART_APPEARANCE_HOVER', 'THEME_REGISTRY_GUIDE', 'SDL_SYSTEM_APPEARANCE', 'PLOT_CHART_OWNER_MOTION', 'INPUT_REFERENCE_CONTRACTS', 'CORE_PREPAINT', 'PLOT_CHART_CURRENT_FRAME', 'INPUT_ACCEPTANCE', 'CHART_SOURCE_POINT_AXIS', 'INPUT_NORMALIZATION', 'TABS_SCROLL_CHAINING', 'CHART_RADAR_TOOLTIP_TITLE', 'CHART_TYPED_TOOLTIP', 'BUTTON_ACTIVATION_BLOCKING', 'PASSWORD_ENGINE_STAGE1', 'PASSWORD_INPUT_STAGE2', 'INPUT_PATTERN_FORMATTING', 'INPUT_NUMBER_FORMATTING', 'INPUT_POINTER_SELECTION', 'BUTTON_GROUP', 'DROP_SHADOW', 'INSET_SHADOW', 'SHADOW_PRESETS', 'CHART_TOOLTIP_APPEARANCE'})
 
 
-GUIDES.update({"BINDING_BUILDERS", "GO_BUILDERS", "RUST_BUILDERS", "BRIDGE_COMPONENTS", "PACKAGING"})
+GUIDES.update({"BINDING_BUILDERS", "GO_BUILDERS", "RUST_BUILDERS", "BRIDGE_COMPONENTS",
+               "LAYOUT_GUIDE", "IDS_AND_LIFETIMES", "DEBUGGING", "APP_RECIPES", "ONBOARDING_BENCHMARK",
+               "PACKAGING", "SDK_TEXT_PARITY"})
+
+TASKS = {
+    'native-app': ('Build a native application', ['START_HERE', 'NATIVE_APP_STARTER', 'IMMEDIATE_AND_STATE', 'IDS_AND_LIFETIMES']),
+    'layout': ('Understand and repair layouts', ['LAYOUT_GUIDE', 'APP_RECIPES', 'BUTTON_BEHAVIOR', 'CORE']),
+    'debugging': ('Diagnose errors and missing output', ['DEBUGGING', 'IDS_AND_LIFETIMES', 'ICON', 'LAYOUT_GUIDE']),
+}
+SEARCH_TERMS = {
+    'LAYOUT_GUIDE': 'star disappeared grow fit fixed min width max_width clipping nowrap overflow',
+    'DEBUGGING': 'capacity error unclosed box unbalanced missing end blank icon diagnostic',
+    'ICON': 'blank icon missing icon embedded catalog loader not found',
+    'IDS_AND_LIFETIMES': 'zero id duplicate id anonymous stable row identity lifetime borrowed',
+    'NATIVE_APP_STARTER': 'bundle tarball custom app app.c main.c Makefile build',
+}
+
+
+@lru_cache(maxsize=16)
+def source_revision(root):
+    try:
+        # Fixtures and unpacked source trees need no Git installation/history.
+        if not (root / '.git').exists():
+            return 'main'
+        return subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'],
+                                       text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return 'main'
+
+
+def description_for(path):
+    tokens = MarkdownIt('commonmark', {'html': False}).parse(path.read_text(encoding='utf-8'))
+    for index, token in enumerate(tokens):
+        if token.type == 'paragraph_open' and index + 1 < len(tokens):
+            return re.sub(r'\s+', ' ', tokens[index + 1].content).strip()[:220]
+    return path.stem.replace('_', ' ').title()
+
 
 
 def slugify(value):
@@ -68,7 +107,7 @@ def document_slug(path, root):
 def category(path, root):
     if path == root / 'README.md' or path.stem in {'START_HERE', 'AI_AGENTS', 'NATIVE_APP_STARTER', 'RESIZABLE_DRAG_AUDIT'}:
         return 'Getting started'
-    if path.stem in DEVELOPMENT:
+    if path.stem in DEVELOPMENT or 'validation' in path.relative_to(root).parts:
         return 'Development'
     if path.stem in GUIDES or path.relative_to(root).parts[0] in {'backends', 'examples'}:
         return 'Guides'
@@ -139,7 +178,7 @@ def render_document(path, root, slugs, output):
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(target, destination)
             return quote(asset.as_posix(), safe='/')
-        result = REPOSITORY + quote(relative, safe='/')
+        result = REPOSITORY.replace('/main/', '/' + source_revision(root) + '/') + quote(relative, safe='/')
         if url.fragment:
             result += '#' + quote(unquote(url.fragment), safe='-')
         return result
@@ -152,9 +191,14 @@ def render_document(path, root, slugs, output):
         elif token.type == 'image':
             token.attrSet('src', rewrite(token.attrGet('src') or '', image=True))
             token.attrSet('loading', 'lazy')
+    relative = path.relative_to(root).as_posix()
+    historical = category(path, root) == 'Development'
     return {'slug': slug, 'title': title, 'html': parser.renderer.render(tokens, parser.options, {}),
-            'source': REPOSITORY + quote(path.relative_to(root).as_posix(), safe='/'),
-            'category': category(path, root)}
+            'source': REPOSITORY.replace('/main/', '/' + source_revision(root) + '/') + quote(relative, safe='/'),
+            'markdown': './markdown/' + quote(relative, safe='/'),
+            'description': description_for(path), 'keywords': SEARCH_TERMS.get(path.stem, ''),
+            'symbols': sorted(set(re.findall(r'\bcui_[A-Za-z0-9_]+', path.read_text(encoding='utf-8')))),
+            'historical': historical, 'category': category(path, root)}
 
 
 def markdown_for_agents(path, root):
@@ -175,7 +219,7 @@ def markdown_for_agents(path, root):
         target = (path.parent / unquote(url.path)).resolve()
         if not target.is_relative_to(root.resolve()):
             return match.group(0)
-        destination = 'https://raw.githubusercontent.com/mattmezza/cui/main/'
+        destination = 'https://raw.githubusercontent.com/mattmezza/cui/' + source_revision(root) + '/'
         destination += quote(target.relative_to(root.resolve()).as_posix(), safe='/')
         if url.fragment:
             destination += '#' + url.fragment
@@ -190,34 +234,78 @@ def markdown_for_agents(path, root):
     return ''.join(lines)
 
 
-def publish_agent_docs(root, output, paths, documents):
+def publish_agent_docs(root, output, paths, documents, profile):
     introduction = ('# CUI\n\n'
         '> Experimental portable C11 UI: immediate frame composition, persistent '
         'application models, themed components and independent host/renderer adapters.\n\n'
         'All 78 comparison entries remain in scope; gallery presence is not complete '
         'component parity. Use catalog.json for feature status and limitations. '
         'Public headers define the API; examples must state their tested host.\n')
+    revision = source_revision(root)
+    headers = sorted((root / 'include/cui').glob('*.h'))
+    hashes = {}
+    symbols = []
+    declaration = re.compile(r'^(?:[A-Za-z_]\w*[ \t*]+)+(cui_[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*;', re.M)
+    for header in headers:
+        relative = header.relative_to(root).as_posix()
+        target = output / 'headers' / header.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(header, target)
+        hashes[relative] = hashlib.sha256(header.read_bytes()).hexdigest()
+        clean = re.sub(r'/\*.*?\*/|//[^\n]*', '', header.read_text(), flags=re.S)
+        for match in declaration.finditer(clean):
+            symbols.append({'name': match[1], 'declaration': re.sub(r'\s+', ' ', match[0]).strip(),
+                            'header': './headers/' + header.name})
+    documentation_hashes = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                            for path in paths}
+    metadata = {'source_revision': revision, 'build_profile': profile, 'headers_sha256': hashes,
+                'documentation_sha256': documentation_hashes,
+                'api_authority': 'Matching public headers; declarations do not establish feature completeness.'}
+    (output / 'build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    (output / 'api-index.json').write_text(json.dumps({'source_revision': revision, 'symbols': symbols}, indent=2) + '\n')
+    introduction += ('\nSource revision: `' + revision + '`. Build profile: `' + profile + '`. '
+                     '[Exact input hashes and build metadata](./build-info.json).\n')
     index = introduction
     bundle = introduction
+    index += '\n## Choose a task\n\n'
+    for task, (title, stems) in TASKS.items():
+        chosen = [(path, doc) for path, doc in zip(paths, documents) if path.stem in stems]
+        content = introduction + '\n# ' + title + '\n'
+        for path, doc in chosen:
+            content += '\n## ' + doc['title'] + '\n\n' + markdown_for_agents(path, root)
+        target = output / 'tasks' / (task + '.md')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding='utf-8')
+        index += f'- [{title}](./tasks/{task}.md): A focused reading set for this task.\n'
+
+    complete_index = introduction + '\n## All documentation\n\n'
+    curated = {'API', 'CORE', 'INTERFACES', 'ICON', 'AI_AGENTS', 'LAYOUT_GUIDE', 'IDS_AND_LIFETIMES', 'DEBUGGING', 'APP_RECIPES', 'THEME_GUIDE', 'PLATFORM_MATRIX', 'IMMEDIATE_AND_STATE', 'LANGUAGE_BINDINGS'}
     for group in ('Getting started', 'Guides', 'Components', 'Development'):
         entries = [(path, doc) for path, doc in zip(paths, documents) if doc['category'] == group]
         if not entries:
             continue
-        index += '\n## ' + ('Optional' if group == 'Development' else group) + '\n\n'
+        if group in {'Getting started', 'Guides'}:
+            index += '\n## ' + group + '\n\n'
         for path, doc in entries:
             relative = path.relative_to(root).as_posix()
             url = './markdown/' + quote(relative, safe='/')
             label = doc['title'].replace('[', '\\[').replace(']', '\\]')
-            index += f'- [{label}]({url}): {group} documentation.\n'
+            entry = f'- [{label}]({url}): {doc["description"]}\n'
+            complete_index += entry
+            if group == 'Getting started' or (path.stem in curated and not doc['historical']):
+                index += entry
             markdown = markdown_for_agents(path, root)
             destination = output / 'markdown' / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(markdown, encoding='utf-8')
-            bundle += f"\n\n---\n\n## {doc['title']}\n\nSource: {doc['source']}\n\n{markdown}"
+            if not doc['historical']:
+                bundle += f"\n\n---\n\n## {doc['title']}\n\nSource: {doc['source']}\n\n{markdown}"
+    (output / 'docs-index.md').write_text(complete_index, encoding='utf-8')
     index += ('\n## API and status\n\n'
-              '- [Public headers](https://github.com/mattmezza/cui/tree/main/include/cui): API authority.\n'
+              '- [Complete documentation index](./docs-index.md): All guides, component references and historical reports.\n'
+              '- [API symbol index](./api-index.json): Header-derived declarations and matching downloadable headers.\n'
               '- [Feature manifest](./catalog.json): All 78 entries and incomplete behavior.\n'
-              '- [Full documentation bundle](./llms-full.txt): All documentation and catalog data.\n')
+              '- [Full documentation bundle](./llms-full.txt): Current documentation and catalog data; historical reports are linked separately.\n')
     manifest = root / 'docs/gpui-parity.json'
     if manifest.is_file():
         shutil.copyfile(manifest, output / 'catalog.json')
@@ -228,7 +316,7 @@ def publish_agent_docs(root, output, paths, documents):
         (output / name).write_text(bundle, encoding='utf-8')
 
 
-def build(root, output):
+def build(root, output, profile='source-defaults'):
     root, output = root.resolve(), output.resolve()
     paths = discover(root)
     slugs = {p.resolve(): document_slug(p, root) for p in paths}
@@ -238,7 +326,7 @@ def build(root, output):
     documents = [render_document(p, root, slugs, output) for p in paths]
     (output / 'docs.json').write_text(json.dumps(documents, ensure_ascii=False, indent=2) + '\n',
                                      encoding='utf-8')
-    publish_agent_docs(root, output, paths, documents)
+    publish_agent_docs(root, output, paths, documents, profile)
     return documents
 
 
@@ -246,8 +334,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=ROOT)
     parser.add_argument('--output', type=Path, default=ROOT / 'build/web')
+    parser.add_argument('--profile', default='source-defaults', help='Actual artifact build configuration')
     args = parser.parse_args()
-    documents = build(args.root, args.output)
+    documents = build(args.root, args.output, args.profile)
     print(f'Rendered {len(documents)} documentation pages into {args.output / "docs.json"}')
 
 

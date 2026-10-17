@@ -16,3 +16,17 @@ prefix. Copy this folder to start a separate project.
 - `test_app.c` verifies component behavior without a native window.
 
 Sign-in/out is local demonstration state; no authentication service is connected.
+
+On macOS the CMake starter produces `native_starter.app`, including the pinned
+Inter fonts and their license. Finder launches discover the bundled font; `--font`
+still overrides it. Set `CUI_MACOS_BUNDLE=OFF` for a plain executable.
+
+A copied starter must set `-DCUI_MACOS_BUNDLE_HELPER=/path/to/CUIMacOSBundle.cmake`
+and `-DCUI_MACOS_FONT_DIR=/path/to/third_party/inter` from the same CUI checkout.
+Native macOS installs deploy linked dylibs through CMake BundleUtilities by default;
+set `CUI_MACOS_DEPLOY_DEPENDENCIES=OFF` to manage deployment yourself.
+Cross builds require a Darwin toolchain, SDK and target dependencies. They package
+resources without executing target binaries. Dependency deployment is disabled:
+stage target dylibs, repair install names, and sign/notarize on macOS separately.
+
+Keep `CUISignMacOS.cmake` beside the bundle helper when copying the helpers; native dependency deployment applies ad-hoc development signatures after fixing library paths.

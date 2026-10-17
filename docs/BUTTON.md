@@ -35,6 +35,21 @@ an accessible description. Disabled text/background preserve theme contrast;
 hover/pressed states tint enabled surfaces and keyboard focus has a distinct border.
 Selected is application-owned presentation; it does not imply a semantic pressed state. For value toggling use `cui_toggle` or the controlled toggle group.
 
+With `custom_colors`, `pressed || selected || open` selects `colors.active`
+(or `outline_active`); otherwise hover selects `hover`, then `normal` is the
+fallback. A selected/open button therefore keeps its active background while
+hovered or pressed. Disabled painting takes precedence over those states. Use a
+custom interactive row when selected, hovered and pressed need independent
+colors; see [Interaction](INTERACTION.md#custom-clickable-rows).
+
+Component variants and theme palettes are different enums. Primary maps to
+`CUI_THEME_BUTTON_PRIMARY`; secondary/danger/warning/success/info map to their
+namesakes; default/outline map to `CUI_THEME_BUTTON_DEFAULT`. Ghost uses
+secondary active, accent hover and a transparent normal background; its pressed
+background comes from default active. Link uses `link`, `link_hover` and
+`link_active`. There is no `CUI_THEME_BUTTON_GHOST` palette. Set `custom_colors`
+on a component for a local override instead of copying the theme.
+
 Headless tests exercise all nine variants, four sizes and four themes, measured
 bounds, adornments, content callbacks, semantic names and ordinary push-button state and keyboard
 suppression while loading. SVG icons, custom palettes and animation are separate

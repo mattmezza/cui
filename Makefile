@@ -21,3 +21,7 @@ dist:
 	python scripts/amalgamate.py
 dist-check:
 	python scripts/amalgamate.py --check
+native-dist:
+	python scripts/native_bundle.py --output $(BUILD)/cui-native.tar.gz
+
+.PHONY: native-dist

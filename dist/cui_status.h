@@ -72,9 +72,11 @@ bool cui_tag_resolve(const cui_theme *theme, cui_tag_options options, bool hover
                      cui_tag_style *style);
 /* Pair end only after a successful begin. Children are application submitted;
  * text children should use the returned foreground/font size. */
+/* Requires a unique nonzero ID; false on zero, before opening any boxes. */
 bool cui_begin_tag(cui_context *ui, cui_id id, const cui_theme *theme, cui_tag_options options,
                    cui_tag_style *style);
 void cui_end_tag(cui_context *ui, cui_id id, const cui_tag_style *style);
+/* Requires a unique nonzero ID; zero reports CUI_ERROR_INVALID_ACTION. */
 bool cui_tag(cui_context *ui, cui_id id, const cui_theme *theme, cui_str text,
              cui_tag_options options);
 typedef enum { CUI_MARKER_PLAIN, CUI_MARKER_SEPARATOR, CUI_MARKER_BORDER } cui_marker_variant;
@@ -292,9 +294,10 @@ bool cui_notifications_checked(cui_context *, cui_id, const cui_theme *, cui_not
 #ifdef __cplusplus
 }
 #endif
+#define CUI_STATUS_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_STATUS_IMPLEMENTATION) && !defined(CUI_STATUS_IMPLEMENTATION_ONCE)
+#if defined(CUI_STATUS_IMPLEMENTATION) && defined(CUI_STATUS_DECLARATIONS_READY) && !defined(CUI_STATUS_IMPLEMENTATION_ONCE)
 #define CUI_STATUS_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_status.c */
@@ -929,6 +932,14 @@ bool cui_tag_named_palette(cui_status_color name, bool dark, cui_tag_palette *ou
 bool cui_begin_tag(cui_context *ui, cui_id id, const cui_theme *t, cui_tag_options o,
                    cui_tag_style *out) {
     cui_tag_style s;
+    if (ui && !id) {
+        cui_diagnostic diagnostic = {.error = CUI_ERROR_INVALID_ACTION,
+                                     .detail = CUI_DIAGNOSTIC_ZERO_ID,
+                                     .operation = "cui_begin_tag",
+                                     .id = id};
+        cui_report_diagnostic(ui, &diagnostic);
+        return false;
+    }
     if (!ui || !cui_tag_resolve(t, o, cui_hovered(ui, id), &s))
         return false;
     /* Separate horizontal/vertical padding using inner composition, since the

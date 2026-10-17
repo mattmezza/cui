@@ -28,3 +28,14 @@ Custom size sets the height directly and font to `custom_size * .875`, with hori
 `name` labels the semantic node and is no longer painted as a second row. This corrects the previous Input appearance. `no_appearance` suppresses the frame surface/border; `no_border` keeps the surface. Focus/invalid border colors remain separately controlled. There is no outer source focus shadow yet. `text_align` supports Start, Center and End. Both growing and fixed-width fields align text in the current layout pass. Selection uses `theme.selection` without changing the foreground, and the caret uses independent `theme.caret` with source height 85% of the line box. Disabled appearance uses input background at 20% alpha and muted foreground at 50% alpha. Source caret blinking, IME, shaping and native context menus remain separate gaps.
 
 Growing single-line inputs now align text through the current layout pass. Their inner content no longer uses a previous-frame viewport width as a minimum, so changing parent width or horizontal padding does not force a stale viewport size. Headless tests cover left, center and right alignment on the first frame and after shrink/grow transitions with changing padding; the regression fails against the previous implementation.
+
+Single-line inputs render both their value and placeholder as one unwrapped line,
+including when the host supplies only a measurement callback. The content viewport
+clips overflow; focused values scroll horizontally to keep the caret visible.
+A long placeholder does not increase the input height or wrap into extra lines.
+
+Known layout limitation: a grow-width input (`width = -1`) containing a long
+value can report a content-sized viewport even inside a narrower fixed parent.
+Ancestor clipping still limits painting, but viewport-based hit geometry and
+caret scrolling may be inaccurate. Use an explicit input width for this case.
+Long placeholders in empty grow-width inputs retain the constrained viewport.

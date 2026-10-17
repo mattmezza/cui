@@ -1,8 +1,9 @@
 # Icon
 
 Icon renders named, host-loaded or raw SVG as a monochrome antialiased mask through
-CUI's portable RGBA bitmap draw path. It is decorative: it contributes layout and
-paint, without a semantic role, focus stop or pointer target.
+CUI's portable RGBA bitmap draw path. It is decorative by default: it contributes layout and
+paint without a focus stop or pointer target. A nonempty `accessible_name` opts
+into a noninteractive image semantic; `decorative = true` suppresses that name.
 
 ```c
 #include "cui/cui_icon.h"
@@ -33,10 +34,36 @@ returns. Returning false tries the embedded bundle. CUI performs no implicit
 filesystem or network access. Raw data uses `cui_icon_set_data`.
 
 The complete 1,830-name/path catalog remains available through
-`cui_icon_catalog_*`. The default build embeds the 106 frozen upstream default
-SVGs. Define `CUI_ICON_ALL_ASSETS=1` when compiling the implementation to embed all
+`cui_icon_catalog_*`. The default build embeds the 106 frozen upstream defaults plus 17 application essentials
+from the same pinned archive (123 SVGs total). These include `pencil`, `pen-line`,
+`funnel`, `archive`, `trash`, `mail`, `mail-open`, `paperclip`, `send`, `reply`,
+`reply-all`, `forward`, `download`, `upload`, `link`, `log-out`, and `check-check`.
+`filter`, `trash-2`, and `more-vertical` are accepted aliases for `funnel`, `trash`,
+and `ellipsis-vertical`, including their `icons/*.svg` path spellings. Aliases do
+not add catalog entries. Define `CUI_ICON_ALL_ASSETS=1` when compiling the implementation to embed all
 1,830; other catalog paths require a host loader in the default build.
 `cui_icon_asset` returns a borrowed static SVG string when embedded.
+
+Query `cui_icon_query(name_or_path)` before selecting artwork:
+
+| Result | Meaning |
+| --- | --- |
+| `CUI_ICON_UNKNOWN` | No catalog entry matches |
+| `CUI_ICON_CATALOG_NOT_EMBEDDED` | Known name/path, SVG omitted from this build |
+| `CUI_ICON_EMBEDDED` | SVG is embedded in this build |
+
+The query accepts catalog names, paths and the aliases above. It reports build
+assets, not whether an application loader can supply an SVG. For example,
+`clock-3` is known but is not embedded in the default build. Handle the
+`CUI_ICON_NOT_FOUND` result explicitly or supply a loader.
+
+For development, opt into `.debug_placeholder = true` in `cui_icon_options`.
+A missing named or state-backed icon then paints an outline inside its allocated
+box, preserving `CUI_ICON_NOT_FOUND` and the decorative/named semantic contract.
+The outline respects tint and custom opacity; it does not replace arbitrary SVG
+parse errors. Default behavior remains no placeholder. Do not use emoji as a
+fallback: font coverage and appearance vary.
+
 
 `scripts/icon_assets.py` regenerates the bundle offline from the pinned JSON
 catalog in `third_party/gpui_icons`; `--check` verifies reproducibility. Generated
@@ -139,3 +166,22 @@ subject to the context's resource count and payload budget. Finish rendering bef
 `cui_begin_frame`: that call collects retired masks and eventually destroys omitted
 widgets. Context destruction releases all caches. Source/raster preparation errors
 are returned; context resource exhaustion also reports `CUI_ERROR_CAPACITY`.
+
+## Handling missing icons
+
+Check the result of `cui_icon_named` or `cui_icon`: `CUI_ICON_NOT_FOUND` means
+no host SVG or embedded asset was available; no icon is painted. A successful
+`cui_icon_set_name` only selects a catalog source and does not guarantee that its
+SVG is embedded. Check `cui_icon_prepare` (or the widget call) as well. For example:
+
+```c
+cui_icon_error error = cui_icon_named(ui, 42, &theme, cui_string("mail"),
+                                      (cui_icon_options){0});
+if (error != CUI_ICON_OK) {
+    /* Application policy: log error, report it in debug UI, or paint a fallback. */
+}
+```
+
+Use `cui_icon_catalog_default` to inspect the default bundle, provide a theme
+loader for other names, or enable the full bundle. CUI does not print diagnostics
+implicitly; applications retain control of logging and fallback presentation.

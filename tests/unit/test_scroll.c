@@ -776,6 +776,65 @@ static void list_overlay_policy(void) {
     cui_destroy(ui);
 }
 #endif
+#ifndef CUI_SCROLL_BASE_ONLY
+static void auto_content(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    cui_theme theme = cui_theme_light();
+    cui_scroll_state state = {0};
+    cui_scroll_options options = {.width = 200,
+                                  .height = 100,
+                                  .vertical = true,
+                                  .hide_scrollbars = true,
+                                  .auto_measure_content = true};
+    assert(ui);
+    scene(ui, &theme, &state, options);
+    state.y = 1000;
+    scene(ui, &theme, &state, options);
+    assert(state.y == 300); /* Ten FIT rows total 400, viewport 100. */
+    assert(cui_bounds(ui, 100).y == -300);
+    /* Shrinking content replaces the retained extent after one frame. */
+    for (int frame = 0; frame < 2; frame++) {
+        assert(cui_begin_frame(ui, 400, 300, .016f));
+        assert(cui_scrollable_begin(ui, 1, &theme, &state, options));
+        cui_begin_box(ui, 100, (cui_box){.width = 180, .height = 20});
+        cui_end_box(ui);
+        cui_scrollable_end_ex(ui, 1, &theme, &state, options);
+        cui_end_frame(ui);
+    }
+    assert(state.y == 0 && cui_bounds(ui, 100).y == 0);
+    /* Explicit height wins even when automatic measurement is enabled. */
+    options.content_height = 700;
+    state.y = 1000;
+    scene(ui, &theme, &state, options);
+    assert(state.y == 600);
+    options.content_height = 0;
+    options.width = 100;
+    /* Text wraps to the viewport width; FIT height retains all wrapped lines. */
+    float wrapped_height = 0;
+    for (int frame = 0; frame < 2; frame++) {
+        assert(cui_begin_frame(ui, 400, 300, .016f));
+        if (frame)
+            state.y = 1000;
+        assert(cui_scrollable_begin(ui, 1, &theme, &state, options));
+        cui_begin_box(ui, 100, (cui_box){.width = -1});
+        cui_text(ui,
+                 cui_string("one two three four five six seven eight nine ten "
+                            "one two three four five six seven eight nine ten "
+                            "one two three four five six seven eight nine ten"),
+                 20, (cui_color){255, 255, 255, 255});
+        cui_end_box(ui);
+        cui_scrollable_end_ex(ui, 1, &theme, &state, options);
+        cui_end_frame(ui);
+        if (!frame) {
+            wrapped_height = cui_bounds(ui, 100).h;
+            assert(wrapped_height > 100);
+        }
+    }
+    assert(fabsf(state.y - (wrapped_height - 100)) < .01f);
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
     appearance_policy();
     cui_rect thumb = cui_scrollbar_thumb((cui_rect){10, 20, 10, 100}, 450, 100, 1000, true);
@@ -783,6 +842,7 @@ int main(void) {
     thumb = cui_scrollbar_thumb((cui_rect){0, 0, 100, 10}, -1, 100, 50, false);
     assert(thumb.x == 0 && thumb.w == 100);
 #ifndef CUI_SCROLL_BASE_ONLY
+    auto_content();
     styled_tracks();
     list_overlay_policy();
     nested_touch_drag_controls();

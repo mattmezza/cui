@@ -70,9 +70,10 @@ bool cui_effect_blur(cui_bitmap source, cui_effect_buffer output, unsigned radiu
 #ifdef __cplusplus
 }
 #endif
+#define CUI_EFFECTS_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_EFFECTS_IMPLEMENTATION) && !defined(CUI_EFFECTS_IMPLEMENTATION_ONCE)
+#if defined(CUI_EFFECTS_IMPLEMENTATION) && defined(CUI_EFFECTS_DECLARATIONS_READY) && !defined(CUI_EFFECTS_IMPLEMENTATION_ONCE)
 #define CUI_EFFECTS_IMPLEMENTATION_ONCE
 /* src/effects/cui_effects.c */
 /* SPDX-License-Identifier: MIT */

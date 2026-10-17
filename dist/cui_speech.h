@@ -155,9 +155,10 @@ bool cui_speech_waveform(cui_context *, cui_id, const cui_theme *, const cui_spe
 #ifdef __cplusplus
 }
 #endif
+#define CUI_SPEECH_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_SPEECH_IMPLEMENTATION) && !defined(CUI_SPEECH_IMPLEMENTATION_ONCE)
+#if defined(CUI_SPEECH_IMPLEMENTATION) && defined(CUI_SPEECH_DECLARATIONS_READY) && !defined(CUI_SPEECH_IMPLEMENTATION_ONCE)
 #define CUI_SPEECH_IMPLEMENTATION_ONCE
 /* src/base/cui_speech.c */
 /* SPDX-License-Identifier: MIT */

@@ -32,6 +32,7 @@ typedef struct {
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options);
 /* Writes first/last word initials (UTF-8 scalars), or "?". Requires 9 bytes. */
 size_t cui_avatar_initials(cui_str name, char output[9]);
+/* Requires a unique nonzero ID; zero reports CUI_ERROR_INVALID_ACTION. */
 void cui_avatar(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float size);
 /* Caller-owned circular cover cache, no allocation. Storage must be disjoint
  * from source pixels and stay live through rendering. diameter:1..512; capacity
@@ -52,6 +53,9 @@ typedef struct {
     bool custom_ring, interactive, disabled;
     cui_bitmap image;
     cui_avatar_image *image_state;
+    /* Initials fallback only; flags permit explicit transparent/black colors. */
+    bool custom_background, custom_foreground;
+    cui_color background, foreground;
 } cui_avatar_options;
 /* Invalid/missing image/cache falls back to legacy initials. Returns activation
  * only when interactive; image name remains the supplied accessible name. */

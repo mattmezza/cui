@@ -253,9 +253,10 @@ bool cui_questionnaire_choice_control(cui_context *, cui_id, const cui_theme *,
 #ifdef __cplusplus
 }
 #endif
+#define CUI_QUESTIONNAIRE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_QUESTIONNAIRE_IMPLEMENTATION) && !defined(CUI_QUESTIONNAIRE_IMPLEMENTATION_ONCE)
+#if defined(CUI_QUESTIONNAIRE_IMPLEMENTATION) && defined(CUI_QUESTIONNAIRE_DECLARATIONS_READY) && !defined(CUI_QUESTIONNAIRE_IMPLEMENTATION_ONCE)
 #define CUI_QUESTIONNAIRE_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_questionnaire.c */

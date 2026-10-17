@@ -28,13 +28,65 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libfreetype-dev libharfbuzz-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb
-      - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON
+      # SDL is a FetchContent subproject: its install rules default to disabled.
+      # Configure the final prefix up front so its pkg-config metadata and loader
+      # paths agree with the independently built, extracted source consumer.
+      - run: cmake -S . -B build -G Ninja -DCUI_FETCH_SDL=ON -DCUI_SANITIZE=ON -DSDL_INSTALL=ON -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/native-deps"
       - run: cmake --build build
-      - run: ctest --test-dir build --output-on-failure
+      - name: Expose pinned SDL to the standalone bundle consumer
+        run: |
+          if [ -d build/_deps/sdl-build ]; then
+            cmake --install build/_deps/sdl-build --prefix "$RUNNER_TEMP/native-deps"
+          fi
+          PKG_CONFIG_PATH="$RUNNER_TEMP/native-deps/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+            pkg-config --print-errors --exists 'sdl3 >= 3.2' freetype2 harfbuzz
+      - name: Test with an isolated display, including extracted native bundle
+        run: python scripts/test_local.py --build-dir build
+        env:
+          PKG_CONFIG_PATH: ${{ runner.temp }}/native-deps/lib/pkgconfig
+          LD_LIBRARY_PATH: ${{ runner.temp }}/native-deps/lib
       - name: X11 compatibility smoke (software forced; GPU unverified)
         run: xvfb-run -a env SDL_RENDER_DRIVER=software ./build/cui_gallery --smoke 3
       - name: Independent Sokol OpenGL pixel readback (actual driver reported)
         run: xvfb-run -a ./build/test_sokol
+  macos-native:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Build pinned native dependencies
+        run: |
+          cmake -S tools/native-deps -B build/macos-deps -DCMAKE_BUILD_TYPE=Release -DCUI_DEPS_PREFIX="$RUNNER_TEMP/cui-native-deps"
+          cmake --build build/macos-deps --parallel 4
+          python tests/test_native_deps.py --prefix "$RUNNER_TEMP/cui-native-deps"
+      - name: Configure required native adapters and bundled starter
+        env:
+          PKG_CONFIG_PATH: ${{ runner.temp }}/cui-native-deps/lib/pkgconfig
+        run: >-
+          cmake -S . -B build/macos -DCMAKE_BUILD_TYPE=Release
+          -DCUI_REQUIRE_NATIVE=ON -DCUI_BUILD_NATIVE_STARTER=ON
+          -DCUI_HEADLESS_NATIVE_TESTS=ON -DCUI_BUILD_CPP_EXAMPLE=OFF
+          -DCUI_TEST_FONT="$PWD/third_party/inter/Inter-Regular.otf"
+          -DCUI_MACOS_DEPENDENCY_LICENSE_DIR="$RUNNER_TEMP/cui-native-deps/share/licenses"
+      - run: cmake --build build/macos --parallel 4
+      - name: Headless native adapter checks (Cocoa and Metal acceptance deferred)
+        env:
+          CUI_TEST_FONT: ${{ github.workspace }}/third_party/inter/Inter-Regular.otf
+          CUI_TEST_FAMILY_FONT: ${{ github.workspace }}/third_party/inter/Inter-Bold.otf
+        run: python scripts/test_local.py --build-dir build/macos
+      - name: Deploy and verify installed application without opening a window
+        run: |
+          cmake --install build/macos --prefix "$RUNNER_TEMP/cui-native-installed"
+          python tests/packaging/verify_macos_app.py "$RUNNER_TEMP/cui-native-installed/cui_native_starter.app"
+          tar -czf "$RUNNER_TEMP/cui-native-macos.tar.gz" -C "$RUNNER_TEMP/cui-native-installed" cui_native_starter.app
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-development-app
+          path: ${{ runner.temp }}/cui-native-macos.tar.gz
+          if-no-files-found: error
+
   distribution-and-style:
     runs-on: ubuntu-latest
     steps:

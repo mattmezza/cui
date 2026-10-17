@@ -45,6 +45,8 @@ cui_draw_list starter_app_frame(cui_context *ui, starter_app *a, float width, fl
                                 float dt, const cui_platform *clipboard) {
     if (!cui_begin_frame(ui, width, height, dt))
         return (cui_draw_list){0};
+    starter_page previous_page = a->page;
+    bool previous_signed_in = a->signed_in;
     cui_theme t = cui_theme_light();
     cui_begin_box(ui, 1,
                   (cui_box){.width = -1, .height = -1, .row = true, .background = t.background});
@@ -117,5 +119,9 @@ cui_draw_list starter_app_frame(cui_context *ui, starter_app *a, float width, fl
     }
     cui_end_box(ui);
     cui_end_box(ui);
-    return cui_end_frame(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    /* Sidebar/account labels may have been submitted before their callbacks. */
+    if (previous_page != a->page || previous_signed_in != a->signed_in)
+        cui_invalidate(ui);
+    return list;
 }

@@ -95,6 +95,11 @@ def build(output, site_url=DEFAULT_SITE):
                           ('#doc-'+unquote(match[2]) if match[2] else ''), quote=True)+'"',
                           document['html'])
         page('docs/'+document['slug']+'/', document['title']+' · CUI', description, 'docs/'+document['slug'], '<h1>'+escape(document['title'])+'</h1>'+fallback)
+        if document.get('markdown'):
+            destination = output / ('docs/' + document['slug'] + '/index.html')
+            markup = destination.read_text()
+            alternate = '<link rel="alternate" type="text/markdown" href="' + escape(urljoin(site_url, document['markdown']), quote=True) + '">'
+            destination.write_text(markup.replace('</head>', alternate + '</head>', 1))
     (output / 'routes.json').write_text(json.dumps(pages, ensure_ascii=False, indent=2)+'\n')
     root = ET.Element('urlset', xmlns='http://www.sitemaps.org/schemas/sitemap/0.9')
     for entry in pages:

@@ -26,9 +26,10 @@ void cui_overlay_end(cui_context *);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_OVERLAY_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_OVERLAY_IMPLEMENTATION) && !defined(CUI_OVERLAY_IMPLEMENTATION_ONCE)
+#if defined(CUI_OVERLAY_IMPLEMENTATION) && defined(CUI_OVERLAY_DECLARATIONS_READY) && !defined(CUI_OVERLAY_IMPLEMENTATION_ONCE)
 #define CUI_OVERLAY_IMPLEMENTATION_ONCE
 /* src/base/cui_overlay.c */
 /* SPDX-License-Identifier: MIT */

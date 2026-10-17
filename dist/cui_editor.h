@@ -203,9 +203,10 @@ cui_textarea_result cui_editor(cui_context *, cui_id, const cui_theme *, cui_str
 #ifdef __cplusplus
 }
 #endif
+#define CUI_EDITOR_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_EDITOR_IMPLEMENTATION) && !defined(CUI_EDITOR_IMPLEMENTATION_ONCE)
+#if defined(CUI_EDITOR_IMPLEMENTATION) && defined(CUI_EDITOR_DECLARATIONS_READY) && !defined(CUI_EDITOR_IMPLEMENTATION_ONCE)
 #define CUI_EDITOR_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 /* src/base/cui_editor.c */

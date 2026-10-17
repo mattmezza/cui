@@ -77,9 +77,10 @@ bool cui_toolbar_group(cui_context *, cui_id, const cui_theme *, const cui_toolb
 #ifdef __cplusplus
 }
 #endif
+#define CUI_TOOLBAR_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_TOOLBAR_IMPLEMENTATION) && !defined(CUI_TOOLBAR_IMPLEMENTATION_ONCE)
+#if defined(CUI_TOOLBAR_IMPLEMENTATION) && defined(CUI_TOOLBAR_DECLARATIONS_READY) && !defined(CUI_TOOLBAR_IMPLEMENTATION_ONCE)
 #define CUI_TOOLBAR_IMPLEMENTATION_ONCE
 /* src/base/cui_toolbar.c */
 /* SPDX-License-Identifier: MIT */

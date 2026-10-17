@@ -421,9 +421,10 @@ cui_chart_options cui_chart_theme(cui_chart_options, const cui_theme *);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_CHART_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_CHART_IMPLEMENTATION) && !defined(CUI_CHART_IMPLEMENTATION_ONCE)
+#if defined(CUI_CHART_IMPLEMENTATION) && defined(CUI_CHART_DECLARATIONS_READY) && !defined(CUI_CHART_IMPLEMENTATION_ONCE)
 #define CUI_CHART_IMPLEMENTATION_ONCE
 #ifndef CUI_PLOT_MOTION_IMPLEMENTATION
 #define CUI_PLOT_MOTION_IMPLEMENTATION

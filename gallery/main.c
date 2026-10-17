@@ -32,13 +32,13 @@ static void box(cui_context *ui, const char *key, float width, float height, boo
                             .gap = gap,
                             .background = bg});
 }
-static cui_draw_list frame(cui_context *ui, gallery_state *s, float w, float h) {
+static cui_draw_list frame(cui_context *ui, gallery_state *s, float w, float h, float dt) {
     gallery_state before = *s;
     uint64_t revision = cui_edit_get_state(s->edit).revision;
     cui_theme t = s->contrast ? cui_theme_high_contrast()
                   : s->dark   ? cui_theme_dark()
                               : cui_theme_light();
-    cui_begin_frame(ui, w, h, 0.016f);
+    cui_begin_frame(ui, w, h, dt);
     cui_begin_box(ui, id(ui, "root"),
                   (cui_box){.width = w, .height = h, .clip = true, .background = t.background});
     /* Below the supported specimen size, do not submit controls that cannot be
@@ -322,7 +322,7 @@ int main(int argc, char **argv) {
     bool ok = true;
     if (headless) {
         cui_software *r = cui_software_create(width, height, font);
-        cui_draw_list list = frame(ui, &state, (float)width, (float)height);
+        cui_draw_list list = frame(ui, &state, (float)width, (float)height, 0);
         ok = r && cui_software_render(
                       r, &list, dark ? cui_theme_dark().background : cui_theme_light().background);
         if (ok && capture)
@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
                 if (cui_needs_redraw(ui) || frames == 0 || smoke) {
                     float w, h;
                     cui_sdl3_size(s, &w, &h);
-                    cui_draw_list list = frame(ui, &state, w, h);
+                    cui_draw_list list = frame(ui, &state, w, h, cui_sdl3_frame_delta(s));
                     cui_theme t = state.contrast ? cui_theme_high_contrast()
                                   : state.dark   ? cui_theme_dark()
                                                  : cui_theme_light();
@@ -357,7 +357,7 @@ int main(int argc, char **argv) {
                     if (smoke && frames >= smoke)
                         break;
                 } else
-                    cui_sdl3_wait(8);
+                    (void)cui_sdl3_wait_events(s, 250);
             }
             cui_sdl3_destroy(s);
         }

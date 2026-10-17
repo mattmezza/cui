@@ -61,9 +61,10 @@ cui_plot_result cui_plot_motion_follow_at(cui_id, cui_plot_motion_pointer_state 
 #ifdef __cplusplus
 }
 #endif
+#define CUI_PLOT_MOTION_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_PLOT_MOTION_IMPLEMENTATION) && !defined(CUI_PLOT_MOTION_IMPLEMENTATION_ONCE)
+#if defined(CUI_PLOT_MOTION_IMPLEMENTATION) && defined(CUI_PLOT_MOTION_DECLARATIONS_READY) && !defined(CUI_PLOT_MOTION_IMPLEMENTATION_ONCE)
 #define CUI_PLOT_MOTION_IMPLEMENTATION_ONCE
 #ifndef CUI_THEME_IMPLEMENTATION
 #define CUI_THEME_IMPLEMENTATION

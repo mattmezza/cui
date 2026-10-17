@@ -7,6 +7,21 @@
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
+
+/* Per-face storage makes font identity implicit. Raster flags and render mode
+ * are fixed below; only glyph and the exact 26.6 character size can vary.
+ * At most 128 entries retain 16 KiB each (2 MiB plus fixed metadata per face).
+ * Oversized bitmaps use the FreeType slot directly instead of growing storage. */
+#define GLYPH_CACHE_SLOTS 128u
+#define GLYPH_CACHE_BITMAP_MAX 16384u
+typedef struct {
+    FT_UInt glyph;
+    FT_F26Dot6 size;
+    FT_GlyphSlotRec slot;
+    unsigned char *pixels;
+    bool valid;
+} glyph_cache_entry;
 typedef struct cui_font_family {
     uint32_t id;
     struct cui_font *variants[4][2][2];
@@ -14,6 +29,7 @@ typedef struct cui_font_family {
     struct cui_font_family *next;
 } cui_font_family;
 struct cui_font {
+    glyph_cache_entry *glyph_cache;
     FT_Library library;
     FT_Face face;
     hb_font_t *shaper;
@@ -24,6 +40,46 @@ struct cui_font {
     size_t fallback_count;
     bool owns_fallbacks;
 };
+static FT_GlyphSlot raster_glyph(cui_font *font, FT_UInt glyph, float size) {
+    FT_F26Dot6 raster_size = (FT_F26Dot6)lroundf(size * 64);
+    size_t index = ((size_t)glyph * 33u + (size_t)raster_size) % GLYPH_CACHE_SLOTS;
+    glyph_cache_entry *entry = font->glyph_cache ? &font->glyph_cache[index] : NULL;
+    if (entry && entry->valid && entry->glyph == glyph && entry->size == raster_size)
+        return &entry->slot;
+    if (FT_Load_Glyph(font->face, glyph, FT_LOAD_DEFAULT) ||
+        FT_Render_Glyph(font->face->glyph, FT_RENDER_MODE_NORMAL))
+        return NULL;
+    FT_GlyphSlot slot = font->face->glyph;
+    /* FreeType's negative-pitch layout is left untouched on the uncached path. */
+    if (slot->bitmap.pitch < 0 ||
+        (slot->bitmap.rows && (size_t)slot->bitmap.pitch >
+                                  GLYPH_CACHE_BITMAP_MAX / slot->bitmap.rows))
+        return slot;
+    size_t bytes = (size_t)slot->bitmap.pitch * slot->bitmap.rows;
+    unsigned char *pixels = bytes ? malloc(bytes) : NULL;
+    if (bytes && !pixels)
+        return slot;
+    if (!font->glyph_cache)
+        font->glyph_cache = calloc(GLYPH_CACHE_SLOTS, sizeof *font->glyph_cache);
+    if (!font->glyph_cache) {
+        free(pixels);
+        return slot;
+    }
+    if (bytes)
+        memcpy(pixels, slot->bitmap.buffer, bytes);
+    entry = &font->glyph_cache[index];
+    free(entry->pixels);
+    entry->glyph = glyph;
+    entry->size = raster_size;
+    entry->slot = (FT_GlyphSlotRec){0};
+    entry->slot.bitmap = slot->bitmap;
+    entry->slot.bitmap_left = slot->bitmap_left;
+    entry->slot.bitmap_top = slot->bitmap_top;
+    entry->pixels = pixels;
+    entry->slot.bitmap.buffer = pixels;
+    entry->valid = true;
+    return &entry->slot;
+}
 static bool valid_style(cui_text_style style) {
     return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
 }
@@ -91,6 +147,11 @@ void cui_font_close(cui_font *f) {
         if (family != &f->default_family)
             free(family);
         family = next;
+    }
+    if (f->glyph_cache) {
+        for (size_t i = 0; i < GLYPH_CACHE_SLOTS; ++i)
+            free(f->glyph_cache[i].pixels);
+        free(f->glyph_cache);
     }
     if (f->shaper)
         hb_font_destroy(f->shaper);
@@ -295,12 +356,11 @@ bool cui_font_draw_styled(cui_font *font, cui_str s, float size, cui_text_style 
             ok = false;
             break;
         }
-        if (FT_Load_Glyph(f->face, g[i].codepoint, FT_LOAD_DEFAULT) ||
-            FT_Render_Glyph(f->face->glyph, FT_RENDER_MODE_NORMAL)) {
+        FT_GlyphSlot slot = raster_glyph(f, g[i].codepoint, size);
+        if (!slot) {
             ok = false;
             continue;
         }
-        FT_GlyphSlot slot = f->face->glyph;
         emit(user, (int)lroundf(x + (float)p[i].x_offset / 64) + slot->bitmap_left,
              (int)lroundf(baseline - (float)p[i].y_offset / 64) - slot->bitmap_top,
              (int)slot->bitmap.width, (int)slot->bitmap.rows, slot->bitmap.pitch,
@@ -722,12 +782,11 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
         float px = x + g->x, py = y + layout->view.ascent + g->y;
         if (!isfinite(px) || !isfinite(py) || fabsf(px) > 1e7f || fabsf(py) > 1e7f)
             return false;
-        if (FT_Load_Glyph(face->face, g->glyph_id, FT_LOAD_DEFAULT) ||
-            FT_Render_Glyph(face->face->glyph, FT_RENDER_MODE_NORMAL)) {
+        FT_GlyphSlot slot = raster_glyph(face, g->glyph_id, layout->size);
+        if (!slot) {
             ok = false;
             continue;
         }
-        FT_GlyphSlot slot = face->face->glyph;
         if (colored) {
             cui_color ink = color;
             for (size_t span = 0; span < count; span++)
@@ -812,7 +871,11 @@ static bool text_line_append(cui_font *font, cui_str paragraph, float size, cui_
         free(node);
         return false;
     }
-    (void)cui_text_layout_get(node->layout, &view);
+    if (!cui_text_layout_get(node->layout, &view)) {
+        cui_text_layout_destroy(node->layout);
+        free(node);
+        return false;
+    }
     node->y = bounds->height;
     bounds->height += view.height;
     if (view.width > bounds->width)
@@ -1067,7 +1130,10 @@ cui_text_layout_status cui_font_text_geometry(void *font, cui_str text, float si
                                                          0, SIZE_MAX, NULL, &layout);
     if (status != CUI_TEXT_LAYOUT_OK)
         return status;
-    (void)cui_text_layout_get(layout, &view);
+    if (!cui_text_layout_get(layout, &view)) {
+        cui_text_layout_destroy(layout);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
     *out = (cui_text_geometry){layout, &ops, view.width, view.height, text.length};
     return CUI_TEXT_LAYOUT_OK;
 }
@@ -1103,7 +1169,10 @@ cui_text_layout_status cui_font_text_geometry_line(void *font, cui_text_line_sou
     if (status != CUI_TEXT_LAYOUT_OK)
         return status;
     cui_text_layout_view view;
-    (void)cui_text_layout_get(layout, &view);
+    if (!cui_text_layout_get(layout, &view)) {
+        cui_text_layout_destroy(layout);
+        return CUI_TEXT_LAYOUT_INVALID;
+    }
     *out = (cui_text_geometry){layout, &ops, view.width, view.height, source.paragraph.length};
     return CUI_TEXT_LAYOUT_OK;
 #else

@@ -531,9 +531,10 @@ bool cui_dock_area_tick(cui_dock_area *);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_DOCK_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_DOCK_IMPLEMENTATION) && !defined(CUI_DOCK_IMPLEMENTATION_ONCE)
+#if defined(CUI_DOCK_IMPLEMENTATION) && defined(CUI_DOCK_DECLARATIONS_READY) && !defined(CUI_DOCK_IMPLEMENTATION_ONCE)
 #define CUI_DOCK_IMPLEMENTATION_ONCE
 #if !defined(CUI_DOCK_BASE_ONLY)
 #include "cui_components.h"

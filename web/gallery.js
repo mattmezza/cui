@@ -3,6 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {selectedUsage} from "./modules/cui_usage.js";
 let shadowRenderer;
+let iconCatalog=null,apiIndex=null;
 const $ = id => document.getElementById(id);
 // Freeze the asset root before shareable paths change the current document URL.
 const siteAssetRoot=new URL('.',document.baseURI);
@@ -11,6 +12,7 @@ siteBaseElement.href=siteAssetRoot.href;
 function componentSlug(name){return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function shareRoute(path,raw,title,description){
  document.body.dataset.route=raw;
+ if(!raw.startsWith('docs/'))document.querySelector('link[rel=alternate][type="text/markdown"]')?.remove();
  const address=new URL(path,siteAssetRoot);address.hash=raw;
  if(location.href!==address.href)history.replaceState(null,'',address.href);
  const canonical=new URL(path,document.body.dataset.siteUrl||'https://matteo.merola.co/cui/').href;
@@ -536,12 +538,51 @@ function navigation(){
 }
 function docsNavigation(active){
  const nav=$('docs-nav');nav.replaceChildren();
+ const query=$('search').value.trim().toLowerCase();
+ if(query){
+  const words=query.split(/\s+/);
+  const results=documents.filter(doc=>words.every(word=>(doc.title+' '+doc.description+' '+doc.keywords+' '+(doc.symbols||[]).join(' ')).toLowerCase().includes(word))).sort((a,b)=>Number(a.historical)-Number(b.historical));
+  for(const doc of results){const link=document.createElement('a');link.href='#docs/'+doc.slug;link.textContent=doc.title+(doc.historical?' (historical)':'');nav.append(link);}
+  if(!results.length){const empty=document.createElement('p');empty.textContent='No matching documentation';nav.append(empty);}
+  return;
+ }
  for(const category of ['Getting started','Guides','Components','Development']){
   const entries=documents.filter(doc=>doc.category===category);if(!entries.length)continue;
   const h=document.createElement('h3');h.textContent=category;nav.append(h);
   for(const doc of entries){const link=document.createElement('a');link.href=`#docs/${doc.slug}`;link.textContent=doc.title;link.classList.toggle('active',doc.slug===active);if(doc.slug===active)link.setAttribute('aria-current','page');nav.append(link);}
  }
 }
+
+async function loadComponentApi(component){
+ const header=component.public_header?.split('/').pop();
+ $('component-header').href=header?'./headers/'+header:'./api-index.json';
+ $('component-declarations').textContent='Loading matching header declarations…';
+ try{if(!apiIndex){const response=await fetch('./api-index.json');if(!response.ok)throw Error('Cannot load API index');apiIndex=(await response.json()).symbols;}
+  if(selected?.name===component.name)$('component-declarations').textContent=apiIndex.filter(symbol=>symbol.header==='./headers/'+header).map(symbol=>symbol.declaration).join('\n\n')||'See the downloadable header for types and declarations.';
+ }catch(error){if(selected?.name===component.name)$('component-declarations').textContent=error.message;}
+}
+async function loadIconCatalog(){
+ if(!iconCatalog){try{const response=await fetch('./icons.json');if(!response.ok)throw Error('Icon catalog unavailable');iconCatalog=(await response.json()).icons;}catch(error){$('icon-catalog-count').textContent=error.message;return;}}
+ renderIconCatalog();
+}
+function renderIconCatalog(){
+ if(!iconCatalog)return;
+ const query=$('icon-catalog-search').value.trim().toLowerCase(),embedded=$('icon-catalog-embedded').checked;
+ const matches=iconCatalog.filter(icon=>(!embedded||icon.embedded)&&icon.name.includes(query));
+ $('icon-catalog-count').textContent=`${matches.length} matching icons; showing ${Math.min(60,matches.length)}. Narrow the search for more.`;
+ const results=$('icon-catalog-results');results.replaceChildren();
+ for(const icon of matches.slice(0,60)){
+  const row=document.createElement('div');row.className='icon-catalog-row';
+  const name=document.createElement('code');name.textContent=icon.name;
+  const status=document.createElement('span');status.textContent=icon.embedded?'Embedded by default':'Requires loader or full-assets build';
+  const copy=document.createElement('button');copy.type='button';copy.textContent='Copy C';copy.setAttribute('aria-label',`Copy ${icon.name} C example`);
+  copy.addEventListener('click',()=>copyCode(copy,`/* Active frame; stable nonzero id and theme supplied by your app.${icon.embedded?'':' Requires a host loader or CUI_ICON_ALL_ASSETS=1.'} */\ncui_icon_error error = cui_icon_named(ui, id, &theme, cui_string("${icon.name}"),\n    (cui_icon_options){0});\nif (error != CUI_ICON_OK) { /* Report error or render your fallback. */ }`));
+  row.append(name,status,copy);results.append(row);
+ }
+}
+$('icon-catalog-search').addEventListener('input',renderIconCatalog);
+$('icon-catalog-embedded').addEventListener('change',renderIconCatalog);
+
 function route(){
  const raw=location.hash.slice(1)||document.body.dataset.route||'home';
  if(!raw||raw==='home'){
@@ -554,6 +595,11 @@ function route(){
   const doc=documents.find(entry=>entry.slug===slug)||documents.find(entry=>entry.slug==='getting-started');
   selected=null;$('home-page').hidden=true;$('docs-page').hidden=false;$('gallery-page').hidden=true;$('catalog').hidden=true;$('docs-nav').hidden=false;
   $('docs-title').textContent=doc.title;$('docs-content').innerHTML=doc.html;$('docs-source').href=doc.source;
+  $('docs-markdown').href=doc.markdown||'./llms.txt';
+  $('docs-historical').hidden=!doc.historical;
+  let alternate=document.querySelector('link[rel=alternate][type="text/markdown"]');
+  if(!alternate){alternate=document.createElement('link');alternate.rel='alternate';alternate.type='text/markdown';document.head.append(alternate);}
+  alternate.href=doc.markdown||'./llms.txt';
   for(const code of $('docs-content').querySelectorAll('pre>code')){
    const button=document.createElement('button');button.type='button';button.className='docs-copy';button.textContent='Copy';button.setAttribute('aria-label','Copy code block');
    button.addEventListener('click',()=>copyCode(button,code.textContent));code.parentElement.classList.add('copyable');code.parentElement.prepend(button);
@@ -604,6 +650,8 @@ function selectComponent(){
  $('snippet').textContent=(selected.example?'/* Retain app across frames. Include examples/composed_apps/app.h. */\ncomposed_app *app = composed_app_create(on_app_event, user);\n/* Between frames, before cui_begin_frame: */\ncomposed_app_set_theme(app, &theme);\n/* Between cui_begin_frame and cui_end_frame: */\ncomposed_app_scene(ui, app, width, height);\n/* At shutdown, after rendering the last draw list: */\ncomposed_app_destroy(app);':snippets[selected.name])||(live?`/* See the public ${selected.public_header || 'component'} API. */`:'/* No complete styled browser example yet. */');
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
 
+ $('icon-catalog-panel').hidden=selected.name!=='Icon';if(selected.name==='Icon')loadIconCatalog();
+ loadComponentApi(selected);
  const usage=selected.usage;
  $('component-composition').textContent=usage?.composition||'Immediate frame composition';
  $('component-state').textContent=usage?.state_ownership||'Retain application values between frames.';
@@ -837,12 +885,12 @@ function handleCanvasKey(e,type){
 for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>handleCanvasKey(e,type));
 reducedMotion.addEventListener('change',requestFrame);
 systemDark.addEventListener('change',()=>{if(themeChoice==='system')syncTheme();});
-$('search').addEventListener('input',navigation);window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});window.addEventListener('popstate',()=>{if(catalog&&documents)route();});
+$('search').addEventListener('input',()=>{$('docs-page').hidden?navigation():docsNavigation();});window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});window.addEventListener('popstate',()=>{if(catalog&&documents)route();});
 window.addEventListener('keydown',event=>{
  const editing=event.target instanceof HTMLElement&&(event.target.matches('input,textarea,select')||event.target.isContentEditable||event.target.closest('[role="textbox"]'))||(event.target===canvas&&wasm&&prefersCharacterInput(event));
- if(event.key==='/'&&!editing&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();document.body.classList.add('menu-open');$('catalog').hidden=false;$('docs-nav').hidden=true;$('search').focus();$('search').select();}
- if(event.key==='Enter'&&document.activeElement===$('search')){const first=$('catalog').querySelector('a');if(first){event.preventDefault();location.hash=first.getAttribute('href');$('search').value='';navigation();$('search').blur();}}
- if(event.key==='Escape'&&document.activeElement===$('search')){$('search').value='';navigation();$('search').blur();}
+ if(event.key==='/'&&!editing&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();document.body.classList.add('menu-open');$('search').focus();$('search').select();}
+ if(event.key==='Enter'&&document.activeElement===$('search')){const first=($('docs-page').hidden?$('catalog'):$('docs-nav')).querySelector('a');if(first){event.preventDefault();location.hash=first.getAttribute('href');$('search').value='';$('docs-page').hidden?navigation():docsNavigation();$('search').blur();}}
+ if(event.key==='Escape'&&document.activeElement===$('search')){$('search').value='';$('docs-page').hidden?navigation():docsNavigation();$('search').blur();}
 });
 async function copyCode(button,code){
  const original=button.textContent;

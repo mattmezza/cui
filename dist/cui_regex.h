@@ -65,8 +65,9 @@ cui_text_match cui_regex_matcher(cui_regex_session *);
 #ifdef __cplusplus
 }
 #endif
+#define CUI_REGEX_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_REGEX_IMPLEMENTATION) && !defined(CUI_REGEX_IMPLEMENTATION_ONCE)
+#if defined(CUI_REGEX_IMPLEMENTATION) && defined(CUI_REGEX_DECLARATIONS_READY) && !defined(CUI_REGEX_IMPLEMENTATION_ONCE)
 #define CUI_REGEX_IMPLEMENTATION_ONCE
 #endif

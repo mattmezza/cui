@@ -49,9 +49,10 @@ bool cui_description_list(cui_context *, cui_id, const cui_theme *, const cui_de
 #ifdef __cplusplus
 }
 #endif
+#define CUI_DESCRIPTION_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_DESCRIPTION_IMPLEMENTATION) && !defined(CUI_DESCRIPTION_IMPLEMENTATION_ONCE)
+#if defined(CUI_DESCRIPTION_IMPLEMENTATION) && defined(CUI_DESCRIPTION_DECLARATIONS_READY) && !defined(CUI_DESCRIPTION_IMPLEMENTATION_ONCE)
 #define CUI_DESCRIPTION_IMPLEMENTATION_ONCE
 /* src/base/cui_description.c */
 /* SPDX-License-Identifier: MIT */

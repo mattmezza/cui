@@ -56,9 +56,10 @@ cui_otp_result cui_otp(cui_context *, cui_id, const cui_theme *, cui_otp_state *
 #ifdef __cplusplus
 }
 #endif
+#define CUI_OTP_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_OTP_IMPLEMENTATION) && !defined(CUI_OTP_IMPLEMENTATION_ONCE)
+#if defined(CUI_OTP_IMPLEMENTATION) && defined(CUI_OTP_DECLARATIONS_READY) && !defined(CUI_OTP_IMPLEMENTATION_ONCE)
 #define CUI_OTP_IMPLEMENTATION_ONCE
 /* src/base/cui_otp.c */
 /* SPDX-License-Identifier: MIT */

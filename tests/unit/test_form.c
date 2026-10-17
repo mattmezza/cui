@@ -5,6 +5,7 @@
 #include <string.h>
 #ifndef CUI_FORM_BASE_ONLY
 #include "cui/cui_components.h"
+#include "cui/cui_icon.h"
 #endif
 static void planning(void) {
     cui_form_field f[] = {{.id = 1},
@@ -261,6 +262,42 @@ static void click(cui_context *ui, cui_id id) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));
 }
+#ifndef CUI_FORM_BASE_ONLY
+static void search_icon(cui_context *ui, const cui_theme *theme, void *user, bool disabled,
+                        bool readonly, float width) {
+    (void)user;
+    (void)disabled;
+    (void)readonly;
+    (void)width;
+    assert(cui_icon_named(ui, 120, theme, cui_string("search"),
+                          (cui_icon_options){.size = CUI_ICON_CUSTOM, .custom_size = 16}) ==
+           CUI_ICON_OK);
+}
+static void search_with_leading_icon(void) {
+    char buffer[64] = "";
+    cui_edit *edit =
+        cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    cui_context *ui = cui_create((cui_config){.width = 500, .height = 500});
+    cui_input_group_state state = {0};
+    cui_input_group_addon icon = {.id = 110,
+                                  .kind = CUI_INPUT_GROUP_CUSTOM,
+                                  .alignment = CUI_INPUT_GROUP_INLINE_START,
+                                  .width = 24,
+                                  .render = search_icon};
+    cui_input_group_options options = {
+        .width = 300, .name = {"Search mail", 11}, .placeholder = {"Search mail", 11}};
+    assert(ui && edit);
+    group_scene(ui, edit, &state, options, &icon, 1);
+    cui_rect field = cui_bounds(ui, 101), artwork = cui_bounds(ui, 120);
+    assert(artwork.w == 16 && artwork.h == 16 && artwork.x + artwork.w <= field.x);
+    click(ui, 110);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "alice"}));
+    assert(group_scene(ui, edit, &state, options, &icon, 1).input.changed);
+    assert(cui_focused(ui) == 101 && cui_edit_get_text(edit).length == 5);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
+#endif
 static void input_groups(void) {
     char buffer[64] = "";
     cui_edit *edit =
@@ -562,6 +599,7 @@ int main(void) {
     design_input_groups();
     loading_addon_artwork();
     inline_group_geometry();
+    search_with_leading_icon();
 #endif
     planning();
     base_semantics();

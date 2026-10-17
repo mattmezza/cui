@@ -92,6 +92,9 @@ def main():
             page.evaluate('location.hash="#docs/start-here"')
             page.wait_for_function('document.querySelector("#docs-title").textContent==="Start building with CUI"')
             assert page.locator('#docs-content .docs-copy').count() == 2
+            # Slash searches the current documentation/component context.
+            page.locator('header a[href="#Button"]').click()
+            page.wait_for_function('window.cuiGallery?.renderedComponent==="Button"')
             page.keyboard.press('/')
             assert page.locator('#search').evaluate('(node)=>document.activeElement===node')
             page.locator('#search').fill('bt')

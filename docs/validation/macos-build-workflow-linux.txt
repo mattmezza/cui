@@ -1,0 +1,34 @@
+macOS build workflow: Linux validation, 2026-10-15
+
+Implemented native macOS starter bundling, pinned native dependency superbuild,
+native macOS headless CI, development dependency deployment/signing, and guarded
+Linux-to-macOS toolchain/helper. Apple Silicon is the first manual target.
+
+Integrator: GCC 16.2.1 strict warnings build with CUI_REQUIRE_NATIVE=ON and
+CUI_BUILD_NATIVE_STARTER=ON passed in build-macos-host-validation.
+python scripts/test_local.py --build-dir build-macos-host-validation --parallel 4:
+201/201 CTest checks passed (19.34 seconds), through invisible Xvfb.
+Subsequent packaging/signing guard tests passed after final integration changes.
+Runner safety regression tests: 4 passed. Manifest: all 78 entries retained.
+Pinned dependency license/hash checks passed.
+
+Dependency worker: pinned SDL3 3.2.28, FreeType 2.13.3, HarfBuzz 11.0.1 built on
+Linux. Version/license/header checks and warning-clean linked hb-ft consumer
+passed. Full CUI strict warnings build against this private prefix passed;
+7 targeted text/SDL/packaging CTests passed through the isolated-display wrapper.
+
+Portable packaging checks cover resource discovery independent of cwd,
+Darwin bundle generation, deployment rejection on a Linux cross host, development
+signing order/error handling, compiler wrapper symlink preservation, target C++
+selection, target pkg-config isolation, and required-native configure failures.
+
+Repository-wide format check still reports pre-existing violations in
+backends/sdl3/cui_sdl3.c and tests/unit/test_sdl3_rounded_geometry.c, reproduced
+from pre-task revision a335e484. The changed native starter main.c passes format.
+Unrelated concurrent text/font edits were not staged or modified by this task.
+
+Deferred: real native macOS builds/CI results, real Linux-to-Mach-O builds without
+an available caller-provisioned OSXCross/Apple SDK, macOS dependency deployment and
+codesign execution, Cocoa/Retina/input/IME/system clipboard acceptance, actual GPU
+hardware, native accessibility, Developer ID signing/notarization and universal
+binary release acceptance. Authored CI and mock guards do not establish these.

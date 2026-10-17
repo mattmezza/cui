@@ -150,9 +150,10 @@ bool cui_color_picker(cui_context *, cui_id, const cui_theme *, cui_color_state 
 #ifdef __cplusplus
 }
 #endif
+#define CUI_PICKER_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_PICKER_IMPLEMENTATION) && !defined(CUI_PICKER_IMPLEMENTATION_ONCE)
+#if defined(CUI_PICKER_IMPLEMENTATION) && defined(CUI_PICKER_DECLARATIONS_READY) && !defined(CUI_PICKER_IMPLEMENTATION_ONCE)
 #define CUI_PICKER_IMPLEMENTATION_ONCE
 /* src/base/cui_picker.c */
 /* SPDX-License-Identifier: MIT */

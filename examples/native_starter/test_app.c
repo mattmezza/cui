@@ -12,6 +12,8 @@ static void frame(cui_context *ui, starter_app *a) {
     assert(list.count > 10 && cui_last_error(ui) == CUI_OK);
 }
 static void click(cui_context *ui, starter_app *a, cui_id id) {
+    starter_page previous_page = a->page;
+    bool previous_signed_in = a->signed_in;
     cui_rect r = cui_bounds(ui, id);
     assert(r.w > 0 && r.h > 0);
     assert(cui_queue_event(
@@ -20,6 +22,8 @@ static void click(cui_context *ui, starter_app *a, cui_id id) {
     assert(cui_queue_event(
         ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));
     frame(ui, a);
+    if (previous_page != a->page || previous_signed_in != a->signed_in)
+        assert(cui_needs_redraw(ui)); /* Repaint labels submitted before callbacks. */
     frame(ui, a);
 }
 int main(void) {

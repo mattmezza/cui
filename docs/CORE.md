@@ -49,7 +49,24 @@ remain required. This avoids briefly forcing focus back into a closing popup.
 
 Boxes expose portable `align_x`/`align_y` start, center and end values. They align
 children inside the available content area after sizing/padding; default start
-alignment preserves existing layout behavior.
+alignment preserves existing layout behavior. These are physical axes: `align_x`
+always means horizontal and `align_y` vertical, regardless of `row`.
+For a fixed or growing row, `.align_x = CUI_ALIGN_CENTER` centers the whole
+child group horizontally; `.align_y` aligns children vertically. For a column,
+`.align_y = CUI_ALIGN_CENTER` centers the group vertically and `.align_x`
+aligns children horizontally. Centering needs spare space on that axis: a FIT
+box or children that consume all available grow space leave none to distribute.
+
+`padding` is the uniform shorthand. Set `custom_padding` to replace it with
+`padding_edges` (left, right, top, bottom), preserving explicit zero edges.
+Negative/nonfinite edges normalize to zero and use integer layout units.
+Likewise, `custom_corners` replaces `radius` with `corner_radii`, and
+`custom_border_edges` replaces `border_width` with `border_edges`; custom zeros
+win over nonzero uniform values.
+
+`CUI_STR("literal")` is a brace initializer usable for static `cui_str` objects.
+Use `(cui_str)CUI_STR("literal")` in expressions. Length excludes the final NUL
+and includes embedded NUL bytes; use `cui_string` for runtime C strings.
 
 Clipped boxes accept `offset_x`/`offset_y` to translate children while preserving the box viewport and ancestor clips; negative offsets scroll content forward. Fractional offsets are retained. Secondary/middle pointer events carry `pointer_button`, hit-route to previous regions, and never change ordinary primary capture/focus/activation. SDL3 maps all three buttons.
 

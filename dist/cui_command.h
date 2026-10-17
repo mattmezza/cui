@@ -102,9 +102,10 @@ bool cui_command(cui_context *, cui_id, const cui_theme *, cui_command_state *,
 #ifdef __cplusplus
 }
 #endif
+#define CUI_COMMAND_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_COMMAND_IMPLEMENTATION) && !defined(CUI_COMMAND_IMPLEMENTATION_ONCE)
+#if defined(CUI_COMMAND_IMPLEMENTATION) && defined(CUI_COMMAND_DECLARATIONS_READY) && !defined(CUI_COMMAND_IMPLEMENTATION_ONCE)
 #define CUI_COMMAND_IMPLEMENTATION_ONCE
 /* src/base/cui_command.c */
 /* SPDX-License-Identifier: MIT */

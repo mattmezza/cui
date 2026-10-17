@@ -1,5 +1,67 @@
 # Build your first native CUI app
 
+For the smallest standalone build, use the **native source bundle**.
+[Download the archive](https://matteo.merola.co/cui/downloads/cui-native.tar.gz)
+and its [SHA-256 checksum](https://matteo.merola.co/cui/downloads/cui-native.tar.gz.sha256). Given a C11
+compiler, GNU Make, `ar`, pkg-config, SDL3 >= 3.2, FreeType and HarfBuzz development
+packages, unpack it and run:
+
+```sh
+tar -xzf cui-native.tar.gz
+cd cui-native
+make
+./build/native_starter
+```
+
+This path includes CUI's portable sources, native SDL3 adapter, text/bidi
+implementation, generated assets, and Inter 4.1 Regular/Bold fonts with licenses.
+It requires no installed CUI package or repository checkout. The default renderer
+is SDL3's `SDL_Renderer`; Sokol and SDL_GPU are separate optional integrations.
+Linux X11 is the validated native target; Windows, macOS and Wayland native
+runtime support remains unverified. External system libraries remain prerequisites. See [macOS native builds and bundles](MACOS.md) and [Linux-to-macOS cross compilation](MACOS_CROSS.md) for the new workflows and their validation limits.
+
+Before building, check their visibility:
+
+```sh
+cc --version
+make --version
+ar --version
+pkg-config --atleast-version=3.2 sdl3
+pkg-config --modversion sdl3 freetype2 harfbuzz
+```
+
+The archive's README explains the dependency layers and font policy. Ordinary
+application edits compile only app objects and relink; compiler-generated header
+dependencies trigger the appropriate CUI recompilation when headers change.
+`make` never acquires dependencies. To produce the archive from this checkout,
+run `make native-dist` (Python 3.9+ for this workflow), which writes `build/cui-native.tar.gz`.
+The shared `cmake/sources.json` drives CMake, the portable header generator and
+native source selection. Native packaging tests generate twice, compare bytes,
+unpack outside the repository, verify checksums, build, check incremental rebuilds
+and render a bounded Xvfb capture through `scripts/test_local.py`.
+
+## Edit the two-file bundle app
+
+The archive's `main.c` is the host: it loads both font faces, creates the context,
+polls input, begins/ends each frame, renders and cleans up. `app.c` is the portable
+UI: `app_frame` submits boxes, text and the button. Its `bool *clicked` points to
+state owned by the host across frames. Change the greeting or button in `app.c`,
+then run `make`; only that application object and executable rebuild.
+
+```sh
+make APP_SOURCES="main.c app.c" TARGET=build/my_app
+./build/my_app
+```
+
+Add new relative `.c` paths to `APP_SOURCES`. Keep the executable directly in
+`build/` for automatic font discovery, or provide both font paths explicitly.
+The [bundle README](../examples/native_bundle/README.md) is the canonical consumer
+build contract. Read [Layout](LAYOUT_GUIDE.md), [IDs and lifetimes](IDS_AND_LIFETIMES.md)
+and [Debugging](DEBUGGING.md) before growing the application.
+
+The existing installed-library starter below remains useful for projects that
+prefer an installed CUI package and a larger three-page example.
+
 Start with [examples/native_starter](../examples/native_starter/README.md). It is
 an ordinary C11 desktop app: a left sidebar selects Home, Projects and Settings;
 an account menu stays at the sidebar bottom; Settings edits a name, toggles
@@ -49,7 +111,7 @@ export PKG_CONFIG_PATH="$PWD/build/prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_
 pkg-config --exists cui-sdl3
 cmake -S examples/native_starter -B build/starter -G Ninja
 cmake --build build/starter
-ctest --test-dir build/starter --output-on-failure
+python scripts/test_local.py --build-dir build/starter
 ./build/starter/native_starter --font /absolute/path/to/your/font.ttf
 ```
 
@@ -57,6 +119,22 @@ For example, this machine uses `/usr/share/fonts/noto/NotoSans-Regular.ttf`.
 Choose a font that exists on your machine; CUI does not discover an OS font by
 family name. If `cui-sdl3` is missing, inspect CUI's CMake output and confirm the
 SDL3/FreeType/HarfBuzz development packages are visible through pkg-config.
+
+The starter opens one regular face. CUI does **not** synthesize bold, semibold or
+italic. Register the matching files before measuring or drawing styled text;
+otherwise an unavailable style falls back to the regular face:
+
+```c
+/* font is the regular face returned by cui_font_open. Check both results. */
+bool bold_ok = cui_font_register_style(font,
+    (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD}, "/path/to/NotoSans-Bold.ttf");
+bool semibold_ok = cui_font_register_style(font,
+    (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD}, "/path/to/NotoSans-SemiBold.ttf");
+if (!bold_ok || !semibold_ok) { /* report missing assets to your host */ }
+```
+
+Ship these faces with your app or supply explicit paths; filenames vary between
+font families and installations. See [Text](TEXT.md) for registration and fallback.
 
 The example's CMake project consumes **installed** packages and does not build
 the repository as a subdirectory. You can copy the whole `native_starter` folder
@@ -137,9 +215,9 @@ Linux automation can prefix that command with
 Use a screen at least as large as the app window for coordinate-based interaction.
 The screenshot above is from the actual SDL3 window, not a browser mockup.
 
-The starter was checked against an actual local installation of this revision:
+Historical starter validation (before the current usability additions) checked an actual local installation:
 standalone CMake/CTest, Make with warnings treated as errors, the direct compiler
-command, and a Core-only build of `app.c` plus `test_app.c` all passed. Integrated repository
+command, and a Core-only build of `app.c` plus `test_app.c` all passed. At that historical checkpoint, integrated repository
 CTest passed 96/96, sanitizer checks 96/96 and portable WASI suites 80/80. An Xvfb SDL3 window exercised Projects navigation, bottom-menu
 sign-in/out, Settings navigation, editing the name to Grace, disabling
 notifications and saving; callbacks reported the resulting state. These checks

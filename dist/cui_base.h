@@ -156,9 +156,10 @@ cui_date cui_date_add_days(cui_date, int days);     /* years limited to 1..9999 
 #ifdef __cplusplus
 }
 #endif
+#define CUI_BASE_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_BASE_IMPLEMENTATION) && !defined(CUI_BASE_IMPLEMENTATION_ONCE)
+#if defined(CUI_BASE_IMPLEMENTATION) && defined(CUI_BASE_DECLARATIONS_READY) && !defined(CUI_BASE_IMPLEMENTATION_ONCE)
 #define CUI_BASE_IMPLEMENTATION_ONCE
 #ifndef CUI_EDIT_IMPLEMENTATION
 #define CUI_EDIT_IMPLEMENTATION

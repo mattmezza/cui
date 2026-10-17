@@ -77,9 +77,10 @@ cui_button_group_result cui_base_button_group_end(cui_context *, cui_button_grou
 #ifdef __cplusplus
 }
 #endif
+#define CUI_BUTTON_GROUP_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_BUTTON_GROUP_IMPLEMENTATION) && !defined(CUI_BUTTON_GROUP_IMPLEMENTATION_ONCE)
+#if defined(CUI_BUTTON_GROUP_IMPLEMENTATION) && defined(CUI_BUTTON_GROUP_DECLARATIONS_READY) && !defined(CUI_BUTTON_GROUP_IMPLEMENTATION_ONCE)
 #define CUI_BUTTON_GROUP_IMPLEMENTATION_ONCE
 /* src/base/cui_button_group.c */
 /* SPDX-License-Identifier: MIT */

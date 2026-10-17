@@ -54,3 +54,13 @@ forwarding against actual layout/raster output and routes the Core font-metrics
 query through that same host. A wrapper's first parameter must remain `void *`;
 a function taking `cui_font *` directly is a different C function-pointer type,
 even though object pointers can be converted inside the wrapper.
+
+`cui_text`, `cui_text_with_line_height`, and `cui_text_ex` all word-wrap to the
+available width of their layout parent. Give the parent a constrained width
+(for example, `(cui_box){.width = 240, .fixed_width = true}`) to lay out a
+paragraph; a content-sized parent has no narrower width to wrap against. Explicit
+line height and font style do not change wrapping. `cui_text_line` preserves a
+caller-laid-out line and may overflow its parent, so use a clipping ancestor
+when overflow must remain hidden. For strict UTF-8 paragraphs with explicit hard
+breaks and optional color spans, `cui_text_paragraph_colored` selects word wrapping
+with its `wrap` argument.

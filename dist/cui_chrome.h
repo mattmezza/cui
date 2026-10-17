@@ -54,9 +54,10 @@ bool cui_title_bar(cui_context *, cui_id, const cui_theme *, cui_title_bar_state
 #ifdef __cplusplus
 }
 #endif
+#define CUI_CHROME_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_CHROME_IMPLEMENTATION) && !defined(CUI_CHROME_IMPLEMENTATION_ONCE)
+#if defined(CUI_CHROME_IMPLEMENTATION) && defined(CUI_CHROME_DECLARATIONS_READY) && !defined(CUI_CHROME_IMPLEMENTATION_ONCE)
 #define CUI_CHROME_IMPLEMENTATION_ONCE
 #ifndef CUI_ICON_IMPLEMENTATION
 #define CUI_ICON_IMPLEMENTATION

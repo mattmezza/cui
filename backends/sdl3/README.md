@@ -40,3 +40,17 @@ require their own runtime validation. The adapter does not provide native
 accessibility bridges, pen translation, GPU resource sharing or image commands.
 Touch routing and composition have injected SDL service tests; these are separate
 from real touchscreen and OS candidate-window acceptance.
+
+Frame scheduling: call `cui_sdl3_frame_delta()` immediately before each submitted
+frame to measure monotonic elapsed seconds (first call is zero). Presentation
+already requests vsync; an additional fixed sleep reduces the achievable refresh
+rate. When Core has no redraw demand, `cui_sdl3_wait_events(backend, timeout_ms)` sleeps
+until input or the caller's deadline, retaining the wakeup event for poll. Idle
+waits reset the frame clock so a newly triggered animation starts at its first
+frame rather than skipping the time spent idle. Run
+`cui_sdl3_poll()` after rendering and before an idle wait to apply the latest
+text-input focus and caret, then again after waking to dispatch input. Keep
+submitting frames while `cui_needs_redraw()` is true, including animation demand.
+The examples cap idle waits at 250 ms; applications with external timers should
+choose their nearest deadline and explicitly invalidate Core when their model
+changes. Threaded producers can arrange an SDL event wakeup on the main thread.

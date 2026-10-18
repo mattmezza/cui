@@ -164,3 +164,198 @@ no-launch behavior. Compile chosen event examples with warnings and execute thei
 meaningful headless tests through `scripts/test_local.py` for native cases.
 Budget assertions must allow a safety-completeness exception with an explicit
 reason. No benchmark should pass by deleting unsupported/API/build warnings.
+
+
+## Current preparation checkpoint — 2026-10-18
+
+**Still preparation only.** Implement only after the Scroll/API batch is complete
+and root has reviewed the resulting CLI scope. The earlier user dependency on the
+overall component-event API change remains in force; this checkpoint does not
+claim that batch is frozen or authorize CLI/SKILL/exporter/generated edits.
+
+Read the system skill-creator guidance and repository `skills/cui/SKILL.md` before
+this refresh. Its relevant principles are cheap discovery and progressive detail,
+while preserving non-obvious invariants and actual user intent. No need to invent
+another reference directory or duplicate the C manuals inside the entrypoint.
+
+### Repeated measurements and freshness
+
+Measured clean isolated source HEAD
+`c63b100f81539428c3beef8eaee3ddd23abc99dd`. Bundled resource-file SHA256:
+`ff58ff9188a4ba3cc027a25f7a90c036bf8a6ff30d8cb2e4469aa6f78bdff1cc`.
+Bundled `source_digest`:
+`c65a2d1ab742de3bc47f5b71f2c918d4c3e58efaeef8546c7c1b395a1fba846a`.
+Live `collect(source)` digest:
+`0b73f7a749067e4502ccb0ef15f020143af679b5bf377a35159435688216d24e`.
+
+The digests differ: the sole differing resource hash is `docs/TEXT_VIEW.md`.
+This is an observed pending generation mismatch, not evidence of matching snapshots
+or an instruction to hand-edit resources. All measured output bytes/lines below
+happen to match between modes, but component stdout hashes differ because they
+print the different digest. API/search/read stdout hashes match for these queries.
+Regenerate only through the canonical generator after the final batch; remeasure
+rather than treating equal byte counts as equal content.
+
+Each row was run both without source (bundled) and with
+`--source /home/matteo/.cache/cui-worktrees/skill-output-current`. Values include
+the stdout final newline; token estimates are `round(UTF-8 bytes/4)`, not tokenizer
+counts. Both-mode results:
+
+| Arguments after helper | Bytes, each mode | Lines | Estimated tokens |
+| --- | ---: | ---: | ---: |
+| `component Select` | 88,935 | 1,468 | 22,234 |
+| `component Input` | 80,985 | 1,389 | 20,246 |
+| `component Select --show usage` | 597 | 18 | 149 |
+| `component Select --show limitations` | 1,294 | 51 | 324 |
+| `component Input --show limitations` | 7,588 | 167 | 1,897 |
+| `component Select --show examples` | 59,082 | 868 | 14,770 |
+| `component Input --show examples` | 45,952 | 647 | 11,488 |
+| `component Select --show api` | 28,229 | 537 | 7,057 |
+| `component Input --show api` | 26,897 | 564 | 6,724 |
+| `api cui_begin_frame` | 48,354 | 985 | 12,088 |
+| `api cui_select_events` | 27,713 | 521 | 6,928 |
+| `search font fallback --kind guide` | 634 | 20 | 158 |
+| `read docs/START_HERE.md` | 5,539 | 97 | 1,385 |
+
+Raw stdout files and per-output hashes are preserved externally in
+`/home/matteo/.cache/cui-validation/skill-output-current/`; `measurements.json`
+SHA256 is `4f87d0deba106a0f2f2e574b1401292307aa05b05678153cb18ba7ce5c52d021`.
+That evidence is machine-local, not a newly shipped skill resource. Commands use
+only Python stdlib and offline bundled/live resources; no downloads, builds,
+installation or native/browser windows were involved.
+
+Compared with the historical table, Select default grew 10,681 bytes and its
+examples grew 5,842; Input examples grew 2,387. The current default still prints all
+sections. `examples` still means **every linked guide body**, not a targeted
+runnable example: Select expands 53,015-byte `docs/CHOICE.md` plus 5,813-byte
+`docs/SELECT_EVENTS.md`. Input expands seven guides totaling 44,719 body bytes,
+plus headings/references. Input's complete limitations/feature/platform section
+alone is 7,588 bytes. It cannot fit a 4 KiB default without either safe formatting
+savings or a labelled budget exception; removing constraints to satisfy the target
+is unacceptable.
+
+### Exact presentation proposal for review
+
+Keep existing JSON schemas and meaning unchanged initially. Only human-readable
+defaults change; new explicit flags are opt-in, not implemented by this checkpoint.
+
+| Command | Proposed exact semantic output |
+| --- | --- |
+| `component NAME` | Summary: name/digest; complete scope/composition/state ownership/interaction/usage; state types/callback names; selected public declarations and header paths; **all** limitation/platform/status/feature facts; complete required contract blocks (or labelled full fallback) with references; retrieval commands. No automatic guide/header/example/test bodies. |
+| `component NAME --show summary` | Explicit spelling for that same human summary. If JSON is requested, reject this new section initially rather than accidentally returning the legacy all schema under a new meaning. A concise JSON format needs a separately named/versioned contract. |
+| `component NAME --full` | Exact existing all-section human output; alias of existing explicit `--show all`. With `--json`, exact existing `--show all --json` dictionary/values. Reject conflicting `--full --show usage/limitations/...`; do not guess precedence. |
+| `component NAME --show usage` / `--show limitations` | Preserve existing section meaning. Limitations prints all current status/platforms/limitations/features, without count-only replacement, keyword filtering or suppressed unsupported states. |
+| `component NAME --show examples` | Human **index**, preserving every linked document, sample and test reference. Each entry has canonical path, actual title when available, source role (guide/sample/test reference), and exact `read PATH` command. Broad guide must be labelled guide, not claimed component-only runnable example. No bodies. |
+| `component NAME --show api` | Initially preserve existing full API-section contract; declaration-only view is explicit below. Avoid silently dropping header typedefs/comments while claiming a callable API contract. |
+| `api SYMBOL --declaration` | Exact indexed declaration(s), owning header(s), digest and warning `Declaration-only; read the owning header and linked contract before calling.` No complete-contract or ownership claim. If symbol is only a type/macro and lacks indexed function declarations, say so and give exact header reads; never invent a declaration. |
+| `api SYMBOL` / `api SYMBOL --full` | Initially preserve current full matching-header behavior. Default declaration-only replacement is deferred until curated complete contract blocks/types are available, because current exporter strips comments and cannot reliably identify all required lifetime/unsupported conditions. |
+| `read PATH` | Preserve exact existing content plus CLI's existing final print newline; no silent size limit, section slicing or JSON-shape change. Deliberate exact read remains available for offline consumers. |
+
+For legacy machine users, all existing `component --json` invocations (including
+omitted `--show`) retain name/digest and all usage/api/header/status/examples/
+sample/tests fields and complete strings. Existing `--show examples --json`
+retains `{examples:[{path,text}],sample,tests,...}`; the new human index is not a
+JSON truncation. Existing `api --json` retains `{functions,matching_headers}`.
+`--declaration --json` should be rejected initially unless its distinct schema is
+explicitly reviewed; do not remove matching_headers from old JSON. Existing search
+JSON remains the same list with current fields/ranking/default 10; do not wrap it
+in a new envelope to report totals. Human search may default 5 with a footer giving
+returned/total/complete-or-partial status and `--limit` retrieval guidance; explicit
+limits and full-mode details require validated bounded semantics. These are
+presentation differences, not missing data in the bundle.
+
+### Concrete minimal outputs and safe exceptions
+
+A Select summary starts with the actual authoritative facts:
+
+```text
+Select | digest <current source_digest>
+State: Caller retains cui_choice_popup, selected cui_id and item array.
+Interaction: <complete canonical interaction/usage/scope/composition>
+API: cui_select; cui_select_events
+Header: include/cui/cui_choice.h
+Limitations/platforms/features: <ALL canonical facts, not an omitted count>
+Contracts: <complete reviewed contract blocks or labelled full fallback>
+Sources: docs/SELECT_EVENTS.md; relevant Choice contract section
+Examples: component Select --show examples
+Full: component Select --full
+```
+
+Angle-bracket fields above are proposal placeholders, not shipped output or
+permission to omit content. The implementation must populate complete source
+facts and distinguish current legacy usage text from the added native observer
+contract; current Select interaction metadata still says only `Returns selection
+change...`, while the event guide carries multiplicity/lifetimes. Merely using
+that short usage sentence would drop critical event contracts.
+
+A Select example index can accurately say:
+
+```text
+Guide: docs/CHOICE.md — Tabs and toggle groups (shared multi-family guide)
+  read docs/CHOICE.md
+Guide: docs/SELECT_EVENTS.md — Select selection notifications
+  read docs/SELECT_EVENTS.md
+Sample reference: web/gallery.c (shared source, not a standalone Select app)
+Tests: tests/unit/test_choice.c; tests/web/test_browser.py (references only)
+```
+
+Do not guess language/host/relevance/build commands from a filename alone. The
+current metadata contains paths, not reviewed per-component runnable-example
+mappings. Choose existing complete examples only after their build context is
+explicitly captured; `read` of a linked full guide remains the honest fallback.
+Optional future heading reads must preserve a complete uniquely identified section
+and explicitly name omitted sections. `docs/CHOICE.md` has a `List, Select and Menu`
+section plus separate multiple-selection/context/dropdown sections; its first title
+is not a safe automatic Select slice. Input guides often have only one top-level
+heading, so heading slicing would not solve their output cost by itself.
+
+**Critical contracts cannot be classified with the current regex index.** Before
+reducing contract text, add reviewed canonical references in
+`docs/component-usage.json`, e.g. complete contract-section references (path + unique
+heading), or reuse a complete dedicated event guide. The exporter may resolve those
+exact boundaries and preserve their full contents; ambiguity/missing anchors must
+fail validation or fall back to complete authoritative text. This is an explicit
+canonical metadata change requiring review, not heuristic keyword extraction.
+Until that exists, include relevant complete contract guide/header text when
+necessary and label why the summary exceeds its nominal budget. Targets are
+4 KiB summary / 2 KiB example index, with **no hard cut-off**: Input's all-limitations
+payload and any ownership/security/build contracts are permitted exceptions.
+A declaration view is an explicitly incomplete inspection tool, never an automatic
+substitute for these contracts. Do not claim an 80% complete-contract reduction
+until end-to-end measurements include the required follow-up contract reads.
+
+Essential SKILL.md rules remain visible: actual stack and matching `--source`,
+pinned setup/offline provenance, explicit optional dependencies, stable IDs and
+borrowed lifetimes, balanced begin/end, all 78 ≠ binding/platform parity, real
+font/provider and measurement/paint configuration, warnings/behavior checks, and
+private Xvfb/headless browser/no desktop launch. Example indexing does not delete
+build context; selected exact examples must retain it. Unsupported APIs and plain
+versus secure text/queued versus synchronous event boundaries stay explicit.
+
+### Implementation boundaries and acceptance after the batch
+
+Hand-maintained ownership remains CLI `skills/cui/scripts/cui.py`, entrypoint
+`skills/cui/SKILL.md`, canonical exporter `scripts/agent_resources.py`, metadata
+`docs/component-usage.json` and actual docs/headers/examples. Generated
+`skills/cui/scripts/agent_resources.py` and `skills/cui/data/resources.json` are
+never hand-edited. The frozen batch must be regenerated with
+`python scripts/generate_agent_skill.py`, then checked with `--check`. Keep the
+shared website model, all 78 component records, hashes/lifecycle information and
+source-vs-packaged project selection intact.
+
+Existing `tests/test_agent_skill.py` checks complete component fields and JSON
+fixtures, rank/partial behavior, source freshness/digests, archive pinning and
+no-launch setup. Extend it rather than replacing those contracts with byte-only
+assertions. Add bundled/live/packaged cases for unchanged legacy JSON dictionaries
+and complete guide/header bodies; human summary/index/full and conflict errors;
+exact limitation/feature/platform retention including Input; explicit declaration
+absence for types/macros; broad-guide labels and correct read commands; every
+required contract preserved or clearly-labelled full fallback; no byte clipping;
+non-ASCII and metadata larger than target; 5-vs-10 human/JSON search semantics and
+honest counts. Exact `read` stays unchanged. Verify changed-digest source mode
+actually changes identity, not just byte counts.
+
+Measure real flows (summary → selected declaration → mandatory contract → selected
+example/build context) with both output modes after implementation. Report bytes/
+lines and labelled estimates per call and total. No dependency installs, automatic
+UI launch, production CLI changes or generated edits occurred in this preparation.

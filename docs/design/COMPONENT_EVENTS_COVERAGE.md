@@ -191,9 +191,8 @@ reviewable. None of these additions promotes a parity level.
 
 | [DropdownButton](../DROPDOWN_EVENTS.md) | Per-action accepted evidence followed by per-command menu notifications. | Phase indices can decrease; Styled modal and Link accessibility restrictions remain. |
 | [OTP](../OTP_EVENTS.md) | One aggregate CHANGE carrying accepted-operation/completion counts and final borrowed text. | Masked text is redacted; completion is not SUBMIT and final state may be incomplete. |
-
-| [Collapsible](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
-| [Single List](../LIST_EVENTS.md) | Ordered ID transitions after legacy activation/confirmation callbacks. | Same-item confirmation is separate; multi-list and ToggleGroup remain separate slices. |
+| [Collapsible and Accordion](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
+| [List and ToggleGroup](../LIST_EVENTS.md) | Ordered single-ID or per-item bool transitions; List observes after legacy activation/confirmation callbacks. | Same-item confirmation is separate; ToggleGroup preserves intermediate sibling closures. |
 
 Counts summarize actual observer invocations except where a guide explicitly
 preserves another established result convention. Reading results is passive.
@@ -205,3 +204,7 @@ Foreign bindings expose owning [V1 manual notifications](../BRIDGE_NOTIFICATIONS
 and [Go/Rust views](../BRIDGE_NOTIFICATIONS_GO_RUST.md) for the documented initial
 allowlist. They do not automatically expose these direct C facades, synchronous
 requests, text, scalar or selection events. See the [binding audit](COMPONENT_EVENTS_BINDINGS.md).
+
+Opt-in C bridge scalar notifications are implemented for Slider, NumberInput,
+Rating and Pagination; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
+Text, selection and owning language wrappers remain separate slices.

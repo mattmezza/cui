@@ -343,7 +343,7 @@ typedef struct {
 #define CUI_BRIDGE_NOTIFY_LIFECYCLE 3u
 #define CUI_BRIDGE_PAYLOAD_NONE 0u
 #define CUI_BRIDGE_PAYLOAD_BOOLEAN 1u
-#define CUI_BRIDGE_PAYLOAD_SCALAR 2u /* reserved; not emitted in V1's initial allowlist */
+#define CUI_BRIDGE_PAYLOAD_SCALAR 2u /* opt-in only; old V1 poll returns LEGACY */
 #define CUI_BRIDGE_PAYLOAD_TEXT 3u /* reserved */
 #define CUI_BRIDGE_PAYLOAD_SELECTION 4u /* reserved */
 #define CUI_BRIDGE_PAYLOAD_TABLE 5u
@@ -357,7 +357,7 @@ typedef struct {
 } cui_bridge_table_notification_v1;
 typedef union {
     uint32_t boolean_value; /* exactly0 or1 */
-    double scalar_value; /* reserved */
+    double scalar_value; /* opt-in scalar notification view */
     cui_bridge_node selected; /* reserved */
     cui_bridge_table_notification_v1 table;
     uint32_t surface_result;
@@ -386,6 +386,19 @@ CUI_BRIDGE_API uint32_t cui_bridge_notification_versions(void);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_notification_v1(
     cui_bridge_app *, uint32_t struct_size, cui_bridge_notification_v1 *out,
     char *text, uint32_t capacity, uint32_t *required_capacity);
+/* Opt-in categories for the SAME queue and unchanged V1 layout. Old V1 polling
+ * downgrades newly captured categories to complete LEGACY snapshots. */
+#define CUI_BRIDGE_VALUE_SCALAR_V1 (1u << CUI_BRIDGE_PAYLOAD_SCALAR)
+/* Only SCALAR is supported: Slider, NumberInput, Rating, Pagination. */
+CUI_BRIDGE_API uint32_t cui_bridge_notification_value_payloads_v1(void);
+/* Unsupported mask bits/invalid size fail before queue cleanup or consumption.
+ * Unrequested categories return LEGACY; all existing typed tags stay unchanged.
+ * Capacity/lifetime/output rules match cui_bridge_poll_notification_v1. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_value_notification_v1(
+    cui_bridge_app *, uint32_t struct_size, uint32_t enabled_payloads,
+    cui_bridge_notification_v1 *out, char *text, uint32_t capacity,
+    uint32_t *required_capacity);
+
 
 typedef struct {
     uint32_t struct_size; /* Must equal cui_bridge_options_size(). */

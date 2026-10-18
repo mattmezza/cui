@@ -18,7 +18,7 @@ static cui_bridge_status next_scalar(cui_bridge_app *app,
 }
 ```
 
-Dynamic consumers must resolve the two new optional symbols before calling them. Older libraries lack these symbols; retain old APIs or report unavailable without draining through another poll. The category query currently returns only `CUI_BRIDGE_VALUE_SCALAR_V1` (`1u << CUI_BRIDGE_PAYLOAD_SCALAR`). Text and selection categories remain unavailable. No Python, JS/TypeScript, Go or Rust value-poll wrapper is included yet; their existing V1 manual methods retain their initial typed allowlist. Their bundled SDK/export updates are integrator-owned.
+Dynamic consumers must resolve the two new optional symbols before calling them. Older libraries lack these symbols; retain old APIs or report unavailable without draining through another poll. The category query currently returns only `CUI_BRIDGE_VALUE_SCALAR_V1` (`1u << CUI_BRIDGE_PAYLOAD_SCALAR`). Text and selection categories remain unavailable. No Python, JS/TypeScript, Go or Rust value-poll wrapper is included yet; their existing V1 manual methods retain their initial typed allowlist. Bundled Go/Rust SDK source snapshots include the C API; owning value-poll wrappers are deferred.
 
 ## Complete scalar producer allowlist
 
@@ -51,4 +51,4 @@ The poll allocates nothing, adds no text cap, truncates nothing and introduces n
 python scripts/test_local.py --build-dir build -- -R '^(bridge_value_notifications|bridge_notifications_v1|bridge_core|bridge_components)$'
 ```
 
-Native automated tests use the invisible wrapper; no desktop display is required. Build registration, exports, generated SDKs, wrapper additions and human/LLM index regeneration remain separate integrator work. The [design checkpoint](design/BRIDGE_VALUE_NOTIFICATIONS_SLICE.md) describes deferred categories and compatibility decisions; it is not evidence those categories ship.
+Native automated tests use the invisible wrapper; no desktop display is required. Build registration, generated SDK source snapshots and human/LLM indexes include this C API. Owning language wrappers remain separate work. The [design checkpoint](design/BRIDGE_VALUE_NOTIFICATIONS_SLICE.md) describes deferred categories and compatibility decisions; it is not evidence those categories ship.

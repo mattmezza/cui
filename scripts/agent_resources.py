@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import re
 
-FUNCTION = re.compile(r'^(?:[A-Za-z_]\w*[ \t*]+)+(cui_[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*[;{]', re.M)
+FUNCTION = re.compile(r'^(?:[A-Za-z_]\w*[ \t*\r\n]+)+(cui_[A-Za-z0-9_]+)\s*\([^;{}]*\)\s*[;{]', re.M)
 ALIASES = {
     'Select': 'dropdown searchable combobox autocomplete picker options selection',
     'DropdownButton': 'split button actions menu',

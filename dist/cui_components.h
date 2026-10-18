@@ -3,6 +3,7 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
+#include "cui_control_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
@@ -155,6 +156,13 @@ typedef struct {
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
+/* Additive per-event facade: legacy click -> old typed click -> new handler.
+ * Original action_user (including hover) is independent of handler.user.
+ * Counts accepted activations even with no new handler. Existing resource
+ * lifetimes and no-destruction-during-dispatch preconditions remain in force. */
+cui_component_action_result cui_button_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                               cui_button_options,
+                                               cui_component_activation_handler);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 #include "cui_button_group.h"
 typedef struct {
@@ -246,6 +254,14 @@ bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, boo
  * tab ordering remain available. Legacy checkbox/ex retain pointer-focus policy. */
 bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                          cui_checkbox_options);
+
+/* Controlled immutable entry snapshot, source no-pointer-focus policy.
+ * options.on_change/change_user must be NULL. Owner assignments are observed
+ * next submission; this call keeps its snapshot for requests/paint/semantics.
+ * Same callback lifetime/teardown preconditions as cui_base_check_events. */
+cui_component_action_result cui_checkbox_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                                 cui_check_state, cui_checkbox_options,
+                                                 cui_component_check_handler);
 
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {
@@ -3477,6 +3493,74 @@ bool cui_progress_circle(cui_context *ui, cui_id id, const cui_theme *theme, flo
     if (moving)
         cui_invalidate(ui);
     return moving;
+}
+
+/* Additive event facades. Legacy entry points above retain their exact reducers. */
+typedef struct {
+    cui_button_options original;
+    cui_component_activation_handler handler;
+    cui_component_action_result *result;
+} cui_control_events_button_forward;
+static void cui_control_events_button_click(void *user) {
+    cui_control_events_button_forward *forward = user;
+    forward->original.on_click(forward->original.action_user);
+}
+static void cui_control_events_button_hover(void *user, bool hovered) {
+    cui_control_events_button_forward *forward = user;
+    forward->original.on_hover(forward->original.action_user, hovered);
+}
+static void cui_control_events_button_typed(void *user, const cui_button_click_event *click) {
+    cui_control_events_button_forward *forward = user;
+    cui_component_event_metadata event;
+    bool evidence = click->has_evidence &&
+                    cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                         &click->evidence);
+    cui_control_events_private_increment(&forward->result->activation_count,
+                                         &forward->result->count_overflow);
+    if (forward->original.on_click_event)
+        forward->original.on_click_event(forward->original.action_user, click);
+    if (evidence && forward->handler.callback)
+        forward->handler.callback(forward->handler.user, &event);
+}
+cui_component_action_result cui_button_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                               cui_str name, cui_button_options options,
+                                               cui_component_activation_handler handler) {
+    cui_component_action_result result = {0};
+    cui_design_metrics design;
+    if (!ui || !id || !theme || (name.length && !name.data) ||
+        !cui_components_design(theme, options.design_size, &design) ||
+        !cui_button_shape_valid(options))
+        return result;
+    result.valid = true;
+    result.submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
+    cui_control_events_button_forward forward = {options, handler, &result};
+    options.on_click = options.on_click ? cui_control_events_button_click : NULL;
+    options.on_hover = options.on_hover ? cui_control_events_button_hover : NULL;
+    options.on_click_event = cui_control_events_button_typed;
+    options.action_user = &forward;
+    (void)cui_button_ex(ui, id, theme, name, options);
+    return result;
+}
+cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                                 cui_str name, cui_check_state value,
+                                                 cui_checkbox_options options,
+                                                 cui_component_check_handler handler) {
+    cui_component_action_result result = {0};
+    cui_design_metrics design;
+    if (!ui || !id || !theme || (name.length && !name.data) || value < CUI_CHECK_UNCHECKED ||
+        value > CUI_CHECK_MIXED || options.on_change || options.change_user ||
+        (options.custom_role && (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
+        !cui_components_design(theme, options.design_size, &design))
+        return result;
+    result.valid = true;
+    result.submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
+    if (!cui_frame_is_submitting(ui))
+        return result;
+    cui_control_events_private_check forward = {value, handler, &result};
+    options.on_change = cui_control_events_private_check_request;
+    options.change_user = &forward;
+    (void)cui_checkbox_source(ui, id, theme, name, &value, options);
+    return result;
 }
 
 #endif

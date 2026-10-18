@@ -8,6 +8,18 @@ all 78 families. No production, generated SDK or manifest changes accompany
 this document. Tests below were inspected, not rerun for this documentation-only
 audit. Their existence is evidence of intended coverage, not a fresh pass report.
 
+
+## Implemented additions since the checkpoint
+
+[Shared metadata](../COMPONENT_EVENTS.md) and the direct C
+[Button/Check facades](../CONTROL_EVENTS.md) are implemented after this audit.
+Button preserves legacy callback order and adds typed activation metadata;
+Check offers immutable typed requests with per-invocation counts. These are
+submission-borrowed synchronous handlers. The original rows below remain the
+checkpoint baseline, not an assertion that later additions are absent.
+No Python, JavaScript/TypeScript, Go or Rust wrapper for these new handlers is
+implemented yet; existing queued notifications retain their audited behavior.
+
 ## What exists at the C boundary
 
 The canonical public ABI is [cui_bridge.h](../../include/cui/cui_bridge.h).

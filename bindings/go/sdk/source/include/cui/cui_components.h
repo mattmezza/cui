@@ -2,6 +2,7 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
+#include "cui_control_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
@@ -154,6 +155,13 @@ typedef struct {
 /* Paint an independently registered button without reducing events or submitting semantics. */
 void cui_button_paint(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
 bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_button_options);
+/* Additive per-event facade: legacy click -> old typed click -> new handler.
+ * Original action_user (including hover) is independent of handler.user.
+ * Counts accepted activations even with no new handler. Existing resource
+ * lifetimes and no-destruction-during-dispatch preconditions remain in force. */
+cui_component_action_result cui_button_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                               cui_button_options,
+                                               cui_component_activation_handler);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 #include "cui_button_group.h"
 typedef struct {
@@ -245,6 +253,14 @@ bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, boo
  * tab ordering remain available. Legacy checkbox/ex retain pointer-focus policy. */
 bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                          cui_checkbox_options);
+
+/* Controlled immutable entry snapshot, source no-pointer-focus policy.
+ * options.on_change/change_user must be NULL. Owner assignments are observed
+ * next submission; this call keeps its snapshot for requests/paint/semantics.
+ * Same callback lifetime/teardown preconditions as cui_base_check_events. */
+cui_component_action_result cui_checkbox_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                                 cui_check_state, cui_checkbox_options,
+                                                 cui_component_check_handler);
 
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {

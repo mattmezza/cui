@@ -189,7 +189,8 @@
     "cui_video_controls": [
       "src/components/cui_video_controls.c"
     ],
-    "cui_component_events": []
+    "cui_component_events": [],
+    "cui_control_events": []
   },
   "native": {
     "text": [

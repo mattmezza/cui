@@ -2,6 +2,18 @@
 
 Read-only inventory at `e9d2c1a561ced3254e606b0206f412af8b156317` on `integration/next39-components`. This covers the exact 78 names in [the frozen manifest](../gpui-parity.json), not a parity promotion. The design request is tracked in `docs/design/COMPONENT_EVENTS_REQUEST.md` at this baseline. This document describes existing C APIs and implementation seams. It approves no new API.
 
+
+## Implemented additions since the checkpoint
+
+[Shared metadata](../COMPONENT_EVENTS.md) and the direct C
+[Button/Check facades](../CONTROL_EVENTS.md) are implemented after this audit.
+Button preserves legacy callback order and adds typed activation metadata;
+Check offers immutable typed requests with per-invocation counts. These are
+submission-borrowed synchronous handlers. The original rows below remain the
+checkpoint baseline, not an assertion that later additions are absent.
+No Python, JavaScript/TypeScript, Go or Rust wrapper for these new handlers is
+implemented yet; existing queued notifications retain their audited behavior.
+
 ## Reading the evidence
 
 Each row has a public contract, implementation, and an existing focused test to inspect. These are source evidence and test locations, **not a claim that every event property in that row has a dedicated passing assertion**. No runtime suite was run for this documentation-only audit. In particular, general callback reentrancy, context destruction, arbitrary descriptor removal during dispatch, cross-family ordering, and every binding's callback ownership remain unverified unless explicitly documented below.

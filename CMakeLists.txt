@@ -1211,3 +1211,8 @@ add_executable(test_component_events tests/unit/test_component_events.c)
 target_link_libraries(test_component_events PRIVATE cui)
 cui_warnings(test_component_events)
 add_test(NAME component_events_metadata COMMAND test_component_events)
+
+add_executable(test_control_events tests/unit/test_control_events.c)
+target_link_libraries(test_control_events PRIVATE cui)
+cui_warnings(test_control_events)
+add_test(NAME control_events_facades COMMAND test_control_events)

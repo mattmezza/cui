@@ -1,6 +1,6 @@
 # Shared component event metadata
 
-The additive `cui_component_events.h` utility supplies common metadata and a bounded text-copy helper. It does **not** change any existing component callback, result, state owner or dispatch timing. The [78-family coverage](design/COMPONENT_EVENTS_COVERAGE.md), [binding audit](design/COMPONENT_EVENTS_BINDINGS.md) and [design contract](design/COMPONENT_EVENTS_CONTRACT.md) describe the wider work. Uniform family facades remain future slices; this utility is not full component parity.
+The additive `cui_component_events.h` utility supplies common metadata and a bounded text-copy helper. It does **not** change any existing component callback, result, state owner or dispatch timing. The [78-family coverage](design/COMPONENT_EVENTS_COVERAGE.md), [binding audit](design/COMPONENT_EVENTS_BINDINGS.md) and [design contract](design/COMPONENT_EVENTS_CONTRACT.md) describe the wider work. The first [Button and Check facades](CONTROL_EVENTS.md) are implemented; other family facades remain future slices. This utility is not full component parity.
 
 ## Names and meanings
 

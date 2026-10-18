@@ -1,6 +1,6 @@
 # Menu forwarding event checkpoints
 
-Status: ContextMenu and Simple Menu slices implemented in this branch; DropdownButton remains proposed. See [Simple Menu events](../SIMPLE_MENU_EVENTS.md). Original source audit: `b4146c89`. See [ContextMenu events](../CONTEXT_MENU_EVENTS.md) for the implemented API and proof. Preserve [MenuTree's implemented per-command contract](../MENU_EVENTS.md), [event ownership/timing rules](COMPONENT_EVENTS_CONTRACT.md), all legacy entry points/layouts, and the 78-family manifest. No Core/surface change, new queue, capture/bubble routing or binding request hook is proposed. No builds were run for this read-only checkpoint.
+Status: ContextMenu, Simple Menu and paired DropdownButton slices implemented in this branch. See [DropdownButton events](../DROPDOWN_EVENTS.md). See [Simple Menu events](../SIMPLE_MENU_EVENTS.md). Original source audit: `b4146c89`. See [ContextMenu events](../CONTEXT_MENU_EVENTS.md) for the implemented API and proof. Preserve [MenuTree's implemented per-command contract](../MENU_EVENTS.md), [event ownership/timing rules](COMPONENT_EVENTS_CONTRACT.md), all legacy entry points/layouts, and the 78-family manifest. No Core/surface change, new queue, capture/bubble routing or binding request hook is proposed. No builds were run for this read-only checkpoint.
 
 ## Actual entry points and seams
 
@@ -56,7 +56,7 @@ Proof: repeated same-ID commands and multi-command list pass, final output/legac
 
 ## Slice 3: DropdownButton paired action and menu events
 
-Implement this as one separately reviewed public paired facade after the two forwarding slices, rather than silently declaring a partial uniform event API. Reuse the shipped typed activation handler for primary action and MenuTree command handler for menu leaves:
+Implemented as one separately reviewed public paired facade after the two forwarding slices, rather than silently declaring a partial uniform event API. Reuse the shipped typed activation handler for primary action and MenuTree command handler for menu leaves:
 
 ```c
 typedef struct {
@@ -96,3 +96,5 @@ All new payloads are synchronous borrowed views; pointer-free copies survive fra
 Each slice should be its own production commit plus meaningful unit/guide proof, with source ownership limited to `cui_choice.h`, Base/Styled choice implementation, a new slice fixture and human/LLM guide. Slice3 may need a narrow include/use of existing control-event types; no shared type layout changes. Root owns CMake/modules/generated distributions/SDK/bindings/indexing. No build or production edit belongs to this design checkpoint. Future implementation must use strict portable C11/C++ header checks and native CTest through `python scripts/test_local.py --build-dir build`; browser tests stay headless.
 
 Deferred: menu open/close observers, vetoable/synchronous foreign requests, check/radio CHANGE payloads, global event-index ordering, auto callback fanout, tab-overflow/command/surface forwarding, async listeners and parity promotion. Aggregate-only fallback must be explicitly labeled if a later path lacks a true per-event seam; it must never masquerade as complete per-command observation.
+
+Implemented Dropdown proof boundary: Styled root menu paint remains modal regardless of overlay.modal; mixed-phase decreasing-index proof uses genuine Base modeless composition. Existing post-Base LINK role updates reject queued Link accessibility activation at current BUTTON registration; no observer/evidence is fabricated. See the guide and fixture for exact coverage.

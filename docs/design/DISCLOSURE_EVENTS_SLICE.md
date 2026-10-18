@@ -43,7 +43,7 @@ Existing evidence: [`test_disclosure.c`](../../tests/unit/test_disclosure.c), no
 disabled, keyboard-focus and panel-count assertions. These tests prove old behavior,
 not new dispatch.
 
-## Initial aggregate option (superseded recommendation; retained for comparison)
+## SUPERSEDED: initial aggregate workspace option (comparison only)
 
 Start with aggregate final-delta notifications. Use a new `cui_disclosure_events.h`
 including the existing disclosure and metadata headers:
@@ -227,23 +227,28 @@ Do not normalize arbitrary idle multi-open input or create events for animation.
 ### Metadata and timing honesty
 
 At the accepted activation branch, before the **first** affected write/callback,
-freeze the originating event's actual local frame/index and known event-type source.
-Pointer-up is POINTER, key-down/up KEYBOARD, accessibility-action ACCESSIBILITY;
-unrecognized event types remain UNKNOWN. Metadata target is the explicit compound
-ID; payload item/item_index identifies the affected bool slot. Every transition
-caused by the same activation shares that original frame/index, including automatic
-sibling closes. An event index is genuine causal input identity, not a separate
-activation of the affected sibling. Do not infer its physical device/timestamp.
+copy `cui_event_activation_snapshot` when available and initialize shared metadata
+with `cui_component_event_from_activation`. Both reducers already call
+`cui_interact` to register Button semantics before their activation loop, so genuine
+accepted activation evidence must not deliberately be discarded. Override only
+`metadata.target` with the explicit compound ID; retain the original snapshot's
+`activation.target` unchanged. Payload item/item_index identifies the affected bool
+slot. In particular, keyboard cursor redirection and automatic sibling closure do
+not turn the originating activation into an activation of that affected item.
 
-Do not add HAS_ACTIVATION in this initial slice. Registration order differs between
-Collapsible/Accordion and accepted snapshot availability needs a separate proof;
-frame/index/source facts suffice. Never register semantics early just to manufacture
-snapshot evidence. Build metadata only with nonzero active frame and ordinary
-painted, globally enabled submission. Core's inert target/activation suppression
-remains authoritative. If metadata cannot be proven, preserve legacy writes but
-do not emit a fabricated callback. Capture it once before the closure loop so an
-observer cannot indirectly change the recorded cause by consuming input. The new
-observer itself must not mutate active dispatch/input state.
+If an accepted snapshot is unavailable, freeze only the actual local frame/index
+and known event-type source: pointer-up POINTER, key-down/up KEYBOARD,
+accessibility-action ACCESSIBILITY, otherwise UNKNOWN. Do not fabricate activation
+fields or infer a physical device/timestamp. Every transition caused by the same
+activation shares this frozen original evidence, including automatic sibling
+closes. An input index is causal identity, not an activation of the affected sibling.
+
+Never register semantics early to manufacture evidence. Observe only a nonzero
+active frame and ordinary painted, globally enabled submission. Core's inert
+activation/target suppression remains authoritative. If metadata cannot be proven,
+preserve legacy writes but emit no fabricated callback. Capture evidence once before
+the closure loop; observers must not mutate active dispatch/input state. Existing
+semantics are finalized at their original later points, not before notifications.
 
 Callbacks are synchronous **immediately after each applied bool write**, not after
 whole-event/group semantic finalization. They can read an intermediate group:
@@ -289,7 +294,8 @@ single-open closes prior true slots in index order then opens cursor, including 
 disabled-open sibling; multiple=true never closes siblings; collapsible=false open
 activation produces none. Verify every callback's current slot value and explicitly
 sample allowed intermediate arrays/stale semantics. Confirm metadata is frozen once
-per cause, source/index same for sibling closes, no HAS_ACTIVATION, and repeated
+per cause, source/index and original copied activation same for sibling closes,
+HAS_ACTIVATION when genuine snapshots exist, fallback only when unavailable, and repeated
 same-frame inputs each retain their own index. Missing observers keep old results
 and writes, counts are actual invocations, unused user ignored, saturation is safe.
 

@@ -1,6 +1,6 @@
 # Remaining parity: implementable work at the next39 checkpoint
 
-Audit baseline: `99a55efb`, `integration/next39-components`. Frozen comparison:
+Audit baseline: `9c61c158`, `integration/next39-components`. Frozen comparison:
 GPUI Kit 0.7.1, commit `87d10ae5e1299d1be18670a37570c5402f952e34`, recorded in
 [the upstream baseline](../upstream-baseline.md). This is a read-only scheduling
 audit, not production work, a fresh runtime verification report or a promotion of
@@ -15,13 +15,14 @@ completion percentage: `tested_partial` platforms, inherited styling limitations
 provider differences and unverified host behavior still matter. Conversely,
 several old feature rows describe work that now has implementation and tests.
 
-I inspected all manifest limitations/feature rows, the event request/contract and
-binding audit, current public declarations and the source/test paths cited below.
-The deeper frozen-source comparisons here concern Questionnaire, Spinner and
-Icon; this is not a new line-by-line source certification of every family. For
-other families the existing guide/ledger limitations identify follow-up audit
-boundaries. Tests cited were inspected, not rerun for this documentation change.
-Proposed tests below are acceptance work, not claims of existing coverage.
+This refresh inspected the public declarations, implementation seams and focused
+test sources cited below at the audit baseline. Earlier audit conclusions and
+recorded passing gates remain historical evidence; **no native, browser, binding
+or packaging tests were rerun for this documentation-only refresh**. Inspection
+is not a fresh runtime verification or a new frozen-source certification of every
+family. Proposed acceptance cases are future work unless explicitly identified as
+existing tests. Existing guides can contain chronological paragraphs superseded
+by later additions; follow the actual current API and implementation.
 
 ## Do not schedule these requests from stale rows
 
@@ -29,7 +30,7 @@ Proposed tests below are acceptance work, not claims of existing coverage.
 | --- | --- | --- |
 | Questionnaire lacks automatic root capture/cross-item focus | [Styled implementation](../../src/components/cui_questionnaire.c) routes through prior-frame bindings and ordered input reduction; [styled tests](../../tests/unit/test_questionnaire_styled.c) cover automatic routing, omission and focus. [Guide](../QUESTIONNAIRE.md) ends with the newer contracts. | Nested roots, comprehensive callback choreography, slot refinements and localization still need completion. Earlier paragraphs and manifest prose are not the final source truth. |
 | Icon padding/nonzero style is unsupported; no accessible API | [Icon options](../../include/cui/cui_icon.h), [resolver](../../src/base/cui_icon_layout.h), [source-style tests](../../tests/unit/test_icon_style_source.c), [accessibility tests](../../tests/unit/test_icon_accessibility_source.c) implement numeric bounds/padding/border floors, full-box paint, explicit image labels and decorative suppression. | Ambient inheritance, generic Styled layout and SVG renderer fidelity remain limited. Do not redo numeric constraints or add guessed asset-name labels. |
-| Slider has no controlled value/semantics | [Base API](../../include/cui/cui_base.h) and [controlled tests](../../tests/unit/test_slider_controlled.c) already define typed BEGIN/UPDATE/COMMIT/CANCEL requests and read-only behavior without a handler. | Bridge exposure and shared metadata adaptation are separate; do not replace its phased semantics with one bool change callback. |
+| Slider has no controlled value/semantics | [Base API](../../include/cui/cui_base.h) and [controlled tests](../../tests/unit/test_slider_controlled.c) already define typed BEGIN/UPDATE/COMMIT/CANCEL requests and read-only behavior without a handler. | Typed Base/Styled facades and aggregate bridge scalar notifications now exist; foreign controlled phases remain distinct. Do not replace phased semantics with one bool change callback. |
 | Text gradients/tokens/tracking are wholly absent | [Tokens](../TYPOGRAPHY_TOKENS.md), [gradient implementation](../TEXT_GRADIENT.md), [native tracking](../LETTER_SPACING.md), [real gallery gradient proof](../../tests/web/test_gradient_gallery.py). | Canvas tracking, foreign authoring and GPU support are unfinished. Reimplementing solid/gradient paint or native tracking would duplicate completed work. |
 | Native SDK text is unshaped; App.run only polls a fixed-frame loop | [SDK parity guide](../SDK_TEXT_PARITY.md), [installed text fixture](../../tests/packaging/test_installed_text.py), [bridge runner](../../src/bridge/cui_bridge.c), language run tests in bindings. | Provider coverage and style/event API gaps below remain. Launcher-only examples are not evidence about the actual bindings. |
 | Every native accessibility adapter is absent | [AccessKit adapter](../../backends/accesskit/cui_accessibility.c), [native guide](../NATIVE_ACCESSIBILITY.md), [integration test](../../tests/integration/test_accessibility_native.c) exist. | Real assistive-technology acceptance and complete family/platform mappings must be evaluated within that adapter's documented support, not inferred from semantic snapshots. |
@@ -41,28 +42,27 @@ small reviewable implementation boundary, not a claim that lower entries are
 less important forever. Each slice needs a separate approved owner and generated
 consumer refresh by the integrator where public ABI/source changes require it.
 
-### 1. Complete the demonstrated Spinner motion and size differences
+### 1. Close Spinner proof and consumer gaps after the shipped corrections
 
-Concrete source mismatch, not just absent tests: [motion sampler](../../src/base/cui_status.c)
-rejects finite easing outside 0..1 and bypasses easing in reduced motion;
-[Spinner submission](../../src/components/cui_content.c) always chooses
-`CUI_ICON_CUSTOM`. Frozen `crates/component/src/spinner.rs` delegates easing to
-pinned GPUI animation, which permits finite overshoot and evaluates ease(0) when
-reduced. Named source sizes resolve in rem, custom pixels do not.
-[The dedicated audit](../audits/SPINNER_PARITY.md) establishes the source lock and
-separates these from Skeleton's bounded-opacity contract.
+The previously scheduled finite-turn easing, reduced ease(0), and named-rem versus
+custom-pixel descriptor changes are implemented in
+[Spinner submission](../../src/components/cui_content.c) and
+[public options](../../include/cui/cui_content.h). Spinner accepts finite overshoot,
+normalizes in double before radians, and evaluates custom easing at zero under
+reduction without scheduling a wake. Skeleton and the legacy shared sampler keep
+their bounded policy. [Contract tests](../../tests/unit/test_spinner_contract.c)
+and [motion tests](../../tests/unit/test_status_motion.c) contain native regression
+coverage; this refresh inspected rather than executed them.
 
-Bounded change: Spinner-specific finite rotation policy, reduced ease(0), and an
-additive preset/custom/rem descriptor in [content options](../../include/cui/cui_content.h).
-Keep legacy eight-dot `cui_spinner` behavior and Skeleton validation intact.
-Preserve atomic state/result failure and no wake under reduced motion; reduce
-large turns before radians to keep finite paint geometry.
-
-Acceptance: extend [contract tests](../../tests/unit/test_spinner_contract.c),
-[motion tests](../../tests/unit/test_status_motion.c) and [WASM test](../../tests/web/test_spinner_gallery.py)
-with negative/1.25-turn/shifted ease(0), NaN/infinity, two rem scales versus fixed
-64px, omission/remount, custom asymmetric Icon pixels and retained draws after
-source replacement. Existing default/linear curves cannot prove those cases.
+Next bounded slice: extend the [real WASM fixture](../../tests/web/test_spinner_gallery.py)
+to negative/>1 turns, shifted reduced ease(0), nonfinite failure and named rem at
+multiple root scales versus fixed custom64. Separately combine caller-owned raw
+SVG, numeric Icon style, explicit color, rotation and source replacement while
+consuming retained draws before destruction. The [dedicated audit](../audits/SPINNER_PARITY.md)
+retains the full proof boundary, including independent mounts/source curves.
+The bridge still uses legacy eight-dot Spinner; source-style bridge options need
+their own additive contract and tests. Neither these shipped native corrections
+nor old default-curve browser checks establish full Spinner parity.
 
 ### 2. Deliver browser tracking with the same declared shaping policy
 
@@ -106,58 +106,65 @@ Acceptance needs actual differing registered faces, geometry/pixels, cache
 invalidation, missing-face policy and installed binding consumers; font-stack CSS
 strings alone cannot prove equivalent native selection.
 
-### 4. Implement the already-designed discrete C event facades
+### 4. Audit uncovered C lifecycle seams instead of rebuilding shipped facades
 
-Only [shared metadata/copy helpers](../../include/cui/cui_component_events.h) are
-shipped; [the first activation slice](COMPONENT_EVENTS_ACTIVATION_SLICE.md) is
-explicitly proposed. No production Button/Check/Switch/Toggle facade should be
-reported as available from the proposal's illustrative declarations.
+The activation proposal is no longer the implementation frontier. The current
+[78-family inventory and additive checkpoint](COMPONENT_EVENTS_COVERAGE.md)
+records shipped Base/Styled facades for activation, boolean requests, Slider,
+Input, multiline observers, selections, surfaces, menus, numeric/picker controls,
+OTP, disclosures, List/ToggleGroup, Tree, DataTable, Attachment, TimeField,
+Sidebar, Command, Toolbar, InputGroup and Settings. Separate
+[Scroll](../SCROLL_EVENTS.md) and [Hover](../HOVER_EVENTS.md) guides cover their
+newer lifecycle observers. [Public metadata](../../include/cui/cui_component_events.h)
+is shared infrastructure, not the only shipped event API. Focused tests such as
+[controls](../../tests/unit/test_control_events.c),
+[table](../../tests/unit/test_table_events.c),
+[scroll](../../tests/unit/test_scroll_events.c) and
+[hover](../../tests/unit/test_hover_styled_events.c) are existing source evidence.
 
-Implement that bounded slice in Base/Styled headers and
-[src/base/cui_base.c](../../src/base/cui_base.c)/[components](../../src/components/cui_components.c),
-using Button's frozen activation evidence. Switch/Toggle legacy aggregate changes
-cannot supply per-event requests by wrapping their one callback. Preserve old
-ordering, mutation behavior, userdata and result reads; new request callbacks use
-immutable entry snapshots. This does not authorize global capture/bubble or
-turn every family into the same event shape.
+Next bounded audit: identify a genuinely uncovered lifecycle/result seam from the
+current inventory, specify multiplicity, snapshot point and retention, then add
+only that observer with meaningful headless regressions. For example DataTable
+viewport/load-edge completion remains result-only; do not reinterpret it as an
+existing notification. Render-only primitives do not need invented value events.
+Preserve controlled request versus applied CHANGE, aggregate versus per-event
+counts, callback order, secure redaction and explicit unsupported accessibility
+channels. No generic capture/bubble, context destruction during synchronous
+callbacks or universal callback mutation support is established.
 
-Acceptance: per-event multiplicity, metadata provenance, read-only missing
-handler, disabled/loading/inert/omitted behavior, callback-driven owner changes,
-callback/result coexistence without replay, and conflict preflight. Retain
-[Button snapshots](../../tests/unit/test_button_click_snapshot.c),
-[Checkbox](../../tests/unit/test_checkbox_source.c),
-[controlled siblings](../../tests/unit/test_controlled_siblings.c) and
-[metadata tests](../../tests/unit/test_component_events.c). Then schedule continuous
-editing, selections and lifecycle adapters separately using the
-[78-family matrix](COMPONENT_EVENTS_COVERAGE.md).
+### 5. Extend the bridge's remaining typed allowlist and typography authoring
 
-### 5. Add typed bridge events and foreign typography authoring
+Versioned [V1 notifications](../BRIDGE_NOTIFICATIONS.md) and opt-in
+[value notifications](../BRIDGE_VALUE_NOTIFICATIONS.md) are shipped in the
+[C bridge API](../../include/cui/cui_bridge.h) and implementation. Python,
+JS/TypeScript, Go and Rust have owning manual views. Initial CLICK, boolean,
+DataTable and close payloads are followed by explicit scalar
+(Slider/NumberInput/Rating/Pagination), plain-text
+(Input/Textarea/Editor/InputGroup), and selected-handle
+(RadioGroup/Tabs/Select/List/Stepper) allowlists. Copied text, raw table columns,
+historical generations and exact uint64 identities must not be rescheduled as
+missing blanket features. Existing C tests cover
+[initial](../../tests/unit/test_bridge_notifications.c),
+[scalar](../../tests/unit/test_bridge_value_notifications.c),
+[text](../../tests/unit/test_bridge_text_notifications.c) and
+[selection](../../tests/unit/test_bridge_selection_notifications.c) queues.
 
-[C bridge](../../include/cui/cui_bridge.h) exports queued CLICK/CHANGE/CLOSE,
-`uint32_t checked`, `double value`, copied text and selected handles. Its retained
-reducers mutate before CHANGE; foreign callbacks cannot veto those mutations.
-[Questionnaire bridge callback](../../src/bridge/cui_bridge.c) packs event kind into
-`value` and completion into `checked`; [Spinner bridge rendering](../../src/bridge/cui_bridge.c)
-still invokes the legacy eight-dot primitive. Flat style authoring does not expose
-native `letter_spacing`. These are concrete missing surfaces even when the
-underlying native C facilities work.
+Next event slice: choose one remaining LEGACY producer, such as Questionnaire,
+and define an additive typed notification captured at its real enqueue seam.
+Questionnaire still encodes kind in `value` and completion in `checked`;
+Combobox/menu/picker and other unlisted producers must stay LEGACY until audited.
+Preserve shared-FIFO single consumption, old-poll downgrade, capacity retry,
+optional-symbol negotiation and owning wrapper copies. Existing manual polls do
+not bind direct-C facades, add per-input multiplicity, register callbacks or offer
+synchronous rejection; old callback conversions remain their documented legacy
+behavior. [Binding audit](COMPONENT_EVENTS_BINDINGS.md) and the per-language value
+guides define the exact boundary, including paired static Rust SDK requirements.
 
-Split delivery: (a) additive version/capability-safe typed event payloads and
-copied ownership for table indices, Questionnaire events and activation evidence;
-(b) separate explicit controlled requests if desired, without relabeling existing
-post-mutation queues; (c) additive tracking/font/paint authoring and source-style
-Spinner options. Keep old dynamic symbol contracts and predictable unavailable
-results. Do not add fields silently ignored by a backend.
-
-Wire actual [Python](../../bindings/python/cui_bridge/__init__.py),
-[Node](../../bindings/node/index.cjs)/[declarations](../../bindings/node/index.d.cts),
-[Go](../../bindings/go/cui/native.go), [Rust](../../bindings/rust/src/lib.rs) and
-TypeScript surfaces. Python/Node/Go currently bool-convert generic checked values;
-Rust also retains raw checked evidence as documented in the
-[binding audit](COMPONENT_EVENTS_BINDINGS.md). Check JS uint64 precision separately.
-Acceptance must use installed/native consumers, nonzero table columns, long frame
-identities, stale handles, queue overflow, retained handlers, exception/panic
-containment and callback teardown—not only launcher compilation.
+Separate consumer slice: expose native tracking/font/paint authoring and an
+explicit source-style Spinner with reduced motion. Current flat styles omit
+native `letter_spacing`, and bridge Spinner remains legacy. New fields need
+observable unsupported-provider failure and actual installed consumer tests;
+manual notification success cannot prove typography support.
 
 ### 6. Finish Questionnaire's actual remaining Styled/localization contract
 
@@ -201,21 +208,31 @@ Icon paints full resolved bounds. Extend [Icon style browser fixture](../../test
 and native source/lifetime tests for any newly supported subset; combine custom
 raw-data Icon styling with animated Spinner before claiming the composition.
 
-### 8. Complete editor geometry and large-document performance separately
+### 8. Finish editor navigation and performance beyond shipped visual geometry
 
-[Input](../INPUT.md), [Textarea](../TEXTAREA.md) and [Editor](../EDITOR.md) retain
-bidi/caret and host editing limitations despite native paragraph shaping. Native
-text geometry availability does not automatically make all retained edit reducers
-bidi-correct. The 200K-line correctness test is not a viewport-only performance
-proof. Browser asynchronous clipboard is distinct from the synchronous native seam.
+The old blanket claim that editor hit/caret geometry is absent is stale.
+[Input visual geometry](../INPUT_VISUAL_GEOMETRY.md) supplies an optional host
+session, and [Textarea source](../../src/base/cui_textarea.c) now uses visual
+geometry for row x/hit, caret affinity and selection spans, caching bounded line
+sessions. [Editor](../../src/base/cui_editor.c) reuses these row helpers.
+The native [geometry fixture](../../tests/integration/test_native_text_geometry.c)
+contains real shaped Input checks and a separate `--audit` mode; its default run
+must not be mistaken for proof that every multiline audit case passed.
+Older INPUT/TEXTAREA/EDITOR paragraphs retain superseded descriptions alongside
+later work. Native shaping alone still does not establish complete edit behavior.
 
-Schedule one bounded geometry slice in [editor](../../src/base/cui_editor.c) and
-[textarea](../../src/base/cui_textarea.c) with real mixed-direction selection/hit
-fixtures; preserve grapheme and undo contracts. Separately instrument layout work
-and allocations across edits/scrolls in a 200K-line document before implementing
-incremental viewport layout. Set measurable budgets rather than promoting from
-successful allocation or one screenshot. Multicursor IME and physical mobile/OS
-candidate acceptance remain distinct later work.
+Next bounded slice: audit and test mixed-direction visual Left/Right, Home/End,
+preferred-x movement and multiline selection against provider geometry, including
+run-boundary affinities, wrapping, folds and syntax-painted segments. Existing
+logical grapheme movement is not visual bidi navigation. Preserve byte offsets,
+undo, token boundaries, optional-provider fallback and resource failure behavior;
+inspect actual geometry use before replacing already working hit/caret paths.
+
+Separately instrument layout/allocation work across edits and scrolls in a
+200K-line document. Existing large-document correctness does not prove viewport-only
+layout or incremental performance. Set measurable budgets before implementation.
+Multicursor IME, asynchronous browser clipboard and physical OS/mobile candidate
+acceptance remain separate work.
 
 ### 9. Renderer and host completion follow feature delivery
 
@@ -242,8 +259,8 @@ Unsupported GPU/device/screen-reader checks remain explicit host acceptance work
 The 41 `not_started` features are not 41 independent missing implementations.
 Examples include controlled Slider, DataTable sort/virtualization, Table semantics,
 Sheet transitions, Theme preferences and Empty slots, all with later implementation
-or scoped tests. Conversely Spinner's family text omits demonstrated easing/rem
-mismatches. The integrator should reconcile those rows against current source,
+or scoped tests. Conversely Spinner's family text needs current easing/rem evidence and the
+remaining browser/consumer boundary. The integrator should reconcile those rows against current source,
 record the exact supported subset/tested hosts and retain full-family limitations.
 
 Do not delete families or invent completion to make counts uniform. Each delivered

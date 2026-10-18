@@ -335,6 +335,58 @@ typedef struct {
     uint32_t text_length;     /* Bytes excluding NUL. */
     cui_bridge_node selected; /* Full selected Item snapshot; zero when inapplicable. */
 } cui_bridge_event_ex;
+/* Additive queued NOTIFICATION schema; existing ABI/version and event structs
+ * are unchanged. Tags/flags are fixed-width fields, not ABI-sized enums. */
+#define CUI_BRIDGE_NOTIFICATION_V1 1u
+#define CUI_BRIDGE_NOTIFY_ACTIVATE 1u
+#define CUI_BRIDGE_NOTIFY_CHANGE 2u
+#define CUI_BRIDGE_NOTIFY_LIFECYCLE 3u
+#define CUI_BRIDGE_PAYLOAD_NONE 0u
+#define CUI_BRIDGE_PAYLOAD_BOOLEAN 1u
+#define CUI_BRIDGE_PAYLOAD_SCALAR 2u /* reserved; not emitted in V1's initial allowlist */
+#define CUI_BRIDGE_PAYLOAD_TEXT 3u /* reserved */
+#define CUI_BRIDGE_PAYLOAD_SELECTION 4u /* reserved */
+#define CUI_BRIDGE_PAYLOAD_TABLE 5u
+#define CUI_BRIDGE_PAYLOAD_SURFACE 6u
+#define CUI_BRIDGE_PAYLOAD_LEGACY 7u
+#define CUI_BRIDGE_NOTIFY_HAS_FRAME 1u
+#define CUI_BRIDGE_TABLE_SELECTION 1u
+#define CUI_BRIDGE_TABLE_SORT 2u
+typedef struct {
+    uint32_t reason, row, column, sort_column, sort_direction;
+} cui_bridge_table_notification_v1;
+typedef union {
+    uint32_t boolean_value; /* exactly0 or1 */
+    double scalar_value; /* reserved */
+    cui_bridge_node selected; /* reserved */
+    cui_bridge_table_notification_v1 table;
+    uint32_t surface_result;
+} cui_bridge_notification_value_v1;
+typedef struct {
+    uint32_t struct_size, schema_version;
+    uint32_t kind, payload_kind, flags, node_kind;
+    cui_bridge_node node;
+    uint64_t frame_sequence;
+    uint32_t text_length; /* excluding NUL; text copied separately */
+    cui_bridge_notification_value_v1 payload;
+    cui_bridge_event_ex legacy; /* complete old scalar/handle snapshot */
+} cui_bridge_notification_v1;
+CUI_BRIDGE_API uint32_t cui_bridge_notification_v1_size(void);
+/* Bit0 advertises V1. Optional symbol lookup supports older libraries. */
+CUI_BRIDGE_API uint32_t cui_bridge_notification_versions(void);
+/* Drains the SAME queue as old polling, never broadcasts or dispatches callbacks.
+ * Exact struct_size required. CAPACITY changes only required_capacity; a live
+ * event stays queued, but preceding stale origins may already have been freed.
+ * Other failures/EMPTY preserve all outputs. Success copies complete text plus
+ * NUL, then consumes once. Payloads are notifications of existing behavior, never
+ * requests. No source/index/evidence is invented; flags mark frame presence only.
+ * Initial typed allowlist: CLICK, Checkbox/Switch/Toggle, DataTable, CLOSE.
+ * Every other producer is LEGACY. No allocation, truncation or JSON parsing on
+ * poll; caller provides readable/writable declared storage extents. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_notification_v1(
+    cui_bridge_app *, uint32_t struct_size, cui_bridge_notification_v1 *out,
+    char *text, uint32_t capacity, uint32_t *required_capacity);
+
 typedef struct {
     uint32_t struct_size; /* Must equal cui_bridge_options_size(). */
     uint32_t abi_version;

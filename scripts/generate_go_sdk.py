@@ -89,6 +89,11 @@ foreach(target cui cui_bridge cui_text cui_sdl3 cui_bidi cui_sheenbidi_objects)
 endforeach()
 '''
 
+def sdk_relative_name(path, root):
+    """Manifest keys always use POSIX separators, including on Windows."""
+    return path.relative_to(root).as_posix()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
@@ -130,12 +135,12 @@ def main():
             except (OSError, ValueError, KeyError, AssertionError) as error:
                 raise SystemExit("Binding SDK provenance is missing or stale: " + str(SDK)) from error
             mismatches = [name for name, data in files.items() if not (SDK / name).is_file() or (SDK / name).read_bytes() != data]
-            extra = [str(file.relative_to(SDK)) for file in SDK.rglob("*") if file.is_file() and str(file.relative_to(SDK)) not in files]
+            extra = [sdk_relative_name(file, SDK) for file in SDK.rglob("*") if file.is_file() and sdk_relative_name(file, SDK) not in files]
             if mismatches or extra:
                 raise SystemExit("Binding SDK snapshot is stale; regenerate: " + ", ".join((mismatches + extra)[:12]))
             continue
         SDK.mkdir(parents=True, exist_ok=True)
-        existing = [file for file in SDK.rglob("*") if file.is_file() and str(file.relative_to(SDK)) not in files]
+        existing = [file for file in SDK.rglob("*") if file.is_file() and sdk_relative_name(file, SDK) not in files]
         if existing:
             raise SystemExit("Obsolete SDK files require explicit review before removal: " + ", ".join(str(file) for file in existing[:12]))
         for name, data in files.items():

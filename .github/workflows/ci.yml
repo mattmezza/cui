@@ -203,7 +203,7 @@ jobs:
           cache: false
       - run: rustup toolchain install 1.85.1 --profile minimal
       - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
-      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components
+      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components test_bridge_portable_run
       - run: ctest --test-dir build -R '^bridge_' --output-on-failure
       - name: Real Go component state and callback tests
         working-directory: bindings/go

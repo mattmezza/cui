@@ -21,7 +21,7 @@ ALIASES = {
 def public_api(root):
     """Index function declarations; complete headers remain authority for types/macros."""
     symbols = []
-    for header in sorted((root / 'include/cui').glob('*.h')):
+    for header in sorted((root / 'include/cui').glob('*.h'), key=lambda p: p.as_posix()):
         clean = re.sub(r'/\*.*?\*/|//[^\n]*', '', header.read_text(encoding='utf-8'), flags=re.S)
         for match in FUNCTION.finditer(clean):
             symbols.append({'name': match[1], 'declaration': re.sub(r'\s+', ' ', match[0].rstrip().removesuffix('{').rstrip().removesuffix(';') + ';').strip(),
@@ -50,7 +50,7 @@ def source_files(root):
                  'scripts/build_web.py', 'scripts/native_bundle.py', 'scripts/test_local.py',
                  'third_party/dependencies.json'):
         paths.add(root / path)
-    return sorted(p for p in paths if p.is_file())
+    return sorted((p for p in paths if p.is_file()), key=lambda p: p.as_posix())
 
 
 def collect(root):

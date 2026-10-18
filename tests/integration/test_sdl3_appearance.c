@@ -2,6 +2,7 @@
 #include "cui/cui_sdl3.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
+#include <string.h>
 static cui_system_appearance actual(void) {
     switch (SDL_GetSystemTheme()) {
     case SDL_SYSTEM_THEME_LIGHT:
@@ -17,10 +18,20 @@ static void frame(cui_context *ui) {
     (void)cui_end_frame(ui);
 }
 int main(void) {
-    assert(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy"));
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    /* Reproduce a preconfigured runner and require our explicit headless choice
+       to win even over conflicting environment hints. No video is initialized. */
+    assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_VIDEO_DRIVER,
+                                      "cui-test-unavailable-driver", true));
+    assert(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), SDL_HINT_RENDER_DRIVER,
+                                      "cui-test-unavailable-renderer", true));
+    assert(SDL_SetHintWithPriority(SDL_HINT_VIDEO_DRIVER, "dummy", SDL_HINT_OVERRIDE));
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
+    /* Override environment hints too: this test must always remain headless. */
+    assert(strcmp(SDL_GetHint(SDL_HINT_VIDEO_DRIVER), "dummy") == 0);
+    assert(strcmp(SDL_GetHint(SDL_HINT_RENDER_DRIVER), "software") == 0);
     cui_sdl3 *host = cui_sdl3_create("appearance", 120, 80, NULL);
     assert(host);
+    assert(strcmp(SDL_GetCurrentVideoDriver(), "dummy") == 0);
     cui_context *ui = cui_create((cui_config){.width = 120, .height = 80});
     assert(ui);
     cui_platform_appearance observed,

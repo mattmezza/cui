@@ -80,6 +80,22 @@ class AgentSkillTests(unittest.TestCase):
             self.assertIn('gl', names)
             self.assertNotIn('sdl3 >= 3.2', names)
 
+    def test_resource_order_is_case_sensitive_and_platform_independent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            headers = root / 'include/cui'
+            headers.mkdir(parents=True)
+            (headers / 'Zebra.h').write_text('bool cui_zebra(void);\n')
+            (headers / 'alpha.h').write_text('bool cui_alpha(void);\n')
+            docs = root / 'docs'
+            docs.mkdir()
+            (docs / 'Zebra.md').write_text('# Zebra\n')
+            (docs / 'alpha.md').write_text('# Alpha\n')
+            names = [p.relative_to(root).as_posix() for p in agent_resources.source_files(root)]
+            self.assertEqual(names, sorted(names))
+            self.assertEqual([entry['name'] for entry in agent_resources.public_api(root)],
+                             ['cui_zebra', 'cui_alpha'])
+
     def test_fingerprint_tracks_header_and_doc_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -321,6 +321,7 @@ typedef struct {
     bool boolean;
     double number;
     cui_id choice;
+    cui_edit_state text;
 } settings_scalar_before;
 static void scalar_count(settings_frame *f, size_t *count) {
     if (*count == SIZE_MAX)
@@ -341,22 +342,32 @@ static void scalar_observe(settings_frame *f, const cui_setting_item *item, cui_
     if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
         item->boolean && f->handler.on_boolean && before.boolean != *item->boolean) {
         cui_settings_bool_change event = {evidence, id, render.page, render.group, render.item,
-                                          before.boolean, *item->boolean};
+                                          before.boolean, *item->boolean, CUI_SETTINGS_CHANGE_EDIT};
         f->handler.on_boolean(f->handler.user, &event);
         scalar_count(f, &f->events->boolean_count);
     } else if (item->kind == CUI_SETTING_NUMBER && item->number && item->number_state &&
                f->handler.on_number && before.number != *item->number &&
                !(isnan(before.number) && isnan(*item->number))) {
         cui_settings_number_change event = {evidence, id, render.page, render.group, render.item,
-            before.number, *item->number, isfinite(before.number), isfinite(*item->number)};
+            before.number, *item->number, isfinite(before.number), isfinite(*item->number), CUI_SETTINGS_CHANGE_EDIT};
         f->handler.on_number(f->handler.user, &event);
         scalar_count(f, &f->events->number_count);
     } else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && f->handler.on_choice &&
                before.choice != *item->choice) {
         cui_settings_choice_change event = {evidence, id, render.page, render.group, render.item,
-                                            before.choice, *item->choice};
+                                            before.choice, *item->choice, CUI_SETTINGS_CHANGE_EDIT};
         f->handler.on_choice(f->handler.user, &event);
         scalar_count(f, &f->events->choice_count);
+    } else if (item->kind == CUI_SETTING_INPUT && item->edit && item->input_state &&
+               f->handler.on_text) {
+        cui_edit_state after = cui_edit_get_state(item->edit);
+        if (before.text.revision != after.revision) {
+            cui_settings_text_change event = {evidence, id, render.page, render.group, render.item,
+                before.text.revision, after.revision, before.text.length, after.length,
+                cui_edit_get_text(item->edit), CUI_SETTINGS_CHANGE_EDIT};
+            f->handler.on_text(f->handler.user, &event);
+            scalar_count(f, &f->events->text_count);
+        }
     }
 }
 static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
@@ -377,6 +388,9 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
             before.number = *item->number;
         else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && f->handler.on_choice)
             before.choice = *item->choice;
+        else if (item->kind == CUI_SETTING_INPUT && item->edit && item->input_state &&
+                 f->handler.on_text)
+            before.text = cui_edit_get_state(item->edit);
     }
     bool changed = false;
     cui_edit_result error = CUI_EDIT_OK;

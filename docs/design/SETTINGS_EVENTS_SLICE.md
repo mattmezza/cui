@@ -323,3 +323,14 @@ scalar/text payload lifetimes; null handlers and passive UI suppression. Existin
 Settings/Input/Number/Choice/edit acceptance regressions remain mandatory through
 the private wrapper, plus strict C/C++ headers. No foreign wrapper or full parity
 claim follows from those checks. No builds or production changes in this revision.
+
+
+### Text EDIT implementation checkpoint
+
+Implemented the approved built-in Input aggregate EDIT seam after old callbacks.
+The text payload/count and unreleased reason fields are present; RESET remains the
+next independent implementation slice. Strict tests compare old/new state, paint,
+semantics and errors, including multiple inputs, callback redirect, byte-net-zero
+revision changes, IME preedit/commit, progress before capacity error, absent
+observer, passive/inert/disabled silence and bounded copy. No reset implementation
+or wrapper support is implied by this checkpoint.

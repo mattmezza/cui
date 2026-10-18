@@ -302,6 +302,10 @@ struct scalar_fixture {
     cui_settings_bool_change last_boolean;
     cui_settings_number_change last_number;
     cui_settings_choice_change last_choice;
+    cui_settings_text_change last_text;
+    cui_input_state input;
+    char text_copy[64];
+    size_t text_calls;
     bool legacy, passive, inert;
     char order[32];
     size_t order_count;
@@ -317,6 +321,15 @@ static void scalar_legacy(void *user) {
     size_t i = u->index;
     ++f->legacy_calls[i];
     scalar_order(f, 'L');
+    if (f->items[i].kind == CUI_SETTING_INPUT) {
+        if (f->mode[i] == 1)
+            assert(cui_edit_replace_range(f->edit, 0, cui_edit_get_state(f->edit).length,
+                                          cui_string("")) == CUI_EDIT_OK);
+        else if (f->mode[i] == 2)
+            assert(cui_edit_replace_range(f->edit, 0, cui_edit_get_state(f->edit).length,
+                                          cui_string("redirect")) == CUI_EDIT_OK);
+        return;
+    }
     if (f->mode[i] == 1) {
         if (i < 2)
             f->booleans[i] = f->before_bool[i];
@@ -380,6 +393,27 @@ static void choice_event(void *user, const cui_settings_choice_change *event) {
     f->choice_calls++;
     scalar_order(f, 'C');
 }
+static void text_event(void *user, const cui_settings_text_change *e) {
+    scalar_fixture *f = user;
+    assert(e->reason == CUI_SETTINGS_CHANGE_EDIT);
+    assert(e->event.source == CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    assert(e->event.flags == CUI_COMPONENT_EVENT_HAS_FRAME);
+    assert(e->before_revision != e->after_revision);
+    assert(e->after_revision == cui_edit_get_state(f->edit).revision);
+    assert(f->legacy_calls[0]);
+    cui_str copied = {0};
+    assert(cui_component_event_copy_utf8(e->text, 63, f->text_copy, sizeof f->text_copy, &copied) == CUI_COMPONENT_EVENT_COPY_OK);
+    assert(copied.length == e->after_bytes);
+    char storage[2] = {'A', 'B'};
+    cui_str sentinel = cui_string("unchanged");
+    if (e->text.length > 1) {
+        assert(cui_component_event_copy_utf8(e->text, 1, storage, sizeof storage, &sentinel)
+               == CUI_COMPONENT_EVENT_COPY_LIMIT);
+        assert(storage[0] == 'A' && storage[1] == 'B' && sentinel.length == 9);
+    }
+    f->last_text = *e;
+    ++f->text_calls;
+}
 static cui_settings_event_result scalar_frame(scalar_fixture *f, bool observe) {
     f->before_bool[0] = f->booleans[0];
     f->before_bool[1] = f->booleans[1];
@@ -398,7 +432,8 @@ static cui_settings_event_result scalar_frame(scalar_fixture *f, bool observe) {
                                 (cui_settings_handler){.user = f,
                                                        .on_boolean = observe ? boolean_event : NULL,
                                                        .on_number = observe ? number_event : NULL,
-                                                       .on_choice = observe ? choice_event : NULL});
+                                                       .on_choice = observe ? choice_event : NULL,
+                                                       .on_text = observe ? text_event : NULL});
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
     assert(cui_last_error(f->ui) == CUI_OK);
@@ -658,7 +693,72 @@ static void scalar_choices(bool menu) {
     assert(copied.previous == 103 && copied.value == 102);
 }
 
+static void text_changes(void) {
+    scalar_fixture a, b;
+    scalar_init(&a, true, true);
+    scalar_init(&b, false, true);
+    scalar_fixture *fs[] = {&a, &b};
+    for (size_t n = 0; n < 2; ++n) {
+        scalar_fixture *f = fs[n];
+        f->group.count = 1;
+        f->items[0].kind = CUI_SETTING_INPUT;
+        f->items[0].edit = f->edit;
+        f->items[0].input_state = &f->input;
+        assert(cui_edit_replace_range(f->edit, 0, cui_edit_get_state(f->edit).length,
+                                      cui_string("")) == CUI_EDIT_OK);
+    }
+    scalar_pair(&a, &b, true);
+    const unsigned modes[] = {0, 1, 1, 2};
+    for (size_t k = 0; k < sizeof modes / sizeof modes[0]; ++k) {
+        unsigned mode = modes[k];
+        a.mode[0] = b.mode[0] = mode;
+        for (size_t n = 0; n < 2; ++n) {
+            cui_focus(fs[n]->ui, cui_settings_part_id(11, 0, 0, 0, 24));
+            assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "x"}));
+            assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "y"}));
+        }
+        cui_settings_event_result r = scalar_pair(&a, &b, true);
+        assert(r.text_count == 1);
+        assert(b.last_text.after_bytes == cui_edit_get_state(b.edit).length);
+        assert(!strcmp(b.text_copy, mode == 1 ? "" : mode == 2 ? "redirect" : "xy"));
+    }
+    a.mode[0] = b.mode[0] = 0;
+    for (size_t n = 0; n < 2; ++n) {
+        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_COMPOSITION_START}));
+        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                              .text_data = "ime", .text_length = 3, .composition_cursor = 3}));
+    }
+    assert(!scalar_pair(&a, &b, true).text_count);
+    for (size_t n = 0; n < 2; ++n)
+        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_COMPOSITION_COMMIT,
+                              .text_data = "ime", .text_length = 3, .composition_cursor = 3}));
+    assert(scalar_pair(&a, &b, true).text_count == 1);
+    for (size_t n = 0; n < 2; ++n) {
+        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "!"}));
+        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT,
+                              .text = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"}));
+    }
+    cui_settings_event_result error = scalar_pair(&a, &b, true);
+    assert(error.text_count == 1 && error.result.edit_error != CUI_EDIT_OK);
+    for (size_t n = 0; n < 2; ++n)
+        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "z"}));
+    assert(!scalar_pair(&a, &b, false).text_count);
+    a.items[0].disabled = b.items[0].disabled = true;
+    assert(!scalar_pair(&a, &b, true).text_count);
+    a.items[0].disabled = b.items[0].disabled = false;
+    a.passive = b.passive = true;
+    assert(!scalar_pair(&a, &b, true).text_count);
+    a.passive = b.passive = false;
+    a.inert = b.inert = true;
+    assert(!scalar_pair(&a, &b, true).text_count);
+    cui_settings_text_change copy = b.last_text;
+    scalar_done(&a);
+    scalar_done(&b);
+    assert(copy.after_bytes > 0 && copy.before_revision != copy.after_revision);
+}
+
 int main(void) {
+    text_changes();
     navigation_events();
     narrow_and_admission();
     scalar_boolean_and_number();

@@ -115,3 +115,28 @@ not at Settings-call entry, so earlier host changes are not independently report
 Reset helpers and reset-button effects have no new typed reset notification.
 This extends the new C structs and requires rebuilding consumers with this header;
 existing legacy Settings options/state/result layouts and function remain unchanged.
+
+
+Built-in Input EDIT observations use `handler.on_text` and `result.text_count`.
+They compare committed revisions immediately around the old adapter and its old
+`on_change` callback, then report once at most. Two inputs in one adapter remain
+one notification; callback redirects and byte-net-zero edits still notify when the
+revision differs. IME preedit, selection and unchanged revisions stay silent.
+An earlier successful edit is observable even if a later input reports an error.
+Missing observers preserve editing. Disabled, passive and inert submissions do not
+notify. Custom renderers remain outside the built-in observer contract.
+
+`cui_settings_text_change` includes before/after revision and byte counts, field ID
+and source page/group/item indices. `text` is final committed UTF-8 borrowed only
+for the callback; no previous text is copied internally. Use
+`cui_component_event_copy_utf8(event->text, limit, storage, capacity, &owned)` and
+check for `CUI_COMPONENT_EVENT_COPY_OK` to retain it. Settings supplies no secure or
+masked Input configuration, so this payload is actual committed text without
+implicit redaction. Metadata is proven active frame plus UNKNOWN cause, without
+an invented input index, activation or submit. The editor and its storage must
+remain live and unchanged by observers until the outer call and renderer finish.
+
+Bool, number, choice and text payloads now expose `reason`, currently EDIT.
+The RESET enumerator reserves the approved reset slice; no reset observations are
+implemented yet. These **unreleased event structs** changed size: rebuild all C
+consumers. Legacy Settings options/state/results and entrypoints are unchanged.

@@ -1,7 +1,7 @@
 # Scroll observer checkpoint
 
-Original design checkpoint `6251b9d6`; the Base-only pair is now implemented,
-as recorded at the end. Styled/virtual/message proposals below remain unimplemented. This is a
+Original design checkpoint `6251b9d6`; the Base and Styled pairs are now implemented,
+as recorded at the end. Virtual/message event proposals below remain unimplemented. This is a
 bounded follow-up to the [remaining audit](COMPONENT_EVENTS_REMAINING.md) and
 [shared contract](COMPONENT_EVENTS_CONTRACT.md), not a new manifest family or a
 claim of universal scroll events. Command Styled and TitleBar are separate work.
@@ -289,3 +289,15 @@ Frame-zero maintenance and normalization policy follow the approved refinement.
 The focused fixture plus legacy scroll/virtual/message and strict C++ header checks
 verify this slice independently. Styled declarations above remain proposals, not
 public symbols. No virtual/window/MessageScroller event implementation is included.
+
+## Implemented Styled slice
+
+`cui_scrollable_begin_events` / `cui_scrollable_end_events` now use the same
+aggregate policy after exactly one legacy mutable end/translation/paint/closure.
+The unreleased token appends `private_styled`, checked by both finalizers before
+any work; consumers must rebuild. Each layer freezes final payload and consumes
+its token without calling the other layer's observer/finalizer. Callback borrowing
+is through the matching end only. There is still no virtual-window completion or
+MessageScroller event facade. See the guide for begin admission versus change and
+frame-zero limitations. Native strict Release and ASan/UBSan bounded regressions
+include old/new Styled paint/geometry and layer rejection tests.

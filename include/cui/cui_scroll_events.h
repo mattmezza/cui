@@ -32,7 +32,7 @@ typedef struct {
     cui_id private_owner;
     uint64_t private_frame;
     cui_scroll_offset private_entry;
-    bool private_active;
+    bool private_active, private_styled;
 } cui_scroll_event_scope;
 /* Base-only paired final-offset observation. Return is the legacy reducer bool:
  * false can be valid/no-change. scope.private_active is private: always finish
@@ -41,7 +41,7 @@ typedef struct {
  * Same context/owner/state/options/ancestry/frame must surround the pair. Runtime
  * checks cannot detect cross-frame misuse when both frame sequences are zero.
  * End after children to include deferred wheel routing; finish runs once.
- * No Styled box/translation/paint or scrollbar-overlay adapter is supplied. */
+ * Base does not compose boxes/translation/paint; overlay adapters are separate. */
 bool cui_base_scrollable_events(cui_context *, cui_id, cui_scroll_state *, cui_scroll_options,
                                 cui_scroll_event_scope *);
 /* Aggregate CHANGE includes normalization, not proof of user input. Frame-zero
@@ -56,6 +56,17 @@ cui_scroll_event_result cui_base_scrollable_finish_events(cui_context *, cui_id,
                                                           cui_scroll_options,
                                                           cui_scroll_event_scope *,
                                                           cui_scroll_handler);
+/* Styled begin returns composition admission, never an offset-change flag.
+ * False: no new pair/boxes, no end. True: always pair with end_events, including
+ * passive work and no-change. Do not mix Base and Styled pairing entrypoints.
+ * End performs legacy mutable finish/translation/paint/closure once, then observes.
+ * Same options/theme lifetime/ancestry and normal layout balancing are required.
+ * New private_styled extends an unreleased scope layout: rebuild consumers. */
+bool cui_scrollable_begin_events(cui_context *, cui_id, const cui_theme *, cui_scroll_state *,
+                                 cui_scroll_options, cui_scroll_event_scope *);
+cui_scroll_event_result cui_scrollable_end_events(cui_context *, cui_id, const cui_theme *,
+                                                  cui_scroll_state *, cui_scroll_options,
+                                                  cui_scroll_event_scope *, cui_scroll_handler);
 #ifdef __cplusplus
 }
 #endif

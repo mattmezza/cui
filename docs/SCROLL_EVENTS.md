@@ -1,10 +1,11 @@
-# Base final-offset scroll observers
+# Final-offset scroll observers
 
-Include `cui/cui_scroll_events.h`. This slice adds only drawing-free
-`cui_base_scrollable_events` and `cui_base_scrollable_finish_events`. Legacy
-Scrollable APIs, public state/options layouts and reduction timing are unchanged.
-Styled paired composition, scrollbar overlays, virtual widgets and MessageScroller
-have no new observer facade in this slice. See the [checkpoint](design/SCROLL_EVENTS_SLICE.md).
+Include `cui/cui_scroll_events.h`. Drawing-free `cui_base_scrollable_events` /
+`cui_base_scrollable_finish_events` and Styled `cui_scrollable_begin_events` /
+`cui_scrollable_end_events` observe one final offset per pair. Legacy Scrollable
+APIs, public state/options layouts and reduction timing are unchanged. Scrollbar
+overlays, virtual widgets and MessageScroller have no new observer facade. See the
+[checkpoint](design/SCROLL_EVENTS_SLICE.md).
 
 ```c
 static void scrolled(void *user, const cui_scroll_change *change) {
@@ -90,3 +91,47 @@ virtual widget and MessageScroller tests remain separate regression evidence.
 No completion callback, virtual-window rerender, precision conversion, bridge
 producer or foreign-language handler is introduced. Bindings retain their existing
 manual notification allowlists. This slice is not full-family or 78-family parity.
+
+## Styled composition
+
+```c
+cui_scroll_event_scope scope = {0};
+if (cui_scrollable_begin_events(ui, owner, theme, &state, options, &scope)) {
+    /* Compose ordinary child content here. */
+    cui_scroll_event_result result = cui_scrollable_end_events(
+        ui, owner, theme, &state, options, &scope,
+        (cui_scroll_handler){scrolled, &last});
+    (void)result;
+}
+```
+
+Styled begin's bool is successful composition admission, not Base's changed bool.
+False means no new boxes/pair were opened and no end is required. True always
+requires end, including unchanged, disabled, inert and layout-only submissions.
+Do not condition end on offset change. Use the same effective options/theme/state
+and ancestry across the pair; Styled's legacy previous-frame auto-measure resolution
+still runs at its original begin/end points.
+
+Styled end executes the existing mutable `end_ex` once: child-deferred wheel
+reduction, current viewport translation, scrollbar paint and owner box closure.
+Only afterward does it freeze final offsets, consume the token and invoke the
+observer. It never calls the Base event finalizer, so there is no repeated finish
+or double notification. Counts/normalization/metadata/passive suppression and
+callback mutation/lifetime rules are the same as Base. `valid` describes admitted
+pairing and finite final state, not transactional painting success; existing layout
+errors are retained and do not undo already-required balancing.
+
+The token now distinguishes Base and Styled pairs. Cross-layer finalization is
+rejected before reducer or box effects: Base finish cannot consume a Styled pair,
+and Styled end cannot close boxes for a Base pair. Correct finalization is still
+required after a rejected attempt. The added private layer bit extends the
+**unreleased** scope layout; rebuild consumers rather than mixing old objects.
+No legacy public layout changed.
+
+Styled tests compare legacy/new draw command geometry/colors, child/sibling
+bounds, semantics, consumed input and final state; exercise deferred child routing,
+net-zero and missing observers, disabled/passive normalization, cross-layer/owner/
+repeated-token rejection, keyboard and scrollbar drag, and copied payload lifetime.
+The bounded strict Release and ASan/UBSan harnesses also run the Base event and
+legacy scroll/virtual/message tests. Sanitizer proof reuses prebuilt instrumented
+Core/software archives; it does not claim a fresh full-project sanitizer rebuild.

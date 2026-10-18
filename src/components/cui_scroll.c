@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_scroll.h"
+#include "cui/cui_scroll_events.h"
 #include <math.h>
 static float cui_scroll_component_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
@@ -180,4 +181,62 @@ bool cui_scrollbar_overlay(cui_context *ui, cui_id id, const cui_theme *theme, f
     if (x && y)
         cui_scrollbar_overlay_paint(ui, id, theme, *x, *y, viewport, content, o);
     return changed;
+}
+
+
+bool cui_scrollable_begin_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                cui_scroll_state *state, cui_scroll_options options,
+                                cui_scroll_event_scope *scope) {
+    if (!ui || !id || !theme || !state || !scope || scope->private_active ||
+        !cui_frame_is_submitting(ui))
+        return false;
+    cui_scroll_event_scope admitted;
+    memset(&admitted, 0, sizeof(admitted));
+    admitted.private_context = ui;
+    admitted.private_state = state;
+    admitted.private_owner = id;
+    admitted.private_frame = cui_frame_sequence(ui);
+    admitted.private_entry = (cui_scroll_offset){state->x, state->y};
+    admitted.private_active = admitted.private_styled = true;
+    if (!cui_scrollable_begin(ui, id, theme, state, options))
+        return false;
+    *scope = admitted;
+    return true;
+}
+
+cui_scroll_event_result cui_scrollable_end_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_scroll_state *state,
+    cui_scroll_options options, cui_scroll_event_scope *scope, cui_scroll_handler handler) {
+    cui_scroll_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !id || !theme || !state || !scope || !scope->private_active ||
+        !scope->private_styled || scope->private_context != ui || scope->private_owner != id ||
+        scope->private_state != state || !cui_frame_is_submitting(ui) ||
+        scope->private_frame != cui_frame_sequence(ui))
+        return result;
+    cui_scrollable_end_ex(ui, id, theme, state, options);
+    /* Same aggregate policy as Base, after Styled translation/paint/closure.
+     * Do not call the Base event finalizer here: it would reduce finish twice. */
+    cui_scroll_change change;
+    memset(&change, 0, sizeof(change));
+    change.has_previous = isfinite(scope->private_entry.x) && isfinite(scope->private_entry.y);
+    if (change.has_previous)
+        change.previous = scope->private_entry;
+    change.value = (cui_scroll_offset){state->x, state->y};
+    uint64_t frame = scope->private_frame;
+    scope->private_active = false;
+    if (!isfinite(change.value.x) || !isfinite(change.value.y))
+        return result;
+    result.valid = true;
+    result.changed = !change.has_previous || change.previous.x != change.value.x ||
+                     change.previous.y != change.value.y;
+    if (result.changed && frame && handler.on_change) {
+        (void)cui_component_event_init(&change.event, CUI_COMPONENT_EVENT_CHANGE, id,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        change.event.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+        change.event.frame_sequence = frame;
+        result.change_count = 1;
+        handler.on_change(handler.user, &change);
+    }
+    return result;
 }

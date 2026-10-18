@@ -343,6 +343,7 @@ bool cui_base_scrollable_events(cui_context *ui, cui_id id, cui_scroll_state *st
     scope->private_frame = cui_frame_sequence(ui);
     scope->private_entry = (cui_scroll_offset){state->x, state->y};
     scope->private_active = true;
+    scope->private_styled = false;
     return cui_base_scrollable(ui, id, state, options);
 }
 
@@ -351,7 +352,7 @@ cui_scroll_event_result cui_base_scrollable_finish_events(
     cui_scroll_event_scope *scope, cui_scroll_handler handler) {
     cui_scroll_event_result result;
     memset(&result, 0, sizeof(result));
-    if (!ui || !id || !state || !scope || !scope->private_active ||
+    if (!ui || !id || !state || !scope || !scope->private_active || scope->private_styled ||
         scope->private_context != ui || scope->private_owner != id ||
         scope->private_state != state || !cui_frame_is_submitting(ui) ||
         scope->private_frame != cui_frame_sequence(ui))

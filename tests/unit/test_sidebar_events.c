@@ -493,11 +493,189 @@ static void test_nested(void) {
     assert(copies[0].event.target == 2 && copies[0].event.activation.target == 31);
     cui_destroy(ui);
 }
+static cui_sidebar_collapse_request collapse_copies[16];
+static size_t collapse_calls, old_collapse_calls;
+static bool old_collapse_values[16], collapse_owner, toggle_compare, collapse_cancel;
+static void old_collapse(bool value, void *user) {
+    assert(user == &collapse_owner && old_collapse_calls < 16);
+    old_collapse_values[old_collapse_calls++] = value;
+    trace[trace_count++] = 6;
+    collapse_owner = true; /* Deliberately differs from some requests. */
+    if (collapse_cancel) {
+        size_t n;
+        (void)cui_frame_events(ui, &n);
+        for (size_t i = 0; i < n; i++)
+            if (cui_event_activation(ui, i) == 60)
+                cui_cancel_event_activation(ui, i);
+    }
+}
+static void collapse_requested(void *user, const cui_sidebar_collapse_request *request) {
+    assert(user == &collapse_owner && collapse_calls < 16);
+    collapse_copies[collapse_calls++] = *request;
+    trace[trace_count++] = 7;
+    assert(request->event.kind == CUI_COMPONENT_EVENT_REQUEST && request->event.target == 60);
+    assert(request->event.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION);
+    collapse_owner = false; /* Allowed owner assignment; local flips do not reread it. */
+}
+static cui_sidebar_toggle_event_result toggle_frame(bool styled, bool legacy, bool observer,
+                                                    unsigned passive, bool disabled, bool entry) {
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_begin_box(ui, 1,
+                  (cui_box){.width = 250, .inert = passive == 1, .layout_only = passive == 2});
+    cui_sidebar_toggle_options options = {.collapsed = entry,
+                                          .disabled = disabled,
+                                          .accessibility_label = {"Toggle", 6},
+                                          .on_change = old_collapse,
+                                          .user = &collapse_owner};
+    cui_sidebar_collapse_handler handler = {.on_request = observer ? collapse_requested : NULL,
+                                            .user = &collapse_owner};
+    cui_sidebar_toggle_event_result result;
+    memset(&result, 0, sizeof(result));
+    cui_theme theme = cui_theme_light();
+    if (styled) {
+        if (legacy)
+            result.activated = cui_sidebar_toggle_button(ui, 60, &theme, options);
+        else
+            result = cui_sidebar_toggle_button_events(ui, 60, &theme, options, handler);
+    } else {
+        if (legacy)
+            result.activated = cui_base_sidebar_toggle(ui, 60, options);
+        else
+            result = cui_base_sidebar_toggle_events(ui, 60, options, handler);
+        cui_begin_box(ui, 60, (cui_box){.width = 24, .height = 24});
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    if (styled) {
+        assert(draw.count < 128);
+        if (passive != 2)
+            assert(draw.count > 0);
+        if (legacy) {
+            old_count = draw.count;
+            memcpy(old_commands, draw.commands, draw.count * sizeof(*draw.commands));
+        }
+        if (toggle_compare) {
+            assert(old_count == draw.count);
+            for (size_t i = 0; i < draw.count; i++) {
+                assert(old_commands[i].type == draw.commands[i].type);
+                assert(
+                    !memcmp(&old_commands[i].bounds, &draw.commands[i].bounds, sizeof(cui_rect)));
+                assert(!memcmp(&old_commands[i].color, &draw.commands[i].color, sizeof(cui_color)));
+            }
+        }
+    }
+    return result;
+}
+static void test_collapse(void) {
+    for (unsigned styled = 0; styled < 2; styled++) {
+        bool legacy_values[3] = {false};
+        for (unsigned pass = 0; pass < 2; pass++) {
+            reset();
+            collapse_calls = old_collapse_calls = 0;
+            collapse_owner = false;
+            ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
+            assert(ui);
+            toggle_frame(styled != 0, pass == 0, true, 0, false, false);
+            assert(collapse_calls == 0 && old_collapse_calls == 0);
+            click(60, false);
+            click(60, false);
+            click(60, false);
+            toggle_compare = pass != 0;
+            cui_sidebar_toggle_event_result result =
+                toggle_frame(styled != 0, pass == 0, true, 0, false, false);
+            toggle_compare = false;
+            assert(result.activated && old_collapse_calls == 3);
+            assert(old_collapse_values[0] && !old_collapse_values[1] && old_collapse_values[2]);
+            if (!pass)
+                memcpy(legacy_values, old_collapse_values, sizeof(legacy_values));
+            else {
+                assert(result.valid && result.request_count == 3 && collapse_calls == 3);
+                assert(!memcmp(legacy_values, old_collapse_values, sizeof(legacy_values)));
+                assert(!collapse_copies[0].previous && collapse_copies[0].value &&
+                       collapse_copies[1].previous && !collapse_copies[1].value &&
+                       !collapse_copies[2].previous && collapse_copies[2].value);
+                unsigned expected[] = {6, 7, 6, 7, 6, 7};
+                assert(trace_count == 6 && !memcmp(trace, expected, sizeof(expected)));
+                assert(!collapse_owner);
+            }
+            size_t n;
+            const cui_semantic *sem = cui_semantics(ui, &n);
+            bool found = false;
+            for (size_t i = 0; i < n; i++)
+                if (sem[i].id == 60) {
+                    assert(sem[i].details.expanded);
+                    found = true;
+                }
+            assert(found);
+            cui_destroy(ui);
+        }
+        reset();
+        collapse_calls = old_collapse_calls = 0;
+        ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
+        assert(ui);
+        toggle_frame(styled != 0, false, true, 0, false, true);
+        click(60, true);
+        cui_sidebar_toggle_event_result result =
+            toggle_frame(styled != 0, false, true, 0, false, true);
+        assert(result.request_count == 1 && collapse_copies[0].previous &&
+               !collapse_copies[0].value);
+        assert(collapse_copies[0].event.activation.release.type == CUI_POINTER_TOUCH);
+        size_t n;
+        const cui_semantic *sem = cui_semantics(ui, &n);
+        for (size_t i = 0; i < n; i++)
+            if (sem[i].id == 60)
+                assert(!sem[i].details.expanded);
+        cui_focus(ui, 60);
+        key(CUI_KEY_ENTER);
+        result = toggle_frame(styled != 0, false, true, 0, false, false);
+        assert(result.request_count == 1 &&
+               collapse_copies[1].event.source == CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+        assert(cui_queue_accessibility_action(ui, 60, CUI_ACCESSIBILITY_ACTIVATE));
+        result = toggle_frame(styled != 0, false, true, 0, false, false);
+        assert(result.request_count == 1 &&
+               collapse_copies[2].event.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
+        cui_sidebar_collapse_request saved = collapse_copies[2];
+        click(60, false);
+        result = toggle_frame(styled != 0, false, false, 0, false, false);
+        assert(result.activated && result.request_count == 0);
+        toggle_frame(styled != 0, false, true, 0, true, false);
+        click(60, false);
+        result = toggle_frame(styled != 0, false, true, 0, true, false);
+        assert(!result.activated && result.request_count == 0);
+        for (unsigned passive = 1; passive <= 2; passive++) {
+            toggle_frame(styled != 0, false, true, 0, false, false);
+            click(60, false);
+            result = toggle_frame(styled != 0, false, true, passive, false, false);
+            assert(!result.activated && result.request_count == 0);
+        }
+        toggle_frame(styled != 0, false, true, 0, false, false);
+        collapse_cancel = true;
+        click(60, false);
+        click(60, false);
+        click(60, false);
+        result = toggle_frame(styled != 0, false, true, 0, false, false);
+        assert(result.activated && result.request_count == 1);
+        assert(collapse_copies[collapse_calls - 1].event.flags &
+               CUI_COMPONENT_EVENT_HAS_ACTIVATION);
+        collapse_cancel = false;
+        assert(!cui_base_sidebar_toggle_events(ui, 0, (cui_sidebar_toggle_options){0},
+                                               (cui_sidebar_collapse_handler){0})
+                    .valid);
+        assert(!cui_sidebar_toggle_button_events(ui, 60, NULL, (cui_sidebar_toggle_options){0},
+                                                 (cui_sidebar_collapse_handler){0})
+                    .valid);
+        cui_destroy(ui);
+        assert(saved.event.activation.target == 60 &&
+               saved.event.kind == CUI_COMPONENT_EVENT_REQUEST);
+    }
+}
 int main(void) {
     test_base();
     test_legacy_equivalence();
     test_menu();
     test_nested();
     test_expansion();
+    test_collapse();
     return 0;
 }

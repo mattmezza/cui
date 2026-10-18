@@ -304,12 +304,17 @@ bool cui_sidebar_footer(cui_context *ui, cui_id id, const cui_theme *t,
                         cui_sidebar_section_options o) {
     return cui_sidebar_section(ui, id, t, o, true);
 }
-bool cui_sidebar_toggle_button(cui_context *ui, cui_id id, const cui_theme *t,
-                               cui_sidebar_toggle_options o) {
+static bool cui_sidebar_toggle_button_common(cui_context *ui, cui_id id, const cui_theme *t,
+                               cui_sidebar_toggle_options o, cui_sidebar_collapse_handler handler,
+                               cui_sidebar_toggle_event_result *observed) {
     if (!ui || !id || !t || o.side < CUI_SIDEBAR_LEFT || o.side > CUI_SIDEBAR_RIGHT ||
         !cui_sidebar_string(o.accessibility_label))
         return false;
-    bool activated = cui_base_sidebar_toggle(ui, id, o);
+    bool activated;
+    if (observed) {
+        *observed = cui_base_sidebar_toggle_events(ui, id, o, handler);
+        activated = observed->activated;
+    } else activated = cui_base_sidebar_toggle(ui, id, o);
     bool hover = cui_hovered(ui, id), pressed = cui_pressed(ui, id);
     cui_begin_box(ui, id,
                   (cui_box){.width = 24,
@@ -334,6 +339,18 @@ bool cui_sidebar_toggle_button(cui_context *ui, cui_id id, const cui_theme *t,
     cui_sidebar_icon(ui, cui_sidebar_part_id(id, 0), t, cui_string(name), 16, fg, false);
     cui_end_box(ui);
     return activated;
+}
+bool cui_sidebar_toggle_button(cui_context *ui, cui_id id, const cui_theme *t,
+                               cui_sidebar_toggle_options o) {
+    return cui_sidebar_toggle_button_common(ui, id, t, o, (cui_sidebar_collapse_handler){0}, NULL);
+}
+cui_sidebar_toggle_event_result cui_sidebar_toggle_button_events(
+    cui_context *ui, cui_id id, const cui_theme *t, cui_sidebar_toggle_options o,
+    cui_sidebar_collapse_handler handler) {
+    cui_sidebar_toggle_event_result result;
+    memset(&result, 0, sizeof(result));
+    (void)cui_sidebar_toggle_button_common(ui, id, t, o, handler, &result);
+    return result;
 }
 static void cui_sidebar_section_outer(cui_context *ui, const cui_theme *t,
                                       cui_sidebar_content_fn content, void *user, bool collapsed,

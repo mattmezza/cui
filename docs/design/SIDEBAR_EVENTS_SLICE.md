@@ -1,6 +1,6 @@
 # Sidebar event checkpoint
 
-Activation and item expansion Base/Styled slices implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Collapse and header/footer remain proposals. Original audit: `2d7e16d1`. Activation and expansion payload/handler/result fields are exposed now.
+Activation, item expansion and collapse Base/Styled slices implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Header/footer remain proposals. Original audit: `2d7e16d1`. Activation, expansion and collapse payload/handler/result types are exposed now.
 Preserve the shared component event contract, existing public layouts and all old
 callbacks/results. This is an additive seam proposal, not new input routing.
 
@@ -155,7 +155,7 @@ then Enter sequence lacks a current accepted snapshot, so only genuine keyboard,
 frame and index metadata is carried there. TREEITEM ACTIVATE is rejected at ingress.
 Generic consumption of later ordinary mouse events does not cancel cached activation;
 explicit cancellation does. Both legacy outcomes remain unchanged. These are existing
-Core facts, not new acceptance/propagation rules. Expansion fields have now been appended to the unreleased handler/results as approved; rebuild consumers. Collapse/section fields remain unexposed.
+Core facts, not new acceptance/propagation rules. Expansion fields have now been appended to the unreleased handler/results as approved; rebuild consumers. Section event fields remain unexposed.
 
 ## Expansion implementation checkpoint
 
@@ -169,4 +169,18 @@ controlled acceptance paths/rejection/repeated requests, precise synchronous ord
 legacy cancellation after capture, missing observers, caret accessibility/touch,
 passive work and Styled compound forwarding. This is an unreleased struct extension,
 not an ABI-preserving change to a published event handler. Legacy Sidebar layouts
-are unchanged; collapse/header/footer remain separate review checkpoints.
+are unchanged; header/footer remain a separate review checkpoint.
+
+## Collapse implementation checkpoint
+
+Separate `cui_sidebar_collapse_request`/`cui_sidebar_collapse_handler` and
+`cui_sidebar_toggle_event_result` support Base `cui_base_sidebar_toggle_events` and
+Styled `cui_sidebar_toggle_button_events`. Requests follow the legacy local flip
+sequence from entry options, old callback then typed callback per activation.
+External owner assignment is permitted but never redirects that local sequence.
+Semantics and Styled paint retain the entry snapshot, including after acceptance.
+No collapse CHANGE, callback reconstruction from aggregate bool or hidden resync.
+Bounded tests compare actual old/new callback values and Styled geometry, repeated
+requests, divergent owner writes, entry semantics, genuine pointer/touch/key/Button
+accessibility, inert/layout-only/disabled/missing handlers and copied lifetime.
+Header/footer remain unimplemented and require separate approval.

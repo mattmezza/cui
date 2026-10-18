@@ -1,8 +1,8 @@
 # Sidebar row activation events
 
 This additive C slice provides Base and Styled **row activation notifications**
-and typed item expansion requests/changes. Collapse requests and header/footer
-actions remain later slices. Legacy Sidebar callbacks, results, layouts and retained cache lifetimes are
+and typed item expansion and collapse requests. Header/footer actions remain later
+slices. Legacy Sidebar callbacks, results, layouts and retained cache lifetimes are
 unchanged; no component parity or binding coverage is promoted.
 
 ```c
@@ -98,10 +98,53 @@ ACTIVATE is genuinely supported and tested separately from unsupported TREEITEM
 activation. Existing `disable_caret`, collapsed/omitted and passive policies remain;
 a disabled row does not implicitly disable its separate caret in the legacy API.
 
+## Collapse toggle requests
+
+`cui_base_sidebar_toggle_events(ui, id, options, handler)` and
+`cui_sidebar_toggle_button_events(ui, id, theme, options, handler)` return
+`cui_sidebar_toggle_event_result`. Its `activated` is the unchanged legacy toggle
+bool; `valid` records argument validation. `request_count` counts actual typed calls
+and `count_overflow` reports saturation. A valid inert/layout-only submission has
+no activation or request count. A missing handler still permits normal legacy work.
+
+Use a separate `cui_sidebar_collapse_handler` with `on_request`/`user`. The callback
+receives `cui_sidebar_collapse_request { event, previous, value }` with REQUEST
+metadata targeting the public toggle ID. For example:
+
+```c
+static void collapse_requested(void *user, const cui_sidebar_collapse_request *request) {
+    bool *owner_collapsed = user;
+    *owner_collapsed = request->value; /* Optional acceptance of the request. */
+}
+```
+
+The reducer starts a local bool at the entry `options.collapsed`, then flips that
+local bool for each existing activation. With entry false and three inputs, requests
+are `(false,true)`, `(true,false)`, `(false,true)`. The old `on_change` runs before
+the typed request for each activation. Both callbacks may assign an external owner
+collapsed bool, but **neither assignment redirects the active local flip sequence**.
+The caller supplies an updated owner value in a later submission. These are requests,
+not notifications of confirmed owner changes; no collapse CHANGE is emitted.
+
+Genuine metadata is captured before the old callback. The original semantics
+`expanded = !options.collapsed` and the Styled icon/paint also retain the entry
+snapshot for that submission, even after an owner accepts or rejects. No silent
+semantic/visual resynchronization, second reduction or aggregate reconstruction is
+introduced. The narrow permitted typed mutation is assignment of the external
+collapsed owner bool; active options/input/item storage and context teardown remain
+unsupported. Handler/payload copies have the same lifetime rules below.
+
+Tests compare old/new local value sequences, aggregate bool and Styled command
+geometry/colors; prove legacy-then-typed ordering despite divergent owner writes,
+entry-snapshot semantics, repeated requests, pointer/touch/keyboard/genuine Button
+accessibility, missing handlers, disabled/inert/layout-only work, invalid arguments
+frozen current evidence after legacy cancellation of remaining inputs, and copied metadata after context destruction. Header/footer observers remain a
+separate review slice.
+
 Handler, user and payload pointers are borrowed only during submission. Copying the
 pointer-free payload preserves it through later frames, omission and context teardown;
 IDs do not retain live rows. Typed observers may update unrelated application outputs,
-but, apart from the controlled REQUEST assignment above, must not mutate active item arrays/labels/child state/input storage, recurse into
+but, apart from the controlled expansion/collapse REQUEST assignments above, must not mutate active item arrays/labels/child state/input storage, recurse into
 UI composition, remove active storage or destroy the context. Context destruction
 during dispatch remains unsupported; there is no fake teardown guard. Defer structural
 changes and resource teardown until outer submission and renderer consumption finish.

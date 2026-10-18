@@ -1,6 +1,6 @@
 # MenuTree command observer checkpoint
 
-Status: design only, audited at `4ecd73dd`. No signatures below ship. This narrows the [event contract](COMPONENT_EVENTS_CONTRACT.md) to Base/Styled MenuTree command observation. Simple Menu, ContextMenu, Dropdown and other forwarding remain later slices. No Core/surface change, ledger promotion or complete Menu family claim is proposed.
+Status: reviewed checkpoint, audited at `4ecd73dd`; the Base/Styled MenuTree subset is now implemented in [MENU_EVENTS.md](../MENU_EVENTS.md). This narrows the [event contract](COMPONENT_EVENTS_CONTRACT.md) to Base/Styled MenuTree command observation. Simple Menu, ContextMenu, Dropdown and other forwarding remain later slices. No Core/surface change, ledger promotion or complete Menu family claim is proposed.
 
 ## Existing contract and evidence
 
@@ -88,3 +88,5 @@ Required tests with real reducers/input:
 - Strict portable C11 and C++17 header checks, targeted legacy `choice` regression and new CTest through `python scripts/test_local.py --build-dir build` only. Native/headless evidence must not claim desktop/GPU or full-family parity.
 
 Defer simple Menu, ContextMenu, Dropdown, SplitButton, tab-overflow and menu-popup-paint forwarding until each trigger/context identity and callback boundary is audited. Also defer controlled/vetoable commands, check/radio CHANGE payloads, open/close observers, async listeners, foreign synchronous hooks and full menu-family verification.
+
+Implementation proof uncovered a separate existing paint-ID collision: radio12 left icon (`id ^ 0x9e3f5d2a91bca001`) and submenu15 chevron (`id ^ 0x9e3f5d2a91bca002`) both derive `0x9e3f5d2a91bca00d`. The new unit retains compact IDs behind `CUI_MENU_COMPACT_ID_REPRO`; ordinary event tests use spaced IDs. This pending renderer fix is separate from observer semantics and prevents any full-renderer parity claim.

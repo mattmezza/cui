@@ -1946,9 +1946,10 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
     cui_end_box(ui);
     cui_end_focus_scope(ui);
 }
-bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
+static bool cui_choice_render_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
                    const cui_menu_entry *items, size_t count, cui_id *action,
-                   cui_menu_tree_state *state, cui_menu_tree_options options) {
+                   cui_menu_tree_state *state, cui_menu_tree_options options,
+                   cui_menu_command_handler handler, cui_menu_command_result *observed) {
     if (!theme || !state || !state->overlay.id || !action || (!items && count) ||
         !isfinite(theme->control_height) || theme->control_height <= 0 ||
         !isfinite(theme->padding) || theme->padding < 0 || !isfinite(options.popup.viewport.x) ||
@@ -1957,9 +1958,14 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
         options.popup.viewport.h <= 2 * theme->padding)
         return false;
     state->drag_scroll = options.drag_scroll;
-    bool activated =
-        cui_base_menu_tree(ui, trigger, name, items, count, action, state, options.popup.disabled,
-                           options.popup.dt, options.keep_open_checks);
+    bool activated;
+    if (observed) {
+        *observed = cui_base_menu_tree_events(ui, trigger, name, items, count, action, state,
+            options.popup.disabled, options.popup.dt, options.keep_open_checks, handler);
+        activated = observed->legacy_activated;
+    } else
+        activated = cui_base_menu_tree(ui, trigger, name, items, count, action, state,
+            options.popup.disabled, options.popup.dt, options.keep_open_checks);
     cui_choice_item trigger_item = {trigger, name, options.popup.disabled};
     cui_choice_draw(ui, &trigger_item, theme, false, options.popup.disabled, CUI_TAB_DEFAULT);
     cui_choice_menu_retain_metrics(state, cui_choice_menu_metrics(theme, options));
@@ -1967,6 +1973,25 @@ bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_
         cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger), options,
                               name);
     return activated;
+}
+
+bool cui_menu_tree(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
+    const cui_menu_entry *items, size_t count, cui_id *action, cui_menu_tree_state *state,
+    cui_menu_tree_options options) {
+    return cui_choice_render_menu_tree(ui, trigger, theme, name, items, count, action, state,
+        options, (cui_menu_command_handler){0}, NULL);
+}
+cui_menu_command_result cui_menu_tree_events(cui_context *ui, cui_id trigger,
+    const cui_theme *theme, cui_str name, const cui_menu_entry *items, size_t count,
+    cui_id *action, cui_menu_tree_state *state, cui_menu_tree_options options,
+    cui_menu_command_handler handler) {
+    cui_menu_command_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !trigger)
+        return result;
+    result.legacy_activated = cui_choice_render_menu_tree(ui, trigger, theme, name, items, count,
+        action, state, options, handler, &result);
+    return result;
 }
 
 bool cui_menu_popup_paint(cui_context *ui, const cui_theme *theme, cui_str name,

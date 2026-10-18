@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Headless configuration checks; no macOS SDK or target execution needed."""
+import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -10,25 +12,54 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 class MacOSBundleTests(unittest.TestCase):
-    def configure(self, *, darwin=True, deploy=False):
+    def configure(self, *, darwin=True, deploy=False, providers=False):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         source = pathlib.Path(temp.name)
+        provider_setup = ''
+        if providers:
+            provider_setup = r'''# Model native deployment only; this fixture never builds Mach-O.
+set(CMAKE_HOST_APPLE TRUE)
+set(CMAKE_CROSSCOMPILING FALSE)
+set(TEST_PROVIDER_DIR "${CMAKE_BINARY_DIR}/pinned deps \${cash} ]=]" CACHE PATH "fixture")
+add_library(PkgConfig::SDL3 UNKNOWN IMPORTED)
+set_target_properties(PkgConfig::SDL3 PROPERTIES
+  IMPORTED_LOCATION_RELEASE "${TEST_PROVIDER_DIR}/sdl/libSDL3.0.dylib"
+  IMPORTED_CONFIGURATIONS RELEASE)
+add_library(PkgConfig::TEXT INTERFACE IMPORTED)
+set_target_properties(PkgConfig::TEXT PROPERTIES INTERFACE_LINK_LIBRARIES
+  "${TEST_PROVIDER_DIR}/text/libfreetype.6.dylib;${TEST_PROVIDER_DIR}/text/libharfbuzz.0.dylib")
+add_library(provider INTERFACE)
+set_target_properties(provider PROPERTIES INTERFACE_LINK_LIBRARIES
+  "$<LINK_ONLY:PkgConfig::SDL3>;$<BUILD_INTERFACE:PkgConfig::TEXT>;$<INSTALL_INTERFACE:ignored-provider>")
+set_target_properties(provider PROPERTIES INTERFACE_LINK_DIRECTORIES "${TEST_PROVIDER_DIR}/runtime")
+add_library(provider_cycle INTERFACE)
+target_link_libraries(provider INTERFACE provider_cycle)
+target_link_libraries(provider_cycle INTERFACE provider)
+add_library(bridge STATIC main.c)
+set_target_properties(bridge PROPERTIES LINKER_LANGUAGE C)
+target_link_libraries(bridge PRIVATE provider)
+target_link_libraries(probe PRIVATE bridge)
+'''
         (source / 'main.c').write_text('int main(void) { return 0; }\n')
         (source / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.20)
 project(bundle_probe NONE)
 # Configuration-only fixture: do not select or invoke a host/target compiler.
 set(CMAKE_C_LINK_EXECUTABLE "unused-configuration-only-linker")
+set(CMAKE_C_ARCHIVE_CREATE "unused-configuration-only-archiver")
+set(CMAKE_C_ARCHIVE_FINISH "unused-configuration-only-archiver")
 include("{(ROOT / 'cmake/CUIMacOSBundle.cmake').as_posix()}")
 add_executable(probe main.c)
 set_target_properties(probe PROPERTIES LINKER_LANGUAGE C)
+{provider_setup}
 cui_macos_bundle(probe FONT_DIR "{(ROOT / 'third_party/inter').as_posix()}")
 get_target_property(bundle probe MACOSX_BUNDLE)
 get_target_property(sources probe SOURCES)
 file(WRITE "${{CMAKE_BINARY_DIR}}/properties.txt" "${{bundle}}\\n${{sources}}")
 ''')
         command = ['cmake', '-G', 'Ninja', '-S', str(source), '-B', str(source / 'build'),
-                   '-DCUI_MACOS_BUNDLE=ON', '-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY',
+                   '-DCUI_MACOS_BUNDLE=ON', '-DCMAKE_BUILD_TYPE=Release',
+                   '-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY',
                    f'-DCUI_MACOS_DEPLOY_DEPENDENCIES={"ON" if deploy else "OFF"}']
         if darwin:
             command += ['-DCMAKE_SYSTEM_NAME=Darwin']
@@ -49,6 +80,59 @@ file(WRITE "${{CMAKE_BINARY_DIR}}/properties.txt" "${{bundle}}\\n${{sources}}")
         install = (build / 'cmake_install.cmake').read_text()
         self.assertIn('probe.app', install)
         self.assertNotIn('fixup_bundle(', install)
+
+    def test_native_install_searches_resolved_providers_and_revalidates(self):
+        build, result = self.configure(deploy=True, providers=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        install_path = build / 'cmake_install.cmake'
+        install = install_path.read_text()
+        initial = build / 'pinned deps ${cash} ]=]'
+        search_file = build / 'cui-bundle-probe-Release-directories.txt'
+        search = search_file.read_text()
+        for suffix in ('sdl', 'text', 'runtime'):
+            self.assertIn(str(initial / suffix), search)
+        self.assertNotIn('ignored-provider', search)
+        self.assertIn(str(search_file), install)
+        self.assertNotIn('$<LINK_ONLY:', search)
+        self.assertIn('$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/probe.app', install)
+        self.assertIn('cui_sign_macos_development_bundle', install)
+        # Execute the actual generated fixup fragment with a recording module.
+        # This checks CMake argument boundaries/quoting, not Mach-O resolution.
+        module = build / 'modules'
+        module.mkdir()
+        (module / 'BundleUtilities.cmake').write_text(r'''function(fixup_bundle app libraries directories)
+  if(NOT ARGC EQUAL 3 OR NOT "${libraries}" STREQUAL "")
+    message(FATAL_ERROR "bad argument boundaries")
+  endif()
+  file(WRITE "${CMAKE_CURRENT_LIST_DIR}/observed.txt" "${app}\n${directories}")
+endfunction()
+''')
+        fragment = re.search(r'include\(BundleUtilities\).*?fixup_bundle\([^\n]+\)', install,
+                             re.DOTALL).group(0)
+        script = build / 'fixup-probe.cmake'
+        prefix = '/install prefix with spaces'
+        stage = build / 'DESTDIR with spaces'
+        script.write_text(f'set(CMAKE_MODULE_PATH [==[{module}]==])\n'
+                          f'set(CMAKE_INSTALL_PREFIX [==[{prefix}]==])\n' + fragment + '\n')
+        env = dict(os.environ, DESTDIR=str(stage))
+        run = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True, env=env)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        observed = (build / 'observed.txt').read_text().splitlines()
+        self.assertEqual(observed[0], str(stage) + prefix + '/probe.app')
+        directories = observed[1].split(';')
+        self.assertEqual(directories.count(str(initial / 'text')), 1)
+        for suffix in ('sdl', 'text', 'runtime'):
+            self.assertIn(str(initial / suffix), directories)
+        # No cached search list may retain a previous resolved dependency prefix.
+        replacement = build / 'replacement providers'
+        run = subprocess.run(['cmake', '-S', str(build.parent), '-B', str(build),
+                              '-DTEST_PROVIDER_DIR=' + str(replacement)],
+                             capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        regenerated = install_path.read_text()
+        self.assertIn(str(search_file), regenerated)
+        self.assertNotIn(str(initial), search_file.read_text())
+        self.assertIn(str(replacement / 'sdl'), search_file.read_text())
 
     @unittest.skipUnless(sys.platform.startswith('linux'),
                          'uses the Linux linker to test the isolated resolver')
@@ -78,7 +162,7 @@ int main(void) {{
     return path && strstr(path, "Resources/inter/Inter-Regular.otf") ? 0 : 1;
 }}
 ''')
-            result = subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Wpedantic',
+            result = subprocess.run(['cc', '-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                                      '-D__APPLE__', '-ffunction-sections',
                                      '-I' + str(root), '-I' + str(ROOT / 'include'),
                                      str(probe), '-Wl,--gc-sections', '-o', str(root / 'probe')],

@@ -265,11 +265,17 @@ static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id, float 
         return NULL;
     return icons;
 }
-bool cui_rating(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
-                cui_rating_options o) {
+static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
+    cui_rating_options o, const cui_rating_event_handler *handler, size_t *change_count) {
     if (!t || !value)
         return false;
-    bool changed = cui_base_rating(ui, id, name, value, o);
+    bool changed;
+    if (handler) {
+        cui_numeric_selection_event_result result = cui_base_rating_events(ui, id, name, value, o, *handler);
+        changed = result.control;
+        *change_count = result.change_count;
+    } else
+        changed = cui_base_rating(ui, id, name, value, o);
     unsigned maximum = o.maximum ? o.maximum : 5;
     if (maximum > 100)
         maximum = 100;
@@ -325,6 +331,17 @@ bool cui_rating(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
                                  o.disabled || o.readonly);
     cui_end_box(ui);
     return changed;
+}
+bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
+    cui_rating_options options) {
+    return cui_rating_common(ui, id, theme, name, value, options, NULL, NULL);
+}
+cui_numeric_selection_event_result cui_rating_events(cui_context *ui, cui_id id,
+    const cui_theme *theme, cui_str name, float *value, cui_rating_options options,
+    cui_rating_event_handler handler) {
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_rating_common(ui, id, theme, name, value, options, &handler, &result.change_count);
+    return result;
 }
 static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t, const cui_step *steps,
     size_t count, size_t *current, bool vertical, bool disabled,

@@ -203,4 +203,8 @@ Pagination now has an additive Base wrapper and a narrow Styled common seam.
 Legacy paint and reduction remain on their original unobserved path. Stepper
 has a separate aggregate wrapper/common seam with zero-based exact index payloads;
 its legacy descriptor statuses and rejection rules remain unchanged. Rating
-remains pending its independent implementation and validation checkpoint.
+now has a distinct float/nonfinite-aware aggregate wrapper and a narrow Styled
+common seam. All three families preserve their direct legacy Base path and paint;
+none adds per-event requests or bridge tags. The implemented ownership restriction
+remains: callbacks may copy payloads/request deferred work, but owner mutation is
+unsupported until the outer call returns.

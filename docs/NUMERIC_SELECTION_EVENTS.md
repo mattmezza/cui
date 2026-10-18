@@ -44,5 +44,27 @@ Error, and shows an unselected ACTIVE descriptor as Pending. Counts above 100 or
 missing nonempty descriptor arrays retain legacy rejection. Disabled items cannot
 activate, while list-wide normalization still occurs when disabled or passive.
 
-Legacy entrypoints remain unchanged. Rating is the next family slice. This native
-facade does not add bridge notification tags or binding wrappers.
+Rating adds a distinct `cui_rating_change_event` containing native `float before`
+and `after`, `bool before_finite`, and effective defaulted/capped `unsigned maximum`.
+The legacy reducer normalizes NaN and infinities to zero; an eligible observation
+preserves that nonfinite `before` and sets `before_finite=false`. Do not compare
+NaN using ordinary equality or assume canonical NaN payload bits. The committed
+`after` is finite. Finite values compare exactly, with no epsilon; signed zeros
+compare equal. Whole/half-step rounding and range clamping can cause CHANGE even
+without input. Readonly suppresses callbacks while preserving normalization.
+Pointer half-star selection and keyboard/full-star activation retain their
+existing differences; Home still clears regardless of `clearable`, while
+Delete/Backspace clearing requires it. Rating is a float API, unlike NumberInput's
+double API. Failed later icon preparation does not undo a committed change.
+
+Legacy entrypoints remain unchanged. These facades do not expose per-event
+REQUEST, COMMIT or SUBMIT, and add no bridge notification tags or binding wrappers.
+The native `size_t` payload is not a guarantee about legacy bridge float transport.
+
+Verification uses actual reducers, unchanged legacy tests, and paired Base/Styled
+submissions comparing scalar owners, bools, semantics, focus, geometry, draw text,
+colors and Rating bitmap pixels. Tests include queue-rejected disabled accessibility
+actions, input coalescing/cancellation, nil handlers, passive normalization, and
+callback payload copies with teardown deferred until the outer call returns.
+Native test execution uses `scripts/test_local.py` with a private display; hardware
+GPU behavior is outside this portable slice.

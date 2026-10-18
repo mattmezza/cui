@@ -37,6 +37,22 @@ cui_numeric_selection_event_result cui_base_stepper_events(cui_context *, cui_id
 cui_numeric_selection_event_result cui_stepper_events(cui_context *, cui_id,
     const cui_theme *, const cui_step *, size_t count, size_t *current,
     bool vertical, bool disabled, cui_stepper_event_handler);
+typedef struct {
+    cui_component_event_metadata event;
+    float before, after;
+    unsigned maximum;
+    bool before_finite;
+} cui_rating_change_event;
+typedef void (*cui_rating_change_fn)(void *user, const cui_rating_change_event *event);
+typedef struct { cui_rating_change_fn change; void *user; } cui_rating_event_handler;
+/* Float owner preserved exactly, including nonfinite before (check before_finite).
+ * After is finite, maximum defaulted/capped. Signed zeros compare equal.
+ * Readonly also suppresses observation while retaining legacy normalization.
+ * Same borrowed lifetime and no owner mutation rules as Pagination. */
+cui_numeric_selection_event_result cui_base_rating_events(cui_context *, cui_id, cui_str,
+    float *, cui_rating_options, cui_rating_event_handler);
+cui_numeric_selection_event_result cui_rating_events(cui_context *, cui_id, const cui_theme *,
+    cui_str, float *, cui_rating_options, cui_rating_event_handler);
 #ifdef __cplusplus
 }
 #endif

@@ -3,11 +3,15 @@
 #include "cui/cui_components.h"
 #include <assert.h>
 #include <string.h>
+#include <math.h>
+#include <float.h>
 typedef struct {
     cui_context *ui;
     size_t value, calls;
     cui_pagination_change_event page_event;
     cui_stepper_change_event step_event;
+    cui_rating_change_event rating_event;
+    float rating;
     cui_draw_list draw;
     bool teardown_requested;
 } fixture;
@@ -22,9 +26,17 @@ static void metadata(fixture *f, const cui_component_event_metadata *e) {
     assert(e->flags == CUI_COMPONENT_EVENT_HAS_FRAME);
     assert(e->frame_sequence == cui_frame_sequence(f->ui));
 }
+static void committed_semantics(fixture *f,float value) {
+    size_t count;const cui_semantic *items=cui_semantics(f->ui,&count);
+    bool found=false;
+    for(size_t i=0;i<count;++i) if(items[i].id==2) {
+        assert(items[i].value==value);found=true;
+    }
+    assert(found); /* Observation follows the real reducer's final semantics. */
+}
 static void page_changed(void *user, const cui_pagination_change_event *e) {
     fixture *f = user; metadata(f, &e->event);
-    assert(e->after == f->value);
+    assert(e->after == f->value);committed_semantics(f,(float)e->after);
     f->page_event = *e; f->calls++; f->teardown_requested = true;
 }
 static void key(fixture *f, cui_id id, cui_key code) {
@@ -78,6 +90,14 @@ static void compare(fixture *a, fixture *b) {
             ac->color.a==bc->color.a && ac->radius==bc->radius && ac->stroke==bc->stroke &&
             ac->font_size==bc->font_size && ac->text.length==bc->text.length);
         if(ac->text.length) assert(!memcmp(ac->text.data,bc->text.data,ac->text.length));
+        assert(ac->bitmap.bitmap.width==bc->bitmap.bitmap.width && ac->bitmap.bitmap.height==bc->bitmap.bitmap.height &&
+            ac->bitmap.source.x==bc->bitmap.source.x && ac->bitmap.source.y==bc->bitmap.source.y &&
+            ac->bitmap.source.w==bc->bitmap.source.w && ac->bitmap.source.h==bc->bitmap.source.h &&
+            ac->bitmap.opacity==bc->bitmap.opacity && ac->bitmap.custom_tint==bc->bitmap.custom_tint);
+        if(ac->bitmap.bitmap.pixels && bc->bitmap.bitmap.pixels)
+            for(unsigned row=0;row<ac->bitmap.bitmap.height;++row)
+                assert(!memcmp(ac->bitmap.bitmap.pixels+row*ac->bitmap.bitmap.stride,
+                    bc->bitmap.bitmap.pixels+row*bc->bitmap.bitmap.stride,ac->bitmap.bitmap.width*4u));
     }
 }
 static void pagination(bool styled) {
@@ -123,7 +143,7 @@ static const cui_step steps[] = {
 };
 static void step_changed(void *user, const cui_stepper_change_event *e) {
     fixture *f=user; metadata(f,&e->event);
-    assert(e->after==f->value); f->step_event=*e; f->calls++;
+    assert(e->after==f->value);committed_semantics(f,(float)e->after); f->step_event=*e; f->calls++;
     f->teardown_requested=true;
 }
 static cui_numeric_selection_event_result step_frame(fixture *f,bool styled,bool legacy,
@@ -180,4 +200,117 @@ static void stepper(bool styled) {
             cui_destroy(a.ui);cui_destroy(b.ui);
         }
 }
-int main(void) { pagination(false); pagination(true); stepper(false); stepper(true); return 0; }
+static void rating_changed(void *user,const cui_rating_change_event *e) {
+    fixture *f=user;metadata(f,&e->event);
+    assert(e->after==f->rating && isfinite(e->after));committed_semantics(f,e->after);
+    assert(e->before_finite==(isfinite(e->before)!=0));
+    f->rating_event=*e;f->calls++;f->teardown_requested=true;
+}
+static cui_numeric_selection_event_result rating_frame(fixture *f,bool styled,bool legacy,
+    cui_rating_options o,unsigned passive,bool handler) {
+    assert(cui_begin_frame(f->ui,1400,800,.016f));
+    cui_begin_box(f->ui,900,(cui_box){.width=1300,.height=700,.inert=passive==1,.layout_only=passive==2});
+    cui_theme t=cui_theme_light();cui_numeric_selection_event_result r={0};
+    if(legacy) r.control=styled ? cui_rating(f->ui,2,&t,cui_string("Stars"),&f->rating,o)
+        : cui_base_rating(f->ui,2,cui_string("Stars"),&f->rating,o);
+    else {
+        cui_rating_event_handler h={handler?rating_changed:NULL,f};
+        r=styled ? cui_rating_events(f->ui,2,&t,cui_string("Stars"),&f->rating,o,h)
+            : cui_base_rating_events(f->ui,2,cui_string("Stars"),&f->rating,o,h);
+    }
+    cui_end_box(f->ui);f->draw=cui_end_frame(f->ui);
+    assert(cui_last_error(f->ui)==CUI_OK);return r;
+}
+static void rating(bool styled) {
+    fixture f=make();f.rating=2;
+    cui_rating_options o={.half_steps=true,.clearable=true};
+    rating_frame(&f,styled,false,o,0,true);
+    key(&f,2,CUI_KEY_RIGHT);
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==2.5f);
+    assert(f.rating_event.before==2 && f.rating_event.after==2.5f && f.rating_event.maximum==5);
+    key(&f,2,CUI_KEY_LEFT);key(&f,2,CUI_KEY_RIGHT);
+    assert(!rating_frame(&f,styled,false,o,0,true).control && f.calls==1);
+    activate(&f,13);activate(&f,11);
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==2);
+    activate(&f,11);
+    assert(!rating_frame(&f,styled,false,o,0,true).change_count);
+    key(&f,2,CUI_KEY_HOME);
+    o.clearable=false;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==0);
+    key(&f,2,CUI_KEY_END);
+    assert(!rating_frame(&f,styled,false,o,0,false).change_count && f.rating==5);
+    f.rating=NAN;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==0);
+    assert(isnan(f.rating_event.before) && !f.rating_event.before_finite);
+    f.rating=INFINITY;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1);
+    assert(isinf(f.rating_event.before) && !f.rating_event.before_finite);
+    f.rating=-INFINITY;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && signbit(f.rating_event.before));
+    f.rating=-0.0f;
+    assert(!rating_frame(&f,styled,false,o,0,true).change_count);
+    f.rating=FLT_TRUE_MIN;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating_event.before==FLT_TRUE_MIN);
+    f.rating=2.26f;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==2.5f);
+    o.half_steps=false;f.rating=2.26f;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==2);
+    o.maximum=101;f.rating=FLT_MAX;
+    assert(rating_frame(&f,styled,false,o,0,true).change_count==1 && f.rating==100 && f.rating_event.maximum==100);
+    assert(f.teardown_requested);cui_destroy(f.ui);
+    if(styled) {
+        f=make();o=(cui_rating_options){.half_steps=true,.clearable=true};
+        rating_frame(&f,true,false,o,0,true);click(&f,13,.25f);
+        assert(rating_frame(&f,true,false,o,0,true).change_count==1 && f.rating==3.5f);
+        click(&f,1,.5f);
+        assert(rating_frame(&f,true,false,o,0,true).change_count==1 && f.rating==0);
+        cui_destroy(f.ui);
+    }
+    for(unsigned passive=0;passive<3;++passive) for(unsigned restricted=0;restricted<3;++restricted)
+        for(unsigned nonfinite=0;nonfinite<2;++nonfinite) {
+            fixture a=make(),b=make();a.rating=b.rating=nonfinite?NAN:2.26f;
+            o=(cui_rating_options){.half_steps=true,.clearable=true,.disabled=restricted==1,.readonly=restricted==2};
+            cui_numeric_selection_event_result ar=rating_frame(&a,styled,true,o,passive,false);
+            cui_numeric_selection_event_result br=rating_frame(&b,styled,false,o,passive,true);
+            compare(&a,&b);assert(a.rating==b.rating && ar.control==br.control);
+            assert(br.change_count==((!passive&&!restricted)?1u:0u));
+            cui_destroy(a.ui);cui_destroy(b.ui);
+        }
+}
+static void paired_input(bool styled) {
+    fixture a=make(),b=make();a.value=b.value=50;
+    page_frame(&a,styled,true,100,false,false,0,false);
+    page_frame(&b,styled,false,100,false,false,0,true);
+    activate(&a,4);activate(&a,2);activate(&b,4);activate(&b,2);
+    cui_numeric_selection_event_result ar=page_frame(&a,styled,true,100,false,false,0,false);
+    cui_numeric_selection_event_result br=page_frame(&b,styled,false,100,false,false,0,true);
+    compare(&a,&b);assert(ar.control==br.control && br.change_count==1 && b.value==99);
+    cui_destroy(a.ui);cui_destroy(b.ui);
+    a=make();b=make();
+    step_frame(&a,styled,true,steps,3,false,0,false,false);
+    step_frame(&b,styled,false,steps,3,false,0,true,false);
+    activate(&a,2);activate(&b,2);
+    ar=step_frame(&a,styled,true,steps,3,false,0,false,false);
+    br=step_frame(&b,styled,false,steps,3,false,0,true,false);
+    compare(&a,&b);assert(ar.control==br.control && br.change_count==1 && b.value==1);
+    cui_destroy(a.ui);cui_destroy(b.ui);
+    a=make();b=make();a.rating=b.rating=2;
+    cui_rating_options o={.half_steps=true};
+    rating_frame(&a,styled,true,o,0,false);rating_frame(&b,styled,false,o,0,true);
+    key(&a,2,CUI_KEY_RIGHT);key(&b,2,CUI_KEY_RIGHT);
+    ar=rating_frame(&a,styled,true,o,0,false);br=rating_frame(&b,styled,false,o,0,true);
+    compare(&a,&b);assert(ar.control==br.control && br.change_count==1 && a.rating==b.rating && b.rating==2.5f);
+    if(styled) {
+        /* A pointer queued against editable semantics is still gated by the next call's readonly option. */
+        click(&a,13,.25f);click(&b,13,.25f);o.readonly=true;
+        ar=rating_frame(&a,true,true,o,0,false);br=rating_frame(&b,true,false,o,0,true);
+        compare(&a,&b);assert(!ar.control && !br.control && !br.change_count && a.rating==2.5f && b.rating==2.5f);
+    }
+    cui_destroy(a.ui);cui_destroy(b.ui);
+}
+int main(void) {
+    for(unsigned styled=0;styled<2;++styled) {
+        pagination(styled!=0);stepper(styled!=0);rating(styled!=0);paired_input(styled!=0);
+    }
+    return 0;
+}

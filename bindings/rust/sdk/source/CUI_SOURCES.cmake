@@ -86,4 +86,6 @@ set(CUI_SOURCES
  src/components/cui_text_overflow.c
  src/components/cui_video_controls.c
  src/base/cui_boolean_events.c
+ src/base/cui_surface_events.c
+ src/components/cui_surface_events.c
 )

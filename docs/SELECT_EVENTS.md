@@ -37,6 +37,6 @@ Handler/user/payload are borrowed synchronously. Pointer-free payload copies sur
 python scripts/test_local.py --build-dir build -- -R '^(select_events|choice)$'
 ```
 
-[Private plumbing checkpoint](design/SELECT_EVENTS_SLICE.md) explains the reducer seam. No new public List observer, Base Select, controlled selection request, confirmation/lifecycle event or Combobox observer is implemented. Module/generator/SDK/binding and human/LLM index integration are integrator-owned.
+[Private plumbing checkpoint](design/SELECT_EVENTS_SLICE.md) explains the reducer seam. No new public List observer, Base Select, controlled selection request, confirmation/lifecycle event is implemented by this Select facade. [Combobox observers](COMBOBOX_EVENTS.md) have a separate ordering contract.
 
 Accessibility boundary: current Core permits FOCUS for OPTION but its ACTIVATE role allowlist excludes OPTION. Select therefore supports accessibility focus followed by explicit keyboard navigation/selection, not a newly enabled accessibility option-activation path. Accessibility focus alone also leaves the retained list active cursor unchanged; the tested fallback explicitly navigates before Enter rather than claiming focused-option confirmation. Tests assert these boundaries without changing Core or claiming positive activation coverage.

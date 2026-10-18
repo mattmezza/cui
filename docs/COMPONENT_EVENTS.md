@@ -85,4 +85,6 @@ The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_I
 
 [Textarea observers](MULTILINE_EVENTS.md) deliberately aggregate committed revision changes into at most one notification per submission. They do not claim a single input cause, per-event delivery or submission intent; Editor observers use the same aggregation, after its entire completion/multicursor/painting pass.
 
-[Select observers](SELECT_EVENTS.md) report each actual selection transition, preserving the full list pass and popup-close timing. Combobox remains separate work; option accessibility limitations are explicit in the guide.
+[Select observers](SELECT_EVENTS.md) report each actual selection transition, preserving the full list pass and popup-close timing. [Combobox observers](COMBOBOX_EVENTS.md) preserve Base/query and popup-list phase ordering; option accessibility limitations are explicit in both guides.
+
+[Surface completed-close observers](SURFACE_EVENTS.md) use caller-owned retained registration, unlike render-call-only handlers. Existing close decisions and result consumption stay separate from lifecycle notification.

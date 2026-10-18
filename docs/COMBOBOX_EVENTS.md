@@ -44,4 +44,4 @@ Handler/user/payload are borrowed through synchronous submission. Pointer-free p
 python scripts/test_local.py --build-dir build -- -R '^(combobox_events|select_events|choice)$'
 ```
 
-[Private plumbing checkpoint](design/COMBOBOX_EVENTS_SLICE.md) records the implementation boundary. Controlled selection rejection, query/edit events, confirmation/lifecycle events, multi-selection, foreign request hooks and parity promotion remain deferred. Module/generator/SDK/binding and human/LLM index integration are integrator-owned.
+[Private plumbing checkpoint](design/COMBOBOX_EVENTS_SLICE.md) records the implementation boundary. Controlled selection rejection, query/edit events, confirmation/lifecycle events, multi-selection, foreign request hooks and parity promotion remain deferred.

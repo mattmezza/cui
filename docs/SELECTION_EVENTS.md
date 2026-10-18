@@ -1,6 +1,6 @@
 # RadioGroup selection notifications
 
-`cui_selection_events.h` and `cui_radio_group.h` add synchronous Base/Styled RadioGroup CHANGE observers. [Select observers](SELECT_EVENTS.md) have their own guide; Combobox remains [proposed](design/SELECTION_EVENTS_SLICE.md). No bridge/binding selection allowlist or uniform family coverage is implied.
+`cui_selection_events.h` and `cui_radio_group.h` add synchronous Base/Styled RadioGroup CHANGE observers. [Select observers](SELECT_EVENTS.md) have their own guide; [Combobox observers](COMBOBOX_EVENTS.md) preserve their own reducer-phase ordering. No bridge/binding selection allowlist or uniform family coverage is implied.
 
 ```c
 #include <cui/cui_radio_group.h>

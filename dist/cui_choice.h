@@ -262,6 +262,20 @@ cui_combobox_result cui_combobox(cui_context *, cui_id input, const cui_theme *,
                                  cui_edit *query, const cui_choice_item *, size_t count,
                                  cui_choice_item *filtered, size_t filtered_capacity,
                                  cui_id *selected, cui_choice_popup *, cui_choice_popup_options);
+/* Selection CHANGE only; query edits and confirmation without transition do
+ * not notify. Base query/Enter phase precedes Styled option-list phase. */
+typedef struct {
+    cui_selection_event_result events;
+    cui_combobox_result legacy;
+} cui_combobox_event_result;
+cui_combobox_event_result cui_base_combobox_events(
+    cui_context *, cui_id input, cui_str name, cui_edit *, const cui_choice_item *, size_t,
+    cui_choice_item *, size_t filtered_capacity, cui_id *selected, cui_choice_popup *,
+    bool disabled, cui_selection_handler);
+cui_combobox_event_result cui_combobox_events(
+    cui_context *, cui_id input, const cui_theme *, cui_str name, cui_edit *,
+    const cui_choice_item *, size_t, cui_choice_item *, size_t filtered_capacity,
+    cui_id *selected, cui_choice_popup *, cui_choice_popup_options, cui_selection_handler);
 cui_combobox_result cui_base_combobox_multi(cui_context *, cui_id input, cui_str name, cui_edit *,
                                             const cui_choice_item *, size_t count,
                                             cui_choice_item *filtered, bool *filtered_selected,
@@ -1370,12 +1384,17 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
                            const cui_choice_item *items, size_t count, cui_choice_item *filtered,
                            size_t capacity, cui_id *selected, cui_choice_popup *state,
                            bool disabled, bool keep_open, cui_choice_activation_fn commit_fn,
-                           void *commit_user) {
+                           void *commit_user, cui_selection_handler handler,
+                           cui_selection_event_result *observed) {
     cui_combobox_result result = {.error = CUI_EDIT_OK};
     if (!query || !selected || !state || !state->overlay.id || (!items && count) ||
         (!filtered && capacity) || capacity < count || cui_edit_get_state(query).multiline) {
         result.error = capacity < count ? CUI_EDIT_CAPACITY : CUI_EDIT_INVALID_ARGUMENT;
         return result;
+    }
+    if (observed) {
+        observed->valid = true;
+        observed->submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
     }
     state->overlay.modal = false;
     cui_overlay_update(ui, &state->overlay);
@@ -1483,12 +1502,31 @@ cui_choice_reduce_combobox(cui_context *ui, cui_id input, cui_str name, cui_edit
             }
             if (!commit_id)
                 continue;
+            cui_component_event_metadata metadata;
+            memset(&metadata, 0, sizeof(metadata));
+            bool notify = observed && handler.on_change && cui_frame_sequence(ui) != 0;
+            if (notify) {
+                /* Enter confirmation is a direct key path, not Core activation. */
+                (void)cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE,
+                    input, CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+                (void)cui_component_event_set_frame_index(&metadata, cui_frame_sequence(ui), e);
+            }
             cui_id old = *selected;
             *selected = commit_id;
             state->list.active = *selected;
             if (commit_fn)
                 commit_fn(*selected, commit_user);
-            result.changed |= keep_open || old != *selected;
+            cui_id value = *selected;
+            result.changed |= keep_open || old != value;
+            if (notify && old != value) {
+                cui_selection_change change = {metadata, old, value, commit_id,
+                                                CUI_SELECTION_REASON_ACTIVATION};
+                if (observed->change_count == SIZE_MAX)
+                    observed->count_overflow = true;
+                else
+                    observed->change_count++;
+                handler.on_change(handler.user, &change);
+            }
             commit = true;
             edit_after_commit |= later_text;
             if (!keep_open)
@@ -1579,8 +1617,23 @@ cui_combobox_result cui_base_combobox(cui_context *ui, cui_id input, cui_str nam
                                       cui_choice_item *filtered, size_t capacity, cui_id *selected,
                                       cui_choice_popup *state, bool disabled) {
     return cui_choice_reduce_combobox(ui, input, name, query, items, count, filtered, capacity,
-                                      selected, state, disabled, false, NULL, NULL);
+                                      selected, state, disabled, false, NULL, NULL, (cui_selection_handler){0}, NULL);
 }
+cui_combobox_event_result cui_base_combobox_events(cui_context *ui, cui_id input, cui_str name,
+    cui_edit *query, const cui_choice_item *items, size_t count, cui_choice_item *filtered,
+    size_t capacity, cui_id *selected, cui_choice_popup *state, bool disabled,
+    cui_selection_handler handler) {
+    cui_combobox_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !input) {
+        result.legacy.error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    result.legacy = cui_choice_reduce_combobox(ui, input, name, query, items, count, filtered,
+        capacity, selected, state, disabled, false, NULL, NULL, handler, &result.events);
+    return result;
+}
+
 cui_combobox_result cui_base_combobox_multi(cui_context *ui, cui_id input, cui_str name,
                                             cui_edit *query, const cui_choice_item *items,
                                             size_t count, cui_choice_item *filtered,
@@ -1593,7 +1646,7 @@ cui_combobox_result cui_base_combobox_multi(cui_context *ui, cui_id input, cui_s
     cui_id action = 0;
     cui_combobox_result result = cui_choice_reduce_combobox(
         ui, input, name, query, items, count, filtered, capacity, &action, state, disabled, true,
-        cui_choice_multi_activate, &reducer);
+        cui_choice_multi_activate, &reducer, (cui_selection_handler){0}, NULL);
     if (result.error != CUI_EDIT_OK)
         return result;
     size_t source = 0;
@@ -3466,11 +3519,12 @@ static void cui_choice_paint_query(cui_context *ui, cui_id input, const cui_them
                                         .design_size = design_size});
     state->query_scroll_x = paint_state.scroll_x;
 }
-cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme *theme,
+static cui_combobox_result cui_combobox_render(cui_context *ui, cui_id input, const cui_theme *theme,
                                  cui_str name, cui_edit *query, const cui_choice_item *items,
                                  size_t count, cui_choice_item *filtered, size_t capacity,
                                  cui_id *selected, cui_choice_popup *state,
-                                 cui_choice_popup_options options) {
+                                 cui_choice_popup_options options, cui_selection_handler handler,
+                                 cui_selection_event_result *observed) {
     cui_combobox_result result = {.error = CUI_EDIT_OK};
     if (!theme || !query || !selected || !state || !state->overlay.id || (!items && count) ||
         (!filtered && capacity) || capacity < count || cui_edit_get_state(query).multiline ||
@@ -3490,8 +3544,14 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
         return result;
     }
     state->query_font_size = input_metrics.font_size;
-    result = cui_base_combobox(ui, input, name, query, items, count, filtered, capacity, selected,
-                               state, options.disabled);
+    if (observed) {
+        cui_combobox_event_result base = cui_base_combobox_events(ui, input, name, query,
+            items, count, filtered, capacity, selected, state, options.disabled, handler);
+        result = base.legacy;
+        *observed = base.events;
+    } else
+        result = cui_base_combobox(ui, input, name, query, items, count, filtered, capacity, selected,
+                                   state, options.disabled);
     cui_choice_paint_query(ui, input, theme, name, query, state, options.disabled, result.error,
                            options.design_size);
     cui_str text = cui_edit_get_text(query);
@@ -3532,7 +3592,9 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
                                      .window_changed = result.scrolled};
     cui_id old = *selected;
     bool activated =
-        matched ? cui_base_list(ui, filtered, matched, selected, &state->list, list_options)
+        matched ? (observed ? cui_choice_private_list_events(ui, filtered, matched, selected,
+                    &state->list, list_options, input, handler, observed)
+                           : cui_base_list(ui, filtered, matched, selected, &state->list, list_options))
                 : false;
     if (activated) {
         cui_overlay_close(ui, &state->overlay);
@@ -3567,6 +3629,28 @@ cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme 
         cui_text(ui, cui_string("No matches"), theme->font_size, theme->muted);
     cui_end_box(ui);
     cui_overlay_end(ui);
+    return result;
+}
+
+cui_combobox_result cui_combobox(cui_context *ui, cui_id input, const cui_theme *theme,
+    cui_str name, cui_edit *query, const cui_choice_item *items, size_t count,
+    cui_choice_item *filtered, size_t capacity, cui_id *selected, cui_choice_popup *state,
+    cui_choice_popup_options options) {
+    return cui_combobox_render(ui, input, theme, name, query, items, count, filtered,
+        capacity, selected, state, options, (cui_selection_handler){0}, NULL);
+}
+cui_combobox_event_result cui_combobox_events(cui_context *ui, cui_id input, const cui_theme *theme,
+    cui_str name, cui_edit *query, const cui_choice_item *items, size_t count,
+    cui_choice_item *filtered, size_t capacity, cui_id *selected, cui_choice_popup *state,
+    cui_choice_popup_options options, cui_selection_handler handler) {
+    cui_combobox_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !input) {
+        result.legacy.error = CUI_EDIT_INVALID_ARGUMENT;
+        return result;
+    }
+    result.legacy = cui_combobox_render(ui, input, theme, name, query, items, count, filtered,
+        capacity, selected, state, options, handler, &result.events);
     return result;
 }
 

@@ -24,6 +24,8 @@ def generate(name,sources):
         lines += ['#include "cui_multiline_events.h"']
     if name == "cui_editor":
         lines += ['#include "cui_editor_events.h"']
+    if name == "cui_surface_events":
+        lines += ['#ifndef CUI_SURFACE_IMPLEMENTATION', '#define CUI_SURFACE_IMPLEMENTATION', '#endif', '#include "cui_surface.h"']
     if name == "cui_video_controls":
         for module in ["cui_components", "cui_video"]:
             lines += [f'#ifndef {module.upper()}_IMPLEMENTATION', f'#define {module.upper()}_IMPLEMENTATION', '#endif', f'#include "{module}.h"']

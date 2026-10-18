@@ -261,6 +261,20 @@ cui_combobox_result cui_combobox(cui_context *, cui_id input, const cui_theme *,
                                  cui_edit *query, const cui_choice_item *, size_t count,
                                  cui_choice_item *filtered, size_t filtered_capacity,
                                  cui_id *selected, cui_choice_popup *, cui_choice_popup_options);
+/* Selection CHANGE only; query edits and confirmation without transition do
+ * not notify. Base query/Enter phase precedes Styled option-list phase. */
+typedef struct {
+    cui_selection_event_result events;
+    cui_combobox_result legacy;
+} cui_combobox_event_result;
+cui_combobox_event_result cui_base_combobox_events(
+    cui_context *, cui_id input, cui_str name, cui_edit *, const cui_choice_item *, size_t,
+    cui_choice_item *, size_t filtered_capacity, cui_id *selected, cui_choice_popup *,
+    bool disabled, cui_selection_handler);
+cui_combobox_event_result cui_combobox_events(
+    cui_context *, cui_id input, const cui_theme *, cui_str name, cui_edit *,
+    const cui_choice_item *, size_t, cui_choice_item *, size_t filtered_capacity,
+    cui_id *selected, cui_choice_popup *, cui_choice_popup_options, cui_selection_handler);
 cui_combobox_result cui_base_combobox_multi(cui_context *, cui_id input, cui_str name, cui_edit *,
                                             const cui_choice_item *, size_t count,
                                             cui_choice_item *filtered, bool *filtered_selected,

@@ -198,7 +198,11 @@
     "cui_text_input_events": [],
     "cui_selection_events": [],
     "cui_multiline_events": [],
-    "cui_editor_events": []
+    "cui_editor_events": [],
+    "cui_surface_events": [
+      "src/base/cui_surface_events.c",
+      "src/components/cui_surface_events.c"
+    ]
   },
   "native": {
     "text": [

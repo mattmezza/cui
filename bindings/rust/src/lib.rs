@@ -66,7 +66,7 @@ struct Options {
     font: *const c_char,
 }
 #[repr(C)]
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 struct EventEx {
     kind: u32,
     node: RawNode,
@@ -75,6 +75,209 @@ struct EventEx {
     value: f64,
     text_length: u32,
     selected: RawNode,
+}
+// V1 mirrors the exact C ABI; union alignment is native, never packed.
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+struct TableNotificationRawV1 {
+    reason: u32,
+    row: u32,
+    column: u32,
+    sort_column: u32,
+    sort_direction: u32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+union NotificationValueRawV1 {
+    boolean: u32,
+    scalar: f64,
+    selected: RawNode,
+    table: TableNotificationRawV1,
+    surface: u32,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NotificationRawV1 {
+    struct_size: u32,
+    schema_version: u32,
+    kind: u32,
+    payload_kind: u32,
+    flags: u32,
+    node_kind: u32,
+    node: RawNode,
+    frame: u64,
+    text_length: u32,
+    payload: NotificationValueRawV1,
+    legacy: EventEx,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RawHandle {
+    pub slot: u32,
+    pub generation: u32,
+}
+impl From<RawNode> for RawHandle {
+    fn from(n: RawNode) -> Self {
+        Self {
+            slot: n.slot,
+            generation: n.generation,
+        }
+    }
+}
+#[derive(Clone, Debug)]
+pub struct LegacySnapshotV1 {
+    pub kind: u32,
+    pub handle: RawHandle,
+    pub frame: u64,
+    pub checked_raw: u32,
+    pub value: f64,
+    pub text: String,
+    pub selected_handle: RawHandle,
+}
+#[derive(Clone, Debug)]
+pub struct MetadataV1 {
+    pub handle: RawHandle,
+    pub node: Option<Node>,
+    pub node_kind: u32,
+    pub frame: u64,
+    pub has_frame: bool,
+    pub legacy: LegacySnapshotV1,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TableChangeV1 {
+    pub reason: u32,
+    pub row: u32,
+    pub column: u32,
+    pub sort_column: u32,
+    pub sort_direction: u32,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SurfaceResultV1 {
+    Accepted,
+    Cancelled,
+    Closed,
+}
+/// Owning queued notifications, not synchronous requests. Initial scalar/text/
+/// selection and other producers remain Legacy; no callbacks are dispatched.
+#[derive(Clone, Debug)]
+pub enum NotificationV1 {
+    Activation(MetadataV1),
+    BooleanChange(MetadataV1, bool),
+    TableChange(MetadataV1, TableChangeV1),
+    SurfaceClose(MetadataV1, SurfaceResultV1),
+    Legacy(MetadataV1),
+}
+/// Text capacity policy is 1 MiB including NUL; this error leaves the live event queued.
+pub const NOTIFICATION_PAYLOAD_LIMIT: Error = Error(0x10001);
+pub const NOTIFICATION_PROTOCOL_ERROR: Error = Error(0x10002);
+const NOTIFICATION_TEXT_LIMIT: usize = 1 << 20;
+fn read_notification_text_v1(
+    mut read: impl FnMut(&mut [u8]) -> (u32, u32),
+) -> Result<Option<Vec<u8>>> {
+    let mut text = vec![0; 4097];
+    for attempt in 0..2 {
+        let (status, required) = read(&mut text);
+        match status {
+            0 => return Ok(Some(text)),
+            1 => return Ok(None),
+            5 => {
+                if required as usize > NOTIFICATION_TEXT_LIMIT {
+                    return Err(NOTIFICATION_PAYLOAD_LIMIT);
+                }
+                if attempt != 0 || required as usize <= text.len() {
+                    return Err(NOTIFICATION_PROTOCOL_ERROR);
+                }
+                text = vec![0; required as usize];
+            }
+            _ => {
+                check(status)?;
+                unreachable!()
+            }
+        }
+    }
+    unreachable!()
+}
+type NotificationQueryV1 = unsafe extern "C" fn() -> u32;
+type NotificationPollV1 = unsafe extern "C" fn(
+    *mut c_void,
+    u32,
+    *mut NotificationRawV1,
+    *mut c_char,
+    u32,
+    *mut u32,
+) -> u32;
+#[cfg(cui_bridge_static)]
+fn notification_functions_v1(
+) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
+    extern "C" {
+        fn cui_bridge_notification_v1_size() -> u32;
+        fn cui_bridge_notification_versions() -> u32;
+        fn cui_bridge_poll_notification_v1(
+            app: *mut c_void,
+            size: u32,
+            out: *mut NotificationRawV1,
+            text: *mut c_char,
+            capacity: u32,
+            required: *mut u32,
+        ) -> u32;
+    }
+    Some((
+        cui_bridge_notification_v1_size,
+        cui_bridge_notification_versions,
+        cui_bridge_poll_notification_v1,
+    ))
+}
+#[cfg(all(not(cui_bridge_static), unix))]
+unsafe fn notification_symbol_v1(name: *const c_char) -> *mut c_void {
+    #[cfg_attr(target_os = "linux", link(name = "dl"))]
+    extern "C" {
+        fn dlsym(handle: *mut c_void, name: *const c_char) -> *mut c_void;
+    }
+    #[cfg(target_os = "macos")]
+    let scope = (-2isize) as *mut c_void;
+    #[cfg(not(target_os = "macos"))]
+    let scope = std::ptr::null_mut();
+    dlsym(scope, name)
+}
+#[cfg(all(not(cui_bridge_static), windows))]
+unsafe fn notification_symbol_v1(name: *const c_char) -> *mut c_void {
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GetModuleHandleExA(flags: u32, address: *const c_char, module: *mut *mut c_void) -> i32;
+        fn GetProcAddress(module: *mut c_void, name: *const c_char) -> *mut c_void;
+    }
+    let mut module = std::ptr::null_mut();
+    if GetModuleHandleExA(
+        6,
+        cui_bridge_abi_version as *const () as *const c_char,
+        &mut module,
+    ) == 0
+    {
+        return std::ptr::null_mut();
+    }
+    GetProcAddress(module, name)
+}
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn notification_functions_v1(
+) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
+    unsafe {
+        let size = notification_symbol_v1(b"cui_bridge_notification_v1_size\0".as_ptr().cast());
+        let versions =
+            notification_symbol_v1(b"cui_bridge_notification_versions\0".as_ptr().cast());
+        let poll = notification_symbol_v1(b"cui_bridge_poll_notification_v1\0".as_ptr().cast());
+        if size.is_null() || versions.is_null() || poll.is_null() {
+            return None;
+        }
+        Some((
+            std::mem::transmute::<*mut c_void, NotificationQueryV1>(size),
+            std::mem::transmute::<*mut c_void, NotificationQueryV1>(versions),
+            std::mem::transmute::<*mut c_void, NotificationPollV1>(poll),
+        ))
+    }
+}
+#[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
+fn notification_functions_v1(
+) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
+    None
 }
 #[derive(Clone, Debug)]
 pub struct ChangeEvent {
@@ -1408,6 +1611,106 @@ impl App {
             return Err(Error(8));
         }
         check(unsafe { cui_bridge_step(self.raw, dt) })
+    }
+    /// Manually drain the same queue as dispatch. No callbacks run, and returned
+    /// strings/identities are owned snapshots. Old libraries return Error(9).
+    pub fn poll_notification_v1(&mut self) -> Result<Option<NotificationV1>> {
+        let (size, versions, poll) = notification_functions_v1().ok_or(Error(9))?;
+        if unsafe { versions() } & 1 == 0 {
+            return Err(Error(9));
+        }
+        if unsafe { size() } as usize != std::mem::size_of::<NotificationRawV1>() {
+            return Err(NOTIFICATION_PROTOCOL_ERROR);
+        }
+        let mut raw: NotificationRawV1 = unsafe { std::mem::zeroed() };
+        let text = read_notification_text_v1(|text| {
+            let mut required = 0;
+            let status = unsafe {
+                poll(
+                    self.raw,
+                    std::mem::size_of::<NotificationRawV1>() as u32,
+                    &mut raw,
+                    text.as_mut_ptr().cast(),
+                    text.len() as u32,
+                    &mut required,
+                )
+            };
+            (status, required)
+        })?;
+        let Some(text) = text else {
+            return Ok(None);
+        };
+        if raw.struct_size as usize != std::mem::size_of::<NotificationRawV1>()
+            || raw.schema_version != 1
+            || raw.flags & !1 != 0
+            || raw.text_length as usize >= text.len()
+            || text[raw.text_length as usize] != 0
+        {
+            return Err(NOTIFICATION_PROTOCOL_ERROR);
+        }
+        let text =
+            String::from_utf8(text[..raw.text_length as usize].to_vec()).map_err(|_| Error(7))?;
+        self.decode_notification_v1(raw, text).map(Some)
+    }
+    fn decode_notification_v1(
+        &self,
+        raw: NotificationRawV1,
+        text: String,
+    ) -> Result<NotificationV1> {
+        let old = raw.legacy;
+        let meta = MetadataV1 {
+            handle: raw.node.into(),
+            node: (raw.node.slot != 0).then_some(Node {
+                raw: raw.node,
+                app_id: self.id,
+            }),
+            node_kind: raw.node_kind,
+            frame: raw.frame,
+            has_frame: raw.flags & 1 != 0,
+            legacy: LegacySnapshotV1 {
+                kind: old.kind,
+                handle: old.node.into(),
+                frame: old.frame,
+                checked_raw: old.checked,
+                value: old.value,
+                text,
+                selected_handle: old.selected.into(),
+            },
+        };
+        match raw.payload_kind {
+            0 if raw.kind == 1 => Ok(NotificationV1::Activation(meta)),
+            1 if raw.kind == 2 => {
+                let value = unsafe { raw.payload.boolean };
+                if value > 1 {
+                    return Err(NOTIFICATION_PROTOCOL_ERROR);
+                }
+                Ok(NotificationV1::BooleanChange(meta, value != 0))
+            }
+            5 if raw.kind == 2 => {
+                let t = unsafe { raw.payload.table };
+                Ok(NotificationV1::TableChange(
+                    meta,
+                    TableChangeV1 {
+                        reason: t.reason,
+                        row: t.row,
+                        column: t.column,
+                        sort_column: t.sort_column,
+                        sort_direction: t.sort_direction,
+                    },
+                ))
+            }
+            6 if raw.kind == 3 => {
+                let result = match unsafe { raw.payload.surface } {
+                    1 => SurfaceResultV1::Accepted,
+                    2 => SurfaceResultV1::Cancelled,
+                    3 => SurfaceResultV1::Closed,
+                    _ => return Err(NOTIFICATION_PROTOCOL_ERROR),
+                };
+                Ok(NotificationV1::SurfaceClose(meta, result))
+            }
+            7 => Ok(NotificationV1::Legacy(meta)),
+            _ => Err(NOTIFICATION_PROTOCOL_ERROR),
+        }
     }
     pub fn dispatch(&mut self) -> Result<usize> {
         let mut count = 0;

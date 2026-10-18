@@ -32,6 +32,9 @@ def check(root, tag, registries=False):
     python = tomllib.loads(read("bindings/python/pyproject.toml"))["project"]
     node = json.loads(read("bindings/node/package.json"))
     rust = tomllib.loads(read("bindings/rust/Cargo.toml"))["package"]
+    rust_lock = tomllib.loads(read("bindings/rust/Cargo.lock"))
+    rust_locked = [entry.get("version") for entry in rust_lock.get("package", [])
+                   if entry.get("name") == rust.get("name")]
     backend = read("bindings/python/packaging/wheel_backend.py")
     packaging = literal_assignments(read("scripts/package_bindings.py"))
     expected = {
@@ -41,6 +44,7 @@ def check(root, tag, registries=False):
         "Python wheel METADATA": (re.search(r"(?<!-)Version: ([^\\\n]+)\\n", backend).group(1), python_version),
         "npm": (node.get("version"), semver),
         "Rust": (rust.get("version"), semver),
+        "Rust lockfile": (rust_locked, [semver]),
         "Go proxy": (packaging.get("version"), tag),
         "Go module": (packaging.get("module"), read("bindings/go/go.mod").splitlines()[0].removeprefix("module ")),
     }
@@ -70,10 +74,17 @@ class ParserTests(unittest.TestCase):
             staged = Path(temporary)
             for relative in ("CMakeLists.txt", "bindings/python/pyproject.toml",
                              "bindings/python/packaging/wheel_backend.py", "bindings/node/package.json",
-                             "bindings/rust/Cargo.toml", "bindings/go/go.mod", "scripts/package_bindings.py"):
+                             "bindings/rust/Cargo.toml", "bindings/rust/Cargo.lock",
+                             "bindings/go/go.mod", "scripts/package_bindings.py"):
                 target = staged / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text((root / relative).read_text())
+            lockfile = staged / "bindings/rust/Cargo.lock"
+            original_lock = lockfile.read_text()
+            lockfile.write_text(original_lock.replace('version = "' + tag[1:] + '"',
+                                                       'version = "0.0.0"'))
+            self.assertTrue(any(e.startswith("Rust lockfile:") for e in check(staged, tag)))
+            lockfile.write_text(original_lock)
             manifest = staged / "bindings/node/package.json"
             metadata = json.loads(manifest.read_text())
             metadata["private"] = True

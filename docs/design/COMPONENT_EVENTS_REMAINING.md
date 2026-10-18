@@ -1,6 +1,6 @@
 # Remaining component event coverage
 
-Source checkpoint: `5b417b67` (78 frozen manifest families). Documentation-only
+Source checkpoint: `18715985` (78 frozen manifest families). Documentation-only
 audit, not a parity/status promotion or a claim of 78 uniform event APIs. The
 [contract](COMPONENT_EVENTS_CONTRACT.md), original [matrix](COMPONENT_EVENTS_COVERAGE.md)
 and [binding audit](COMPONENT_EVENTS_BINDINGS.md) retain their historical scope;
@@ -47,9 +47,9 @@ full-family verification. Each family links its authoritative public header.
 | [Collapsible](../../include/cui/cui_disclosure.h) | A | [DISCLOSURE_EVENTS](../DISCLOSURE_EVENTS.md): Every applied expansion transition; no controlled veto added. |
 | [DropdownButton](../../include/cui/cui_choice.h) | A | [DROPDOWN_EVENTS](../DROPDOWN_EVENTS.md): Action phase then every menu command; indices can decrease across phases. |
 | [Empty](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
-| [Focus Trap](../../include/cui/cui_overlay.h) | G | Explicit overlay/focus-scope operations and close-input result; no trap lifecycle callback. Child events and Surface completed-close are separate. |
+| [Focus Trap](../../include/cui/cui_overlay.h) | N | Reviewed primitive exception in [checkpoint](LIFECYCLE_RESULT_EVENTS_SLICE.md): caller-owned scope begin/end is composition, not open/close lifecycle. Optional overlay-operation observer absent; Surface close separate. |
 | [GroupBox](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
-| [HoverCard](../../include/cui/cui_content.h) | G | Visibility reduction has no lifecycle observer; content callback is rendering, not opening notification. |
+| [HoverCard](../../include/cui/cui_content.h) | A | [HOVER_EVENTS](../HOVER_EVENTS.md): Pure Base and Styled final open-model transitions; not actual visibility or animation completion. Child composition remains separate. |
 | [Icon](../../include/cui/cui_icon.h) | H | Resource loading/style/rendering, not activation; loader users/resources follow resource lifetime. |
 | [Image](../../include/cui/cui_media.h) | H | Loader/result and borrowed frame resources through render completion; no implied image activation or async load-change event. |
 | [Kbd](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
@@ -69,7 +69,7 @@ full-family verification. Each family links its authoritative public header.
 | [Switch](../../include/cui/cui_components.h) | A | [BOOLEAN_EVENTS](../BOOLEAN_EVENTS.md): Base/Styled immutable entry requests; ToggleGroup transitions are separately covered by LIST_EVENTS. |
 | [Tag](../../include/cui/cui_status.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [Toggle](../../include/cui/cui_components.h) | A | [BOOLEAN_EVENTS](../BOOLEAN_EVENTS.md): Base/Styled immutable entry requests; ToggleGroup transitions are separately covered by LIST_EVENTS. |
-| [Tooltip](../../include/cui/cui_content.h) | G | Visibility reduction has no lifecycle observer; hover/focus timing and omitted submissions require distinct lifecycle design. |
+| [Tooltip](../../include/cui/cui_content.h) | A | [HOVER_EVENTS](../HOVER_EVENTS.md): Aggregate applied open-model transition, distinct from composition bool; omission retains no listener or synthetic close. |
 | [Calendar](../../include/cui/cui_picker.h) | A | [PICKER_EVENTS](../PICKER_EVENTS.md): Aggregate applied dates/RGBA; navigation/latent HSV/popup lifecycle excluded. |
 | [ColorPicker](../../include/cui/cui_picker.h) | A | [PICKER_EVENTS](../PICKER_EVENTS.md): Aggregate applied dates/RGBA; navigation/latent HSV/popup lifecycle excluded. |
 | [Combobox](../../include/cui/cui_choice.h) | A | [COMBOBOX_EVENTS](../COMBOBOX_EVENTS.md): Selection only; query editing and submission are not derived from selection notifications. |
@@ -117,7 +117,7 @@ full-family verification. Each family links its authoritative public header.
 
 Command Base/Styled forwarding and Scrollable Base/Styled pairing are implemented. TitleBar remains an explicitly reviewed host-service exception: host dispatch success is not confirmed OS state, and existing host/close hooks already provide synchronous extension points. TextView keeps its typed link/reveal callbacks; focused contract tests and copying guidance were added without changing dispatch. The original coverage matrix remains a historical checkpoint, not a current absence claim.
 
-Focus Trap, HoverCard, Tooltip, VirtualList and MessageScroller remain marked G below until their lifecycle/result-only dispositions are independently settled; do not count them as newly uniform APIs. Foreign binding allowlists remain separately bounded. The follow-up list records the original review plan; the status above supersedes completed/in-flight descriptions in that historical plan.
+HoverCard and Tooltip now have final open-model observers. Focus Trap bracketing and virtual-window completion are explicitly accepted primitive/result exceptions in the [lifecycle checkpoint](LIFECYCLE_RESULT_EVENTS_SLICE.md). VirtualList and MessageScroller remain marked G for their separate, deferred precise offset/tail observers; result-only completion is not a claimed callback API. No universal lifecycle coverage is asserted. Foreign binding allowlists remain separately bounded. The follow-up list records the original review plan; the status above supersedes completed/in-flight descriptions in that historical plan.
 
 ## Independently reviewable follow-ups
 
@@ -207,3 +207,28 @@ fixtures. Preserve old/new polling interleave, FIFO/capacity atomicity, removal 
 historical generations, malformed-tag failure, older-library no-drain, UTF-8
 ownership and numeric precision in every language. A new C facade alone does not
 close any of these binding gaps.
+
+## Verified delivery checkpoints
+
+The Scroll/Command/Sidebar checkpoint at `5da9648f` passed the warning-enabled
+native build and all **292/292** CTest cases through the private-display wrapper
+(87.12 seconds). Scroll additionally passed 5/5 WASI and 5/5 ASan/UBSan cases.
+The subsequent Hover Base/Styled and standalone Content dependency changes passed
+6/6 applicable native cases, 5/5 ASan/UBSan cases, 4/4 WASI suites, strict generated
+all-implementation C11 syntax, 11/11 documentation tests and 11/11 skill tests.
+This is broad baseline plus focused subsequent proof, not a claim that the earlier
+292-case run included APIs added afterward. All 78 manifest entries remain intact.
+
+The separately rebuilt optional async host example passed 5/5 deterministic offline
+cases at `5da9648f`, including actual SDL frames and pending-work shutdown under
+private Xvfb. Cancellation means immediate logical invalidation plus cooperative
+transport cancellation subject to configured timeouts, not a hard real-time abort.
+No networking or worker pool was added to Core. Unsupported GPU hardware and
+physical macOS/Wayland behavior remain outside this headless proof.
+
+Go/Rust owning notification integration also passed a fresh 52/52-case run after
+the Command/Sidebar/InputGroup fixes and before Scroll/Hover additions. That proof
+includes actual older-library no-drain behavior and static/dynamic SDK cases; it
+neither exports the newer native observers nor implies foreign synchronous request
+acceptance. Binding omissions above remain explicit. No new hash-pair claim is
+made for that run.

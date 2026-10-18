@@ -423,7 +423,7 @@ representation. **No notification emission promise is inferred from membership.*
 | Combobox, DatePicker, Form, OtpInput, Questionnaire, Speech, TimeField, Carousel, DescriptionList, Dock, Menu, Resizable, Root View, Scrollable | No additional dedicated typed value allowlist. Existing producer-specific Legacy/common initial records only where implemented; native family observers/results/host services do not automatically cross this bridge. |
 | Settings, Sidebar, StatusBar, Theme, TitleBar, Toolbar, Tree, VirtualList, Chart, Command, Plot, Table, TextView | No additional dedicated typed value allowlist. Existing producer-specific Legacy/common initial records only where implemented; native family observers/results/host services do not automatically cross this bridge. |
 
-Command, Toolbar and Sidebar in that remainder now have direct-C typed facades,
+Command, Toolbar, Sidebar, Scrollable, HoverCard and Tooltip in that remainder now have direct-C typed facades,
 as do numerous other families audited in their guides. That does not add foreign
 handlers, direct-C synchronous execution timing or callback veto. Tree activation,
 retained surface completion, Command early query/confirmed-path semantics, Toolbar

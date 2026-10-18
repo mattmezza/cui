@@ -293,8 +293,11 @@ void cui_end_hover_card(cui_context *ui);
 
 #if defined(CUI_CONTENT_IMPLEMENTATION) && defined(CUI_CONTENT_DECLARATIONS_READY) && !defined(CUI_CONTENT_IMPLEMENTATION_ONCE)
 #define CUI_CONTENT_IMPLEMENTATION_ONCE
+#include "cui_components.h"
+#include "cui_hover_events.h"
 /* src/base/cui_content.c */
 /* SPDX-License-Identifier: MIT */
+
 
 #include <math.h>
 #include <string.h>
@@ -445,8 +448,34 @@ bool cui_hover_update(cui_hover_state *s, bool trigger, bool content, bool focus
     return old != s->open;
 }
 
+cui_hover_event_result cui_hover_update_events(
+    cui_id target, cui_hover_state *state, bool trigger, bool content, bool focus,
+    bool escape, bool disabled, float dt, float opening, float closing, cui_hover_handler handler) {
+    cui_hover_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!target || !state)
+        return result;
+    bool previous = state->open;
+    result.valid = true;
+    result.control_result = cui_hover_update(state, trigger, content, focus, escape, disabled,
+                                             dt, opening, closing);
+    result.changed = previous != state->open;
+    if (result.changed && handler.on_change) {
+        cui_hover_lifecycle_event event;
+        memset(&event, 0, sizeof(event));
+        (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_LIFECYCLE, target,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        event.previous_open = previous;
+        event.open = state->open;
+        result.change_count = 1;
+        handler.on_change(handler.user, &event);
+    }
+    return result;
+}
+
 /* src/components/cui_content.c */
 /* SPDX-License-Identifier: MIT */
+
 
 
 
@@ -1427,6 +1456,47 @@ bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *t, cui_ho
 void cui_end_hover_card(cui_context *ui) {
     cui_end_box(ui);
     cui_end_box(ui);
+}
+
+static cui_hover_event_result cui_content_hover_events(cui_context *ui, cui_id id,
+                                                       const cui_theme *theme,
+                                                       cui_hover_state *state, cui_str name,
+                                                       cui_hover_options options,
+                                                       cui_hover_handler handler, bool card) {
+    cui_hover_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !id || !theme || !state)
+        return result;
+    bool previous = state->open;
+    uint64_t frame = cui_frame_sequence(ui);
+    result.valid = true;
+    result.control_result = card ? cui_begin_hover_card(ui, id, theme, state, name, options)
+                                 : cui_tooltip(ui, id, theme, state, name, options);
+    result.changed = previous != state->open;
+    if (result.changed && frame && frame == cui_frame_sequence(ui) && handler.on_change) {
+        cui_hover_lifecycle_event event;
+        memset(&event, 0, sizeof(event));
+        (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_LIFECYCLE, id,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        event.event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
+        event.event.frame_sequence = frame;
+        event.previous_open = previous;
+        event.open = state->open;
+        result.change_count = 1;
+        handler.on_change(handler.user, &event);
+    }
+    return result;
+}
+cui_hover_event_result cui_tooltip_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                          cui_hover_state *state, cui_str text,
+                                          cui_hover_options options, cui_hover_handler handler) {
+    return cui_content_hover_events(ui, id, theme, state, text, options, handler, false);
+}
+cui_hover_event_result cui_begin_hover_card_events(cui_context *ui, cui_id id,
+                                                   const cui_theme *theme, cui_hover_state *state,
+                                                   cui_str name, cui_hover_options options,
+                                                   cui_hover_handler handler) {
+    return cui_content_hover_events(ui, id, theme, state, name, options, handler, true);
 }
 
 #endif

@@ -134,3 +134,5 @@ original category callback seams, with aggregate zero/one counts per category.
 They report requested host actions, not completed deletion/upload work.
 
 [Scrollable final-offset observers](SCROLL_EVENTS.md) pair Base reduction or Styled composition with one final notification after children. They preserve legacy input consumption and report aggregate offsets, including normalization, without inventing an input cause. VirtualList and MessageScroller retain their separate typed result contracts.
+
+[HoverCard and Tooltip model observers](HOVER_EVENTS.md) distinguish the applied open-state transition from composition admission and actual visibility. Pure Base policy has no invented input evidence; Styled aggregation carries only a genuine frame. Pending timers and omitted components retain no handler.

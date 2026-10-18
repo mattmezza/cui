@@ -295,11 +295,13 @@ API: `cui_begin_group_box`, `cui_end_group_box`. [Public header](../include/cui/
 
 **State:** Caller retains cui_hover_state for delay/open lifecycle.
 
-**Interaction:** Hover, focus and escape update lifecycle; child controls handle card actions.
+**Interaction:** Hover, focus and escape update the open model. Optional synchronous observers report aggregate open-state transitions, independently of composition admission or actual visibility.
 
-**Usage:** Submit the trigger first; Tooltip submits text, while HoverCard pairs end only after begin returns true.
+**Usage:** Submit the trigger first. With event facades, inspect changed separately from control_result; end HoverCard only when control_result is true. Handlers are borrowed for the call and are not retained across delay or omission.
 
-API: `cui_begin_hover_card`, `cui_end_hover_card`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_begin_hover_card`, `cui_end_hover_card`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md); [event header](../include/cui/cui_hover_events.h); [event guide](HOVER_EVENTS.md).
+
+Event API: `cui_hover_update_events`, `cui_begin_hover_card_events`.
 
 ## Icon
 
@@ -543,11 +545,13 @@ Additional event includes: `cui/cui_list_events.h`.
 
 **State:** Caller retains cui_hover_state for delay/open lifecycle.
 
-**Interaction:** Hover, focus and escape update lifecycle; child controls handle card actions.
+**Interaction:** Hover, focus and escape update the open model. Optional synchronous observers report aggregate open-state transitions, independently of composition admission or actual visibility.
 
-**Usage:** Submit the trigger first; Tooltip submits text, while HoverCard pairs end only after begin returns true.
+**Usage:** Submit the trigger first. With event facades, inspect changed separately from control_result; end HoverCard only when control_result is true. Handlers are borrowed for the call and are not retained across delay or omission.
 
-API: `cui_tooltip`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_tooltip`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md); [event header](../include/cui/cui_hover_events.h); [event guide](HOVER_EVENTS.md).
+
+Event API: `cui_hover_update_events`, `cui_tooltip_events`.
 
 ## Calendar
 

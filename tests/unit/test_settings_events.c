@@ -736,7 +736,7 @@ static void text_changes(void) {
     for (size_t n = 0; n < 2; ++n) {
         assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "!"}));
         assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT,
-                              .text = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"}));
+                              .text_data = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", .text_length = 78}));
     }
     cui_settings_event_result error = scalar_pair(&a, &b, true);
     assert(error.text_count == 1 && error.result.edit_error != CUI_EDIT_OK);

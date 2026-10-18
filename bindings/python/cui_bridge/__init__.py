@@ -322,6 +322,29 @@ class LegacyNotificationV1(NotificationV1):
     kind: ClassVar[Literal["legacy"]] = "legacy"
 
 
+@dataclass(frozen=True)
+class ScalarChangeNotificationV1(NotificationV1):
+    value: float
+    kind: ClassVar[Literal["scalar-change"]] = "scalar-change"
+
+
+@dataclass(frozen=True)
+class TextChangeNotificationV1(NotificationV1):
+    text: str
+    kind: ClassVar[Literal["text-change"]] = "text-change"
+
+
+@dataclass(frozen=True)
+class SelectionChangeNotificationV1(NotificationV1):
+    selected_handle: tuple[int, int]
+    selected_node: "Widget | None"
+    kind: ClassVar[Literal["selection-change"]] = "selection-change"
+
+
+ValueNotificationV1 = (NotificationV1 | ScalarChangeNotificationV1 |
+                       TextChangeNotificationV1 | SelectionChangeNotificationV1)
+
+
 class Widget:
     def __init__(self, kind: str, key: str | None = None, text: str = ""):
         if kind not in _KIND:
@@ -1594,6 +1617,106 @@ class App:
             else:
                 yield LegacyNotificationV1(*common, self._by_handle.get(selected))
 
+    def poll_value_notifications_v1(self) -> Iterator[ValueNotificationV1]:
+        """Owning opt-in value views on the shared queue; never dispatch callbacks.
+
+        Requires optional value symbols and exact V1 layout. Requests only known
+        advertised scalar/text/selection categories. Old libraries fail without
+        fallback draining; text retries once up to 1MiB including NUL.
+        """
+        self._ensure_open()
+        try:
+            size = self._api.lib.cui_bridge_notification_v1_size
+            versions = self._api.lib.cui_bridge_notification_versions
+            categories = self._api.lib.cui_bridge_notification_value_payloads_v1
+            poll = self._api.lib.cui_bridge_poll_value_notification_v1
+        except AttributeError as error:
+            raise BridgeError(9, "V1 value notification symbols unavailable") from error
+        for query in (size, versions, categories):
+            query.argtypes = []
+            query.restype = C.c_uint32
+        if not (versions() & 1) or size() != C.sizeof(_NotificationV1):
+            raise BridgeError(8, "V1 value notification capability/layout mismatch")
+        mask = categories() & ((1 << 2) | (1 << 3) | (1 << 4))
+        if not mask:
+            raise BridgeError(9, "V1 value notification categories unavailable")
+        poll.restype = C.c_int
+        poll.argtypes = [C.c_void_p, C.c_uint32, C.c_uint32, C.POINTER(_NotificationV1),
+                         C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32)]
+        while self._ptr:
+            raw = _NotificationV1()
+            capacity = 4097
+            for attempt in range(2):
+                buffer = C.create_string_buffer(capacity)
+                required = C.c_uint32()
+                status = poll(self._ptr, C.sizeof(raw), mask, C.byref(raw), buffer,
+                              capacity, C.byref(required))
+                if status != 5:
+                    break
+                if attempt or required.value <= capacity or required.value > 1024 * 1024:
+                    raise BridgeError(5, "V1 value payload exceeds limit or invalid capacity retry")
+                capacity = required.value
+            if status in (1, 2):
+                return
+            self._api.check(status)
+            if (raw.schema_version != 1 or raw.struct_size != C.sizeof(raw) or
+                    raw.text_length >= capacity or buffer.raw[raw.text_length] != 0 or
+                    raw.flags & ~1 or bool(raw.flags & 1) != bool(raw.frame_sequence) or
+                    required.value != raw.text_length + 1 or
+                    raw.legacy.text_length != raw.text_length or
+                    raw.legacy.frame_sequence != raw.frame_sequence or
+                    (raw.node.slot, raw.node.generation) !=
+                    (raw.legacy.node.slot, raw.legacy.node.generation) or
+                    raw.kind not in (1, 2, 3) or raw.legacy.type != raw.kind):
+                raise BridgeError(8, "invalid V1 value notification output")
+            try:
+                text = bytes(buffer.raw[:raw.text_length]).decode("utf-8")
+            except UnicodeDecodeError as error:
+                raise BridgeError(8, "invalid V1 value notification UTF-8") from error
+            handle = (raw.node.slot, raw.node.generation)
+            selected = (raw.legacy.selected.slot, raw.legacy.selected.generation)
+            legacy = LegacySnapshotV1(raw.legacy.type, raw.legacy.checked, raw.legacy.value,
+                                      text, selected)
+            common = (handle, self._by_handle.get(handle), raw.frame_sequence,
+                      bool(raw.flags & 1), raw.node_kind, legacy)
+            tag = raw.payload_kind
+            if ((tag == 0 and raw.kind != 1) or
+                    (tag in (1, 2, 3, 4, 5) and raw.kind != 2) or
+                    (tag == 6 and raw.kind != 3) or tag not in range(8) or
+                    (tag in (2, 3, 4) and not mask & (1 << tag))):
+                raise BridgeError(8, "invalid V1 value notification kind/tag")
+            if tag == 0:
+                yield ActivationNotificationV1(*common)
+            elif tag == 1:
+                if raw.payload.boolean_value > 1:
+                    raise BridgeError(8, "invalid V1 boolean payload")
+                yield BooleanChangeNotificationV1(*common, bool(raw.payload.boolean_value))
+            elif tag == 2:
+                value = raw.payload.scalar_value
+                if not math.isfinite(value) or value != raw.legacy.value:
+                    raise BridgeError(8, "invalid V1 scalar payload")
+                yield ScalarChangeNotificationV1(*common, value)
+            elif tag == 3:
+                yield TextChangeNotificationV1(*common, text)
+            elif tag == 4:
+                value = (raw.payload.selected.slot, raw.payload.selected.generation)
+                if value != selected or bool(value[0]) != bool(value[1]):
+                    raise BridgeError(8, "invalid V1 selection payload")
+                yield SelectionChangeNotificationV1(*common, value, self._by_handle.get(value))
+            elif tag == 5:
+                table = raw.payload.table
+                if table.reason not in (1, 2):
+                    raise BridgeError(8, "invalid V1 table payload")
+                yield TableChangeNotificationV1(*common,
+                    "selection" if table.reason == 1 else "sort", table.row, table.column,
+                    table.sort_column, table.sort_direction)
+            elif tag == 6:
+                if raw.payload.surface_result not in (1, 2, 3):
+                    raise BridgeError(8, "invalid V1 surface payload")
+                yield SurfaceCloseNotificationV1(*common, raw.payload.surface_result)
+            else:
+                yield LegacyNotificationV1(*common, self._by_handle.get(selected))
+
     def dispatch(self) -> int:
         """Invoke callbacks after step; Python exceptions propagate outside C frames."""
         count = 0
@@ -1702,3 +1825,6 @@ def settings(key: str, text: str = "") -> Widget:
     return Widget("settings", key, text)
 
 __all__ += ["settings"]
+
+__all__ += ["ValueNotificationV1", "ScalarChangeNotificationV1", "TextChangeNotificationV1",
+            "SelectionChangeNotificationV1"]

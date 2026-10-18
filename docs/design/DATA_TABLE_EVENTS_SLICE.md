@@ -201,3 +201,10 @@ they do not expose native per-transition multiplicity, cui_id-width keys, comple
 multi sets, column movement/resize, activation/context/mode requests or load edges.
 Python/Node/Go/Rust manual polling remains a separate post-step queue contract.
 Do not replace it or claim native observer parity from these new C declarations.
+
+## Implementation checkpoints
+
+Sort now has a private common reducer with optional typed observation and additive
+reduce/Base/Styled facades. Old paths call the reducer without an observer and
+retain legacy flags/consumed-event handling. Only implemented sort handler/count
+fields are public; selection remains a subsequent independently tested slice.

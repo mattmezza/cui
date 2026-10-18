@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_form_events.h"
+#include "cui_form_private.h"
 #include <math.h>
 static size_t cui_form_private_columns(cui_form_options o) {
     return o.columns ? o.columns : 1;
@@ -162,12 +162,13 @@ static bool cui_form_private_group_valid(cui_id group, cui_id input, const cui_i
     }
     return true;
 }
-static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id group, cui_id input,
+cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id group, cui_id input,
                                             cui_edit *edit, cui_input_group_state *state,
                                             const cui_input_group_addon *a, size_t count,
                                             cui_input_group_options o,
                                             cui_input_group_handler handler,
-                                            cui_input_group_event_result *notifications) {
+                                            cui_input_group_event_result *notifications,
+                                            cui_form_private_input_fn input_fn, void *input_user) {
     cui_input_group_result result = {.input.error = CUI_EDIT_OK};
     if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
         result.error = CUI_FORM_INVALID;
@@ -226,17 +227,22 @@ static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id gro
     cui_base_input_options behavior = o.input;
     cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
                                   state->scroll_x};
-    if (!behavior.hit_test && !cui_edit_get_state(edit).multiline) {
+    bool synthetic_hit = !behavior.hit_test && !cui_edit_get_state(edit).multiline;
+    if (synthetic_hit) {
         behavior.hit_test = cui_base_input_hit_test;
         behavior.hit_test_user = &hit;
     }
-    if (notifications && handler.on_text) {
-        cui_input_event_result observed = cui_base_input_events(ui, input, o.name, edit,
-            &state->behavior, behavior, (cui_component_text_handler){handler.on_text, handler.user});
+    if (input_fn || (notifications && handler.on_text)) {
+        cui_component_text_handler text_handler = {notifications ? handler.on_text : NULL, handler.user};
+        cui_input_event_result observed = input_fn
+            ? input_fn(input_user, ui, input, o.name, edit, &state->behavior, behavior, synthetic_hit, text_handler)
+            : cui_base_input_events(ui, input, o.name, edit, &state->behavior, behavior, text_handler);
         result.input = observed.control;
-        notifications->change_count = observed.change_count;
-        notifications->submit_count = observed.submit_count;
-        notifications->count_overflow |= observed.count_overflow;
+        if (notifications) {
+            notifications->change_count = observed.change_count;
+            notifications->submit_count = observed.submit_count;
+            notifications->count_overflow |= observed.count_overflow;
+        }
     } else
         result.input = cui_base_input_ex(ui, input, o.name, edit, &state->behavior, behavior);
     size_t sc;
@@ -254,14 +260,14 @@ static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id gro
 cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_id input,
     cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
     size_t count, cui_input_group_options options) {
-    return cui_form_private_group(ui, group, input, edit, state, addons, count, options,
-                                  (cui_input_group_handler){0}, NULL);
+    return cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
+                                  (cui_input_group_handler){0}, NULL, NULL, NULL);
 }
 cui_input_group_event_result cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input,
     cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
     size_t count, cui_input_group_options options, cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
-    result.control = cui_form_private_group(ui, group, input, edit, state, addons, count, options,
-                                            handler, &result);
+    result.control = cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
+                                            handler, &result, NULL, NULL);
     return result;
 }

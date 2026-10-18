@@ -105,7 +105,7 @@ typedef struct {
     bool collapsed, selected, custom_box;
     cui_sidebar_content_fn content;
     void *user;
-    void (*on_activate)(void *); /* Optional pointer-only Header/Footer host action. */
+    void (*on_activate)(void *); /* Optional Header/Footer host action (pointer or accepted accessibility activation). */
     void *activate_user;
     cui_box box;
 } cui_sidebar_section_options;
@@ -755,19 +755,41 @@ bool cui_sidebar_group(cui_context *ui, cui_id id, const cui_theme *t, cui_str l
     return true;
 }
 static bool cui_sidebar_section(cui_context *ui, cui_id id, const cui_theme *t,
-                                cui_sidebar_section_options o, bool footer) {
+                                cui_sidebar_section_options o, bool footer,
+                                cui_component_activation_handler handler,
+                                cui_component_action_result *observed) {
     if (!ui || !id || !t || !o.content || !cui_begin_focus_scope(ui, id, false))
         return false;
+    if (observed)
+        observed->valid = observed->submitted = true;
     cui_interaction interaction =
         cui_interact(ui, id, CUI_ROLE_GROUP,
                      cui_string(footer ? "Sidebar footer" : "Sidebar header"), false, false, 0);
     cui_set_semantic_details(ui, id, (cui_semantic_details){.pointer_activatable = true});
-    if (interaction.activated && o.on_activate) {
+    if (interaction.activated && (o.on_activate || handler.callback)) {
         size_t count = 0;
         cui_frame_events(ui, &count);
         for (size_t i = 0; i < count; i++)
-            if (cui_event_activation(ui, i) == id)
-                o.on_activate(o.activate_user);
+            if (cui_event_activation(ui, i) == id) {
+                cui_component_event_metadata event;
+                cui_activation_snapshot snapshot;
+                bool captured = cui_event_activation_snapshot(ui, i, &snapshot) &&
+                                cui_component_event_from_activation(
+                                    &event, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot);
+                if (!captured) {
+                    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_ACTIVATE, id,
+                                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                    (void)cui_component_event_set_frame_index(&event, cui_frame_sequence(ui), i);
+                }
+                event.target = id;
+                if (o.on_activate)
+                    o.on_activate(o.activate_user);
+                if (handler.callback) {
+                    cui_control_events_private_increment(&observed->activation_count,
+                                                         &observed->count_overflow);
+                    handler.callback(handler.user, &event);
+                }
+            }
         cui_invalidate(ui);
     }
     bool highlighted = o.selected || cui_hover_within(ui, id) || cui_hovered(ui, id);
@@ -790,11 +812,29 @@ static bool cui_sidebar_section(cui_context *ui, cui_id id, const cui_theme *t,
 }
 bool cui_sidebar_header(cui_context *ui, cui_id id, const cui_theme *t,
                         cui_sidebar_section_options o) {
-    return cui_sidebar_section(ui, id, t, o, false);
+    return cui_sidebar_section(ui, id, t, o, false, (cui_component_activation_handler){0}, NULL);
 }
 bool cui_sidebar_footer(cui_context *ui, cui_id id, const cui_theme *t,
                         cui_sidebar_section_options o) {
-    return cui_sidebar_section(ui, id, t, o, true);
+    return cui_sidebar_section(ui, id, t, o, true, (cui_component_activation_handler){0}, NULL);
+}
+cui_component_action_result cui_sidebar_header_events(cui_context *ui, cui_id id,
+                                                      const cui_theme *t,
+                                                      cui_sidebar_section_options o,
+                                                      cui_component_activation_handler handler) {
+    cui_component_action_result result;
+    memset(&result, 0, sizeof(result));
+    (void)cui_sidebar_section(ui, id, t, o, false, handler, &result);
+    return result;
+}
+cui_component_action_result cui_sidebar_footer_events(cui_context *ui, cui_id id,
+                                                      const cui_theme *t,
+                                                      cui_sidebar_section_options o,
+                                                      cui_component_activation_handler handler) {
+    cui_component_action_result result;
+    memset(&result, 0, sizeof(result));
+    (void)cui_sidebar_section(ui, id, t, o, true, handler, &result);
+    return result;
 }
 static bool cui_sidebar_toggle_button_common(cui_context *ui, cui_id id, const cui_theme *t,
                                cui_sidebar_toggle_options o, cui_sidebar_collapse_handler handler,

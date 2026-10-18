@@ -1561,7 +1561,9 @@
         "cui_sidebar_state_init",
         "cui_sidebar",
         "cui_sidebar_menu_events",
-        "cui_base_sidebar_item_events"
+        "cui_base_sidebar_item_events",
+        "cui_sidebar_header_events",
+        "cui_sidebar_footer_events"
       ],
       "state_types": [
         "cui_sidebar_state",
@@ -1793,7 +1795,12 @@
     {
       "api_symbols": [
         "cui_command_init",
-        "cui_command"
+        "cui_command",
+        "cui_command_rebuild_events",
+        "cui_command_select_events",
+        "cui_command_move_events",
+        "cui_command_confirm_events",
+        "cui_command_events"
       ],
       "state_types": [
         "cui_command_state",
@@ -1803,7 +1810,8 @@
       "interaction": "on_select/on_query/on_confirm/on_cancel observe synchronous interaction; command item action invokes application work.",
       "usage": "Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events.",
       "docs": [
-        "docs/COMMAND.md"
+        "docs/COMMAND.md",
+        "docs/COMMAND_EVENTS.md"
       ],
       "callback_symbols": [
         "on_select",
@@ -1815,7 +1823,13 @@
       "scope": "styled frame component",
       "name": "Command",
       "public_header": "include/cui/cui_command.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_command_events.h"
+      ],
+      "handler_types": [
+        "cui_command_event_handler"
+      ]
     },
     {
       "api_symbols": [

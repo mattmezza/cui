@@ -107,8 +107,30 @@ bool cui_command(cui_context *, cui_id, const cui_theme *, cui_command_state *,
 
 #if defined(CUI_COMMAND_IMPLEMENTATION) && defined(CUI_COMMAND_DECLARATIONS_READY) && !defined(CUI_COMMAND_IMPLEMENTATION_ONCE)
 #define CUI_COMMAND_IMPLEMENTATION_ONCE
+#include "cui_command_events.h"
 /* src/base/cui_command.c */
 /* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_COMMAND_EVENTS_PRIVATE_H
+#define CUI_COMMAND_EVENTS_PRIVATE_H
+
+typedef struct {
+    cui_id target;
+    cui_command_event_handler handler;
+    cui_command_event_result result;
+    cui_component_event_metadata cause;
+    bool has_cause, suppress;
+} cui_command_events_private_observer;
+bool cui_command_events_private_rebuild(cui_command_state *, const cui_command_entry *, size_t,
+                                        cui_str, bool, cui_command_options,
+                                        cui_command_events_private_observer *);
+bool cui_command_events_private_select(cui_command_state *, cui_command_index, bool,
+                                       cui_command_options, cui_command_events_private_observer *);
+bool cui_command_events_private_move(cui_command_state *, bool, cui_command_options,
+                                     cui_command_events_private_observer *);
+bool cui_command_events_private_confirm(cui_command_state *, cui_command_options,
+                                        cui_command_events_private_observer *);
+#endif
 
 #include <ctype.h>
 #include <math.h>
@@ -189,8 +211,36 @@ static bool cui_command_match(const cui_command_item *i, cui_str q, cui_command_
     return !o.searchable || !o.filterable ||
            (o.matches ? o.matches(i, q, o.match_user) : cui_command_matches(i, q));
 }
-bool cui_command_rebuild(cui_command_state *s, const cui_command_entry *entries, size_t n,
-                         cui_str q, bool changed, cui_command_options o) {
+static cui_component_event_metadata
+cui_command_events_private_metadata(const cui_command_events_private_observer *observer,
+                                    cui_component_event_kind kind) {
+    cui_component_event_metadata event = {0};
+    if (observer->has_cause) {
+        event = observer->cause;
+        event.kind = kind;
+    } else
+        (void)cui_component_event_init(&event, kind, observer->target,
+                                       CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC);
+    return event;
+}
+static void cui_command_events_private_count(size_t *count, bool *overflow) {
+    if (*count == SIZE_MAX)
+        *overflow = true;
+    else
+        ++*count;
+}
+static void
+cui_command_events_private_notify_selection(cui_command_events_private_observer *observer,
+                                            const cui_command_selection_change *change) {
+    if (!observer || observer->suppress || !observer->handler.on_selection)
+        return;
+    cui_command_events_private_count(&observer->result.selection_count,
+                                     &observer->result.count_overflow);
+    observer->handler.on_selection(observer->handler.user, change);
+}
+bool cui_command_events_private_rebuild(cui_command_state *s, const cui_command_entry *entries,
+                                        size_t n, cui_str q, bool changed, cui_command_options o,
+                                        cui_command_events_private_observer *observer) {
     if (!s || !s->rows || !s->capacity || s->capacity > CUI_COMMAND_LIMIT ||
         n > CUI_COMMAND_LIMIT || (n && !entries) || !cui_command_str_valid(q))
         return false;
@@ -280,16 +330,37 @@ bool cui_command_rebuild(cui_command_state *s, const cui_command_entry *entries,
     if (changed)
         s->preserve_no_selection = false;
     s->initialized = true;
-    cui_command_index now;
-    if (changed && cui_command_selected(s, &now) && (!had || !cui_command_index_equal(old, now)) &&
-        o.on_select)
-        o.on_select(now, o.user);
+    cui_command_index now = {0};
+    bool selection_changed =
+        changed && cui_command_selected(s, &now) && (!had || !cui_command_index_equal(old, now));
+    cui_command_selection_change selection = {0};
+    if (observer) {
+        selection.event = cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_CHANGE);
+        selection.has_previous = had;
+        selection.previous = old;
+        selection.value = now;
+        /* Borrowed query must be observed before either legacy hook can replace it. */
+        if (changed && o.searchable && !observer->suppress && observer->handler.on_query) {
+            cui_command_query_change query = {
+                cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_CHANGE),
+                raw_query};
+            cui_command_events_private_count(&observer->result.query_count,
+                                             &observer->result.count_overflow);
+            observer->handler.on_query(observer->handler.user, &query);
+        }
+    }
+    if (selection_changed) {
+        if (o.on_select)
+            o.on_select(now, o.user);
+        cui_command_events_private_notify_selection(observer, &selection);
+    }
     if (changed && o.searchable && o.on_query)
         o.on_query(raw_query, o.user);
     return true;
 }
-bool cui_command_select(cui_command_state *s, cui_command_index index, bool scroll,
-                        cui_command_options o) {
+bool cui_command_events_private_select(cui_command_state *s, cui_command_index index, bool scroll,
+                                       cui_command_options o,
+                                       cui_command_events_private_observer *observer) {
     if (!s)
         return false;
     for (size_t i = 0; i < s->row_count; ++i)
@@ -297,11 +368,19 @@ bool cui_command_select(cui_command_state *s, cui_command_index index, bool scro
             cui_command_index_equal(index, s->rows[i].index)) {
             if (s->selected == i)
                 return false;
+            cui_command_selection_change change = {0};
+            if (observer) {
+                change.event =
+                    cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_CHANGE);
+                change.has_previous = cui_command_selected(s, &change.previous);
+                change.value = index;
+            }
             s->selected = i;
             s->preserve_no_selection = false;
             s->pending_scroll = scroll;
             if (o.on_select)
                 o.on_select(index, o.user);
+            cui_command_events_private_notify_selection(observer, &change);
             return true;
         }
     return false;
@@ -313,18 +392,20 @@ void cui_command_clear_selection(cui_command_state *s) {
         s->pending_scroll = false;
     }
 }
-bool cui_command_move(cui_command_state *s, bool forward, cui_command_options o) {
+bool cui_command_events_private_move(cui_command_state *s, bool forward, cui_command_options o,
+                                     cui_command_events_private_observer *observer) {
     if (!s || !s->row_count)
         return false;
     size_t i = s->selected < s->row_count ? s->selected : forward ? s->row_count - 1 : 0;
     for (size_t k = 0; k < s->row_count; ++k) {
         i = forward ? (i + 1) % s->row_count : (i + s->row_count - 1) % s->row_count;
         if (s->rows[i].item && !s->rows[i].item->disabled)
-            return cui_command_select(s, s->rows[i].index, true, o);
+            return cui_command_events_private_select(s, s->rows[i].index, true, o, observer);
     }
     return false;
 }
-bool cui_command_confirm(cui_command_state *s, cui_command_options o) {
+bool cui_command_events_private_confirm(cui_command_state *s, cui_command_options o,
+                                        cui_command_events_private_observer *observer) {
     if (!s || o.disabled || s->selected >= s->row_count)
         return false;
     cui_command_row row = s->rows[s->selected];
@@ -332,15 +413,99 @@ bool cui_command_confirm(cui_command_state *s, cui_command_options o) {
         return false;
     void (*confirm)(cui_command_index, void *) = o.on_confirm;
     void *user = o.user;
+    cui_command_activation activation = {0};
+    if (observer) {
+        activation.event =
+            cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_ACTIVATE);
+        activation.value = row.index;
+    }
     if (row.item->action)
         row.item->action(row.item->action_user);
     if (confirm)
         confirm(row.index, user);
+    if (observer && !observer->suppress && observer->handler.on_activate) {
+        cui_command_events_private_count(&observer->result.activation_count,
+                                         &observer->result.count_overflow);
+        observer->handler.on_activate(observer->handler.user, &activation);
+    }
     return true;
+}
+
+bool cui_command_rebuild(cui_command_state *s, const cui_command_entry *entries, size_t n,
+                         cui_str query, bool changed, cui_command_options options) {
+    return cui_command_events_private_rebuild(s, entries, n, query, changed, options, NULL);
+}
+bool cui_command_select(cui_command_state *s, cui_command_index index, bool scroll,
+                        cui_command_options options) {
+    return cui_command_events_private_select(s, index, scroll, options, NULL);
+}
+bool cui_command_move(cui_command_state *s, bool forward, cui_command_options options) {
+    return cui_command_events_private_move(s, forward, options, NULL);
+}
+bool cui_command_confirm(cui_command_state *s, cui_command_options options) {
+    return cui_command_events_private_confirm(s, options, NULL);
+}
+cui_command_event_result cui_command_rebuild_events(cui_command_state *s, cui_id target,
+                                                    const cui_command_entry *entries, size_t n,
+                                                    cui_str query, bool changed,
+                                                    cui_command_options options,
+                                                    cui_command_event_handler handler) {
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
+    if (target)
+        observer.result.control =
+            cui_command_events_private_rebuild(s, entries, n, query, changed, options, &observer);
+    return observer.result;
+}
+cui_command_event_result cui_command_select_events(cui_command_state *s, cui_id target,
+                                                   cui_command_index index, bool scroll,
+                                                   cui_command_options options,
+                                                   cui_command_event_handler handler) {
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
+    if (target)
+        observer.result.control =
+            cui_command_events_private_select(s, index, scroll, options, &observer);
+    return observer.result;
+}
+cui_command_event_result cui_command_move_events(cui_command_state *s, cui_id target, bool forward,
+                                                 cui_command_options options,
+                                                 cui_command_event_handler handler) {
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
+    if (target)
+        observer.result.control = cui_command_events_private_move(s, forward, options, &observer);
+    return observer.result;
+}
+cui_command_event_result cui_command_confirm_events(cui_command_state *s, cui_id target,
+                                                    cui_command_options options,
+                                                    cui_command_event_handler handler) {
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
+    if (target)
+        observer.result.control = cui_command_events_private_confirm(s, options, &observer);
+    return observer.result;
 }
 
 /* src/components/cui_command.c */
 /* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_COMMAND_EVENTS_PRIVATE_H
+#define CUI_COMMAND_EVENTS_PRIVATE_H
+
+typedef struct {
+    cui_id target;
+    cui_command_event_handler handler;
+    cui_command_event_result result;
+    cui_component_event_metadata cause;
+    bool has_cause, suppress;
+} cui_command_events_private_observer;
+bool cui_command_events_private_rebuild(cui_command_state *, const cui_command_entry *, size_t,
+                                        cui_str, bool, cui_command_options,
+                                        cui_command_events_private_observer *);
+bool cui_command_events_private_select(cui_command_state *, cui_command_index, bool,
+                                       cui_command_options, cui_command_events_private_observer *);
+bool cui_command_events_private_move(cui_command_state *, bool, cui_command_options,
+                                     cui_command_events_private_observer *);
+bool cui_command_events_private_confirm(cui_command_state *, cui_command_options,
+                                        cui_command_events_private_observer *);
+#endif
 
 
 
@@ -415,15 +580,51 @@ static bool cui_command_geometry(cui_context *ui, cui_command_state *s, float co
     *out = total;
     return true;
 }
-bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_state *s,
-                 const cui_command_entry *entries, size_t n, cui_command_options o) {
+static cui_component_event_metadata cui_command_styled_events_frame(cui_context *ui, cui_id id) {
+    cui_component_event_metadata event = {0};
+    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_CHANGE, id,
+                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    event.frame_sequence = cui_frame_sequence(ui);
+    if (event.frame_sequence)
+        event.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+    return event;
+}
+static void cui_command_styled_events_cause(cui_command_events_private_observer *observer,
+                                            cui_component_event_metadata cause) {
+    if (observer) {
+        observer->cause = cause;
+        observer->has_cause = true;
+        observer->suppress = !(cause.flags & CUI_COMPONENT_EVENT_HAS_FRAME);
+    }
+}
+static cui_component_event_metadata cui_command_styled_events_row(cui_context *ui, cui_id id,
+                                                                  cui_id row) {
+    cui_component_event_metadata cause = cui_command_styled_events_frame(ui, id);
+    size_t count = 0, matches = 0;
+    (void)cui_frame_events(ui, &count);
+    cui_activation_snapshot snapshot = {0};
+    for (size_t i = 0; i < count; ++i)
+        if (cui_event_accepted_activation(ui, i) == row) {
+            if (++matches == 1)
+                (void)cui_event_activation_snapshot(ui, i, &snapshot);
+        }
+    if (matches == 1 &&
+        cui_component_event_from_activation(&cause, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot))
+        cause.target = id;
+    return cause;
+}
+static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const cui_theme *t,
+                                             cui_command_state *s, const cui_command_entry *entries,
+                                             size_t n, cui_command_options o,
+                                             cui_command_events_private_observer *observer) {
+
     if (!ui || !id || !t || !s || !s->query || !isfinite(o.width) || !isfinite(o.max_height) ||
         o.max_height <= 0 || o.width == 0)
         return false;
     cui_str q = cui_edit_get_text(s->query);
     uint64_t hash = cui_command_hash(q);
     bool changed = s->initialized && hash != s->query_hash;
-    if (!cui_command_rebuild(s, entries, n, q, changed, o))
+    if (!cui_command_events_private_rebuild(s, entries, n, q, changed, o, observer))
         return false;
     s->query_hash = hash;
     float density = t->font_size / 16;
@@ -503,8 +704,9 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
         cui_end_box(ui);
         cui_end_box(ui);
         if (result.changed) {
+            cui_command_styled_events_cause(observer, cui_command_styled_events_frame(ui, id));
             q = cui_edit_get_text(s->query);
-            if (!cui_command_rebuild(s, entries, n, q, true, o)) {
+            if (!cui_command_events_private_rebuild(s, entries, n, q, true, o, observer)) {
                 cui_end_box(ui);
                 cui_end_focus_scope(ui);
                 return false;
@@ -558,6 +760,8 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
                                  : id ^ UINT64_C(0x90cc548000000000) ^ (uint64_t)i;
             bool selected = s->selected == i && r->item && !r->item->disabled;
             cui_interaction interaction = {0};
+            cui_component_event_metadata row_cause = {0};
+            cui_command_index interaction_index = r->index;
             if (r->item) {
                 interaction = cui_interact(ui, row, CUI_ROLE_OPTION, r->item->label,
                                            o.disabled || r->item->disabled, selected, 0);
@@ -567,10 +771,15 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
                                                                 .pos_in_set = position,
                                                                 .set_size = s->matched_count});
                 cui_set_tab_stop(ui, row, false);
+                if (observer && interaction.activated)
+                    row_cause = cui_command_styled_events_row(ui, id, row);
                 if (interaction.hovered && !o.disabled && !r->item->disabled) {
                     hovered = row;
-                    if (s->hovered_row != row)
-                        (void)cui_command_select(s, r->index, false, o);
+                    if (s->hovered_row != row) {
+                        cui_command_styled_events_cause(observer,
+                                                        cui_command_styled_events_frame(ui, id));
+                        (void)cui_command_events_private_select(s, r->index, false, o, observer);
+                    }
                 }
                 selected = s->selected == i && !r->item->disabled;
             }
@@ -633,8 +842,15 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
             cui_end_box(ui);
             cui_end_box(ui);
             if (interaction.activated && !o.disabled) {
-                (void)cui_command_select(s, r->index, false, o);
-                (void)cui_command_confirm(s, o);
+                cui_command_styled_events_cause(observer, row_cause);
+                (void)cui_command_events_private_select(s, r->index, false, o, observer);
+                cui_command_index confirmed;
+                if (observer && cui_command_selected(s, &confirmed) &&
+                    !cui_command_index_equal(interaction_index, confirmed)) {
+                    observer->cause.flags &= ~CUI_COMPONENT_EVENT_HAS_ACTIVATION;
+                    memset(&observer->cause.activation, 0, sizeof observer->cause.activation);
+                }
+                (void)cui_command_events_private_confirm(s, o, observer);
                 cui_command_focus(ui, id, o);
             }
         }
@@ -657,29 +873,63 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
             const cui_event *e = &events[i];
             if (cui_event_consumed(ui, i) || e->type != CUI_EVENT_KEY_DOWN || e->modifiers)
                 continue;
+            cui_component_event_metadata cause = cui_command_styled_events_frame(ui, id);
+            if (cause.flags & CUI_COMPONENT_EVENT_HAS_FRAME) {
+                (void)cui_component_event_set_frame_index(&cause, cause.frame_sequence, i);
+                cause.source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                cause.flags |= CUI_COMPONENT_EVENT_HAS_SOURCE;
+            }
+            cui_command_styled_events_cause(observer, cause);
             if (e->key == CUI_KEY_UP || e->key == CUI_KEY_DOWN) {
-                (void)cui_command_move(s, e->key == CUI_KEY_DOWN, o);
+                (void)cui_command_events_private_move(s, e->key == CUI_KEY_DOWN, o, observer);
                 (void)cui_consume_event(ui, i);
                 cui_invalidate(ui);
             } else if (e->key == CUI_KEY_ENTER) {
-                (void)cui_command_confirm(s, o);
+                (void)cui_command_events_private_confirm(s, o, observer);
                 (void)cui_consume_event(ui, i);
             } else if (e->key == CUI_KEY_ESCAPE) {
                 q = cui_edit_get_text(s->query);
                 if (o.searchable && q.length) {
                     (void)cui_edit_select(s->query, 0, q.length);
                     (void)cui_edit_insert(s->query, cui_string(""));
-                    (void)cui_command_rebuild(s, entries, n, cui_edit_get_text(s->query), true, o);
+                    (void)cui_command_events_private_rebuild(
+                        s, entries, n, cui_edit_get_text(s->query), true, o, observer);
                     s->query_hash = cui_command_hash(cui_edit_get_text(s->query));
                     (void)cui_consume_event(ui, i);
                     cui_invalidate(ui);
-                } else if (o.on_cancel)
-                    o.on_cancel(o.user);
+                } else if (o.on_cancel || (observer && observer->handler.on_cancel)) {
+                    cui_command_cancel_request request = {cause};
+                    request.event.kind = CUI_COMPONENT_EVENT_REQUEST;
+                    if (o.on_cancel)
+                        o.on_cancel(o.user);
+                    if (observer && !observer->suppress && observer->handler.on_cancel) {
+                        if (observer->result.cancel_request_count == SIZE_MAX)
+                            observer->result.count_overflow = true;
+                        else
+                            observer->result.cancel_request_count++;
+                        observer->handler.on_cancel(observer->handler.user, &request);
+                    }
+                }
             }
         }
     cui_end_box(ui);
     cui_end_focus_scope(ui);
     return true;
+}
+
+bool cui_command(cui_context *ui, cui_id id, const cui_theme *theme, cui_command_state *state,
+                 const cui_command_entry *entries, size_t count, cui_command_options options) {
+    return cui_command_styled_events_common(ui, id, theme, state, entries, count, options, NULL);
+}
+cui_command_event_result cui_command_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                            cui_command_state *state,
+                                            const cui_command_entry *entries, size_t count,
+                                            cui_command_options options,
+                                            cui_command_event_handler handler) {
+    cui_command_events_private_observer observer = {.target = id, .handler = handler};
+    observer.result.control =
+        cui_command_styled_events_common(ui, id, theme, state, entries, count, options, &observer);
+    return observer.result;
 }
 
 #endif

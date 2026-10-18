@@ -119,6 +119,19 @@ cui_input_group_result cui_input_group(cui_context *, cui_id group, cui_id input
 #include "cui_form_events.h"
 /* src/base/cui_form.c */
 /* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_FORM_PRIVATE_H
+#define CUI_FORM_PRIVATE_H
+
+/* Synchronous delegation at the original nested Input seam; Base-only types. */
+typedef cui_input_event_result (*cui_form_private_input_fn)(
+    void *, cui_context *, cui_id, cui_str, cui_edit *, cui_input_behavior_state *,
+    cui_base_input_options, bool synthetic_hit, cui_component_text_handler);
+cui_input_group_result cui_form_private_input_group(
+    cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
+    const cui_input_group_addon *, size_t, cui_input_group_options,
+    cui_input_group_handler, cui_input_group_event_result *, cui_form_private_input_fn, void *);
+#endif
 
 #include <math.h>
 static size_t cui_form_private_columns(cui_form_options o) {
@@ -282,12 +295,13 @@ static bool cui_form_private_group_valid(cui_id group, cui_id input, const cui_i
     }
     return true;
 }
-static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id group, cui_id input,
+cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id group, cui_id input,
                                             cui_edit *edit, cui_input_group_state *state,
                                             const cui_input_group_addon *a, size_t count,
                                             cui_input_group_options o,
                                             cui_input_group_handler handler,
-                                            cui_input_group_event_result *notifications) {
+                                            cui_input_group_event_result *notifications,
+                                            cui_form_private_input_fn input_fn, void *input_user) {
     cui_input_group_result result = {.input.error = CUI_EDIT_OK};
     if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
         result.error = CUI_FORM_INVALID;
@@ -346,17 +360,22 @@ static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id gro
     cui_base_input_options behavior = o.input;
     cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
                                   state->scroll_x};
-    if (!behavior.hit_test && !cui_edit_get_state(edit).multiline) {
+    bool synthetic_hit = !behavior.hit_test && !cui_edit_get_state(edit).multiline;
+    if (synthetic_hit) {
         behavior.hit_test = cui_base_input_hit_test;
         behavior.hit_test_user = &hit;
     }
-    if (notifications && handler.on_text) {
-        cui_input_event_result observed = cui_base_input_events(ui, input, o.name, edit,
-            &state->behavior, behavior, (cui_component_text_handler){handler.on_text, handler.user});
+    if (input_fn || (notifications && handler.on_text)) {
+        cui_component_text_handler text_handler = {notifications ? handler.on_text : NULL, handler.user};
+        cui_input_event_result observed = input_fn
+            ? input_fn(input_user, ui, input, o.name, edit, &state->behavior, behavior, synthetic_hit, text_handler)
+            : cui_base_input_events(ui, input, o.name, edit, &state->behavior, behavior, text_handler);
         result.input = observed.control;
-        notifications->change_count = observed.change_count;
-        notifications->submit_count = observed.submit_count;
-        notifications->count_overflow |= observed.count_overflow;
+        if (notifications) {
+            notifications->change_count = observed.change_count;
+            notifications->submit_count = observed.submit_count;
+            notifications->count_overflow |= observed.count_overflow;
+        }
     } else
         result.input = cui_base_input_ex(ui, input, o.name, edit, &state->behavior, behavior);
     size_t sc;
@@ -374,20 +393,46 @@ static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id gro
 cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_id input,
     cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
     size_t count, cui_input_group_options options) {
-    return cui_form_private_group(ui, group, input, edit, state, addons, count, options,
-                                  (cui_input_group_handler){0}, NULL);
+    return cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
+                                  (cui_input_group_handler){0}, NULL, NULL, NULL);
 }
 cui_input_group_event_result cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input,
     cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
     size_t count, cui_input_group_options options, cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
-    result.control = cui_form_private_group(ui, group, input, edit, state, addons, count, options,
-                                            handler, &result);
+    result.control = cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
+                                            handler, &result, NULL, NULL);
     return result;
 }
 
 /* src/components/cui_form.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_FORM_PRIVATE_H
+#define CUI_FORM_PRIVATE_H
+
+/* Synchronous delegation at the original nested Input seam; Base-only types. */
+typedef cui_input_event_result (*cui_form_private_input_fn)(
+    void *, cui_context *, cui_id, cui_str, cui_edit *, cui_input_behavior_state *,
+    cui_base_input_options, bool synthetic_hit, cui_component_text_handler);
+cui_input_group_result cui_form_private_input_group(
+    cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
+    const cui_input_group_addon *, size_t, cui_input_group_options,
+    cui_input_group_handler, cui_input_group_event_result *, cui_form_private_input_fn, void *);
+#endif
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_INPUT_PRIVATE_H
+#define CUI_INPUT_PRIVATE_H
+
+/* Prepare and reduce once, never paint. Actual behavior owner remains observable
+ * during callbacks; local hit scratch does not escape the synchronous call. */
+cui_input_event_result cui_input_private_reduce(
+    cui_context *, cui_id, const cui_theme *, cui_str, cui_edit *, cui_input_state *,
+    cui_input_behavior_state *, cui_input_options *, cui_base_input_options,
+    cui_rect viewport, bool synthetic_hit, cui_component_text_handler);
+#endif
 
 
 #include <math.h>
@@ -573,6 +618,22 @@ static void cui_form_private_addons(cui_context *ui, const cui_theme *t,
         if (a[i].alignment == alignment)
             cui_form_private_addon(ui, t, &a[i], o, height, rem_size);
 }
+typedef struct {
+    const cui_theme *theme;
+    cui_input_group_state *state;
+    cui_input_options *paint;
+} cui_form_private_secure;
+static cui_input_event_result cui_form_private_secure_input(
+    void *user, cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
+    cui_input_behavior_state *behavior, cui_base_input_options options, bool synthetic_hit,
+    cui_component_text_handler handler) {
+    cui_form_private_secure *secure = user;
+    cui_input_state temporary = {.behavior = *behavior, .scroll_x = secure->state->scroll_x};
+    cui_input_event_result result = cui_input_private_reduce(ui, id, secure->theme, name, edit,
+        &temporary, behavior, secure->paint, options, secure->state->viewport, synthetic_hit, handler);
+    secure->state->scroll_x = temporary.scroll_x;
+    return result;
+}
 static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input,
                                        const cui_theme *theme, cui_edit *edit,
                                        cui_input_group_state *state, const cui_input_group_addon *a,
@@ -688,8 +749,21 @@ static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui
         }
         a = bounded;
     }
+    paint_options.masked = o.input.masked;
+    paint_options.content_type = o.input.content_type;
+    paint_options.format = o.input.format;
+    paint_options.format_workspace = o.input.format_workspace;
+    paint_options.clipboard = o.input.clipboard;
+    paint_options.validate = o.input.validate;
+    paint_options.validate_user = o.input.validate_user;
+    paint_options.normalization = o.input.normalization;
+    paint_options.matcher = o.input.matcher;
     cui_input_group_result result;
-    if (notifications) {
+    if (o.input.masked) {
+        cui_form_private_secure secure = {&t, state, &paint_options};
+        result = cui_form_private_input_group(ui, group, input, edit, state, a, count, o,
+            handler, notifications, cui_form_private_secure_input, &secure);
+    } else if (notifications) {
         cui_input_group_event_result observed = cui_base_input_group_events(
             ui, group, input, edit, state, a, count, o, handler);
         result = observed.control;

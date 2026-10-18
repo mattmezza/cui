@@ -834,11 +834,13 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
                                (cui_edit_acceptance){0});
     if (configured.error != CUI_EDIT_OK)
         return (cui_input_result){.error = configured.error};
+    /* Owned sessions may have expired during an omitted/rejected submission.
+     * Reacquire without dereferencing the old pointer before lifecycle checks. */
+    state->composition =
+        cui_base_composition(ui, id, state->composition, &state->composition_owned);
     cui_input_secure_lifecycle(edit, state, options);
     cui_input_history_focus(ui, id, edit, state, options.disabled);
     cui_edit_state before = cui_edit_get_state(edit);
-    state->composition =
-        cui_base_composition(ui, id, state->composition, &state->composition_owned);
     if (state->composition && state->composition->active)
         (void)cui_edit_composition_event(edit, state->composition,
                                          (cui_event){.type = CUI_EVENT_GESTURE}, true);
@@ -1103,10 +1105,12 @@ static cui_input_result cui_input_events_common(cui_context *ui, cui_id id, cui_
                                (cui_edit_acceptance){0});
     if (configured.error != CUI_EDIT_OK)
         return (cui_input_result){.error = configured.error};
-    cui_input_secure_lifecycle(edit, state, options);
-    cui_input_history_focus(ui, id, edit, state, options.disabled);
+    /* Owned sessions may have expired during an omitted/rejected submission.
+     * Reacquire without dereferencing the old pointer before lifecycle checks. */
     state->composition =
         cui_base_composition(ui, id, state->composition, &state->composition_owned);
+    cui_input_secure_lifecycle(edit, state, options);
+    cui_input_history_focus(ui, id, edit, state, options.disabled);
     if (state->composition && state->composition->active)
         (void)cui_edit_composition_event(edit, state->composition,
                                          (cui_event){.type = CUI_EVENT_GESTURE}, true);

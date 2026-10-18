@@ -13115,8 +13115,24 @@ void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
 bool cui_set_text_input_geometry_rect(cui_context *ui, cui_id owner, cui_id caret, float height) {
     if (!cui_core_mutation(ui))
         return false;
-    if (!ui || !ui->in_frame || !owner || !caret || !isfinite(height) || height < 0 ||
-        !cui_track_bounds(ui, caret, &ui->text_geometry_ime_bounds))
+    if (!ui || !ui->in_frame || !owner || !caret || !isfinite(height) || height < 0)
+        return false;
+    /* Focus can transfer after an earlier text control painted in this frame.
+     * Replace only our private retained destination, preserving generic tracking
+     * alias checks and the previous owner on failure. */
+    size_t previous = ui->bounds_track_count;
+    for (size_t i = 0; i < ui->bounds_track_count; ++i) {
+        cui_core_bounds_track track = ui->bounds_tracks[i];
+        if (track.retained == &ui->text_geometry_ime_bounds)
+            previous = i;
+        else if (track.id == caret) {
+            cui_core_fail(ui, CUI_ERROR_DUPLICATE_ID);
+            return false;
+        }
+    }
+    if (previous < ui->bounds_track_count)
+        ui->bounds_tracks[previous].id = caret;
+    else if (!cui_track_bounds(ui, caret, &ui->text_geometry_ime_bounds))
         return false;
     ui->text_input_owner = owner;
     ui->text_geometry_ime_owner = owner;

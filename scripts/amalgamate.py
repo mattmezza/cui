@@ -26,6 +26,8 @@ def generate(name,sources):
         lines += ['#include "cui_editor_events.h"']
     if name == "cui_table":
         lines += ['#include "cui_table_events.h"']
+    if name == "cui_command":
+        lines += ['#include "cui_command_events.h"']
     if name == "cui_toolbar":
         lines += ['#include "cui_toolbar_events.h"']
     if name == "cui_form":
@@ -94,6 +96,10 @@ def generate(name,sources):
             code=code.replace(private_include, (ROOT/'src/base/cui_icon_layout.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_textarea_geometry.h').read_text(encoding='utf-8'))
+        for private_path in ['src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h']:
+            private_name = private_path.rsplit("/", 1)[-1]
+            for private_include in [f'#include "{private_name}"', f'#include "../base/{private_name}"', f'#include "../components/{private_name}"']:
+                code = code.replace(private_include, (ROOT/private_path).read_text(encoding='utf-8'))
         if name=='cui_theme_registry':
             for private_name in ['cui_theme_json.h', 'cui_theme_equal.h', 'cui_theme_palette.inc', 'cui_theme_legacy_fields.inc']:
                 code=code.replace(f'#include "{private_name}"', (ROOT/'src/theme'/private_name).read_text(encoding='utf-8'))

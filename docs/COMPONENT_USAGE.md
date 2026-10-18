@@ -615,6 +615,8 @@ Additional event includes: `cui/cui_picker_events.h`.
 
 API: `cui_editor_state_init`, `cui_editor_multicursor_init`, `cui_editor_matcher_init`, `cui_editor_search_enable_replace`, `cui_editor_find_bar`, `cui_editor_search_open`, `cui_editor`. [Public header](../include/cui/cui_editor.h); [guide](EDITOR.md).
 
+Event API includes: `cui/cui_editor_events.h`.
+
 ## Form
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
@@ -951,6 +953,8 @@ API: `cui_status_bar`. [Public header](../include/cui/cui_chrome.h); [guide](CHR
 
 API: `cui_tabs`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.md).
 
+Event API includes: `cui/cui_tabs_events.h`.
+
 ## Theme
 
 **Composition:** application model + frame composition. **Scope:** application style data; passed during frame submission.
@@ -1001,6 +1005,8 @@ Additional event includes: `cui/cui_toolbar_events.h`.
 
 API: `cui_tree_create`, `cui_tree_rebuild`, `cui_tree`, `cui_tree_destroy`. [Public header](../include/cui/cui_tree.h); [guide](TREE.md).
 
+Event API includes: `cui/cui_tree_events.h`.
+
 ## VirtualList
 
 **Composition:** application model + frame composition. **Scope:** styled frame adapter + retained base model.
@@ -1038,6 +1044,8 @@ The gallery custom tooltip toggle uses `cui_chart_tooltip_build_fn` with copied 
 **Usage:** Initialize bounded query/row storage, submit entries each frame, and execute actions only from confirmation/action events.
 
 API: `cui_command_init`, `cui_command`. [Public header](../include/cui/cui_command.h); [guide](COMMAND.md).
+
+Event API includes: `cui/cui_command_events.h`.
 
 ## DataTable
 

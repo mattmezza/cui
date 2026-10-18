@@ -2,6 +2,7 @@
 #ifndef CUI_SIDEBAR_EVENTS_H
 #define CUI_SIDEBAR_EVENTS_H
 #include "cui_component_events.h"
+#include "cui_control_events.h"
 #include "cui_sidebar.h"
 #ifdef __cplusplus
 extern "C" {
@@ -69,6 +70,14 @@ cui_sidebar_toggle_event_result cui_sidebar_toggle_button_events(cui_context *, 
                                                                  const cui_theme *,
                                                                  cui_sidebar_toggle_options,
                                                                  cui_sidebar_collapse_handler);
+/* Styled section actions: old callback then observer, once per actual activation.
+ * No Base section counterpart; GROUP pointer_activatable also permits Core a11y ACTIVATE. */
+cui_component_action_result cui_sidebar_header_events(cui_context *, cui_id, const cui_theme *,
+                                                      cui_sidebar_section_options,
+                                                      cui_component_activation_handler);
+cui_component_action_result cui_sidebar_footer_events(cui_context *, cui_id, const cui_theme *,
+                                                      cui_sidebar_section_options,
+                                                      cui_component_activation_handler);
 #ifdef __cplusplus
 }
 #endif

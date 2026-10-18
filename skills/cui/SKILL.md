@@ -29,12 +29,38 @@ python "$HELPER" component Select --show examples
 ```
 
 `search` supports component, api and guide filters, weighted literal words, and
-labelled partial matches when no entry matches every word. Try related terms or
-`list` if a concept is not found. `component --show all` includes everything.
-`api SYMBOL` returns exact matching function declarations and complete headers,
-including types, callbacks, macros and comments. `read PATH` prints an exact
-bundled document or example; `info` lists available paths and content hashes.
-Use `--json` for machine-readable search, component and list results.
+labelled partial matches when no entry matches every word. Human output defaults
+to five results, JSON to ten; use `--limit N` to request more. Ranking is unchanged.
+`component NAME` summarizes usage and retains ALL canonical status, platform,
+limitation and feature information, plus canonical public-header paths and handler
+types with source-aware full-read commands. `--show examples` indexes guides, sample and
+test references rather than printing every shared guide. Read chosen resources.
+`component --show all` or `--full` restores the complete previous human output.
+
+`api SYMBOL` and `component --show api` print declaration/resource indexes,
+**incomplete contracts**: declarations do not retain header comments, ownership,
+errors, types or lifecycle rules. Read the exact authoritative headers and relevant
+guides using the printed commands before building. Printed read commands use
+POSIX shell quoting; on Windows pass the same arguments with your shell’s quoting. Types/macros without indexed
+function declarations produce matching paths only. `api SYMBOL --full` restores
+complete matching headers. `--declaration` explicitly selects the concise API view.
+No output is clipped or filtered by safety keywords.
+
+`read PATH` still prints the exact full document; `info` lists paths and hashes.
+For broad Markdown guides use `read PATH --headings`, then
+`read PATH --section 'Exact heading title'`. Sections include child headings up to
+the next heading of equal or higher rank. These are explicitly partial views,
+with line ranges, omitted-line counts, source digest and a full-read command;
+they do not establish a complete contract or standalone program. The scanner
+recognizes ATX (`#`) headings outside fenced/indented code, not every CommonMark
+extension. Duplicate titles, missing headings and unterminated fences fail; use the full read rather
+than guessing. Select the relevant contract sections, example and shared ownership
+headers; use full reads whenever omitted context is required. This saves output,
+not the obligation to read the chosen API's complete applicable contracts.
+
+Existing `--json` search/component/api/read shapes and full content are unchanged.
+The new summary/declaration/headings/section selectors are human-only and reject
+`--json`; omitted component selectors with JSON still return the legacy full data.
 
 Run `doctor --profile TARGET` for the chosen path. For a native window, also run
 `doctor --profile native --font /absolute/font.ttf`. These are read-only probes,

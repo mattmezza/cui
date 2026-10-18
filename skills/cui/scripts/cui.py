@@ -7,6 +7,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -91,6 +92,78 @@ def component(data, name, section):
         result['sample'] = c.get('sample')
         result['tests'] = c['tests']
     return result
+
+
+def read_command(path, source=None):
+    words = [sys.executable, str(Path(__file__).resolve()), 'read', path]
+    if source:
+        words += ['--source', str(source)]
+    return shlex.join(words)
+
+
+def resource_index(data, paths, source=None):
+    for path in dict.fromkeys(paths):
+        body = data['documents'].get(path, '')
+        title = next((line[2:] for line in body.splitlines() if line.startswith('# ')), path)
+        print(path + ' — ' + title)
+        print('  ' + read_command(path, source))
+
+
+def declaration_index(data, matches, paths, source=None):
+    print('Source digest: ' + data['source_digest'])
+    print('Declaration/index only: incomplete contract. Read authoritative headers and relevant guides before building.')
+    for match in matches:
+        print(match['declaration'])
+    if not matches:
+        print('No indexed function declaration; types/macros require the exact resources below.')
+    resource_index(data, paths, source)
+
+
+def markdown_headings(body):
+    """ATX headings outside fenced/indented code; not a complete CommonMark parser."""
+    headings = []
+    fence = None
+    lines = body.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        marker = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line.rstrip('\r\n'))
+        if fence:
+            if marker and marker[1][0] == fence[0] and len(marker[1]) >= fence[1] and not marker[2].strip():
+                fence = None
+            continue
+        if marker and (marker[1][0] != '`' or '`' not in marker[2]):
+            fence = (marker[1][0], len(marker[1]))
+            continue
+        match = re.match(r'^ {0,3}(#{1,6})(?:[ \t]+(.*?)|[ \t]*)$', line.rstrip('\r\n'))
+        if match:
+            title = re.sub(r'[ \t]+#+[ \t]*$', '', match[2] or '').strip()
+            headings.append({'title': title, 'level': len(match[1]), 'start': index + 1})
+    if fence:
+        raise ValueError('Unterminated Markdown code fence; use the full read instead of a partial view.')
+    for index, heading in enumerate(headings):
+        heading['end'] = next((h['start'] - 1 for h in headings[index + 1:] if h['level'] <= heading['level']), len(lines))
+    return headings
+
+
+def read_partial(data, path, section, source=None):
+    if section == '':
+        raise ValueError('--section requires a nonempty exact heading title')
+    body = data['documents'][path]
+    headings = markdown_headings(body)
+    total = len(body.splitlines())
+    selected = [h for h in headings if h['title'] == section] if section is not None else []
+    if section is not None and len(selected) != 1:
+        locations = ', '.join(str(h['start']) for h in selected)
+        raise ValueError('Section must match one exact heading; ' + ('duplicate lines: ' + locations if selected else 'not found') + '. Use --headings or the full read.')
+    print('Partial Markdown view (ATX headings outside code); not a complete contract or standalone program.')
+    print('Resource: ' + path + '\nSource digest: ' + data['source_digest'])
+    print('Full read: ' + read_command(path, source))
+    if section is None:
+        for h in headings:
+            print(f"{h['level']}: {h['title']} [lines {h['start']}–{h['end']} of {total}]")
+        return
+    h = selected[0]
+    print(f"Lines {h['start']}–{h['end']} of {total}; omitted before: {h['start'] - 1}, after: {total - h['end']}.")
+    print(''.join(body.splitlines(keepends=True)[h['start'] - 1:h['end']]), end='')
 
 
 def doctor(profile, font=None):
@@ -240,9 +313,17 @@ def main(argv=None):
             p.add_argument('query')
         if command == 'search':
             p.add_argument('--kind', choices=['all', 'component', 'api', 'guide'], default='all')
-            p.add_argument('--limit', type=int, default=10)
+            p.add_argument('--limit', type=int)
         if command == 'component':
-            p.add_argument('--show', choices=['all', 'api', 'usage', 'examples', 'limitations'], default='all')
+            p.add_argument('--show', choices=['summary', 'all', 'api', 'usage', 'examples', 'limitations'])
+        if command in {'component', 'api'}:
+            p.add_argument('--full', action='store_true', help='Restore complete legacy human output')
+        if command == 'api':
+            p.add_argument('--declaration', action='store_true')
+        if command == 'read':
+            group = p.add_mutually_exclusive_group()
+            group.add_argument('--headings', action='store_true')
+            group.add_argument('--section', help='One exact, unique ATX heading title')
         p.add_argument('--json', action='store_true')
     p = sub.add_parser('doctor')
     p.add_argument('--profile', choices=sorted(TEMPLATES), default='portable')
@@ -284,15 +365,41 @@ def main(argv=None):
         else:
             data = resources(args.source)
         if args.command == 'search':
-            if args.limit < 1:
+            limit = args.limit if args.limit is not None else (10 if args.json else 5)
+            if limit < 1:
                 raise ValueError('--limit must be positive')
-            result = search(data, args.query, args.kind, args.limit)
+            all_results = search(data, args.query, args.kind, sys.maxsize)
+            result = all_results[:limit]
             emit(result if args.json else '\n'.join(f"{r['kind']}: {r['name']}{' (partial match)' if r['partial'] else ''}\n  {r['description']}" for r in result), args.json)
+            if not args.json:
+                print(f"Showing {len(result)} of {len(all_results)} {'partial' if result and result[0]['partial'] else 'complete'} matches; use --limit N or refine the query.")
             return 0 if result else 1
         if args.command == 'component':
-            result = component(data, args.query, args.show)
+            if args.full and args.show not in {None, 'all'}:
+                raise ValueError('--full conflicts with --show other than all')
+            if args.json and args.show == 'summary':
+                raise ValueError('--show summary is human-only; omit it for legacy JSON')
+            section = args.show or ('all' if args.json or args.full else 'summary')
+            result = component(data, args.query, 'all' if section == 'summary' else section)
             if args.json:
                 emit(result, True)
+            elif section == 'summary':
+                print('# ' + result['name'] + '\nSource digest: ' + data['source_digest'])
+                emit(result['usage'], True)
+                print('Canonical status, platforms, limitations and features (unabridged):')
+                emit(result['status'], True)
+                c = next(c for c in data['components'] if c['name'] == result['name'])
+                print('Handler types: ' + json.dumps(c.get('handler_types', []), ensure_ascii=False))
+                resource_index(data, [c['public_header']] + c.get('additional_public_headers', []), args.source)
+                print('Incomplete contract; use --show api, --show examples and --full for progressive detail.')
+            elif section == 'examples':
+                print('Example/guide index; read selected resources in full. Shared guides are not standalone programs.')
+                resource_index(data, [e['path'] for e in result['examples']], args.source)
+                print('Sample reference: ' + str(result['sample']))
+                print('Test references: ' + json.dumps(result['tests'], ensure_ascii=False))
+            elif section == 'api':
+                c = next(c for c in data['components'] if c['name'] == result['name'])
+                declaration_index(data, result['api'], [result['header']['path']] + c.get('additional_public_headers', []) + [m['header'] for m in result['api']] + c['docs'], args.source)
             else:
                 print('# ' + result['name'] + '\nSource digest: ' + data['source_digest'])
                 for key, value in result.items():
@@ -307,6 +414,10 @@ def main(argv=None):
                     else:
                         print(json.dumps(value, indent=2, ensure_ascii=False))
         elif args.command == 'api':
+            if args.full and args.declaration:
+                raise ValueError('--full conflicts with --declaration')
+            if args.json and args.declaration:
+                raise ValueError('--declaration is human-only')
             matches = [s for s in data['symbols'] if s['name'] == args.query]
             # Types, enums and macros are also discoverable without inventing declarations.
             headers = {p: text for p, text in data['documents'].items() if p.startswith('include/') and re.search(r'\b' + re.escape(args.query) + r'\b', text)}
@@ -314,6 +425,9 @@ def main(argv=None):
                 raise ValueError('Unknown public symbol; use search.')
             if args.json:
                 emit({'functions': matches, 'matching_headers': headers}, True)
+            elif not args.full:
+                guides = [p for c in data['components'] if args.query in c['api_symbols'] for p in c['docs']]
+                declaration_index(data, matches, list(headers) + guides, args.source)
             else:
                 for match in matches:
                     print(match['declaration'])
@@ -322,7 +436,14 @@ def main(argv=None):
         elif args.command == 'read':
             if args.query not in data['documents']:
                 raise ValueError('Unknown resource path; use search or info --json.')
-            emit(data['documents'][args.query], args.json)
+            if args.headings or args.section is not None:
+                if args.json:
+                    raise ValueError('--headings/--section are human-only; JSON read remains the full document')
+                if not args.query.endswith('.md'):
+                    raise ValueError('--headings/--section require a Markdown resource')
+                read_partial(data, args.query, args.section, args.source)
+            else:
+                emit(data['documents'][args.query], args.json)
         elif args.command == 'list':
             result = [{'name': c['name'], 'category': c['category'], 'status': c['status']} for c in data['components']]
             emit(result if args.json else '\n'.join(f"{r['name']} [{r['category']}; {r['status']}]" for r in result), args.json)

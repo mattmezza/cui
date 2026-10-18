@@ -2,6 +2,8 @@
 """Offline consumer tests: installed skill, real metadata, pinned setup and hostile archives."""
 import hashlib
 import io
+import contextlib
+import shlex
 import json
 from pathlib import Path
 import re
@@ -25,6 +27,143 @@ class AgentSkillTests(unittest.TestCase):
     def setUpClass(cls):
         cls.data = cui.resources()
 
+    def invoke(self, arguments, data=None):
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(cui, 'resources', return_value=data or self.data), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cui.main(arguments)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_presentation_preserves_json_full_and_read(self):
+        for name in ('Select', 'Input'):
+            full = cui.component(self.data, name, 'all')
+            code, out, _ = self.invoke(['component', name, '--json'])
+            self.assertEqual(code, 0)
+            self.assertEqual(json.loads(out), full)
+            self.assertEqual(self.invoke(['component', name, '--full'])[1],
+                             self.invoke(['component', name, '--show', 'all'])[1])
+            summary = self.invoke(['component', name])[1]
+            self.assertIn(json.dumps(full['status'], indent=2, ensure_ascii=False), summary)
+            self.assertNotIn(full['header']['text'], summary)
+            canonical = next(c for c in self.data['components'] if c['name'] == name)
+            self.assertIn(json.dumps(canonical.get('handler_types', []), ensure_ascii=False), summary)
+            for header in [canonical['public_header']] + canonical.get('additional_public_headers', []):
+                self.assertIn(header, summary)
+            index = self.invoke(['component', name, '--show', 'examples'])[1]
+            for example in full['examples']:
+                self.assertIn(example['path'], index)
+                self.assertNotIn(example['text'], index)
+            for section in ('usage', 'api', 'limitations', 'examples'):
+                self.assertEqual(json.loads(self.invoke(['component', name, '--show', section, '--json'])[1]),
+                                 cui.component(self.data, name, section))
+        path = 'docs/START_HERE.md'
+        self.assertEqual(self.invoke(['read', path])[1], self.data['documents'][path] + '\n')
+        self.assertEqual(json.loads(self.invoke(['read', path, '--json'])[1]), self.data['documents'][path])
+        symbol = 'cui_begin_frame'
+        matches = [s for s in self.data['symbols'] if s['name'] == symbol]
+        headers = {p: text for p, text in self.data['documents'].items()
+                   if p.startswith('include/') and re.search(r'\b' + symbol + r'\b', text)}
+        expected = ''.join(m['declaration'] + '\n' for m in matches)
+        expected += ''.join('\n# ' + p + '\n\n' + text + '\n' for p, text in headers.items())
+        self.assertEqual(self.invoke(['api', symbol, '--full'])[1], expected)
+        self.assertEqual(json.loads(self.invoke(['api', symbol, '--json'])[1]),
+                         {'functions': matches, 'matching_headers': headers})
+        concise = self.invoke(['api', symbol])[1]
+        self.assertIn('incomplete contract', concise)
+        self.assertIn(self.data['source_digest'], concise)
+        for c in self.data['components']:
+            api_index = self.invoke(['component', c['name'], '--show', 'api'])[1]
+            for match in cui.component(self.data, c['name'], 'api')['api']:
+                self.assertIn(match['header'], api_index)
+        self.assertIn(matches[0]['declaration'], concise)
+        self.assertLess(len(concise), len(expected))
+
+    def test_search_defaults_ranking_and_flag_errors(self):
+        expected = cui.search(self.data, 'cui', limit=10)
+        self.assertEqual(json.loads(self.invoke(['search', 'cui', '--json'])[1]), expected)
+        human = self.invoke(['search', 'cui'])[1]
+        self.assertIn('Showing 5 of ', human)
+        for match in expected[:5]:
+            self.assertIn(match['name'], human)
+        self.assertIn('Showing 2 of ', self.invoke(['search', 'cui', '--limit', '2'])[1])
+        for args in (['component', 'Input', '--full', '--show', 'usage'],
+                     ['component', 'Input', '--show', 'summary', '--json'],
+                     ['api', 'cui_begin_frame', '--full', '--declaration'],
+                     ['api', 'cui_begin_frame', '--declaration', '--json'],
+                     ['read', 'docs/START_HERE.md', '--headings', '--json'],
+                     ['read', 'docs/START_HERE.md', '--section', 'x', '--json'],
+                     ['search', 'cui', '--limit', '0']):
+            code, _, error = self.invoke(args)
+            self.assertEqual(code, 2, args)
+            self.assertTrue(error, args)
+
+    def test_exact_markdown_sections_fences_duplicates_unicode(self):
+        body = '# Guide\nintro\n## Résumé *exact* ##\nkeep\n### Child\nchild\n```md\n## Fake\n```\n~~~\n# Also fake\n~~~\n    ## Indented\n## Next\nnext\n## Duplicate\na\n## Duplicate\nb\n'
+        headings = cui.markdown_headings(body)
+        self.assertEqual([h['title'] for h in headings],
+                         ['Guide', 'Résumé *exact*', 'Child', 'Next', 'Duplicate', 'Duplicate'])
+        data = {'documents': {'docs/é.md': body}, 'source_digest': 'fixture'}
+        code, out, _ = self.invoke(['read', 'docs/é.md', '--section', 'Résumé *exact*'], data)
+        self.assertEqual(code, 0)
+        self.assertIn('Partial Markdown', out)
+        self.assertIn('omitted before: 2', out)
+        self.assertTrue(out.endswith(''.join(body.splitlines(keepends=True)[2:13])))
+        self.assertNotIn('next\n', out)
+        for title in ('Duplicate', 'Missing', 'résumé *exact*', 'Fake', ''):
+            self.assertEqual(self.invoke(['read', 'docs/é.md', '--section', title], data)[0], 2)
+        self.assertIn('lines 3–13', self.invoke(['read', 'docs/é.md', '--headings'], data)[1])
+        source = Path("/tmp/source with spaces/é's checkout")
+        self.assertEqual(shlex.split(cui.read_command('docs/é.md', source))[-2:], ['--source', str(source)])
+        # Types/macros use resource paths, never fabricated declarations.
+        data = {'symbols': [], 'components': [], 'documents': {'include/cui/a.h': '#define CUI_TEST 1'}, 'source_digest': 'fixture'}
+        code, out, _ = self.invoke(['api', 'CUI_TEST'], data)
+        self.assertEqual(code, 0)
+        self.assertIn('No indexed function declaration', out)
+        self.assertNotIn('#define', out)
+
+    def test_markdown_fence_failure_and_exact_boundaries(self):
+        for body in ('# Heading\n```\n## hidden\n', '# Heading\n````\n```\n',
+                     '# Heading\n~~~\n```\n', '# Heading\n```\n``` trailing\n'):
+            data = {'documents': {'docs/a.md': body}, 'source_digest': 'fixture'}
+            for selector in (['--headings'], ['--section', 'Heading']):
+                code, out, error = self.invoke(['read', 'docs/a.md'] + selector, data)
+                self.assertEqual(code, 2)
+                self.assertEqual(out, '')
+                self.assertIn('Unterminated', error)
+            self.assertEqual(self.invoke(['read', 'docs/a.md'], data)[1], body + '\n')
+        body = '# Heading\r\n```` lang\r\n## hidden\r\n`````\r\n## Last\r\nno final newline'
+        data = {'documents': {'docs/a.md': body}, 'source_digest': 'fixture'}
+        self.assertEqual([h['title'] for h in cui.markdown_headings(body)], ['Heading', 'Last'])
+        code, out, _ = self.invoke(['read', 'docs/a.md', '--section', 'Last'], data)
+        self.assertEqual(code, 0)
+        self.assertTrue(out.endswith('## Last\r\nno final newline'))
+        empty = {'documents': {'docs/a.md': ''}, 'source_digest': 'fixture'}
+        self.assertEqual(self.invoke(['read', 'docs/a.md', '--headings'], empty)[0], 0)
+        self.assertEqual(self.invoke(['read', 'docs/a.md', '--section', 'Missing'], empty)[0], 2)
+
+    def test_live_packaged_and_installed_presentation(self):
+        # Live resources and packaged native-bundle data take different loading paths.
+        command = [sys.executable, str(SCRIPTS / 'cui.py')]
+        live = subprocess.run(command + ['component', 'Select', '--source', str(ROOT)], capture_output=True, text=True)
+        self.assertEqual(live.returncode, 0, live.stderr)
+        live_data = agent_resources.collect(ROOT)
+        self.assertIn(json.dumps(cui.component(live_data, 'Select', 'limitations')['status'], indent=2, ensure_ascii=False), live.stdout)
+        with tempfile.TemporaryDirectory(prefix="cui skill é '") as directory:
+            target = Path(directory)
+            installed = target / 'installed'
+            shutil.copytree(ROOT / 'skills/cui', installed)
+            (target / '.cui-resources.json').write_text(json.dumps(self.data), encoding='utf-8')
+            installed_command = [sys.executable, str(installed / 'scripts/cui.py')]
+            for args in (['component', 'Select'], ['component', 'Input', '--show', 'examples'],
+                         ['api', 'cui_begin_frame'], ['read', 'docs/START_HERE.md', '--headings']):
+                result = subprocess.run(installed_command + args + ['--source', str(target)], cwd=target, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(result.stdout)
+            result = subprocess.run(installed_command + ['api', 'cui_begin_frame', '--source', str(target)], capture_output=True, text=True)
+            read_line = next(line.strip() for line in result.stdout.splitlines() if ' read ' in line)
+            followup = subprocess.run(shlex.split(read_line), cwd=target, capture_output=True, text=True)
+            self.assertEqual(followup.returncode, 0, followup.stderr)
+            self.assertIn('cui_begin_frame', followup.stdout)
+
     def test_all_components_have_real_declarations_and_limits(self):
         self.assertEqual(len(self.data['components']), 78)
         for c in self.data['components']:
@@ -32,6 +171,8 @@ class AgentSkillTests(unittest.TestCase):
             self.assertEqual(len(result['api']), len(c['api_symbols']))
             self.assertEqual(result['header']['text'], (ROOT / c['public_header']).read_text(encoding='utf-8'))
             self.assertIn('limitations', result['status'])
+            self.assertIn(json.dumps(result['status'], indent=2, ensure_ascii=False),
+                          self.invoke(['component', c['name']])[1])
             self.assertTrue(result['examples'])
 
     def test_search_exact_alias_multiterm_literal_and_partial(self):

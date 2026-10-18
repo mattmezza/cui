@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_base.h"
+#include "cui/cui_slider_events.h"
 #include <math.h>
 static float cui_progress_fraction(float value) {
     return isfinite(value) ? fmaxf(0, fminf(1, value)) : 0;
@@ -297,15 +298,68 @@ static double cui_slider_limit(double value, cui_slider_options o) {
     }
     return fmax(o.minimum, fmin(o.maximum, value));
 }
+typedef struct {
+    cui_context *ui;
+    cui_id id;
+    double current;
+    cui_component_slider_handler handler;
+    cui_component_slider_result *result;
+} cui_slider_dispatch;
+static void cui_slider_count(size_t *count, bool *overflow) {
+    if (*count == SIZE_MAX)
+        *overflow = true;
+    else
+        ++*count;
+}
 static void cui_slider_emit(cui_slider_options o, cui_slider_phase phase, double value,
-                            cui_event event) {
+                            cui_event event, size_t index, cui_slider_event_reason reason,
+                            cui_slider_dispatch *dispatch) {
     if (o.on_request) {
         cui_slider_request request = {.phase = phase, .value = value, .event = event};
         o.on_request(o.user, &request);
     }
+    if (!dispatch || !dispatch->handler.callback)
+        return;
+    cui_component_slider_request request = {.phase = phase,
+                                            .current = dispatch->current,
+                                            .requested = value,
+                                            .reason = reason,
+                                            .has_input = index != SIZE_MAX};
+    cui_component_event_kind kind = phase == CUI_SLIDER_UPDATE   ? CUI_COMPONENT_EVENT_REQUEST
+                                    : phase == CUI_SLIDER_COMMIT ? CUI_COMPONENT_EVENT_COMMIT
+                                                                 : CUI_COMPONENT_EVENT_LIFECYCLE;
+    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+    if (index != SIZE_MAX) {
+        if (event.type == CUI_EVENT_KEY_DOWN)
+            source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+        else if (event.type == CUI_EVENT_POINTER_DOWN || event.type == CUI_EVENT_POINTER_MOVE ||
+                 event.type == CUI_EVENT_POINTER_UP)
+            source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+        request.input = (cui_slider_event_input){.type = event.type,
+                                                 .x = event.x,
+                                                 .y = event.y,
+                                                 .key = event.key,
+                                                 .modifiers = event.modifiers,
+                                                 .repeat = event.repeat,
+                                                 .pointer_type = event.pointer_type,
+                                                 .pointer_button = event.pointer_button,
+                                                 .pointer_id = event.pointer_id,
+                                                 .pointer_device = event.pointer_device};
+    }
+    (void)cui_component_event_init(&request.event, kind, dispatch->id, source);
+    if (index != SIZE_MAX)
+        (void)cui_component_event_set_frame_index(&request.event, cui_frame_sequence(dispatch->ui),
+                                                  index);
+    size_t *count = phase == CUI_SLIDER_BEGIN    ? &dispatch->result->begin_count
+                    : phase == CUI_SLIDER_UPDATE ? &dispatch->result->request_count
+                    : phase == CUI_SLIDER_COMMIT ? &dispatch->result->commit_count
+                                                 : &dispatch->result->cancel_count;
+    cui_slider_count(count, &dispatch->result->count_overflow);
+    dispatch->handler.callback(dispatch->handler.user, &request);
 }
-bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double value,
-                                cui_slider_state *state, cui_slider_options o) {
+static bool cui_slider_controlled(cui_context *ui, cui_id id, cui_str name, double value,
+                                  cui_slider_state *state, cui_slider_options o,
+                                  cui_slider_dispatch *dispatch) {
     if (!ui || !cui_frame_is_submitting(ui) || !id || !state || (name.length && !name.data) ||
         (o.value_description.length && !o.value_description.data) || !isfinite(value) ||
         !isfinite(o.minimum) || !isfinite(o.maximum) || o.maximum < o.minimum ||
@@ -313,7 +367,7 @@ bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double
         !isfinite(o.step) || o.step < 0 || (state->id && state->id != id) ||
         (state->dragging && (!isfinite(state->preview) || !isfinite(state->start))))
         return false;
-    bool readonly = o.readonly || !o.on_request;
+    bool readonly = o.readonly || (!o.on_request && !(dispatch && dispatch->handler.callback));
     double span = o.maximum - o.minimum;
     float ratio = span > 0 ? (float)((value - o.minimum) / span) : 0;
     cui_interact(ui, id, CUI_ROLE_SLIDER, name, o.disabled, false, ratio);
@@ -326,7 +380,11 @@ bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double
     state->id = id;
     if (o.disabled || readonly || span == 0) {
         if (state->dragging)
-            cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, (cui_event){0});
+            cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, (cui_event){0}, SIZE_MAX,
+                            o.disabled ? CUI_SLIDER_EVENT_DISABLED
+                            : readonly ? CUI_SLIDER_EVENT_READONLY
+                                       : CUI_SLIDER_EVENT_ZERO_SPAN,
+                            dispatch);
         state->dragging = false;
         state->preview = value;
         return true;
@@ -348,23 +406,26 @@ bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double
         if (e.type == CUI_EVENT_POINTER_DOWN && bounds.w > 0) {
             state->dragging = true;
             state->start = value;
-            cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e);
+            cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e, i, CUI_SLIDER_EVENT_INPUT, dispatch);
         }
         if (state->dragging && bounds.w > 0 &&
             (e.type == CUI_EVENT_POINTER_DOWN || e.type == CUI_EVENT_POINTER_MOVE ||
              e.type == CUI_EVENT_POINTER_UP)) {
             double fraction = fmax(0, fmin(1, ((double)e.x - bounds.x) / bounds.w));
             state->preview = cui_slider_limit(o.minimum + span * fraction, o);
-            cui_slider_emit(o, CUI_SLIDER_UPDATE, state->preview, e);
+            cui_slider_emit(o, CUI_SLIDER_UPDATE, state->preview, e, i, CUI_SLIDER_EVENT_INPUT,
+                            dispatch);
         }
         if (state->dragging && e.type == CUI_EVENT_POINTER_UP) {
             state->dragging = false;
-            cui_slider_emit(o, CUI_SLIDER_COMMIT, state->preview, e);
+            cui_slider_emit(o, CUI_SLIDER_COMMIT, state->preview, e, i, CUI_SLIDER_EVENT_INPUT,
+                            dispatch);
         } else if (state->dragging && (e.type == CUI_EVENT_CANCEL ||
                                        (e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE))) {
             state->dragging = false;
             state->preview = state->start;
-            cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, e);
+            cui_slider_emit(o, CUI_SLIDER_CANCEL, state->start, e, i, CUI_SLIDER_EVENT_INPUT,
+                            dispatch);
         } else if (!state->dragging && e.type == CUI_EVENT_KEY_DOWN) {
             double increment = o.step > 0 ? o.step : span / 100;
             double next = value;
@@ -378,13 +439,29 @@ bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double
                 next = cui_slider_limit(value + increment, o);
             else
                 continue;
-            cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e);
-            cui_slider_emit(o, CUI_SLIDER_UPDATE, next, e);
-            cui_slider_emit(o, CUI_SLIDER_COMMIT, next, e);
+            cui_slider_emit(o, CUI_SLIDER_BEGIN, value, e, i, CUI_SLIDER_EVENT_INPUT, dispatch);
+            cui_slider_emit(o, CUI_SLIDER_UPDATE, next, e, i, CUI_SLIDER_EVENT_INPUT, dispatch);
+            cui_slider_emit(o, CUI_SLIDER_COMMIT, next, e, i, CUI_SLIDER_EVENT_INPUT, dispatch);
             state->preview = next;
         }
     }
     return true;
+}
+bool cui_base_slider_controlled(cui_context *ui, cui_id id, cui_str name, double value,
+                                cui_slider_state *state, cui_slider_options o) {
+    return cui_slider_controlled(ui, id, name, value, state, o, NULL);
+}
+cui_component_slider_result cui_base_slider_events(cui_context *ui, cui_id id, cui_str name,
+                                                   double value, cui_slider_state *state,
+                                                   cui_slider_options o,
+                                                   cui_component_slider_handler handler) {
+    cui_component_slider_result result = {0};
+    if (o.on_request || o.user)
+        return result;
+    cui_slider_dispatch dispatch = {ui, id, value, handler, &result};
+    result.valid = cui_slider_controlled(ui, id, name, value, state, o, &dispatch);
+    result.submitted = result.valid;
+    return result;
 }
 
 static bool cui_input_readonly_event(cui_event event) {

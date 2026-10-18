@@ -36,8 +36,7 @@ static void content(cui_context *ui, void *user) {
     ++m->content_calls;
     if (m->mutate_content)
         m->value = true;
-    cui_begin_box(ui, 77, (cui_box){.width = 13, .height = 11,
-                                   .background = {31, 32, 33, 255}});
+    cui_begin_box(ui, 77, (cui_box){.width = 13, .height = 11, .background = {31, 32, 33, 255}});
     cui_end_box(ui);
 }
 static const cui_semantic *node(cui_context *ui, cui_id id) {
@@ -65,40 +64,54 @@ static bool painted(cui_draw_list draw, cui_rect bounds, cui_color color) {
 static cui_component_action_result submit(model *m) {
     cui_component_boolean_handler handler = {m->readonly ? NULL : requested, m};
     if (m->toggle) {
-        cui_toggle_options o = {.width = 140, .size = m->size, .design_size = m->design_size,
-                                 .disabled = m->disabled, .variant = CUI_TOGGLE_OUTLINE,
-                                 .accessibility_label = CUI_STR("Toggle flag"), .tooltip = CUI_STR("Details"),
-                                 .content = content, .content_user = m,
-                                 .on_change = m->legacy || m->conflict == 1 || m->conflict == 3 ? legacy : NULL,
-                                 .change_user = m->legacy || m->conflict == 2 || m->conflict == 3 ? m : NULL};
+        cui_toggle_options o = {
+            .width = 140,
+            .size = m->size,
+            .design_size = m->design_size,
+            .disabled = m->disabled,
+            .variant = CUI_TOGGLE_OUTLINE,
+            .accessibility_label = CUI_STR("Toggle flag"),
+            .tooltip = CUI_STR("Details"),
+            .content = content,
+            .content_user = m,
+            .on_change = m->legacy || m->conflict == 1 || m->conflict == 3 ? legacy : NULL,
+            .change_user = m->legacy || m->conflict == 2 || m->conflict == 3 ? m : NULL};
         if (m->legacy) {
-            bool changed = cui_toggle_ex(m->ui, 10, &m->theme, cui_string("Flag"), &m->value,
-                                          &m->tooltip, o);
-            return (cui_component_action_result){.valid = true, .submitted = true,
-                                                  .activation_count = changed ? 1 : 0};
+            bool changed =
+                cui_toggle_ex(m->ui, 10, &m->theme, cui_string("Flag"), &m->value, &m->tooltip, o);
+            return (cui_component_action_result){
+                .valid = true, .submitted = true, .activation_count = changed ? 1 : 0};
         }
-        return cui_toggle_events(m->ui, 10, &m->theme, cui_string("Flag"), m->value,
-                                  &m->tooltip, o, handler);
+        return cui_toggle_events(m->ui, 10, &m->theme, cui_string("Flag"), m->value, &m->tooltip, o,
+                                 handler);
     }
-    cui_switch_options o = {.width = 140, .size = m->size, .design_size = m->design_size,
-                             .disabled = m->disabled, .reduced_motion = true, .label_left = true,
-                             .accessibility_label = CUI_STR("Switch flag"), .tooltip = CUI_STR("Details"),
-                             .content = content, .content_user = m,
-                             .on_change = m->legacy || m->conflict == 1 || m->conflict == 3 ? legacy : NULL,
-                             .change_user = m->legacy || m->conflict == 2 || m->conflict == 3 ? m : NULL};
+    cui_switch_options o = {
+        .width = 140,
+        .size = m->size,
+        .design_size = m->design_size,
+        .disabled = m->disabled,
+        .reduced_motion = true,
+        .label_left = true,
+        .accessibility_label = CUI_STR("Switch flag"),
+        .tooltip = CUI_STR("Details"),
+        .content = content,
+        .content_user = m,
+        .on_change = m->legacy || m->conflict == 1 || m->conflict == 3 ? legacy : NULL,
+        .change_user = m->legacy || m->conflict == 2 || m->conflict == 3 ? m : NULL};
     if (m->legacy) {
-        bool changed = cui_switch_ex(m->ui, 10, &m->theme, cui_string("Flag"), &m->value,
-                                      &m->motion, o);
-        return (cui_component_action_result){.valid = true, .submitted = true,
-                                              .activation_count = changed ? 1 : 0};
+        bool changed =
+            cui_switch_ex(m->ui, 10, &m->theme, cui_string("Flag"), &m->value, &m->motion, o);
+        return (cui_component_action_result){
+            .valid = true, .submitted = true, .activation_count = changed ? 1 : 0};
     }
-    return cui_switch_events(m->ui, 10, &m->theme, cui_string("Flag"), m->value,
-                              &m->motion, o, handler);
+    return cui_switch_events(m->ui, 10, &m->theme, cui_string("Flag"), m->value, &m->motion, o,
+                             handler);
 }
 static cui_draw_list frame(model *m, cui_component_action_result *out) {
     assert(cui_begin_frame(m->ui, 350, 240, .016f));
-    cui_begin_box(m->ui, 1, (cui_box){.width = 350, .height = 240,
-                                     .inert = m->inert, .layout_only = m->layout_only});
+    cui_begin_box(
+        m->ui, 1,
+        (cui_box){.width = 350, .height = 240, .inert = m->inert, .layout_only = m->layout_only});
     cui_component_action_result r = submit(m);
     cui_end_box(m->ui);
     cui_draw_list draw = cui_end_frame(m->ui);
@@ -117,8 +130,8 @@ static model create(bool toggle) {
 }
 static void accessibility(cui_context *ui) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
-                                         .accessibility_target = 10,
-                                         .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+                                           .accessibility_target = 10,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
 }
 static void click(cui_context *ui) {
     cui_rect b = cui_bounds(ui, 10);
@@ -138,17 +151,20 @@ static void snapshot(bool toggle, bool accept, bool initial) {
     cui_component_action_result r;
     cui_draw_list draw = frame(&m, &r);
     assert(r.valid && r.submitted && r.activation_count == 2 && r.request_count == 2);
-    assert(m.requests == 2 && m.value == (accept ? !initial : initial) && m.content_calls == 1 && !m.legacy_calls);
+    assert(m.requests == 2 && m.value == (accept ? !initial : initial) && m.content_calls == 1 &&
+           !m.legacy_calls);
     for (unsigned i = 0; i < 2; ++i) {
         assert(m.copies[i].current == initial && m.copies[i].requested == !initial);
         assert(m.copies[i].event.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
     }
     const cui_semantic *s = node(m.ui, 10);
-    assert(s && s->checked == initial && s->value == (initial ? 1 : 0) && s->role == (toggle ? CUI_ROLE_BUTTON : CUI_ROLE_SWITCH));
+    assert(s && s->checked == initial && s->value == (initial ? 1 : 0) &&
+           s->role == (toggle ? CUI_ROLE_BUTTON : CUI_ROLE_SWITCH));
     assert(s->name.length == (toggle ? strlen("Toggle flag") : strlen("Switch flag")));
     cui_rect b = cui_bounds(m.ui, toggle ? 10 : cui_switch_track_id(10));
-    assert(painted(draw, b, initial ? (toggle ? m.theme.accent : m.theme.primary)
-                                   : (toggle ? m.theme.background : m.theme.switch_background)));
+    assert(painted(draw, b,
+                   initial ? (toggle ? m.theme.accent : m.theme.primary)
+                           : (toggle ? m.theme.background : m.theme.switch_background)));
     assert(toggle || (initial ? m.motion.target > 0 : m.motion.target == 0));
     frame(&m, NULL);
     assert(node(m.ui, 10)->checked == (accept ? !initial : initial));
@@ -186,10 +202,10 @@ static void sizes(bool toggle) {
         m.size = (cui_control_size)size;
         frame(&m, NULL);
         cui_rect b = cui_bounds(m.ui, toggle ? 10 : cui_switch_track_id(10));
-        float height = size == CUI_CONTROL_XSMALL ? (toggle ? 20 : 16)
+        float height = size == CUI_CONTROL_XSMALL  ? (toggle ? 20 : 16)
                        : size == CUI_CONTROL_SMALL ? (toggle ? 24 : 16)
                        : size == CUI_CONTROL_LARGE ? (toggle ? 36 : 24)
-                                                  : (toggle ? 32 : 20);
+                                                   : (toggle ? 32 : 20);
         assert(b.h == height && cui_bounds(m.ui, 10).w == 140 && cui_bounds(m.ui, 77).w == 13);
     }
     m.design_size = CUI_DESIGN_LG;

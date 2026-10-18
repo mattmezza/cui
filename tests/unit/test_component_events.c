@@ -54,8 +54,7 @@ static void metadata_test(void) {
     assert(cui_component_event_set_frame_index(&value, UINT64_MAX, 0));
     assert(value.frame_sequence == UINT64_MAX && value.event_index == 0);
     assert(!(value.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION));
-    cui_activation_snapshot bad = {.target = 10, .frame_sequence = 1,
-                                    .event_type = CUI_EVENT_TEXT};
+    cui_activation_snapshot bad = {.target = 10, .frame_sequence = 1, .event_type = CUI_EVENT_TEXT};
     before = value;
     assert(!cui_component_event_from_activation(&value, CUI_COMPONENT_EVENT_SUBMIT, &bad));
     assert(!cui_component_event_from_activation(&value, CUI_COMPONENT_EVENT_SUBMIT, NULL));
@@ -81,12 +80,19 @@ static void metadata_test(void) {
     assert(ui);
     scene(ui);
     finish(ui);
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 20, .y = 20,
-                                          .pointer_type = CUI_POINTER_TOUCH, .pointer_id = 42,
-                                          .pointer_device = 5}));
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 24, .y = 20,
-                                          .pointer_type = CUI_POINTER_TOUCH, .pointer_id = 42,
-                                          .pointer_device = 5, .click_count = 2}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                           .x = 20,
+                                           .y = 20,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 42,
+                                           .pointer_device = 5}));
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                           .x = 24,
+                                           .y = 20,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 42,
+                                           .pointer_device = 5,
+                                           .click_count = 2}));
     scene(ui);
     cui_component_event_metadata pointer = accepted(ui, 1);
     assert(pointer.source == CUI_COMPONENT_EVENT_SOURCE_POINTER);
@@ -99,17 +105,19 @@ static void metadata_test(void) {
     assert(cui_component_event_set_frame_index(&pointer, pointer.frame_sequence, 1));
     finish(ui);
     cui_focus(ui, 10);
-    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER,
-                                          .modifiers = CUI_MOD_ALT}));
+    assert(cui_queue_event(
+        ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER, .modifiers = CUI_MOD_ALT}));
     scene(ui);
     cui_component_event_metadata keyboard = accepted(ui, 0);
     assert(keyboard.source == CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
     assert(keyboard.activation.has_key_bounds && !keyboard.activation.has_press);
-    assert(keyboard.activation.key == CUI_KEY_ENTER && keyboard.activation.modifiers == CUI_MOD_ALT);
+    assert(keyboard.activation.key == CUI_KEY_ENTER &&
+           keyboard.activation.modifiers == CUI_MOD_ALT);
     finish(ui);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
-                                          .accessibility_target = 10,
-                                          .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+                                           .accessibility_target = 10,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
     scene(ui);
     cui_component_event_metadata accessibility = accepted(ui, 0);
     assert(accessibility.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
@@ -134,8 +142,8 @@ static void copy_test(void) {
     const char text[] = "A\xc3\xa9\xf0\x9f\x98\x80";
     char buffer[sizeof text];
     cui_str out;
-    assert(cui_component_event_copy_utf8((cui_str){text, sizeof text - 1}, sizeof text - 1,
-                                          buffer, sizeof buffer, &out) == CUI_COMPONENT_EVENT_COPY_OK);
+    assert(cui_component_event_copy_utf8((cui_str){text, sizeof text - 1}, sizeof text - 1, buffer,
+                                         sizeof buffer, &out) == CUI_COMPONENT_EVENT_COPY_OK);
     assert(out.data == buffer && out.length == sizeof text - 1 && !strcmp(buffer, text));
     assert(cui_component_event_copy_utf8((cui_str){NULL, 0}, 0, buffer, 1, &out) ==
            CUI_COMPONENT_EVENT_COPY_OK);
@@ -168,6 +176,7 @@ static void copy_test(void) {
 int main(void) {
     metadata_test();
     copy_test();
-    puts("component metadata: actual pointer/key/accessibility evidence and bounded UTF-8 copies PASS");
+    puts("component metadata: actual pointer/key/accessibility evidence and bounded UTF-8 copies "
+         "PASS");
     return 0;
 }

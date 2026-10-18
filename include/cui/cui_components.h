@@ -2,15 +2,14 @@
 #ifndef CUI_COMPONENTS_H
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
-#include "cui_control_events.h"
 #include "cui_boolean_events.h"
-#include "cui_text_input_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
 #include "cui_chrome.h"
 #include "cui_command.h"
 #include "cui_content.h"
+#include "cui_control_events.h"
 #include "cui_description.h"
 #include "cui_disclosure.h"
 #include "cui_editor.h"
@@ -29,6 +28,7 @@
 #include "cui_status.h"
 #include "cui_surface.h"
 #include "cui_table.h"
+#include "cui_text_input_events.h"
 #include "cui_text_overflow.h"
 #include "cui_text_view.h"
 #include "cui_theme.h"
@@ -162,8 +162,7 @@ bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_b
  * Counts accepted activations even with no new handler. Existing resource
  * lifetimes and no-destruction-during-dispatch preconditions remain in force. */
 cui_component_action_result cui_button_events(cui_context *, cui_id, const cui_theme *, cui_str,
-                                               cui_button_options,
-                                               cui_component_activation_handler);
+                                              cui_button_options, cui_component_activation_handler);
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 #include "cui_button_group.h"
 typedef struct {
@@ -261,8 +260,8 @@ bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_
  * next submission; this call keeps its snapshot for requests/paint/semantics.
  * Same callback lifetime/teardown preconditions as cui_base_check_events. */
 cui_component_action_result cui_checkbox_events(cui_context *, cui_id, const cui_theme *, cui_str,
-                                                 cui_check_state, cui_checkbox_options,
-                                                 cui_component_check_handler);
+                                                cui_check_state, cui_checkbox_options,
+                                                cui_component_check_handler);
 
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {
@@ -298,8 +297,8 @@ bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool 
  * state retains spring/tooltip presentation only. Same teardown preconditions
  * as cui_base_switch_events; no handler means read-only. */
 cui_component_action_result cui_switch_events(cui_context *, cui_id, const cui_theme *, cui_str,
-                                               bool, cui_switch_state *, cui_switch_options,
-                                               cui_component_boolean_handler);
+                                              bool, cui_switch_state *, cui_switch_options,
+                                              cui_component_boolean_handler);
 typedef enum { CUI_TOGGLE_GHOST, CUI_TOGGLE_OUTLINE } cui_toggle_variant;
 typedef struct {
     cui_toggle_variant variant;
@@ -326,8 +325,8 @@ bool cui_toggle_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
 /* Same immutable/request/conflict rules as cui_switch_events. Tooltip state is
  * optional presentation storage; passive ancestors do not mutate it. */
 cui_component_action_result cui_toggle_events(cui_context *, cui_id, const cui_theme *, cui_str,
-                                               bool, cui_hover_state *, cui_toggle_options,
-                                               cui_component_boolean_handler);
+                                              bool, cui_hover_state *, cui_toggle_options,
+                                              cui_component_boolean_handler);
 typedef struct {
     cui_id id;
     cui_str label;
@@ -423,8 +422,8 @@ cui_input_result cui_input_ex(cui_context *, cui_id, const cui_theme *, cui_str 
 /* CHANGE/SUBMIT observers follow Base Input timing and lifetime rules. Secure text
  * is redacted. Defer model/context destruction until frame/render consumption. */
 cui_input_event_result cui_input_events(cui_context *, cui_id, const cui_theme *, cui_str name,
-                                         cui_edit *, cui_input_state *, cui_input_options,
-                                         cui_component_text_handler);
+                                        cui_edit *, cui_input_state *, cui_input_options,
+                                        cui_component_text_handler);
 cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);

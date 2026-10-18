@@ -151,7 +151,8 @@ cui_id cui_table_body_id(cui_id table);
 typedef cui_str (*cui_table_label_fn)(void *, size_t row, cui_id column);
 typedef void (*cui_table_cell_fn)(cui_context *, const cui_theme *, void *, size_t row,
                                   cui_id column);
-/* Additive scalar, column, action/context and exact multi-set observers: include cui_table_events.h. */
+/* Additive scalar, column, action/context and exact multi-set observers: include
+ * cui_table_events.h. */
 cui_table_result cui_table_reduce(cui_context *, cui_id, cui_table_model *, cui_table_state *,
                                   cui_table_options);
 void cui_table_submit_root(cui_context *, cui_id, cui_table_model *, cui_table_state *,

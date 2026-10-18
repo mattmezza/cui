@@ -46,14 +46,14 @@ static cui_picker_event_result frame(fixture *f, bool facade, bool handler) {
         if (facade) {
             cui_time_handler h = {.on_change = handler ? observe : NULL, .user = f};
             out = f->styled ? cui_time_field_events(f->ui, 20, &theme, cui_string("Time"),
-                                                     &f->state, &f->time, f->options, h)
-                            : cui_base_time_field_events(f->ui, 20, cui_string("Time"),
-                                                          &f->state, &f->time, f->options, h);
+                                                    &f->state, &f->time, f->options, h)
+                            : cui_base_time_field_events(f->ui, 20, cui_string("Time"), &f->state,
+                                                         &f->time, f->options, h);
         } else
             out.changed = f->styled ? cui_time_field(f->ui, 20, &theme, cui_string("Time"),
-                                                       &f->state, &f->time, f->options)
-                                   : cui_base_time_field(f->ui, 20, cui_string("Time"),
-                                                            &f->state, &f->time, f->options);
+                                                     &f->state, &f->time, f->options)
+                                    : cui_base_time_field(f->ui, 20, cui_string("Time"), &f->state,
+                                                          &f->time, f->options);
         if (!f->styled) {
             size_t count;
             const cui_semantic *semantics = cui_semantics(f->ui, &count);
@@ -84,7 +84,8 @@ static cui_picker_event_result pair(fixture *a, fixture *b, bool handler) {
         assert(sa[i].tab_index == sb[i].tab_index && sa[i].tab_ordered == sb[i].tab_ordered &&
                sa[i].tab_stop_disabled == sb[i].tab_stop_disabled);
         assert(sa[i].details.readonly == sb[i].details.readonly &&
-               sa[i].details.minimum == sb[i].details.minimum && sa[i].details.maximum == sb[i].details.maximum);
+               sa[i].details.minimum == sb[i].details.minimum &&
+               sa[i].details.maximum == sb[i].details.maximum);
     }
     assert(a->draw.count == b->draw.count);
     for (size_t i = 0; i < a->draw.count; ++i) {
@@ -113,25 +114,34 @@ static void exercise(bool styled) {
     b.ui = cui_create((cui_config){.max_elements = 64, .max_commands = 128});
     assert(a.ui && b.ui);
     cui_time_handler admitted = {.on_change = observe, .user = &b};
-    assert(!cui_base_time_field_events(b.ui, 0, cui_string("Time"), &b.state, &b.time,
-                                     b.options, admitted).changed);
-    assert(!cui_base_time_field_events(NULL, 20, cui_string("Time"), &b.state, &b.time,
-                                     b.options, admitted).change_count);
-    assert(!cui_base_time_field_events(b.ui, 20, cui_string("Time"), NULL, &b.time,
-                                     b.options, admitted).change_count);
-    assert(!cui_base_time_field_events(b.ui, 20, cui_string("Time"), &b.state, NULL,
-                                     b.options, admitted).change_count);
-    assert(!cui_time_field_events(b.ui, 20, NULL, cui_string("Time"), &b.state, &b.time,
-                                b.options, admitted).change_count);
+    assert(!cui_base_time_field_events(b.ui, 0, cui_string("Time"), &b.state, &b.time, b.options,
+                                       admitted)
+                .changed);
+    assert(!cui_base_time_field_events(NULL, 20, cui_string("Time"), &b.state, &b.time, b.options,
+                                       admitted)
+                .change_count);
+    assert(!cui_base_time_field_events(b.ui, 20, cui_string("Time"), NULL, &b.time, b.options,
+                                       admitted)
+                .change_count);
+    assert(!cui_base_time_field_events(b.ui, 20, cui_string("Time"), &b.state, NULL, b.options,
+                                       admitted)
+                .change_count);
+    assert(!cui_time_field_events(b.ui, 20, NULL, cui_string("Time"), &b.state, &b.time, b.options,
+                                  admitted)
+                .change_count);
     assert(!b.calls && b.time.hour == 23 && !b.state.segment);
     assert(!pair(&a, &b, true).change_count);
     cui_rect ra = cui_bounds(a.ui, cui_time_segment_id(20, 1));
     cui_rect rb = cui_bounds(b.ui, cui_time_segment_id(20, 1));
     assert(ra.w > 0 && rb.w > 0);
     assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
-        .x = ra.x + ra.w / 2, .y = ra.y + ra.h / 2, .pointer_button = CUI_POINTER_PRIMARY}));
+                                             .x = ra.x + ra.w / 2,
+                                             .y = ra.y + ra.h / 2,
+                                             .pointer_button = CUI_POINTER_PRIMARY}));
     assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
-        .x = rb.x + rb.w / 2, .y = rb.y + rb.h / 2, .pointer_button = CUI_POINTER_PRIMARY}));
+                                             .x = rb.x + rb.w / 2,
+                                             .y = rb.y + rb.h / 2,
+                                             .pointer_button = CUI_POINTER_PRIMARY}));
     assert(!pair(&a, &b, true).change_count && b.state.segment == 1);
     key(&a, &b, CUI_KEY_UP);
     assert(pair(&a, &b, true).change_count == 1 && b.time.minute == 0);
@@ -173,7 +183,8 @@ static void exercise(bool styled) {
     a.state.segment = b.state.segment = 9;
     a.state.digit_count = b.state.digit_count = 9;
     key(&a, &b, CUI_KEY_UP);
-    assert(!pair(&a, &b, true).change_count && b.time.hour == 11 && !b.state.segment && !b.state.digit_count);
+    assert(!pair(&a, &b, true).change_count && b.time.hour == 11 && !b.state.segment &&
+           !b.state.digit_count);
     a.options.readonly = b.options.readonly = false;
     a.options.disabled = b.options.disabled = true;
     key(&a, &b, CUI_KEY_UP);

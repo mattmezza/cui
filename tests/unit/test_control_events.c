@@ -50,8 +50,8 @@ static void check_request(void *user, const cui_component_check_request *request
 }
 static void begin(void) {
     assert(cui_begin_frame(ui, 400, 220, .016f));
-    cui_begin_box(ui, 1, (cui_box){.width = 350, .height = 200, .inert = inert,
-                                 .layout_only = layout_only});
+    cui_begin_box(
+        ui, 1, (cui_box){.width = 350, .height = 200, .inert = inert, .layout_only = layout_only});
 }
 static void finish(void) {
     cui_end_box(ui);
@@ -61,11 +61,17 @@ static void finish(void) {
 static void frame(void) {
     static cui_button_state state;
     begin();
-    button_result = cui_button_events(ui, 10, &theme, cui_string("Run"),
-        (cui_button_options){.width = 120, .disabled = disabled, .loading = loading,
-                             .on_click = legacy, .on_click_event = old_typed,
-                             .on_hover = hovered, .state = &state, .action_user = &legacy_count},
-        (cui_component_activation_handler){activated, &activation_count});
+    button_result =
+        cui_button_events(ui, 10, &theme, cui_string("Run"),
+                          (cui_button_options){.width = 120,
+                                               .disabled = disabled,
+                                               .loading = loading,
+                                               .on_click = legacy,
+                                               .on_click_event = old_typed,
+                                               .on_hover = hovered,
+                                               .state = &state,
+                                               .action_user = &legacy_count},
+                          (cui_component_activation_handler){activated, &activation_count});
     cui_component_check_handler handler = {readonly ? NULL : check_request, &owner};
     if (base) {
         cui_begin_box(ui, 20, (cui_box){.width = 120, .height = 36});
@@ -74,14 +80,18 @@ static void frame(void) {
         cui_end_box(ui);
     } else
         check_result = cui_checkbox_events(ui, 20, &theme, cui_string("Check"), owner,
-                                            (cui_checkbox_options){.disabled = disabled}, handler);
+                                           (cui_checkbox_options){.disabled = disabled}, handler);
     finish();
 }
 static void click(cui_id id, cui_pointer_type type) {
     cui_rect bounds = cui_bounds(ui, id);
     assert(bounds.w > 0 && bounds.h > 0);
-    cui_event event = {.type = CUI_EVENT_POINTER_DOWN, .x = bounds.x + 4, .y = bounds.y + 4,
-                       .pointer_type = type, .pointer_id = 9, .pointer_device = 7};
+    cui_event event = {.type = CUI_EVENT_POINTER_DOWN,
+                       .x = bounds.x + 4,
+                       .y = bounds.y + 4,
+                       .pointer_type = type,
+                       .pointer_id = 9,
+                       .pointer_device = 7};
     assert(cui_queue_event(ui, event));
     event.type = CUI_EVENT_POINTER_UP;
     assert(cui_queue_event(ui, event));
@@ -108,12 +118,14 @@ int main(void) {
     click(10, CUI_POINTER_MOUSE);
     frame();
     assert(button_result.valid && button_result.submitted && button_result.activation_count == 2);
-    assert(!button_result.request_count && legacy_count == 2 && typed_count == 2 && activation_count == 2);
+    assert(!button_result.request_count && legacy_count == 2 && typed_count == 2 &&
+           activation_count == 2);
     assert(trace_count == 6 && !memcmp(trace, "LTNLTN", 6));
     assert(hover_count && retained.activation.press.contact == 9);
     assert(retained.source == CUI_COMPONENT_EVENT_SOURCE_POINTER);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
-                 .accessibility_target = 10, .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+                                           .accessibility_target = 10,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
     consume = true;
     frame();
     consume = false;
@@ -132,7 +144,8 @@ int main(void) {
     click(20, CUI_POINTER_TOUCH);
     frame();
     assert(check_result.activation_count == 1 && check_result.request_count == 1);
-    assert(owner == CUI_CHECK_MIXED && requested.current == CUI_CHECK_MIXED && requested.requested == CUI_CHECK_CHECKED);
+    assert(owner == CUI_CHECK_MIXED && requested.current == CUI_CHECK_MIXED &&
+           requested.requested == CUI_CHECK_CHECKED);
     assert(requested.event.source == CUI_COMPONENT_EVENT_SOURCE_POINTER);
     assert(cui_focused(ui) == 10); /* Styled source preserves pointer focus. */
     accept = true;
@@ -141,7 +154,8 @@ int main(void) {
     frame();
     assert(check_result.request_count == 2 && owner == CUI_CHECK_CHECKED);
     assert(requested.current == CUI_CHECK_MIXED && requested.requested == CUI_CHECK_CHECKED);
-    assert(semantic(20)->value == (float)CUI_CHECK_MIXED); /* Entry snapshot, not owner writeback. */
+    assert(semantic(20)->value ==
+           (float)CUI_CHECK_MIXED); /* Entry snapshot, not owner writeback. */
     frame();
     assert(semantic(20)->checked && semantic(20)->value == (float)CUI_CHECK_CHECKED);
     cui_focus(ui, 20);
@@ -151,7 +165,8 @@ int main(void) {
     assert(check_result.request_count == 2 && owner == CUI_CHECK_UNCHECKED);
     assert(requested.current == CUI_CHECK_CHECKED && requested.requested == CUI_CHECK_UNCHECKED);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
-                 .accessibility_target = 20, .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+                                           .accessibility_target = 20,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
     frame();
     assert(check_result.request_count == 1 && owner == CUI_CHECK_CHECKED);
     assert(requested.event.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
@@ -160,7 +175,8 @@ int main(void) {
     unsigned before = request_count;
     click(20, CUI_POINTER_MOUSE);
     frame();
-    assert(check_result.activation_count == 1 && !check_result.request_count && request_count == before);
+    assert(check_result.activation_count == 1 && !check_result.request_count &&
+           request_count == before);
     assert(owner == CUI_CHECK_CHECKED);
     readonly = false;
     disabled = true;
@@ -195,31 +211,36 @@ int main(void) {
     frame();
     unsigned activations_before = activation_count;
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
-                 .accessibility_target = 10, .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
+                                           .accessibility_target = 10,
+                                           .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
     begin();
-    cui_component_action_result no_handler = cui_button_events(ui, 10, &theme, cui_string("Run"),
-        (cui_button_options){0}, (cui_component_activation_handler){0});
+    cui_component_action_result no_handler =
+        cui_button_events(ui, 10, &theme, cui_string("Run"), (cui_button_options){0},
+                          (cui_component_activation_handler){0});
     assert(no_handler.valid && no_handler.submitted && no_handler.activation_count == 1);
     assert(activation_count == activations_before);
     finish();
     /* Conflicting old/new handlers reject before semantics or callbacks. */
     begin();
     cui_check_options conflict = {.change_user = &owner};
-    cui_component_action_result invalid = cui_base_check_events(ui, 99, cui_string("Bad"), owner,
-                conflict, (cui_component_check_handler){check_request, &owner});
+    cui_component_action_result invalid =
+        cui_base_check_events(ui, 99, cui_string("Bad"), owner, conflict,
+                              (cui_component_check_handler){check_request, &owner});
     assert(!invalid.valid && !invalid.submitted);
     invalid = cui_checkbox_events(ui, 98, &theme, cui_string("Bad"), owner,
-        (cui_checkbox_options){.change_user = &owner}, (cui_component_check_handler){0});
+                                  (cui_checkbox_options){.change_user = &owner},
+                                  (cui_component_check_handler){0});
     assert(!invalid.valid);
     finish();
-    cui_component_action_result outside = cui_button_events(ui, 10, &theme, cui_string("Run"),
-        (cui_button_options){0}, (cui_component_activation_handler){activated, &activation_count});
+    cui_component_action_result outside =
+        cui_button_events(ui, 10, &theme, cui_string("Run"), (cui_button_options){0},
+                          (cui_component_activation_handler){activated, &activation_count});
     assert(outside.valid && !outside.submitted && !outside.activation_count);
     cui_checkbox_state untouched = {.id = 20};
     cui_checkbox_state untouched_before = untouched;
     outside = cui_checkbox_events(ui, 20, &theme, cui_string("Check"), owner,
-        (cui_checkbox_options){.state = &untouched},
-        (cui_component_check_handler){check_request, &owner});
+                                  (cui_checkbox_options){.state = &untouched},
+                                  (cui_component_check_handler){check_request, &owner});
     assert(outside.valid && !outside.submitted && !outside.request_count);
     assert(memcmp(&untouched, &untouched_before, sizeof untouched) == 0);
     size_t saturated = SIZE_MAX;

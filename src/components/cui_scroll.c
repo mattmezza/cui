@@ -183,10 +183,9 @@ bool cui_scrollbar_overlay(cui_context *ui, cui_id id, const cui_theme *theme, f
     return changed;
 }
 
-
 bool cui_scrollable_begin_events(cui_context *ui, cui_id id, const cui_theme *theme,
-                                cui_scroll_state *state, cui_scroll_options options,
-                                cui_scroll_event_scope *scope) {
+                                 cui_scroll_state *state, cui_scroll_options options,
+                                 cui_scroll_event_scope *scope) {
     if (!ui || !id || !theme || !state || !scope || scope->private_active ||
         !cui_frame_is_submitting(ui))
         return false;
@@ -204,9 +203,11 @@ bool cui_scrollable_begin_events(cui_context *ui, cui_id id, const cui_theme *th
     return true;
 }
 
-cui_scroll_event_result cui_scrollable_end_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_scroll_state *state,
-    cui_scroll_options options, cui_scroll_event_scope *scope, cui_scroll_handler handler) {
+cui_scroll_event_result cui_scrollable_end_events(cui_context *ui, cui_id id,
+                                                  const cui_theme *theme, cui_scroll_state *state,
+                                                  cui_scroll_options options,
+                                                  cui_scroll_event_scope *scope,
+                                                  cui_scroll_handler handler) {
     cui_scroll_event_result result;
     memset(&result, 0, sizeof(result));
     if (!ui || !id || !theme || !state || !scope || !scope->private_active ||

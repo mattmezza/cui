@@ -161,18 +161,19 @@ static void cui_sidebar_set_open(const cui_sidebar_menu_item *item, bool open) {
     if (item->on_expand)
         item->on_expand(open, item->user);
 }
-static cui_sidebar_activation cui_sidebar_event_cause(cui_context *ui, cui_id item,
-                                                       unsigned level, size_t index,
-                                                       cui_event_type type) {
+static cui_sidebar_activation cui_sidebar_event_cause(cui_context *ui, cui_id item, unsigned level,
+                                                      size_t index, cui_event_type type) {
     cui_sidebar_activation event;
     memset(&event, 0, sizeof(event));
     event.item = item;
     event.level = level;
     cui_activation_snapshot snapshot;
     if (!cui_event_activation_snapshot(ui, index, &snapshot) ||
-        !cui_component_event_from_activation(&event.event, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+        !cui_component_event_from_activation(&event.event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                             &snapshot)) {
         cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
-        if (type == CUI_EVENT_POINTER_UP) source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+        if (type == CUI_EVENT_POINTER_UP)
+            source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
         else if (type == CUI_EVENT_KEY_DOWN || type == CUI_EVENT_KEY_UP)
             source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
         else if (type == CUI_EVENT_ACCESSIBILITY_ACTION)
@@ -189,26 +190,34 @@ static void cui_sidebar_expand_observed(const cui_sidebar_menu_item *item, bool 
                                         const cui_sidebar_activation *cause) {
     bool controlled = item->expanded != NULL;
     cui_sidebar_set_open(item, next);
-    if (!observed) return;
-    cui_sidebar_expansion_fn callback = controlled ? handler.on_expand_request : handler.on_expand_change;
+    if (!observed)
+        return;
+    cui_sidebar_expansion_fn callback =
+        controlled ? handler.on_expand_request : handler.on_expand_change;
     bool value = controlled ? next : item->state && item->state->open;
-    if (!callback || (!controlled && value == before)) return;
+    if (!callback || (!controlled && value == before))
+        return;
     cui_sidebar_expansion_event event = {cause->event, cause->item, cause->level, before, value};
     event.event.kind = controlled ? CUI_COMPONENT_EVENT_REQUEST : CUI_COMPONENT_EVENT_CHANGE;
     callback(handler.user, &event);
     size_t *count = controlled ? &observed->request_count : &observed->change_count;
-    if (*count == SIZE_MAX) observed->count_overflow = true;
-    else (*count)++;
+    if (*count == SIZE_MAX)
+        observed->count_overflow = true;
+    else
+        (*count)++;
 }
-static cui_sidebar_item_result cui_sidebar_item_common(cui_context *ui, const cui_sidebar_menu_item *item,
-                                              bool collapsed, unsigned level, cui_sidebar_item_handler handler,
-                                              cui_sidebar_item_event_result *observed) {
+static cui_sidebar_item_result cui_sidebar_item_common(cui_context *ui,
+                                                       const cui_sidebar_menu_item *item,
+                                                       bool collapsed, unsigned level,
+                                                       cui_sidebar_item_handler handler,
+                                                       cui_sidebar_item_event_result *observed) {
     cui_sidebar_item_result r = {0};
     if (!ui || !item || !item->id || !cui_sidebar_string_valid(item->label) ||
         !cui_sidebar_string_valid(item->accessibility_label) ||
         (item->child_count && (!item->children || !item->state)) || level > CUI_SIDEBAR_DEPTH_LIMIT)
         return r;
-    if (observed) observed->valid = true;
+    if (observed)
+        observed->valid = true;
     if (item->child_count && item->state &&
         (!item->state->initialized || item->state->id != item->id)) {
         item->state->id = item->id;
@@ -239,7 +248,8 @@ static cui_sidebar_item_result cui_sidebar_item_common(cui_context *ui, const cu
         if (row.activated && activation == item->id) {
             cui_sidebar_activation notification;
             bool notify = observed && handler.on_activate;
-            bool expansion_observer = observed && (handler.on_expand_request || handler.on_expand_change);
+            bool expansion_observer =
+                observed && (handler.on_expand_request || handler.on_expand_change);
             if (notify || expansion_observer)
                 notification = cui_sidebar_event_cause(ui, item->id, level, i, events[i].type);
             r.activated = true;
@@ -263,7 +273,8 @@ static cui_sidebar_item_result cui_sidebar_item_common(cui_context *ui, const cu
             }
         } else if (caret.activated && activation == caret_id) {
             cui_sidebar_activation cause;
-            bool expansion_observer = observed && (handler.on_expand_request || handler.on_expand_change);
+            bool expansion_observer =
+                observed && (handler.on_expand_request || handler.on_expand_change);
             if (expansion_observer)
                 cause = cui_sidebar_event_cause(ui, item->id, level, i, events[i].type);
             bool before = cui_sidebar_open(item);
@@ -296,21 +307,23 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
                                               bool collapsed, unsigned level) {
     return cui_sidebar_item_common(ui, item, collapsed, level, (cui_sidebar_item_handler){0}, NULL);
 }
-cui_sidebar_item_event_result cui_base_sidebar_item_events(
-    cui_context *ui, const cui_sidebar_menu_item *item, bool collapsed, unsigned level,
-    cui_sidebar_item_handler handler) {
+cui_sidebar_item_event_result cui_base_sidebar_item_events(cui_context *ui,
+                                                           const cui_sidebar_menu_item *item,
+                                                           bool collapsed, unsigned level,
+                                                           cui_sidebar_item_handler handler) {
     cui_sidebar_item_event_result result;
     memset(&result, 0, sizeof(result));
     result.control = cui_sidebar_item_common(ui, item, collapsed, level, handler, &result);
     return result;
 }
 static bool cui_sidebar_toggle_common(cui_context *ui, cui_id id, cui_sidebar_toggle_options o,
-                                       cui_sidebar_collapse_handler handler,
-                                       cui_sidebar_toggle_event_result *observed) {
+                                      cui_sidebar_collapse_handler handler,
+                                      cui_sidebar_toggle_event_result *observed) {
     if (!ui || !id || o.side < CUI_SIDEBAR_LEFT || o.side > CUI_SIDEBAR_RIGHT ||
         !cui_sidebar_string_valid(o.accessibility_label))
         return false;
-    if (observed) observed->valid = true;
+    if (observed)
+        observed->valid = true;
     cui_interaction state =
         cui_interact(ui, id, CUI_ROLE_BUTTON, o.accessibility_label, o.disabled, false, 0);
     cui_set_semantic_details(ui, id, (cui_semantic_details){.expanded = !o.collapsed});
@@ -323,7 +336,8 @@ static bool cui_sidebar_toggle_common(cui_context *ui, cui_id id, cui_sidebar_to
                 cui_sidebar_collapse_request request;
                 bool notify = observed && handler.on_request;
                 if (notify) {
-                    cui_sidebar_activation cause = cui_sidebar_event_cause(ui, id, 0, i, events[i].type);
+                    cui_sidebar_activation cause =
+                        cui_sidebar_event_cause(ui, id, 0, i, events[i].type);
                     request.event = cause.event;
                     request.event.kind = CUI_COMPONENT_EVENT_REQUEST;
                     request.previous = collapsed;
@@ -334,8 +348,10 @@ static bool cui_sidebar_toggle_common(cui_context *ui, cui_id id, cui_sidebar_to
                     o.on_change(collapsed, o.user);
                 if (notify) {
                     handler.on_request(handler.user, &request);
-                    if (observed->request_count == SIZE_MAX) observed->count_overflow = true;
-                    else observed->request_count++;
+                    if (observed->request_count == SIZE_MAX)
+                        observed->count_overflow = true;
+                    else
+                        observed->request_count++;
                 }
             }
         cui_invalidate(ui);
@@ -345,8 +361,9 @@ static bool cui_sidebar_toggle_common(cui_context *ui, cui_id id, cui_sidebar_to
 bool cui_base_sidebar_toggle(cui_context *ui, cui_id id, cui_sidebar_toggle_options o) {
     return cui_sidebar_toggle_common(ui, id, o, (cui_sidebar_collapse_handler){0}, NULL);
 }
-cui_sidebar_toggle_event_result cui_base_sidebar_toggle_events(
-    cui_context *ui, cui_id id, cui_sidebar_toggle_options o, cui_sidebar_collapse_handler handler) {
+cui_sidebar_toggle_event_result
+cui_base_sidebar_toggle_events(cui_context *ui, cui_id id, cui_sidebar_toggle_options o,
+                               cui_sidebar_collapse_handler handler) {
     cui_sidebar_toggle_event_result result;
     memset(&result, 0, sizeof(result));
     result.activated = cui_sidebar_toggle_common(ui, id, o, handler, &result);

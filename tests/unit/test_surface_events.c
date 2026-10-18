@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_surface_events.h"
 #include "cui/cui_components.h"
+#include "cui/cui_surface_events.h"
 #include <assert.h>
 #include <string.h>
 typedef struct {
@@ -30,7 +30,8 @@ static bool decide(void *user, cui_surface_result result) {
     return o->allow;
 }
 static void legacy_closed(void *user, cui_surface_result result) {
-    (void)user; (void)result;
+    (void)user;
+    (void)result;
 }
 static cui_surface_event_result scene(observer *o, cui_surface_options options, unsigned mode) {
     cui_theme theme = cui_theme_light();
@@ -41,13 +42,19 @@ static cui_surface_event_result scene(observer *o, cui_surface_options options, 
     if (mode == 0)
         result = cui_base_surface_update_events(o->ui, o->state, options);
     else if (mode == 1) {
-        result = cui_base_surface_begin_events(o->ui, o->state, cui_string("Title"), cui_string("Body"), options);
-        if (result.control_result) cui_base_surface_end(o->ui);
+        result = cui_base_surface_begin_events(o->ui, o->state, cui_string("Title"),
+                                               cui_string("Body"), options);
+        if (result.control_result)
+            cui_base_surface_end(o->ui);
     } else if (mode == 2) {
-        result = cui_surface_begin_events(o->ui, &theme, o->state, cui_string("Title"), cui_string("Body"), options);
-        if (result.control_result) cui_surface_end(o->ui);
+        result = cui_surface_begin_events(o->ui, &theme, o->state, cui_string("Title"),
+                                          cui_string("Body"), options);
+        if (result.control_result)
+            cui_surface_end(o->ui);
     } else
-        result = cui_alert_dialog_events(o->ui, &theme, o->state, cui_string("Title"), cui_string("Body"), cui_string("OK"), cui_string("Cancel"), options);
+        result = cui_alert_dialog_events(o->ui, &theme, o->state, cui_string("Title"),
+                                         cui_string("Body"), cui_string("OK"), cui_string("Cancel"),
+                                         options);
     cui_end_box(o->ui);
     cui_end_frame(o->ui);
     assert(cui_last_error(o->ui) == CUI_OK);
@@ -71,8 +78,11 @@ static void lifecycle(void) {
         cui_surface_events_init(&state, 100, mode == 3 ? CUI_SURFACE_ALERT : CUI_SURFACE_DIALOG);
         observer o = {.ui = ui, .state = &state};
         assert(cui_surface_events_set_handler(&state, (cui_surface_event_handler){closed, &o}));
-        cui_surface_options options = {.viewport = {0, 0, 600, 400}, .width = 300, .height = 220,
-                                       .decide = decide, .decision_user = &o};
+        cui_surface_options options = {.viewport = {0, 0, 600, 400},
+                                       .width = 300,
+                                       .height = 220,
+                                       .decide = decide,
+                                       .decision_user = &o};
         assert(scene(&o, options, mode).valid);
         cui_surface_open(ui, &state.control, 1);
         assert(!cui_surface_events_detach(&state));
@@ -125,15 +135,25 @@ static void conflicts_and_helper(void) {
     cui_surface_request_close(ui, &state.control, CUI_SURFACE_ACCEPTED);
     for (unsigned i = 0; i < 2; ++i) {
         cui_surface_options conflict = options;
-        if (i) conflict.close_user = &o; else conflict.on_close = legacy_closed;
+        if (i)
+            conflict.close_user = &o;
+        else
+            conflict.on_close = legacy_closed;
         cui_surface_event_state before = state;
         cui_theme theme = cui_theme_light();
         assert(!cui_base_surface_update_events(ui, &state, conflict).valid);
-        assert(!cui_base_surface_begin_events(ui, &state, cui_string("T"), cui_string("D"), conflict).valid);
-        assert(!cui_surface_begin_events(ui, &theme, &state, cui_string("T"), cui_string("D"), conflict).valid);
-        assert(!cui_alert_dialog_events(ui, &theme, &state, cui_string("T"), cui_string("D"), cui_string("Y"), cui_string("N"), conflict).valid);
+        assert(
+            !cui_base_surface_begin_events(ui, &state, cui_string("T"), cui_string("D"), conflict)
+                 .valid);
+        assert(!cui_surface_begin_events(ui, &theme, &state, cui_string("T"), cui_string("D"),
+                                         conflict)
+                    .valid);
+        assert(!cui_alert_dialog_events(ui, &theme, &state, cui_string("T"), cui_string("D"),
+                                        cui_string("Y"), cui_string("N"), conflict)
+                    .valid);
         assert(memcmp(&before, &state, sizeof state) == 0);
-        cui_surface_options output; memset(&output, 0x5a, sizeof output);
+        cui_surface_options output;
+        memset(&output, 0x5a, sizeof output);
         cui_surface_options previous = output;
         assert(!cui_surface_events_options(&state, conflict, &output));
         assert(memcmp(&output, &previous, sizeof output) == 0);
@@ -141,7 +161,8 @@ static void conflicts_and_helper(void) {
     assert(cui_surface_events_set_handler(&state, (cui_surface_event_handler){closed, &o}));
     cui_surface_options transformed;
     assert(cui_surface_events_options(&state, options, &transformed));
-    assert(transformed.width == options.width && transformed.on_close && transformed.close_user == &state);
+    assert(transformed.width == options.width && transformed.on_close &&
+           transformed.close_user == &state);
     assert(cui_begin_frame(ui, 600, 400, .016f));
     assert(cui_base_surface_update(ui, &state.control, transformed));
     cui_end_frame(ui);
@@ -169,8 +190,8 @@ static void retained_after_begin(void) {
     assert(cui_begin_frame(ui, 600, 400, .016f));
     cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400});
     cui_button(ui, 1, &theme, cui_string("Open"), false);
-    cui_surface_event_result result = cui_surface_begin_events(ui, &theme, &state,
-        cui_string("Title"), cui_string("Body"), options);
+    cui_surface_event_result result = cui_surface_begin_events(
+        ui, &theme, &state, cui_string("Title"), cui_string("Body"), options);
     assert(result.valid && result.control_result && result.close_count == 0 && !state.active);
     cui_surface_close(ui, &state.control, CUI_SURFACE_CLOSED);
     assert(o.calls == 1 && result.close_count == 0); /* Returned values never mutate. */
@@ -195,20 +216,30 @@ static void sheet_replacement(void) {
     cui_surface_events_init(&state, 100, CUI_SURFACE_SHEET);
     observer first = {.ui = ui, .state = &state}, second = first;
     assert(cui_surface_events_set_handler(&state, (cui_surface_event_handler){closed, &first}));
-    cui_surface_options options = {.viewport = {0, 0, 600, 400}, .width = 200, .height = 200,
+    cui_surface_options options = {.viewport = {0, 0, 600, 400},
+                                   .width = 200,
+                                   .height = 200,
                                    .sheet_animation_seconds = .064f};
     scene(&first, options, 2);
     cui_surface_open(ui, &state.control, 1);
-    for (unsigned i = 0; i < 6; ++i) scene(&first, options, 2);
+    for (unsigned i = 0; i < 6; ++i)
+        scene(&first, options, 2);
     cui_surface_request_close(ui, &state.control, CUI_SURFACE_CANCELLED);
     assert(scene(&first, options, 2).close_count == 0 && state.control.sheet_closing);
     assert(!cui_surface_events_detach(&state));
     assert(cui_surface_events_set_handler(&state, (cui_surface_event_handler){closed, &second}));
     size_t count = 0;
-    for (unsigned i = 0; i < 8; ++i) count += scene(&second, options, 2).close_count;
+    for (unsigned i = 0; i < 8; ++i)
+        count += scene(&second, options, 2).close_count;
     assert(count == 1 && first.calls == 0 && second.calls == 1);
     assert(second.saved.result == CUI_SURFACE_CANCELLED);
     assert(cui_surface_events_detach(&state));
     cui_destroy(ui);
 }
-int main(void) { lifecycle(); conflicts_and_helper(); retained_after_begin(); sheet_replacement(); return 0; }
+int main(void) {
+    lifecycle();
+    conflicts_and_helper();
+    retained_after_begin();
+    sheet_replacement();
+    return 0;
+}

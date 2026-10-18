@@ -40,8 +40,8 @@ static unsigned page_touch_cancels;
 #include "cui/cui_text_view.h"
 #include "cui/cui_textarea.h"
 #include "cui/cui_toolbar.h"
-#include "cui/cui_virtual.h"
 #include "cui/cui_video_controls.h"
+#include "cui/cui_virtual.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2651,18 +2651,26 @@ void gallery_video_sync(unsigned session, unsigned epoch, double position, doubl
         !isfinite(position) || position < 0 || !isfinite(duration) || duration < 0 ||
         !isfinite(rate) || rate <= 0 || status < 0 || status > CUI_VIDEO_FAILED || (caps & ~15u))
         return;
-    if (epoch != video_epoch) video_frame_valid = false;
+    if (epoch != video_epoch)
+        video_frame_valid = false;
     video_epoch = epoch;
-    video_view.timeline = (cui_video){.position = fmin(position, duration), .duration = duration,
-        .duration_known = duration > 0, .seekable = (caps & CUI_VIDEO_CAP_SEEK) != 0, .rate = rate,
-        .generation = epoch, .playing = playing != 0, .loop = true};
+    video_view.timeline = (cui_video){.position = fmin(position, duration),
+                                      .duration = duration,
+                                      .duration_known = duration > 0,
+                                      .seekable = (caps & CUI_VIDEO_CAP_SEEK) != 0,
+                                      .rate = rate,
+                                      .generation = epoch,
+                                      .playing = playing != 0,
+                                      .loop = true};
     video_view.capabilities = caps;
     video_view.status = (cui_video_status)status;
     video_view.fullscreen = fullscreen != 0;
-    video_view.status_description = status == CUI_VIDEO_LOADING ? cui_string("Loading browser-decoded sample") :
-        status == CUI_VIDEO_BUFFERING ? cui_string("Seeking / buffering") :
-        status == CUI_VIDEO_FAILED ? cui_string("Browser media operation failed; see host status") :
-        cui_string("Silent local sample · browser decoding · CUI controls");
+    video_view.status_description =
+        status == CUI_VIDEO_LOADING     ? cui_string("Loading browser-decoded sample")
+        : status == CUI_VIDEO_BUFFERING ? cui_string("Seeking / buffering")
+        : status == CUI_VIDEO_FAILED
+            ? cui_string("Browser media operation failed; see host status")
+            : cui_string("Silent local sample · browser decoding · CUI controls");
 }
 unsigned char *gallery_video_buffer(unsigned session, unsigned epoch) {
     return session && session == video_session && epoch == video_epoch ? video_pixels : NULL;
@@ -2677,22 +2685,38 @@ int gallery_video_commit(unsigned session, unsigned epoch, double timestamp) {
     video_frame_valid = true;
     return 1;
 }
-unsigned gallery_video_request_count(void) { return video_request_count; }
+unsigned gallery_video_request_count(void) {
+    return video_request_count;
+}
 double gallery_video_request(unsigned i, unsigned field) {
-    if (i >= video_request_count) return -1;
+    if (i >= video_request_count)
+        return -1;
     const cui_video_request *r = &video_requests[i];
     switch (field) {
-    case 0: return r->kind;
-    case 1: return r->phase;
-    case 2: return r->source_id;
-    case 3: return r->generation;
-    case 4: return r->kind == CUI_VIDEO_PLAYING || r->kind == CUI_VIDEO_FULLSCREEN ?
-        (double)r->value.enabled : r->kind == CUI_VIDEO_RATE ? r->value.rate : r->value.seconds;
-    default: return -1;
+    case 0:
+        return r->kind;
+    case 1:
+        return r->phase;
+    case 2:
+        return r->source_id;
+    case 3:
+        return r->generation;
+    case 4:
+        return r->kind == CUI_VIDEO_PLAYING || r->kind == CUI_VIDEO_FULLSCREEN
+                   ? (double)r->value.enabled
+               : r->kind == CUI_VIDEO_RATE ? r->value.rate
+                                           : r->value.seconds;
+    default:
+        return -1;
     }
 }
-unsigned gallery_video_overflow(void) { return video_request_overflow; }
-void gallery_video_drain(void) { video_request_count = 0; video_request_overflow = false; }
+unsigned gallery_video_overflow(void) {
+    return video_request_overflow;
+}
+void gallery_video_drain(void) {
+    video_request_count = 0;
+    video_request_overflow = false;
+}
 
 int gallery_frame(int story, int theme, int disabled, float width, float height) {
     if (!ui || width < 1 || height < 1)
@@ -2760,9 +2784,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     switch (story) {
     case 81: {
         float player_width = fmaxf(160, fminf(width - 48, 640));
-        cui_video_player_options o = {.controls = true,
-            .surface = {.geometry = {.width = player_width, .height = player_width * 180 / 320,
-                                     .fit = CUI_IMAGE_CONTAIN}, .opacity = 1,
+        cui_video_player_options o = {
+            .controls = true,
+            .surface = {.geometry = {.width = player_width,
+                                     .height = player_width * 180 / 320,
+                                     .fit = CUI_IMAGE_CONTAIN},
+                        .opacity = 1,
                         .description = cui_string("Decoded moving color test sample")},
             .controls_options = cui_video_controls_defaults()};
         o.controls_options.width = player_width;
@@ -2772,9 +2799,13 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         o.controls_options.disabled = disabled != 0;
         o.controls_options.on_request = video_request;
         cui_video_player_frame frame = {.source_id = video_session,
-            .frame = {.bitmap = {.pixels = video_pixels, .width = 320, .height = 180,
-                                .stride = 320 * 4, .revision = video_revision},
-                      .generation = video_epoch, .timestamp = video_timestamp}};
+                                        .frame = {.bitmap = {.pixels = video_pixels,
+                                                             .width = 320,
+                                                             .height = 180,
+                                                             .stride = 320 * 4,
+                                                             .revision = video_revision},
+                                                  .generation = video_epoch,
+                                                  .timestamp = video_timestamp}};
         (void)cui_video_player(ui, cui_id_from(ui, "browser-video"), &t, &video_controls,
                                video_view, video_frame_valid ? &frame : NULL, o);
         break;

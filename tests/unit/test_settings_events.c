@@ -383,7 +383,8 @@ static void scalar_metadata(scalar_fixture *f, cui_settings_change_reason reason
 static void boolean_event(void *user, const cui_settings_bool_change *event) {
     scalar_fixture *f = user;
     assert(event->item < 2);
-    scalar_metadata(f, event->reason, event->event, event->field_id, event->page, event->group, event->item);
+    scalar_metadata(f, event->reason, event->event, event->field_id, event->page, event->group,
+                    event->item);
     assert(f->booleans[event->item] == event->value && event->previous != event->value);
     assert(f->legacy_calls[event->item]);
     f->last_boolean = *event;
@@ -392,7 +393,8 @@ static void boolean_event(void *user, const cui_settings_bool_change *event) {
 }
 static void number_event(void *user, const cui_settings_number_change *event) {
     scalar_fixture *f = user;
-    scalar_metadata(f, event->reason, event->event, event->field_id, event->page, event->group, event->item);
+    scalar_metadata(f, event->reason, event->event, event->field_id, event->page, event->group,
+                    event->item);
     assert(event->item == 2 && f->number == event->value && f->legacy_calls[2]);
     assert(event->previous_finite == isfinite(event->previous) &&
            event->value_finite == isfinite(event->value));
@@ -405,7 +407,8 @@ static void number_event(void *user, const cui_settings_number_change *event) {
 }
 static void choice_event(void *user, const cui_settings_choice_change *event) {
     scalar_fixture *f = user;
-    scalar_metadata(f, event->reason, event->event, event->field_id, event->page, event->group, event->item);
+    scalar_metadata(f, event->reason, event->event, event->field_id, event->page, event->group,
+                    event->item);
     assert(event->item == 3 && f->choice == event->value && f->legacy_calls[3]);
     f->last_choice = *event;
     f->choice_calls++;
@@ -418,13 +421,14 @@ static void text_event(void *user, const cui_settings_text_change *e) {
     assert(e->after_revision == cui_edit_get_state(f->edit).revision);
     assert(f->legacy_calls[0]);
     cui_str copied = {0};
-    assert(cui_component_event_copy_utf8(e->text, 63, f->text_copy, sizeof f->text_copy, &copied) == CUI_COMPONENT_EVENT_COPY_OK);
+    assert(cui_component_event_copy_utf8(e->text, 63, f->text_copy, sizeof f->text_copy, &copied) ==
+           CUI_COMPONENT_EVENT_COPY_OK);
     assert(copied.length == e->after_bytes);
     char storage[2] = {'A', 'B'};
     cui_str sentinel = cui_string("unchanged");
     if (e->text.length > 1) {
-        assert(cui_component_event_copy_utf8(e->text, 1, storage, sizeof storage, &sentinel)
-               == CUI_COMPONENT_EVENT_COPY_LIMIT);
+        assert(cui_component_event_copy_utf8(e->text, 1, storage, sizeof storage, &sentinel) ==
+               CUI_COMPONENT_EVENT_COPY_LIMIT);
         assert(storage[0] == 'A' && storage[1] == 'B' && sentinel.length == 9);
     }
     f->last_text = *e;
@@ -743,17 +747,24 @@ static void text_changes(void) {
     for (size_t n = 0; n < 2; ++n) {
         assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_COMPOSITION_START}));
         assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
-                              .text_data = "ime", .text_length = 3, .composition_cursor = 3}));
+                                                      .text_data = "ime",
+                                                      .text_length = 3,
+                                                      .composition_cursor = 3}));
     }
     assert(!scalar_pair(&a, &b, true).text_count);
     for (size_t n = 0; n < 2; ++n)
         assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_COMPOSITION_COMMIT,
-                              .text_data = "ime", .text_length = 3, .composition_cursor = 3}));
+                                                      .text_data = "ime",
+                                                      .text_length = 3,
+                                                      .composition_cursor = 3}));
     assert(scalar_pair(&a, &b, true).text_count == 1);
     for (size_t n = 0; n < 2; ++n) {
         assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "!"}));
-        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_TEXT,
-                              .text_data = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", .text_length = 78}));
+        assert(cui_queue_event(fs[n]->ui,
+                               (cui_event){.type = CUI_EVENT_TEXT,
+                                           .text_data = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnop"
+                                                        "qrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+                                           .text_length = 78}));
     }
     cui_settings_event_result error = scalar_pair(&a, &b, true);
     assert(error.text_count == 1 && error.result.edit_error != CUI_EDIT_OK);
@@ -800,8 +811,8 @@ static void reset_custom(void *user) {
     ++f->custom_calls;
     f->boolean = !f->boolean;
 }
-static void reset_metadata(reset_fixture *f, const cui_component_event_metadata *e,
-                           cui_id field, size_t page, size_t group, size_t item,
+static void reset_metadata(reset_fixture *f, const cui_component_event_metadata *e, cui_id field,
+                           size_t page, size_t group, size_t item,
                            cui_settings_change_reason reason) {
     assert(reason == CUI_SETTINGS_CHANGE_RESET);
     assert(e->kind == CUI_COMPONENT_EVENT_CHANGE && e->target == 11);
@@ -833,8 +844,8 @@ static void reset_text(void *user, const cui_settings_text_change *e) {
     reset_metadata(f, &e->event, e->field_id, e->page, e->group, e->item, e->reason);
     f->text = *e;
     cui_str copy;
-    assert(cui_component_event_copy_utf8(e->text, 63, f->copy, sizeof f->copy, &copy)
-           == CUI_COMPONENT_EVENT_COPY_OK);
+    assert(cui_component_event_copy_utf8(e->text, 63, f->copy, sizeof f->copy, &copy) ==
+           CUI_COMPONENT_EVENT_COPY_OK);
 }
 static void programmatic_resets(void) {
     reset_fixture f = {.number = 3, .choice = 101};
@@ -857,10 +868,15 @@ static void programmatic_resets(void) {
     groups[0].items = items;
     groups[0].count = 4;
     cui_setting_page page = {.groups = groups, .count = 1};
-    cui_settings_handler h = {.user = &f, .on_boolean = reset_boolean, .on_number = reset_number,
-                              .on_choice = reset_choice, .on_text = reset_text};
-    cui_settings_reset_event_result r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
-    assert(r.reset && r.boolean_count == 1 && r.number_count == 1 && r.choice_count == 1 && r.text_count == 1);
+    cui_settings_handler h = {.user = &f,
+                              .on_boolean = reset_boolean,
+                              .on_number = reset_number,
+                              .on_choice = reset_choice,
+                              .on_text = reset_text};
+    cui_settings_reset_event_result r =
+        cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(r.reset && r.boolean_count == 1 && r.number_count == 1 && r.choice_count == 1 &&
+           r.text_count == 1);
     assert(f.old_calls == 4 && f.calls == 4 && !memcmp(f.order, "LOLOLOLO", 8));
     f.order_count = 0;
     r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
@@ -898,9 +914,11 @@ static void programmatic_resets(void) {
     f.order_count = 0;
     r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
     assert(r.reset && r.text_count == 1 && !strcmp(buffer, "redirect"));
-    assert(f.text.before_bytes == f.text.after_bytes && f.text.before_revision != f.text.after_revision);
+    assert(f.text.before_bytes == f.text.after_bytes &&
+           f.text.before_revision != f.text.after_revision);
     f.redirect = false;
-    items[3].default_text = cui_string("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
+    items[3].default_text = cui_string(
+        "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
     f.order_count = 0;
     size_t old = f.old_calls;
     r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
@@ -929,26 +947,31 @@ static void styled_resets(void) {
     cui_id reset = cui_settings_part_id(11, 0, 0, 0, 34);
     for (size_t n = 0; n < 2; ++n) {
         cui_focus(fs[n]->ui, reset);
-        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        assert(cui_queue_event(fs[n]->ui,
+                               (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     }
     cui_settings_event_result r = scalar_pair(&a, &b, true);
     assert(r.result.reset && r.boolean_count == 1 && r.number_count == 2);
     assert(b.booleans[0] && b.number == 10);
     assert(b.last_boolean.reason == CUI_SETTINGS_CHANGE_RESET);
-    assert(b.observed_number_count == 2 && b.observed_numbers[0] == 20 && b.observed_numbers[1] == 10);
-    assert(b.observed_reasons[0] == CUI_SETTINGS_CHANGE_RESET && b.observed_reasons[1] == CUI_SETTINGS_CHANGE_EDIT);
+    assert(b.observed_number_count == 2 && b.observed_numbers[0] == 20 &&
+           b.observed_numbers[1] == 10);
+    assert(b.observed_reasons[0] == CUI_SETTINGS_CHANGE_RESET &&
+           b.observed_reasons[1] == CUI_SETTINGS_CHANGE_EDIT);
     /* Two accepted activations still perform the old one reset; no unique cause. */
     a.reset_multiple = b.reset_multiple = true;
     for (size_t n = 0; n < 2; ++n) {
         fs[n]->booleans[0] = false;
         for (size_t i = 0; i < 2; ++i)
-            assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+            assert(cui_queue_event(fs[n]->ui,
+                                   (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     }
     r = scalar_pair(&a, &b, true);
     assert(r.result.reset && r.boolean_count == 1 && r.number_count == 2);
     for (size_t n = 0; n < 2; ++n) {
         fs[n]->booleans[0] = false;
-        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        assert(cui_queue_event(fs[n]->ui,
+                               (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     }
     r = scalar_pair(&a, &b, false);
     assert(r.result.reset && !r.boolean_count && !r.number_count && b.booleans[0]);
@@ -965,19 +988,22 @@ static void styled_resets(void) {
     }
     scalar_pair(&a, &b, true);
     for (size_t n = 0; n < 2; ++n)
-        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        assert(cui_queue_event(fs[n]->ui,
+                               (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     r = scalar_pair(&a, &b, true);
     assert(r.result.reset && r.text_count == 1 && !strcmp(b.text_copy, "reset text"));
     assert(b.last_text.reason == CUI_SETTINGS_CHANGE_RESET);
     for (size_t n = 0; n < 2; ++n) {
         fs[n]->passive = true;
-        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        assert(cui_queue_event(fs[n]->ui,
+                               (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     }
     assert(!scalar_pair(&a, &b, true).text_count);
     for (size_t n = 0; n < 2; ++n) {
         fs[n]->passive = false;
         fs[n]->inert = true;
-        assert(cui_queue_event(fs[n]->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        assert(cui_queue_event(fs[n]->ui,
+                               (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     }
     assert(!scalar_pair(&a, &b, true).text_count);
     scalar_done(&a);

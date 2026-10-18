@@ -28,12 +28,15 @@ typedef struct {
  * free/rebind active model/state/descriptors/input/context, recursively submit UI,
  * or destroy resources in observers. Unrelated flags allowed; defer teardown until
  * outer return plus frame/renderer consumption. No reject/COMMIT semantics. */
-cui_input_group_event_result cui_base_input_group_events(
-    cui_context *, cui_id group, cui_id input, cui_edit *, cui_input_group_state *,
-    const cui_input_group_addon *, size_t, cui_input_group_options, cui_input_group_handler);
-cui_input_group_event_result cui_input_group_events(
-    cui_context *, cui_id group, cui_id input, const cui_theme *, cui_edit *, cui_input_group_state *,
-    const cui_input_group_addon *, size_t, cui_input_group_options, cui_input_group_handler);
+cui_input_group_event_result cui_base_input_group_events(cui_context *, cui_id group, cui_id input,
+                                                         cui_edit *, cui_input_group_state *,
+                                                         const cui_input_group_addon *, size_t,
+                                                         cui_input_group_options,
+                                                         cui_input_group_handler);
+cui_input_group_event_result
+cui_input_group_events(cui_context *, cui_id group, cui_id input, const cui_theme *, cui_edit *,
+                       cui_input_group_state *, const cui_input_group_addon *, size_t,
+                       cui_input_group_options, cui_input_group_handler);
 #ifdef __cplusplus
 }
 #endif

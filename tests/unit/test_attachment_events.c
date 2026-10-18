@@ -32,9 +32,15 @@ static void old_action(fixture *f, cui_id id, unsigned action) {
         }
     }
 }
-static void old_open(void *user, cui_id id) { old_action(user, id, 0); }
-static void old_remove(void *user, cui_id id) { old_action(user, id, 1); }
-static void old_retry(void *user, cui_id id) { old_action(user, id, 2); }
+static void old_open(void *user, cui_id id) {
+    old_action(user, id, 0);
+}
+static void old_remove(void *user, cui_id id) {
+    old_action(user, id, 1);
+}
+static void old_retry(void *user, cui_id id) {
+    old_action(user, id, 2);
+}
 static void observed(void *user, const cui_attachment_action_event *event) {
     fixture *f = user;
     unsigned action = event->action;
@@ -45,8 +51,9 @@ static void observed(void *user, const cui_attachment_action_event *event) {
         assert(event->event.flags == CUI_COMPONENT_EVENT_HAS_FRAME);
         assert(event->event.source == CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
     } else {
-        assert(event->event.flags == (CUI_COMPONENT_EVENT_HAS_FRAME | CUI_COMPONENT_EVENT_HAS_INDEX |
-                                     CUI_COMPONENT_EVENT_HAS_SOURCE | CUI_COMPONENT_EVENT_HAS_ACTIVATION));
+        assert(event->event.flags ==
+               (CUI_COMPONENT_EVENT_HAS_FRAME | CUI_COMPONENT_EVENT_HAS_INDEX |
+                CUI_COMPONENT_EVENT_HAS_SOURCE | CUI_COMPONENT_EVENT_HAS_ACTIVATION));
         assert(event->event.activation.frame_sequence == event->event.frame_sequence);
         assert(event->event.activation.event_index == event->event.event_index);
         if (!f->change_focus) {
@@ -66,7 +73,8 @@ static void child(cui_context *ui, cui_id id, void *user, float width, float hei
     fixture *f = user;
     (void)height;
     f->child_id = id;
-    cui_interaction i = cui_interact(ui, id, CUI_ROLE_BUTTON, cui_string("Custom"), false, false, 0);
+    cui_interaction i =
+        cui_interact(ui, id, CUI_ROLE_BUTTON, cui_string("Custom"), false, false, 0);
     cui_begin_box(ui, id, (cui_box){.width = width, .height = 24});
     cui_text(ui, cui_string("custom"), 12, (cui_color){0, 0, 0, 255});
     cui_end_box(ui);
@@ -94,11 +102,12 @@ static cui_attachment_event_result frame(fixture *f, bool facade) {
     cui_attachment_event_result out = {0};
     if (!f->omit) {
         if (facade)
-            out = cui_attachment_events(f->ui, 20, &theme, &f->state, options,
+            out = cui_attachment_events(
+                f->ui, 20, &theme, &f->state, options,
                 (cui_attachment_handler){.user = f,
-                    .on_activate = f->typed_mask & 1 ? observed : NULL,
-                    .on_remove = f->typed_mask & 2 ? observed : NULL,
-                    .on_retry = f->typed_mask & 4 ? observed : NULL});
+                                         .on_activate = f->typed_mask & 1 ? observed : NULL,
+                                         .on_remove = f->typed_mask & 2 ? observed : NULL,
+                                         .on_retry = f->typed_mask & 4 ? observed : NULL});
         else
             out.control = cui_attachment(f->ui, 20, &theme, &f->state, options);
     }
@@ -111,7 +120,8 @@ static cui_attachment_event_result pair(fixture *a, fixture *b) {
     cui_attachment_event_result x = frame(a, false), y = frame(b, true);
     assert(x.control.valid == y.control.valid && x.control.clicked == y.control.clicked &&
            x.control.removed == y.control.removed && x.control.retried == y.control.retried);
-    assert(x.control.plan.width == y.control.plan.width && x.control.plan.height == y.control.plan.height);
+    assert(x.control.plan.width == y.control.plan.width &&
+           x.control.plan.height == y.control.plan.height);
     assert(x.control.plan.remove_visible == y.control.plan.remove_visible &&
            x.control.plan.retry_media == y.control.plan.retry_media &&
            x.control.plan.retry_description == y.control.plan.retry_description);
@@ -158,9 +168,12 @@ static void init(fixture *f, unsigned old, unsigned typed) {
     f->options.model.status = CUI_ATTACHMENT_FAILED;
     f->options.child_count = 3;
     f->children[0] = (cui_attachment_child){.kind = CUI_ATTACHMENT_TITLE, .text = {"File", 4}};
-    f->children[1] = (cui_attachment_child){.kind = CUI_ATTACHMENT_DESCRIPTION, .text = {"Details", 7},
-                                         .status_override = true, .status = CUI_ATTACHMENT_COMPLETE};
-    f->children[2] = (cui_attachment_child){.kind = CUI_ATTACHMENT_DESCRIPTION, .text = {"More", 4}};
+    f->children[1] = (cui_attachment_child){.kind = CUI_ATTACHMENT_DESCRIPTION,
+                                            .text = {"Details", 7},
+                                            .status_override = true,
+                                            .status = CUI_ATTACHMENT_COMPLETE};
+    f->children[2] =
+        (cui_attachment_child){.kind = CUI_ATTACHMENT_DESCRIPTION, .text = {"More", 4}};
     f->options.actions = child;
     f->options.actions_width = 48;
 }
@@ -192,7 +205,8 @@ static void actions_and_evidence(bool typed_only) {
     activate(&a, &b, cui_attachment_retry_id(20));
     activate(&a, &b, cui_attachment_remove_id(20));
     activate(&a, &b, 20);
-    a.change_focus = b.change_focus = !typed_only; /* Later callback invalidates live focus evidence. */
+    a.change_focus = b.change_focus =
+        !typed_only; /* Later callback invalidates live focus evidence. */
     cui_attachment_event_result r = pair(&a, &b);
     assert(r.activation_count == 1 && r.remove_count == 1 && r.retry_count == 1);
     assert(r.control.clicked && r.control.removed && r.control.retried);
@@ -224,25 +238,30 @@ static void actions_and_evidence(bool typed_only) {
     assert(!r.activation_count && !r.remove_count && !r.retry_count && b.child_calls == 1);
     /* Real pointer card action preserves genuine pointer evidence. */
     cui_rect card = b.state.card;
-    cui_event pointer = {.type = CUI_EVENT_POINTER_DOWN, .x = card.x + 8, .y = card.y + 8,
+    cui_event pointer = {.type = CUI_EVENT_POINTER_DOWN,
+                         .x = card.x + 8,
+                         .y = card.y + 8,
                          .pointer_button = CUI_POINTER_PRIMARY};
     assert(cui_queue_event(a.ui, pointer) && cui_queue_event(b.ui, pointer));
     pointer.type = CUI_EVENT_POINTER_UP;
     assert(cui_queue_event(a.ui, pointer) && cui_queue_event(b.ui, pointer));
     r = pair(&a, &b);
-    assert(r.activation_count == 1 && b.copies[0].event.source == CUI_COMPONENT_EVENT_SOURCE_POINTER);
+    assert(r.activation_count == 1 &&
+           b.copies[0].event.source == CUI_COMPONENT_EVENT_SOURCE_POINTER);
     cui_focus(a.ui, cui_attachment_remove_id(20));
     cui_focus(b.ui, cui_attachment_remove_id(20));
     assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
     assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
-    assert(pair(&a, &b).remove_count == 1 && b.copies[1].event.source == CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+    assert(pair(&a, &b).remove_count == 1 &&
+           b.copies[1].event.source == CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
     cui_attachment_action_event copy = b.copies[1];
     a.omit = b.omit = b.request_omit;
     r = pair(&a, &b);
     assert(!r.activation_count && !r.remove_count && !r.retry_count);
     cui_destroy(a.ui);
     cui_destroy(b.ui);
-    assert(copy.action == CUI_ATTACHMENT_ACTION_REMOVE && copy.event.activation.target == cui_attachment_remove_id(20));
+    assert(copy.action == CUI_ATTACHMENT_ACTION_REMOVE &&
+           copy.event.activation.target == cui_attachment_remove_id(20));
 }
 static void availability_and_suppression(void) {
     fixture a, b;
@@ -254,15 +273,20 @@ static void availability_and_suppression(void) {
         for (unsigned identified = 0; identified < 2; ++identified)
             for (unsigned touch = 0; touch < 2; ++touch)
                 for (unsigned media = 0; media < 2; ++media)
-                    for (unsigned status = CUI_ATTACHMENT_PENDING; status <= CUI_ATTACHMENT_COMPLETE; ++status) {
+                    for (unsigned status = CUI_ATTACHMENT_PENDING;
+                         status <= CUI_ATTACHMENT_COMPLETE; ++status) {
                         a.options.model.identified = b.options.model.identified = identified != 0;
                         a.options.model.touch = b.options.model.touch = touch != 0;
                         a.options.model.media = b.options.model.media = media != 0;
-                        a.options.model.status = b.options.model.status = (cui_attachment_status)status;
+                        a.options.model.status = b.options.model.status =
+                            (cui_attachment_status)status;
                         cui_attachment_event_result r = pair(&a, &b);
-                        assert(r.control.valid && !r.activation_count && !r.remove_count && !r.retry_count);
-                        assert(r.control.plan.remove_visible == (identified && touch && (mask & 2)));
-                        assert(r.control.plan.retry_media == (identified && media && (mask & 4) && status == CUI_ATTACHMENT_FAILED));
+                        assert(r.control.valid && !r.activation_count && !r.remove_count &&
+                               !r.retry_count);
+                        assert(r.control.plan.remove_visible ==
+                               (identified && touch && (mask & 2)));
+                        assert(r.control.plan.retry_media == (identified && media && (mask & 4) &&
+                                                              status == CUI_ATTACHMENT_FAILED));
                     }
     }
     a.old_mask = 7;
@@ -271,8 +295,8 @@ static void availability_and_suppression(void) {
     a.options.model.touch = b.options.model.touch = false;
     pair(&a, &b);
     cui_rect hover = b.state.card;
-    cui_event move = {.type = CUI_EVENT_POINTER_MOVE, .x = hover.x + hover.w / 2,
-                     .y = hover.y + hover.h / 2};
+    cui_event move = {
+        .type = CUI_EVENT_POINTER_MOVE, .x = hover.x + hover.w / 2, .y = hover.y + hover.h / 2};
     assert(cui_queue_event(a.ui, move) && cui_queue_event(b.ui, move));
     assert(pair(&a, &b).control.plan.remove_visible);
     move.x = 590;

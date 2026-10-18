@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_textarea.h"
-#include "cui/cui_multiline_events.h"
 #include "../base/cui_textarea_geometry.h"
 #include "cui/cui_base.h"
+#include "cui/cui_multiline_events.h"
 #include "cui/cui_scroll.h"
 #include <math.h>
 static cui_id cui_textarea_child(cui_id id, size_t row, unsigned part) {
@@ -22,10 +22,10 @@ static float cui_textarea_prefix(cui_context *ui, cui_str text, cui_textarea_lin
                                  size_t offset, float font, cui_text_style style) {
     return cui_textarea_visual_x(ui, text, line, offset, font, style, CUI_TEXT_DOWNSTREAM);
 }
-static cui_textarea_result cui_textarea_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
-                                 cui_edit *edit, cui_textarea_state *state,
-                                 cui_textarea_options options, cui_component_text_handler handler,
-                                 cui_multiline_event_result *events) {
+static cui_textarea_result
+cui_textarea_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                    cui_edit *edit, cui_textarea_state *state, cui_textarea_options options,
+                    cui_component_text_handler handler, cui_multiline_event_result *events) {
     cui_textarea_result result = {.error = CUI_TEXTAREA_INVALID};
     cui_textarea_metrics metrics;
     if (!ui || !id || !theme || !edit || !state ||
@@ -252,10 +252,13 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
     return cui_textarea_common(ui, id, theme, name, edit, state, options,
                                (cui_component_text_handler){0}, NULL);
 }
-cui_multiline_event_result cui_textarea_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_edit *edit,
-    cui_textarea_state *state, cui_textarea_options options, cui_component_text_handler handler) {
+cui_multiline_event_result cui_textarea_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                               cui_str name, cui_edit *edit,
+                                               cui_textarea_state *state,
+                                               cui_textarea_options options,
+                                               cui_component_text_handler handler) {
     cui_multiline_event_result result = {0};
-    result.control = cui_textarea_common(ui, id, theme, name, edit, state, options, handler, &result);
+    result.control =
+        cui_textarea_common(ui, id, theme, name, edit, state, options, handler, &result);
     return result;
 }

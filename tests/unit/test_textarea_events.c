@@ -47,10 +47,11 @@ static cui_multiline_event_result frame(fixture *f, bool facade, bool observer, 
     if (!omit) {
         if (facade)
             r = cui_textarea_events(f->ui, 10, &theme, cui_string("Name"), f->edit, &f->state,
-                                 f->options, (cui_component_text_handler){observer ? observe : NULL, f});
+                                    f->options,
+                                    (cui_component_text_handler){observer ? observe : NULL, f});
         else
-            r.control = cui_textarea(f->ui, 10, &theme, cui_string("Name"), f->edit,
-                                      &f->state, f->options);
+            r.control =
+                cui_textarea(f->ui, 10, &theme, cui_string("Name"), f->edit, &f->state, f->options);
     }
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
@@ -60,18 +61,26 @@ static cui_multiline_event_result frame(fixture *f, bool facade, bool observer, 
 static void init(fixture *f) {
     memset(f, 0, sizeof *f);
     f->ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});
-    f->edit = cui_edit_create((cui_edit_config){.buffer = f->bytes, .capacity = 128, .multiline = true,
-                                              .history_bytes = 4096, .max_history_steps = 16});
+    f->edit = cui_edit_create((cui_edit_config){.buffer = f->bytes,
+                                                .capacity = 128,
+                                                .multiline = true,
+                                                .history_bytes = 4096,
+                                                .max_history_steps = 16});
     assert(f->ui && f->edit);
     assert(cui_textarea_state_init(&f->state, f->lines, 32));
     f->options = (cui_textarea_options){.width = 220, .rows = 3};
     frame(f, false, false, false);
     cui_focus(f->ui, 10);
 }
-static void finish(fixture *f) { cui_destroy(f->ui); cui_edit_destroy(f->edit); }
+static void finish(fixture *f) {
+    cui_destroy(f->ui);
+    cui_edit_destroy(f->edit);
+}
 static void queue(fixture *f, cui_event_type type, const char *text) {
-    assert(cui_queue_event(f->ui, (cui_event){.type = type, .key = CUI_KEY_ENTER,
-                          .text_data = text, .text_length = text ? strlen(text) : 0}));
+    assert(cui_queue_event(f->ui, (cui_event){.type = type,
+                                              .key = CUI_KEY_ENTER,
+                                              .text_data = text,
+                                              .text_length = text ? strlen(text) : 0}));
 }
 static void equal(fixture *a, fixture *b, cui_textarea_result x, cui_textarea_result y) {
     assert(x.changed == y.changed && x.pressed_enter == y.pressed_enter && x.error == y.error &&
@@ -94,11 +103,13 @@ static void equal(fixture *a, fixture *b, cui_textarea_result x, cui_textarea_re
         assert(p->type == q->type && !memcmp(&p->bounds, &q->bounds, sizeof p->bounds));
         assert(!memcmp(&p->color, &q->color, sizeof p->color));
         assert(p->text.length == q->text.length);
-        if (p->text.length) assert(!memcmp(p->text.data, q->text.data, p->text.length));
+        if (p->text.length)
+            assert(!memcmp(p->text.data, q->text.data, p->text.length));
     }
 }
 static void pair_event(fixture *a, fixture *b, cui_event_type type, const char *text) {
-    queue(a, type, text); queue(b, type, text);
+    queue(a, type, text);
+    queue(b, type, text);
 }
 static cui_multiline_event_result pair_frame(fixture *a, fixture *b, bool observer) {
     cui_multiline_event_result x = frame(a, false, false, false);
@@ -107,7 +118,9 @@ static cui_multiline_event_result pair_frame(fixture *a, fixture *b, bool observ
     return y;
 }
 int main(void) {
-    fixture a, b; init(&a); init(&b);
+    fixture a, b;
+    init(&a);
+    init(&b);
     pair_event(&a, &b, CUI_EVENT_TEXT, "a");
     pair_event(&a, &b, CUI_EVENT_KEY_DOWN, NULL);
     pair_event(&a, &b, CUI_EVENT_TEXT, "b");
@@ -116,33 +129,49 @@ int main(void) {
     assert(b.events[0].before.length == 0 && b.events[0].after.length == 3);
     pair_event(&a, &b, CUI_EVENT_COMPOSITION_START, NULL);
     pair_event(&a, &b, CUI_EVENT_COMPOSITION_UPDATE, "hi");
-    y = pair_frame(&a, &b, true); assert(!y.change_count);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count);
     pair_event(&a, &b, CUI_EVENT_COMPOSITION_COMMIT, "hi");
-    y = pair_frame(&a, &b, true); assert(y.change_count == 1);
+    y = pair_frame(&a, &b, true);
+    assert(y.change_count == 1);
     assert(!strcmp(b.copies[0], "a\nb")); /* Owned copy survives later edits. */
     pair_event(&a, &b, CUI_EVENT_TEXT, "z");
-    y = pair_frame(&a, &b, false); assert(y.control.changed && !y.change_count);
-    y = pair_frame(&a, &b, true); assert(!y.change_count);
+    y = pair_frame(&a, &b, false);
+    assert(y.control.changed && !y.change_count);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count);
     assert(cui_edit_select(a.edit, 0, 1) == CUI_EDIT_OK);
     assert(cui_edit_select(b.edit, 0, 1) == CUI_EDIT_OK);
-    y = pair_frame(&a, &b, true); assert(!y.change_count); /* External/selection-only. */
-    assert(cui_queue_event(a.ui, (cui_event){.type=CUI_EVENT_KEY_DOWN,.key=CUI_KEY_Z,.modifiers=CUI_MOD_CTRL}));
-    assert(cui_queue_event(b.ui, (cui_event){.type=CUI_EVENT_KEY_DOWN,.key=CUI_KEY_Z,.modifiers=CUI_MOD_CTRL}));
-    y = pair_frame(&a, &b, true); assert(y.change_count == 1);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count); /* External/selection-only. */
+    assert(cui_queue_event(
+        a.ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_Z, .modifiers = CUI_MOD_CTRL}));
+    assert(cui_queue_event(
+        b.ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_Z, .modifiers = CUI_MOD_CTRL}));
+    y = pair_frame(&a, &b, true);
+    assert(y.change_count == 1);
     a.options.readonly = b.options.readonly = true;
     pair_event(&a, &b, CUI_EVENT_TEXT, "ignored");
-    y = pair_frame(&a, &b, true); assert(!y.change_count);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count);
     a.options.readonly = b.options.readonly = false;
     a.options.submit_on_enter = b.options.submit_on_enter = true;
     pair_event(&a, &b, CUI_EVENT_KEY_DOWN, NULL);
-    y = pair_frame(&a, &b, true); assert(y.control.pressed_enter && !y.change_count);
+    y = pair_frame(&a, &b, true);
+    assert(y.control.pressed_enter && !y.change_count);
     assert(b.omit && b.draw.count);
     frame(&b, true, true, b.omit);
-    size_t n; const cui_semantic *items = cui_semantics(b.ui, &n);
-    for (size_t i = 0; i < n; ++i) assert(items[i].id != 10);
-    finish(&a); finish(&b);
+    size_t n;
+    const cui_semantic *items = cui_semantics(b.ui, &n);
+    for (size_t i = 0; i < n; ++i)
+        assert(items[i].id != 10);
+    finish(&a);
+    finish(&b);
     /* A committed newline can exceed row storage: still notify despite layout error. */
-    init(&a); init(&b);
+    init(&a);
+    init(&b);
     a.state.capacity = b.state.capacity = 1;
     pair_event(&a, &b, CUI_EVENT_TEXT, "x\ny");
     y = pair_frame(&a, &b, true);
@@ -150,32 +179,41 @@ int main(void) {
            !strcmp(b.copies[0], "x\ny"));
     /* Existing invalid layout before reduction must not apply another queued edit. */
     pair_event(&a, &b, CUI_EVENT_TEXT, "ignored");
-    y = pair_frame(&a, &b, true); assert(!y.change_count && !strcmp(b.bytes,"x\ny"));
-    finish(&a); finish(&b);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count && !strcmp(b.bytes, "x\ny"));
+    finish(&a);
+    finish(&b);
     /* Failed IME commit exceeds document capacity, without committed CHANGE. */
-    init(&a); init(&b);
-    char long_text[200]; memset(long_text, 'x', sizeof long_text - 1); long_text[199] = 0;
+    init(&a);
+    init(&b);
+    char long_text[200];
+    memset(long_text, 'x', sizeof long_text - 1);
+    long_text[199] = 0;
     pair_event(&a, &b, CUI_EVENT_COMPOSITION_START, NULL);
     pair_event(&a, &b, CUI_EVENT_COMPOSITION_UPDATE, long_text);
-    y = pair_frame(&a, &b, true); assert(!y.change_count);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count);
     pair_event(&a, &b, CUI_EVENT_COMPOSITION_COMMIT, long_text);
     y = pair_frame(&a, &b, true);
     assert(!y.change_count && y.control.edit_error != CUI_EDIT_OK && !b.bytes[0]);
     a.options.disabled = b.options.disabled = true;
     pair_event(&a, &b, CUI_EVENT_TEXT, "ignored");
-    y = pair_frame(&a, &b, true); assert(!y.change_count);
-    finish(&a); finish(&b);
+    y = pair_frame(&a, &b, true);
+    assert(!y.change_count);
+    finish(&a);
+    finish(&b);
     /* Public Base facade: aggregation is one revision notification even when
      * text followed by Undo returns to the original bytes within one batch. */
     init(&b);
     queue(&b, CUI_EVENT_TEXT, "one");
-    assert(cui_queue_event(b.ui, (cui_event){.type=CUI_EVENT_KEY_DOWN,.key=CUI_KEY_Z,
-                                           .modifiers=CUI_MOD_CTRL}));
+    assert(cui_queue_event(
+        b.ui,
+        (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_Z, .modifiers = CUI_MOD_CTRL}));
     assert(cui_begin_frame(b.ui, 400, 100, .016f));
     cui_textarea_metrics metrics;
     assert(cui_textarea_measure(b.options, 16, &metrics));
-    y = cui_base_textarea_events(b.ui, 10, cui_string("Name"), b.edit, &b.state, b.options,
-                                  metrics, (cui_component_text_handler){observe, &b});
+    y = cui_base_textarea_events(b.ui, 10, cui_string("Name"), b.edit, &b.state, b.options, metrics,
+                                 (cui_component_text_handler){observe, &b});
     b.draw = cui_end_frame(b.ui);
     assert(y.change_count == 1 && y.control.changed && !b.bytes[0]);
     assert(b.events[0].before.revision != b.events[0].after.revision);

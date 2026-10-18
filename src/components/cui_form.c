@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_form_events.h"
 #include "../base/cui_form_private.h"
-#include "cui_input_private.h"
+#include "cui/cui_form_events.h"
 #include "cui/cui_icon.h"
+#include "cui_input_private.h"
 #include <math.h>
 static float cui_form_private_form_gap(cui_form_options o) {
     return o.size == CUI_FORM_LARGE                                ? 12
@@ -191,23 +191,24 @@ typedef struct {
     cui_input_group_state *state;
     cui_input_options *paint;
 } cui_form_private_secure;
-static cui_input_event_result cui_form_private_secure_input(
-    void *user, cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
-    cui_input_behavior_state *behavior, cui_base_input_options options, bool synthetic_hit,
-    cui_component_text_handler handler) {
+static cui_input_event_result
+cui_form_private_secure_input(void *user, cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
+                              cui_input_behavior_state *behavior, cui_base_input_options options,
+                              bool synthetic_hit, cui_component_text_handler handler) {
     cui_form_private_secure *secure = user;
     cui_input_state temporary = {.behavior = *behavior, .scroll_x = secure->state->scroll_x};
-    cui_input_event_result result = cui_input_private_reduce(ui, id, secure->theme, name, edit,
-        &temporary, behavior, secure->paint, options, secure->state->viewport, synthetic_hit, handler);
+    cui_input_event_result result = cui_input_private_reduce(
+        ui, id, secure->theme, name, edit, &temporary, behavior, secure->paint, options,
+        secure->state->viewport, synthetic_hit, handler);
     secure->state->scroll_x = temporary.scroll_x;
     return result;
 }
-static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input,
-                                       const cui_theme *theme, cui_edit *edit,
-                                       cui_input_group_state *state, const cui_input_group_addon *a,
-                                       size_t count, cui_input_group_options o,
-                                       cui_input_group_handler handler,
-                                       cui_input_group_event_result *notifications) {
+static cui_input_group_result
+cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input, const cui_theme *theme,
+                              cui_edit *edit, cui_input_group_state *state,
+                              const cui_input_group_addon *a, size_t count,
+                              cui_input_group_options o, cui_input_group_handler handler,
+                              cui_input_group_event_result *notifications) {
     if (!theme || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_input_group_result){.error = CUI_FORM_INVALID,
                                         .input.error = CUI_EDIT_INVALID_ARGUMENT};
@@ -329,11 +330,12 @@ static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui
     cui_input_group_result result;
     if (o.input.masked) {
         cui_form_private_secure secure = {&t, state, &paint_options};
-        result = cui_form_private_input_group(ui, group, input, edit, state, a, count, o,
-            handler, notifications, cui_form_private_secure_input, &secure);
+        result =
+            cui_form_private_input_group(ui, group, input, edit, state, a, count, o, handler,
+                                         notifications, cui_form_private_secure_input, &secure);
     } else if (notifications) {
-        cui_input_group_event_result observed = cui_base_input_group_events(
-            ui, group, input, edit, state, a, count, o, handler);
+        cui_input_group_event_result observed =
+            cui_base_input_group_events(ui, group, input, edit, state, a, count, o, handler);
         result = observed.control;
         notifications->addon_count = observed.addon_count;
         notifications->change_count = observed.change_count;
@@ -394,17 +396,21 @@ static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui
 }
 
 cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id input,
-    const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
-    const cui_input_group_addon *addons, size_t count, cui_input_group_options options) {
-    return cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count, options,
-                                  (cui_input_group_handler){0}, NULL);
+                                       const cui_theme *theme, cui_edit *edit,
+                                       cui_input_group_state *state,
+                                       const cui_input_group_addon *addons, size_t count,
+                                       cui_input_group_options options) {
+    return cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count,
+                                         options, (cui_input_group_handler){0}, NULL);
 }
 cui_input_group_event_result cui_input_group_events(cui_context *ui, cui_id group, cui_id input,
-    const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
-    const cui_input_group_addon *addons, size_t count, cui_input_group_options options,
-    cui_input_group_handler handler) {
+                                                    const cui_theme *theme, cui_edit *edit,
+                                                    cui_input_group_state *state,
+                                                    const cui_input_group_addon *addons,
+                                                    size_t count, cui_input_group_options options,
+                                                    cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
-    result.control = cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count,
-                                            options, handler, &result);
+    result.control = cui_form_private_styled_group(ui, group, input, theme, edit, state, addons,
+                                                   count, options, handler, &result);
     return result;
 }

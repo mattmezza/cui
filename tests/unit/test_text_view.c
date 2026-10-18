@@ -1447,97 +1447,115 @@ typedef struct {
     bool omit;
 } callback_contract;
 static void contract_reveal(cui_rect r, void *user) {
-    callback_contract *c=user;
+    callback_contract *c = user;
     assert(c->fixture->state.reveal_pending); /* Cleared only after callback. */
     assert(cui_frame_is_submitting(c->ui));
-    assert(fabsf(r.x-c->expected.x)<.01f && fabsf(r.y-c->expected.y)<.01f);
-    assert(r.w==c->expected.w && r.h==c->expected.h);
+    assert(fabsf(r.x - c->expected.x) < .01f && fabsf(r.y - c->expected.y) < .01f);
+    assert(r.w == c->expected.w && r.h == c->expected.h);
     ++c->reveals;
 }
 static void contract_link(cui_str uri, const cui_event *event, void *user) {
-    callback_contract *c=user;
+    callback_contract *c = user;
     size_t n;
-    const cui_event *events=cui_frame_events(c->ui, &n);
-    c->index=SIZE_MAX;
-    for(size_t i=0;i<n;++i) if(events+i==event) c->index=i;
-    assert(c->index<n && !cui_event_consumed(c->ui,c->index));
-    assert(uri.length<sizeof c->uri);
-    memcpy(c->uri,uri.data,uri.length); c->uri[uri.length]=0;
+    const cui_event *events = cui_frame_events(c->ui, &n);
+    c->index = SIZE_MAX;
+    for (size_t i = 0; i < n; ++i)
+        if (events + i == event)
+            c->index = i;
+    assert(c->index < n && !cui_event_consumed(c->ui, c->index));
+    assert(uri.length < sizeof c->uri);
+    memcpy(c->uri, uri.data, uri.length);
+    c->uri[uri.length] = 0;
     ++c->links;
-    c->omit=true; /* Apply omission only after outer return/frame consumption. */
+    c->omit = true; /* Apply omission only after outer return/frame consumption. */
 }
 static bool contract_open(cui_str uri, void *user) {
-    callback_contract *c=user;
-    assert(uri.length==strlen("https://x.test?a=1&b=2"));
+    callback_contract *c = user;
+    assert(uri.length == strlen("https://x.test?a=1&b=2"));
     ++c->opens;
     return false;
 }
 static void test_callback_contracts(void) {
     static fixture f;
-    setup(&f,CUI_TEXT_VIEW_MARKDOWN);
-    assert(cui_text_view_set_text(&f.state,text("first\n\nsecond\n\nlast"))==CUI_TEXT_VIEW_OK);
-    cui_context *ui=cui_create((cui_config){.max_elements=512});
+    setup(&f, CUI_TEXT_VIEW_MARKDOWN);
+    assert(cui_text_view_set_text(&f.state, text("first\n\nsecond\n\nlast")) == CUI_TEXT_VIEW_OK);
+    cui_context *ui = cui_create((cui_config){.max_elements = 512});
     assert(ui);
-    callback_contract c={.fixture=&f,.ui=ui};
-    cui_text_view_options o=cui_text_view_default();
-    o.width=200; o.height=20; o.scrollable=false;
-    o.on_reveal=contract_reveal; o.reveal_user=&c;
-    frame(ui,&f,o);
-    cui_text_view_glyph last=f.glyphs[f.state.glyph_count-1];
-    c.expected=last.bounds;
-    c.expected.x+=f.state.viewport.x; c.expected.y+=f.state.viewport.y;
-    cui_text_view_range range={last.text.begin,last.text.end};
-    assert(cui_text_view_reveal(&f.state,range)==CUI_TEXT_VIEW_OK);
+    callback_contract c = {.fixture = &f, .ui = ui};
+    cui_text_view_options o = cui_text_view_default();
+    o.width = 200;
+    o.height = 20;
+    o.scrollable = false;
+    o.on_reveal = contract_reveal;
+    o.reveal_user = &c;
+    frame(ui, &f, o);
+    cui_text_view_glyph last = f.glyphs[f.state.glyph_count - 1];
+    c.expected = last.bounds;
+    c.expected.x += f.state.viewport.x;
+    c.expected.y += f.state.viewport.y;
+    cui_text_view_range range = {last.text.begin, last.text.end};
+    assert(cui_text_view_reveal(&f.state, range) == CUI_TEXT_VIEW_OK);
     assert(!c.reveals && f.state.reveal_pending);
-    frame(ui,&f,o);
-    assert(c.reveals==1 && !f.state.reveal_pending);
-    frame(ui,&f,o); assert(c.reveals==1);
+    frame(ui, &f, o);
+    assert(c.reveals == 1 && !f.state.reveal_pending);
+    frame(ui, &f, o);
+    assert(c.reveals == 1);
     /* Disabled is not cancellation of an explicit programmatic reveal request. */
-    o.disabled=true;
-    assert(cui_text_view_reveal(&f.state,range)==CUI_TEXT_VIEW_OK);
-    frame(ui,&f,o); assert(c.reveals==2 && !f.state.reveal_pending);
-    o.disabled=false; o.scrollable=true;
-    assert(cui_text_view_reveal(&f.state,range)==CUI_TEXT_VIEW_OK);
-    frame(ui,&f,o);
-    assert(c.reveals==2 && !f.state.reveal_pending && f.state.scroll.y>0);
+    o.disabled = true;
+    assert(cui_text_view_reveal(&f.state, range) == CUI_TEXT_VIEW_OK);
+    frame(ui, &f, o);
+    assert(c.reveals == 2 && !f.state.reveal_pending);
+    o.disabled = false;
+    o.scrollable = true;
+    assert(cui_text_view_reveal(&f.state, range) == CUI_TEXT_VIEW_OK);
+    frame(ui, &f, o);
+    assert(c.reveals == 2 && !f.state.reveal_pending && f.state.scroll.y > 0);
     /* Parent scopes do not turn this programmatic host request into input. */
-    o.scrollable=false;
-    for(unsigned passive=0;passive<2;++passive) {
-        assert(cui_text_view_reveal(&f.state,range)==CUI_TEXT_VIEW_OK);
-        assert(cui_begin_frame(ui,400,300,.016f));
-        cui_begin_box(ui,999,(cui_box){.inert=passive==0,.layout_only=passive==1});
-        cui_theme theme=cui_theme_light();
-        assert(cui_text_view(ui,77,&theme,&f.state,o));
-        cui_end_box(ui); cui_end_frame(ui);
-        assert(cui_last_error(ui)==CUI_OK && !f.state.reveal_pending);
+    o.scrollable = false;
+    for (unsigned passive = 0; passive < 2; ++passive) {
+        assert(cui_text_view_reveal(&f.state, range) == CUI_TEXT_VIEW_OK);
+        assert(cui_begin_frame(ui, 400, 300, .016f));
+        cui_begin_box(ui, 999, (cui_box){.inert = passive == 0, .layout_only = passive == 1});
+        cui_theme theme = cui_theme_light();
+        assert(cui_text_view(ui, 77, &theme, &f.state, o));
+        cui_end_box(ui);
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && !f.state.reveal_pending);
     }
-    assert(c.reveals==4);
-    assert(cui_text_view_set_text(&f.state,
-        text("[site](https://x.test?a=1&b=2)"))==CUI_TEXT_VIEW_OK);
-    o.on_link=contract_link; o.open_url=contract_open; o.link_user=&c;
-    frame(ui,&f,o);
-    float x=f.state.viewport.x+f.glyphs[0].bounds.x+2;
-    float y=f.state.viewport.y+f.glyphs[0].bounds.y+2;
-    for(unsigned route=0;route<2;++route) {
-        assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_POINTER_DOWN,
-            .pointer_button=CUI_POINTER_PRIMARY,.x=x,.y=y}));
-        frame(ui,&f,o);
-        assert(cui_queue_event(ui,(cui_event){.type=CUI_EVENT_POINTER_UP,
-            .pointer_button=CUI_POINTER_PRIMARY,.x=x,.y=y}));
-        frame(ui,&f,o);
-        assert(cui_event_consumed(ui,0));
-        if(!route) {
-            assert(c.links==1 && !c.opens && c.omit && c.index==0);
-            assert(!strcmp(c.uri,"https://x.test?a=1&b=2"));
-        } else assert(c.opens==1 && c.links==1); /* false still consumes */
-        o.on_link=NULL;
+    assert(c.reveals == 4);
+    assert(cui_text_view_set_text(&f.state, text("[site](https://x.test?a=1&b=2)")) ==
+           CUI_TEXT_VIEW_OK);
+    o.on_link = contract_link;
+    o.open_url = contract_open;
+    o.link_user = &c;
+    frame(ui, &f, o);
+    float x = f.state.viewport.x + f.glyphs[0].bounds.x + 2;
+    float y = f.state.viewport.y + f.glyphs[0].bounds.y + 2;
+    for (unsigned route = 0; route < 2; ++route) {
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                               .pointer_button = CUI_POINTER_PRIMARY,
+                                               .x = x,
+                                               .y = y}));
+        frame(ui, &f, o);
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                               .pointer_button = CUI_POINTER_PRIMARY,
+                                               .x = x,
+                                               .y = y}));
+        frame(ui, &f, o);
+        assert(cui_event_consumed(ui, 0));
+        if (!route) {
+            assert(c.links == 1 && !c.opens && c.omit && c.index == 0);
+            assert(!strcmp(c.uri, "https://x.test?a=1&b=2"));
+        } else
+            assert(c.opens == 1 && c.links == 1); /* false still consumes */
+        o.on_link = NULL;
     }
-    assert(cui_text_view_set_text(&f.state,text("replacement document"))==CUI_TEXT_VIEW_OK);
-    frame(ui,&f,o);
-    assert(!strcmp(c.uri,"https://x.test?a=1&b=2"));
-    assert(c.omit && cui_begin_frame(ui,400,300,.016f));
+    assert(cui_text_view_set_text(&f.state, text("replacement document")) == CUI_TEXT_VIEW_OK);
+    frame(ui, &f, o);
+    assert(!strcmp(c.uri, "https://x.test?a=1&b=2"));
+    assert(c.omit && cui_begin_frame(ui, 400, 300, .016f));
     cui_end_frame(ui); /* Deferred omission; no callback destroys active resources. */
-    assert(cui_last_error(ui)==CUI_OK && c.links==1 && c.opens==1);
+    assert(cui_last_error(ui) == CUI_OK && c.links == 1 && c.opens == 1);
     cui_destroy(ui);
 }
 static void test_styled_stream_motion(void) {

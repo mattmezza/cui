@@ -20,8 +20,7 @@ static void request(void *user, const cui_component_boolean_request *event) {
     assert(event->event.kind == CUI_COMPONENT_EVENT_REQUEST);
     assert(event->event.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION);
     assert(event->event.frame_sequence == cui_frame_sequence(o->ui));
-    if (o->calls && event->event.frame_sequence ==
-                        o->requests[o->calls - 1].event.frame_sequence)
+    if (o->calls && event->event.frame_sequence == o->requests[o->calls - 1].event.frame_sequence)
         assert(event->event.event_index > o->requests[o->calls - 1].event.event_index);
     o->requests[o->calls++] = *event;
     ++o->unrelated;
@@ -47,7 +46,8 @@ static cui_component_action_result scene(owner *o, configuration c, bool *parent
     cui_context *ui = o->ui;
     assert(cui_begin_frame(ui, 200, 120, 0));
     cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 120});
-    bool activated = cui_interact(ui, 1, CUI_ROLE_BUTTON, cui_string("Parent"), false, false, 0).activated;
+    bool activated =
+        cui_interact(ui, 1, CUI_ROLE_BUTTON, cui_string("Parent"), false, false, 0).activated;
     if (parent)
         *parent = activated;
     cui_begin_absolute_box(ui, 10, (cui_box){.inert = c.inert, .layout_only = c.layout_only},
@@ -57,13 +57,17 @@ static cui_component_action_result scene(owner *o, configuration c, bool *parent
         assert(cui_cancel_event_activation(ui, 1));
     if (!c.omit) {
         if (c.legacy) {
-            bool changed = c.toggle ? cui_base_toggle(ui, 10, cui_string("Flag"), &o->value, c.options.disabled)
-                                    : cui_base_switch(ui, 10, cui_string("Flag"), &o->value, c.options.disabled);
+            bool changed =
+                c.toggle
+                    ? cui_base_toggle(ui, 10, cui_string("Flag"), &o->value, c.options.disabled)
+                    : cui_base_switch(ui, 10, cui_string("Flag"), &o->value, c.options.disabled);
             result.activation_count = changed ? 1 : 0;
         } else {
             cui_component_boolean_handler handler = {c.no_handler ? NULL : request, o};
-            result = c.toggle ? cui_base_toggle_events(ui, 10, cui_string("Flag"), o->value, c.options, handler)
-                              : cui_base_switch_events(ui, 10, cui_string("Flag"), o->value, c.options, handler);
+            result = c.toggle ? cui_base_toggle_events(ui, 10, cui_string("Flag"), o->value,
+                                                       c.options, handler)
+                              : cui_base_switch_events(ui, 10, cui_string("Flag"), o->value,
+                                                       c.options, handler);
         }
     }
     cui_end_box(ui);
@@ -88,8 +92,12 @@ static void queue(cui_context *ui, cui_event event) {
     assert(cui_queue_event(ui, event));
 }
 static void click(cui_context *ui, cui_pointer_type type) {
-    cui_event event = {.type = CUI_EVENT_POINTER_DOWN, .x = 25, .y = 20,
-                       .pointer_type = type, .pointer_id = 7, .pointer_device = 9};
+    cui_event event = {.type = CUI_EVENT_POINTER_DOWN,
+                       .x = 25,
+                       .y = 20,
+                       .pointer_type = type,
+                       .pointer_id = 7,
+                       .pointer_device = 9};
     queue(ui, event);
     event.type = CUI_EVENT_POINTER_UP;
     queue(ui, event);
@@ -199,8 +207,8 @@ static void suppression_and_legacy(bool toggle) {
     o = create(c);
     for (unsigned mode = 0; mode < 3; ++mode) {
         click(o.ui, CUI_POINTER_MOUSE);
-        configuration passive = {.toggle = toggle, .inert = mode == 0,
-                                  .layout_only = mode == 1, .omit = mode == 2};
+        configuration passive = {
+            .toggle = toggle, .inert = mode == 0, .layout_only = mode == 1, .omit = mode == 2};
         r = scene(&o, passive, NULL);
         assert(!r.submitted && !r.activation_count && !o.calls);
         scene(&o, c, NULL);
@@ -213,14 +221,14 @@ static void suppression_and_legacy(bool toggle) {
     cui_destroy(o.ui);
 }
 static void focus_policy(bool toggle) {
-    configuration c = {.toggle = toggle, .options = {.no_pointer_focus = true, .skip_tab = true,
-                                                     .tab_index = 7}};
+    configuration c = {.toggle = toggle,
+                       .options = {.no_pointer_focus = true, .skip_tab = true, .tab_index = 7}};
     owner o = create(c);
     click(o.ui, CUI_POINTER_MOUSE);
     cui_component_action_result r = scene(&o, c, NULL);
     const cui_semantic *s = semantic(o.ui, 10);
-    assert(r.activation_count == 1 && !s->focused && s->tab_stop_disabled &&
-           s->tab_index == 7 && s->details.no_pointer_focus);
+    assert(r.activation_count == 1 && !s->focused && s->tab_stop_disabled && s->tab_index == 7 &&
+           s->details.no_pointer_focus);
     cui_focus(o.ui, 10); /* Pointer suppression does not suppress explicit/key focus. */
     queue(o.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER});
     r = scene(&o, c, NULL);
@@ -241,7 +249,7 @@ static cui_size guarded_measure(void *user, cui_str text, float size) {
     return (cui_size){text.length * size / 2, size};
 }
 static bool guarded_paint(const cui_prepaint_info *info, const void *payload,
-                           cui_prepaint_writer *writer) {
+                          cui_prepaint_writer *writer) {
     (void)info;
     (void)writer;
     cui_context *ui = *(cui_context *const *)payload;
@@ -258,16 +266,17 @@ static void preflight_and_phases(void) {
     assert(cui_begin_frame(ui, 200, 120, 0));
     cui_begin_box(ui, 1, (cui_box){.width = 200, .height = 120});
     assert(!cui_base_switch_events(ui, 0, cui_string("Invalid"), false,
-                                    (cui_boolean_event_options){0},
-                                    (cui_component_boolean_handler){0}).valid);
-    assert(!cui_base_switch_events(ui, 9, (cui_str){NULL, 1}, false,
-                                    (cui_boolean_event_options){0},
-                                    (cui_component_boolean_handler){0}).valid);
+                                   (cui_boolean_event_options){0},
+                                   (cui_component_boolean_handler){0})
+                .valid);
+    assert(!cui_base_switch_events(ui, 9, (cui_str){NULL, 1}, false, (cui_boolean_event_options){0},
+                                   (cui_component_boolean_handler){0})
+                .valid);
     (void)cui_measure_text(ui, cui_string("Measure"), 14);
     assert(cui_set_prepaint(ui, (cui_prepaint_options){.callback = guarded_paint,
-                                                      .payload = &ui,
-                                                      .payload_bytes = sizeof ui,
-                                                      .command_budget = 1}));
+                                                       .payload = &ui,
+                                                       .payload_bytes = sizeof ui,
+                                                       .command_budget = 1}));
     cui_end_box(ui);
     (void)cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK && !semantic(ui, 9) && !semantic(ui, 99));
@@ -277,7 +286,8 @@ int main(void) {
     preflight_and_phases();
     assert(!cui_base_switch_events(NULL, 1, cui_string("Flag"), false,
                                    (cui_boolean_event_options){0},
-                                   (cui_component_boolean_handler){0}).valid);
+                                   (cui_component_boolean_handler){0})
+                .valid);
     for (unsigned role = 0; role < 2; ++role) {
         values_and_metadata(role != 0, false, false);
         values_and_metadata(role != 0, true, false);

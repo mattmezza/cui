@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
-#include "cui_input_private.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
+#include "cui_input_private.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1347,8 +1347,8 @@ static void cui_components_switch_label(cui_context *ui, const cui_theme *t, cui
 }
 
 static bool cui_components_switch_valid(cui_context *ui, cui_id id, const cui_theme *t,
-                                         cui_str label, cui_switch_options o,
-                                         cui_design_metrics *design) {
+                                        cui_str label, cui_switch_options o,
+                                        cui_design_metrics *design) {
     if (!ui || !id || !t || !cui_components_design(t, o.design_size, design) ||
         o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL || !isfinite(o.width) ||
         !isfinite(o.now_seconds) || o.now_seconds < 0 || !isfinite(t->font_size) ||
@@ -1363,9 +1363,9 @@ static bool cui_components_switch_valid(cui_context *ui, cui_id id, const cui_th
     return true;
 }
 static void cui_components_switch_paint(cui_context *ui, cui_id id, const cui_theme *t,
-                                         cui_str label, const bool *value,
-                                         cui_switch_state *state, cui_switch_options o,
-                                         cui_design_metrics design, bool lifecycle) {
+                                        cui_str label, const bool *value, cui_switch_state *state,
+                                        cui_switch_options o, cui_design_metrics design,
+                                        bool lifecycle) {
     bool small = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL;
     float width = small ? 28 : o.size == CUI_CONTROL_LARGE ? 44 : 36;
     float height = small ? 16 : o.size == CUI_CONTROL_LARGE ? 24 : 20;
@@ -2617,13 +2617,15 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_end_box(ui);
     cui_end_box(ui);
 }
-static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                              cui_edit *edit, cui_input_state *state, cui_input_options options,
-                              cui_component_text_handler handler, cui_input_event_result *events,
-                              bool paint, const cui_base_input_options *overrides,
-                              cui_input_behavior_state *behavior_owner, cui_rect viewport,
-                              bool synthetic_hit, cui_input_options *final_options) {
-    cui_input_behavior_state *behavior = behavior_owner ? behavior_owner : state ? &state->behavior : NULL;
+static cui_input_result
+cui_input_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_edit *edit,
+                 cui_input_state *state, cui_input_options options,
+                 cui_component_text_handler handler, cui_input_event_result *events, bool paint,
+                 const cui_base_input_options *overrides, cui_input_behavior_state *behavior_owner,
+                 cui_rect viewport, bool synthetic_hit, cui_input_options *final_options) {
+    cui_input_behavior_state *behavior = behavior_owner ? behavior_owner
+                                         : state        ? &state->behavior
+                                                        : NULL;
     if (final_options)
         *final_options = options;
     cui_input_metrics metrics;
@@ -2640,9 +2642,13 @@ static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_t
     if (overrides && options.masked &&
         (overrides->presentation.prepare || overrides->presentation_complete)) {
         (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, true, false, 0);
-        cui_set_semantic_details(ui, id, (cui_semantic_details){.secret = true,
-            .password = options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED,
-            .invalid = true, .readonly = true});
+        cui_set_semantic_details(
+            ui, id,
+            (cui_semantic_details){.secret = true,
+                                   .password =
+                                       options.content_type != CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED,
+                                   .invalid = true,
+                                   .readonly = true});
         if (final_options)
             final_options->invalid = true;
         return (cui_input_result){.error = CUI_EDIT_INVALID_ARGUMENT};
@@ -2670,11 +2676,11 @@ static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_t
         if (plain)
             cui_input_visual_clear(plain);
         mask = cui_input_mask_resource(ui, id);
-        behavior->composition = cui_base_composition(ui, id, behavior->composition,
-                                                           &behavior->composition_owned);
+        behavior->composition =
+            cui_base_composition(ui, id, behavior->composition, &behavior->composition_owned);
         cui_edit_result prepared =
-            cui_input_mask_bind(mask, ui, edit, behavior->composition, options,
-                                metrics.font_size, !behavior->focus_initialized);
+            cui_input_mask_bind(mask, ui, edit, behavior->composition, options, metrics.font_size,
+                                !behavior->focus_initialized);
         if (prepared != CUI_EDIT_OK) {
             (void)cui_interact(ui, id, CUI_ROLE_TEXTBOX, name, true, false, 0);
             cui_set_semantic_details(
@@ -2690,8 +2696,8 @@ static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_t
         }
     }
     cui_id viewport_id = cui_input_viewport_id(id);
-    cui_input_hit_geometry hit = {ui, overrides ? viewport : cui_bounds(ui, viewport_id), metrics.font_size,
-                                  state->scroll_x};
+    cui_input_hit_geometry hit = {ui, overrides ? viewport : cui_bounds(ui, viewport_id),
+                                  metrics.font_size, state->scroll_x};
     bool multiline = cui_edit_get_state(edit).multiline;
     cui_input_cached_hit cached_hit = {
         hit, (multiline || options.masked) ? NULL : cui_input_visual_resource(ui, id)};
@@ -2707,33 +2713,33 @@ static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_t
                            : cui_measure_text(ui, committed, metrics.font_size).width;
     cached_hit.measured.viewport.x +=
         cui_input_alignment(hit.viewport.w, text_width, options.text_align);
-    behavior->composition = cui_base_composition(ui, id, behavior->composition,
-                                                       &behavior->composition_owned);
+    behavior->composition =
+        cui_base_composition(ui, id, behavior->composition, &behavior->composition_owned);
     if (behavior->composition && behavior->composition_owned)
         behavior->composition->grow_view = true;
     cui_input_mask_hit masked_hit = {cached_hit, mask};
     cui_base_input_options base_options = {
-            .disabled = options.disabled,
-            .readonly = options.readonly,
-            .required = options.required,
-            .invalid = options.invalid,
-            .clipboard = options.clipboard,
-            .validate = options.validate,
-            .validate_user = options.validate_user,
-            .normalization = options.normalization,
-            .format = options.format,
-            .format_workspace = options.format_workspace,
-            .matcher = options.matcher,
-            .masked = options.masked,
-            .content_type = options.content_type,
-            .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},
-            .presentation_complete = mask ? cui_input_mask_complete : NULL,
-            .presentation_user = mask,
-            .delegate_up_down = options.delegate_up_down,
-            .hit_test = multiline        ? NULL
-                        : options.masked ? cui_input_mask_hit_test
-                                         : cui_input_cached_hit_test,
-            .hit_test_user = options.masked ? (void *)&masked_hit : (void *)&cached_hit};
+        .disabled = options.disabled,
+        .readonly = options.readonly,
+        .required = options.required,
+        .invalid = options.invalid,
+        .clipboard = options.clipboard,
+        .validate = options.validate,
+        .validate_user = options.validate_user,
+        .normalization = options.normalization,
+        .format = options.format,
+        .format_workspace = options.format_workspace,
+        .matcher = options.matcher,
+        .masked = options.masked,
+        .content_type = options.content_type,
+        .presentation = mask ? cui_input_mask_presentation(mask) : (cui_edit_presentation){0},
+        .presentation_complete = mask ? cui_input_mask_complete : NULL,
+        .presentation_user = mask,
+        .delegate_up_down = options.delegate_up_down,
+        .hit_test = multiline        ? NULL
+                    : options.masked ? cui_input_mask_hit_test
+                                     : cui_input_cached_hit_test,
+        .hit_test_user = options.masked ? (void *)&masked_hit : (void *)&cached_hit};
     if (overrides) {
         cui_base_input_options supplied = *overrides;
         if (!supplied.hit_test || synthetic_hit) {
@@ -2775,28 +2781,30 @@ static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_t
 
 cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                               cui_edit *edit, cui_input_state *state, cui_input_options options) {
-    return cui_input_common(ui, id, t, name, edit, state, options,
-                            (cui_component_text_handler){0}, NULL, true, NULL, NULL, (cui_rect){0}, false, NULL);
+    return cui_input_common(ui, id, t, name, edit, state, options, (cui_component_text_handler){0},
+                            NULL, true, NULL, NULL, (cui_rect){0}, false, NULL);
 }
 
-cui_input_event_result cui_input_events(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                                         cui_edit *edit, cui_input_state *state,
-                                         cui_input_options options,
-                                         cui_component_text_handler handler) {
+cui_input_event_result cui_input_events(cui_context *ui, cui_id id, const cui_theme *t,
+                                        cui_str name, cui_edit *edit, cui_input_state *state,
+                                        cui_input_options options,
+                                        cui_component_text_handler handler) {
     cui_input_event_result result = {0};
-    result.control = cui_input_common(ui, id, t, name, edit, state, options, handler, &result,
-                                      true, NULL, NULL, (cui_rect){0}, false, NULL);
+    result.control = cui_input_common(ui, id, t, name, edit, state, options, handler, &result, true,
+                                      NULL, NULL, (cui_rect){0}, false, NULL);
     return result;
 }
 
-cui_input_event_result cui_input_private_reduce(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_edit *edit,
-    cui_input_state *state, cui_input_behavior_state *behavior, cui_input_options *options,
-    cui_base_input_options overrides, cui_rect viewport, bool synthetic_hit,
-    cui_component_text_handler handler) {
+cui_input_event_result
+cui_input_private_reduce(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                         cui_edit *edit, cui_input_state *state, cui_input_behavior_state *behavior,
+                         cui_input_options *options, cui_base_input_options overrides,
+                         cui_rect viewport, bool synthetic_hit,
+                         cui_component_text_handler handler) {
     cui_input_event_result result = {0};
     result.control = cui_input_common(ui, id, theme, name, edit, state, *options, handler,
-        handler.callback ? &result : NULL, false, &overrides, behavior, viewport, synthetic_hit, options);
+                                      handler.callback ? &result : NULL, false, &overrides,
+                                      behavior, viewport, synthetic_hit, options);
     return result;
 }
 
@@ -2893,9 +2901,9 @@ static void cui_control_events_button_hover(void *user, bool hovered) {
 static void cui_control_events_button_typed(void *user, const cui_button_click_event *click) {
     cui_control_events_button_forward *forward = user;
     cui_component_event_metadata event;
-    bool evidence = click->has_evidence &&
-                    cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE,
-                                                         &click->evidence);
+    bool evidence =
+        click->has_evidence &&
+        cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE, &click->evidence);
     cui_control_events_private_increment(&forward->result->activation_count,
                                          &forward->result->count_overflow);
     if (forward->original.on_click_event)
@@ -2904,8 +2912,8 @@ static void cui_control_events_button_typed(void *user, const cui_button_click_e
         forward->handler.callback(forward->handler.user, &event);
 }
 cui_component_action_result cui_button_events(cui_context *ui, cui_id id, const cui_theme *theme,
-                                               cui_str name, cui_button_options options,
-                                               cui_component_activation_handler handler) {
+                                              cui_str name, cui_button_options options,
+                                              cui_component_activation_handler handler) {
     cui_component_action_result result = {0};
     cui_design_metrics design;
     if (!ui || !id || !theme || (name.length && !name.data) ||
@@ -2923,14 +2931,15 @@ cui_component_action_result cui_button_events(cui_context *ui, cui_id id, const 
     return result;
 }
 cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, const cui_theme *theme,
-                                                 cui_str name, cui_check_state value,
-                                                 cui_checkbox_options options,
-                                                 cui_component_check_handler handler) {
+                                                cui_str name, cui_check_state value,
+                                                cui_checkbox_options options,
+                                                cui_component_check_handler handler) {
     cui_component_action_result result = {0};
     cui_design_metrics design;
     if (!ui || !id || !theme || (name.length && !name.data) || value < CUI_CHECK_UNCHECKED ||
         value > CUI_CHECK_MIXED || options.on_change || options.change_user ||
-        (options.custom_role && (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
+        (options.custom_role &&
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)) ||
         !cui_components_design(theme, options.design_size, &design))
         return result;
     result.valid = true;
@@ -2945,9 +2954,9 @@ cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, cons
 }
 
 cui_component_action_result cui_switch_events(cui_context *ui, cui_id id, const cui_theme *theme,
-                                               cui_str label, bool value,
-                                               cui_switch_state *state, cui_switch_options options,
-                                               cui_component_boolean_handler handler) {
+                                              cui_str label, bool value, cui_switch_state *state,
+                                              cui_switch_options options,
+                                              cui_component_boolean_handler handler) {
     cui_component_action_result result = {0};
     cui_design_metrics design;
     if (options.on_change || options.change_user ||
@@ -2957,9 +2966,10 @@ cui_component_action_result cui_switch_events(cui_context *ui, cui_id id, const 
     if (!cui_frame_is_submitting(ui))
         return result;
     cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
-    result = cui_base_switch_events(ui, id, name, value,
-                                    (cui_boolean_event_options){.disabled = options.disabled,
-                                                               .skip_tab = options.skip_tab}, handler);
+    result = cui_base_switch_events(
+        ui, id, name, value,
+        (cui_boolean_event_options){.disabled = options.disabled, .skip_tab = options.skip_tab},
+        handler);
     cui_update_semantic(ui, id, value, value ? 1 : 0);
     cui_switch_state passive;
     if (!result.submitted && state) {
@@ -2971,10 +2981,10 @@ cui_component_action_result cui_switch_events(cui_context *ui, cui_id id, const 
     return result;
 }
 cui_component_action_result cui_toggle_events(cui_context *ui, cui_id id, const cui_theme *theme,
-                                               cui_str label, bool value,
-                                               cui_hover_state *tooltip_state,
-                                               cui_toggle_options options,
-                                               cui_component_boolean_handler handler) {
+                                              cui_str label, bool value,
+                                              cui_hover_state *tooltip_state,
+                                              cui_toggle_options options,
+                                              cui_component_boolean_handler handler) {
     cui_component_action_result result = {0};
     cui_design_metrics design;
     if (options.on_change || options.change_user || !ui || !id || !theme ||
@@ -2986,18 +2996,20 @@ cui_component_action_result cui_toggle_events(cui_context *ui, cui_id id, const 
     if (!cui_frame_is_submitting(ui))
         return result;
     cui_str name = options.accessibility_label.length ? options.accessibility_label
-                   : options.tooltip.length ? options.tooltip : label;
-    result = cui_base_toggle_events(ui, id, name, value,
-                                    (cui_boolean_event_options){.disabled = options.disabled,
-                                                               .skip_tab = options.skip_tab}, handler);
+                   : options.tooltip.length           ? options.tooltip
+                                                      : label;
+    result = cui_base_toggle_events(
+        ui, id, name, value,
+        (cui_boolean_event_options){.disabled = options.disabled, .skip_tab = options.skip_tab},
+        handler);
     cui_update_semantic(ui, id, value, value ? 1 : 0);
     cui_toggle_paint(ui, id, theme, label, value, options);
     if (result.submitted && tooltip_state && options.tooltip.length) {
         cui_hover_options tooltip = options.tooltip_options;
         tooltip.trigger = id;
         tooltip.disabled |= options.disabled;
-        cui_tooltip(ui, cui_components_child_id(id, 5100), theme, tooltip_state,
-                     options.tooltip, tooltip);
+        cui_tooltip(ui, cui_components_child_id(id, 5100), theme, tooltip_state, options.tooltip,
+                    tooltip);
     }
     return result;
 }

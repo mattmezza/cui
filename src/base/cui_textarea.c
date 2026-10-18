@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_textarea.h"
-#include "cui/cui_multiline_events.h"
 #include "cui/cui_base.h"
+#include "cui/cui_multiline_events.h"
 #include "cui_textarea_geometry.h"
 #include <math.h>
 #include <stdlib.h>
@@ -237,8 +237,7 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
         metrics.line_height <= 0 || style.weight < CUI_TEXT_WEIGHT_NORMAL ||
         style.weight > CUI_TEXT_WEIGHT_BOLD || !isfinite(style.letter_spacing) ||
-        (style.letter_spacing != 0 &&
-         !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING))) {
+        (style.letter_spacing != 0 && !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING))) {
         if (state)
             state->error = CUI_TEXTAREA_INVALID;
         return CUI_TEXTAREA_INVALID;
@@ -265,7 +264,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         state->font_size == metrics.font_size && state->line_height == metrics.line_height &&
         state->wrap_width == width && state->layout_wrap == wrap &&
         state->text_style.family == style.family && state->text_style.weight == style.weight &&
-        state->text_style.italic == style.italic && state->text_style.monospace == style.monospace &&
+        state->text_style.italic == style.italic &&
+        state->text_style.monospace == style.monospace &&
         state->text_style.letter_spacing == style.letter_spacing;
     if (reusable && state->revision == selection.revision) {
         state->caret_line = cui_textarea_cursor_line(state, selection.cursor);
@@ -754,14 +754,15 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
     bool external =
         state->initialized && (state->revision != before.revision ||
                                state->cursor != before.cursor || state->anchor != before.anchor);
-    external = external || (state->initialized &&
-                            (state->text_style.family != options.text_style.family ||
-                             state->text_style.weight != options.text_style.weight ||
-                             state->text_style.italic != options.text_style.italic ||
-                             state->text_style.monospace != options.text_style.monospace ||
-                             state->text_style.letter_spacing != options.text_style.letter_spacing ||
-                             state->font_size != metrics.font_size ||
-                             state->line_height != metrics.line_height));
+    external =
+        external ||
+        (state->initialized &&
+         (state->text_style.family != options.text_style.family ||
+          state->text_style.weight != options.text_style.weight ||
+          state->text_style.italic != options.text_style.italic ||
+          state->text_style.monospace != options.text_style.monospace ||
+          state->text_style.letter_spacing != options.text_style.letter_spacing ||
+          state->font_size != metrics.font_size || state->line_height != metrics.line_height));
     if (external) {
         state->preferred_valid = false;
         state->upstream_affinity = false;
@@ -1041,24 +1042,25 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
     return result;
 }
 
-cui_multiline_event_result cui_base_textarea_events(
-    cui_context *ui, cui_id id, cui_str name, cui_edit *edit, cui_textarea_state *state,
-    cui_textarea_options options, cui_textarea_metrics metrics, cui_component_text_handler handler) {
+cui_multiline_event_result cui_base_textarea_events(cui_context *ui, cui_id id, cui_str name,
+                                                    cui_edit *edit, cui_textarea_state *state,
+                                                    cui_textarea_options options,
+                                                    cui_textarea_metrics metrics,
+                                                    cui_component_text_handler handler) {
     cui_multiline_event_result result = {0};
     cui_edit_state before = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
     result.control = cui_base_textarea(ui, id, name, edit, state, options, metrics);
     cui_edit_state after = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
     if (ui && edit && handler.callback && before.revision != after.revision) {
-        cui_component_text_event event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
-                      .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
-                      .frame_sequence = cui_frame_sequence(ui)},
-            .before = before,
-            .after = after,
-            .has_text = true,
-            .text = cui_edit_get_text(edit)};
+        cui_component_text_event event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                                    .target = id,
+                                                    .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                                    .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                                    .frame_sequence = cui_frame_sequence(ui)},
+                                          .before = before,
+                                          .after = after,
+                                          .has_text = true,
+                                          .text = cui_edit_get_text(edit)};
         handler.callback(handler.user, &event);
         result.change_count = 1;
     }

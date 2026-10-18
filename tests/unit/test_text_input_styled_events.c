@@ -36,10 +36,11 @@ static cui_input_event_result frame(fixture *f, bool facade, bool observer, bool
     if (!omit) {
         if (facade)
             r = cui_input_events(f->ui, 10, &theme, cui_string("Name"), f->edit, &f->state,
-                                 f->options, (cui_component_text_handler){observer ? observe : NULL, f});
+                                 f->options,
+                                 (cui_component_text_handler){observer ? observe : NULL, f});
         else
-            r.control = cui_input_ex(f->ui, 10, &theme, cui_string("Name"), f->edit,
-                                      &f->state, f->options);
+            r.control =
+                cui_input_ex(f->ui, 10, &theme, cui_string("Name"), f->edit, &f->state, f->options);
     }
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
@@ -49,16 +50,21 @@ static cui_input_event_result frame(fixture *f, bool facade, bool observer, bool
 static void init(fixture *f) {
     memset(f, 0, sizeof *f);
     f->ui = cui_create((cui_config){.max_elements = 64, .max_commands = 128});
-    f->edit = cui_edit_create((cui_edit_config){.buffer = f->bytes, .capacity = 128,
-                                              .history_bytes = 4096, .max_history_steps = 16});
+    f->edit = cui_edit_create((cui_edit_config){
+        .buffer = f->bytes, .capacity = 128, .history_bytes = 4096, .max_history_steps = 16});
     assert(f->ui && f->edit);
     frame(f, false, false, false);
     cui_focus(f->ui, 10);
 }
-static void finish(fixture *f) { cui_destroy(f->ui); cui_edit_destroy(f->edit); }
+static void finish(fixture *f) {
+    cui_destroy(f->ui);
+    cui_edit_destroy(f->edit);
+}
 static void queue(fixture *f, cui_event_type type, const char *text) {
-    assert(cui_queue_event(f->ui, (cui_event){.type = type, .key = CUI_KEY_ENTER,
-                          .text_data = text, .text_length = text ? strlen(text) : 0}));
+    assert(cui_queue_event(f->ui, (cui_event){.type = type,
+                                              .key = CUI_KEY_ENTER,
+                                              .text_data = text,
+                                              .text_length = text ? strlen(text) : 0}));
 }
 static void equal(fixture *a, fixture *b, cui_input_result x, cui_input_result y) {
     assert(x.changed == y.changed && x.submitted == y.submitted && x.error == y.error &&
@@ -71,57 +77,87 @@ static void equal(fixture *a, fixture *b, cui_input_result x, cui_input_result y
         assert(p->type == q->type && !memcmp(&p->bounds, &q->bounds, sizeof p->bounds));
         assert(!memcmp(&p->color, &q->color, sizeof p->color));
         assert(p->text.length == q->text.length);
-        if (p->text.length) assert(!memcmp(p->text.data, q->text.data, p->text.length));
+        if (p->text.length)
+            assert(!memcmp(p->text.data, q->text.data, p->text.length));
     }
 }
-static void *fail_allocate(void *user, size_t bytes) { (void)user; (void)bytes; return NULL; }
-static void fail_release(void *user, void *storage) { (void)user; (void)storage; assert(false); }
+static void *fail_allocate(void *user, size_t bytes) {
+    (void)user;
+    (void)bytes;
+    return NULL;
+}
+static void fail_release(void *user, void *storage) {
+    (void)user;
+    (void)storage;
+    assert(false);
+}
 int main(void) {
-    fixture a, b; init(&a); init(&b);
+    fixture a, b;
+    init(&a);
+    init(&b);
     for (unsigned mode = 0; mode < 3; ++mode) {
         a.options.masked = b.options.masked = mode == 1;
-        a.options.content_type = b.options.content_type = mode == 2 ?
-            CUI_TEXT_INPUT_PURPOSE_PASSWORD : CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+        a.options.content_type = b.options.content_type =
+            mode == 2 ? CUI_TEXT_INPUT_PURPOSE_PASSWORD : CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
         unsigned start = b.count;
         for (unsigned i = 0; i < 2; ++i) {
-            queue(&a, CUI_EVENT_TEXT, "a"); queue(&b, CUI_EVENT_TEXT, "a");
-            queue(&a, CUI_EVENT_KEY_DOWN, NULL); queue(&b, CUI_EVENT_KEY_DOWN, NULL);
+            queue(&a, CUI_EVENT_TEXT, "a");
+            queue(&b, CUI_EVENT_TEXT, "a");
+            queue(&a, CUI_EVENT_KEY_DOWN, NULL);
+            queue(&b, CUI_EVENT_KEY_DOWN, NULL);
         }
         cui_input_event_result x = frame(&a, false, false, false);
         cui_input_event_result y = frame(&b, true, true, false);
         equal(&a, &b, x.control, y.control);
         assert(y.change_count == 2 && y.submit_count == 2 && b.count == start + 4);
         for (unsigned i = 0; i < 4; ++i) {
-            assert(b.events[start+i].event.event_index == i);
-            assert(b.events[start+i].has_text == (mode == 0));
+            assert(b.events[start + i].event.event_index == i);
+            assert(b.events[start + i].has_text == (mode == 0));
         }
-        if (!mode) assert(!strcmp(b.copies[0], "a") && !strcmp(b.copies[2], "aa"));
+        if (!mode)
+            assert(!strcmp(b.copies[0], "a") && !strcmp(b.copies[2], "aa"));
     }
     a.options = b.options = (cui_input_options){.masked = true};
-    queue(&a, CUI_EVENT_COMPOSITION_START, NULL); queue(&b, CUI_EVENT_COMPOSITION_START, NULL);
-    queue(&a, CUI_EVENT_COMPOSITION_UPDATE, "hi"); queue(&b, CUI_EVENT_COMPOSITION_UPDATE, "hi");
+    queue(&a, CUI_EVENT_COMPOSITION_START, NULL);
+    queue(&b, CUI_EVENT_COMPOSITION_START, NULL);
+    queue(&a, CUI_EVENT_COMPOSITION_UPDATE, "hi");
+    queue(&b, CUI_EVENT_COMPOSITION_UPDATE, "hi");
     cui_input_event_result x = frame(&a, false, false, false), y = frame(&b, true, true, false);
-    equal(&a, &b, x.control, y.control); assert(!y.change_count);
-    queue(&a, CUI_EVENT_COMPOSITION_COMMIT, "hi"); queue(&b, CUI_EVENT_COMPOSITION_COMMIT, "hi");
-    x = frame(&a, false, false, false); y = frame(&b, true, true, false);
-    equal(&a, &b, x.control, y.control); assert(y.change_count == 1 && !b.events[b.count-1].has_text);
-    queue(&a, CUI_EVENT_TEXT, "z"); queue(&b, CUI_EVENT_TEXT, "z");
-    x = frame(&a, false, false, false); y = frame(&b, true, false, false);
-    equal(&a, &b, x.control, y.control); assert(y.control.changed && !y.change_count);
+    equal(&a, &b, x.control, y.control);
+    assert(!y.change_count);
+    queue(&a, CUI_EVENT_COMPOSITION_COMMIT, "hi");
+    queue(&b, CUI_EVENT_COMPOSITION_COMMIT, "hi");
+    x = frame(&a, false, false, false);
+    y = frame(&b, true, true, false);
+    equal(&a, &b, x.control, y.control);
+    assert(y.change_count == 1 && !b.events[b.count - 1].has_text);
+    queue(&a, CUI_EVENT_TEXT, "z");
+    queue(&b, CUI_EVENT_TEXT, "z");
+    x = frame(&a, false, false, false);
+    y = frame(&b, true, false, false);
+    equal(&a, &b, x.control, y.control);
+    assert(y.control.changed && !y.change_count);
     assert(b.omit && b.draw.count); /* Callback did not remove current submission. */
     frame(&b, true, true, b.omit);
-    size_t n; const cui_semantic *items = cui_semantics(b.ui, &n);
-    for (size_t i = 0; i < n; ++i) assert(items[i].id != 10);
-    finish(&a); finish(&b);
-    init(&a); init(&b);
-    a.options = b.options = (cui_input_options){.masked = true,
-        .mask_allocator = {.allocate = fail_allocate, .release = fail_release}};
-    queue(&a, CUI_EVENT_TEXT, "secret"); queue(&b, CUI_EVENT_TEXT, "secret");
-    x = frame(&a, false, false, false); y = frame(&b, true, true, false);
+    size_t n;
+    const cui_semantic *items = cui_semantics(b.ui, &n);
+    for (size_t i = 0; i < n; ++i)
+        assert(items[i].id != 10);
+    finish(&a);
+    finish(&b);
+    init(&a);
+    init(&b);
+    a.options = b.options = (cui_input_options){
+        .masked = true, .mask_allocator = {.allocate = fail_allocate, .release = fail_release}};
+    queue(&a, CUI_EVENT_TEXT, "secret");
+    queue(&b, CUI_EVENT_TEXT, "secret");
+    x = frame(&a, false, false, false);
+    y = frame(&b, true, true, false);
     equal(&a, &b, x.control, y.control);
     assert(y.control.error != CUI_EDIT_OK && !y.change_count && !y.submit_count && !b.count);
     assert(!a.bytes[0] && !b.bytes[0]);
-    finish(&a); finish(&b);
+    finish(&a);
+    finish(&b);
     puts("PASS Styled Input ordered observers, legacy paint equivalence, IME and secure lifetime");
     return 0;
 }

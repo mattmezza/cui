@@ -9,8 +9,8 @@ int main(void) {
     cui_component_event_metadata metadata;
     if (!cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_REQUEST, 7,
                                   CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC) ||
-        cui_component_event_copy_utf8(cui_string("owned"), 7, storage, sizeof storage,
-                                      &copied) != CUI_COMPONENT_EVENT_COPY_OK ||
+        cui_component_event_copy_utf8(cui_string("owned"), 7, storage, sizeof storage, &copied) !=
+            CUI_COMPONENT_EVENT_COPY_OK ||
         copied.length != 5 || copied.data != storage || metadata.target != 7)
         return 1;
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});

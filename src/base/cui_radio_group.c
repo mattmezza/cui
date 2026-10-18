@@ -16,11 +16,10 @@ static size_t cui_radio_group_enabled(const cui_radio_group_item *items, size_t 
     }
     return count;
 }
-static cui_radio_group_result cui_radio_group_reduce(cui_context *ui, cui_id id,
-                                            const cui_radio_group_item *items, size_t count,
-                                            cui_id *selected, cui_radio_group_state *state,
-                                            cui_radio_group_options o, cui_selection_handler handler,
-                                            cui_selection_event_result *observed) {
+static cui_radio_group_result
+cui_radio_group_reduce(cui_context *ui, cui_id id, const cui_radio_group_item *items, size_t count,
+                       cui_id *selected, cui_radio_group_state *state, cui_radio_group_options o,
+                       cui_selection_handler handler, cui_selection_event_result *observed) {
     cui_radio_group_result r = {0};
     if (!ui || !id || !selected || !state || count > CUI_RADIO_GROUP_MAX || (count && !items) ||
         !isfinite(o.gap) || o.gap < 0 || o.size > CUI_CONTROL_XSMALL ||
@@ -82,9 +81,9 @@ static cui_radio_group_result cui_radio_group_reduce(cui_context *ui, cui_id id,
                 source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
             else if (events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION)
                 source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
-            has_metadata = cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE,
-                id, source) && cui_component_event_set_frame_index(
-                    &metadata, cui_frame_sequence(ui), e);
+            has_metadata =
+                cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE, id, source) &&
+                cui_component_event_set_frame_index(&metadata, cui_frame_sequence(ui), e);
         }
         if (activate < count) {
             cui_cancel_event_activation(ui, e);
@@ -135,11 +134,12 @@ static cui_radio_group_result cui_radio_group_reduce(cui_context *ui, cui_id id,
                 r.changed |= before != after;
                 if (before != after && observed && handler.on_change && submitting) {
                     if (!has_metadata)
-                        (void)cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE,
-                            id, CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                        (void)cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE, id,
+                                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
                     cui_selection_change change = {metadata, before, after, attempted,
-                        activate < count ? CUI_SELECTION_REASON_ACTIVATION
-                                         : CUI_SELECTION_REASON_NAVIGATION};
+                                                   activate < count
+                                                       ? CUI_SELECTION_REASON_ACTIVATION
+                                                       : CUI_SELECTION_REASON_NAVIGATION};
                     if (observed->change_count == SIZE_MAX)
                         observed->count_overflow = true;
                     else
@@ -178,17 +178,19 @@ static cui_radio_group_result cui_radio_group_reduce(cui_context *ui, cui_id id,
 }
 
 cui_radio_group_result cui_base_radio_group(cui_context *ui, cui_id id,
-    const cui_radio_group_item *items, size_t count, cui_id *selected,
-    cui_radio_group_state *state, cui_radio_group_options options) {
+                                            const cui_radio_group_item *items, size_t count,
+                                            cui_id *selected, cui_radio_group_state *state,
+                                            cui_radio_group_options options) {
     return cui_radio_group_reduce(ui, id, items, count, selected, state, options,
                                   (cui_selection_handler){0}, NULL);
 }
-cui_radio_group_event_result cui_base_radio_group_events(cui_context *ui, cui_id id,
-    const cui_radio_group_item *items, size_t count, cui_id *selected,
-    cui_radio_group_state *state, cui_radio_group_options options, cui_selection_handler handler) {
+cui_radio_group_event_result
+cui_base_radio_group_events(cui_context *ui, cui_id id, const cui_radio_group_item *items,
+                            size_t count, cui_id *selected, cui_radio_group_state *state,
+                            cui_radio_group_options options, cui_selection_handler handler) {
     cui_radio_group_event_result result;
     memset(&result, 0, sizeof(result));
-    result.legacy = cui_radio_group_reduce(ui, id, items, count, selected, state, options,
-                                          handler, &result.events);
+    result.legacy = cui_radio_group_reduce(ui, id, items, count, selected, state, options, handler,
+                                           &result.events);
     return result;
 }

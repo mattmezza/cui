@@ -167,8 +167,9 @@ int main(void) {
                    b.copy.activation.target == 10);
         if (input < 4) {
             cui_component_event_source source = input < 2 ? CUI_COMPONENT_EVENT_SOURCE_POINTER
-                : input == 2 ? CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY
-                             : CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                                                : input == 2
+                                                    ? CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY
+                                                    : CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
             assert(b.copy.source == source && (b.copy.flags & CUI_COMPONENT_EVENT_HAS_INDEX));
             assert(b.copy.activation.event_index == b.copy.event_index);
             if (input == 1)

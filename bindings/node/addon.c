@@ -890,13 +890,14 @@ static napi_value notification_frame(napi_env env, uint64_t frame) {
     return napi_create_bigint_uint64(env, frame, &result) == napi_ok ? result : NULL;
 }
 static napi_value notification_object(napi_env env, const cui_bridge_notification_v1 *event,
-                                       const char *text) {
+                                      const char *text) {
     napi_value result, x;
     if (napi_create_object(env, &result) != napi_ok)
         return NULL;
-#define NOTIFY_UINT(name, value) \
-    if (napi_create_uint32(env, (uint32_t)(value), &x) != napi_ok || \
-        napi_set_named_property(env, result, name, x) != napi_ok) return NULL
+#define NOTIFY_UINT(name, value)                                                                   \
+    if (napi_create_uint32(env, (uint32_t)(value), &x) != napi_ok ||                               \
+        napi_set_named_property(env, result, name, x) != napi_ok)                                  \
+    return NULL
     NOTIFY_UINT("payloadKind", event->payload_kind);
     NOTIFY_UINT("type", event->legacy.type);
     NOTIFY_UINT("slot", event->node.slot);
@@ -936,13 +937,14 @@ static napi_value poll_notification_v1(napi_env env, napi_callback_info info) {
         return NULL;
     typedef uint32_t (*query_fn)(void);
     typedef cui_bridge_status (*poll_fn)(cui_bridge_app *, uint32_t, cui_bridge_notification_v1 *,
-                                        char *, uint32_t, uint32_t *);
+                                         char *, uint32_t, uint32_t *);
     query_fn size_query = NULL, versions_query = NULL;
     poll_fn poll_query = NULL;
 #if defined(_WIN32)
     HMODULE module = GetModuleHandleA("cui_bridge.dll");
     FARPROC size_symbol = module ? GetProcAddress(module, "cui_bridge_notification_v1_size") : NULL;
-    FARPROC versions_symbol = module ? GetProcAddress(module, "cui_bridge_notification_versions") : NULL;
+    FARPROC versions_symbol =
+        module ? GetProcAddress(module, "cui_bridge_notification_versions") : NULL;
     FARPROC poll_symbol = module ? GetProcAddress(module, "cui_bridge_poll_notification_v1") : NULL;
 #else
     void *size_symbol = dlsym(RTLD_DEFAULT, "cui_bridge_notification_v1_size");
@@ -961,7 +963,8 @@ static napi_value poll_notification_v1(napi_env env, napi_callback_info info) {
     if (!text)
         return status(env, CUI_BRIDGE_OUT_OF_MEMORY);
     cui_bridge_notification_v1 event;
-    cui_bridge_status code = poll_query(app->bridge, sizeof event, &event, text, capacity, &required);
+    cui_bridge_status code =
+        poll_query(app->bridge, sizeof event, &event, text, capacity, &required);
     if (code == CUI_BRIDGE_CAPACITY) {
         if (required <= capacity || required > 1024u * 1024u) {
             free(text);
@@ -988,7 +991,8 @@ static napi_value poll_notification_v1(napi_env env, napi_callback_info info) {
         free(text);
         return status(env, code);
     }
-    if (event.schema_version != 1 || event.struct_size != sizeof event || event.text_length >= capacity) {
+    if (event.schema_version != 1 || event.struct_size != sizeof event ||
+        event.text_length >= capacity) {
         free(text);
         return fail(env, "invalid V1 notification output");
     }
@@ -1001,19 +1005,33 @@ static bool notification_utf8(const char *text, uint32_t length) {
     uint32_t i = 0;
     while (i < length) {
         unsigned char c = (unsigned char)text[i++];
-        if (c < 0x80u) continue;
+        if (c < 0x80u)
+            continue;
         uint32_t value, count, minimum;
-        if (c >= 0xc2u && c <= 0xdfu) { value = c & 31u; count = 1; minimum = 0x80u; }
-        else if (c >= 0xe0u && c <= 0xefu) { value = c & 15u; count = 2; minimum = 0x800u; }
-        else if (c >= 0xf0u && c <= 0xf4u) { value = c & 7u; count = 3; minimum = 0x10000u; }
-        else return false;
-        if (count > length - i) return false;
+        if (c >= 0xc2u && c <= 0xdfu) {
+            value = c & 31u;
+            count = 1;
+            minimum = 0x80u;
+        } else if (c >= 0xe0u && c <= 0xefu) {
+            value = c & 15u;
+            count = 2;
+            minimum = 0x800u;
+        } else if (c >= 0xf0u && c <= 0xf4u) {
+            value = c & 7u;
+            count = 3;
+            minimum = 0x10000u;
+        } else
+            return false;
+        if (count > length - i)
+            return false;
         while (count--) {
             c = (unsigned char)text[i++];
-            if ((c & 0xc0u) != 0x80u) return false;
+            if ((c & 0xc0u) != 0x80u)
+                return false;
             value = (value << 6) | (c & 63u);
         }
-        if (value < minimum || value > 0x10ffffu || (value >= 0xd800u && value <= 0xdfffu)) return false;
+        if (value < minimum || value > 0x10ffffu || (value >= 0xd800u && value <= 0xdfffu))
+            return false;
     }
     return true;
 }
@@ -1023,16 +1041,20 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
     if (!args(env, info, 1, args_value) || !app_arg(env, args_value[0], &app))
         return NULL;
     typedef uint32_t (*query_fn)(void);
-    typedef cui_bridge_status (*poll_fn)(cui_bridge_app *, uint32_t, uint32_t, cui_bridge_notification_v1 *,
-                                        char *, uint32_t, uint32_t *);
+    typedef cui_bridge_status (*poll_fn)(cui_bridge_app *, uint32_t, uint32_t,
+                                         cui_bridge_notification_v1 *, char *, uint32_t,
+                                         uint32_t *);
     query_fn size_query = NULL, versions_query = NULL, payloads_query = NULL;
     poll_fn poll_query = NULL;
 #if defined(_WIN32)
     HMODULE module = GetModuleHandleA("cui_bridge.dll");
     FARPROC size_symbol = module ? GetProcAddress(module, "cui_bridge_notification_v1_size") : NULL;
-    FARPROC versions_symbol = module ? GetProcAddress(module, "cui_bridge_notification_versions") : NULL;
-    FARPROC poll_symbol = module ? GetProcAddress(module, "cui_bridge_poll_value_notification_v1") : NULL;
-    FARPROC payloads_symbol = module ? GetProcAddress(module, "cui_bridge_notification_value_payloads_v1") : NULL;
+    FARPROC versions_symbol =
+        module ? GetProcAddress(module, "cui_bridge_notification_versions") : NULL;
+    FARPROC poll_symbol =
+        module ? GetProcAddress(module, "cui_bridge_poll_value_notification_v1") : NULL;
+    FARPROC payloads_symbol =
+        module ? GetProcAddress(module, "cui_bridge_notification_value_payloads_v1") : NULL;
 #else
     void *size_symbol = dlsym(RTLD_DEFAULT, "cui_bridge_notification_v1_size");
     void *versions_symbol = dlsym(RTLD_DEFAULT, "cui_bridge_notification_versions");
@@ -1048,13 +1070,15 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
     if (!(versions_query() & 1u) || size_query() != sizeof(cui_bridge_notification_v1))
         return fail(env, "V1 notification capability/layout mismatch");
     uint32_t enabled = payloads_query() & 28u;
-    if (!enabled) return fail(env, "V1 value notification categories unavailable");
+    if (!enabled)
+        return fail(env, "V1 value notification categories unavailable");
     uint32_t capacity = 4097, required = 0;
     char *text = malloc(capacity);
     if (!text)
         return status(env, CUI_BRIDGE_OUT_OF_MEMORY);
     cui_bridge_notification_v1 event;
-    cui_bridge_status code = poll_query(app->bridge, sizeof event, enabled, &event, text, capacity, &required);
+    cui_bridge_status code =
+        poll_query(app->bridge, sizeof event, enabled, &event, text, capacity, &required);
     if (code == CUI_BRIDGE_CAPACITY) {
         if (required <= capacity || required > 1024u * 1024u) {
             free(text);
@@ -1081,25 +1105,33 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
         free(text);
         return status(env, code);
     }
-    if (event.schema_version != 1 || event.struct_size != sizeof event || event.text_length >= capacity ||
-        text[event.text_length] != '\0' || !notification_utf8(text, event.text_length) || required != event.text_length + 1u ||
+    if (event.schema_version != 1 || event.struct_size != sizeof event ||
+        event.text_length >= capacity || text[event.text_length] != '\0' ||
+        !notification_utf8(text, event.text_length) || required != event.text_length + 1u ||
         (event.flags & ~CUI_BRIDGE_NOTIFY_HAS_FRAME) ||
         ((event.flags & CUI_BRIDGE_NOTIFY_HAS_FRAME) != 0) != (event.frame_sequence != 0) ||
         event.kind < 1u || event.kind > 3u || event.legacy.type != event.kind ||
-        event.legacy.node.slot != event.node.slot || event.legacy.node.generation != event.node.generation ||
-        event.legacy.frame_sequence != event.frame_sequence || event.legacy.text_length != event.text_length ||
+        event.legacy.node.slot != event.node.slot ||
+        event.legacy.node.generation != event.node.generation ||
+        event.legacy.frame_sequence != event.frame_sequence ||
+        event.legacy.text_length != event.text_length ||
         event.payload_kind > CUI_BRIDGE_PAYLOAD_LEGACY ||
-        (event.payload_kind >= 2u && event.payload_kind <= 4u && !(enabled & (1u << event.payload_kind))) ||
+        (event.payload_kind >= 2u && event.payload_kind <= 4u &&
+         !(enabled & (1u << event.payload_kind))) ||
         (event.payload_kind == 0u && event.kind != 1u) ||
         (event.payload_kind >= 1u && event.payload_kind <= 5u && event.kind != 2u) ||
         (event.payload_kind == 6u && event.kind != 3u) ||
         (event.payload_kind == 1u && event.payload.boolean_value > 1u) ||
-        (event.payload_kind == 2u && (!isfinite(event.payload.scalar_value) || event.payload.scalar_value != event.legacy.value)) ||
-        (event.payload_kind == 4u && (event.payload.selected.slot != event.legacy.selected.slot ||
+        (event.payload_kind == 2u && (!isfinite(event.payload.scalar_value) ||
+                                      event.payload.scalar_value != event.legacy.value)) ||
+        (event.payload_kind == 4u &&
+         (event.payload.selected.slot != event.legacy.selected.slot ||
           event.payload.selected.generation != event.legacy.selected.generation ||
           (!event.payload.selected.slot != !event.payload.selected.generation))) ||
-        (event.payload_kind == 5u && event.payload.table.reason != 1u && event.payload.table.reason != 2u) ||
-        (event.payload_kind == 6u && (event.payload.surface_result < 1u || event.payload.surface_result > 3u))) {
+        (event.payload_kind == 5u && event.payload.table.reason != 1u &&
+         event.payload.table.reason != 2u) ||
+        (event.payload_kind == 6u &&
+         (event.payload.surface_result < 1u || event.payload.surface_result > 3u))) {
         free(text);
         return fail(env, "invalid V1 notification output");
     }

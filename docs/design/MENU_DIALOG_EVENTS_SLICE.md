@@ -109,22 +109,155 @@ close, independent of whether the owner later takes the result.
 
 A stack-local adapter in `surface_begin_events` is invalid: state retains
 `on_close/close_user` and imperative close can call it after the render function
-returns. Require a caller-owned `cui_surface_event_binding` registration whose
-storage/user owner outlive all possible closes. An explicit attach/detach API
-associates it with one initialized surface state. Repeated registration replaces
-rather than accumulates a listener. Refuse a conflicting legacy `on_close` or
-`close_user` before changing state/options; never silently chain callbacks and
-thereby alter timing. `decide`/`decision_user` remain allowed. Detach clears only
-the matching trampoline/user registration, not a newer unrelated listener.
+returns. Attaching a trampoline to an ordinary state once is also insufficient:
+every open legacy update overwrites those fields from its options. Use a new
+caller-owned state wrapper, not a promise that attach intercepts old functions.
 
-That retained-registration contract must be reviewed before coding this facade;
-its first implementation must cover imperative close, update-driven close,
-options refresh and state reuse. Do not retain arbitrary pointers to a per-call
-options object. For close between frames metadata is LIFECYCLE/UNKNOWN without
-frame/index/activation flags. Completion during update may record the completion
-frame only; an earlier animated request's frame is not completion evidence.
-Programmatic origin may be reported only through an explicit new programmatic
-entrypoint; existing imperative close alone does not establish a physical cause.
+### Proposed exact first-slice API
+
+Names are proposals; keep these declarations in a separate header, with Base
+functions implemented below Components and Styled functions implemented in
+Components. No platform types or heap allocation are required.
+
+```c
+typedef struct {
+    cui_component_event_metadata metadata;
+    cui_surface_result result;
+} cui_surface_lifecycle_event;
+typedef void (*cui_surface_lifecycle_fn)(
+    const cui_surface_lifecycle_event *event, void *user);
+typedef struct {
+    cui_surface_lifecycle_fn closed; /* NULL means no observer. */
+    void *user;
+} cui_surface_event_handler;
+typedef struct {
+    cui_surface_state control;
+    cui_surface_event_handler handler;
+    /* Adapter-owned: callers must not edit these fields. */
+    bool attached, active, notifying;
+    size_t call_close_count;
+} cui_surface_event_state;
+typedef struct {
+    bool valid; /* Adapter preflight accepted; not a rendering success claim. */
+    bool control_result; /* Original update/begin bool; false for void Alert. */
+    size_t close_count; /* Observer invocations during this call only. */
+} cui_surface_event_result;
+
+void cui_surface_events_init(cui_surface_event_state *, cui_id,
+                             cui_surface_kind);
+bool cui_surface_events_set_handler(cui_surface_event_state *,
+                                    cui_surface_event_handler);
+bool cui_surface_events_detach(cui_surface_event_state *);
+bool cui_surface_events_options(cui_surface_event_state *,
+                                cui_surface_options input,
+                                cui_surface_options *output);
+cui_surface_event_result cui_base_surface_update_events(
+    cui_context *, cui_surface_event_state *, cui_surface_options);
+cui_surface_event_result cui_base_surface_begin_events(
+    cui_context *, cui_surface_event_state *, cui_str title,
+    cui_str description, cui_surface_options);
+cui_surface_event_result cui_surface_begin_events(
+    cui_context *, const cui_theme *, cui_surface_event_state *,
+    cui_str title, cui_str description, cui_surface_options);
+cui_surface_event_result cui_alert_dialog_events(
+    cui_context *, const cui_theme *, cui_surface_event_state *,
+    cui_str title, cui_str description, cui_str confirm, cui_str cancel,
+    cui_surface_options);
+```
+
+The proposed struct is concrete portable storage, not a variable opaque allocation.
+Init initializes `control` with the existing init function,
+sets the empty handler and installs the internal trampoline with the enclosing
+state as its user pointer. This enclosing object's address is stable until detach;
+copying/moving an attached state is unsupported. Init is for fresh or detached,
+closed storage only; it is not an implicit teardown/reinitialization operation.
+
+`set_handler` replaces one retained registration; it does not append listeners.
+Reject NULL/detached state, a non-NULL user with NULL function, unexpected legacy callback
+fields, and calls during an active wrapper/trampoline. Failure changes nothing.
+Changing the handler while open is allowed between component calls: the latest
+handler receives a subsequent completed close, including an already-started Sheet
+exit. A NULL handler still keeps adapter registration intact and native mutation
+continues. No callback count or queued close is replayed on replacement.
+
+Every event-aware update/begin wrapper preflights the **whole call** before any
+state or UI mutation, then calls `cui_surface_events_options` on its by-value
+options. The helper rejects NULL/detached state, NULL output, non-NULL incoming `on_close`
+**or** `close_user`, an
+unexpected retained callback/user pair, or an active invocation; it leaves output
+and state untouched on failure. On success it copies every option unchanged,
+including `decide`/`decision_user`, then sets only `on_close` to the trampoline and
+`close_user` to this enclosing state. The internal common implementation handles
+the guard once; wrappers must not recursively call another public guarded wrapper.
+The existing open-update assignment therefore refreshes the *same* retained
+trampoline each frame. Do not mutate the caller's options or cache a pointer to it.
+The options helper itself never changes native state or starts an active call.
+
+`valid=false` means adapter preflight failed; native reduction/submission must not
+have run. After successful preflight, preserve the exact legacy return in
+`control_result`, including false for closed/invalid native geometry; `valid=true`
+does not upgrade native failure. For the legacy void Alert composition,
+`control_result` is always false and callers inspect `control.overlay.open` when
+needed. A completed close can precede a later submission failure; its callback
+and count remain real. Base/Styled end and footer helpers stay unchanged and are
+called only when the corresponding begin's `control_result` is true. Never run
+update separately and then begin on the same input to manufacture notification.
+
+Imperative lifecycle operations use the existing functions on `&state.control`:
+`cui_surface_open`, `cui_surface_close`, `cui_surface_request_close` and
+`cui_surface_take_result`. This deliberately adds no second close policy. The
+retained trampoline receives direct close between frames; request-close still
+waits for a submitted update and its unchanged decision policy. Imperative
+operations have no per-call facade result/count. An invalid/no-op repeated close
+emits nothing. Taking a result neither unregisters nor replays the callback.
+
+Existing legacy update/begin calls on `&state.control` with ordinary options are
+**not supported while attached**: they can clear the retained trampoline before
+an imperative close, and the adapter cannot intercept them. Prefer the wrappers.
+For custom composition that must use a legacy update/begin, call the options
+helper first and pass its returned options to that exact call; this preserves
+registration but reports no wrapper-local count and supplies no wrapper completion
+frame evidence. Keep both options and their enclosing state alive for the call;
+only the enclosing state/handler owner must remain alive afterward. The helper
+must not be used to pass the callback to a different surface state. A subsequent
+wrapper detects a lost/replaced registration and fails; it cannot recover a close
+already missed through an unsupported legacy call. Document this restriction in
+examples and migration guidance rather than imply attach handles arbitrary calls.
+
+Detach is an explicit operation between calls. It succeeds only when closed,
+not exiting, and neither a wrapper nor trampoline is active. It clears only the
+matching trampoline/user pair, empties the handler and marks the adapter detached;
+unexpected replacement means failure with no mutation. After detach ordinary
+legacy entrypoints may use `control`, and the enclosing storage may be released.
+To resume event-aware use, initialize a closed detached state again (discarding
+its old control/result as explicitly requested by init). Detach does not close,
+consume a result, invoke a callback or free resources. Rejecting open detach
+prevents accidentally dropping an outstanding animated completion.
+
+The trampoline copies the handler and pointer-free payload before calling the
+observer, after native focus restoration/overlay close. Increment the active
+call's count only when invoking a non-NULL observer; outside a wrapper there is
+no returned count. Reentrant surface operations on this state, including the
+legacy imperative operations, are unsupported during notification; the owner may
+change unrelated application state. This bounds completion notification to the
+existing close transition rather than enabling observer-driven close recursion.
+
+Its event is LIFECYCLE with surface ID and committed result, UNKNOWN source and
+no frame/index/activation flags in this first slice, consistently for imperative
+close, wrapper update and the options-helper escape hatch. Do not read a possibly
+previous `cui_frame_sequence` value between frames and advertise it as a completion
+frame. A later extension may add frame evidence only where active-frame validity
+is actually established; no retained request frame is completion evidence.
+No source inference comes from result:
+ACCEPTED is a result, not proof of keyboard/pointer/programmatic origin. Explicit
+programmatic origin would require a separately reviewed new operation.
+
+This design leaves `cui_surface_state` and all legacy signatures/layouts intact;
+its cost is distinct event-aware storage plus explicit migration of *all* update/
+begin calls for that storage. That is smaller and safer than changing the legacy
+state's callback overwrite rules, adding a context registry, or retaining stack
+adapters. Implement Dialog/Alert registration and imperative-close tests first;
+shared Sheet paths remain compatibility gates, not a claim of new Sheet coverage.
 
 Callbacks may copy metadata/result and mutate application owner state. Destruction
 of context/state/registration or descriptor storage during any callback is
@@ -155,7 +288,9 @@ explicit observer order. Callback owner mutation must be visible to subsequent
 painting without reprocessing input. Test invalid options before any mutation.
 For lifecycle, cover all three results, veto/retry, pending overwrite, direct close
 versus request close, take-result before/after callback, focus restoration,
-re-registration/detach, no callback on repeated close, and animated completion
+re-registration/detach, registration preserved across changing options in every
+Base/Styled wrapper and helper-bridged legacy call, unsupported plain-legacy
+update clearing registration detected on the next wrapper, no callback on repeated close, and animated completion
 across frames. Retain existing legacy tests unchanged. Compile with strict C/C++
 header checks and run CTest through the private headless wrapper. No dispatcher,
 Core teardown, generated SDK or binding changes belong in this first slice.

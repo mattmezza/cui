@@ -1,0 +1,129 @@
+# TitleBar events: host dispatch checkpoint
+
+Design only, audited at `ad11bb38`. No proposed API below exists yet. The frozen
+78-family inventory is unchanged. Read with [the shared contract](COMPONENT_EVENTS_CONTRACT.md)
+and [coverage audit](COMPONENT_EVENTS_COVERAGE.md), whose host-service exception
+remains necessary even if an optional observer is added.
+
+## Existing ownership and timing
+
+[`cui_chrome.h`](../../include/cui/cui_chrome.h) exposes caller-owned gesture state
+(`move_armed`, `moved`, pending click/time/position), borrowed options/items, a
+`cui_window_host`, and legacy `on_close(close_user)`. There is no confirmed window
+model owned by TitleBar and no disabled/readonly option. Public functions return a
+boolean, not a typed event/result or guaranteed window-state change.
+
+| Path | Actual behavior and return meaning |
+| --- | --- |
+| [`cui_base_title_bar`](../../src/base/cui_chrome.c) | Registers pointer-activatable GROUP with no tab stop, then scans original events in order. Primary down arms move; first targeted move disarms and dispatches MOVE, consumes that event even if unsupported/false. Secondary down dispatches MENU only for client decoration and consumes even if unsupported. Two accepted primary releases within distance/time dispatch TITLEBAR_DOUBLE_CLICK. Cancel/outside down clears gesture state. Boolean ORs successful host returns only. |
+| [`cui_title_bar`](../../src/components/cui_chrome.c) | Validates arguments/items, queries host once, executes Base before opening bar layout, renders custom items in order, then renders minimize, maximize-or-restore, close controls in that order. The queried info snapshot remains fixed for the submission even if a host callback changes external state. Boolean ORs Base and control results. |
+| Private `cui_title_control` | Calls `cui_interact(BUTTON)`, paints control/icon, then on aggregate `input.activated` invokes close override or host perform. Close override takes precedence, returns no decision, and makes boolean true; it does not also call host CLOSE. Other controls return capability-gated host bool. Multiple accepted activations for one control in a frame coalesce into this one old dispatch. |
+
+Client decoration alone shows portable controls: capability bits gate minimize and
+current maximize/restore; CLOSE bit **or** old `on_close` enables close. Browser,
+server-decoration and native-traffic-lights modes do not render these controls.
+Custom item renderers own their own input/semantics and are not TitleBar actions.
+The old `on_close` is synchronous inside control painting, before the outer bar
+ends, not a window-destroyed callback. Base host calls precede custom item painting.
+
+[`test_chrome.c`](../../tests/unit/test_chrome.c), `title_bar`, proves fake-host
+close versus override, keyboard Enter maximize/restore, first-move dispatch,
+double click, secondary menu, child-target isolation, decoration semantics and
+paint. It does not prove OS service availability or all accessibility paths.
+
+## Recommendation and explicit service exception
+
+Retain host query/perform and close override as services, not rejectable value
+requests or lifecycle events. `perform=true` is only the adapter's reported handling;
+window state must be queried later. A notification after dispatch cannot cancel
+work already performed. In particular CLOSE may only set a host quit flag.
+
+An additive observer is worthwhile for uniform logging/application follow-up, but
+must observe **actual synchronous dispatch**, not pretend to replace host policy.
+Propose a separate `cui_chrome_events.h` with Base/Styled `*_title_bar_events`
+facades returning `{bool acted; size_t action_count;}` and a callback-local typed
+payload containing common metadata, `cui_window_action action`, an explicit
+`HOST_PERFORM`/`CLOSE_OVERRIDE` route, and `bool handled`. Coordinates, if exposed,
+need a separate `has_position` flag: Base forwards real x/y, control services use
+old synthetic 0/0 and must not advertise those as pointer evidence. No fabricated
+before/after maximized state, CHANGE, COMMIT, destroyed lifecycle or rejection.
+Declare only reviewed implemented fields; do not change old options/state layouts.
+
+Use narrow private common hooks rather than wrapping host callbacks: hooks see the
+actual action, target and input seam without replacing shared host/close userdata
+or accidentally observing query/custom renderer operations. Existing entry points
+use the same code with no observer. Observe immediately after the original
+`perform` returns (including false), or after original `on_close` returns. Only a
+real call counts: unsupported actions/missing perform have no dispatch callback;
+observer presence must not enable controls or services. Nil observer preserves
+all legacy writes/host calls and yields zero actual callbacks. No allocation,
+collector workspace, event replay, input consumption or new dispatch system.
+
+Implement Base service observations first and Styled control observations second
+as independently verified slices. Base emits per actual event dispatch, including
+repetition; Styled controls retain their legacy zero/one dispatch per control,
+fixed category order and activation coalescing. This is a documented aggregation
+exception, not a claim of per-input control callbacks.
+
+## Evidence, passive work and lifetimes
+
+Capture evidence **before** host/close/custom callbacks can mutate unrelated UI.
+Base already has the genuine frame index/type/target. MOVE and MENU are raw
+pointer dispatches, not accepted activations: use real indexed source facts only.
+For double click copy the actual accepted second-release activation snapshot when
+available. Styled controls register BUTTON before inspecting activation; enumerate
+matching accepted activation evidence after interaction and before painting custom
+icons/dispatch. Preserve a unique genuine snapshot; for coalesced multiple causes
+use proven frame/UNKNOWN/no index rather than selecting an arbitrary last event.
+Metadata target should identify the compound TitleBar; carry the actual control
+ID separately and preserve snapshot's original target. No early registration.
+
+There is no general disabled flag to forward. Capability/decorations are service
+availability, not disabled state. Base has no explicit passive/inert check around
+its event loop, unlike its `cui_interact` call: do not claim that all host callbacks
+are suppressed in those scopes merely because semantics are absent. Before any
+facade promises observer silence, test actual `cui_frame_events`/target behavior
+under inert/layout scopes and preserve old gesture/host behavior. Observer policy
+may suppress passive notification without silently suppressing old host effects;
+any demonstrated legacy safety fix must be separately reviewed.
+
+Payload scalars/metadata can be copied; any future text pointer must have explicit
+borrow/copy policy (none needed here). Descriptors, host, state, UI and users must
+survive the whole call and renderer consumption. Host callbacks already execute
+synchronously and may block in platform services; no worker-thread delivery is
+implied. New observers may copy payloads/set unrelated flags, but may not mutate
+active state/items/host descriptors, replay input, recursively submit UI, destroy
+context/window, or unwind foreign exceptions. Defer close teardown/omission until
+outer return and renderer completion. Existing host side effects cannot be rolled
+back; absence of a handler is observational, not readonly.
+
+## Host and binding limits
+
+[`cui_platform.h`](../../include/cui/cui_platform.h) is the authoritative service
+contract. [`cui_sdl3.c`](../../backends/sdl3/cui_sdl3.c), window query/perform,
+currently advertises CLOSE; conditionally minimize and resizable zoom actions;
+non-mac resizable double-click. MOVE/MENU are not advertised/implemented there.
+Dummy/offscreen drivers omit the conditional capabilities. macOS reports native
+traffic lights. Do not infer real Cocoa/Windows move/menu support from fake-host
+unit tests, or infer completion from an SDL function return. This audit makes no
+native runtime claim and needs no external dependency or OS experiment.
+
+[`bridge_render_chrome`](../../src/bridge/cui_bridge.c) constructs TitleBar with
+only name, no window host or close callback, and ignores its bool. Python/JS/TS/Go/
+Rust node factories therefore do not imply these C callbacks/services are wired.
+Surface `on_close` APIs are a different domain; do not claim TitleBar support from
+their name. New foreign callback registration, lifetime and exception containment
+would require a separate bridge/binding slice.
+
+## Verification required before implementation handoff
+
+Extend focused Chrome tests with old/new comparisons of gesture state, returns,
+host logs/order, semantics, commands and focus. Cover multiple Base actions in one
+frame, same-control coalescing, cross-control fixed order, maximize snapshot versus
+host mutation, false host results, missing capability/perform/query, override
+precedence, unique and ambiguous evidence, callback mutation of unrelated flags,
+copied payload/deferred omission, actual inert/layout scopes and child routing.
+Use genuine pointer and Enter activation; separately test supported accessibility
+activation through public Core API before claiming it. Do not invent a keyboard
+shortcut for dragging/menu/double click. Strict C11/C++ headers and private-wrapper
+Chrome/Core tests are required; fake-host success is not OS/GPU acceptance.

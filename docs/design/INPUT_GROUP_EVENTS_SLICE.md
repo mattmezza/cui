@@ -327,3 +327,16 @@ dist/SDK regeneration. Scope extension requested: `cui_components.c`, the two
 private headers above, existing owned Form source/tests/guide/checkpoint only.
 No production changes before checkpoint review; tests described here are planned,
 not claimed passing coverage of the proposed fix.
+
+### Secure paint implementation checkpoint
+
+Implemented shared standard Input preparation/reduction behind two private headers,
+with the actual Group behavior owner passed through callbacks and one later Group
+paint. Existing standard Input failure branches retain their paint/return behavior.
+The Styled common function uses the amalgamation-safe name
+`cui_form_private_styled_group`; private Base delegation is
+`cui_form_private_input_group`. Masked custom presentation is explicitly rejected;
+caller model-offset hit testing is retained. Focused old/facade equivalence covers
+secret draw/preedit/semantics, purpose-only visibility, custom hit offsets, custom
+presentation rejection, and one accepted change before format capacity failure.
+No broader family or renderer parity promotion is implied.

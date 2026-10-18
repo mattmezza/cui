@@ -42,6 +42,9 @@ static void text(void *user, const cui_component_text_event *event) {
     assert(event->event.flags & CUI_COMPONENT_EVENT_HAS_FRAME);
     assert(event->event.flags & CUI_COMPONENT_EVENT_HAS_INDEX);
     assert(event->after.revision == cui_edit_get_state(f->edit).revision);
+    assert(f->state.behavior.focus_initialized && f->state.behavior.secure_initialized);
+    assert(f->state.behavior.was_masked == f->options.input.masked);
+    assert(f->state.behavior.bound_edit_identity == (uintptr_t)f->edit);
     assert(event->has_text == !f->redacted);
     f->texts[f->count] = *event;
     if (event->has_text) {
@@ -163,6 +166,8 @@ static void exercise(bool styled, unsigned secure) {
     pair(&a, &b, true);
     cui_focus(a.ui, 20);
     cui_focus(b.ui, 20);
+    a.state.behavior.focus_initialized = b.state.behavior.focus_initialized = false;
+    a.state.behavior.secure_initialized = b.state.behavior.secure_initialized = false;
     activate(&a, &b, 31);
     activate(&a, &b, 30);
     activate(&a, &b, 31);
@@ -257,7 +262,108 @@ static void exercise(bool styled, unsigned secure) {
     cui_edit_destroy(b.edit);
     assert(copy.target == 30 && copy.kind == CUI_COMPONENT_EVENT_ACTIVATE);
 }
+static bool drawn(fixture *f, const char *value) {
+    size_t n = strlen(value);
+    for (size_t i = 0; i < f->draw.count; ++i) {
+        cui_str t = f->draw.commands[i].text;
+        if (f->draw.commands[i].type == CUI_DRAW_TEXT && t.length == n &&
+            !memcmp(t.data, value, n)) return true;
+    }
+    return false;
+}
+static void secret(fixture *f) {
+    assert(!drawn(f, "private") && !drawn(f, "leak"));
+    size_t n;
+    const cui_semantic *s = cui_semantics(f->ui, &n);
+    bool found = false;
+    for (size_t i = 0; i < n; ++i) if (s[i].id == 20) {
+        assert(!s[i].value && s[i].details.secret && s[i].details.password);
+        found = true;
+    }
+    assert(found);
+}
+static cui_edit_result prepared(void *user, cui_str value, bool provisional) {
+    (void)value; (void)provisional;
+    ++*(unsigned *)user;
+    return CUI_EDIT_OK;
+}
+static size_t custom_hit(void *user, cui_str text_value, float x, float y) {
+    (void)text_value; (void)x; (void)y;
+    ++*(unsigned *)user;
+    return 0;
+}
+static void secure_paint(void) {
+    fixture a, b;
+    init(&a, true); init(&b, true);
+    a.redacted = b.redacted = true;
+    a.options.input.masked = b.options.input.masked = true;
+    a.options.input.content_type = b.options.input.content_type = CUI_TEXT_INPUT_PURPOSE_PASSWORD;
+    assert(cui_edit_replace_range(a.edit, 0, 0, cui_string("private")) == CUI_EDIT_OK);
+    assert(cui_edit_replace_range(b.edit, 0, 0, cui_string("private")) == CUI_EDIT_OK);
+    pair(&a, &b, true);
+    assert(drawn(&b, "•••••••")); secret(&b);
+    cui_focus(a.ui, 20); cui_focus(b.ui, 20);
+    assert(cui_edit_select(a.edit, 0, 7) == CUI_EDIT_OK);
+    assert(cui_edit_select(b.edit, 0, 7) == CUI_EDIT_OK);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_COMPOSITION_START, .composition_target=20});
+    assert(!pair(&a, &b, true).change_count);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_COMPOSITION_UPDATE, .composition_target=20,
+        .text_data="leak", .text_length=4, .composition_cursor=4});
+    assert(!pair(&a, &b, true).change_count);
+    assert(drawn(&b, "••••")); secret(&b);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_COMPOSITION_CANCEL, .composition_target=20});
+    pair(&a, &b, true); secret(&b);
+    unsigned ha=0, hb=0;
+    a.options.input.hit_test = b.options.input.hit_test = custom_hit;
+    a.options.input.hit_test_user = &ha; b.options.input.hit_test_user = &hb;
+    cui_rect bounds = cui_bounds(b.ui, 20);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_POINTER_DOWN,
+        .x=bounds.x+2, .y=bounds.y+2});
+    pair(&a, &b, true);
+    assert(ha && hb && cui_edit_get_state(b.edit).cursor == 0);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_POINTER_UP,
+        .x=bounds.x+2, .y=bounds.y+2});
+    pair(&a, &b, true);
+    a.options.input.hit_test = b.options.input.hit_test = NULL;
+    assert(cui_edit_select(a.edit, 0, 7) == CUI_EDIT_OK);
+    assert(cui_edit_select(b.edit, 0, 7) == CUI_EDIT_OK);
+    /* Actual custom presentation cannot safely coexist with the private mask stage. */
+    unsigned ca=0, cb=0;
+    a.options.input.presentation = (cui_edit_presentation){.prepare=prepared, .user=&ca, .user_bytes=sizeof ca};
+    b.options.input.presentation = (cui_edit_presentation){.prepare=prepared, .user=&cb, .user_bytes=sizeof cb};
+    uint64_t revision = cui_edit_get_state(b.edit).revision;
+    send(&a, &b, (cui_event){.type=CUI_EVENT_TEXT, .text="x"});
+    cui_input_group_event_result r=pair(&a, &b, true);
+    assert(r.control.input.error == CUI_EDIT_INVALID_ARGUMENT && !r.change_count);
+    assert(!ca && !cb && cui_edit_get_state(b.edit).revision == revision);
+    secret(&b);
+    /* Purpose alone intentionally retains visible-password rendering/custom policy. */
+    a.options.input.masked = b.options.input.masked = false;
+    pair(&a, &b, true);
+    cui_focus(a.ui, 20); cui_focus(b.ui, 20);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_TEXT, .text="x"});
+    r=pair(&a, &b, true);
+    assert(r.control.input.error == CUI_EDIT_OK && r.change_count == 1 && ca == 1 && cb == 1);
+    assert(drawn(&b, "x")); secret(&b);
+    a.options.input.presentation = b.options.input.presentation = (cui_edit_presentation){0};
+    a.options.input.masked = b.options.input.masked = true;
+    a.options.input.format.kind = b.options.input.format.kind = CUI_EDIT_FORMAT_NUMBER;
+    char wa[4], wb[4];
+    a.options.input.format_workspace = (cui_edit_workspace){wa, sizeof wa};
+    b.options.input.format_workspace = (cui_edit_workspace){wb, sizeof wb};
+    assert(cui_edit_replace_range(a.edit, 0, strlen(a.bytes), cui_string("12")) == CUI_EDIT_OK);
+    assert(cui_edit_replace_range(b.edit, 0, strlen(b.bytes), cui_string("12")) == CUI_EDIT_OK);
+    pair(&a, &b, true);
+    cui_focus(a.ui, 20); cui_focus(b.ui, 20);
+    send(&a, &b, (cui_event){.type=CUI_EVENT_TEXT, .text="3"});
+    send(&a, &b, (cui_event){.type=CUI_EVENT_TEXT, .text="4567"});
+    r=pair(&a, &b, true);
+    assert(r.control.input.error == CUI_EDIT_CAPACITY && r.change_count == 1);
+    assert(!strcmp(b.bytes, "123") && drawn(&b, "•••")); secret(&b);
+    cui_destroy(a.ui); cui_destroy(b.ui); cui_edit_destroy(a.edit); cui_edit_destroy(b.edit);
+}
 int main(void) {
+    secure_paint();
     exercise(false, false);
     exercise(true, false);
     exercise(false, true);

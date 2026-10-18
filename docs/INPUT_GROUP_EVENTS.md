@@ -62,11 +62,22 @@ context in observers. Unrelated flags and copying are allowed; defer omission an
 teardown until outer return plus frame/renderer consumption. Notifications cannot
 reject already applied changes, consume by return or imply COMMIT/form submission.
 
-**Compatibility slice limitation:** the existing Styled InputGroup paint path
-currently does not forward masked/password-purpose paint configuration. This event
-slice preserves legacy paint for equivalence and guarantees event redaction only;
-it does not establish secure visual rendering. A separate reviewed fix is required
-before using that Styled path to display secrets. Base event semantics remain valid.
+Styled InputGroup now shares standard Input's mask preparation and checked resource
+gate before its single nested reduction, then paints once in the existing Group
+layout. Masked committed text and preedit use bullets; source-byte selection and
+caller-provided hit testing retain their existing model-offset policy. The default
+plain hit fallback is replaced with masked mapping. The actual caller-owned Group
+behavior remains current inside text callbacks; temporary Styled configuration does
+not redirect state ownership. No public layouts or event timing change.
+
+Masked Styled InputGroup rejects an actual custom `presentation.prepare` or
+`presentation_complete` with `CUI_EDIT_INVALID_ARGUMENT`: the mask stage needs the
+single checked presentation gate. Rejection registers a disabled, secret, readonly,
+invalid input without reducing or exposing raw text. Earlier addon work remains
+applied. Failure after accepted text progress retains those changes/notifications
+and the last valid mask; the failing edit is atomic. Custom Base and unmasked
+presentation policies remain supported. Password purpose alone intentionally uses
+visible-password painting while semantics and text events remain redacted.
 
 `tests/unit/test_input_group_events.c` compares legacy/facade state, aggregate
 results, focus/redraw, semantics and paint for Base/Styled, including addon ordering,
@@ -77,3 +88,8 @@ omission. Existing `form`, `form_base_only`, `input`, `text_input_events` remain
 regressions through `scripts/test_local.py`. No browser or full-family parity claim.
 Bridge and language wrappers retain existing queued generic text notifications;
 this does not expose synchronous typed addon/per-event handlers through bindings.
+
+Focused regressions inspect committed/preedit draw commands, secret semantics,
+custom model-offset hit testing, forbidden custom presentation, actual owner state
+inside callbacks, visible-password behavior, and progress before format-capacity
+failure. These are headless command/semantic tests, not GPU pixel acceptance.

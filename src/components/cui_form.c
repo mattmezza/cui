@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_form_events.h"
+#include "../base/cui_form_private.h"
+#include "cui_input_private.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 static float cui_form_private_form_gap(cui_form_options o) {
@@ -184,6 +186,22 @@ static void cui_form_private_addons(cui_context *ui, const cui_theme *t,
         if (a[i].alignment == alignment)
             cui_form_private_addon(ui, t, &a[i], o, height, rem_size);
 }
+typedef struct {
+    const cui_theme *theme;
+    cui_input_group_state *state;
+    cui_input_options *paint;
+} cui_form_private_secure;
+static cui_input_event_result cui_form_private_secure_input(
+    void *user, cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
+    cui_input_behavior_state *behavior, cui_base_input_options options, bool synthetic_hit,
+    cui_component_text_handler handler) {
+    cui_form_private_secure *secure = user;
+    cui_input_state temporary = {.behavior = *behavior, .scroll_x = secure->state->scroll_x};
+    cui_input_event_result result = cui_input_private_reduce(ui, id, secure->theme, name, edit,
+        &temporary, behavior, secure->paint, options, secure->state->viewport, synthetic_hit, handler);
+    secure->state->scroll_x = temporary.scroll_x;
+    return result;
+}
 static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input,
                                        const cui_theme *theme, cui_edit *edit,
                                        cui_input_group_state *state, const cui_input_group_addon *a,
@@ -299,8 +317,21 @@ static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui
         }
         a = bounded;
     }
+    paint_options.masked = o.input.masked;
+    paint_options.content_type = o.input.content_type;
+    paint_options.format = o.input.format;
+    paint_options.format_workspace = o.input.format_workspace;
+    paint_options.clipboard = o.input.clipboard;
+    paint_options.validate = o.input.validate;
+    paint_options.validate_user = o.input.validate_user;
+    paint_options.normalization = o.input.normalization;
+    paint_options.matcher = o.input.matcher;
     cui_input_group_result result;
-    if (notifications) {
+    if (o.input.masked) {
+        cui_form_private_secure secure = {&t, state, &paint_options};
+        result = cui_form_private_input_group(ui, group, input, edit, state, a, count, o,
+            handler, notifications, cui_form_private_secure_input, &secure);
+    } else if (notifications) {
         cui_input_group_event_result observed = cui_base_input_group_events(
             ui, group, input, edit, state, a, count, o, handler);
         result = observed.control;

@@ -84,11 +84,10 @@ cui_number_event_result cui_number_input_events(
     cui_number_state *, double *, cui_number_options, cui_number_event_handler);
 ```
 
-An empty handler still performs ordinary reduction. A user pointer without a
-function is rejected with the existing INVALID_ARGUMENT/invalid control result,
-zero count and no UI/state/editor mutation. `step_by/step_user` are allowed and
-remain independent; they are policy, not conflicting legacy numeric observers.
-No retained registration is needed: handler/user are borrowed for this call only.
+An empty handler still performs ordinary reduction; a non-NULL user pointer with
+an absent callback is accepted and ignored, matching immediate Input/selection
+handlers. `step_by/step_user` remain independent legacy policy callbacks. No
+retained registration is needed: handler/user are borrowed for this call only.
 
 Capture the valid finite double owner at entry, before native mutation; after
 native reduction finishes capture its finite final double once. Emit iff exact
@@ -108,13 +107,16 @@ an already completed owner change/callback. Preflight rejection before reduction
 notifies nothing; nonfinite entry values are invalid input, not a NaN CHANGE.
 Callback count does not certify rendering or input validity.
 
-Metadata is CHANGE with the NumberInput root ID, source UNKNOWN, no input index
-or activation snapshot. For the smallest first slice conservatively omit optional
-frame/source flags too: an aggregate may include owner/draft synchronization,
-several edits, composition commit, steps and blur. Do not substitute the previous
-context frame sequence when active-frame provenance is unavailable. A future
-proven completion-frame flag is independent from an input cause; it must not
-change these numeric semantics.
+Metadata is CHANGE with the NumberInput root ID, source UNKNOWN and HAS_FRAME
+only when `cui_frame_sequence` proves the same nonzero active submission before
+and after reduction. That API excludes inert/layout-only ancestry and protected
+phases. No index/source/activation flag is inferred from an aggregate. Notify only
+for ordinary active, enabled, editable submissions: inert/layout-only/outside-frame,
+disabled and readonly calls do not notify. Still run the original reducer exactly
+once, preserving any legacy synchronization/normalization and diagnostics; lack
+of callback is not a promise of no model mutation. Draft synchronization and
+normalization are not evidence of physical input. Compare legacy/facade passive
+state and owner behavior explicitly in tests rather than silently fixing Base.
 
 ## Equality, normalization and lifetime
 
@@ -171,7 +173,7 @@ readonly/disabled and invalid options. Exercise signed zero, adjacent doubles,
 subnormals, NaN/Inf owner rejection, no-op overflow/bounds and `step_by` call order/
 count. Force draft-capacity/normalization errors with actual edit storage to prove
 postmutation owner-change delivery; do not mirror the reducer in a fake fixture.
-Test zero/one observer counts, empty handler, atomic invalid handler preflight,
+Test zero/one observer counts, empty handler, ignored user data without callback,
 retained payload copies and finite observer owner updates with next-frame draft
 sync. Keep legacy tests unchanged, compile strict C11/C++ headers, and run native
 CTest through the private headless wrapper before a production slice is proposed.

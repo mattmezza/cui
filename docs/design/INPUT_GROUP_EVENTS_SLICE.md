@@ -118,3 +118,27 @@ The bridge's existing InputGroup generic text producer and opt-in owning TEXT po
 are separate post-step queue contracts. They do not expose these proposed
 synchronous per-event/addon handlers, rejection or native multiplicity. Binding
 omissions must remain explicit until independently implemented and tested.
+
+## Approved implementation refinement
+
+Use private Base and Styled common functions. Legacy entrypoints pass no observer.
+After each existing Button addon interaction, preserve its old aggregate flag and
+last-addon result write, then its existing semantic details. Only then enumerate
+actual accepted activations for that addon in input order. Copy genuine snapshot
+when available; if accepted ID is proven but snapshot unavailable, use only actual
+frame/index/type-source facts, never fabricate activation. No accepted entry means
+no synthetic callback merely because an aggregate button boolean was true.
+
+Addon descriptor traversal still precedes exactly one nested Input operation.
+When on_text is supplied, call existing `cui_base_input_events` and forward the
+same handler user, preserving actual per-event counts/control/errors. Otherwise
+use the old Input entrypoint. Styled calls this observed Base once at its old
+seam, then performs its unchanged paint/custom rendering once. No hidden workspace,
+allocation, second reduction, aggregate text wrapper or Core change.
+
+Compatibility boundary: current Styled InputGroup does not forward masked or
+content_type from behavior options into its Input paint options. The event slice
+must preserve this old paint path for paired equivalence, while secure event
+payloads inherit the existing observed Base Input redaction. Do not claim secure
+paint parity. A separate review/fix must audit actual secure paint fields and
+prove no secret text leaks through draw commands, semantics or selection paths.

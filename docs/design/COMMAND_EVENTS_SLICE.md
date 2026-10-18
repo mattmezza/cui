@@ -34,8 +34,9 @@ query callback timing is intentional compatibility behavior.
 1. Base observed rebuild/select/move/confirm with pointer-free typed selected
    path snapshots (section,row), optional previous path and shared metadata;
    query callback borrowing raw UTF-8; ACTIVATE confirmation snapshot. Each exact
-   legacy callback seam freezes payload before legacy callback, invokes that
-   callback with original userdata, then invokes the borrowed observer. Confirm
+   pointer-free callback seam freezes payload before legacy callback, invokes
+   that callback with original userdata, then invokes the borrowed observer.
+   Borrowed query observation has the explicit ordering exception below. Confirm
    preserves action -> captured legacy on_confirm -> new ACTIVATE ordering and
    snapshot identity. Counts summarize actual observer calls, even if old callbacks
    subsequently redirect state. Programmatic entry points use PROGRAMMATIC
@@ -66,7 +67,8 @@ legacy callbacks merely to impose new policy. Root reviews the refinement.
 Observer handler/user and payload views are borrowed for the outer operation.
 Copy paths/metadata by value and query through bounded UTF-8 copy for deferred
 work. No heap allocations, queue, propagation tree, deferred dispatch or generic
-veto. CHANGE/ACTIVATE/REQUEST are notifications after the documented legacy seam;
+veto. Pointer-free CHANGE/ACTIVATE/REQUEST follow their documented legacy seam;
+borrowed query CHANGE uses the explicit safe pre-hook exception below;
 acceptance, consumption and platform defaults remain independent. Do not destroy
 context/active resources or recursively submit UI during observers. Existing
 legacy callback-driven selection changes remain observable at their old timing;
@@ -169,15 +171,16 @@ cancel operation is proposed. Missing callbacks ignore `user`, including nonNULL
 
 The observer removes only the old callback-presence predicate, never the reducer
 predicate. Keep old options callbacks and `options.user` unchanged; do not install
-forwarders into those fields. Each old callback precedes its corresponding new
-observer. Freeze operation facts before the old callback so redirects cannot turn
+forwarders into those fields. Each pointer-free old callback precedes its new
+observer. Borrowed query uses the ordering exception below. Freeze operation facts
+before the old callback so redirects cannot turn
 one operation into another. Observer snapshots describe the completed operation,
 not a promise that current owner state still equals the payload after legacy code.
 
 | Operation | Observer predicate independent of old callback presence | Order/facts |
 | --- | --- | --- |
 | Rebuild selection | Rebuild succeeds; `query_changed`; eligible selected path exists; no previous path or different path | Install all rebuilt rows/state, freeze previous/value, old `on_select`, new `on_selection` |
-| Rebuild query | Rebuild succeeds; `query_changed && options.searchable` | After the selection pair, freeze raw query view/metadata, old `on_query`, new `on_query` |
+| Rebuild query | Rebuild succeeds; `query_changed && options.searchable` | After rebuilt state/path snapshots are installed, new `on_query` BEFORE legacy select/query hooks; old `on_query` keeps its original position after the selection pair |
 | Select/move | Eligible item found and selected row index actually changes | Store selected/preserve/pending-scroll, freeze previous/value, old select, new selection |
 | Confirm | Existing confirm returns true: state exists, options not disabled, selected row/item exists and item enabled | Freeze selected row/path, action callback and old confirm/user as today; action, captured old confirm, new activation |
 | Styled cancel | Existing keyboard Escape branch reaches empty/nonsearchable query, enabled palette/focus, unconsumed unmodified KEY_DOWN; either old cancel or new cancel installed | Freeze REQUEST, old cancel if present, new cancel if present; no added consume/invalidate/host close |
@@ -247,13 +250,36 @@ selection does not change the ensuing captured confirm/typed activation path.
 New observers must not mutate active state/editor/model/resources, recursively
 invoke the same UI/reducer, or destroy context; legacy permitted redirects remain.
 
-A query payload freezes its `cui_str` pointer/length, not its bytes. It borrows the
-same untrimmed raw view that old query receives; legacy query callbacks that edit
-those bytes can affect what the later observer reads. No immutable-byte promise,
-old-query reconstruction or hidden allocation is made. Legacy callbacks must keep
-borrowed storage live through the new observer; freeing/rebinding active resources
-is unsupported. Observers needing retention call `cui_component_event_copy_utf8`
-with explicit bound/storage and check its status; struct copy alone is insufficient.
+**Query-only ordering exception, requiring root review:** invoke the new query
+observer after all rebuild state and selection facts are installed/frozen, before
+the first potentially mutating legacy selection/query hook. Exact order when all
+are eligible: new query -> old select -> new selection -> old query. If no select
+transition is eligible, this reduces to new query immediately before old query.
+Old select -> old query order, state installation, and their original argument
+values remain unchanged; new observers cannot mutate active state/resources.
+
+Placing the new query immediately after old query is unsafe: legitimate legacy
+`on_query` can edit the editor and reallocate its backing store. Placing it only
+immediately **before** old query, but after old select, is insufficient for
+callbackless observation: legacy `on_select` can replace the raw storage while
+`on_query` is NULL; the old implementation then never reads the raw query again.
+Installing a new query observer there would introduce a new dangling-view read.
+The proposed uniform pre-hook position avoids both hazards with no allocation,
+workspace, refetching/reinterpreting query, or new legacy callback constraints.
+
+The query view is exactly the original raw untrimmed rebuild argument, borrowed
+only during the new callback, before legacy mutations. Never dereference the
+saved view after either legacy hook returns. Observers needing retention call
+`cui_component_event_copy_utf8` with explicit bound/storage and check its status;
+struct copy alone is insufficient. Legacy on_select still has its **existing**
+obligation to leave the raw argument valid if legacy on_query will subsequently
+read it; this slice neither repairs that pre-existing ordering nor extends that
+obligation when legacy on_query is absent. Legacy query editing/reallocation and
+select redirects remain supported at their original times. No hidden snapshot,
+owned-byte or post-hook view promise is made. Root must approve this earlier
+query exception (or separately design explicit bounded caller snapshot workspace)
+before production; a pointer freeze alone is not an acceptable solution.
+
 Selection/activation/cancel payloads are pointer-free copies and survive context
 teardown. All callbacks/users borrow only through the outer operation.
 
@@ -270,7 +296,12 @@ actual successful reducer callbacks. No architecture/dispatch/teardown fixes her
    Verify callbackless predicates, explicit changed=true initialization, silent
    changed=false selection replacement/loss, select/move disabled policy, confirm
    without action/hooks, redirects and action snapshot, raw query/copy bounds,
-   counts/zero-target failure and unchanged old bool returns. No Styled activation
+   counts/zero-target failure and unchanged old bool returns. Add a legacy query
+   hook that grows/reallocates its editor after the new observer copies the view,
+   plus a legacy select hook doing the same with old query absent. Assert old
+   callbacks retain their relative order and no post-hook view is accessed under
+   ASan. Cover old query present/select redirect with the same original raw-view
+   obligations, without silently forbidding legacy edits. No Styled activation
    claim from this slice.
 2. Styled submission: same private reducers with scoped cause contexts; leading
    programmatic rebuild, aggregate query, hover/row confirm, keyboard/cancel.

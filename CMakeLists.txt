@@ -1306,3 +1306,8 @@ add_executable(test_picker_events tests/unit/test_picker_events.c)
 target_link_libraries(test_picker_events PRIVATE cui)
 cui_warnings(test_picker_events)
 add_test(NAME picker_events COMMAND test_picker_events)
+
+add_executable(test_simple_menu_events tests/unit/test_simple_menu_events.c)
+target_link_libraries(test_simple_menu_events PRIVATE cui)
+cui_warnings(test_simple_menu_events)
+add_test(NAME simple_menu_events COMMAND test_simple_menu_events)

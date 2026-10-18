@@ -183,11 +183,11 @@ reviewable. None of these additions promotes a parity level.
 | [Textarea](../MULTILINE_EVENTS.md), [Editor](../MULTILINE_EVENTS.md#editor-observers) | Zero-or-one aggregate revision CHANGE after the relevant complete reducer. | Editor observes its outer completion path; no inferred cause/index or submit event. |
 | [RadioGroup](../SELECTION_EVENTS.md), [Select](../SELECT_EVENTS.md), [Combobox](../COMBOBOX_EVENTS.md) | ID transitions at actual reducer seams, preserving existing callbacks and phase order. | OPTION accessibility ACTIVATE remains unsupported; combobox query edits are separate. |
 | [Surface](../SURFACE_EVENTS.md) | Retained completed-close lifecycle observer; legacy decision callback remains separate. | Stable state address/user lifetime extends through exit motion; imperative close requires an active frame. |
-| [MenuTree](../MENU_EVENTS.md), [ContextMenu](../CONTEXT_MENU_EVENTS.md) | Every applied command, including repeated same-ID activation; context opening is separate. | Simple Menu/Dropdown forwarding remains separate; no value veto. |
+| [MenuTree](../MENU_EVENTS.md), [ContextMenu](../CONTEXT_MENU_EVENTS.md), [Simple Menu](../SIMPLE_MENU_EVENTS.md) | Every applied command, including repeated same-ID activation; context opening is separate. | Dropdown forwarding remains separate; no value veto. |
 | [NumberInput](../NUMBER_EVENTS.md) | Zero-or-one aggregate exact-double applied CHANGE, separate from draft revision. | A committed change can accompany a legacy error; no inferred COMMIT/SUBMIT. |
 | [Tabs](../TABS_EVENTS.md) | Zero-or-one aggregate stable-ID selection CHANGE before Styled paint/panel. | Scroll, reorder and overflow lifecycle are separate; no reconstructed input cause. |
 | [Pagination, Stepper, Rating](../NUMERIC_SELECTION_EVENTS.md) | Aggregate applied size_t page/index or float rating CHANGE. | One-based page differs from zero-based step; passive normalization can mutate without notification. |
-| [Calendar](../PICKER_EVENTS.md) | Aggregate typed start/end date CHANGE after the chosen whole reduce/Base/Styled call. | Month/year navigation and popup lifecycle are separate; DatePicker/ColorPicker remain separate slices. |
+| [Calendar/DatePicker/ColorPicker](../PICKER_EVENTS.md) | Aggregate typed start/end dates or RGBA CHANGE after the chosen whole reduce/Base/Styled call. | Month/year navigation, latent HSV, external color sync and popup lifecycle are separate. |
 
 Counts summarize actual observer invocations except where a guide explicitly
 preserves another established result convention. Reading results is passive.

@@ -236,6 +236,11 @@ cui_select_event_result cui_select_events(
 bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
               const cui_choice_item *, size_t count, cui_id *action, cui_choice_popup *,
               cui_choice_popup_options);
+/* Per-command notifications, including repeated same-ID activations. */
+cui_menu_command_result cui_menu_events(cui_context *, cui_id trigger, const cui_theme *,
+    cui_str name, const cui_choice_item *, size_t count, cui_id *action,
+    cui_choice_popup *, cui_choice_popup_options, cui_menu_command_handler);
+
 bool cui_base_selection_remove(cui_context *, cui_id chip, cui_str name, bool *selected,
                                bool disabled);
 bool cui_base_list_multi(cui_context *, const cui_choice_item *, size_t count, bool *selected,

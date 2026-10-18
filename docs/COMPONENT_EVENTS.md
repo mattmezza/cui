@@ -90,8 +90,8 @@ The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_I
 [Surface completed-close observers](SURFACE_EVENTS.md) use caller-owned retained registration, unlike render-call-only handlers. Existing close decisions and result consumption stay separate from lifecycle notification.
 
 [MenuTree observers](MENU_EVENTS.md) report each applied command synchronously,
-including repeated commands. Simple Menu, ContextMenu and Dropdown forwarding
-remain separate work; this is not complete menu-family coverage.
+including repeated commands. ContextMenu and Simple Menu forwarding are implemented separately; Dropdown
+forwarding remains separate work; this is not complete menu-family coverage.
 
 [NumberInput observers](NUMBER_EVENTS.md) report an aggregate committed double
 change after the legacy reducer, independently of draft revisions or submission.
@@ -99,6 +99,7 @@ They preserve step-policy callbacks and do not provide rejectable numeric reques
 
 Additional implemented observers cover [Tabs selection](TABS_EVENTS.md),
 [ContextMenu commands](CONTEXT_MENU_EVENTS.md), [Pagination, Stepper and Rating](NUMERIC_SELECTION_EVENTS.md),
-and [Calendar selected dates](PICKER_EVENTS.md). Their guides specify aggregation
-and timing; DatePicker/ColorPicker and Simple Menu/Dropdown forwarding remain
-separate slices. These additions do not automatically extend binding allowlists.
+and [Calendar/DatePicker selected dates and ColorPicker RGBA](PICKER_EVENTS.md).
+[Simple Menu commands](SIMPLE_MENU_EVENTS.md) preserve repeated activations.
+Their guides specify aggregation and timing; Dropdown forwarding remains a
+separate slice. These additions do not automatically extend binding allowlists.

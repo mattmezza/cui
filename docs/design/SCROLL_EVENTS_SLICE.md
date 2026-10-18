@@ -1,6 +1,7 @@
 # Scroll observer checkpoint
 
-Design only, source checkpoint `6251b9d6`. No API below is implemented. This is a
+Original design checkpoint `6251b9d6`; the Base-only pair is now implemented,
+as recorded at the end. Styled/virtual/message proposals below remain unimplemented. This is a
 bounded follow-up to the [remaining audit](COMPONENT_EVENTS_REMAINING.md) and
 [shared contract](COMPONENT_EVENTS_CONTRACT.md), not a new manifest family or a
 claim of universal scroll events. Command Styled and TitleBar are separate work.
@@ -277,3 +278,14 @@ Run warnings-enabled isolated tests through `python scripts/test_local.py
 headless. No runtime tests/builds were run for this documentation-only proposal.
 Bindings retain existing notification allowlists; no shared queue producer,
 synchronous foreign veto or foreign scroll callback is proposed here.
+
+## Implemented Base slice
+
+The first implementation exposes only the Base pair and shared types described
+in [SCROLL_EVENTS](../SCROLL_EVENTS.md). The complete Base-only scope has no Styled
+layer field because there is no Styled facade yet. Finish consumes the token before
+observer dispatch; typed count is bounded to one and overflow remains false.
+Frame-zero maintenance and normalization policy follow the approved refinement.
+The focused fixture plus legacy scroll/virtual/message and strict C++ header checks
+verify this slice independently. Styled declarations above remain proposals, not
+public symbols. No virtual/window/MessageScroller event implementation is included.

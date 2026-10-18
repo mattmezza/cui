@@ -23,6 +23,10 @@ export function column(): Column;
 export function label(text?: string): Label;
 export function button(key?: string): Button;
 export class App {
+  /** Submit without dispatch. Caller owns draining the shared queue. */
+  step_only(dt?: number): this;
+  poll_notification_v1(): NotificationV1 | undefined;
+
   constructor(options?: AppOptions);
   mount(root: Row | Column): this;
   pointer(phase: PointerPhase, x: number, y: number): this;
@@ -211,3 +215,25 @@ export interface Settings extends Label, Composite {
 export function settings(key: string, text?: string): Settings;
 
 export interface Input {detail(text: string): this}
+
+/** Owning manual V1 views. No listeners, auto-dispatch or controlled requests. */
+export interface NotificationHandleV1 {readonly slot: number; readonly generation: number}
+export interface LegacySnapshotV1 {
+  readonly type: number; readonly checkedRaw: number; readonly value: number;
+  readonly text: string; readonly selectedHandle: NotificationHandleV1;
+}
+export interface NotificationBaseV1 {
+  readonly schemaVersion: 1; readonly handle: NotificationHandleV1; readonly node?: Node;
+  readonly frame: bigint; readonly hasFrame: boolean; readonly nodeKind: number;
+  readonly legacy: LegacySnapshotV1;
+}
+export interface ActivationNotificationV1 extends NotificationBaseV1 {readonly kind: 'activation'}
+export interface BooleanChangeNotificationV1 extends NotificationBaseV1 {readonly kind: 'boolean-change'; readonly value: boolean}
+export interface TableChangeNotificationV1 extends NotificationBaseV1 {
+  readonly kind: 'table-change'; readonly reason: 'selection' | 'sort';
+  readonly row: number; readonly column: number; readonly sortColumn: number; readonly sortDirection: number;
+}
+export interface SurfaceCloseNotificationV1 extends NotificationBaseV1 {readonly kind: 'surface-close'; readonly result: 1 | 2 | 3}
+export interface LegacyNotificationV1 extends NotificationBaseV1 {readonly kind: 'legacy'; readonly selectedNode?: Node}
+export type NotificationV1 = ActivationNotificationV1 | BooleanChangeNotificationV1 |
+  TableChangeNotificationV1 | SurfaceCloseNotificationV1 | LegacyNotificationV1;

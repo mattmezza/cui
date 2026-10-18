@@ -411,6 +411,32 @@ class App {
     native.step(this.handle, dt);
     return this._dispatch();
   }
+  step_only(dt = 1 / 60) {
+    this._alive();
+    if (this.running) throw new Error("step is unavailable during run");
+    native.step(this.handle, dt);
+    return this;
+  }
+  poll_notification_v1() {
+    this._alive();
+    if (typeof native.pollNotificationV1 !== 'function') throw new Error('V1 notification addon unavailable');
+    const raw = native.pollNotificationV1(this.handle);
+    if (raw === undefined) return undefined;
+    const handle = Object.freeze({slot: raw.slot, generation: raw.generation});
+    const selectedHandle = Object.freeze({slot: raw.selectedSlot, generation: raw.selectedGeneration});
+    const legacy = Object.freeze({type: raw.type, checkedRaw: raw.checkedRaw, value: raw.value,
+      text: raw.text, selectedHandle});
+    const common = {schemaVersion: 1, handle, node: this.nodes.get(keyFor(handle)),
+      frame: raw.frame, hasFrame: raw.hasFrame, nodeKind: raw.nodeKind, legacy};
+    switch (raw.payloadKind) {
+      case 0: return Object.freeze({...common, kind: 'activation'});
+      case 1: return Object.freeze({...common, kind: 'boolean-change', value: raw.booleanValue});
+      case 5: return Object.freeze({...common, kind: 'table-change', reason: raw.reason === 1 ? 'selection' : 'sort',
+        row: raw.row, column: raw.column, sortColumn: raw.sortColumn, sortDirection: raw.sortDirection});
+      case 6: return Object.freeze({...common, kind: 'surface-close', result: raw.result});
+      default: return Object.freeze({...common, kind: 'legacy', selectedNode: this.nodes.get(keyFor(selectedHandle))});
+    }
+  }
   _dispatch() {
     let event; let delivered = 0;
     while ((event = native.poll(this.handle)) !== undefined) {

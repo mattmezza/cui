@@ -884,6 +884,131 @@ static napi_value poll(napi_env env, napi_callback_info info) {
         return NULL;
     return result;
 }
+/* Manual V1 view only: legacy poll/dispatch and ABI remain unchanged. */
+static napi_value notification_frame(napi_env env, uint64_t frame) {
+    napi_value result;
+    return napi_create_bigint_uint64(env, frame, &result) == napi_ok ? result : NULL;
+}
+static napi_value notification_object(napi_env env, const cui_bridge_notification_v1 *event,
+                                       const char *text) {
+    napi_value result, x;
+    if (napi_create_object(env, &result) != napi_ok)
+        return NULL;
+#define NOTIFY_UINT(name, value) \
+    if (napi_create_uint32(env, (uint32_t)(value), &x) != napi_ok || \
+        napi_set_named_property(env, result, name, x) != napi_ok) return NULL
+    NOTIFY_UINT("payloadKind", event->payload_kind);
+    NOTIFY_UINT("type", event->legacy.type);
+    NOTIFY_UINT("slot", event->node.slot);
+    NOTIFY_UINT("generation", event->node.generation);
+    NOTIFY_UINT("nodeKind", event->node_kind);
+    NOTIFY_UINT("checkedRaw", event->legacy.checked);
+    NOTIFY_UINT("selectedSlot", event->legacy.selected.slot);
+    NOTIFY_UINT("selectedGeneration", event->legacy.selected.generation);
+    if (event->payload_kind == CUI_BRIDGE_PAYLOAD_TABLE) {
+        NOTIFY_UINT("reason", event->payload.table.reason);
+        NOTIFY_UINT("row", event->payload.table.row);
+        NOTIFY_UINT("column", event->payload.table.column);
+        NOTIFY_UINT("sortColumn", event->payload.table.sort_column);
+        NOTIFY_UINT("sortDirection", event->payload.table.sort_direction);
+    }
+    if (event->payload_kind == CUI_BRIDGE_PAYLOAD_SURFACE) {
+        NOTIFY_UINT("result", event->payload.surface_result);
+    }
+#undef NOTIFY_UINT
+    x = notification_frame(env, event->frame_sequence);
+    if (!x || napi_set_named_property(env, result, "frame", x) != napi_ok ||
+        napi_get_boolean(env, (event->flags & CUI_BRIDGE_NOTIFY_HAS_FRAME) != 0, &x) != napi_ok ||
+        napi_set_named_property(env, result, "hasFrame", x) != napi_ok ||
+        napi_get_boolean(env, event->payload.boolean_value != 0, &x) != napi_ok ||
+        napi_set_named_property(env, result, "booleanValue", x) != napi_ok ||
+        napi_create_double(env, event->legacy.value, &x) != napi_ok ||
+        napi_set_named_property(env, result, "value", x) != napi_ok ||
+        napi_create_string_utf8(env, text, event->text_length, &x) != napi_ok ||
+        napi_set_named_property(env, result, "text", x) != napi_ok)
+        return NULL;
+    return result;
+}
+static napi_value poll_notification_v1(napi_env env, napi_callback_info info) {
+    napi_value args_value[1];
+    js_app *app;
+    if (!args(env, info, 1, args_value) || !app_arg(env, args_value[0], &app))
+        return NULL;
+    typedef uint32_t (*query_fn)(void);
+    typedef cui_bridge_status (*poll_fn)(cui_bridge_app *, uint32_t, cui_bridge_notification_v1 *,
+                                        char *, uint32_t, uint32_t *);
+    query_fn size_query = NULL, versions_query = NULL;
+    poll_fn poll_query = NULL;
+#if defined(_WIN32)
+    HMODULE module = GetModuleHandleA("cui_bridge.dll");
+    FARPROC size_symbol = module ? GetProcAddress(module, "cui_bridge_notification_v1_size") : NULL;
+    FARPROC versions_symbol = module ? GetProcAddress(module, "cui_bridge_notification_versions") : NULL;
+    FARPROC poll_symbol = module ? GetProcAddress(module, "cui_bridge_poll_notification_v1") : NULL;
+#else
+    void *size_symbol = dlsym(RTLD_DEFAULT, "cui_bridge_notification_v1_size");
+    void *versions_symbol = dlsym(RTLD_DEFAULT, "cui_bridge_notification_versions");
+    void *poll_symbol = dlsym(RTLD_DEFAULT, "cui_bridge_poll_notification_v1");
+#endif
+    if (!size_symbol || !versions_symbol || !poll_symbol)
+        return fail(env, "V1 notification symbols unavailable");
+    memcpy(&size_query, &size_symbol, sizeof size_query);
+    memcpy(&versions_query, &versions_symbol, sizeof versions_query);
+    memcpy(&poll_query, &poll_symbol, sizeof poll_query);
+    if (!(versions_query() & 1u) || size_query() != sizeof(cui_bridge_notification_v1))
+        return fail(env, "V1 notification capability/layout mismatch");
+    uint32_t capacity = 4097, required = 0;
+    char *text = malloc(capacity);
+    if (!text)
+        return status(env, CUI_BRIDGE_OUT_OF_MEMORY);
+    cui_bridge_notification_v1 event;
+    cui_bridge_status code = poll_query(app->bridge, sizeof event, &event, text, capacity, &required);
+    if (code == CUI_BRIDGE_CAPACITY) {
+        if (required <= capacity || required > 1024u * 1024u) {
+            free(text);
+            return fail(env, "V1 notification payload exceeds limit or invalid capacity retry");
+        }
+        capacity = required;
+        char *larger = realloc(text, capacity);
+        if (!larger) {
+            free(text);
+            return status(env, CUI_BRIDGE_OUT_OF_MEMORY);
+        }
+        text = larger;
+        code = poll_query(app->bridge, sizeof event, &event, text, capacity, &required);
+        if (code == CUI_BRIDGE_CAPACITY) {
+            free(text);
+            return fail(env, "invalid repeated V1 notification capacity response");
+        }
+    }
+    if (code == CUI_BRIDGE_EMPTY || code == CUI_BRIDGE_CLOSED) {
+        free(text);
+        return undefined(env);
+    }
+    if (code != CUI_BRIDGE_OK) {
+        free(text);
+        return status(env, code);
+    }
+    if (event.schema_version != 1 || event.struct_size != sizeof event || event.text_length >= capacity) {
+        free(text);
+        return fail(env, "invalid V1 notification output");
+    }
+    napi_value result = notification_object(env, &event, text);
+    free(text);
+    return result;
+}
+#ifdef CUI_NODE_NOTIFICATION_TESTS
+/* Conversion-only fixture: roundtrip a uint64, without inventing UI evidence. */
+static napi_value notification_frame_fixture(napi_env env, napi_callback_info info) {
+    napi_value value[1];
+    uint64_t frame;
+    bool lossless;
+    if (!args(env, info, 1, value) ||
+        napi_get_value_bigint_uint64(env, value[0], &frame, &lossless) != napi_ok || !lossless)
+        return fail(env, "expected uint64 BigInt");
+    return notification_frame(env, frame);
+}
+#endif
+
 static napi_value bounds(napi_env env, napi_callback_info info) {
     napi_value v[2], result, x;
     js_app *app;
@@ -1553,6 +1678,10 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("key", key_input, 0);
     EXPORT("step", step, 0);
     EXPORT("poll", poll, 0);
+    EXPORT("pollNotificationV1", poll_notification_v1, 0);
+#ifdef CUI_NODE_NOTIFICATION_TESTS
+    EXPORT("testNotificationFrame", notification_frame_fixture, 0);
+#endif
     EXPORT("run", run_app, 0);
     EXPORT("bounds", bounds, 0);
     EXPORT("dropdownBounds", dropdown_bounds, 0);

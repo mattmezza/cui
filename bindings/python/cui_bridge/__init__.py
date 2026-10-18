@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import math
 import os
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable, ClassVar, Iterator, Literal
 
 
 def _utf8(value: str, limit: int = 4096) -> bytes:
@@ -50,6 +50,24 @@ class _Event(C.Structure):
 class _EventEx(C.Structure):
     _fields_ = _Event._fields_ + [("checked", C.c_uint32), ("value", C.c_double),
                                  ("text_length", C.c_uint32), ("selected", _Handle)]
+
+
+class _TableNotificationV1(C.Structure):
+    _fields_ = [(name, C.c_uint32) for name in
+                ("reason", "row", "column", "sort_column", "sort_direction")]
+
+
+class _NotificationValueV1(C.Union):
+    _fields_ = [("boolean_value", C.c_uint32), ("scalar_value", C.c_double),
+                ("selected", _Handle), ("table", _TableNotificationV1),
+                ("surface_result", C.c_uint32)]
+
+
+class _NotificationV1(C.Structure):
+    _fields_ = [(name, C.c_uint32) for name in
+                ("struct_size", "schema_version", "kind", "payload_kind", "flags", "node_kind")] + [
+        ("node", _Handle), ("frame_sequence", C.c_uint64), ("text_length", C.c_uint32),
+        ("payload", _NotificationValueV1), ("legacy", _EventEx)]
 
 
 class _ChartDatum(C.Structure):
@@ -249,6 +267,59 @@ class Event:
     value: float = 0.0
     text: str = ""
     selected_handle: tuple[int, int] = (0, 0)
+
+
+@dataclass(frozen=True)
+class LegacySnapshotV1:
+    type: int
+    checked_raw: int
+    value: float
+    text: str
+    selected_handle: tuple[int, int]
+
+
+@dataclass(frozen=True)
+class NotificationV1:
+    handle: tuple[int, int]
+    node: "Widget | None"
+    frame_sequence: int
+    has_frame: bool
+    node_kind: int
+    legacy: LegacySnapshotV1
+    kind: ClassVar[str] = "legacy"
+
+
+@dataclass(frozen=True)
+class ActivationNotificationV1(NotificationV1):
+    kind: ClassVar[Literal["activation"]] = "activation"
+
+
+@dataclass(frozen=True)
+class BooleanChangeNotificationV1(NotificationV1):
+    value: bool
+    kind: ClassVar[Literal["boolean-change"]] = "boolean-change"
+
+
+@dataclass(frozen=True)
+class TableChangeNotificationV1(NotificationV1):
+    reason: Literal["selection", "sort"]
+    row: int
+    column: int
+    sort_column: int
+    sort_direction: int
+    kind: ClassVar[Literal["table-change"]] = "table-change"
+
+
+@dataclass(frozen=True)
+class SurfaceCloseNotificationV1(NotificationV1):
+    result: int
+    kind: ClassVar[Literal["surface-close"]] = "surface-close"
+
+
+@dataclass(frozen=True)
+class LegacyNotificationV1(NotificationV1):
+    selected_node: "Widget | None"
+    kind: ClassVar[Literal["legacy"]] = "legacy"
 
 
 class Widget:
@@ -1462,6 +1533,66 @@ class App:
                 yield Event({1:"click", 2:"change", 3:"close"}[raw.type], node, raw.frame_sequence,
                             bool(raw.checked), raw.value, buffer.value.decode("utf-8"),
                             (raw.selected.slot, raw.selected.generation))
+
+    def poll_notifications_v1(self) -> Iterator[NotificationV1]:
+        """Consume owning V1 snapshots without callbacks; shares the legacy queue.
+
+        Requires optional V1 symbols, exact native layout and a <=1MiB payload
+        including NUL. Capacity failures retain the event for a capable consumer.
+        Existing step/dispatch behavior is unchanged.
+        """
+        self._ensure_open()
+        try:
+            size = self._api.lib.cui_bridge_notification_v1_size
+            versions = self._api.lib.cui_bridge_notification_versions
+            poll = self._api.lib.cui_bridge_poll_notification_v1
+        except AttributeError as error:
+            raise BridgeError(9, "V1 notification symbols unavailable") from error
+        size.argtypes = versions.argtypes = []
+        size.restype = versions.restype = C.c_uint32
+        if not (versions() & 1) or size() != C.sizeof(_NotificationV1):
+            raise BridgeError(8, "V1 notification capability/layout mismatch")
+        poll.restype = C.c_int
+        poll.argtypes = [C.c_void_p, C.c_uint32, C.POINTER(_NotificationV1),
+                         C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32)]
+        while self._ptr:
+            raw = _NotificationV1()
+            capacity = 4097
+            for attempt in range(2):
+                buffer = C.create_string_buffer(capacity)
+                required = C.c_uint32()
+                status = poll(self._ptr, C.sizeof(raw), C.byref(raw), buffer, capacity,
+                              C.byref(required))
+                if status != 5:
+                    break
+                if attempt or required.value <= capacity or required.value > 1024 * 1024:
+                    raise BridgeError(5, "V1 notification payload exceeds limit or invalid capacity retry")
+                capacity = required.value
+            if status in (1, 2):
+                return
+            self._api.check(status)
+            if raw.schema_version != 1 or raw.struct_size != C.sizeof(raw) or raw.text_length >= capacity:
+                raise BridgeError(8, "invalid V1 notification output")
+            text = bytes(buffer.raw[:raw.text_length]).decode("utf-8")
+            handle = (raw.node.slot, raw.node.generation)
+            selected = (raw.legacy.selected.slot, raw.legacy.selected.generation)
+            legacy = LegacySnapshotV1(raw.legacy.type, raw.legacy.checked, raw.legacy.value,
+                                      text, selected)
+            common = (handle, self._by_handle.get(handle), raw.frame_sequence,
+                      bool(raw.flags & 1), raw.node_kind, legacy)
+            if raw.payload_kind == 0:
+                yield ActivationNotificationV1(*common)
+            elif raw.payload_kind == 1:
+                yield BooleanChangeNotificationV1(*common, bool(raw.payload.boolean_value))
+            elif raw.payload_kind == 5:
+                table = raw.payload.table
+                yield TableChangeNotificationV1(*common,
+                    "selection" if table.reason == 1 else "sort", table.row, table.column,
+                    table.sort_column, table.sort_direction)
+            elif raw.payload_kind == 6:
+                yield SurfaceCloseNotificationV1(*common, raw.payload.surface_result)
+            else:
+                yield LegacyNotificationV1(*common, self._by_handle.get(selected))
 
     def dispatch(self) -> int:
         """Invoke callbacks after step; Python exceptions propagate outside C frames."""

@@ -127,3 +127,111 @@ Use genuine pointer and Enter activation; separately test supported accessibilit
 activation through public Core API before claiming it. Do not invent a keyboard
 shortcut for dragging/menu/double click. Strict C11/C++ headers and private-wrapper
 Chrome/Core tests are required; fake-host success is not OS/GPU acceptance.
+
+## Reviewed refinement: exact semantics and implementation decision
+
+This section supersedes the earlier tentative recommendation to add a shared
+metadata-envelope facade immediately. **Recommend retaining the explicit
+host-service exception for this batch**, not manufacturing an event kind. Existing
+host `perform` and `on_close` already give applications synchronous extension
+points; application-owned wrappers can log dispatch/results without changing CUI
+routing. No evidence here establishes a missing user-value notification or an
+inability to execute an action. Consistency does not require renaming services.
+A separate observer remains optional future work only if a concrete application
+needs independent listeners without wrapping its host. Root review is required.
+
+### Why the shared kind is not honest
+
+[`cui_component_events.h`](../../include/cui/cui_component_events.h) has ACTIVATE,
+REQUEST, CHANGE, COMMIT, SUBMIT and LIFECYCLE. A raw first move is not an accepted
+activation. A post-`perform` callback is not a rejectable REQUEST, confirmed CHANGE,
+COMMIT or lifecycle transition. Close override returning void is not acceptance.
+Do not set ACTIVATE merely to obtain the existing metadata struct or add a global
+DISPATCH kind for this one service. Existing host bool means exactly “returned true
+from this invocation”; call it `host_returned_true`, not completed/succeeded/applied.
+
+### Exact alternative, if separately approved
+
+A future service-only header can define the following portable additive API without
+changing shared kinds or old struct layouts. These names remain a proposal:
+
+```c
+typedef enum {
+    CUI_TITLE_BAR_DISPATCH_HOST,
+    CUI_TITLE_BAR_DISPATCH_CLOSE_OVERRIDE
+} cui_title_bar_dispatch_route;
+typedef struct {
+    cui_id target;             /* compound TitleBar */
+    cui_id control;            /* actual control ID, or 0 for title-area gesture */
+    cui_window_action action;
+    cui_title_bar_dispatch_route route;
+    bool host_returned_true;   /* meaningful only for HOST route */
+    bool has_position;
+    float x, y;               /* meaningful only when has_position */
+    unsigned evidence_flags;  /* existing HAS_FRAME/INDEX/SOURCE/ACTIVATION bits */
+    uint64_t frame_sequence;
+    size_t event_index;
+    cui_component_event_source source;
+    cui_activation_snapshot activation;
+} cui_title_bar_dispatch_event;
+typedef void (*cui_title_bar_dispatch_fn)(void *, const cui_title_bar_dispatch_event *);
+typedef struct {
+    cui_title_bar_dispatch_fn callback;
+    void *user;
+} cui_title_bar_dispatch_handler;
+typedef struct {
+    bool acted;               /* unchanged old function result */
+    size_t dispatch_count;    /* actual observer calls, not host calls if callback absent */
+} cui_title_bar_dispatch_result;
+cui_title_bar_dispatch_result cui_base_title_bar_dispatch_events(
+    cui_context *, cui_id, cui_title_bar_state *, cui_window_info,
+    cui_title_bar_options, cui_title_bar_dispatch_handler);
+cui_title_bar_dispatch_result cui_title_bar_dispatch_events(
+    cui_context *, cui_id, const cui_theme *, cui_title_bar_state *,
+    const cui_chrome_item *, size_t, cui_title_bar_options,
+    cui_title_bar_dispatch_handler);
+```
+
+The custom evidence fields intentionally have **no shared event kind**. Same flag
+presence rules apply; absent evidence is zero-filled, UNKNOWN omits HAS_SOURCE.
+Never infer source from action alone. Copy real unique accepted snapshots before
+painting/host callbacks; retain their original target even though `event.target`
+is compound and `control` names the affected button. Base indexed pointer facts
+are copied directly. No pointer coordinates for keyboard/a11y controls or host
+control arguments `(0,0)`. CLOSE_OVERRIDE fixes action CLOSE and route override;
+`host_returned_true=false` is explicitly inapplicable, while legacy `acted=true`.
+No extra “accepted”, attempted, pending, completed or destroyed field.
+
+No callback when no old function is invoked: capability suppression, absent host
+or perform, missing controls and passive work do not become dispatch events.
+Callback absence leaves `dispatch_count=0`; old calls/results still occur.
+Count only after actual observer invocation. Base invokes at most once per input
+event (branches dispatch on mutually exclusive types); Styled adds at most three
+control dispatches. Core bounds event count, and existing `CUI_CORE_EVENT_MAX` is
+far below `SIZE_MAX-3` on supported targets; implementation must check that bound
+with a compile-time assertion or checked counter, never wrap/saturate silently.
+No dynamic workspace, unbounded dispatch, callback reentrancy or invented overflow
+status. If the invariant cannot be established without exporting private Core
+limits, prefer a local checked increment with pre-proven `event_count <= SIZE_MAX-3`
+before any dispatch; failure policy needs review rather than changing legacy calls.
+This complexity further weakens the case for an unrequested service facade.
+
+### Passive evidence resolved from source, remaining test gap
+
+`cui_frame_events` returns the event buffer even inside inert/layout scopes, but
+`cui_event_target` and `cui_event_activation` return zero when `cui_core_inert(ui)`.
+Thus inert Base cannot match its nonzero ID; CANCEL still clears gesture state and
+any primary UP clears arming even without a target. Preserve those maintenance
+writes. `cui_interact` also returns empty interaction in inert scope, so Styled
+controls have no activation there. **Layout-only differs:** target lookup does
+not check layout-only, whereas `cui_frame_sequence` returns zero. Source therefore
+does not justify claiming layout-only host-dispatch silence; a TitleBar Base loop
+can still match a previous target. Do not silently change that old behavior in an
+observer patch. New observations, if approved, should be admitted only when
+`cui_frame_sequence(ui) != 0`, while preserving any old passive calls/writes;
+this is an explicit notification policy, not proof that service effects stopped.
+The exact actual-scope regression remains required before production.
+
+The current signed checkpoint is design/source audit only. No tests were run for
+this refinement, no host capability was added, and neither the shared event API
+nor foreign bindings now expose these proposed declarations.

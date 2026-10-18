@@ -1,4 +1,4 @@
-# Calendar and DatePicker selection observers
+# Picker applied observers
 
 Include `cui/cui_picker_events.h` for additive applied date-selection observers:
 `cui_calendar_reduce_events`, `cui_base_calendar_events`, and `cui_calendar_events`.
@@ -15,8 +15,8 @@ cui_calendar_event_result result = cui_calendar_events(
     (cui_date_selection_handler){selected_date, app});
 ```
 
-This slice does not add ColorPicker, TimeField, navigation, popup lifecycle or
-controlled-request observers. A CHANGE reports an already-applied
+This slice does not add TimeField, navigation, popup lifecycle or controlled-request
+observers. A CHANGE reports an already-applied
 date selection and cannot reject it. The existing disabled-date predicate remains
 an enablement policy, not a notification or a newly rejectable transaction.
 
@@ -118,3 +118,45 @@ range completion, invalid viewport after mutation, close/focus at callback time,
 null handler, multiple Base inputs with one callback, passive/disabled/inert/layout
 silence, payload copying after destruction, deferred omission and atomic calendar-ID
 admission. These remain native source proofs, not foreign or browser coverage.
+
+
+## ColorPicker applied RGBA
+
+`cui_base_color_picker_events` and `cui_color_picker_events` mirror the respective
+legacy signatures and append `cui_color_handler`. Each returns
+`cui_picker_event_result`, preserving the exact legacy bool in `changed` and
+counting zero/one actual callbacks. The typed `cui_color_change` contains metadata
+and previous/final `cui_color` RGBA bytes. All fields are pointer-free and copyable.
+
+Each whole legacy operation runs once, including final HSV/drag/last_color state,
+semantics and (Styled) painting, before notification. Comparison explicitly checks
+r/g/b/a fields; it does not compare padding, formatted text or HSV. Several changes
+coalesce and net-zero RGBA means no callback. A latent hue change while black or
+achromatic need not change RGBA and is not an applied color event. External color
+assignment before entry resynchronizes HSV without a component CHANGE.
+
+A palette selection preserves the old alpha when alpha editing is off; the payload
+reports that actual final RGBA, not the palette entry's unused alpha. Missing
+handler does not inhibit edits. The unused user pointer is ignored. Required
+context/state/color pointers, nonzero ID and Styled theme are checked before
+legacy code. All other legacy validation remains unchanged.
+
+Delivery requires active painted submission, a proven nonzero frame, enabled and
+non-readonly options. Passive maintenance still runs, including HSV synchronization
+and readonly/disabled drag cleanup. Metadata has CHANGE and outer picker ID,
+UNKNOWN source, HAS_FRAME only, no index/activation/cause. There is no rejection,
+BEGIN/COMMIT/CANCEL or owner-controlled color contract added here.
+
+Keep palette/color/state/theme and callback userdata alive through the call. Do
+not mutate/free/rebind active resources or recursively submit UI in the observer;
+set unrelated flags and defer omission/teardown until return and frame/render
+consumption. No payload points into the palette or retains userdata.
+
+Color tests pair Base and Styled legacy/facade contexts for real palette clicks,
+channel keys and saturation/value-plane pointer drags, comparing RGBA, HSV/capture,
+semantics, results and draw commands. They verify alpha-off preservation, net-zero
+updates, latent HSV silence, external RGBA resynchronization, absent-observer
+editing, readonly/disabled cleanup, inert/layout-only silence, copied payload after
+context destruction and deferred omission. Together with the original Picker and
+Base-only suites these are native source proofs; foreign/browser parity is not
+implied. The existing time field remains a separate future slice.

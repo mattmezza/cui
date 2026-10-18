@@ -303,7 +303,98 @@ static void dates(void) {
            !memcmp(&value,&b.f.selection,sizeof value));cui_end_frame(b.f.ui);
     finish(&a.f);finish(&b.f);
 }
+typedef struct {
+    fixture f;
+    cui_color_state state;
+    cui_color color,palette[2];
+    cui_color_picker_options options;
+    cui_color_change copies[16];
+    size_t calls;
+    bool base;
+} color_fixture;
+static bool rgba(cui_color a,cui_color b) {
+    return a.r==b.r && a.g==b.g && a.b==b.b && a.a==b.a;
+}
+static void color_observe(void *user,const cui_color_change *e) {
+    color_fixture *c=user;assert(c->calls<16);
+    assert(e->event.target==50 && e->event.kind==CUI_COMPONENT_EVENT_CHANGE);
+    assert(e->event.flags==CUI_COMPONENT_EVENT_HAS_FRAME && e->event.frame_sequence>0);
+    assert(e->event.source==CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    assert(rgba(e->value,c->color) && rgba(c->state.last_color,c->color));
+    c->copies[c->calls++]=*e;c->f.request_omit=true;
+}
+static cui_picker_event_result color_frame(color_fixture *c,bool facade,bool handler) {
+    fixture *f=&c->f;assert(cui_begin_frame(f->ui,1000,700,.016f));
+    cui_begin_box(f->ui,1000,(cui_box){.inert=f->inert,.layout_only=f->layout});
+    cui_picker_event_result r={0};cui_color_handler h={handler?color_observe:NULL,c};
+    if(!f->omit) {
+        cui_theme t=cui_theme_light();
+        if(c->base) {
+            if(facade) r=cui_base_color_picker_events(f->ui,50,&c->state,&c->color,c->options,h);
+            else r.changed=cui_base_color_picker(f->ui,50,&c->state,&c->color,c->options);
+            size_t n;const cui_semantic *sem=cui_semantics(f->ui,&n);
+            for(size_t i=0;i<n;++i) {
+                cui_begin_box(f->ui,sem[i].id,(cui_box){.width=240,.height=24});cui_end_box(f->ui);
+            }
+        } else {
+            if(facade) r=cui_color_picker_events(f->ui,50,&t,&c->state,&c->color,c->options,h);
+            else r.changed=cui_color_picker(f->ui,50,&t,&c->state,&c->color,c->options);
+        }
+    }
+    cui_end_box(f->ui);f->draw=cui_end_frame(f->ui);assert(cui_last_error(f->ui)==CUI_OK);return r;
+}
+static void color_init(color_fixture *c,bool base) {
+    memset(c,0,sizeof *c);c->base=base;
+    c->f.ui=cui_create((cui_config){.max_elements=256,.max_commands=1024});assert(c->f.ui);
+    c->color=(cui_color){255,0,0,73};
+    c->palette[0]=(cui_color){0,0,255,10};c->palette[1]=(cui_color){0,255,0,255};
+    c->options=(cui_color_picker_options){.alpha=true,.palette=c->palette,.palette_count=2};
+    color_frame(c,false,false);
+}
+static cui_picker_event_result color_pair(color_fixture *a,color_fixture *b,bool handler) {
+    cui_picker_event_result x=color_frame(a,false,false),y=color_frame(b,true,handler);
+    equal(&a->f,&b->f,(cui_calendar_result){.changed=x.changed},(cui_calendar_result){.changed=y.changed});
+    assert(rgba(a->color,b->color) && rgba(a->state.last_color,b->state.last_color));
+    assert(a->state.hsv.hue==b->state.hsv.hue && a->state.hsv.saturation==b->state.hsv.saturation &&
+           a->state.hsv.value==b->state.hsv.value && a->state.hsv.alpha==b->state.hsv.alpha &&
+           a->state.dragging==b->state.dragging);return y;
+}
+static void colors(bool base) {
+    color_fixture a,b;color_init(&a,base);color_init(&b,base);
+    cui_focus(a.f.ui,cui_color_part_id(50,20));cui_focus(b.f.ui,cui_color_part_id(50,20));
+    key(&a.f,CUI_KEY_DOWN);key(&b.f,CUI_KEY_DOWN);
+    assert(color_pair(&a,&b,true).change_count==1 && b.color.r==254);
+    cui_color_change saved=b.copies[0];
+    key(&a.f,CUI_KEY_DOWN);key(&b.f,CUI_KEY_DOWN);key(&a.f,CUI_KEY_UP);key(&b.f,CUI_KEY_UP);
+    assert(!color_pair(&a,&b,true).change_count); /* Net-zero channel updates. */
+    a.options.alpha=b.options.alpha=false;
+    click(&a.f,cui_color_part_id(50,100));click(&b.f,cui_color_part_id(50,100));
+    assert(color_pair(&a,&b,true).change_count==1 && b.color.b==255 && b.color.a==73);
+    a.color=b.color=(cui_color){0,0,0,73};assert(!color_pair(&a,&b,true).change_count);
+    cui_focus(a.f.ui,cui_color_part_id(50,1));cui_focus(b.f.ui,cui_color_part_id(50,1));
+    float old=b.state.hsv.hue;key(&a.f,CUI_KEY_RIGHT);key(&b.f,CUI_KEY_RIGHT);
+    assert(!color_pair(&a,&b,true).change_count && b.state.hsv.hue!=old && b.color.r==0);
+    a.color=b.color=(cui_color){255,0,0,73};assert(!color_pair(&a,&b,true).change_count);
+    cui_rect plane=cui_bounds(b.f.ui,cui_color_part_id(50,2));
+    cui_event e={.type=CUI_EVENT_POINTER_DOWN,.x=plane.x+plane.w/2,.y=plane.y+plane.h/2};
+    assert(cui_queue_event(a.f.ui,e) && cui_queue_event(b.f.ui,e));
+    assert(color_pair(&a,&b,true).change_count==1 && b.state.dragging);
+    e.type=CUI_EVENT_POINTER_UP;e.x=plane.x+plane.w;e.y=plane.y;
+    assert(cui_queue_event(a.f.ui,e) && cui_queue_event(b.f.ui,e));
+    assert(color_pair(&a,&b,false).changed && !b.state.dragging);
+    assert(b.calls==3); /* Null observer still applies pointer release. */
+    a.state.dragging=b.state.dragging=3;a.options.readonly=b.options.readonly=true;
+    assert(!color_pair(&a,&b,true).change_count && !b.state.dragging);
+    a.options.readonly=b.options.readonly=false;a.options.disabled=b.options.disabled=true;
+    a.state.dragging=b.state.dragging=3;assert(!color_pair(&a,&b,true).change_count && !b.state.dragging);
+    a.options.disabled=b.options.disabled=false;a.f.inert=b.f.inert=true;
+    key(&a.f,CUI_KEY_DOWN);key(&b.f,CUI_KEY_DOWN);assert(!color_pair(&a,&b,true).change_count);
+    a.f.inert=b.f.inert=false;a.f.layout=b.f.layout=true;
+    assert(!color_pair(&a,&b,true).change_count);a.f.layout=b.f.layout=false;
+    a.f.omit=b.f.omit=b.f.request_omit;assert(!color_pair(&a,&b,true).change_count);
+    finish(&a.f);finish(&b.f);assert(saved.previous.r==255 && saved.value.r==254 && saved.value.a==73);
+}
 int main(void) {
     for(unsigned mode=0;mode<3;++mode) keyboard(mode);
-    range_and_chooser();admission();dates();puts("PASS Calendar selection observers, legacy equivalence and navigation silence");return 0;
+    range_and_chooser();admission();dates();colors(false);colors(true);puts("PASS Calendar selection observers, legacy equivalence and navigation silence");return 0;
 }

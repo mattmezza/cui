@@ -47,3 +47,26 @@ cui_picker_event_result cui_date_picker_events(
     }
     return result;
 }
+
+cui_picker_event_result cui_color_picker_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_color_state *state, cui_color *color,
+    cui_color_picker_options options, cui_color_handler handler) {
+    cui_picker_event_result result = {0};
+    if (!ui || !id || !state || !color || !theme)
+        return result;
+    cui_color before = *color;
+    uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
+                         ? cui_frame_sequence(ui) : 0;
+    result.changed = cui_color_picker(ui, id, theme, state, color, options);
+    if (frame && handler.on_change && (before.r != color->r || before.g != color->g ||
+                                       before.b != color->b || before.a != color->a)) {
+        cui_color_change event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
+            .previous = before, .value = *color};
+        handler.on_change(handler.user, &event);
+        result.change_count = 1;
+    }
+    return result;
+}

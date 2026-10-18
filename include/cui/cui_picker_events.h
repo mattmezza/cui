@@ -51,6 +51,18 @@ cui_calendar_event_result cui_base_date_picker_events(
 cui_picker_event_result cui_date_picker_events(
     cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_date_picker_state *,
     cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
+/* Applied RGBA only. Latent HSV/capture/synchronization changes are not CHANGE. */
+typedef struct {
+    cui_component_event_metadata event;
+    cui_color previous, value;
+} cui_color_change;
+typedef void (*cui_color_change_fn)(void *, const cui_color_change *);
+typedef struct { cui_color_change_fn on_change; void *user; } cui_color_handler;
+cui_picker_event_result cui_base_color_picker_events(
+    cui_context *, cui_id, cui_color_state *, cui_color *, cui_color_picker_options, cui_color_handler);
+cui_picker_event_result cui_color_picker_events(
+    cui_context *, cui_id, const cui_theme *, cui_color_state *, cui_color *,
+    cui_color_picker_options, cui_color_handler);
 #ifdef __cplusplus
 }
 #endif

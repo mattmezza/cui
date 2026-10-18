@@ -169,3 +169,13 @@ owned event header/sources. They observe the complete outer legacy operation onc
 including late false Styled returns after mutation, with trigger-ID metadata and
 post-dismiss/focus timing. The guide records the distinct legacy result types.
 ColorPicker remains awaiting review; no popup lifecycle or foreign API is added.
+
+
+## Third slice implementation status
+
+Base and Styled ColorPicker RGBA observers are implemented in the same event
+header/wrapper sources. Whole-operation comparison uses explicit RGBA fields,
+retains alpha policy and HSV/capture maintenance, and never treats latent HSV or
+external synchronization as applied CHANGE. See the implementation guide.
+TimeField, navigation/lifecycle, controlled requests and foreign wrappers remain
+excluded. Completion of these three bounded slices does not promote family parity.

@@ -1138,6 +1138,7 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
 static bool cui_list_common(cui_context *ui, cui_id container, const cui_theme *theme,
     const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
     cui_list_options options, const cui_selection_handler *handler, cui_list_event_result *result) {
+    if (handler && (!ui || !container)) return false;
     if (!theme || (!items && count) || !selected || !state)
         return false;
     cui_theme validation_theme;
@@ -1475,9 +1476,11 @@ cui_combobox_event_result cui_combobox_events(cui_context *ui, cui_id input, con
     return result;
 }
 
-bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
-                    const cui_choice_item *items, size_t count, bool *selected,
-                    cui_list_state *state, cui_list_options options) {
+static bool cui_list_multi_common(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, bool *selected,
+    cui_list_state *state, cui_list_options options, const cui_choice_item_handler *handler,
+    cui_choice_items_event_result *result) {
+    if (handler && (!ui || !container)) return false;
     if (!theme || !items || !selected || !state)
         return false;
     cui_theme validation_theme;
@@ -1486,12 +1489,30 @@ bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
     cui_list_metrics metrics = cui_choice_list_metrics(theme, options);
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;
-    bool activated = cui_base_list_multi(ui, items, count, selected, state, options);
+    bool activated;
+    if (handler) {
+        *result = cui_base_list_multi_events(ui, container, items, count, selected, state, options, *handler);
+        activated = result->legacy_result;
+    } else
+        activated = cui_base_list_multi(ui, items, count, selected, state, options);
     cui_id action = 0;
     cui_choice_paint_list(ui, container, theme, items, count, &action, state, options, selected,
                           false, &metrics);
     return activated;
 }
+bool cui_list_multi(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, bool *selected,
+    cui_list_state *state, cui_list_options options) {
+    return cui_list_multi_common(ui, container, theme, items, count, selected, state, options, NULL, NULL);
+}
+cui_choice_items_event_result cui_list_multi_events(cui_context *ui, cui_id container,
+    const cui_theme *theme, const cui_choice_item *items, size_t count, bool *selected,
+    cui_list_state *state, cui_list_options options, cui_choice_item_handler handler) {
+    cui_choice_items_event_result result = {0};
+    (void)cui_list_multi_common(ui, container, theme, items, count, selected, state, options, &handler, &result);
+    return result;
+}
+
 static bool cui_choice_chips(cui_context *ui, cui_id input, const cui_theme *theme,
                              const cui_choice_item *items, size_t count, bool *selected,
                              bool disabled) {

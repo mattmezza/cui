@@ -30,5 +30,16 @@ teardown until submission and renderer consumption finish. Legacy callbacks keep
 their existing owner-update timing; typed changes read the resulting owner after
 them. Disabled/inert/layout-only calls retain old behavior without typed events.
 
-This checkpoint implements single List only. Multi List and ToggleGroup are
-separate transition slices. Bridge and Python/Node/Go/Rust behavior is unchanged.
+List multi adds `cui_base_list_multi_events`/`cui_list_multi_events`, accepting
+`cui_choice_item_handler`. Each actual bool transition delivers a pointer-free
+`cui_choice_item_change` with affected `item`, causal `trigger_item`, `previous`
+and `value`. The adapter captures the bool before its flip, then preserves legacy
+activate/confirm order and observes the resulting bool. Legacy callbacks may
+redirect that bool and cancel its net transition; unrelated writes by legacy
+callbacks get no fabricated notifications. Repeated toggles remain distinct even
+when the final array matches entry. Item/selected-array ordering and storage stay
+borrowed throughout submission/paint. The result's `legacy_result` preserves the
+old activation bool; `change_count` counts actual typed callbacks with saturation.
+
+New facades require a nonzero compound ID. ToggleGroup is the next independent
+slice. Bridge and Python/Node/Go/Rust behavior is unchanged.

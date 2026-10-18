@@ -192,5 +192,8 @@ Single List now exposes the existing per-transition private hook through Base an
 Styled facades. Its narrow Styled common seam retains direct legacy reduction and
 paint; existing Select/Combo/Menu forwarding is unchanged. New typed callbacks
 retain the existing selection-forwarding ability to consume later input events,
-without permitting active owner/resource mutation. Multi List and ToggleGroup
-remain pending independently reviewed/tested slices.
+without permitting active owner/resource mutation. Multi List now captures bool
+facts at the real private activation path, after which legacy activate/confirm
+retain their original timing and the final item bool is observed. New facades
+preflight the required compound ID before paint. ToggleGroup remains pending its
+independently reviewed/tested slice.

@@ -23,6 +23,26 @@ cui_list_event_result cui_base_list_events(cui_context *, cui_id control,
 cui_list_event_result cui_list_events(cui_context *, cui_id container,
     const cui_theme *, const cui_choice_item *, size_t count, cui_id *selected,
     cui_list_state *, cui_list_options, cui_selection_handler);
+typedef struct {
+    cui_component_event_metadata event;
+    cui_id item, trigger_item;
+    bool previous, value;
+} cui_choice_item_change;
+typedef void (*cui_choice_item_change_fn)(void *user, const cui_choice_item_change *event);
+typedef struct { cui_choice_item_change_fn on_change; void *user; } cui_choice_item_handler;
+typedef struct {
+    bool valid, submitted, legacy_result, count_overflow;
+    size_t change_count;
+} cui_choice_items_event_result;
+/* Multi List observes each real bool transition after legacy activate/confirm.
+ * Same lifetime/mutation restrictions as single List. Arrays borrow count entries;
+ * descriptors and selected-array ordering must remain stable through submission. */
+cui_choice_items_event_result cui_base_list_multi_events(cui_context *, cui_id control,
+    const cui_choice_item *, size_t count, bool *selected,
+    cui_list_state *, cui_list_options, cui_choice_item_handler);
+cui_choice_items_event_result cui_list_multi_events(cui_context *, cui_id container,
+    const cui_theme *, const cui_choice_item *, size_t count, bool *selected,
+    cui_list_state *, cui_list_options, cui_choice_item_handler);
 #ifdef __cplusplus
 }
 #endif

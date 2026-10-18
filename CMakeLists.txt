@@ -1281,3 +1281,8 @@ add_executable(test_menu_events tests/unit/test_menu_events.c)
 target_link_libraries(test_menu_events PRIVATE cui)
 cui_warnings(test_menu_events)
 add_test(NAME menu_events COMMAND test_menu_events)
+
+add_executable(test_number_events tests/unit/test_number_events.c)
+target_link_libraries(test_number_events PRIVATE cui)
+cui_warnings(test_number_events)
+add_test(NAME number_events COMMAND test_number_events)

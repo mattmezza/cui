@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
+#include "cui/cui_number_events.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include <math.h>
@@ -76,14 +77,21 @@ static void cui_number_step_paint(cui_context *ui, cui_id id, const cui_theme *t
                                       .color = color});
     cui_end_box(ui);
 }
-cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                                   cui_number_state *s, double *value, cui_number_options o) {
+static cui_number_result cui_number_input_common(cui_context *ui, cui_id id, const cui_theme *t,
+    cui_str name, cui_number_state *s, double *value, cui_number_options o,
+    const cui_number_event_handler *handler, size_t *change_count) {
     cui_number_metrics metrics;
     if (!ui || !id || !t || !cui_number_measure(o, t->font_size, &metrics) || !isfinite(o.width) ||
         (o.prefix.length && !o.prefix.data) || (o.suffix.length && !o.suffix.data) ||
         (o.placeholder.length && !o.placeholder.data))
         return (cui_number_result){.invalid = true, .error = CUI_EDIT_INVALID_ARGUMENT};
-    cui_number_result result = cui_base_number_input(ui, id, name, s, value, o);
+    cui_number_result result;
+    if (handler) {
+        cui_number_event_result notification = cui_base_number_input_events(ui, id, name, s, value, o, *handler);
+        result = notification.control;
+        *change_count = notification.change_count;
+    } else
+        result = cui_base_number_input(ui, id, name, s, value, o);
     if (!s || !s->edit || !value || result.error == CUI_EDIT_INVALID_ARGUMENT)
         return result;
     bool editable = !o.disabled && !o.readonly;
@@ -149,6 +157,18 @@ cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *
     cui_number_step_paint(ui, cui_numeric_part_id(id, 2), t, metrics, true, !editable, inner,
                           radius);
     cui_end_box(ui);
+    return result;
+}
+cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_str name, cui_number_state *state, double *value, cui_number_options options) {
+    return cui_number_input_common(ui, id, theme, name, state, value, options, NULL, NULL);
+}
+cui_number_event_result cui_number_input_events(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_str name, cui_number_state *state, double *value, cui_number_options options,
+    cui_number_event_handler handler) {
+    cui_number_event_result result = {0};
+    result.control = cui_number_input_common(ui, id, theme, name, state, value, options,
+                                             &handler, &result.change_count);
     return result;
 }
 bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page, size_t total,

@@ -5,7 +5,8 @@ Read-only audit at `c55a9601`. This is a prioritized work list, not a replacemen
 remains the baseline; its later additions are not fully reflected in its legacy
 rows. No manifest entry should be removed. The [contract](COMPONENT_EVENTS_CONTRACT.md)
 requires preserving ownership and timing, not making every family emit the same
-callback. Combobox and Surface work is in flight elsewhere and is not claimed here.
+callback. Subsequent implemented additions are listed below; the priority table
+records the original audit recommendations and is not a current completion count.
 
 ## Already landed: do not repeat
 
@@ -20,9 +21,16 @@ CHANGE, and controlled Slider reports lifecycle/requests without writing confirm
 values. Missing-handler and count semantics also differ. There is no uniformity
 claim and no basis for renaming requests into committed changes.
 
+Additional implemented slices: [Styled controlled Slider](../STYLED_SLIDER_EVENTS.md),
+[Combobox](../COMBOBOX_EVENTS.md), [Surface](../SURFACE_EVENTS.md),
+[MenuTree](../MENU_EVENTS.md), and [NumberInput](../NUMBER_EVENTS.md).
+Tabs, remaining numeric selections and menu forwarding have separate design
+checkpoints; proposals must not be read as implemented APIs.
+
 ## Highest-value independent slices
 
-Proposals below are unimplemented. Prefer one family per review and preserve all
+The original proposals below are an audit baseline; the additions above supersede
+its Styled Slider and NumberInput recommendations. Remaining entries are unimplemented. Prefer one family per review and preserve all
 old signatures/options/results. An aggregate observer needs UNKNOWN source and no
 index; per-event evidence must be captured at the actual reducer seam. Neither
 approach supplies rejection for an already-mutated pointer value.

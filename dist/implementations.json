@@ -408,6 +408,13 @@
       "sources": [
         "src/components/cui_styled_slider_events.c"
       ]
+    },
+    {
+      "header": "cui_number_events.h",
+      "macro": "CUI_NUMBER_EVENTS_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_number_events.c"
+      ]
     }
   ]
 }

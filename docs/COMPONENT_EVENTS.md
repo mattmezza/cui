@@ -92,3 +92,7 @@ The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_I
 [MenuTree observers](MENU_EVENTS.md) report each applied command synchronously,
 including repeated commands. Simple Menu, ContextMenu and Dropdown forwarding
 remain separate work; this is not complete menu-family coverage.
+
+[NumberInput observers](NUMBER_EVENTS.md) report an aggregate committed double
+change after the legacy reducer, independently of draft revisions or submission.
+They preserve step-policy callbacks and do not provide rejectable numeric requests.

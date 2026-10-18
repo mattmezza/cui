@@ -169,4 +169,30 @@ Documentation validation checks exact family equality/count against `docs/gpui-p
 
 ## Subsequent compatible slices
 
-The checkpoint matrix above records the audited legacy baseline. Additive APIs now cover [Button/Checkbox activation and requests](../CONTROL_EVENTS.md), [Switch/Toggle requests](../BOOLEAN_EVENTS.md), [Base Slider phases](../SLIDER_EVENTS.md), and [Base Input changes/submissions](../TEXT_INPUT_EVENTS.md). Each linked guide specifies ownership, timing, evidence, counts and exceptions. This is partial family coverage: Styled/multiline text, selection, menu and dialog facades remain separate work. No matrix row or parity level is promoted by this note.
+The checkpoint matrix above records the audited legacy baseline. The following
+additive C entry points are implemented; their guides and focused tests define the
+actual limits. Existing rows remain intact so the original 78-family audit stays
+reviewable. None of these additions promotes a parity level.
+
+| Implemented entry points | Values and dispatch | Important exception |
+| --- | --- | --- |
+| [Button/Checkbox](../CONTROL_EVENTS.md) | Activation plus typed tri-state requests at the existing synchronous seams. | Controlled acceptance is separate from consumption; legacy callback order remains. |
+| [Switch/Toggle](../BOOLEAN_EVENTS.md) | Immutable boolean requests; owner accepts on a later submission. | No handler means read-only requests, unlike applied observers below. |
+| [Base Slider](../SLIDER_EVENTS.md), [Styled Slider](../STYLED_SLIDER_EVENTS.md) | Double BEGIN/UPDATE/COMMIT/CANCEL phases, caller-owned confirmed value and preview. | Cancellation can lack input evidence; old float API remains unchanged. |
+| [Base Input](../TEXT_INPUT_EVENTS.md), [Styled Input](../TEXT_INPUT_STYLED_EVENTS.md) | Per-event committed text CHANGE and eligible Enter SUBMIT. | No rejectable edit transaction; secure payloads are redacted. |
+| [Textarea](../MULTILINE_EVENTS.md), [Editor](../MULTILINE_EVENTS.md#editor-observers) | Zero-or-one aggregate revision CHANGE after the relevant complete reducer. | Editor observes its outer completion path; no inferred cause/index or submit event. |
+| [RadioGroup](../SELECTION_EVENTS.md), [Select](../SELECT_EVENTS.md), [Combobox](../COMBOBOX_EVENTS.md) | ID transitions at actual reducer seams, preserving existing callbacks and phase order. | OPTION accessibility ACTIVATE remains unsupported; combobox query edits are separate. |
+| [Surface](../SURFACE_EVENTS.md) | Retained completed-close lifecycle observer; legacy decision callback remains separate. | Stable state address/user lifetime extends through exit motion; imperative close requires an active frame. |
+| [MenuTree](../MENU_EVENTS.md) | Every applied command, including repeated same-ID activation. | Simple Menu/ContextMenu/Dropdown forwarding remains separate; no value veto. |
+| [NumberInput](../NUMBER_EVENTS.md) | Zero-or-one aggregate exact-double applied CHANGE, separate from draft revision. | A committed change can accompany a legacy error; no inferred COMMIT/SUBMIT. |
+
+Counts summarize actual observer invocations except where a guide explicitly
+preserves another established result convention. Reading results is passive.
+Synchronous callbacks must not destroy their active context or storage. New
+immediate handlers are borrowed; Surface is explicitly retained. No generic
+capture/bubble dispatch or end-of-frame retiming was introduced.
+
+Foreign bindings expose owning [V1 manual notifications](../BRIDGE_NOTIFICATIONS.md)
+and [Go/Rust views](../BRIDGE_NOTIFICATIONS_GO_RUST.md) for the documented initial
+allowlist. They do not automatically expose these direct C facades, synchronous
+requests, text, scalar or selection events. See the [binding audit](COMPONENT_EVENTS_BINDINGS.md).

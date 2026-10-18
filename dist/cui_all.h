@@ -54,6 +54,7 @@
 #include "cui_boolean_events.h"
 #include "cui_surface_events.h"
 #include "cui_styled_slider_events.h"
+#include "cui_number_events.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -269,4 +270,8 @@
 #define CUI_STYLED_SLIDER_EVENTS_IMPLEMENTATION
 #endif
 #include "cui_styled_slider_events.h"
+#ifndef CUI_NUMBER_EVENTS_IMPLEMENTATION
+#define CUI_NUMBER_EVENTS_IMPLEMENTATION
+#endif
+#include "cui_number_events.h"
 #endif

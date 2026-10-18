@@ -177,6 +177,57 @@ static bool dropdown(settings_frame *f, const cui_setting_item *item, cui_id id,
                              .drag_scroll = item->dropdown_scrollable});
     return changed;
 }
+/* Private Base seam shared with the explicit programmatic helper. */
+extern cui_settings_reset_event_result cui_settings_reset_page_events_internal(
+    cui_id, size_t, const cui_setting_page *, cui_str, cui_settings_handler,
+    const cui_component_event_metadata *);
+static bool reset_evidence(settings_frame *f, cui_id trigger, cui_component_event_metadata *out) {
+    uint64_t frame = cui_frame_sequence(f->ui);
+    if (!f->events || !frame || !cui_frame_paint_enabled(f->ui))
+        return false;
+    (void)cui_component_event_init(out, CUI_COMPONENT_EVENT_CHANGE, f->id,
+                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    out->frame_sequence = frame;
+    out->flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+    size_t count, match = SIZE_MAX;
+    (void)cui_frame_events(f->ui, &count);
+    for (size_t e = 0; e < count; ++e) {
+        if (cui_event_activation(f->ui, e) != trigger)
+            continue;
+        if (match != SIZE_MAX)
+            return true; /* Aggregate button bool cannot identify one causal activation. */
+        match = e;
+    }
+    cui_activation_snapshot snapshot;
+    cui_component_event_metadata actual;
+    if (match != SIZE_MAX && cui_event_activation_snapshot(f->ui, match, &snapshot) &&
+        cui_component_event_from_activation(&actual, CUI_COMPONENT_EVENT_CHANGE, &snapshot)) {
+        *out = actual;
+        out->target = f->id;
+    }
+    return true;
+}
+static void reset_count_add(cui_settings_event_result *out, size_t *count, size_t amount) {
+    if (amount > SIZE_MAX - *count) {
+        *count = SIZE_MAX;
+        out->count_overflow = true;
+    } else
+        *count += amount;
+}
+static bool reset_page(settings_frame *f, size_t page) {
+    if (!f->events)
+        return cui_settings_reset_page(&f->pages[page], f->query);
+    cui_component_event_metadata evidence;
+    bool observe = reset_evidence(f, part(f, page, 0, 0, 34), &evidence);
+    cui_settings_reset_event_result result = cui_settings_reset_page_events_internal(
+        f->id, page, &f->pages[page], f->query, f->handler, observe ? &evidence : NULL);
+    reset_count_add(f->events, &f->events->boolean_count, result.boolean_count);
+    reset_count_add(f->events, &f->events->number_count, result.number_count);
+    reset_count_add(f->events, &f->events->choice_count, result.choice_count);
+    reset_count_add(f->events, &f->events->text_count, result.text_count);
+    f->events->count_overflow |= result.count_overflow;
+    return result.reset;
+}
 static void label(settings_frame *f, cui_str text, float font, cui_color color) {
     if (text.length)
         cui_text_with_line_height(f->ui, text, font, color, 20 * density(f));
@@ -615,7 +666,7 @@ static void content(cui_context *ui, void *user) {
                                                .size = CUI_CONTROL_SMALL,
                                                .icon = {"undo-2", 6},
                                                .icon_only = true})) {
-            f->result->reset = cui_settings_reset_page(page, f->query);
+            f->result->reset = reset_page(f, p);
         }
         cui_rect viewport = f->state->bounds;
         if (viewport.w <= 0 || viewport.h <= 8)

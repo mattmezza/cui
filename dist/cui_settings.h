@@ -417,21 +417,96 @@ static bool reset_item(const cui_setting_item *item) {
         item->on_change(item->user);
     return done;
 }
-bool cui_settings_reset_page(const cui_setting_page *page, cui_str query) {
+/* Internal cross-layer seam: no input dispatch, allocation or renderer dependency.
+ * The components layer freezes genuine UI evidence before calling this operation. */
+cui_settings_reset_event_result cui_settings_reset_page_events_internal(
+    cui_id root, size_t page_index, const cui_setting_page *page, cui_str query,
+    cui_settings_handler handler, const cui_component_event_metadata *evidence) {
+    cui_settings_reset_event_result out = {0};
     if (!page || page->no_reset || !valid_string(query) || (page->count && !page->groups))
-        return false;
-    bool reset = false;
+        return out;
     for (size_t g = 0; g < page->count; g++) {
         const cui_setting_group *group = &page->groups[g];
-        if (group->count && !group->items)
-            return false;
+        if (group->count && !group->items) {
+            out.reset = false;
+            return out;
+        }
         for (size_t i = 0; i < group->count; i++) {
             const cui_setting_item *item = &group->items[i];
-            if (cui_setting_item_matches(item, query))
-                reset |= reset_item(item);
+            if (!cui_setting_item_matches(item, query))
+                continue;
+            bool observe = evidence && !item->reset && item->has_default && !item->custom_item;
+            bool boolean = false;
+            double number = 0;
+            cui_id choice = 0;
+            cui_edit_state text = {0};
+            if (observe) {
+                if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
+                    item->boolean && handler.on_boolean)
+                    boolean = *item->boolean;
+                else if (item->kind == CUI_SETTING_NUMBER && item->number && handler.on_number)
+                    number = *item->number;
+                else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && handler.on_choice)
+                    choice = *item->choice;
+                else if (item->kind == CUI_SETTING_INPUT && item->edit && handler.on_text)
+                    text = cui_edit_get_state(item->edit);
+            }
+            out.reset |= reset_item(item);
+            if (!observe)
+                continue;
+            cui_id field = cui_settings_part_id(root, page_index, g, i, 24);
+            size_t *count = NULL;
+            if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
+                item->boolean && handler.on_boolean && boolean != *item->boolean) {
+                cui_settings_bool_change event = {*evidence, field, page_index, g, i,
+                    boolean, *item->boolean, CUI_SETTINGS_CHANGE_RESET};
+                handler.on_boolean(handler.user, &event);
+                count = &out.boolean_count;
+            } else if (item->kind == CUI_SETTING_NUMBER && item->number && handler.on_number &&
+                       number != *item->number && !(isnan(number) && isnan(*item->number))) {
+                cui_settings_number_change event = {*evidence, field, page_index, g, i,
+                    number, *item->number, isfinite(number), isfinite(*item->number),
+                    CUI_SETTINGS_CHANGE_RESET};
+                handler.on_number(handler.user, &event);
+                count = &out.number_count;
+            } else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && handler.on_choice &&
+                       choice != *item->choice) {
+                cui_settings_choice_change event = {*evidence, field, page_index, g, i,
+                    choice, *item->choice, CUI_SETTINGS_CHANGE_RESET};
+                handler.on_choice(handler.user, &event);
+                count = &out.choice_count;
+            } else if (item->kind == CUI_SETTING_INPUT && item->edit && handler.on_text) {
+                cui_edit_state after = cui_edit_get_state(item->edit);
+                if (text.revision != after.revision) {
+                    cui_settings_text_change event = {*evidence, field, page_index, g, i,
+                        text.revision, after.revision, text.length, after.length,
+                        cui_edit_get_text(item->edit), CUI_SETTINGS_CHANGE_RESET};
+                    handler.on_text(handler.user, &event);
+                    count = &out.text_count;
+                }
+            }
+            if (count) {
+                if (*count == SIZE_MAX)
+                    out.count_overflow = true;
+                else
+                    ++*count;
+            }
         }
     }
-    return reset;
+    return out;
+}
+bool cui_settings_reset_page(const cui_setting_page *page, cui_str query) {
+    return cui_settings_reset_page_events_internal(0, 0, page, query,
+                                                  (cui_settings_handler){0}, NULL).reset;
+}
+cui_settings_reset_event_result cui_settings_reset_page_events(
+    cui_id root, size_t page_index, const cui_setting_page *page, cui_str query,
+    cui_settings_handler handler) {
+    cui_component_event_metadata evidence;
+    if (!root || !page || !cui_component_event_init(&evidence, CUI_COMPONENT_EVENT_CHANGE,
+                                                  root, CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC))
+        return (cui_settings_reset_event_result){0};
+    return cui_settings_reset_page_events_internal(root, page_index, page, query, handler, &evidence);
 }
 cui_id cui_settings_part_id(cui_id root, size_t page, size_t group, size_t item, unsigned part) {
     uint64_t values[4] = {page, group, item, part}, hash = root ^ UINT64_C(0x612f695f419ab257);
@@ -650,6 +725,57 @@ static bool dropdown(settings_frame *f, const cui_setting_item *item, cui_id id,
                              .max_height = item->dropdown_scrollable ? 0 : viewport.h - 8,
                              .drag_scroll = item->dropdown_scrollable});
     return changed;
+}
+/* Private Base seam shared with the explicit programmatic helper. */
+extern cui_settings_reset_event_result cui_settings_reset_page_events_internal(
+    cui_id, size_t, const cui_setting_page *, cui_str, cui_settings_handler,
+    const cui_component_event_metadata *);
+static bool reset_evidence(settings_frame *f, cui_id trigger, cui_component_event_metadata *out) {
+    uint64_t frame = cui_frame_sequence(f->ui);
+    if (!f->events || !frame || !cui_frame_paint_enabled(f->ui))
+        return false;
+    (void)cui_component_event_init(out, CUI_COMPONENT_EVENT_CHANGE, f->id,
+                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    out->frame_sequence = frame;
+    out->flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+    size_t count, match = SIZE_MAX;
+    (void)cui_frame_events(f->ui, &count);
+    for (size_t e = 0; e < count; ++e) {
+        if (cui_event_activation(f->ui, e) != trigger)
+            continue;
+        if (match != SIZE_MAX)
+            return true; /* Aggregate button bool cannot identify one causal activation. */
+        match = e;
+    }
+    cui_activation_snapshot snapshot;
+    cui_component_event_metadata actual;
+    if (match != SIZE_MAX && cui_event_activation_snapshot(f->ui, match, &snapshot) &&
+        cui_component_event_from_activation(&actual, CUI_COMPONENT_EVENT_CHANGE, &snapshot)) {
+        *out = actual;
+        out->target = f->id;
+    }
+    return true;
+}
+static void reset_count_add(cui_settings_event_result *out, size_t *count, size_t amount) {
+    if (amount > SIZE_MAX - *count) {
+        *count = SIZE_MAX;
+        out->count_overflow = true;
+    } else
+        *count += amount;
+}
+static bool reset_page(settings_frame *f, size_t page) {
+    if (!f->events)
+        return cui_settings_reset_page(&f->pages[page], f->query);
+    cui_component_event_metadata evidence;
+    bool observe = reset_evidence(f, part(f, page, 0, 0, 34), &evidence);
+    cui_settings_reset_event_result result = cui_settings_reset_page_events_internal(
+        f->id, page, &f->pages[page], f->query, f->handler, observe ? &evidence : NULL);
+    reset_count_add(f->events, &f->events->boolean_count, result.boolean_count);
+    reset_count_add(f->events, &f->events->number_count, result.number_count);
+    reset_count_add(f->events, &f->events->choice_count, result.choice_count);
+    reset_count_add(f->events, &f->events->text_count, result.text_count);
+    f->events->count_overflow |= result.count_overflow;
+    return result.reset;
 }
 static void label(settings_frame *f, cui_str text, float font, cui_color color) {
     if (text.length)
@@ -1089,7 +1215,7 @@ static void content(cui_context *ui, void *user) {
                                                .size = CUI_CONTROL_SMALL,
                                                .icon = {"undo-2", 6},
                                                .icon_only = true})) {
-            f->result->reset = cui_settings_reset_page(page, f->query);
+            f->result->reset = reset_page(f, p);
         }
         cui_rect viewport = f->state->bounds;
         if (viewport.w <= 0 || viewport.h <= 8)

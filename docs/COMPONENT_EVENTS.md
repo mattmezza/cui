@@ -119,4 +119,11 @@ scalar, plain-text and selection notifications; existing polling retains its con
 
 [DataTable events](TABLE_EVENTS.md) cover sort, single selection, exact multi-selection sets and column width/move transitions;
 [Settings events](SETTINGS_EVENTS.md) cover navigation and built-in boolean,
-number and choice fields plus committed text revisions. Settings reset remains a separate slice.
+number and choice fields plus committed text revisions. Explicit programmatic and UI resets report RESET separately from normal EDIT changes.
+
+
+[TimeField events](TIME_FIELD_EVENTS.md) report zero or one final typed time
+change after the complete Base/Styled operation; draft/focus changes are separate.
+[Sidebar events](SIDEBAR_EVENTS.md) currently report each row invocation after
+legacy callbacks. Expansion, collapse and header/footer actions remain separate
+slices; no generic TREEITEM accessibility activation support is implied.

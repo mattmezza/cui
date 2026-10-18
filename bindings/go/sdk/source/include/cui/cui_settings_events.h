@@ -57,18 +57,33 @@ typedef struct {
     size_t boolean_count, number_count, choice_count; /* Actual calls, independently saturated. */
     size_t text_count;
 } cui_settings_event_result;
+typedef struct {
+    bool reset; /* Exact legacy result, including false after partial progress. */
+    size_t boolean_count, number_count, choice_count, text_count;
+    bool count_overflow;
+} cui_settings_reset_event_result;
+/* Explicit programmatic reset includes disabled matching built-ins. Observes final
+ * values after legacy callbacks, reason RESET, SOURCE_PROGRAMMATIC without input
+ * or frame evidence. Custom reset callbacks retain their legacy behavior and have
+ * no typed observation. Requires nonzero root and page; page_index is caller's
+ * original source index. Owner/callback lifetime restrictions below also apply. */
+cui_settings_reset_event_result cui_settings_reset_page_events(
+    cui_id root, size_t page_index, const cui_setting_page *, cui_str query, cui_settings_handler);
 /* Notify each actual navigation pair transition after original writes/invalidation,
  * before content. Filter/default repair and same-pair pending-scroll work are silent.
  * Missing observer permits all legacy work; no passive/layout-only observations.
- * Pointer-free payload may be copied; callback/user/payload pointer borrowed.
+ * Scalar/navigation payloads copy by value; text UTF-8 remains borrowed.
+ * Callback/user/payload pointer borrowed.
  * Do not mutate/rebind/free active pages/values/editors/states/labels, input or
  * context, or recursively submit UI. Unrelated flags allowed; defer removal and
  * teardown until outer return plus renderer consumption. Legacy callbacks retain
  * their existing timing; scalar owners must remain readable through the new observer.
- * Built-in bool/number/choice observers aggregate one adapter after legacy callback,
+ * Built-in bool/number/choice EDIT observers aggregate one adapter after legacy callback,
  * using UNKNOWN cause/frame only. Number payload finite flags describe validity;
  * two NaNs and signed zeros compare equal. Text observes committed revision differences after the legacy callback, including
- * net-zero byte changes. No preedit/selection/submit/reset observation. Text UTF-8
+ * net-zero byte changes. No preedit/selection/submit observation. Reset observes each built-in adapter
+ * after its old callback, reason RESET; disabled fields remain eligible. UI reset
+ * uses a unique genuine activation snapshot when available, otherwise frame only. Text UTF-8
  * is borrowed; use cui_component_event_copy_utf8 for an owned bounded copy.
  * These unreleased event payload additions require rebuilding consumers. */
 cui_settings_event_result cui_settings_events(cui_context *, cui_id, const cui_theme *,

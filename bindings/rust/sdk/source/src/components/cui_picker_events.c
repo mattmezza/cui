@@ -70,3 +70,26 @@ cui_picker_event_result cui_color_picker_events(
     }
     return result;
 }
+
+cui_picker_event_result cui_time_field_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_time_state *state,
+    cui_time *time, cui_time_options options, cui_time_handler handler) {
+    cui_picker_event_result result = {0};
+    if (!ui || !id || !state || !time || !theme)
+        return result;
+    cui_time before = *time;
+    uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
+                         ? cui_frame_sequence(ui) : 0;
+    result.changed = cui_time_field(ui, id, theme, name, state, time, options);
+    if (frame && handler.on_change &&
+        (before.hour != time->hour || before.minute != time->minute || before.second != time->second)) {
+        cui_time_change event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
+            .previous = before, .value = *time};
+        handler.on_change(handler.user, &event);
+        result.change_count = 1;
+    }
+    return result;
+}

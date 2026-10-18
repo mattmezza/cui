@@ -63,6 +63,24 @@ cui_picker_event_result cui_base_color_picker_events(
 cui_picker_event_result cui_color_picker_events(
     cui_context *, cui_id, const cui_theme *, cui_color_state *, cui_color *,
     cui_color_picker_options, cui_color_handler);
+/* Applied final time only. Draft/focus changes and net-zero edits are silent.
+ * Calls the complete legacy operation once, then observes after semantics (Base)
+ * or paint (Styled). UNKNOWN cause, proven active frame only, no input index.
+ * Payload copies by value; handler/user borrowed. The lifetime and mutation
+ * restrictions above apply. Disabled/readonly/passive/inert never notify.
+ * Missing observer preserves edits. Invalid time, including hidden seconds,
+ * retains legacy rejection. No request/commit/submit or IME contract is added. */
+typedef struct {
+    cui_component_event_metadata event;
+    cui_time previous, value;
+} cui_time_change;
+typedef void (*cui_time_change_fn)(void *, const cui_time_change *);
+typedef struct { cui_time_change_fn on_change; void *user; } cui_time_handler;
+cui_picker_event_result cui_base_time_field_events(
+    cui_context *, cui_id, cui_str, cui_time_state *, cui_time *, cui_time_options, cui_time_handler);
+cui_picker_event_result cui_time_field_events(
+    cui_context *, cui_id, const cui_theme *, cui_str, cui_time_state *, cui_time *,
+    cui_time_options, cui_time_handler);
 #ifdef __cplusplus
 }
 #endif

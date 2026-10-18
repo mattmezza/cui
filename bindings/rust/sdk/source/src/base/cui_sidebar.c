@@ -161,13 +161,15 @@ static void cui_sidebar_set_open(const cui_sidebar_menu_item *item, bool open) {
     if (item->on_expand)
         item->on_expand(open, item->user);
 }
-cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar_menu_item *item,
-                                              bool collapsed, unsigned level) {
+static cui_sidebar_item_result cui_sidebar_item_common(cui_context *ui, const cui_sidebar_menu_item *item,
+                                              bool collapsed, unsigned level, cui_sidebar_item_handler handler,
+                                              cui_sidebar_item_event_result *observed) {
     cui_sidebar_item_result r = {0};
     if (!ui || !item || !item->id || !cui_sidebar_string_valid(item->label) ||
         !cui_sidebar_string_valid(item->accessibility_label) ||
         (item->child_count && (!item->children || !item->state)) || level > CUI_SIDEBAR_DEPTH_LIMIT)
         return r;
+    if (observed) observed->valid = true;
     if (item->child_count && item->state &&
         (!item->state->initialized || item->state->id != item->id)) {
         item->state->id = item->id;
@@ -192,10 +194,33 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
                              item->disable_caret, false, 0);
     }
     size_t count = 0;
-    cui_frame_events(ui, &count);
+    const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count; i++) {
         cui_id activation = cui_event_activation(ui, i);
         if (row.activated && activation == item->id) {
+            cui_sidebar_activation notification;
+            bool notify = observed && handler.on_activate;
+            if (notify) {
+                memset(&notification, 0, sizeof(notification));
+                notification.item = item->id;
+                notification.level = level;
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, i, &snapshot) ||
+                    !cui_component_event_from_activation(&notification.event,
+                        CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+                    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+                    if (events[i].type == CUI_EVENT_POINTER_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+                    else if (events[i].type == CUI_EVENT_KEY_DOWN || events[i].type == CUI_EVENT_KEY_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                    else if (events[i].type == CUI_EVENT_ACCESSIBILITY_ACTION)
+                        source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+                    (void)cui_component_event_init(&notification.event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                    item->id, source);
+                    (void)cui_component_event_set_frame_index(&notification.event,
+                                                              cui_frame_sequence(ui), i);
+                }
+            }
             r.activated = true;
             if (item->child_count && (item->click_to_open || item->click_to_toggle)) {
                 bool before = cui_sidebar_open(item);
@@ -207,6 +232,13 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
             }
             if (item->on_activate)
                 item->on_activate(item->user);
+            if (notify) {
+                handler.on_activate(handler.user, &notification);
+                if (observed->activation_count == SIZE_MAX)
+                    observed->count_overflow = true;
+                else
+                    observed->activation_count++;
+            }
         } else if (caret.activated && activation == caret_id) {
             r.expansion_changed = true;
             cui_sidebar_set_open(item, !cui_sidebar_open(item));
@@ -231,6 +263,18 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
     if (r.expansion_changed || r.activated)
         cui_invalidate(ui);
     return r;
+}
+cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar_menu_item *item,
+                                              bool collapsed, unsigned level) {
+    return cui_sidebar_item_common(ui, item, collapsed, level, (cui_sidebar_item_handler){0}, NULL);
+}
+cui_sidebar_item_event_result cui_base_sidebar_item_events(
+    cui_context *ui, const cui_sidebar_menu_item *item, bool collapsed, unsigned level,
+    cui_sidebar_item_handler handler) {
+    cui_sidebar_item_event_result result;
+    memset(&result, 0, sizeof(result));
+    result.control = cui_sidebar_item_common(ui, item, collapsed, level, handler, &result);
+    return result;
 }
 bool cui_base_sidebar_toggle(cui_context *ui, cui_id id, cui_sidebar_toggle_options o) {
     if (!ui || !id || o.side < CUI_SIDEBAR_LEFT || o.side > CUI_SIDEBAR_RIGHT ||

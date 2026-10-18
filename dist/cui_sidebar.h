@@ -126,6 +126,8 @@ cui_id cui_sidebar_part_id(cui_id, unsigned part);
 #ifdef __cplusplus
 }
 #endif
+/* Additive typed row notifications are discoverable from the Sidebar header. */
+#include "cui_sidebar_events.h"
 #define CUI_SIDEBAR_DECLARATIONS_READY
 #endif
 
@@ -295,13 +297,15 @@ static void cui_sidebar_set_open(const cui_sidebar_menu_item *item, bool open) {
     if (item->on_expand)
         item->on_expand(open, item->user);
 }
-cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar_menu_item *item,
-                                              bool collapsed, unsigned level) {
+static cui_sidebar_item_result cui_sidebar_item_common(cui_context *ui, const cui_sidebar_menu_item *item,
+                                              bool collapsed, unsigned level, cui_sidebar_item_handler handler,
+                                              cui_sidebar_item_event_result *observed) {
     cui_sidebar_item_result r = {0};
     if (!ui || !item || !item->id || !cui_sidebar_string_valid(item->label) ||
         !cui_sidebar_string_valid(item->accessibility_label) ||
         (item->child_count && (!item->children || !item->state)) || level > CUI_SIDEBAR_DEPTH_LIMIT)
         return r;
+    if (observed) observed->valid = true;
     if (item->child_count && item->state &&
         (!item->state->initialized || item->state->id != item->id)) {
         item->state->id = item->id;
@@ -326,10 +330,33 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
                              item->disable_caret, false, 0);
     }
     size_t count = 0;
-    cui_frame_events(ui, &count);
+    const cui_event *events = cui_frame_events(ui, &count);
     for (size_t i = 0; i < count; i++) {
         cui_id activation = cui_event_activation(ui, i);
         if (row.activated && activation == item->id) {
+            cui_sidebar_activation notification;
+            bool notify = observed && handler.on_activate;
+            if (notify) {
+                memset(&notification, 0, sizeof(notification));
+                notification.item = item->id;
+                notification.level = level;
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, i, &snapshot) ||
+                    !cui_component_event_from_activation(&notification.event,
+                        CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+                    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+                    if (events[i].type == CUI_EVENT_POINTER_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+                    else if (events[i].type == CUI_EVENT_KEY_DOWN || events[i].type == CUI_EVENT_KEY_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                    else if (events[i].type == CUI_EVENT_ACCESSIBILITY_ACTION)
+                        source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+                    (void)cui_component_event_init(&notification.event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                    item->id, source);
+                    (void)cui_component_event_set_frame_index(&notification.event,
+                                                              cui_frame_sequence(ui), i);
+                }
+            }
             r.activated = true;
             if (item->child_count && (item->click_to_open || item->click_to_toggle)) {
                 bool before = cui_sidebar_open(item);
@@ -341,6 +368,13 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
             }
             if (item->on_activate)
                 item->on_activate(item->user);
+            if (notify) {
+                handler.on_activate(handler.user, &notification);
+                if (observed->activation_count == SIZE_MAX)
+                    observed->count_overflow = true;
+                else
+                    observed->activation_count++;
+            }
         } else if (caret.activated && activation == caret_id) {
             r.expansion_changed = true;
             cui_sidebar_set_open(item, !cui_sidebar_open(item));
@@ -365,6 +399,18 @@ cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar
     if (r.expansion_changed || r.activated)
         cui_invalidate(ui);
     return r;
+}
+cui_sidebar_item_result cui_base_sidebar_item(cui_context *ui, const cui_sidebar_menu_item *item,
+                                              bool collapsed, unsigned level) {
+    return cui_sidebar_item_common(ui, item, collapsed, level, (cui_sidebar_item_handler){0}, NULL);
+}
+cui_sidebar_item_event_result cui_base_sidebar_item_events(
+    cui_context *ui, const cui_sidebar_menu_item *item, bool collapsed, unsigned level,
+    cui_sidebar_item_handler handler) {
+    cui_sidebar_item_event_result result;
+    memset(&result, 0, sizeof(result));
+    result.control = cui_sidebar_item_common(ui, item, collapsed, level, handler, &result);
+    return result;
 }
 bool cui_base_sidebar_toggle(cui_context *ui, cui_id id, cui_sidebar_toggle_options o) {
     if (!ui || !id || o.side < CUI_SIDEBAR_LEFT || o.side > CUI_SIDEBAR_RIGHT ||
@@ -392,6 +438,7 @@ bool cui_base_sidebar_toggle(cui_context *ui, cui_id id, cui_sidebar_toggle_opti
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
+#include <string.h>
 static void cui_sidebar_spacer(cui_context *ui, float width, float height) {
     cui_begin_box(ui, 0,
                   (cui_box){.width = width,
@@ -445,13 +492,35 @@ static bool cui_sidebar_menu_valid(const cui_sidebar_menu_item *items, size_t co
     }
     return true;
 }
+typedef struct {
+    cui_id target;
+    cui_sidebar_item_handler handler;
+    cui_sidebar_menu_event_result *result;
+} cui_sidebar_menu_observer;
+static void cui_sidebar_menu_notify(void *user, const cui_sidebar_activation *event) {
+    cui_sidebar_menu_observer *observer = user;
+    cui_sidebar_activation copy = *event;
+    copy.event.target = observer->target;
+    observer->handler.on_activate(observer->handler.user, &copy);
+    if (observer->result->activation_count == SIZE_MAX)
+        observer->result->count_overflow = true;
+    else
+        observer->result->activation_count++;
+}
 static void cui_sidebar_menu_render(cui_context *ui, const cui_theme *t,
                                     const cui_sidebar_menu_item *items, size_t count,
-                                    bool parent_collapsed, unsigned level) {
+                                    bool parent_collapsed, unsigned level,
+                                    cui_sidebar_menu_observer *observer) {
     for (size_t i = 0; i < count; i++) {
         const cui_sidebar_menu_item *item = &items[i];
         bool collapsed = level > 1 ? item->collapsed : parent_collapsed;
-        cui_sidebar_item_result state = cui_base_sidebar_item(ui, item, collapsed, level);
+        cui_sidebar_item_result state;
+        if (observer && observer->handler.on_activate) {
+            cui_sidebar_item_event_result result = cui_base_sidebar_item_events(ui, item, collapsed, level,
+                (cui_sidebar_item_handler){cui_sidebar_menu_notify, observer});
+            state = result.control;
+        } else
+            state = cui_base_sidebar_item(ui, item, collapsed, level);
         bool hover = !item->disabled && !item->active && cui_hovered(ui, item->id);
         cui_color fg = item->disabled          ? t->muted
                        : item->active || hover ? t->sidebar_accent_foreground
@@ -536,7 +605,7 @@ static void cui_sidebar_menu_render(cui_context *ui, const cui_theme *t,
             cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true});
             cui_sidebar_spacer(ui, 11, 0);
             cui_begin_box(ui, 0, (cui_box){.width = -1, .gap = 4});
-            cui_sidebar_menu_render(ui, t, item->children, item->child_count, false, level + 1);
+            cui_sidebar_menu_render(ui, t, item->children, item->child_count, false, level + 1, observer);
             cui_end_box(ui);
             cui_end_box(ui);
             cui_sidebar_spacer(ui, 0, 2);
@@ -560,8 +629,9 @@ static void cui_sidebar_menu_render(cui_context *ui, const cui_theme *t,
             item->context(ui, t, collapsed, item->context_user);
     }
 }
-bool cui_sidebar_menu(cui_context *ui, cui_id id, const cui_theme *t,
-                      const cui_sidebar_menu_item *items, size_t count, bool collapsed) {
+static bool cui_sidebar_menu_common(cui_context *ui, cui_id id, const cui_theme *t,
+                      const cui_sidebar_menu_item *items, size_t count, bool collapsed,
+                      cui_sidebar_menu_observer *observer) {
     if (!ui || !id || !t)
         return false;
     cui_id ids[CUI_SIDEBAR_ENTRY_LIMIT * 6u];
@@ -571,11 +641,25 @@ bool cui_sidebar_menu(cui_context *ui, cui_id id, const cui_theme *t,
     for (size_t i = 0; i < used; i++)
         if (ids[i] == id)
             return false;
+    if (observer) observer->result->valid = true;
     cui_interact(ui, id, CUI_ROLE_TREE, (cui_str){0}, false, false, 0);
     cui_begin_box(ui, id, (cui_box){.width = -1, .gap = 8});
-    cui_sidebar_menu_render(ui, t, items, count, collapsed, 1);
+    cui_sidebar_menu_render(ui, t, items, count, collapsed, 1, observer);
     cui_end_box(ui);
     return true;
+}
+bool cui_sidebar_menu(cui_context *ui, cui_id id, const cui_theme *t,
+                      const cui_sidebar_menu_item *items, size_t count, bool collapsed) {
+    return cui_sidebar_menu_common(ui, id, t, items, count, collapsed, NULL);
+}
+cui_sidebar_menu_event_result cui_sidebar_menu_events(
+    cui_context *ui, cui_id id, const cui_theme *t, const cui_sidebar_menu_item *items,
+    size_t count, bool collapsed, cui_sidebar_item_handler handler) {
+    cui_sidebar_menu_event_result result;
+    memset(&result, 0, sizeof(result));
+    cui_sidebar_menu_observer observer = {id, handler, &result};
+    result.submitted = cui_sidebar_menu_common(ui, id, t, items, count, collapsed, &observer);
+    return result;
 }
 bool cui_sidebar_group(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
                        cui_sidebar_content_fn content, void *user, bool collapsed) {

@@ -64,6 +64,24 @@ cui_picker_event_result cui_base_color_picker_events(
 cui_picker_event_result cui_color_picker_events(
     cui_context *, cui_id, const cui_theme *, cui_color_state *, cui_color *,
     cui_color_picker_options, cui_color_handler);
+/* Applied final time only. Draft/focus changes and net-zero edits are silent.
+ * Calls the complete legacy operation once, then observes after semantics (Base)
+ * or paint (Styled). UNKNOWN cause, proven active frame only, no input index.
+ * Payload copies by value; handler/user borrowed. The lifetime and mutation
+ * restrictions above apply. Disabled/readonly/passive/inert never notify.
+ * Missing observer preserves edits. Invalid time, including hidden seconds,
+ * retains legacy rejection. No request/commit/submit or IME contract is added. */
+typedef struct {
+    cui_component_event_metadata event;
+    cui_time previous, value;
+} cui_time_change;
+typedef void (*cui_time_change_fn)(void *, const cui_time_change *);
+typedef struct { cui_time_change_fn on_change; void *user; } cui_time_handler;
+cui_picker_event_result cui_base_time_field_events(
+    cui_context *, cui_id, cui_str, cui_time_state *, cui_time *, cui_time_options, cui_time_handler);
+cui_picker_event_result cui_time_field_events(
+    cui_context *, cui_id, const cui_theme *, cui_str, cui_time_state *, cui_time *,
+    cui_time_options, cui_time_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -161,6 +179,29 @@ cui_picker_event_result cui_base_color_picker_events(
     return result;
 }
 
+cui_picker_event_result cui_base_time_field_events(
+    cui_context *ui, cui_id id, cui_str name, cui_time_state *state,
+    cui_time *time, cui_time_options options, cui_time_handler handler) {
+    cui_picker_event_result result = {0};
+    if (!ui || !id || !state || !time)
+        return result;
+    cui_time before = *time;
+    uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
+                         ? cui_frame_sequence(ui) : 0;
+    result.changed = cui_base_time_field(ui, id, name, state, time, options);
+    if (frame && handler.on_change &&
+        (before.hour != time->hour || before.minute != time->minute || before.second != time->second)) {
+        cui_time_change event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
+            .previous = before, .value = *time};
+        handler.on_change(handler.user, &event);
+        result.change_count = 1;
+    }
+    return result;
+}
+
 /* src/components/cui_picker_events.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -229,6 +270,29 @@ cui_picker_event_result cui_color_picker_events(
                       .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
                       .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
             .previous = before, .value = *color};
+        handler.on_change(handler.user, &event);
+        result.change_count = 1;
+    }
+    return result;
+}
+
+cui_picker_event_result cui_time_field_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_time_state *state,
+    cui_time *time, cui_time_options options, cui_time_handler handler) {
+    cui_picker_event_result result = {0};
+    if (!ui || !id || !state || !time || !theme)
+        return result;
+    cui_time before = *time;
+    uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
+                         ? cui_frame_sequence(ui) : 0;
+    result.changed = cui_time_field(ui, id, theme, name, state, time, options);
+    if (frame && handler.on_change &&
+        (before.hour != time->hour || before.minute != time->minute || before.second != time->second)) {
+        cui_time_change event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
+            .previous = before, .value = *time};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }

@@ -47,3 +47,22 @@ from an observer. Unrelated app flags may change. Defer structural changes,
 omission and teardown until outer return plus renderer consumption. Nodes/expanded
 arrays remain borrowed until next successful model rebuild; model must be explicitly
 destroyed. Omission does not reset it. There is no new bridge/language binding API.
+
+## Expansion
+
+Set `handler.on_expansion_change` to receive `cui_tree_expansion_change` with key,
+current model index and applied `previous`/`expanded` bools. `expansion_count` counts
+actual calls. Repeated toggle or Left/Right input preserves each actual transition;
+leaf/no-op requests are silent. Programmatic `cui_tree_set_expanded`, direct external
+edits and rebuilds are outside these UI observers.
+
+The callback follows the setter's rebuild attempt. On a valid unchanged borrowed
+model, visible mappings already match the new bool; existing later cursor, focus,
+consume and semantic submission have not moved. Capture key/index values rather
+than pointers into the model's alternating mapping banks. The legacy setter writes
+the bool before rebuilding and does not roll it back on rebuild failure: a real
+bool difference is still notified while the old aggregate result remains unchanged.
+Do not assume updated mappings on failure. Existing valid-data/lifetime preconditions
+still apply; observer callbacks cannot edit the borrowed model or expanded array.
+Toggle-origin activation evidence, when available, retains its toggle ID; Left/Right
+navigation has actual keyboard/index evidence without manufactured activation.

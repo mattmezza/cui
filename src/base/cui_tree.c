@@ -277,6 +277,22 @@ static void cui_tree_selection_notify(cui_tree_event_result *out, cui_tree_handl
     else
         ++out->selection_count;
 }
+static bool cui_tree_expand_observed(cui_tree_model *model, size_t index, bool expanded,
+    cui_tree_handler handler, cui_tree_event_result *out,
+    const cui_component_event_metadata *evidence) {
+    cui_id key = model->nodes[index].key;
+    bool previous = model->expanded[index];
+    bool changed = cui_tree_set_expanded(model, key, expanded);
+    if (evidence && handler.on_expansion_change && previous != model->expanded[index]) {
+        cui_tree_expansion_change event = {*evidence, key, index, previous, model->expanded[index]};
+        handler.on_expansion_change(handler.user, &event);
+        if (out->expansion_count == SIZE_MAX)
+            out->count_overflow = true;
+        else
+            ++out->expansion_count;
+    }
+    return changed;
+}
 static cui_tree_result cui_tree_reduce_common(
     cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
     cui_tree_options o, cui_tree_handler handler, cui_tree_event_result *out) {
@@ -324,10 +340,11 @@ static cui_tree_result cui_tree_reduce_common(
         if (hit == SIZE_MAX || m->nodes[hit].disabled)
             continue;
         cui_component_event_metadata evidence;
-        bool observe = out && handler.on_selection_change &&
+        bool observe = out && (handler.on_selection_change || handler.on_expansion_change) &&
                        cui_tree_event_evidence(ui, id, e, events[e].type, &evidence);
         if (activation == cui_tree_toggle_id(id, m->nodes[hit].key)) {
-            if (cui_tree_set_expanded(m, m->nodes[hit].key, !m->expanded[hit]))
+            if (cui_tree_expand_observed(m, hit, !m->expanded[hit], handler, out,
+                                          observe ? &evidence : NULL))
                 result.expansion_changed = true;
             s->cursor = m->nodes[hit].key;
             cui_focus(ui, cui_tree_row_id(id, s->cursor));
@@ -362,7 +379,8 @@ static cui_tree_result cui_tree_reduce_common(
                 }
             } else if (key == CUI_KEY_LEFT) {
                 if (cui_tree_is_branch(m, cursor) && m->expanded[cursor])
-                    result.expansion_changed |= cui_tree_set_expanded(m, s->cursor, false);
+                    result.expansion_changed |= cui_tree_expand_observed(
+                        m, cursor, false, handler, out, observe ? &evidence : NULL);
                 else {
                     size_t parent = cursor;
                     while (cui_tree_parent(m, parent, &parent))
@@ -373,7 +391,8 @@ static cui_tree_result cui_tree_reduce_common(
                 }
             } else if (key == CUI_KEY_RIGHT && cui_tree_is_branch(m, cursor)) {
                 if (!m->expanded[cursor])
-                    result.expansion_changed |= cui_tree_set_expanded(m, s->cursor, true);
+                    result.expansion_changed |= cui_tree_expand_observed(
+                        m, cursor, true, handler, out, observe ? &evidence : NULL);
                 else {
                     for (size_t candidate = position + 1; candidate < m->visible_count;
                          ++candidate) {

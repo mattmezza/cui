@@ -189,3 +189,10 @@ The first approved slice implements Base/reduce-only/Styled per-write selection
 notifications through a shared reducer seam. Expansion and activation observers
 remain pending independent commits. Legacy aggregate results and public layouts
 are unchanged; no model setter or binding callback is added by this slice.
+
+## Expansion implementation checkpoint
+
+The second approved slice adds per-applied-bool expansion notifications after the
+existing setter/rebuild attempt, preserving all aggregate flags and later consume,
+focus and semantic work. Programmatic setter/rebuild calls remain unobserved.
+Activation observers remain pending their independent commit.

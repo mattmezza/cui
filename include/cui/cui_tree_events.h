@@ -12,11 +12,19 @@ typedef struct {
     size_t node_index; /* Current model slot, not input index or stable identity. */
 } cui_tree_selection_change;
 typedef struct {
+    cui_component_event_metadata event;
+    cui_id key;
+    size_t node_index;
+    bool previous, expanded;
+} cui_tree_expansion_change;
+typedef struct {
     void (*on_selection_change)(void *, const cui_tree_selection_change *);
+    void (*on_expansion_change)(void *, const cui_tree_expansion_change *);
     void *user;
 } cui_tree_handler;
 typedef struct {
     cui_tree_result result; /* Exact legacy aggregate, including net-zero false. */
+    size_t expansion_count; /* Applied bool differences, after model rebuild attempt. */
     size_t selection_count; /* Actual calls; saturates at SIZE_MAX. */
     bool count_overflow;
 } cui_tree_event_result;

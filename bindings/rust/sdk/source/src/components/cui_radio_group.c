@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_radio_group.h"
 #include <math.h>
-cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_theme *t,
+static cui_radio_group_result cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                                        const cui_radio_group_item *items, size_t count,
                                        cui_id *selected, cui_radio_group_state *state,
-                                       cui_radio_group_options o) {
+                                       cui_radio_group_options o, cui_selection_handler handler,
+                                       cui_selection_event_result *observed) {
     cui_radio_group_result r = {0};
     if (!t)
         return r;
@@ -25,7 +26,13 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
         size = design.indicator_size;
         font = design.font_size;
     }
-    r = cui_base_radio_group(ui, id, items, count, selected, state, o);
+    if (observed) {
+        cui_radio_group_event_result result = cui_base_radio_group_events(
+            ui, id, items, count, selected, state, o, handler);
+        *observed = result.events;
+        r = result.legacy;
+    } else
+        r = cui_base_radio_group(ui, id, items, count, selected, state, o);
     if (!r.valid)
         return r;
     cui_begin_box(ui, id, (cui_box){.row = !o.vertical, .gap = o.gap > 0 ? o.gap : 12 * density});
@@ -69,4 +76,20 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
     }
     cui_end_box(ui);
     return r;
+}
+
+cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_theme *theme,
+    const cui_radio_group_item *items, size_t count, cui_id *selected,
+    cui_radio_group_state *state, cui_radio_group_options options) {
+    return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
+                                  (cui_selection_handler){0}, NULL);
+}
+cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
+    const cui_theme *theme, const cui_radio_group_item *items, size_t count, cui_id *selected,
+    cui_radio_group_state *state, cui_radio_group_options options, cui_selection_handler handler) {
+    cui_radio_group_event_result result;
+    memset(&result, 0, sizeof(result));
+    result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
+                                          handler, &result.events);
+    return result;
 }

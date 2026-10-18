@@ -121,11 +121,11 @@ Components. No platform types or heap allocation are required.
 
 ```c
 typedef struct {
-    cui_component_event_metadata metadata;
+    cui_component_event_metadata event;
     cui_surface_result result;
 } cui_surface_lifecycle_event;
 typedef void (*cui_surface_lifecycle_fn)(
-    const cui_surface_lifecycle_event *event, void *user);
+    void *user, const cui_surface_lifecycle_event *event);
 typedef struct {
     cui_surface_lifecycle_fn closed; /* NULL means no observer. */
     void *user;
@@ -206,7 +206,7 @@ update separately and then begin on the same input to manufacture notification.
 Imperative lifecycle operations use the existing functions on `&state.control`:
 `cui_surface_open`, `cui_surface_close`, `cui_surface_request_close` and
 `cui_surface_take_result`. This deliberately adds no second close policy. The
-retained trampoline receives direct close between frames; request-close still
+retained trampoline receives direct close; request-close still
 waits for a submitted update and its unchanged decision policy. Imperative
 operations have no per-call facade result/count. An invalid/no-op repeated close
 emits nothing. Taking a result neither unregisters nor replays the callback.
@@ -294,3 +294,17 @@ update clearing registration detected on the next wrapper, no callback on repeat
 across frames. Retain existing legacy tests unchanged. Compile with strict C/C++
 header checks and run CTest through the private headless wrapper. No dispatcher,
 Core teardown, generated SDK or binding changes belong in this first slice.
+
+Implementation preflight correction: only request-close is documented safe between
+frames. Existing imperative close calls `cui_dismiss_focus_scope`, which requires
+an active frame (`src/core/cui.c`, `cui_core_active`). Outside-frame close can
+commit and notify while recording CUI_ERROR_LIFECYCLE. The facade must preserve
+that diagnostic and must not promise safe between-frame imperative close or full
+scope restoration there. Test valid imperative close after begin returns within an active frame; preserve
+the legacy outside-frame restriction and diagnostic; no Core architecture change belongs
+in this slice.
+
+The completed CLOSED slice is now specified by `include/cui/cui_surface_events.h`
+and `docs/SURFACE_EVENTS.md`: callback order is `(void *user, const event *)` and
+the shared metadata field is named `event`, matching the other facades. No menu
+implementation is included; Choice ownership remains a separate workstream.

@@ -166,7 +166,144 @@ static void admission(void) {
     assert(!memcmp(&state,&f.state,sizeof state) && !memcmp(&value,&f.selection,sizeof value));
     assert(!f.calls);cui_end_frame(f.ui);finish(&f);
 }
+typedef struct {
+    fixture f;
+    cui_date_picker_state picker;
+    cui_date_picker_options options;
+    bool base, open_at_callback;
+    cui_id focus_at_callback;
+} date_fixture;
+static void date_observe(void *user,const cui_date_selection_change *e) {
+    date_fixture *d=user;fixture *f=&d->f;assert(f->calls<16);
+    assert(e->event.target==31 && e->event.kind==CUI_COMPONENT_EVENT_CHANGE);
+    assert(e->event.flags==CUI_COMPONENT_EVENT_HAS_FRAME && e->event.frame_sequence>0);
+    assert(e->event.source==CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    f->copies[f->calls++]=*e;f->request_omit=true;
+    d->open_at_callback=d->picker.overlay.open;d->focus_at_callback=cui_focused(f->ui);
+}
+static cui_calendar_event_result date_frame(date_fixture *d,bool facade,bool observer) {
+    fixture *f=&d->f;assert(cui_begin_frame(f->ui,1000,700,.016f));
+    cui_theme theme=cui_theme_light();cui_calendar_event_result r={0};
+    cui_date_selection_handler h={observer?date_observe:NULL,d};
+    cui_begin_box(f->ui,1000,(cui_box){.inert=f->inert,.layout_only=f->layout});
+    if(!f->omit) {
+        if(d->base) {
+            if(facade) r=cui_base_date_picker_events(f->ui,31,10,cui_string("Date"),
+                &d->picker,&f->selection,d->options,h);
+            else r.control=cui_base_date_picker(f->ui,31,10,cui_string("Date"),
+                &d->picker,&f->selection,d->options);
+            if(d->picker.overlay.open) {
+                cui_overlay_set_bounds(&d->picker.overlay,(cui_rect){0,30,900,600});
+                if(cui_overlay_begin(f->ui,&d->picker.overlay)) {
+                    cui_calendar_submit(f->ui,10,&d->picker.calendar,f->selection,d->options.calendar);
+                    cui_overlay_end(f->ui);
+                }
+            }
+            size_t n;const cui_semantic *sem=cui_semantics(f->ui,&n);
+            for(size_t i=0;i<n;++i) {
+                cui_begin_box(f->ui,sem[i].id,(cui_box){.width=32,.height=24});cui_end_box(f->ui);
+            }
+        } else {
+            if(facade) {
+                cui_picker_event_result styled=cui_date_picker_events(f->ui,31,&theme,
+                    cui_string("Date"),&d->picker,&f->selection,d->options,h);
+                r.control.changed=styled.changed;r.change_count=styled.change_count;
+            } else r.control.changed=cui_date_picker(f->ui,31,&theme,cui_string("Date"),
+                &d->picker,&f->selection,d->options);
+        }
+    }
+    f->state=d->picker.calendar;
+    cui_end_box(f->ui);f->draw=cui_end_frame(f->ui);assert(cui_last_error(f->ui)==CUI_OK);return r;
+}
+static void date_init(date_fixture *d,bool base) {
+    memset(d,0,sizeof *d);d->base=base;fixture *f=&d->f;
+    f->ui=cui_create((cui_config){.max_elements=256,.max_commands=512});assert(f->ui);
+    f->selection.start=(cui_date){2024,2,15};
+    cui_date_picker_init(&d->picker,32,f->selection.start);
+    d->options=(cui_date_picker_options){.calendar={.is_disabled=policy,.disabled_user=f},
+        .viewport={0,0,1000,700}};
+    date_frame(d,false,false);
+}
+static cui_calendar_event_result date_pair(date_fixture *a,date_fixture *b,bool observer) {
+    cui_calendar_event_result x=date_frame(a,false,false),y=date_frame(b,true,observer);
+    equal(&a->f,&b->f,x.control,y.control);
+    assert(a->picker.overlay.open==b->picker.overlay.open);return y;
+}
+static cui_id date_named(date_fixture *d,const char *iso) {
+    fixture *f=&d->f;
+    int year,month,day;assert(sscanf(iso,"%d-%d-%d",&year,&month,&day)==3);
+    char label[96];cui_date_format_locale((cui_date){year,month,day},d->options.calendar.locale,
+                                          label,sizeof label);
+    const char *name=label;
+    size_t n;const cui_semantic *sem=cui_semantics(f->ui,&n);
+    for(size_t i=0;i<n;++i) if(sem[i].name.length==strlen(name) &&
+        !memcmp(sem[i].name.data,name,strlen(name))) return sem[i].id;
+    assert(false);return 0;
+}
+static void date_open(date_fixture *a,date_fixture *b) {
+    click(&a->f,31);click(&b->f,31);assert(!date_pair(a,b,true).change_count);
+    assert(a->picker.overlay.open && b->picker.overlay.open);
+}
+static void dates(void) {
+    date_fixture a,b;date_init(&a,false);date_init(&b,false);
+    a.options.calendar.locale=b.options.calendar.locale=cui_date_locale_builtin(CUI_DATE_LOCALE_IT);
+    date_open(&a,&b);
+    cui_id id=date_named(&b,"2024-02-15");click(&a.f,id);click(&b.f,id);
+    assert(!date_pair(&a,&b,true).change_count && !b.picker.overlay.open); /* Same-date close. */
+    date_open(&a,&b);id=date_named(&b,"2024-02-20");click(&a.f,id);click(&b.f,id);
+    assert(date_pair(&a,&b,true).change_count==1);
+    assert(!b.open_at_callback && b.focus_at_callback==31);
+    cui_date_selection_change saved=b.f.copies[0];
+    a.options.calendar.range=b.options.calendar.range=true;
+    date_open(&a,&b);id=date_named(&b,"2024-02-18");click(&a.f,id);click(&b.f,id);
+    assert(date_pair(&a,&b,true).change_count==1 && b.open_at_callback);
+    id=date_named(&b,"2024-02-10");click(&a.f,id);click(&b.f,id);
+    assert(date_pair(&a,&b,true).change_count==1 && !b.open_at_callback);
+    assert(b.f.selection.start.day==10 && b.f.selection.end.day==18);
+    /* First range selection keeps popup open; late invalid viewport returns
+     * legacy false after applied mutation and closes before observer. */
+    date_open(&a,&b);id=date_named(&b,"2024-02-21");click(&a.f,id);click(&b.f,id);
+    a.options.viewport=b.options.viewport=(cui_rect){0};
+    cui_calendar_event_result r=date_pair(&a,&b,true);
+    assert(!r.control.changed && r.change_count==1 && b.f.selection.start.day==21);
+    assert(!b.open_at_callback && b.focus_at_callback==31);
+    a.options.viewport=b.options.viewport=(cui_rect){0,0,1000,700};
+    date_open(&a,&b);id=date_named(&b,"2024-02-22");click(&a.f,id);click(&b.f,id);
+    assert(!date_pair(&a,&b,false).change_count && b.f.selection.end.day==22);
+    a.options.disabled=b.options.disabled=true;
+    assert(!date_pair(&a,&b,true).change_count && !b.picker.overlay.open);
+    a.options.disabled=b.options.disabled=false;a.f.inert=b.f.inert=true;
+    key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);assert(!date_pair(&a,&b,true).change_count);
+    a.f.inert=b.f.inert=false;a.f.layout=b.f.layout=true;
+    assert(!date_pair(&a,&b,true).change_count);a.f.layout=b.f.layout=false;
+    a.f.omit=b.f.omit=b.f.request_omit;assert(!date_pair(&a,&b,true).change_count);
+    finish(&a.f);finish(&b.f);assert(saved.previous.start.day==15 && saved.value.start.day==20);
+    /* Base popup host owns layout; exact aggregate result and close/focus still
+     * finalize before observer without a nested Calendar notification. */
+    date_init(&a,true);date_init(&b,true);date_open(&a,&b);
+    cui_focus(a.f.ui,cui_calendar_day_id(10,(cui_date){2024,2,15}));
+    cui_focus(b.f.ui,cui_calendar_day_id(10,(cui_date){2024,2,15}));
+    key(&a.f,CUI_KEY_RIGHT);key(&b.f,CUI_KEY_RIGHT);key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);
+    r=date_pair(&a,&b,true);assert(r.change_count==1 && r.control.changed);
+    assert(!b.open_at_callback && b.focus_at_callback==31 && b.f.selection.start.day==16);
+    date_open(&a,&b);
+    cui_focus(a.f.ui,cui_calendar_day_id(10,(cui_date){2024,2,16}));
+    cui_focus(b.f.ui,cui_calendar_day_id(10,(cui_date){2024,2,16}));
+    for(unsigned i=0;i<2;++i) {
+        key(&a.f,CUI_KEY_RIGHT);key(&b.f,CUI_KEY_RIGHT);
+        key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);
+    }
+    r=date_pair(&a,&b,true);assert(r.change_count==1 && b.f.selection.start.day==18);
+    assert(b.f.calls==2); /* Four inputs, one outer callback; no nested observer. */
+    assert(cui_begin_frame(b.f.ui,1000,700,.016f));
+    cui_date_picker_state before=b.picker;cui_date_selection value=b.f.selection;
+    r=cui_base_date_picker_events(b.f.ui,31,0,cui_string("Date"),&b.picker,&b.f.selection,
+        b.options,(cui_date_selection_handler){date_observe,&b});
+    assert(!r.change_count && !memcmp(&before,&b.picker,sizeof before) &&
+           !memcmp(&value,&b.f.selection,sizeof value));cui_end_frame(b.f.ui);
+    finish(&a.f);finish(&b.f);
+}
 int main(void) {
     for(unsigned mode=0;mode<3;++mode) keyboard(mode);
-    range_and_chooser();admission();puts("PASS Calendar selection observers, legacy equivalence and navigation silence");return 0;
+    range_and_chooser();admission();dates();puts("PASS Calendar selection observers, legacy equivalence and navigation silence");return 0;
 }

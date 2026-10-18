@@ -160,3 +160,12 @@ Each whole legacy operation is called once; date comparison, callback count,
 passive silence and outer completion timing follow the first slice above.
 DatePicker and ColorPicker remain proposals awaiting separate review. No TimeField,
 navigation/popup lifecycle, foreign binding or parity-ledger promotion is included.
+
+
+## Second slice implementation status
+
+Base and Styled DatePicker selected-date wrappers are implemented in the same
+owned event header/sources. They observe the complete outer legacy operation once,
+including late false Styled returns after mutation, with trigger-ID metadata and
+post-dismiss/focus timing. The guide records the distinct legacy result types.
+ColorPicker remains awaiting review; no popup lifecycle or foreign API is added.

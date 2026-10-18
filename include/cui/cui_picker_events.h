@@ -39,6 +39,18 @@ cui_calendar_event_result cui_base_calendar_events(
 cui_calendar_event_result cui_calendar_events(
     cui_context *, cui_id, const cui_theme *, cui_calendar_state *, cui_date_selection *,
     cui_calendar_options, cui_date_selection_handler);
+/* DatePicker wraps the entire outer operation, with trigger-ID metadata.
+ * Popup open/close and same-date activation alone do not emit CHANGE. */
+typedef struct {
+    bool changed;        /* Exact Styled legacy bool, including false on late errors. */
+    size_t change_count; /* Zero or one actual callback. */
+} cui_picker_event_result;
+cui_calendar_event_result cui_base_date_picker_events(
+    cui_context *, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *,
+    cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
+cui_picker_event_result cui_date_picker_events(
+    cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_date_picker_state *,
+    cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
 #ifdef __cplusplus
 }
 #endif

@@ -1,4 +1,4 @@
-# Calendar selection observers
+# Calendar and DatePicker selection observers
 
 Include `cui/cui_picker_events.h` for additive applied date-selection observers:
 `cui_calendar_reduce_events`, `cui_base_calendar_events`, and `cui_calendar_events`.
@@ -15,8 +15,8 @@ cui_calendar_event_result result = cui_calendar_events(
     (cui_date_selection_handler){selected_date, app});
 ```
 
-This slice does not add DatePicker, ColorPicker, TimeField, navigation, popup
-lifecycle or controlled-request observers. A CHANGE reports an already-applied
+This slice does not add ColorPicker, TimeField, navigation, popup lifecycle or
+controlled-request observers. A CHANGE reports an already-applied
 date selection and cannot reject it. The existing disabled-date predicate remains
 an enablement policy, not a notification or a newly rejectable transaction.
 
@@ -80,3 +80,41 @@ copy lifetime, deferred omission and atomic pointer/ID admission. Callback-time
 checks distinguish reduce-only semantics from Base/Styled completion. Legacy
 `picker` and `picker_base_only` suites remain required. Tests use the private native
 display wrapper. No browser, host accessibility or foreign binding proof is implied.
+
+
+## DatePicker selected dates
+
+The same header provides `cui_base_date_picker_events` and
+`cui_date_picker_events`, mirroring the old arguments plus date handler. Base
+returns `cui_calendar_event_result`; Styled returns `cui_picker_event_result` with
+its exact old bool in `changed` and zero/one actual `change_count`. Base requires
+both trigger and calendar IDs nonzero; Styled requires its trigger ID and theme.
+Required pointers/IDs are checked atomically before legacy code.
+
+Each wraps the complete original operation once, with no nested Calendar observer.
+The event target is the **outer trigger ID**, even though Base also takes a separate
+calendar ID. The observer runs after all original popup dismissal, focus restoration,
+trigger formatting, layout and paint work (or the original early return). Opening,
+closing, navigating and activating the same selected date do not alone notify.
+A first range selection may notify while the popup stays open; completing a range
+can notify after it closes. Only selected start/end date comparisons decide CHANGE.
+
+A late Styled failure can return false even after Base has changed dates: for
+example, first range selection followed by invalid popup viewport placement.
+The facade preserves that bool and still delivers the applied date CHANGE after
+close/focus restoration. Do not treat `changed` as a callback count or successful
+render signal, and do not gate applied notification on that bool. There is no
+invented error or close reason in the payload.
+
+Global disabled or Calendar-disabled options suppress observers while keeping old
+trigger/overlay maintenance. Active painted/frame, UNKNOWN/no-index evidence,
+missing-handler editing, copied payload, borrowed policy/locale data and deferred
+teardown rules match Calendar above. DatePicker overlay state retains its existing
+lifetime and the standalone trigger has no date observer API.
+
+DatePicker tests pair legacy/facade results, state, focus, locale/policy calls,
+semantics and draw commands. They cover Italian locale labels, same-date close,
+range completion, invalid viewport after mutation, close/focus at callback time,
+null handler, multiple Base inputs with one callback, passive/disabled/inert/layout
+silence, payload copying after destruction, deferred omission and atomic calendar-ID
+admission. These remain native source proofs, not foreign or browser coverage.

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_textarea.h"
+#include "cui/cui_multiline_events.h"
 #include "cui/cui_base.h"
 #include "cui_textarea_geometry.h"
 #include <math.h>
@@ -1037,6 +1038,30 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                                .scroll_max_y = state->maximum_y});
     if (result.changed || result.selection_changed || result.scrolled)
         cui_invalidate(ui);
+    return result;
+}
+
+cui_multiline_event_result cui_base_textarea_events(
+    cui_context *ui, cui_id id, cui_str name, cui_edit *edit, cui_textarea_state *state,
+    cui_textarea_options options, cui_textarea_metrics metrics, cui_component_text_handler handler) {
+    cui_multiline_event_result result = {0};
+    cui_edit_state before = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    result.control = cui_base_textarea(ui, id, name, edit, state, options, metrics);
+    cui_edit_state after = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    if (ui && edit && handler.callback && before.revision != after.revision) {
+        cui_component_text_event event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                      .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                      .frame_sequence = cui_frame_sequence(ui)},
+            .before = before,
+            .after = after,
+            .has_text = true,
+            .text = cui_edit_get_text(edit)};
+        handler.callback(handler.user, &event);
+        result.change_count = 1;
+    }
     return result;
 }
 

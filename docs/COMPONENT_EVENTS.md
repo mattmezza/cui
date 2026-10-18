@@ -82,3 +82,5 @@ The controlled [Slider phase facade](SLIDER_EVENTS.md) preserves double values a
 The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_INPUT_STYLED_EVENTS.md) report committed text changes and eligible submissions synchronously. It does not add rejectable edit requests or multiline observers. [Go and Rust manual notification views](BRIDGE_NOTIFICATIONS_GO_RUST.md) preserve typed queue values with owning payloads; their callbacks retain existing timing.
 
 [RadioGroup observers](SELECTION_EVENTS.md) report actual owner selection transitions after the existing request callback. Select/Combobox and general selection requests remain outside that slice; RadioGroup activation snapshots are unavailable at its preserved reducer step.
+
+[Textarea observers](MULTILINE_EVENTS.md) deliberately aggregate committed revision changes into at most one notification per submission. They do not claim a single input cause, per-event delivery or submission intent; Editor observers remain separate work.

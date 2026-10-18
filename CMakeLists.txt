@@ -1252,3 +1252,8 @@ add_executable(test_selection_events tests/unit/test_selection_events.c)
 target_link_libraries(test_selection_events PRIVATE cui)
 cui_warnings(test_selection_events)
 add_test(NAME selection_events COMMAND test_selection_events)
+
+add_executable(test_textarea_events tests/unit/test_textarea_events.c)
+target_link_libraries(test_textarea_events PRIVATE cui)
+cui_warnings(test_textarea_events)
+add_test(NAME textarea_events COMMAND test_textarea_events)

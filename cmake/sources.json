@@ -196,7 +196,8 @@
     ],
     "cui_slider_events": [],
     "cui_text_input_events": [],
-    "cui_selection_events": []
+    "cui_selection_events": [],
+    "cui_multiline_events": []
   },
   "native": {
     "text": [

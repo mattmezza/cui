@@ -120,6 +120,8 @@ size_t cui_textarea_row_offset(cui_context *, cui_edit *, const cui_textarea_sta
                                float x);
 float cui_textarea_row_x(cui_context *, cui_edit *, const cui_textarea_state *, size_t row,
                          size_t offset);
+/* Optional aggregate CHANGE observers are declared in cui_multiline_events.h.
+ * Include that header to use the additive facades; legacy declarations stay independent. */
 /* Base uses the state's last viewport and supplied metrics, preserving caller layout. */
 cui_textarea_result cui_base_textarea(cui_context *, cui_id, cui_str name, cui_edit *,
                                       cui_textarea_state *, cui_textarea_options,
@@ -134,12 +136,14 @@ cui_textarea_result cui_textarea(cui_context *, cui_id, const cui_theme *, cui_s
 
 #if defined(CUI_TEXTAREA_IMPLEMENTATION) && defined(CUI_TEXTAREA_DECLARATIONS_READY) && !defined(CUI_TEXTAREA_IMPLEMENTATION_ONCE)
 #define CUI_TEXTAREA_IMPLEMENTATION_ONCE
+#include "cui_multiline_events.h"
 #ifndef CUI_EDIT_IMPLEMENTATION
 #define CUI_EDIT_IMPLEMENTATION
 #endif
 #include "cui_edit.h"
 /* src/base/cui_textarea.c */
 /* SPDX-License-Identifier: MIT */
+
 
 
 /* SPDX-License-Identifier: MIT */
@@ -1194,6 +1198,30 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
     return result;
 }
 
+cui_multiline_event_result cui_base_textarea_events(
+    cui_context *ui, cui_id id, cui_str name, cui_edit *edit, cui_textarea_state *state,
+    cui_textarea_options options, cui_textarea_metrics metrics, cui_component_text_handler handler) {
+    cui_multiline_event_result result = {0};
+    cui_edit_state before = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    result.control = cui_base_textarea(ui, id, name, edit, state, options, metrics);
+    cui_edit_state after = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    if (ui && edit && handler.callback && before.revision != after.revision) {
+        cui_component_text_event event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                      .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                      .frame_sequence = cui_frame_sequence(ui)},
+            .before = before,
+            .after = after,
+            .has_text = true,
+            .text = cui_edit_get_text(edit)};
+        handler.callback(handler.user, &event);
+        result.change_count = 1;
+    }
+    return result;
+}
+
 bool cui_textarea_visual_paint_range(cui_context *ui, cui_id id, cui_str text,
                                      cui_textarea_line line, size_t first, size_t last, float size,
                                      cui_text_style style, cui_color color, float y, float height) {
@@ -1227,6 +1255,7 @@ bool cui_textarea_visual_paint_range(cui_context *ui, cui_id id, cui_str text,
 
 /* src/components/cui_textarea.c */
 /* SPDX-License-Identifier: MIT */
+
 
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_TEXTAREA_GEOMETRY_H
@@ -1262,9 +1291,10 @@ static float cui_textarea_prefix(cui_context *ui, cui_str text, cui_textarea_lin
                                  size_t offset, float font, cui_text_style style) {
     return cui_textarea_visual_x(ui, text, line, offset, font, style, CUI_TEXT_DOWNSTREAM);
 }
-cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+static cui_textarea_result cui_textarea_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
                                  cui_edit *edit, cui_textarea_state *state,
-                                 cui_textarea_options options) {
+                                 cui_textarea_options options, cui_component_text_handler handler,
+                                 cui_multiline_event_result *events) {
     cui_textarea_result result = {.error = CUI_TEXTAREA_INVALID};
     cui_textarea_metrics metrics;
     if (!ui || !id || !theme || !edit || !state ||
@@ -1300,7 +1330,12 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
         cui_base_composition(ui, id, state->composition, &state->composition_owned);
     if (state->composition && state->composition_owned)
         state->composition->grow_view = true;
-    result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
+    if (events) {
+        *events = cui_base_textarea_events(ui, id, name, edit, state, options, metrics, handler);
+        result = events->control;
+    } else {
+        result = cui_base_textarea(ui, id, name, edit, state, options, metrics);
+    }
     if (result.error != CUI_TEXTAREA_OK)
         return result;
     height = options.height > 0
@@ -1477,6 +1512,20 @@ cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *th
     cui_begin_box(ui, cui_textarea_child(id, 0, 7), (cui_box){.height = py, .fixed_height = true});
     cui_end_box(ui);
     cui_end_box(ui);
+    return result;
+}
+
+cui_textarea_result cui_textarea(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                                 cui_edit *edit, cui_textarea_state *state,
+                                 cui_textarea_options options) {
+    return cui_textarea_common(ui, id, theme, name, edit, state, options,
+                               (cui_component_text_handler){0}, NULL);
+}
+cui_multiline_event_result cui_textarea_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_edit *edit,
+    cui_textarea_state *state, cui_textarea_options options, cui_component_text_handler handler) {
+    cui_multiline_event_result result = {0};
+    result.control = cui_textarea_common(ui, id, theme, name, edit, state, options, handler, &result);
     return result;
 }
 

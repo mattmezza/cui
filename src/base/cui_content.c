@@ -161,7 +161,8 @@ cui_hover_event_result cui_hover_update_events(
     result.valid = true;
     result.control_result = cui_hover_update(state, trigger, content, focus, escape, disabled,
                                              dt, opening, closing);
-    if (previous != state->open && handler.on_change) {
+    result.changed = previous != state->open;
+    if (result.changed && handler.on_change) {
         cui_hover_lifecycle_event event;
         memset(&event, 0, sizeof(event));
         (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_LIFECYCLE, target,

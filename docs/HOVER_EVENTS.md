@@ -36,13 +36,15 @@ there is no implicit once-per-frame guard.
 return a zero result before any state/callback work. Other parameters keep legacy
 policy: finite positive dt advances elapsed, invalid/nonpositive dt does not;
 nonfinite or negative delay becomes zero. `control_result` is the exact legacy
-bool (entry open differs from final open), not successful submission. Pending,
+bool (entry open differs from final open), not successful submission. The explicit
+`changed` flag independently records the same entry/final comparison even without
+a handler; it will remain distinct from Styled composition admission. Pending,
 target, elapsed or suppression-only changes are not open transitions.
 
 One actual open transition invokes the optional handler once, after reduction,
 with frozen `previous_open` and `open`. `change_count` counts actual observer calls,
 zero or one; `count_overflow` is always false. Missing handler preserves ordinary
-state mutation and `control_result`, with count zero. Reading a result does not
+state mutation and `control_result`, with count zero and `changed` still observable. Reading a result does not
 invoke another observer. Callback does not veto or confirm the state change.
 
 Disabled pure policy closes an open state and may notify. Escape closes and
@@ -76,3 +78,6 @@ No Styled Tooltip/HoverCard composition, Focus Trap, virtual-window completion,
 MessageScroller, bridge producer or language callback is added. Existing binding
 notification allowlists remain unchanged. This is a bounded model observation
 slice, not full-family or uniform coverage of all 78 manifest families.
+
+The explicit `changed` field extends the unreleased event-result layout. Rebuild
+consumers rather than mixing earlier objects; no legacy result/layout changed.

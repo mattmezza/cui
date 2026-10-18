@@ -26,9 +26,13 @@ static cui_hover_event_result update(cui_hover_state *state, bool trigger, bool 
                                      bool escape, bool disabled, float dt, float opening,
                                      float closing, bool observer) {
     active = state;
-    return cui_hover_update_events(UINT64_C(0xfedcba9876543210), state, trigger, content, focus,
-                                   escape, disabled, dt, opening, closing,
-                                   (cui_hover_handler){observer ? observed : NULL, &calls});
+    bool previous = state->open;
+    cui_hover_event_result result = cui_hover_update_events(
+        UINT64_C(0xfedcba9876543210), state, trigger, content, focus, escape, disabled, dt, opening,
+        closing, (cui_hover_handler){observer ? observed : NULL, &calls});
+    assert(result.changed == (previous != state->open));
+    assert(result.control_result == result.changed);
+    return result;
 }
 static void same_state(cui_hover_state a, cui_hover_state b) {
     assert(a.open == b.open && a.pending == b.pending && a.target == b.target &&
@@ -64,7 +68,7 @@ static void test_lifecycle(void) {
     r = update(&state, false, false, false, false, true, 0, 0, 0, true);
     assert(!r.control_result && !r.change_count && calls == 4);
     r = update(&state, true, false, false, false, false, 0, 0, 0, false);
-    assert(r.valid && r.control_result && !r.change_count && state.open && calls == 4);
+    assert(r.valid && r.changed && r.control_result && !r.change_count && state.open && calls == 4);
     r = update(&state, false, false, false, false, false, .2f, .3f, .2f, true);
     assert(r.control_result && r.change_count == 1 && calls == 5);
 }
@@ -98,11 +102,11 @@ static void test_validation_and_lifetime(void) {
     size_t count = calls;
     cui_hover_event_result r = cui_hover_update_events(0, &state, true, true, true, true, true, 10,
                                                        0, 0, (cui_hover_handler){observed, &calls});
-    assert(!r.valid && !r.control_result && !r.change_count);
+    assert(!r.valid && !r.changed && !r.control_result && !r.change_count);
     same_state(state, before);
     r = cui_hover_update_events(10, NULL, true, true, true, true, true, 10, 0, 0,
                                 (cui_hover_handler){observed, &calls});
-    assert(!r.valid && !r.control_result && !r.change_count && calls == count);
+    assert(!r.valid && !r.changed && !r.control_result && !r.change_count && calls == count);
     cui_hover_state *owned = calloc(1, sizeof(*owned));
     assert(owned);
     r = update(owned, true, false, false, false, false, 0, 0, 0, true);

@@ -20,6 +20,7 @@ typedef struct {
 } cui_hover_handler;
 typedef struct {
     bool valid, control_result, count_overflow;
+    bool changed;        /* Entry open differs from final open, independent of handler. */
     size_t change_count; /* Actual callbacks: zero or one; overflow always false. */
 } cui_hover_event_result;
 /* Additive pure Base policy; all existing timing and bool behavior is preserved.

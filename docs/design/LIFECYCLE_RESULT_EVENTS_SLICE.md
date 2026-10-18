@@ -291,9 +291,15 @@ order and borrowed lifetime. No platform desktop is needed for these tests.
 `cui_hover_events.h` now exposes `cui_hover_update_events`,
 `cui_hover_lifecycle_event` (`event, previous_open, open`), borrowed
 `cui_hover_handler` and `cui_hover_event_result` (`valid, control_result,
-count_overflow, change_count`). It preserves the pure reducer once, validates
+count_overflow, change_count, changed`). It preserves the pure reducer once, validates
 nonzero target/state before work and reports actual open transitions only.
 UNKNOWN metadata has no context/frame/index/source-presence/activation/reason.
 Disabled pure close is eligible notification. Read [HOVER_EVENTS](../HOVER_EVENTS.md)
 for examples, timing, copies and unsupported mutation. Styled names in this
 checkpoint remain proposals; no Core/overlay/virtual/message behavior changed.
+
+The unreleased Base result now has explicit `changed = previous_open != open`,
+independent of handler/count. Base `control_result` is the same legacy transition
+bool; future Styled `control_result` remains composition admission. Tests assert
+that absence of a handler does not erase the applied transition. Consumers rebuild
+for this additive unreleased layout change.

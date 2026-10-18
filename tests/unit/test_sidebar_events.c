@@ -495,18 +495,29 @@ static void test_nested(void) {
 }
 static cui_sidebar_collapse_request collapse_copies[16];
 static size_t collapse_calls, old_collapse_calls;
-static bool old_collapse_values[16], collapse_owner, toggle_compare, collapse_cancel;
+static bool old_collapse_values[16], collapse_owner, toggle_compare, collapse_consume_a11y,
+    collapse_cancel_claimed;
+static size_t claimed_cancel_attempts;
 static void old_collapse(bool value, void *user) {
     assert(user == &collapse_owner && old_collapse_calls < 16);
     old_collapse_values[old_collapse_calls++] = value;
     trace[trace_count++] = 6;
     collapse_owner = true; /* Deliberately differs from some requests. */
-    if (collapse_cancel) {
+    if (collapse_consume_a11y) {
         size_t n;
         (void)cui_frame_events(ui, &n);
         for (size_t i = 0; i < n; i++)
             if (cui_event_activation(ui, i) == 60)
-                cui_cancel_event_activation(ui, i);
+                assert(cui_consume_event(ui, i));
+    }
+    if (collapse_cancel_claimed) {
+        size_t n;
+        (void)cui_frame_events(ui, &n);
+        for (size_t i = 0; i < n; i++)
+            if (cui_event_activation(ui, i) == 60) {
+                assert(!cui_cancel_event_activation(ui, i));
+                claimed_cancel_attempts++;
+            }
     }
 }
 static void collapse_requested(void *user, const cui_sidebar_collapse_request *request) {
@@ -650,15 +661,22 @@ static void test_collapse(void) {
             assert(!result.activated && result.request_count == 0);
         }
         toggle_frame(styled != 0, false, true, 0, false, false);
-        collapse_cancel = true;
+        collapse_cancel_claimed = true;
+        claimed_cancel_attempts = 0;
         click(60, false);
         click(60, false);
         click(60, false);
         result = toggle_frame(styled != 0, false, true, 0, false, false);
+        assert(result.request_count == 3 && claimed_cancel_attempts >= 3);
+        collapse_cancel_claimed = false;
+        collapse_consume_a11y = true;
+        for (unsigned i = 0; i < 3; i++)
+            assert(cui_queue_accessibility_action(ui, 60, CUI_ACCESSIBILITY_ACTIVATE));
+        result = toggle_frame(styled != 0, false, true, 0, false, false);
         assert(result.activated && result.request_count == 1);
         assert(collapse_copies[collapse_calls - 1].event.flags &
                CUI_COMPONENT_EVENT_HAS_ACTIVATION);
-        collapse_cancel = false;
+        collapse_consume_a11y = false;
         assert(!cui_base_sidebar_toggle_events(ui, 0, (cui_sidebar_toggle_options){0},
                                                (cui_sidebar_collapse_handler){0})
                     .valid);

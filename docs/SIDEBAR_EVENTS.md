@@ -128,7 +128,10 @@ not notifications of confirmed owner changes; no collapse CHANGE is emitted.
 
 Genuine metadata is captured before the old callback. The original semantics
 `expanded = !options.collapsed` and the Styled icon/paint also retain the entry
-snapshot for that submission, even after an owner accepts or rejects. No silent
+snapshot for that submission, even after an owner accepts or rejects. The toggle
+has already claimed its same-ID mouse activations before callbacks;
+late explicit cancellation does not clear those claimed slots. Consuming an
+accessibility action still clears it, preserving existing Core behavior. No silent
 semantic/visual resynchronization, second reduction or aggregate reconstruction is
 introduced. The narrow permitted typed mutation is assignment of the external
 collapsed owner bool; active options/input/item storage and context teardown remain
@@ -137,8 +140,9 @@ unsupported. Handler/payload copies have the same lifetime rules below.
 Tests compare old/new local value sequences, aggregate bool and Styled command
 geometry/colors; prove legacy-then-typed ordering despite divergent owner writes,
 entry-snapshot semantics, repeated requests, pointer/touch/keyboard/genuine Button
-accessibility, missing handlers, disabled/inert/layout-only work, invalid arguments
-frozen current evidence after legacy cancellation of remaining inputs, and copied metadata after context destruction. Header/footer observers remain a
+accessibility, missing handlers, disabled/inert/layout-only work, invalid arguments,
+frozen current evidence after legacy consumption of accessibility activations, and
+copied metadata after context destruction. Header/footer observers remain a
 separate review slice.
 
 Handler, user and payload pointers are borrowed only during submission. Copying the

@@ -14,6 +14,10 @@ typedef struct {
     size_t count;
     cui_tree_expansion_change expansions[32];
     size_t expansion_count;
+    cui_tree_activation activations[32];
+    size_t activation_count;
+    char order[96];
+    size_t order_count;
     cui_draw_list draw;
     bool legacy, base, pre_submit, passive, inert, consume;
 } fixture;
@@ -25,6 +29,8 @@ static void selected(void *user, const cui_tree_selection_change *change) {
     assert(change->event.flags & CUI_COMPONENT_EVENT_HAS_FRAME);
     assert(change->event.flags & CUI_COMPONENT_EVENT_HAS_INDEX);
     f->changes[f->count++] = *change;
+    assert(f->order_count < sizeof f->order);
+    f->order[f->order_count++] = 'S';
 }
 static void expanded(void *user, const cui_tree_expansion_change *change) {
     fixture *f = user;
@@ -41,6 +47,18 @@ static void expanded(void *user, const cui_tree_expansion_change *change) {
             assert(sem[i].role != CUI_ROLE_TREE);
     }
     f->expansions[f->expansion_count++] = *change;
+    assert(f->order_count < sizeof f->order);
+    f->order[f->order_count++] = 'E';
+}
+static void activated(void *user, const cui_tree_activation *event) {
+    fixture *f = user;
+    assert(f->activation_count < 32 && event->event.target == 10);
+    assert(event->event.kind == CUI_COMPONENT_EVENT_ACTIVATE);
+    assert(f->selected == event->key && f->state.cursor == event->key);
+    assert(f->nodes[event->node_index].key == event->key);
+    f->activations[f->activation_count++] = *event;
+    assert(f->order_count < sizeof f->order);
+    f->order[f->order_count++] = 'A';
 }
 static cui_tree_event_result frame(fixture *f, bool observe) {
     assert(cui_begin_frame(f->ui, 500, 300, .016f));
@@ -53,6 +71,7 @@ static cui_tree_event_result frame(fixture *f, bool observe) {
     cui_theme t = cui_theme_light();
     cui_tree_handler handler = {.on_selection_change = observe ? selected : NULL,
                                 .on_expansion_change = observe ? expanded : NULL,
+                                .on_activate = observe ? activated : NULL,
                                 .user = f};
     if (f->pre_submit)
         out = cui_tree_reduce_events(f->ui, 10, f->model, &f->state, &f->selected, f->options,
@@ -298,6 +317,130 @@ static void expansion_accepted(void) {
     assert(f.expansions[0].event.target == 10);
     done(&f);
 }
+static void activation(bool base) {
+    fixture a, b;
+    init(&a, true, base);
+    init(&b, false, base);
+    click(&a, 4);
+    click(&b, 4);
+    click(&a, 4);
+    click(&b, 4);
+    cui_tree_event_result r = paired(&a, &b, true);
+    assert(r.selection_count == 1 && r.activation_count == 2 && r.result.activated == 4);
+    assert(b.order_count == 3 && !memcmp(b.order, "SAA", 3));
+    assert(b.activations[0].event.event_index == 1 && b.activations[1].event.event_index == 3);
+    assert(b.activations[0].event.source == CUI_COMPONENT_EVENT_SOURCE_POINTER);
+    assert(!(b.activations[0].event.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION));
+    click(&a, 2);
+    click(&b, 2);
+    click(&a, 4);
+    click(&b, 4);
+    r = paired(&a, &b, true);
+    assert(r.selection_count == 2 && !r.result.selection_changed && r.activation_count == 2);
+    assert(b.order_count == 7 && !memcmp(b.order + 3, "SASA", 4));
+    cui_focus(a.ui, cui_tree_row_id(10, 4));
+    cui_focus(b.ui, cui_tree_row_id(10, 4));
+    key(&a, CUI_KEY_ENTER);
+    key(&b, CUI_KEY_ENTER);
+    key(&a, CUI_KEY_ENTER);
+    key(&b, CUI_KEY_ENTER);
+    r = paired(&a, &b, true);
+    assert(r.activation_count == 2 && !r.selection_count);
+    assert(b.activations[4].event.source == CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+    key(&a, CUI_KEY_HOME);
+    key(&b, CUI_KEY_HOME);
+    r = paired(&a, &b, true);
+    assert(!r.activation_count && r.selection_count == 1);
+    /* Toggle invokes expansion only, never the row action. */
+    toggle(&a);
+    toggle(&b);
+    r = paired(&a, &b, true);
+    assert(r.expansion_count == 1 && !r.activation_count);
+    click(&a, 1);
+    click(&b, 1);
+    r = paired(&a, &b, false);
+    assert(r.result.activated == 1 && !r.activation_count);
+    a.options.disabled = b.options.disabled = true;
+    key(&a, CUI_KEY_ENTER);
+    key(&b, CUI_KEY_ENTER);
+    assert(!paired(&a, &b, true).activation_count);
+    a.options.disabled = b.options.disabled = false;
+    paired(&a, &b, true);
+    a.inert = b.inert = true;
+    key(&a, CUI_KEY_ENTER);
+    key(&b, CUI_KEY_ENTER);
+    assert(!paired(&a, &b, true).activation_count);
+    a.inert = b.inert = false;
+    a.passive = b.passive = true;
+    key(&a, CUI_KEY_ENTER);
+    key(&b, CUI_KEY_ENTER);
+    assert(!paired(&a, &b, true).activation_count);
+    cui_tree_activation copy = b.activations[0];
+    done(&a);
+    done(&b);
+    assert(copy.key == 4 && copy.event.target == 10);
+}
+static void activation_accepted(void) {
+    fixture f;
+    init(&f, false, false);
+    f.pre_submit = true;
+    click(&f, 4);
+    cui_tree_event_result r = frame(&f, true);
+    assert(r.selection_count == 1 && r.activation_count == 1);
+    assert(f.activations[0].event.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION);
+    assert(f.activations[0].event.activation.target == cui_tree_row_id(10, 4));
+    assert(f.changes[0].event.activation.target == f.activations[0].event.activation.target);
+    assert(f.changes[0].event.event_index == f.activations[0].event.event_index);
+    done(&f);
+}
+static void accessibility(void) {
+    fixture f;
+    init(&f, false, false);
+    assert(!cui_accessibility_action_supported(f.ui, cui_tree_row_id(10, 4),
+                                               CUI_ACCESSIBILITY_ACTIVATE));
+    assert(
+        !cui_queue_accessibility_action(f.ui, cui_tree_row_id(10, 4), CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_last_error(f.ui) == CUI_ERROR_INVALID_ACTION);
+    assert(!f.activation_count && !f.count);
+    done(&f);
+    init(&f, false, false);
+    /* Button toggle is supported; legitimate submit-before-reduce provides evidence. */
+    assert(cui_accessibility_action_supported(f.ui, cui_tree_toggle_id(10, 1),
+                                              CUI_ACCESSIBILITY_ACTIVATE));
+    f.pre_submit = true;
+    assert(cui_queue_accessibility_action(f.ui, cui_tree_toggle_id(10, 1),
+                                          CUI_ACCESSIBILITY_ACTIVATE));
+    cui_tree_event_result r = frame(&f, true);
+    assert(r.expansion_count == 1 && !r.activation_count);
+    assert(f.expansions[0].event.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
+    assert(f.expansions[0].event.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION);
+    assert(f.expansions[0].event.activation.target == cui_tree_toggle_id(10, 1));
+    done(&f);
+}
+static void stable_keys(void) {
+    fixture a, b;
+    init(&a, true, false);
+    init(&b, false, false);
+    cui_tree_node temp = a.nodes[1];
+    a.nodes[1] = a.nodes[3];
+    a.nodes[3] = temp;
+    temp = b.nodes[1];
+    b.nodes[1] = b.nodes[3];
+    b.nodes[3] = temp;
+    assert(cui_tree_rebuild(a.model, a.nodes, a.expanded, 5) == CUI_TREE_OK);
+    assert(cui_tree_rebuild(b.model, b.nodes, b.expanded, 5) == CUI_TREE_OK);
+    paired(&a, &b, true); /* idle model change emits nothing */
+    key(&a, CUI_KEY_DOWN);
+    key(&b, CUI_KEY_DOWN);
+    cui_tree_event_result r = paired(&a, &b, true);
+    assert(r.selection_count == 1 && b.changes[0].value == 4 && b.changes[0].node_index == 1);
+    assert(cui_tree_set_expanded(a.model, 1, false) && cui_tree_set_expanded(b.model, 1, false));
+    r = paired(&a, &b, true); /* hidden selection stays, cursor repairs without selection change */
+    assert(!r.selection_count && !r.expansion_count && !r.activation_count && b.selected == 4);
+    assert(b.state.cursor == 1);
+    done(&a);
+    done(&b);
+}
 static void admission(void) {
     fixture f;
     init(&f, false, false);
@@ -317,5 +460,10 @@ int main(void) {
     expansion(false);
     expansion(true);
     expansion_accepted();
+    activation(false);
+    activation(true);
+    activation_accepted();
+    accessibility();
+    stable_keys();
     return 0;
 }

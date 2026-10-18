@@ -66,3 +66,26 @@ Do not assume updated mappings on failure. Existing valid-data/lifetime precondi
 still apply; observer callbacks cannot edit the borrowed model or expanded array.
 Toggle-origin activation evidence, when available, retains its toggle ID; Left/Right
 navigation has actual keyboard/index evidence without manufactured activation.
+
+## Row activation
+
+Set `handler.on_activate` for `cui_tree_activation`. Each existing row-invocation
+branch emits ACTIVATE after selected/cursor/legacy `activated` are assigned,
+including an already-selected row. Any selection CHANGE precedes it and shares the
+same frozen originating evidence. `activation_count` records actual callback count;
+legacy `result.activated` still retains only the last key. A toggle expands without
+invoking the row; navigation, search, repair and scrolling do not invent invocation.
+Missing activation observer preserves the old action/result. All counts independently
+saturate at SIZE_MAX and share `count_overflow`.
+
+Current Core does not offer accessibility ACTIVATE for TREEITEM roles; querying
+support returns false and queuing it is rejected. This facade does not change that.
+Branch toggles have Button semantics and can support accessibility activation;
+the submit-before-reduce-only composition can provide accepted copied evidence.
+Normal Tree remains reduce-before-submit; this guide makes no new accessibility
+routing guarantee for it. Existing focus/navigation semantics stay unchanged.
+
+No move, rename, context-menu, async-load or rejectable expansion hook is added.
+Those are separate owner operations. C bridge and Python/JS/TS/Go/Rust continue to
+use their existing aggregate/net-change paths; they do not acquire per-transition
+C callbacks or row-activation forwarding from this header.

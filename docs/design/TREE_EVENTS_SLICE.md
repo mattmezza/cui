@@ -196,3 +196,12 @@ The second approved slice adds per-applied-bool expansion notifications after th
 existing setter/rebuild attempt, preserving all aggregate flags and later consume,
 focus and semantic work. Programmatic setter/rebuild calls remain unobserved.
 Activation observers remain pending their independent commit.
+
+## Activation implementation checkpoint
+
+The third approved slice adds every existing row invocation after its original
+selected/cursor/result assignments, with selection CHANGE first when applicable.
+All three hooks reuse evidence frozen before writes; only the activation copy's
+kind changes. Legacy last-activated result and mutation/consume/paint order remain.
+Current Core TREEITEM accessibility ACTIVATE is unsupported/rejected; Button toggle
+activation is separately supported. This slice does not alter that routing contract.

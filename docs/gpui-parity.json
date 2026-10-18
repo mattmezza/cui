@@ -1090,7 +1090,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Themed title/description layout and named semantic snapshot tested. Media/icon/action slots and complete upstream audit pending.",
+        "Themed title/description layout and named semantic snapshot tested. Named media/title/description/content/appended slots and native child actions are covered; complete upstream visual/style audit remains pending.",
         "Named header/media/title/description/content/appended child slots now work with native controls; this does not establish complete visual/style parity."
       ],
       "owner": "integrator",
@@ -1098,8 +1098,14 @@
       "features": [
         {
           "name": "title/description/media/action slots",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_empty_source.c",
+            "docs/EMPTY.md"
+          ],
+          "limitations": [
+            "Named optional slots and callback/native child actions are covered; dashed borders, paragraph alignment and general inherited style parity remain incomplete."
+          ]
         },
         {
           "name": "themed layout",
@@ -1572,7 +1578,12 @@
         {
           "name": "grouped shortcut rendering",
           "status": "not_started",
-          "evidence": []
+          "evidence": [
+            "tests/unit/test_content.c"
+          ],
+          "limitations": [
+            "Pinned Kbd models one Keystroke and host Action binding lookup (crates/component/src/kbd.rs); the original grouped-shortcut wording has no mapped multi-shortcut API contract. CUI formats one chord; grouped composition and host binding lookup are not established by modifier-format tests."
+          ]
         },
         {
           "name": "accessible description",
@@ -2509,7 +2520,12 @@
         {
           "name": "loading semantics",
           "status": "not_started",
-          "evidence": []
+          "evidence": [
+            "tests/unit/test_status_motion.c"
+          ],
+          "limitations": [
+            "The pinned source Skeleton is decorative and has no loading boolean, status role or busy relationship (crates/component/src/skeleton.rs). Extended CUI skeleton intentionally emits no semantics, asserted by tests/unit/test_status_motion.c; applications own loading announcements. This original row is retained as a scope clarification, not an unimplemented upstream loading API."
+          ]
         },
         {
           "name": "theme/motion states",
@@ -3235,8 +3251,13 @@
       "features": [
         {
           "name": "filter/single/multiple selection",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_choice.c"
+          ],
+          "limitations": [
+            "Filtering is ASCII-insensitive over caller-owned items; remote data, Unicode case folding and complete IME/grapheme editing remain incomplete."
+          ]
         },
         {
           "name": "active descendant and keyboard",
@@ -4257,8 +4278,13 @@
         },
         {
           "name": "controlled value and semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_components.c"
+          ],
+          "limitations": [
+            "Controlled scalar value, semantic range/value and keyboard updates are covered; complete native accessibility delivery and broader geometry/touch variants are not established."
+          ]
         },
         {
           "name": "disabled/theme variants",
@@ -5468,15 +5494,21 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling and pinned footer composition are tested. Automatic root overlay management, body scrollbar/focus reveal, custom part styles/backdrop, exact default margins and animated transitions remain pending."
+        "Partial surface behavior; see docs/SURFACES.md. Nested focus, validated deferred close, resize, measured wheel scrolling, pinned footer composition, explicit four-edge transitions and reduced-motion snapping are tested. Automatic root integration details, focus reveal, custom part styles/backdrop and exact source defaults remain incomplete."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "edge placement and transition",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/SURFACES.md"
+          ],
+          "limitations": [
+            "All four edges, explicit-duration entry/exit, close timing and reversal are covered. Default zero duration is immediate; complete source transition/style parity is not claimed."
+          ]
         },
         {
           "name": "focus trap/restore/dismissal",
@@ -5488,8 +5520,14 @@
         },
         {
           "name": "theme/reduced motion",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_surface.c",
+            "docs/SURFACES.md"
+          ],
+          "limitations": [
+            "Themed composition and explicit reduced-motion entry/exit snapping are covered; automatic physical OS reduced-motion observation and complete part styling remain unverified."
+          ]
         },
         {
           "name": "four edge placement and themed header close",
@@ -6531,8 +6569,14 @@
       "features": [
         {
           "name": "column models/sort/resize/pinning",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c",
+            "tests/unit/test_table_selection_contracts.c"
+          ],
+          "limitations": [
+            "Controlled keyed columns, sort, pointer/keyboard resize/reorder and pinned-left geometry are covered; full source defaults, arbitrary pinning and exact palette/spacing remain incomplete."
+          ]
         },
         {
           "name": "cell/row selection keyboard and mouse",
@@ -6549,7 +6593,12 @@
         {
           "name": "header/footer/table semantics",
           "status": "not_started",
-          "evidence": []
+          "evidence": [
+            "tests/unit/test_table.c"
+          ],
+          "limitations": [
+            "DataTable header/table and row-header semantics have scoped coverage in tests/unit/test_table.c. Its static Table footer fixture does not establish a dedicated DataTable footer contract; this bundled feature remains incomplete."
+          ]
         },
         {
           "name": "independent headless reducers and actual themed rendering",
@@ -6754,20 +6803,29 @@
       },
       "limitations": [
         "Real themed rows/cells, static header/body/footer sections, captions and validated spans plus associated data-table behavior tested. Exhaustive alignment/sizing/style composition and complete upstream scope remain pending.",
-        "Append-only named/indexed checked Table parts and all14 design row/cell sizes tested; child typography remains host-owned. DataTable source Desc/Asc/Default cycle is opt-in with legacy Asc-first preserved; selection-only opt-outs retain sort/resize/custom action activation and controlled stable keys. Exact edge padding, span metadata, dedicated source palette and axis-specific scrollbar projection remain incomplete. See TABLE_BEHAVIOR.md."
+        "Append-only named/indexed checked Table parts and all14 design row/cell sizes tested; child typography remains host-owned. DataTable source Desc/Asc/Default cycle is opt-in with legacy Asc-first preserved; selection-only opt-outs retain sort/resize/custom action activation and controlled stable keys. Exact edge padding, span metadata, dedicated source palette and axis-specific scrollbar projection remain incomplete. See TABLE_BEHAVIOR.md.",
+        "Static Table semantic composition is tested independently. Shared DataTable selection/sort/resize tests do not establish interactive static Table controls; the original interactive row remains unpromoted, and upstream static Table explicitly has no column management."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "semantic row/column/header/footer",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_table.c"
+          ],
+          "limitations": [
+            "Actual static Table composition asserts table, rowgroup, row, columnheader, cell and caption roles, footer name and layout across four themes. Complete parent/index/span metadata and native accessibility delivery are not established."
+          ]
         },
         {
           "name": "selection/sorting/resizing",
           "status": "not_started",
-          "evidence": []
+          "evidence": [],
+          "limitations": [
+            "The pinned static Table is stateless composition without column management (crates/component/src/table/table.rs). Shared DataTable reducer tests do not establish interactive static Table controls; this original row is retained without promotion pending explicit scope reconciliation."
+          ]
         },
         {
           "name": "themed cells and keyboard behavior",

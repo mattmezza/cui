@@ -663,12 +663,28 @@ static void static_tables(void) {
                cui_bounds(ui, 13).y == 96);
         size_t n;
         const cui_semantic *sem = cui_semantics(ui, &n);
-        for (size_t j = 0; j < n; j++)
-            if (sem[j].id == 2)
-                assert(sem[j].role == CUI_ROLE_ROWGROUP && sem[j].tab_index == -1);
-            else if (sem[j].id == 4)
-                assert(sem[j].role == CUI_ROLE_COLUMNHEADER && sem[j].details.readonly &&
-                       sem[j].tab_index == -1);
+        /* Exercise static Table composition itself, independently of DataTable's reducer. */
+        const cui_id ids[] = {1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13};
+        const cui_role roles[] = {CUI_ROLE_TABLE,        CUI_ROLE_ROWGROUP,     CUI_ROLE_ROW,
+                                  CUI_ROLE_COLUMNHEADER, CUI_ROLE_COLUMNHEADER, CUI_ROLE_ROWGROUP,
+                                  CUI_ROLE_ROW,          CUI_ROLE_CELL,         CUI_ROLE_ROWGROUP,
+                                  CUI_ROLE_ROW,          CUI_ROLE_CELL,         CUI_ROLE_LABEL};
+        for (size_t part = 0; part < sizeof ids / sizeof ids[0]; part++) {
+            unsigned found = 0;
+            for (size_t j = 0; j < n; j++) {
+                if (sem[j].id != ids[part])
+                    continue;
+                ++found;
+                assert(sem[j].role == roles[part] && sem[j].tab_index == -1);
+                if (sem[j].id == 4 || sem[j].id == 5)
+                    assert(sem[j].details.readonly);
+                if (sem[j].id == 10)
+                    assert(sem[j].name.length == sizeof("Table footer") - 1 &&
+                           !memcmp(sem[j].name.data, "Table footer", sizeof("Table footer") - 1));
+            }
+            assert(found == 1);
+        }
+        assert(cui_bounds(ui, 12).y == 64 && cui_bounds(ui, 12).w == 200);
         bool header = false;
         for (size_t j = 0; j < list.count; j++)
             if (list.commands[j].type == CUI_DRAW_RECT && list.commands[j].bounds.y == 0 &&

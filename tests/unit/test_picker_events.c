@@ -103,7 +103,13 @@ static void equal(fixture *a, fixture *b, cui_calendar_result x, cui_calendar_re
     assert(x.changed == y.changed && x.activated == y.activated && x.navigated == y.navigated);
     assert(!cui_date_compare(a->selection.start, b->selection.start));
     assert(!cui_date_compare(a->selection.end, b->selection.end));
-    assert(!memcmp(&a->state, &b->state, sizeof a->state));
+    /* Struct padding is unspecified after assignments, including calendar init. */
+    assert(!cui_date_compare(a->state.month, b->state.month));
+    assert(!cui_date_compare(a->state.cursor, b->state.cursor));
+    assert(a->state.selecting_end == b->state.selecting_end && a->state.view == b->state.view);
+    assert(a->state.year_page == b->state.year_page &&
+           a->state.year_cursor == b->state.year_cursor &&
+           a->state.month_cursor == b->state.month_cursor);
     assert(a->policy_calls == b->policy_calls && cui_focused(a->ui) == cui_focused(b->ui));
     assert(a->draw.count == b->draw.count);
     for (size_t i = 0; i < a->draw.count; ++i) {

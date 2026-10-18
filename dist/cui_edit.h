@@ -4324,6 +4324,9 @@ static size_t cui_edit_private_line_end(cui_edit *e, size_t p) {
         p = cui_edit_private_next(e, p);
     return p;
 }
+static bool cui_edit_private_boundary_valid(cui_str text, size_t at);
+static size_t cui_edit_private_previous_valid(cui_str text, size_t at);
+static size_t cui_edit_private_next_valid(cui_str text, size_t at);
 cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
     if (cui_edit_private_callback_guard(e))
         return CUI_EDIT_INVALID_ARGUMENT;
@@ -4344,9 +4347,10 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
              (m == CUI_EDIT_GRAPHEME_PREVIOUS || m == CUI_EDIT_GRAPHEME_NEXT)) {
         p = m == CUI_EDIT_GRAPHEME_PREVIOUS ? (e->anchor < p ? e->anchor : p)
                                             : (e->anchor > p ? e->anchor : p);
-        if (!cui_grapheme_boundary(cui_edit_get_text(e), p))
-            p = m == CUI_EDIT_GRAPHEME_PREVIOUS ? cui_grapheme_previous(cui_edit_get_text(e), p)
-                                                : cui_grapheme_next(cui_edit_get_text(e), p);
+        if (!cui_edit_private_boundary_valid(cui_edit_get_text(e), p))
+            p = m == CUI_EDIT_GRAPHEME_PREVIOUS
+                    ? cui_edit_private_previous_valid(cui_edit_get_text(e), p)
+                    : cui_edit_private_next_valid(cui_edit_get_text(e), p);
     } else
         switch (m) {
         case CUI_EDIT_PREVIOUS:
@@ -4356,10 +4360,10 @@ cui_edit_result cui_edit_move(cui_edit *e, cui_edit_motion m, bool extend) {
             p = cui_edit_private_next(e, p);
             break;
         case CUI_EDIT_GRAPHEME_PREVIOUS:
-            p = cui_grapheme_previous(cui_edit_get_text(e), p);
+            p = cui_edit_private_previous_valid(cui_edit_get_text(e), p);
             break;
         case CUI_EDIT_GRAPHEME_NEXT:
-            p = cui_grapheme_next(cui_edit_get_text(e), p);
+            p = cui_edit_private_next_valid(cui_edit_get_text(e), p);
             break;
         case CUI_EDIT_UNICODE_WORD_PREVIOUS:
             p = e->masked_words ? 0 : cui_edit_private_unicode_word_previous(e, p);

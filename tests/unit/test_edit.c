@@ -413,8 +413,8 @@ static void test_model_grapheme_motion(void) {
         memcpy(buffer, "ab\n", 3);
         memcpy(buffer + 3, grapheme_cases[i].text, length);
         memcpy(buffer + 3 + length, "xy", 3);
-        cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-            .capacity = sizeof buffer, .multiline = true});
+        cui_edit *edit = cui_edit_create(
+            (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
         assert(edit);
         cui_str text = cui_edit_get_text(edit);
         for (size_t offset = 0; offset <= text.length; ++offset) {
@@ -434,8 +434,8 @@ static void test_model_grapheme_motion(void) {
     }
     /* Collapsing a scalar selection inside CRLF snaps to the outer cluster. */
     char buffer[] = "ab\r\ncd";
-    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-        .capacity = sizeof buffer, .multiline = true});
+    cui_edit *edit = cui_edit_create(
+        (cui_edit_config){.buffer = buffer, .capacity = sizeof buffer, .multiline = true});
     assert(edit && cui_edit_select(edit, 3, 5) == CUI_EDIT_OK);
     assert(cui_edit_move(edit, CUI_EDIT_GRAPHEME_PREVIOUS, false) == CUI_EDIT_OK);
     assert(cui_edit_get_state(edit).cursor == 2);

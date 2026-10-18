@@ -46,7 +46,9 @@ Choose **Fetch URL** to perform the network request. No request starts at launch
 The URL is a command-line value, not a new Input callback API. The example
 accepts printable ASCII HTTPS URLs up to 2048 bytes (percent-encode other bytes).
 A success displays received byte count/HTTP status; binary response data is not
-passed to CUI as unvalidated UTF-8. Failure displays an error and allows retry.
+passed to CUI as unvalidated UTF-8. Failure, including a response exceeding the body limit, displays an error and
+labels the action **Retry fetch**. Retrying an oversized response may fail again
+unless the server returns a smaller body.
 The retry button uses the same existing synchronous handler as initial fetch.
 Cancel invalidates the request generation and enables a subsequent attempt.
 If the single pending job slot is still occupied, the UI reports busy and the
@@ -128,11 +130,21 @@ completion pushes an SDL user event; the next UI frame drains the mailbox and
 renders the result. No event watch/filter renders, applies state or calls CUI.
 SDL documents `SDL_PushEvent` as thread-safe, but it can fail if filtered or its
 queue is full. This host installs no filter and leaves the registered event
-enabled. Failed pushes are counted by `af_worker_wake_failures`; results remain
-queued for the next UI event/drain. This sample does not promise delivery through
-an externally installed rejecting event filter, nor does it introduce a hidden
-heartbeat/thread to work around one. A host that adds filters must preserve its
-completion event. Queue-full traffic itself provides events to wake the loop.
+enabled. On a failed push, the worker retries twice after condition-variable
+waits of 10 ms and 20 ms (three total attempts). Shutdown interrupts these waits;
+this adds no UI polling, heartbeat or extra thread. Failed attempts are counted
+by `af_worker_wake_failures`. A transient failure can therefore recover without
+user input; the offline SDL test injects exactly this case while Core is idle.
+The delays are configured waits, not a wall-clock scheduling guarantee.
+
+If all three attempts fail, the completion remains queued for the next UI event
+and drain. **There is no unconditional idle-wake guarantee after persistent SDL
+rejection.** The UI cannot inspect failure counters while asleep, and this sample
+has no independent fallback timer. A host that adds filters must preserve the
+completion event. Queue-full traffic provides other events to wake the loop,
+but a permanently rejecting filter or failed SDL event subsystem cannot be
+bypassed by retries. Replacing the wake implementation with one that silently
+drops events violates the host's notification contract.
 
 Authoritative behavior references:
 [SDL_PushEvent](https://wiki.libsdl.org/SDL3/SDL_PushEvent),
@@ -159,6 +171,9 @@ to their documented roles; no new Core dependency is introduced.
   worker; a loading frame reaches Core idle before completion is released;
   the real SDL user event wakes the callback runner and the UI applies/renders
   completion. Saves `async-fetch-smoke.bmp` and checks visible text pixels.
+- `async_fetch_sdl_wake_retry`: suppresses the first notification attempt, then
+  verifies retry wakes the idle actual SDL runner, applies the retained result
+  on the UI thread and reports exactly one failed/two total wake attempts.
 - `async_fetch_sdl_pending_shutdown`: closes the actual host while its injected
   transport is blocked, then verifies cancellation/worker return before host
   teardown. All native tests use private Xvfb through the repository wrapper.

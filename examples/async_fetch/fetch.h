@@ -21,6 +21,9 @@ typedef bool (*af_cancel_fn)(void *);
  * Transport/user and wake/user remain alive until worker_destroy has joined.
  * A transport must return in bounded time or cooperate with cancellation. */
 typedef void (*af_transport_fn)(void *, const char *, af_cancel_fn, void *, af_result *);
+/* Notification must return promptly. Worker retries failure up to three total
+ * attempts (10/20 ms interruptible waits); persistent failure retains output
+ * until an independent host event drains it. No unconditional wake guarantee. */
 typedef bool (*af_wake_fn)(void *);
 typedef struct af_worker af_worker;
 af_worker *af_worker_create(af_transport_fn, void *, af_wake_fn, void *);

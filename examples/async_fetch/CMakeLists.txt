@@ -60,6 +60,8 @@ if(AF_BUILD_UI)
   add_test(NAME async_fetch_sdl COMMAND cui_async_fetch --offline-smoke --font "${AF_TEST_FONT}"
     --capture "${CMAKE_CURRENT_BINARY_DIR}/async-fetch-smoke.bmp")
   set_tests_properties(async_fetch_sdl PROPERTIES TIMEOUT 25)
+  add_test(NAME async_fetch_sdl_wake_retry COMMAND cui_async_fetch --offline-wake-failure --font "${AF_TEST_FONT}")
+  set_tests_properties(async_fetch_sdl_wake_retry PROPERTIES TIMEOUT 25)
   add_test(NAME async_fetch_sdl_pending_shutdown COMMAND cui_async_fetch --offline-close-pending --font "${AF_TEST_FONT}")
   set_tests_properties(async_fetch_sdl_pending_shutdown PROPERTIES TIMEOUT 25)
  endif()

@@ -10,7 +10,7 @@ typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t changed;
     pthread_t ui;
-    unsigned entered, exited, wakes, observed_cancel;
+    unsigned entered, exited, wakes, observed_cancel, fail_first_wakes;
     bool release[16], cooperate, fail_wake;
     af_status status[16];
     char urls[16][AF_URL_MAX+1];
@@ -46,7 +46,7 @@ static void transport(void *user, const char *url, af_cancel_fn cancel, void *to
 }
 static bool wake(void *user) {
     fixture *f=user; assert(!pthread_equal(f->ui,pthread_self()));
-    pthread_mutex_lock(&f->mutex); ++f->wakes; bool success=!f->fail_wake;
+    pthread_mutex_lock(&f->mutex); ++f->wakes; bool success=!f->fail_wake && f->wakes>f->fail_first_wakes;
     pthread_cond_broadcast(&f->changed); pthread_mutex_unlock(&f->mutex); return success;
 }
 static void wait_count(fixture *f, unsigned *counter, unsigned desired) {
@@ -147,6 +147,24 @@ static void bounded_mailbox(void) {
      * wake it, discard unpublished output, and join without UI draining. */
     af_worker_destroy(w); assert(f.wakes==2); finish(&f);
 }
+static void transient_wake_failure(void) {
+    fixture f; init(&f); f.fail_first_wakes=1;
+    af_worker *w=af_worker_create(transport,&f,wake,&f); assert(w);
+    af_model m; af_model_init(&m);
+    assert(af_model_start(&m,w,"https://example.invalid/retry-wake")==AF_STARTED);
+    wait_count(&f,&f.entered,1); release(&f,0); wait_count(&f,&f.wakes,2);
+    assert(af_worker_wake_failures(w)==1);
+    assert(af_model_drain(&m,w)==1 && m.applied==1 && !m.loading);
+    af_worker_destroy(w); finish(&f);
+}
+static void shutdown_during_wake_retry(void) {
+    fixture f; init(&f); f.fail_wake=true;
+    af_worker *w=af_worker_create(transport,&f,wake,&f); assert(w);
+    assert(af_worker_submit(w,"https://example.invalid/stop-retry",1));
+    wait_count(&f,&f.entered,1); release(&f,0); wait_count(&f,&f.wakes,1);
+    af_worker_destroy(w); /* Stop also wakes any notification-delay wait. */
+    assert(f.wakes>=1 && f.wakes<=3 && f.exited==1); finish(&f);
+}
 static void pending_and_wake_failure(void) {
     fixture f; init(&f); f.fail_wake=true; f.status[0]=AF_TOO_LARGE;
     af_worker *w=af_worker_create(transport,&f,wake,&f); assert(w);
@@ -156,7 +174,7 @@ static void pending_and_wake_failure(void) {
     assert(!af_worker_submit(w,"https://example.invalid/full",3));
     release(&f,0); wait_count(&f,&f.entered,2);
     assert(!strcmp(f.urls[1],"https://example.invalid/pending"));
-    release(&f,1); wait_count(&f,&f.wakes,2);
+    release(&f,1); wait_count(&f,&f.wakes,6);
     af_result r; assert(af_worker_take(w,&r) && r.status==AF_TOO_LARGE && r.size==0);
     assert(af_worker_take(w,&r) && r.generation==2);
     /* Wake failure does not discard mailbox output. Take retries are bounded. */
@@ -164,6 +182,6 @@ static void pending_and_wake_failure(void) {
     af_worker_destroy(w); finish(&f);
 }
 int main(void) {
-    basic(); stale(); cancel_and_shutdown(); queued_shutdown(); bounded_mailbox(); pending_and_wake_failure();
+    basic(); stale(); cancel_and_shutdown(); queued_shutdown(); bounded_mailbox(); transient_wake_failure(); shutdown_during_wake_retry(); pending_and_wake_failure();
     puts("PASS async worker: owned bounded jobs/results, cancellation, stale delivery, join and UI thread"); return 0;
 }

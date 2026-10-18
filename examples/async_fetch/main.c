@@ -20,9 +20,9 @@ typedef struct {
     af_model model;
     char url[AF_URL_MAX+1];
     const char *capture;
-    bool offline, curl_ready, idle_observed, close_pending, quit_error;
+    bool offline, curl_ready, idle_observed, close_pending, quit_error, fail_first_wake;
     atomic_bool release_offline;
-    atomic_uint wake_calls, offline_started, offline_finished;
+    atomic_uint wake_calls, wake_attempts, offline_started, offline_finished;
     atomic_bool offline_cancelled;
     Uint32 wake_type;
     unsigned stage, clicks;
@@ -31,6 +31,8 @@ typedef struct {
 } application;
 static bool wake_ui(void *user) {
     application *a=user;
+    unsigned attempt=atomic_fetch_add(&a->wake_attempts,1);
+    if (a->fail_first_wake && !attempt) return false; /* Offline failure injection. */
     SDL_Event event={.type=a->wake_type}; /* No pointer payload or CUI call. */
     /* Publish the observation before the event: UI dispatch may beat the
      * return from SDL_PushEvent on the producer thread. */
@@ -64,6 +66,7 @@ static void cancel_clicked(void *user) {
 static bool initialize(void *user, int argc, char **argv, cui_sdl3 **host, cui_context **ui) {
     application *a=user; const char *font=NULL, *url="https://example.com/";
     atomic_init(&a->release_offline,false); atomic_init(&a->wake_calls,0);
+    atomic_init(&a->wake_attempts,0);
     atomic_init(&a->offline_started,0); atomic_init(&a->offline_finished,0);
     atomic_init(&a->offline_cancelled,false);
     for (int i=1;i<argc;++i) {
@@ -71,6 +74,7 @@ static bool initialize(void *user, int argc, char **argv, cui_sdl3 **host, cui_c
         else if (!strcmp(argv[i],"--url") && i+1<argc) url=argv[++i];
         else if (!strcmp(argv[i],"--capture") && i+1<argc) a->capture=argv[++i];
         else if (!strcmp(argv[i],"--offline-smoke")) a->offline=true;
+        else if (!strcmp(argv[i],"--offline-wake-failure")) { a->offline=true; a->fail_first_wake=true; }
         else if (!strcmp(argv[i],"--offline-close-pending")) { a->offline=true; a->close_pending=true; }
         else { fprintf(stderr,"Usage: async_fetch --font PATH [--url HTTPS_URL] [--offline-smoke --capture BMP]\n"); return false; }
     }
@@ -117,7 +121,7 @@ static int frame(void *user, cui_sdl3 *host, cui_context *ui) {
     cui_text(ui,cui_string("Fetch without blocking the UI"),24,theme.text);
     cui_text(ui,cui_string(a->url),14,theme.text);
     cui_begin_box(ui,2,(cui_box){.row=true,.gap=12});
-    const char *button=a->model.result.status==AF_FAILURE ? "Retry fetch" : "Fetch URL";
+    const char *button=(a->model.result.status==AF_FAILURE || a->model.result.status==AF_TOO_LARGE) ? "Retry fetch" : "Fetch URL";
     (void)cui_button_ex(ui,10,&theme,cui_string(button),(cui_button_options){
         .disabled=a->model.loading,.on_click=fetch_clicked,.action_user=a,.state=&a->fetch_button});
     (void)cui_button_ex(ui,11,&theme,cui_string("Cancel"),(cui_button_options){
@@ -142,6 +146,8 @@ static int frame(void *user, cui_sdl3 *host, cui_context *ui) {
     if (!a->offline) return 0;
     if (done) {
         if (!a->idle_observed || a->clicks!=1 || atomic_load(&a->wake_calls)!=1 ||
+            af_worker_wake_failures(a->worker)!=(a->fail_first_wake ? 1u : 0u) ||
+            atomic_load(&a->wake_attempts)!=(a->fail_first_wake ? 2u : 1u) ||
             a->model.result.status!=AF_SUCCESS || (a->capture && !capture_pixels(a->capture))) return -1;
         puts("PASS actual button enqueue, visible loading, idle SDL wake, UI-thread completion and pixels"); return 1;
     }

@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: MIT */
+#define _POSIX_C_SOURCE 200809L
 #include "fetch.h"
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <errno.h>
 struct af_worker {
     pthread_t thread;
     pthread_mutex_t mutex;
@@ -35,6 +38,27 @@ static bool valid_url(const char *url, size_t *length) {
     *length = n;
     return true;
 }
+/* Retry transient notification failure without polling the UI or allocating a
+ * timer/thread. Stop interrupts these condition-variable delays. Persistent
+ * rejection still requires an independent UI event; no wake API can bypass it. */
+static void notify(af_worker *w) {
+    for (unsigned attempt=0;attempt<3;++attempt) {
+        if (atomic_load(&w->stopping)) return;
+        if (w->wake(w->wake_user)) return;
+        atomic_fetch_add(&w->wake_failures,1);
+        if (attempt==2) return;
+        struct timespec until;
+        if (clock_gettime(CLOCK_REALTIME,&until)) return;
+        until.tv_nsec+=(long)(attempt+1)*10000000;
+        if (until.tv_nsec>=1000000000) { ++until.tv_sec; until.tv_nsec-=1000000000; }
+        pthread_mutex_lock(&w->mutex);
+        int rc=0;
+        while (!atomic_load(&w->stopping) && rc==0)
+            rc=pthread_cond_timedwait(&w->changed,&w->mutex,&until);
+        pthread_mutex_unlock(&w->mutex);
+        if (rc && rc!=ETIMEDOUT) return;
+    }
+}
 static void *work(void *user) {
     af_worker *w = user;
     for (;;) {
@@ -57,7 +81,7 @@ static void *work(void *user) {
         w->completions[(w->head+w->count)%AF_COMPLETIONS]=result; ++w->count;
         pthread_mutex_unlock(&w->mutex);
         /* Notification only: never call CUI or mutate the UI model here. */
-        if (!w->wake(w->wake_user)) atomic_fetch_add(&w->wake_failures,1);
+        notify(w);
     }
     return NULL;
 }

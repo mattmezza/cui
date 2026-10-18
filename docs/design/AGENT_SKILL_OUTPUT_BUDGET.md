@@ -1,9 +1,11 @@
 # Consumer skill output budget proposal
 
-Status: audit and proposal only. **Implement after the overall component-event API
-change lands**, as explicitly requested by the user. Rebase this audit against
-that result before choosing event examples or editing skill scripts. This document
-does not change CLI behavior, generated resources, or public component APIs.
+Status: the presentation slice is implemented by `6ac3e2eb`, after the component-event
+implementation batch. The historical audit/proposals below explain its constraints;
+current CLI/SKILL instructions are authoritative. Human summaries preserve all canonical
+limitations; JSON and complete reads retain their previous shape/content. Exact ATX
+section retrieval is explicitly partial; arbitrary line slicing remains deferred.
+Final integrated validation and publication remain separate gates.
 
 ## Evidence and reproducibility
 
@@ -577,3 +579,26 @@ generator or generated resources changed, and no build/native/browser test ran.
 After Scroll/API completion and root approval, implement these bounded selectors
 with semantic tests, preserve old JSON/full reads, and rerun the measured flows
 against frozen bundled/live/packaged sources before claiming savings.
+
+## Implemented measurement and independent consumer check
+
+Worker commit `e24382143b37241a8e983dadc434572703326fc6`, integrated as
+`6ac3e2eb`, passed 16 semantic tests via the private-display wrapper. Frozen bundled
+and live CLI comparisons retained legacy full/read/JSON output byte-for-byte.
+The measured existing-host Select discovery/contract/example flow, including a
+heading index and full owning/shared headers and dedicated guides, was 50,992
+bytes bundled and 51,544 live versus the earlier 94,992-byte flow: approximately
+46.3% and 45.7% less. These are scenario-specific bytes, not tokenizer counts or
+a promise about every complete application workflow. Measurement receipt:
+`skill-output-implemented/measurements.json`, SHA256
+`750e19505200dfc3c6380e01e415d3e549495bd5f9b2a8aedf7c44d07c9df286`.
+
+An independent consumer copied the installed skill at `6ac3e2eb`, discovered
+Select's applied-transition observer, wrote an actual caller-composed C function
+and passed strict C11 syntax compilation. No linking, UI runtime or application
+validation was claimed. It read broad Choice/Core resources despite the available
+section mode, demonstrating that retrieval choices still determine total context
+cost; the controlled 46% scenario must not be generalized to that larger flow.
+Its feedback identified incomplete handler-type metadata, which must be labelled
+as an incomplete index rather than interpreted as no handlers. Full applicable
+contracts remain mandatory; section retrieval does not establish dependency closure.

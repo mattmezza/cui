@@ -3,9 +3,10 @@
 This document prepares **v0.1.0-alpha.2**; it is not evidence that publication
 has occurred or that the release source is frozen. The next batch includes the
 implemented component event slices, documented typed/host-service exceptions,
-secure InputGroup rendering and IME lifetime/focus fixes. Skill implementation
-and final integration remain pending; this preparation does not claim that work
-has shipped. Final release notes must describe the actual frozen commit.
+secure InputGroup rendering and IME lifetime/focus fixes. Concise skill discovery
+and explicit partial Markdown reads are implemented. Final integrated validation,
+source freeze and artifact checks remain pending; implementation is not publication.
+Final release notes must describe the actual frozen commit.
 
 Keep alpha.1 (`v0.1.0-alpha.1`, Python `0.1.0a1`) and any associated published
 assets immutable. This version update does not retag or replace alpha.1. No

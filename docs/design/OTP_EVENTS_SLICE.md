@@ -176,3 +176,15 @@ Styled call, maps any edit error to frame error and emits legacy `bridge_change`
 when `result.changed`. It has no typed completion/count payload. Leave it and
 Python/Node/Go/Rust notifications unchanged; this native proposal does not imply
 binding completion support, secret transport policy or registry/schema changes.
+
+## Implementation checkpoint
+
+The first aggregate slice now uses a whole-Base wrapper and private Styled common
+seam; the original Base OTP source and public legacy layouts remain unchanged.
+Entry capture scans only declared capacity and checks valid UTF-8 before taking
+scalar snapshots. Delivery follows the real `changed` flag even for accepted
+no-ops, net-zero edits and post-mutation errors, rather than filtering all errors.
+Masked text is redacted; retained unmasked text requires the existing explicit
+bounded copy helper. No COMPLETE kind, per-event extraction or binding tag was
+added. Isolated strict C11/C++ checks and private-wrapper new/legacy OTP tests
+cover the implemented contract; root owns build registration/generated exports.

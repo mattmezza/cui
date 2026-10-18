@@ -26,6 +26,7 @@ cui_bridge_status cui_bridge_native_create(cui_bridge_app *app, const char *titl
         return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     config->measure = cui_font_measure;
     config->measure_styled = cui_font_measure_styled;
+    config->text_capabilities = cui_font_text_capabilities();
     config->text_geometry = cui_font_text_geometry;
     config->text_geometry_line = cui_font_text_geometry_line;
     config->font_metrics = cui_font_get_metrics;

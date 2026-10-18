@@ -48,10 +48,10 @@ static void metadata_test(void) {
                                      (cui_component_event_source)99));
     assert(!cui_component_event_init(NULL, CUI_COMPONENT_EVENT_COMMIT, 20,
                                      CUI_COMPONENT_EVENT_SOURCE_UNKNOWN));
-    assert(!cui_component_event_set_position(&value, 0, 0));
-    assert(!cui_component_event_set_position(&value, 1, SIZE_MAX));
+    assert(!cui_component_event_set_frame_index(&value, 0, 0));
+    assert(!cui_component_event_set_frame_index(&value, 1, SIZE_MAX));
     assert(memcmp(&value, &before, sizeof value) == 0);
-    assert(cui_component_event_set_position(&value, UINT64_MAX, 0));
+    assert(cui_component_event_set_frame_index(&value, UINT64_MAX, 0));
     assert(value.frame_sequence == UINT64_MAX && value.event_index == 0);
     assert(!(value.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION));
     cui_activation_snapshot bad = {.target = 10, .frame_sequence = 1,
@@ -69,7 +69,7 @@ static void metadata_test(void) {
     bad.event_index = SIZE_MAX;
     assert(!cui_component_event_from_activation(&value, CUI_COMPONENT_EVENT_ACTIVATE, &bad));
     assert(!cui_component_event_from_activation(NULL, CUI_COMPONENT_EVENT_ACTIVATE, &bad));
-    assert(!cui_component_event_set_position(NULL, 1, 0));
+    assert(!cui_component_event_set_frame_index(NULL, 1, 0));
     assert(memcmp(&value, &before, sizeof value) == 0);
     for (int kind = CUI_COMPONENT_EVENT_ACTIVATE; kind <= CUI_COMPONENT_EVENT_LIFECYCLE; ++kind) {
         assert(cui_component_event_init(&value, (cui_component_event_kind)kind, 10,
@@ -94,9 +94,9 @@ static void metadata_test(void) {
     assert(pointer.activation.press.contact == 42 && pointer.activation.release.device == 5);
     assert(pointer.activation.release.click_count == 2);
     before = pointer;
-    assert(!cui_component_event_set_position(&pointer, pointer.frame_sequence + 1, 1));
+    assert(!cui_component_event_set_frame_index(&pointer, pointer.frame_sequence + 1, 1));
     assert(memcmp(&pointer, &before, sizeof pointer) == 0);
-    assert(cui_component_event_set_position(&pointer, pointer.frame_sequence, 1));
+    assert(cui_component_event_set_frame_index(&pointer, pointer.frame_sequence, 1));
     finish(ui);
     cui_focus(ui, 10);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER,

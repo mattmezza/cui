@@ -276,6 +276,7 @@ def main() -> int:
         targets += [("distribution_single", ["tests/distribution/single.c"], False, distribution_flags),
                     ("distribution_multi", ["tests/distribution/implementation.c", "tests/distribution/consumer.c"], False, distribution_flags)]
         targets += [("theme_registry_distribution", ["tests/distribution/theme_registry.c"], False, distribution_flags)]
+        targets += [("component_events_metadata", ["tests/unit/test_component_events.c"], True, [])]
         if args.suite:
             unknown = set(args.suite) - {name for name, *_ in targets}
             if unknown:

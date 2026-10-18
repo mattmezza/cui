@@ -1,8 +1,18 @@
 /* Every portable implementation, including standalone optional models. */
 #define CUI_IMPLEMENTATION_ALL
 #include "cui_all.h"
+#include "cui_component_events.h"
 
 int main(void) {
+    char storage[8];
+    cui_str copied;
+    cui_component_event_metadata metadata;
+    if (!cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_REQUEST, 7,
+                                  CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC) ||
+        cui_component_event_copy_utf8(cui_string("owned"), 7, storage, sizeof storage,
+                                      &copied) != CUI_COMPONENT_EVENT_COPY_OK ||
+        copied.length != 5 || copied.data != storage || metadata.target != 7)
+        return 1;
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
     if (!ui || !cui_begin_frame(ui, 200, 100, 0))
         return 1;

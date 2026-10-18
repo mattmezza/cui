@@ -272,7 +272,8 @@ cui_id cui_textarea_viewport_id(cui_id id) {
 bool cui_textarea_measure(cui_textarea_options options, float root, cui_textarea_metrics *out) {
     if (!out || options.size < CUI_TEXTAREA_MEDIUM || options.size > CUI_TEXTAREA_CUSTOM ||
         options.text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
-        options.text_style.weight > CUI_TEXT_WEIGHT_BOLD || options.tab_size > 4096 ||
+        options.text_style.weight > CUI_TEXT_WEIGHT_BOLD ||
+        !isfinite(options.text_style.letter_spacing) || options.tab_size > 4096 ||
         !isfinite(root) || root <= 0 || root > 4096)
         return false;
     float density = root / 16;
@@ -388,7 +389,9 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         !cui_edit_get_state(edit).multiline || !isfinite(width) || width <= 0 ||
         !isfinite(metrics.font_size) || metrics.font_size <= 0 || !isfinite(metrics.line_height) ||
         metrics.line_height <= 0 || style.weight < CUI_TEXT_WEIGHT_NORMAL ||
-        style.weight > CUI_TEXT_WEIGHT_BOLD) {
+        style.weight > CUI_TEXT_WEIGHT_BOLD || !isfinite(style.letter_spacing) ||
+        (style.letter_spacing != 0 &&
+         !(cui_text_capabilities(ui) & CUI_TEXT_CAP_LETTER_SPACING))) {
         if (state)
             state->error = CUI_TEXTAREA_INVALID;
         return CUI_TEXTAREA_INVALID;
@@ -415,7 +418,8 @@ cui_textarea_error cui_textarea_layout_ex(cui_context *ui, cui_edit *edit,
         state->font_size == metrics.font_size && state->line_height == metrics.line_height &&
         state->wrap_width == width && state->layout_wrap == wrap &&
         state->text_style.family == style.family && state->text_style.weight == style.weight &&
-        state->text_style.italic == style.italic && state->text_style.monospace == style.monospace;
+        state->text_style.italic == style.italic && state->text_style.monospace == style.monospace &&
+        state->text_style.letter_spacing == style.letter_spacing;
     if (reusable && state->revision == selection.revision) {
         state->caret_line = cui_textarea_cursor_line(state, selection.cursor);
         state->cursor = selection.cursor;
@@ -680,7 +684,8 @@ cui_text_layout_status cui_textarea_visual_geometry(cui_context *ui, cui_str tex
         if (cached->source == index && cached->start == source.byte_start &&
             cached->end == source.byte_end && cached->size == size &&
             cached->style.weight == style.weight && cached->style.italic == style.italic &&
-            cached->style.monospace == style.monospace && cached->style.family == style.family) {
+            cached->style.monospace == style.monospace && cached->style.family == style.family &&
+            cached->style.letter_spacing == style.letter_spacing) {
             *out = &cached->geometry;
             return CUI_TEXT_LAYOUT_OK;
         }
@@ -907,6 +912,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
                              state->text_style.weight != options.text_style.weight ||
                              state->text_style.italic != options.text_style.italic ||
                              state->text_style.monospace != options.text_style.monospace ||
+                             state->text_style.letter_spacing != options.text_style.letter_spacing ||
                              state->font_size != metrics.font_size ||
                              state->line_height != metrics.line_height));
     if (external) {

@@ -254,6 +254,13 @@ static bool text_draw(cui_software *r, const cui_draw_command *c) {
 bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color clear) {
     if (!r || !list || (!list->commands && list->count))
         return false;
+#ifdef CUI_HAS_TEXT
+    if (!cui_text_tracking_supported(list, cui_font_text_capabilities() != 0))
+        return false;
+#else
+    if (!cui_text_tracking_supported(list, false))
+        return false;
+#endif
     if (!cui_text_paints_supported(list, true))
         return false;
     cui_draw_list prepared;

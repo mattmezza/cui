@@ -120,3 +120,9 @@ better shipped separately. Check each font's redistribution and embedding
 license. Embedding assets is independent of static linking: link CUI and its
 native dependencies statically as well if your distribution requires that.
 This API concerns native fonts; browser font loading continues to use the web host.
+
+## Native letter spacing
+
+See [Letter spacing](LETTER_SPACING.md) for the opt-in cluster tracking API,
+provider capability checks, ABI rebuild requirement, negative-spacing policy,
+and renderer/binding limitations. Canvas and GPU tracking are not implemented.

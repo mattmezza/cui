@@ -1,9 +1,10 @@
 # Component event API: requested work
 
-Status: requirements recorded; design checkpoint and implementation are pending.
+Status: design checkpoint committed; shared metadata is the first implementation
+slice under integration. Family adapters and async host example remain in progress.
 This document defines requested work, not an implemented API or approved design.
-Schedule after the current responsive, typography, video and release work reaches
-a suitable checkpoint. The maintainer expects to pause this session shortly.
+The contract, exact 78-family coverage matrix and binding audit live alongside
+this request. Their exceptions preserve queued, retained and deferred delivery.
 
 Before production changes, commit independently reviewable artifacts covering:
 

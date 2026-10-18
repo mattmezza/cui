@@ -5,9 +5,10 @@ proposal; the declarations below are illustrative and are not shipped APIs.
 No font dependency, production code or renderer was changed for this audit.
 
 Subsequent implementation added [body/heading/code tokens](TYPOGRAPHY_TOKENS.md)
-and [linear gradient text](TEXT_GRADIENT.md) for software, SDL and Canvas. Those
+and [linear gradient text](TEXT_GRADIENT.md) for software, SDL and Canvas, plus
+[cluster letter spacing](LETTER_SPACING.md) for native Bidi/software/SDL. Those
 guides and current public headers define the shipped APIs. The proposed broader
-authoring declarations below remain design notes, especially tracking, numeric
+authoring declarations below remain design notes, especially browser tracking, numeric
 weights/stretch and variable axes.
 
 ## What applications can use today
@@ -19,7 +20,7 @@ weights/stretch and variable axes.
 | Condensed type | A condensed font file can already be registered under a distinct family ID. | A same-family condensed variant cannot be selected independently of existing style keys; add an explicit stretch key before promising that API. |
 | Size and line height | Float logical sizes; explicit line height or zero for natural measurement. Core interns family, size, style and line height. | Named reusable typography tokens and clear defaults across components. |
 | Wrap and alignment | `cui_text_ex` wraps within a constrained parent; `cui_text_line` is unwrapped. Paragraph APIs preserve strict UTF-8, hard breaks, grapheme-safe wrapping and optional left/center/right alignment. | One convenient options API, logical start/end alignment and explicit overflow/ellipsis policy. |
-| Letter spacing | No public tracking field in `cui_text_style`, measurement callbacks or draw commands. | Shared shaping/advance/caret/wrap contract before a paint-only implementation. |
+| Letter spacing | `cui_text_style.letter_spacing` with explicit provider capability; native contextual measurement, geometry, wrapping, caret and software/SDL rendering share cluster tracking. See `LETTER_SPACING.md`. | Canvas, GPU and foreign style API remain unsupported. Broader authoring declarations below remain proposals. |
 | Gradient text | Copied linear stops, block/line anchors and real per-pixel glyph masks in software, SDL and Canvas. See `TEXT_GRADIENT.md`. | GPU implementation, radial/conic paints, color-span combinations and broader native acceptance. |
 
 Named-family fallback currently resolves exact family/style, named-family regular,
@@ -75,8 +76,8 @@ typedef struct {
 
 For today's equivalent, applications can keep these token structs locally,
 register IDs for each family, and submit `cui_text_ex` with explicit size/height.
-Do not add a `letter_spacing` field to that local workaround until the provider
-can measure and paint it consistently. A future `cui_text_options` submission
+Use the landed `cui_text_style.letter_spacing` only after checking the provider
+capability as described in `LETTER_SPACING.md`; it is unavailable on Canvas. A future `cui_text_options` submission
 should contain resolved typography, wrap policy, alignment and paint, with a
 bool/status result for unsupported combinations. Keep legacy APIs as wrappers
 with zero tracking, current wrapping and solid paint. Decide token inheritance
@@ -96,16 +97,17 @@ face under another family is the reliable interim path.
 
 The same resolved shape parameters must reach styled measurement, contextual
 geometry, wrap candidate widths, selection/hit testing, retained layouts and draw.
-The current callbacks cannot carry tracking or stretch; introduce an extended
-provider contract with capability bits and an explicit unavailable result.
+The original audit found callbacks could not carry tracking or stretch. Native
+tracking now uses the landed style field and explicit provider capability;
+`LETTER_SPACING.md` supersedes the tracking proposal below. Numeric stretch
+remains proposed.
 Do not let Core compute `character_count * spacing` independently of the shaper.
 
 Define tracking between eligible shaped clusters in visual advance order, with
 no extra gap after the final eligible cluster. Combining marks must stay attached;
 ligatures, Arabic joining, Indic shaping, default-ignorables, tabs and hard breaks
 need explicit rules and fixtures. Retain natural shaping for zero tracking.
-Choose whether nonzero tracking disables optional ligatures and expose/document
-that policy; splitting UTF-8 text into independent character draws destroys
+The landed policy preserves optional and required ligatures; splitting UTF-8 text into independent character draws destroys
 contextual shaping. Negative tracking requires an explicit overlap policy and
 must not invalidate finite geometry or hit-test ordering assumptions.
 

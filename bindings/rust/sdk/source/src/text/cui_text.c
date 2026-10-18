@@ -6,6 +6,7 @@
 #include <hb.h>
 #include <limits.h>
 #include <math.h>
+#include <float.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -81,7 +82,8 @@ static FT_GlyphSlot raster_glyph(cui_font *font, FT_UInt glyph, float size) {
     return &entry->slot;
 }
 static bool valid_style(cui_text_style style) {
-    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
+    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD &&
+           isfinite(style.letter_spacing);
 }
 static cui_font_family *family_find(cui_font *font, uint32_t id, bool create) {
     if (!id)
@@ -316,8 +318,17 @@ bool cui_font_get_metrics(void *font, float size, cui_text_style style, cui_font
     *out = result;
     return true;
 }
+uint32_t cui_font_text_capabilities(void) {
+#ifdef CUI_TEXT_BIDI
+    return CUI_TEXT_CAP_LETTER_SPACING;
+#else
+    return 0;
+#endif
+}
 cui_size cui_font_measure_styled(void *font, cui_str s, float size, cui_text_style style) {
     cui_size result = {0, 0};
+    if (!valid_style(style) || (style.letter_spacing != 0 && !cui_font_text_capabilities()))
+        return result;
 #ifdef CUI_TEXT_BIDI
     text_lines *lines = NULL;
     if (!text_lines_create(font, s, size, style, &lines, &result))
@@ -344,7 +355,8 @@ cui_size cui_font_measure(void *font, cui_str s, float size) {
 }
 static bool font_draw_styled_scaled(cui_font *font, cui_str s, float size, cui_text_style style,
                                     float x, float y, float scale, cui_glyph_fn emit, void *user) {
-    if (!isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f || !isfinite(scale) ||
+    if (!valid_style(style) || (style.letter_spacing != 0 && !cui_font_text_capabilities()) ||
+        !isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f || fabsf(y) > 1e6f || !isfinite(scale) ||
         scale <= 0 || scale > 16)
         return false;
 #ifdef CUI_TEXT_BIDI
@@ -749,6 +761,36 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     layout->view.run_count = segment_count;
     layout->view.width = pen;
     qsort(layout->clusters, layout->view.cluster_count, sizeof *layout->clusters, cluster_order);
+    /* Shape first, then move intact visual clusters. Required/optional
+     * ligatures and marks retain their original glyphs and relative offsets.
+     * Zero-advance clusters do not earn gaps, nor does the last eligible one. */
+    if (style.letter_spacing != 0) {
+        size_t remaining = 0;
+        for (size_t i = 0; i < layout->view.cluster_count; ++i)
+            remaining += layout->clusters[i].right > layout->clusters[i].left;
+        double shift = 0;
+        for (size_t i = 0; i < layout->view.cluster_count; ++i) {
+            cui_text_cluster *c = &layout->clusters[i];
+            bool eligible = c->right > c->left;
+            float gap = eligible && --remaining ? style.letter_spacing : 0;
+            if ((double)c->right - c->left + gap < 0 ||
+                !isfinite((double)c->right + shift + gap)) {
+                status = CUI_TEXT_LAYOUT_INVALID;
+                goto done;
+            }
+            for (size_t j = 0; j < c->glyph_count; ++j)
+                layout->glyphs[c->glyph_start + j].x += (float)shift;
+            c->left += (float)shift;
+            c->right += (float)(shift + gap);
+            shift += gap;
+        }
+        double width = (double)pen + shift;
+        if (!isfinite(width) || width < 0 || width > FLT_MAX) {
+            status = CUI_TEXT_LAYOUT_INVALID;
+            goto done;
+        }
+        layout->view.width = (float)width;
+    }
     layout->view.clusters = layout->clusters;
     *out = layout;
     layout = NULL;

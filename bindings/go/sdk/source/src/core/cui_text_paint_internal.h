@@ -50,6 +50,16 @@ static inline cui_color cui_text_paint_sample(cui_text_paint p, double x, double
     result.a = (uint8_t)lround(alpha);
     return result;
 }
+static inline bool cui_text_tracking_supported(const cui_draw_list *list, bool supported) {
+    for (size_t i = 0; i < list->count; ++i) {
+        const cui_draw_command *c = &list->commands[i];
+        if (c->type == CUI_DRAW_TEXT &&
+            (!isfinite(c->text_style.letter_spacing) ||
+             (c->text_style.letter_spacing != 0 && !supported)))
+            return false;
+    }
+    return true;
+}
 static inline bool cui_text_paints_supported(const cui_draw_list *list, bool linear) {
     for (size_t i = 0; i < list->count; ++i) {
         const cui_draw_command *c = &list->commands[i];

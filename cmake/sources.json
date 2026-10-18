@@ -188,7 +188,8 @@
     "cui_typography": [],
     "cui_video_controls": [
       "src/components/cui_video_controls.c"
-    ]
+    ],
+    "cui_component_events": []
   },
   "native": {
     "text": [

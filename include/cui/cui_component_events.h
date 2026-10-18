@@ -50,7 +50,8 @@ static inline bool cui_component_event_init(cui_component_event_metadata *out,
         kind > CUI_COMPONENT_EVENT_LIFECYCLE || source < CUI_COMPONENT_EVENT_SOURCE_UNKNOWN ||
         source > CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY)
         return false;
-    cui_component_event_metadata value = {0};
+    cui_component_event_metadata value;
+    memset(&value, 0, sizeof(value));
     value.kind = kind;
     value.target = target;
     value.source = source;
@@ -62,7 +63,7 @@ static inline bool cui_component_event_init(cui_component_event_metadata *out,
 /* Record an explicitly known local frame/index pair. Never infer these from
  * a programmatic request. A copied activation's identity cannot be overwritten.
  * Zero frame and SIZE_MAX index are invalid. Failure preserves metadata. */
-static inline bool cui_component_event_set_position(cui_component_event_metadata *metadata,
+static inline bool cui_component_event_set_frame_index(cui_component_event_metadata *metadata,
                                                     uint64_t frame_sequence, size_t event_index) {
     if (!metadata || !metadata->target || !frame_sequence || event_index == SIZE_MAX ||
         ((metadata->flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION) &&
@@ -124,8 +125,7 @@ typedef enum {
  * descriptor must be disjoint from source/storage and remain caller-owned.
  * Caller guarantees source.length readable bytes and capacity writable bytes.
  * This copies text only, not cui_event or arbitrary pointer-containing payloads. */
-static inline cui_component_event_copy_status
-cui_component_event_copy_utf8(cui_str source, size_t maximum_bytes, char *storage,
+static inline cui_component_event_copy_status cui_component_event_copy_utf8(cui_str source, size_t maximum_bytes, char *storage,
                                size_t capacity, cui_str *out) {
     if (!out || !storage || (source.length && !source.data))
         return CUI_COMPONENT_EVENT_COPY_INVALID_ARGUMENT;
@@ -138,7 +138,8 @@ cui_component_event_copy_utf8(cui_str source, size_t maximum_bytes, char *storag
     if (source.length)
         memmove(storage, source.data, source.length);
     storage[source.length] = '\0';
-    *out = (cui_str){storage, source.length};
+    out->data = storage;
+    out->length = source.length;
     return CUI_COMPONENT_EVENT_COPY_OK;
 }
 #ifdef __cplusplus

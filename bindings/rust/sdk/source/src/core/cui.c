@@ -115,6 +115,8 @@ typedef struct {
     cui_text_align alignment;
     uint32_t alignment_box;
     cui_text_paint paint;
+    cui_text_style style;
+    float size;
 } cui_core_text_source;
 struct cui_context {
     int tab_path[32];
@@ -343,11 +345,21 @@ static bool cui_core_active(cui_context *ui) {
     return true;
 }
 static bool cui_core_text_style_valid(cui_text_style style) {
-    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD;
+    return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD &&
+           isfinite(style.letter_spacing);
+}
+uint32_t cui_text_capabilities(const cui_context *ui) {
+    return ui && ui->config.measure_styled && ui->config.text_geometry_line
+               ? ui->config.text_capabilities : 0;
+}
+static bool cui_core_tracking_supported(const cui_context *ui, cui_text_style style) {
+    return style.letter_spacing == 0 ||
+           (ui && (ui->config.text_capabilities & CUI_TEXT_CAP_LETTER_SPACING) &&
+            ui->config.measure_styled && ui->config.text_geometry_line);
 }
 cui_size cui_measure_text_ex(cui_context *ui, cui_str text, float size, cui_text_style style) {
     if (!ui || (!text.data && text.length) || !isfinite(size) || size <= 0 ||
-        !cui_core_text_style_valid(style))
+        !cui_core_text_style_valid(style) || !cui_core_tracking_supported(ui, style))
         return (cui_size){0};
     size = fminf(size, 65535);
     ++ui->measuring_depth;
@@ -423,6 +435,8 @@ cui_text_layout_status cui_get_text_geometry_line(cui_context *ui, cui_text_line
     if (!ui || !out || !cui_text_line_source_valid(source) || !isfinite(size) || size <= 0 ||
         !cui_core_text_style_valid(style))
         return CUI_TEXT_LAYOUT_INVALID;
+    if (!cui_core_tracking_supported(ui, style))
+        return CUI_TEXT_LAYOUT_UNAVAILABLE;
     if (!ui->config.text_geometry_line) {
         if (source.byte_start == 0 && source.byte_end == source.paragraph.length)
             return cui_get_text_geometry(ui, source.paragraph, size, style, out);
@@ -460,6 +474,8 @@ cui_text_layout_status cui_get_text_geometry(cui_context *ui, cui_str text, floa
     if (!ui || !out || (!text.data && text.length) || !isfinite(size) || size <= 0 ||
         !cui_core_text_style_valid(style))
         return CUI_TEXT_LAYOUT_INVALID;
+    if (!cui_core_tracking_supported(ui, style))
+        return CUI_TEXT_LAYOUT_UNAVAILABLE;
     if (!ui->config.text_geometry)
         return CUI_TEXT_LAYOUT_UNAVAILABLE;
     cui_text_geometry result = {0};
@@ -2262,7 +2278,8 @@ static uint16_t cui_core_text_style_id(cui_context *ui, float size, float line_h
             ui->text_styles[i].style.weight == style.weight &&
             ui->text_styles[i].style.italic == style.italic &&
             ui->text_styles[i].style.monospace == style.monospace &&
-            ui->text_styles[i].style.family == style.family)
+            ui->text_styles[i].style.family == style.family &&
+            ui->text_styles[i].style.letter_spacing == style.letter_spacing)
             return (uint16_t)(i + 1);
     if (ui->text_style_count == ui->text_style_capacity) {
         cui_core_capacity(ui, "text styles", 0, ui->text_style_count, 1, ui->text_style_capacity);
@@ -2382,6 +2399,13 @@ static bool cui_core_wrap_prepare(cui_context *ui, cui_text_line_source source, 
             }
         }
     }
+    if (!shaped && style.letter_spacing != 0) {
+        free(rects);
+        free(clusters);
+        cui_release_text_geometry(&geometry);
+        --ui->measuring_depth;
+        return false;
+    }
     size_t n = 0, ri = 0;
     float accumulated = 0;
     offset = source.byte_start;
@@ -2432,24 +2456,44 @@ static const cui_core_text_source *cui_core_custom_wrap_record(cui_context *ui, 
             return &ui->text_sources[i];
     return NULL;
 }
+/* Tracking must be resolved for this exact contextual line: a wrap removes
+ * its final gap and may change joining at the new boundary. */
+static float cui_core_wrap_width(cui_context *ui, const cui_core_text_source *record,
+                                  size_t first, size_t last) {
+    if (record->style.letter_spacing != 0) {
+        cui_text_line_source source = record->source;
+        source.byte_start = record->wrap_clusters[first].start;
+        source.byte_end = record->wrap_clusters[last - 1].end;
+        cui_text_geometry geometry = {0};
+        if (cui_get_text_geometry_line(ui, source, record->size, record->style, &geometry) !=
+            CUI_TEXT_LAYOUT_OK) {
+            cui_core_fail(ui, CUI_ERROR_LAYOUT);
+            ui->wrap_failed = true;
+            return 0;
+        }
+        float width = geometry.width;
+        cui_release_text_geometry(&geometry);
+        return width;
+    }
+    float width = 0;
+    for (size_t i = first; i < last; ++i)
+        width += record->wrap_clusters[i].advance;
+    return width;
+}
 static float cui_core_custom_text_min_width(Clay_String *text, Clay_Dimensions *dimensions,
                                             void *user) {
     const cui_core_text_source *record = cui_core_custom_wrap_record(user, text->chars);
     if (!record)
         return -1;
-    float width = 0;
-    for (size_t i = 0; i < record->wrap_cluster_count; ++i)
-        width += record->wrap_clusters[i].advance;
+    float width = cui_core_wrap_width(user, record, 0, record->wrap_cluster_count);
     dimensions->width = width;
     return 0; /* Even an oversized indivisible cluster gets its own visual row. */
 }
 static void cui_core_custom_wrap_emit(Clay_Context *context, Clay_LayoutElement *element,
                                       const cui_core_text_source *record, size_t first, size_t last,
-                                      float height) {
+                                      float height, cui_context *ui) {
     const cui_core_wrap_cluster *clusters = record->wrap_clusters;
-    float width = 0;
-    for (size_t i = first; i < last; ++i)
-        width += clusters[i].advance;
+    float width = cui_core_wrap_width(ui, record, first, last);
     size_t start = clusters[first].start - record->source.byte_start;
     size_t end = clusters[last - 1].end - record->source.byte_start;
     Clay__WrappedTextLine line = {{width, height},
@@ -2459,7 +2503,7 @@ static void cui_core_custom_wrap_emit(Clay_Context *context, Clay_LayoutElement 
 }
 static size_t cui_core_custom_wrap_pass(Clay_Context *context, Clay_LayoutElement *element,
                                         const cui_core_text_source *record, float height,
-                                        bool emit) {
+                                        bool emit, cui_context *ui) {
     const cui_core_wrap_cluster *clusters = record->wrap_clusters;
     size_t last = 0, candidate = SIZE_MAX, lines = 1;
     float x = 0, last_x = 0, candidate_x = 0;
@@ -2475,10 +2519,13 @@ static size_t cui_core_custom_wrap_pass(Clay_Context *context, Clay_LayoutElemen
         if (c != ' ')
             first_nonspace = true;
         float next_x = x + clusters[i].advance;
-        if (next_x - last_x > element->dimensions.width && i > last) {
+        float candidate_width = record->style.letter_spacing != 0
+                                    ? cui_core_wrap_width(ui, record, last, i + 1)
+                                    : next_x - last_x;
+        if (candidate_width > element->dimensions.width && i > last) {
             size_t next = candidate != SIZE_MAX && candidate > last ? candidate : i;
             if (emit)
-                cui_core_custom_wrap_emit(context, element, record, last, next, height);
+                cui_core_custom_wrap_emit(context, element, record, last, next, height, ui);
             ++lines;
             last = next;
             last_x = candidate != SIZE_MAX && candidate > 0 && next == candidate ? candidate_x : x;
@@ -2489,7 +2536,7 @@ static size_t cui_core_custom_wrap_pass(Clay_Context *context, Clay_LayoutElemen
     }
     if (emit)
         cui_core_custom_wrap_emit(context, element, record, last, record->wrap_cluster_count,
-                                  height);
+                                  height, ui);
     return lines;
 }
 static bool cui_core_custom_text_wrap(Clay_Context *context, Clay_LayoutElement *element,
@@ -2499,13 +2546,13 @@ static bool cui_core_custom_text_wrap(Clay_Context *context, Clay_LayoutElement 
         cui_core_custom_wrap_record(ui, element->textElementData.text.chars);
     if (!record)
         return false;
-    size_t needed = cui_core_custom_wrap_pass(context, element, record, height, false);
+    size_t needed = cui_core_custom_wrap_pass(context, element, record, height, false, ui);
     if (needed > (size_t)(context->wrappedTextLines.capacity - context->wrappedTextLines.length)) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
         ui->wrap_failed = true;
         return true;
     }
-    (void)cui_core_custom_wrap_pass(context, element, record, height, true);
+    (void)cui_core_custom_wrap_pass(context, element, record, height, true, ui);
     element->dimensions.height = height * (float)needed;
     return true;
 }
@@ -2517,8 +2564,15 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
                           size_t wrap_count) {
     if (!cui_core_active(ui))
         return;
-    if (!cui_core_text_style_valid(text_style))
+    if (!cui_core_text_style_valid(text_style) || !cui_core_tracking_supported(ui, text_style))
         return;
+    if (text_style.letter_spacing != 0) {
+        cui_text_geometry geometry = {0};
+        cui_text_line_source line = source ? *source : (cui_text_line_source){t, 0, t.length};
+        if (cui_get_text_geometry_line(ui, line, size, text_style, &geometry) != CUI_TEXT_LAYOUT_OK)
+            return;
+        cui_release_text_geometry(&geometry);
+    }
     if (ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
         return;
     if (ui->element_count == ui->config.max_elements) {
@@ -2529,7 +2583,7 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
     line_height = isfinite(line_height) ? fminf(65535, fmaxf(0, line_height)) : 0;
     bool special = size != floorf(size) || line_height != floorf(line_height) ||
                    text_style.weight || text_style.italic || text_style.monospace ||
-                   text_style.family;
+                   text_style.family || text_style.letter_spacing;
     cui_str original = source ? source->paragraph : t;
     cui_str retained_paragraph = {0};
     if (source)
@@ -2593,7 +2647,9 @@ static void cui_core_text(cui_context *ui, cui_str t, float size, cui_color c, f
                                .colors = colors,
                                .color_count = color_count,
                                .wrap_clusters = retained_clusters,
-                               .wrap_cluster_count = wrap_count};
+                               .wrap_cluster_count = wrap_count,
+                               .style = text_style,
+                               .size = size};
     Clay__OpenTextElement(
         (Clay_String){false, (int32_t)t.length, t.data},
         (Clay_TextElementConfig){.userData = cui_core_layout_only(ui) ? (void *)ui
@@ -2692,7 +2748,8 @@ static bool cui_core_paragraph_colored(cui_context *ui, cui_str text, float size
     if (alignment < CUI_TEXT_ALIGN_LEFT || alignment > CUI_TEXT_ALIGN_RIGHT || !ui ||
         !cui_frame_active(ui) || (!text.data && text.length) || text.length > INT32_MAX ||
         !isfinite(size) || size <= 0 || !isfinite(line_height) || line_height < 0 ||
-        !cui_core_text_style_valid(style) || (!colors && count) || count > CUI_TEXT_COLOR_SPAN_MAX)
+        !cui_core_text_style_valid(style) || !cui_core_tracking_supported(ui, style) ||
+        (!colors && count) || count > CUI_TEXT_COLOR_SPAN_MAX)
         return false;
     size_t scan = 0, line_count = 1, boundary = 0;
     uint32_t cp, previous_cp = 0;
@@ -2764,7 +2821,7 @@ static bool cui_core_paragraph_colored(cui_context *ui, cui_str text, float size
      * submission. Each paragraph is shared across its U+2028 visual lines. */
     size_t required = 0;
     for (size_t i = 0; i < n; ++i) {
-        if (wrap && lines[i].line_end > lines[i].line_start) {
+        if ((wrap || style.letter_spacing != 0) && lines[i].line_end > lines[i].line_start) {
             cui_text_line_source source = {{text.data + lines[i].paragraph_start,
                                             lines[i].paragraph_end - lines[i].paragraph_start},
                                            lines[i].line_start - lines[i].paragraph_start,
@@ -2816,7 +2873,7 @@ static bool cui_core_paragraph_colored(cui_context *ui, cui_str text, float size
     size = fminf(size, 65535);
     line_height = fminf(line_height, 65535);
     bool special = size != floorf(size) || line_height != floorf(line_height) || style.weight ||
-                   style.italic || style.monospace || style.family;
+                   style.italic || style.monospace || style.family || style.letter_spacing;
     if (special && !cui_core_text_style_id(ui, size, line_height, style)) {
         cui_core_paragraph_lines_free(lines, n);
         free(selected);
@@ -2931,10 +2988,18 @@ bool cui_text_paragraph_painted(cui_context *ui, cui_str text, float size, float
 }
 void cui_text_ex(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                  cui_text_style style) {
+    if (style.letter_spacing != 0) {
+        (void)cui_text_paragraph_colored(ui, t, size, c, line_height, style, true, NULL, 0);
+        return;
+    }
     cui_core_text(ui, t, size, c, line_height, style, false, NULL, NULL, 0, NULL, 0);
 }
 void cui_text_line(cui_context *ui, cui_str t, float size, cui_color c, float line_height,
                    cui_text_style style) {
+    if (style.letter_spacing != 0) {
+        (void)cui_text_paragraph_colored(ui, t, size, c, line_height, style, false, NULL, 0);
+        return;
+    }
     cui_core_text(ui, t, size, c, line_height, style, true, NULL, NULL, 0, NULL, 0);
 }
 void cui_text_with_line_height(cui_context *ui, cui_str t, float size, cui_color c,
@@ -3358,7 +3423,9 @@ bool cui_prepaint_emit(cui_prepaint_writer *writer, const cui_draw_command *comm
         return false;
     cui_draw_command c = command ? *command : (cui_draw_command){.type = (cui_draw_type)-1};
     if (!command || c.text_paint.kind != CUI_TEXT_PAINT_SOLID || c.text_paint.stop_count ||
-        !cui_core_prepaint_command(&c) || (deferred && !p->info.modal_allowed)) {
+        !cui_core_prepaint_command(&c) ||
+        (c.type == CUI_DRAW_TEXT && !cui_core_tracking_supported(ui, c.text_style)) ||
+        (deferred && !p->info.modal_allowed)) {
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
     }

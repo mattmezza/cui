@@ -2710,6 +2710,11 @@ static void bridge_change(cui_bridge_app *app, uint32_t slot) {
         payload.payload_kind = CUI_BRIDGE_PAYLOAD_BOOLEAN;
         payload.notification.boolean_value = node->checked ? 1u : 0u;
     }
+    if (node->kind == CUI_BRIDGE_SLIDER || node->kind == CUI_BRIDGE_NUMBER_INPUT ||
+        node->kind == CUI_BRIDGE_RATING || node->kind == CUI_BRIDGE_PAGINATION) {
+        payload.payload_kind = CUI_BRIDGE_PAYLOAD_SCALAR;
+        payload.notification.scalar_value = node->value;
+    }
     if ((node->kind == CUI_BRIDGE_RADIO_GROUP || node->kind == CUI_BRIDGE_TABS ||
          node->kind == CUI_BRIDGE_SELECT || node->kind == CUI_BRIDGE_COMBOBOX ||
          node->kind == CUI_BRIDGE_DROPDOWN_BUTTON || node->kind == CUI_BRIDGE_LIST ||
@@ -4836,14 +4841,15 @@ uint32_t cui_bridge_notification_v1_size(void) {
 uint32_t cui_bridge_notification_versions(void) {
     return 1u;
 }
-cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
+static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
                                                   cui_bridge_notification_v1 *out,
                                                   char *text, uint32_t capacity,
-                                                  uint32_t *required_capacity) {
+                                                  uint32_t *required_capacity, uint32_t enabled_payloads) {
     cui_bridge_status status = bridge_ready(app);
     if (status != CUI_BRIDGE_OK)
         return status;
-    if (!out || !required_capacity || struct_size != sizeof(*out))
+    if (!out || !required_capacity || struct_size != sizeof(*out) ||
+        (enabled_payloads & ~CUI_BRIDGE_VALUE_SCALAR_V1))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     while (app->event_count) {
         uint32_t index = app->event_head;
@@ -4868,13 +4874,16 @@ cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t 
         value.kind = event.type == CUI_BRIDGE_EVENT_CLICK ? CUI_BRIDGE_NOTIFY_ACTIVATE
                      : event.type == CUI_BRIDGE_EVENT_CLOSE ? CUI_BRIDGE_NOTIFY_LIFECYCLE
                                                            : CUI_BRIDGE_NOTIFY_CHANGE;
-        value.payload_kind = payload.payload_kind;
+        value.payload_kind = payload.payload_kind == CUI_BRIDGE_PAYLOAD_SCALAR &&
+                             !(enabled_payloads & CUI_BRIDGE_VALUE_SCALAR_V1)
+                                 ? CUI_BRIDGE_PAYLOAD_LEGACY : payload.payload_kind;
         value.node_kind = payload.node_kind;
         value.node = event.node;
         value.frame_sequence = event.frame_sequence;
         value.flags = event.frame_sequence ? CUI_BRIDGE_NOTIFY_HAS_FRAME : 0;
         value.text_length = payload.text_length;
-        value.payload = payload.notification;
+        if (value.payload_kind != CUI_BRIDGE_PAYLOAD_LEGACY)
+            value.payload = payload.notification;
         value.legacy = (cui_bridge_event_ex){.type = event.type, .node = event.node,
             .frame_sequence = event.frame_sequence, .checked = payload.checked,
             .value = payload.value, .text_length = payload.text_length, .selected = payload.selected};
@@ -4890,4 +4899,18 @@ cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t 
         return CUI_BRIDGE_OK;
     }
     return CUI_BRIDGE_EMPTY;
+}
+
+uint32_t cui_bridge_notification_value_payloads_v1(void) {
+    return CUI_BRIDGE_VALUE_SCALAR_V1;
+}
+cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
+    cui_bridge_notification_v1 *out, char *text, uint32_t capacity, uint32_t *required_capacity) {
+    return bridge_poll_notification_v1(app, struct_size, out, text, capacity, required_capacity, 0);
+}
+cui_bridge_status cui_bridge_poll_value_notification_v1(cui_bridge_app *app, uint32_t struct_size,
+    uint32_t enabled_payloads, cui_bridge_notification_v1 *out, char *text, uint32_t capacity,
+    uint32_t *required_capacity) {
+    return bridge_poll_notification_v1(app, struct_size, out, text, capacity, required_capacity,
+                                       enabled_payloads);
 }

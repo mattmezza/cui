@@ -1,6 +1,6 @@
 # Bridge scalar, text and selection notification checkpoint
 
-Status: **proposal only**, read-only audit at `7bb03cd8`. No producers, ABI, wrappers, generated SDKs or timing changed; no builds were run. This extends [the shipped V1 guide](../BRIDGE_NOTIFICATIONS.md) and [original bridge checkpoint](BRIDGE_TYPED_EVENTS_SLICE.md). All new names below require review. Preserve the 78-family manifest and queued notification boundary; this is not foreign synchronous veto, a new queue or direct-C event-facade forwarding.
+Status: **C opt-in poll and four-producer SCALAR slice implemented in this branch**; see [the scalar guide](../BRIDGE_VALUE_NOTIFICATIONS.md). Text, selection and all value-poll wrappers remain proposals. Original read-only audit: `7bb03cd8`; the implementation preserves ABI/layout, generated SDKs and timing. This extends [the shipped V1 guide](../BRIDGE_NOTIFICATIONS.md) and [original bridge checkpoint](BRIDGE_TYPED_EVENTS_SLICE.md). All new names below require review. Preserve the 78-family manifest and queued notification boundary; this is not foreign synchronous veto, a new queue or direct-C event-facade forwarding.
 
 ## Blocking compatibility decision: reserved is not automatically deployable
 

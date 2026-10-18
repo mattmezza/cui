@@ -1,6 +1,6 @@
 # Sidebar event checkpoint
 
-Design only, audited at `2d7e16d1`. No proposed declaration below is implemented.
+Activation-only Base/Styled slice implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Expansion, collapse and header/footer remain proposals. Original audit: `2d7e16d1`. Only activation payload/handler/result fields are exposed now.
 Preserve the shared component event contract, existing public layouts and all old
 callbacks/results. This is an additive seam proposal, not new input routing.
 
@@ -143,3 +143,17 @@ Python/JS/TS/Go/Rust builder automatically acquires immediate typed requests,
 per-item metadata or synchronous acceptance from these C facades. Existing generic
 queue timing, copies and lifecycle remain separate, with explicit omissions.
 No source manifest promotion or new dependency follows from this checkpoint.
+
+## Activation implementation checkpoint
+
+The shipped activation names match this proposal. The menu result is named
+`cui_sidebar_menu_event_result`; its `submitted` field is the old submission bool,
+not an aggregate action. `valid` records argument/tree validation. Header discovery
+includes the new standalone `cui_sidebar_events.h`; old public layouts are unchanged.
+Actual snapshots are copied before legacy callbacks. A tested accessibility-focus
+then Enter sequence lacks a current accepted snapshot, so only genuine keyboard,
+frame and index metadata is carried there. TREEITEM ACTIVATE is rejected at ingress.
+Generic consumption of later ordinary mouse events does not cancel cached activation;
+explicit cancellation does. Both legacy outcomes remain unchanged. These are existing
+Core facts, not new acceptance/propagation rules. No expansion/collapse/section event
+fields have been exposed.

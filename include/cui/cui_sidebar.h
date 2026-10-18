@@ -125,4 +125,6 @@ cui_id cui_sidebar_part_id(cui_id, unsigned part);
 #ifdef __cplusplus
 }
 #endif
+/* Additive typed row notifications are discoverable from the Sidebar header. */
+#include "cui_sidebar_events.h"
 #endif

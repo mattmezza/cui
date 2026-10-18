@@ -131,6 +131,8 @@ extern int goBridgeAfterFrame(uintptr_t user);
 extern uint32_t cui_bridge_notification_v1_size(void) __attribute__((weak));
 extern uint32_t cui_bridge_notification_versions(void) __attribute__((weak));
 extern cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *, uint32_t, cui_bridge_notification_v1 *, char *, uint32_t, uint32_t *) __attribute__((weak));
+extern uint32_t cui_bridge_notification_value_payloads_v1(void) __attribute__((weak));
+extern cui_bridge_status cui_bridge_poll_value_notification_v1(cui_bridge_app *, uint32_t, uint32_t, cui_bridge_notification_v1 *, char *, uint32_t, uint32_t *) __attribute__((weak));
 extern cui_bridge_status cui_bridge_run(cui_bridge_app *, run_after_fn, void *) __attribute__((weak));
 #endif
 static cui_bridge_status go_after_frame(void *user) {
@@ -182,6 +184,42 @@ static cui_bridge_status go_poll_notification_v1(cui_bridge_app *app,
  if (size() != sizeof(*out)) return CUI_BRIDGE_INVALID_ARGUMENT;
  return poll(app, (uint32_t)sizeof(*out), out, text, capacity, required);
 }
+typedef cui_bridge_status (*notification_value_poll_fn)(cui_bridge_app *, uint32_t, uint32_t,
+    cui_bridge_notification_v1 *, char *, uint32_t, uint32_t *);
+static cui_bridge_status go_poll_value_notification_v1(cui_bridge_app *app,
+    cui_bridge_notification_v1 *out, char *text, uint32_t capacity, uint32_t *required, uint32_t *enabled_out) {
+ notification_query_fn size = NULL, versions = NULL, payloads = NULL;
+ notification_value_poll_fn poll = NULL;
+#if defined(CUI_GO_STATIC)
+ if (!bridge_lib) {
+  size = cui_bridge_notification_v1_size;
+  versions = cui_bridge_notification_versions;
+  poll = cui_bridge_poll_value_notification_v1;
+  payloads = cui_bridge_notification_value_payloads_v1;
+ }
+#endif
+ if (bridge_lib) {
+#if defined(_WIN32)
+#define NOTIFY_LOAD(dst, name) do { FARPROC sym = GetProcAddress((HMODULE)bridge_lib, name); if (sym) memcpy(&dst, &sym, sizeof dst); } while (0)
+#else
+#define NOTIFY_LOAD(dst, name) do { void *sym = dlsym(bridge_lib, name); if (sym) memcpy(&dst, &sym, sizeof dst); } while (0)
+#endif
+  NOTIFY_LOAD(size, "cui_bridge_notification_v1_size");
+  NOTIFY_LOAD(versions, "cui_bridge_notification_versions");
+  NOTIFY_LOAD(payloads, "cui_bridge_notification_value_payloads_v1");
+  NOTIFY_LOAD(poll, "cui_bridge_poll_value_notification_v1");
+#undef NOTIFY_LOAD
+ }
+ if (!size || !versions || !payloads || !poll || !(versions() & 1u))
+  return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+ if (size() != sizeof(*out)) return CUI_BRIDGE_INVALID_ARGUMENT;
+ uint32_t enabled = payloads() & 28u;
+ if (!enabled) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+ *enabled_out = enabled;
+ return poll(app, (uint32_t)sizeof(*out), enabled, out, text, capacity, required);
+}
+static double go_notification_scalar(const cui_bridge_notification_v1 *n) { return n->payload.scalar_value; }
+static cui_bridge_node go_notification_selected(const cui_bridge_notification_v1 *n) { return n->payload.selected; }
 static uint32_t go_notification_boolean(const cui_bridge_notification_v1 *n) { return n->payload.boolean_value; }
 static cui_bridge_table_notification_v1 go_notification_table(const cui_bridge_notification_v1 *n) { return n->payload.table; }
 static uint32_t go_notification_surface(const cui_bridge_notification_v1 *n) { return n->payload.surface_result; }
@@ -1698,6 +1736,133 @@ func (a *App) PollNotificationV1() (NotificationV1, bool, error) {
 		out.Kind = NotificationLegacyV1
 	default:
 		return NotificationV1{}, false, errors.New("unsupported notification V1 payload")
+	}
+	return out, true, nil
+}
+
+// ValueNotificationKindV1 is separate from the unchanged initial V1 enum.
+type ValueNotificationKindV1 uint32
+
+const (
+	ValueNotificationActivationV1 ValueNotificationKindV1 = iota + 1
+	ValueNotificationBooleanChangeV1
+	ValueNotificationTableChangeV1
+	ValueNotificationSurfaceCloseV1
+	ValueNotificationLegacyV1
+	ValueNotificationScalarChangeV1
+	ValueNotificationTextChangeV1
+	ValueNotificationSelectionChangeV1
+)
+
+type ScalarChangeV1 struct{ Value float64 }
+type TextChangeV1 struct{ Text string }
+type SelectionChangeV1 struct {
+	Handle Handle
+	Node   *Node
+}
+
+// ValueNotificationV1 owns copied values. Node references are optional live objects.
+// Only the Kind-selected payload is nonnil; activation/legacy have none.
+type ValueNotificationV1 struct {
+	Kind      ValueNotificationKindV1
+	Handle    Handle
+	Node      *Node
+	NodeKind  uint32
+	Frame     uint64
+	HasFrame  bool
+	Legacy    LegacySnapshotV1
+	Boolean   *BooleanChangeV1
+	Table     *TableChangeV1
+	Surface   *SurfaceCloseV1
+	Scalar    *ScalarChangeV1
+	Text      *TextChangeV1
+	Selection *SelectionChangeV1
+}
+
+// PollValueNotificationV1 explicitly drains the shared queue without dispatching.
+// It negotiates known value categories; unavailable libraries never fall back.
+func (a *App) PollValueNotificationV1() (ValueNotificationV1, bool, error) {
+	if err := a.check(); err != nil {
+		return ValueNotificationV1{}, false, err
+	}
+	var raw C.cui_bridge_notification_v1
+	var requiredCopy uint32
+	var enabled C.uint32_t
+	buffer, err := readNotificationTextV1(func(buffer []byte) (uint32, uint32, error) {
+		var required C.uint32_t
+		code := C.go_poll_value_notification_v1(a.ptr, &raw, (*C.char)(unsafe.Pointer(&buffer[0])), C.uint32_t(len(buffer)), &required, &enabled)
+		if code != C.CUI_BRIDGE_OK && code != C.CUI_BRIDGE_EMPTY && code != C.CUI_BRIDGE_CAPACITY {
+			return 0, 0, result(code)
+		}
+		requiredCopy = uint32(required)
+		return uint32(code), uint32(required), nil
+	})
+	if err != nil || buffer == nil {
+		return ValueNotificationV1{}, false, err
+	}
+	if raw.struct_size != C.sizeof_cui_bridge_notification_v1 || raw.schema_version != 1 || uint64(raw.text_length) >= uint64(len(buffer)) || buffer[int(raw.text_length)] != 0 || raw.flags & ^C.uint32_t(1) != 0 {
+		return ValueNotificationV1{}, false, errors.New("invalid notification V1 layout/text/flags")
+	}
+	if requiredCopy != uint32(raw.text_length)+1 || raw.legacy.text_length != raw.text_length ||
+		raw.legacy.frame_sequence != raw.frame_sequence || raw.legacy.node != raw.node || C.uint32_t(raw.legacy._type) != raw.kind ||
+		raw.kind < 1 || raw.kind > 3 || ((raw.flags&1 != 0) != (raw.frame_sequence != 0)) {
+		return ValueNotificationV1{}, false, errors.New("invalid value notification V1 metadata")
+	}
+	text := string(buffer[:int(raw.text_length)])
+	if !utf8.ValidString(text) {
+		return ValueNotificationV1{}, false, errors.New("invalid notification V1 UTF-8")
+	}
+	old := raw.legacy
+	out := ValueNotificationV1{Handle: Handle{uint32(raw.node.slot), uint32(raw.node.generation)}, Node: a.nodes[keyID(raw.node)], NodeKind: uint32(raw.node_kind), Frame: uint64(raw.frame_sequence), HasFrame: raw.flags&1 != 0,
+		Legacy: LegacySnapshotV1{Type: uint32(old._type), Handle: Handle{uint32(old.node.slot), uint32(old.node.generation)}, Frame: uint64(old.frame_sequence), CheckedRaw: uint32(old.checked), Value: float64(old.value), Text: text, SelectedHandle: Handle{uint32(old.selected.slot), uint32(old.selected.generation)}}}
+	if raw.payload_kind >= 2 && raw.payload_kind <= 4 && uint32(enabled)&(1<<uint32(raw.payload_kind)) == 0 {
+		return ValueNotificationV1{}, false, errors.New("unnegotiated value notification V1 payload")
+	}
+	switch raw.payload_kind {
+	case C.CUI_BRIDGE_PAYLOAD_NONE:
+		if raw.kind != C.CUI_BRIDGE_NOTIFY_ACTIVATE {
+			return ValueNotificationV1{}, false, errors.New("invalid activation V1 kind")
+		}
+		out.Kind = ValueNotificationActivationV1
+	case C.CUI_BRIDGE_PAYLOAD_BOOLEAN:
+		value := C.go_notification_boolean(&raw)
+		if value > 1 || raw.kind != C.CUI_BRIDGE_NOTIFY_CHANGE {
+			return ValueNotificationV1{}, false, errors.New("invalid boolean V1 payload")
+		}
+		out.Kind, out.Boolean = ValueNotificationBooleanChangeV1, &BooleanChangeV1{Value: value != 0}
+	case C.CUI_BRIDGE_PAYLOAD_SCALAR:
+		value := float64(C.go_notification_scalar(&raw))
+		if raw.kind != C.CUI_BRIDGE_NOTIFY_CHANGE || math.IsNaN(value) || math.IsInf(value, 0) || value != float64(old.value) {
+			return ValueNotificationV1{}, false, errors.New("invalid scalar V1 payload")
+		}
+		out.Kind, out.Scalar = ValueNotificationScalarChangeV1, &ScalarChangeV1{Value: value}
+	case C.CUI_BRIDGE_PAYLOAD_TEXT:
+		if raw.kind != C.CUI_BRIDGE_NOTIFY_CHANGE {
+			return ValueNotificationV1{}, false, errors.New("invalid text V1 kind")
+		}
+		out.Kind, out.Text = ValueNotificationTextChangeV1, &TextChangeV1{Text: text}
+	case C.CUI_BRIDGE_PAYLOAD_SELECTION:
+		selected := C.go_notification_selected(&raw)
+		if raw.kind != C.CUI_BRIDGE_NOTIFY_CHANGE || selected != old.selected || ((selected.slot == 0) != (selected.generation == 0)) {
+			return ValueNotificationV1{}, false, errors.New("invalid selection V1 payload")
+		}
+		out.Kind, out.Selection = ValueNotificationSelectionChangeV1, &SelectionChangeV1{Handle: Handle{uint32(selected.slot), uint32(selected.generation)}, Node: a.nodes[keyID(selected)]}
+	case C.CUI_BRIDGE_PAYLOAD_TABLE:
+		table := C.go_notification_table(&raw)
+		if raw.kind != C.CUI_BRIDGE_NOTIFY_CHANGE || (table.reason != 1 && table.reason != 2) {
+			return ValueNotificationV1{}, false, errors.New("invalid table V1 kind")
+		}
+		out.Kind, out.Table = ValueNotificationTableChangeV1, &TableChangeV1{uint32(table.reason), uint32(table.row), uint32(table.column), uint32(table.sort_column), uint32(table.sort_direction)}
+	case C.CUI_BRIDGE_PAYLOAD_SURFACE:
+		value := uint32(C.go_notification_surface(&raw))
+		if value < 1 || value > 3 || raw.kind != C.CUI_BRIDGE_NOTIFY_LIFECYCLE {
+			return ValueNotificationV1{}, false, errors.New("invalid surface V1 payload")
+		}
+		out.Kind, out.Surface = ValueNotificationSurfaceCloseV1, &SurfaceCloseV1{value}
+	case C.CUI_BRIDGE_PAYLOAD_LEGACY:
+		out.Kind = ValueNotificationLegacyV1
+	default:
+		return ValueNotificationV1{}, false, errors.New("unsupported notification V1 payload")
 	}
 	return out, true, nil
 }

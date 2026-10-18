@@ -129,3 +129,43 @@ Use strict C11/C++ header checks and the private native wrapper. Existing image
 and attachment/group tests remain regressions; no visible desktop tests. Foreign
 bindings retain their existing queued generic notifications unless separately
 implemented and tested; including this header in SDKs is not a language facade.
+
+## Approved implementation refinement: private common hook
+
+The stack-thunk strategy above is superseded by a narrow private common entry in
+Styled media. Legacy `cui_attachment` passes no descriptor; the new facade passes
+its borrowed handler/result. No public old layout changes. Availability is the
+original matching callback OR new matching observer. The final fixed click/remove/
+retry blocks invoke each original callback with the untouched `action_user`, then
+the typed observer. Missing all typed observers uses the exact old path.
+
+Use three fixed stack collector slots, no allocation/workspace/input replay.
+Collect only when the actual old `interaction.activated` is true, immediately at
+that seam before later custom rendering or legacy action callbacks can change
+focus/evidence. Record a unique genuine accepted snapshot when available; multiple
+accepted inputs/control origins coalesce to proven-frame UNKNOWN without index.
+Missing accepted evidence also gets frame-only UNKNOWN, never a fabricated index.
+Freeze category metadata before the first legacy action callback; dispatch still
+occurs at the original category callback point before `end_focus_scope`.
+
+Actual IDs and eligibility audited in current Styled/Base media:
+
+- Card uses compound ID, identified and (old click OR typed activate). Capture
+  after existing GROUP interaction/details; loading does not disable it.
+- Remove uses `cui_attachment_remove_id(card)` only when planner remove_visible
+  and prior tracked card width >0; planner requires identified, remove handler
+  availability and touch/hover. Loading does not disable removal.
+- Media retry uses `cui_attachment_retry_id(card)` only when retry_media and prior
+  tracked media width >0. Retry requires identified, FAILED, retry availability.
+- Description retry uses
+  `media_id(attachment_retry_id(media_id(card,4)), child_index+1)`, not the card
+  retry ID. Only the first non-TITLE/non-CUSTOM child when retry_description gets
+  the LINK; a child status override does not independently gate it. Pass the
+  collector to this existing private metadata helper rather than duplicating its
+  child eligibility logic in an outer scan.
+
+The collector observes accepted activation evidence only, never reducers or input
+consumption. It does not add support for GROUP/LINK accessibility ACTIVATE. Tests
+must include media/description retry, unchanged shared userdata/order, and a late
+legacy callback that changes focus after evidence was frozen, plus payload copying.
+Production is authorized only after this refinement is committed.

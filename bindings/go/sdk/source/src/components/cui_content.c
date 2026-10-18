@@ -732,24 +732,69 @@ void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *t, float width, f
     if (!reduced)
         cui_invalidate(ui);
 }
+static bool cui_spinner_resolve_size(cui_spinner_options o, float *size) {
+    float value = o.size;
+    if (o.sizing) {
+        cui_spinner_sizing sizing = *o.sizing;
+        if (sizing.size < CUI_SPINNER_CUSTOM || sizing.size > CUI_SPINNER_LARGE)
+            return false;
+        if (sizing.size == CUI_SPINNER_CUSTOM)
+            value = sizing.pixels;
+        else {
+            if (!isfinite(sizing.rem_size) || sizing.rem_size < 0 || sizing.rem_size > 4096)
+                return false;
+            const float ratios[] = {0, .75f, .875f, 1, 1.5f};
+            value = (sizing.rem_size ? sizing.rem_size : 16) * ratios[sizing.size];
+        }
+    }
+    if (!isfinite(value) || value <= 0 || value > 4096)
+        return false;
+    *size = value;
+    return true;
+}
+/* Preserve the shared sampler's clock validation/default quadratic behavior,
+ * but do not impose Skeleton's bounded opacity policy on Spinner rotation. */
+static bool cui_spinner_sample(cui_loading_motion *state, double now, float period, bool reduced,
+                               cui_loading_ease_fn ease, void *user,
+                               cui_loading_motion_result *out) {
+    cui_loading_motion next = *state;
+    cui_loading_motion_result result;
+    if (!cui_loading_motion_sample(&next, now, period, reduced, false, NULL, NULL, &result))
+        return false;
+    if (ease) {
+        float phase = reduced ? 0 : (float)(fmod(next.last_time - next.started, period) / period);
+        float turns = ease(phase, user);
+        if (!isfinite(turns))
+            return false;
+        result.phase = turns;
+    }
+    *state = next;
+    *out = result;
+    return true;
+}
 bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
                     cui_spinner_options o, cui_loading_motion_result *out) {
-    if (!ui || !id || !theme || !state || !out || !isfinite(o.size) || o.size <= 0 ||
-        o.size > 4096 || !isfinite(o.duration) || o.duration < 0 || o.duration > 60)
+    float size;
+    if (!ui || !id || !theme || !state || !out || !cui_spinner_resolve_size(o, &size) ||
+        !isfinite(o.duration) || o.duration < 0 || o.duration > 60)
         return false;
     cui_loading_motion next = *state;
     cui_loading_motion_result result;
-    if (!cui_loading_motion_sample(&next, o.now_seconds, o.duration ? o.duration : .8f,
-                                   o.reduced_motion || cui_reduced_motion(ui), false, o.ease,
-                                   o.ease_user, &result))
+    if (!cui_spinner_sample(&next, o.now_seconds, o.duration ? o.duration : .8f,
+                            o.reduced_motion || cui_reduced_motion(ui), o.ease, o.ease_user,
+                            &result))
         return false;
     cui_color color = o.custom_color ? o.color : theme->text;
-    float radians = result.phase * 6.2831853071795864769f;
+    /* Reduce in double before multiplication: even FLT_MAX turns stay finite. */
+    double turns = fmod((double)result.phase, 1.0);
+    if (turns < 0)
+        turns += 1;
+    float radians = (float)(turns * 6.2831853071795864769);
     bool painted =
-        o.paint ? o.paint(ui, id, theme, o.size, color, radians, o.paint_user)
+        o.paint ? o.paint(ui, id, theme, size, color, radians, o.paint_user)
                 : cui_icon_named(ui, id, theme, cui_string("loader"),
                                  (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                                    .custom_size = o.size,
+                                                    .custom_size = size,
                                                     .custom_color = true,
                                                     .color = color,
                                                     .custom_transform = true,

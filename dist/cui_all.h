@@ -51,6 +51,7 @@
 #include "cui_components.h"
 #include "cui_text_overflow.h"
 #include "cui_video_controls.h"
+#include "cui_boolean_events.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -254,4 +255,8 @@
 #define CUI_VIDEO_CONTROLS_IMPLEMENTATION
 #endif
 #include "cui_video_controls.h"
+#ifndef CUI_BOOLEAN_EVENTS_IMPLEMENTATION
+#define CUI_BOOLEAN_EVENTS_IMPLEMENTATION
+#endif
+#include "cui_boolean_events.h"
 #endif

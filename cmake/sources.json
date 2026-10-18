@@ -190,7 +190,10 @@
       "src/components/cui_video_controls.c"
     ],
     "cui_component_events": [],
-    "cui_control_events": []
+    "cui_control_events": [],
+    "cui_boolean_events": [
+      "src/base/cui_boolean_events.c"
+    ]
   },
   "native": {
     "text": [

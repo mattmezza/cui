@@ -1216,3 +1216,8 @@ add_executable(test_control_events tests/unit/test_control_events.c)
 target_link_libraries(test_control_events PRIVATE cui)
 cui_warnings(test_control_events)
 add_test(NAME control_events_facades COMMAND test_control_events)
+
+add_executable(test_boolean_events tests/unit/test_boolean_events.c)
+target_link_libraries(test_boolean_events PRIVATE cui)
+cui_warnings(test_boolean_events)
+add_test(NAME boolean_events_base COMMAND test_boolean_events)

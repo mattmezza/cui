@@ -194,28 +194,44 @@ typedef struct {
 } cui_loading_motion;
 typedef float (*cui_loading_ease_fn)(float phase, void *user);
 typedef struct {
-    float phase, opacity;
+    float phase, opacity; /* Spinner custom phase is finite turns, potentially outside [0,1]. */
     bool active;
     double next_wake_seconds; /* Absolute caller-clock deadline; zero when static. */
 } cui_loading_motion_result;
-/* Pure, atomic sampling; period in (0,60], now in [0,1e12]. Skeleton uses
- * a triangular bounce of the easing curve. Invalid callback output rejects. */
+/* Legacy bounded pure sampler; period in (0,60], now in [0,1e12]. Skeleton
+ * uses a triangular bounce. Easing must be finite [0,1]; reduced motion skips it.
+ * cui_spinner_ex separately accepts finite turns and evaluates reduced ease(0). */
 bool cui_loading_motion_sample(cui_loading_motion *, double now_seconds, float period,
                                bool reduced_motion, bool skeleton, cui_loading_ease_fn,
                                void *ease_user, cui_loading_motion_result *);
-/* Callback paints one icon; radians are center-relative rotation. No callback
+/* Callback paints one icon; radians are center-relative, modulo-one-turn rotation. No callback
  * userdata is retained. A failing callback must leave its own paint unchanged. */
 typedef bool (*cui_spinner_paint_fn)(cui_context *, cui_id, const cui_theme *, float size,
                                      cui_color, float radians, void *user);
+/* Optional source size identity. NULL sizing retains legacy options.size pixels.
+ * Named sizes resolve .75/.875/1/1.5 rem; rem_size=0 selects 16 logical pixels.
+ * CUSTOM uses pixels, independent of rem_size and theme font size. */
+typedef enum {
+    CUI_SPINNER_CUSTOM,
+    CUI_SPINNER_XSMALL,
+    CUI_SPINNER_SMALL,
+    CUI_SPINNER_MEDIUM,
+    CUI_SPINNER_LARGE
+} cui_spinner_size;
+typedef struct {
+    cui_spinner_size size;
+    float pixels, rem_size;
+} cui_spinner_sizing;
 typedef struct {
     float size, duration;
     double now_seconds;
     bool reduced_motion, custom_color;
     cui_color color;
-    cui_loading_ease_fn ease;
+    cui_loading_ease_fn ease; /* Finite turns; also evaluated at raw zero when reduced. */
     void *ease_user;
     cui_spinner_paint_fn paint;
     void *paint_user;
+    const cui_spinner_sizing *sizing; /* Borrowed for submission; overrides size. */
 } cui_spinner_options;
 typedef struct {
     float width, height, radius, duration;
@@ -225,7 +241,7 @@ typedef struct {
     void *ease_user;
 } cui_skeleton_options;
 /* Source Loader, 16 logical pixels, theme foreground, .8-second quadratic loop.
- * Preset source sizes are 12/14/16/24; size is also an explicit custom pixel size.
+ * Without sizing, size remains an explicit pixel size (legacy default 16).
  * Parent boxes provide layout/padding/opacity/clip; see docs/SPINNER.md. */
 cui_spinner_options cui_spinner_options_default(void);
 cui_skeleton_options cui_skeleton_options_default(void);
@@ -1164,24 +1180,69 @@ void cui_skeleton(cui_context *ui, cui_id id, const cui_theme *t, float width, f
     if (!reduced)
         cui_invalidate(ui);
 }
+static bool cui_spinner_resolve_size(cui_spinner_options o, float *size) {
+    float value = o.size;
+    if (o.sizing) {
+        cui_spinner_sizing sizing = *o.sizing;
+        if (sizing.size < CUI_SPINNER_CUSTOM || sizing.size > CUI_SPINNER_LARGE)
+            return false;
+        if (sizing.size == CUI_SPINNER_CUSTOM)
+            value = sizing.pixels;
+        else {
+            if (!isfinite(sizing.rem_size) || sizing.rem_size < 0 || sizing.rem_size > 4096)
+                return false;
+            const float ratios[] = {0, .75f, .875f, 1, 1.5f};
+            value = (sizing.rem_size ? sizing.rem_size : 16) * ratios[sizing.size];
+        }
+    }
+    if (!isfinite(value) || value <= 0 || value > 4096)
+        return false;
+    *size = value;
+    return true;
+}
+/* Preserve the shared sampler's clock validation/default quadratic behavior,
+ * but do not impose Skeleton's bounded opacity policy on Spinner rotation. */
+static bool cui_spinner_sample(cui_loading_motion *state, double now, float period, bool reduced,
+                               cui_loading_ease_fn ease, void *user,
+                               cui_loading_motion_result *out) {
+    cui_loading_motion next = *state;
+    cui_loading_motion_result result;
+    if (!cui_loading_motion_sample(&next, now, period, reduced, false, NULL, NULL, &result))
+        return false;
+    if (ease) {
+        float phase = reduced ? 0 : (float)(fmod(next.last_time - next.started, period) / period);
+        float turns = ease(phase, user);
+        if (!isfinite(turns))
+            return false;
+        result.phase = turns;
+    }
+    *state = next;
+    *out = result;
+    return true;
+}
 bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
                     cui_spinner_options o, cui_loading_motion_result *out) {
-    if (!ui || !id || !theme || !state || !out || !isfinite(o.size) || o.size <= 0 ||
-        o.size > 4096 || !isfinite(o.duration) || o.duration < 0 || o.duration > 60)
+    float size;
+    if (!ui || !id || !theme || !state || !out || !cui_spinner_resolve_size(o, &size) ||
+        !isfinite(o.duration) || o.duration < 0 || o.duration > 60)
         return false;
     cui_loading_motion next = *state;
     cui_loading_motion_result result;
-    if (!cui_loading_motion_sample(&next, o.now_seconds, o.duration ? o.duration : .8f,
-                                   o.reduced_motion || cui_reduced_motion(ui), false, o.ease,
-                                   o.ease_user, &result))
+    if (!cui_spinner_sample(&next, o.now_seconds, o.duration ? o.duration : .8f,
+                            o.reduced_motion || cui_reduced_motion(ui), o.ease, o.ease_user,
+                            &result))
         return false;
     cui_color color = o.custom_color ? o.color : theme->text;
-    float radians = result.phase * 6.2831853071795864769f;
+    /* Reduce in double before multiplication: even FLT_MAX turns stay finite. */
+    double turns = fmod((double)result.phase, 1.0);
+    if (turns < 0)
+        turns += 1;
+    float radians = (float)(turns * 6.2831853071795864769);
     bool painted =
-        o.paint ? o.paint(ui, id, theme, o.size, color, radians, o.paint_user)
+        o.paint ? o.paint(ui, id, theme, size, color, radians, o.paint_user)
                 : cui_icon_named(ui, id, theme, cui_string("loader"),
                                  (cui_icon_options){.size = CUI_ICON_CUSTOM,
-                                                    .custom_size = o.size,
+                                                    .custom_size = size,
                                                     .custom_color = true,
                                                     .color = color,
                                                     .custom_transform = true,

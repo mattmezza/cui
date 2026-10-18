@@ -386,6 +386,13 @@
       "sources": [
         "src/components/cui_video_controls.c"
       ]
+    },
+    {
+      "header": "cui_boolean_events.h",
+      "macro": "CUI_BOOLEAN_EVENTS_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_boolean_events.c"
+      ]
     }
   ]
 }

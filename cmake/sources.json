@@ -224,7 +224,8 @@
       "src/base/cui_otp_events.c"
     ],
     "cui_disclosure_events": [],
-    "cui_list_events": []
+    "cui_list_events": [],
+    "cui_tree_events": []
   },
   "native": {
     "text": [

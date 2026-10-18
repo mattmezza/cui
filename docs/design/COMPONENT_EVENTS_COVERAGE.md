@@ -188,11 +188,11 @@ reviewable. None of these additions promotes a parity level.
 | [Tabs](../TABS_EVENTS.md) | Zero-or-one aggregate stable-ID selection CHANGE before Styled paint/panel. | Scroll, reorder and overflow lifecycle are separate; no reconstructed input cause. |
 | [Pagination, Stepper, Rating](../NUMERIC_SELECTION_EVENTS.md) | Aggregate applied size_t page/index or float rating CHANGE. | One-based page differs from zero-based step; passive normalization can mutate without notification. |
 | [Calendar/DatePicker/ColorPicker](../PICKER_EVENTS.md) | Aggregate typed start/end dates or RGBA CHANGE after the chosen whole reduce/Base/Styled call. | Month/year navigation, latent HSV, external color sync and popup lifecycle are separate. |
-
 | [DropdownButton](../DROPDOWN_EVENTS.md) | Per-action accepted evidence followed by per-command menu notifications. | Phase indices can decrease; Styled modal and Link accessibility restrictions remain. |
 | [OTP](../OTP_EVENTS.md) | One aggregate CHANGE carrying accepted-operation/completion counts and final borrowed text. | Masked text is redacted; completion is not SUBMIT and final state may be incomplete. |
 | [Collapsible and Accordion](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
 | [List and ToggleGroup](../LIST_EVENTS.md) | Ordered single-ID or per-item bool transitions; List observes after legacy activation/confirmation callbacks. | Same-item confirmation is separate; ToggleGroup preserves intermediate sibling closures. |
+| [Tree](../TREE_EVENTS.md) | Each applied selection and expansion transition. | Observer sees intermediate cursor/focus/semantic state; model mutation during callback is unsupported. |
 
 Counts summarize actual observer invocations except where a guide explicitly
 preserves another established result convention. Reading results is passive.
@@ -207,4 +207,5 @@ requests, text, scalar or selection events. See the [binding audit](COMPONENT_EV
 
 Opt-in C bridge scalar notifications are implemented for Slider, NumberInput,
 Rating and Pagination, and plain text for Input, Textarea, Editor and InputGroup; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
-Selection and owning language wrappers remain separate slices.
+Selection snapshots are also supported for the explicit RadioGroup/Tabs/Select/List/Stepper
+allowlist. Owning language wrappers remain separate slices.

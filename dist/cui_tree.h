@@ -62,6 +62,7 @@ typedef struct {
 } cui_tree_result;
 cui_id cui_tree_row_id(cui_id container, cui_id node_key);
 cui_id cui_tree_toggle_id(cui_id container, cui_id node_key);
+/* Applied input observers: see cui_tree_events.h. */
 /* Base handles input/semantics without drawing; layout visible row/toggle IDs. */
 cui_tree_result cui_tree_reduce(cui_context *, cui_id, cui_tree_model *, cui_tree_state *,
                                 cui_id *selected, cui_tree_options);
@@ -79,6 +80,7 @@ cui_tree_result cui_tree(cui_context *, cui_id, const cui_theme *, cui_tree_mode
 
 #if defined(CUI_TREE_IMPLEMENTATION) && defined(CUI_TREE_DECLARATIONS_READY) && !defined(CUI_TREE_IMPLEMENTATION_ONCE)
 #define CUI_TREE_IMPLEMENTATION_ONCE
+#include "cui_tree_events.h"
 /* src/base/cui_tree.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -327,8 +329,57 @@ static size_t cui_tree_enabled_position(const cui_tree_model *m, size_t position
     }
     return SIZE_MAX;
 }
-cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s,
-                                cui_id *selected, cui_tree_options o) {
+static bool cui_tree_event_evidence(cui_context *ui, cui_id id, size_t index,
+                                    cui_event_type type, cui_component_event_metadata *out) {
+    if (!cui_frame_paint_enabled(ui) || !cui_frame_sequence(ui))
+        return false;
+    cui_activation_snapshot snapshot;
+    if (cui_event_activation_snapshot(ui, index, &snapshot) &&
+        cui_component_event_from_activation(out, CUI_COMPONENT_EVENT_CHANGE, &snapshot)) {
+        out->target = id;
+        return true;
+    }
+    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+    switch (type) {
+    case CUI_EVENT_POINTER_UP: source = CUI_COMPONENT_EVENT_SOURCE_POINTER; break;
+    case CUI_EVENT_KEY_DOWN:
+    case CUI_EVENT_KEY_UP: source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD; break;
+    case CUI_EVENT_ACCESSIBILITY_ACTION: source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY; break;
+    default: break;
+    }
+    return cui_component_event_init(out, CUI_COMPONENT_EVENT_CHANGE, id, source) &&
+           cui_component_event_set_frame_index(out, cui_frame_sequence(ui), index);
+}
+static void cui_tree_selection_notify(cui_tree_event_result *out, cui_tree_handler handler,
+    cui_component_event_metadata evidence, cui_id previous, cui_id value, size_t index) {
+    if (!handler.on_selection_change || previous == value)
+        return;
+    cui_tree_selection_change change = {evidence, previous, value, index};
+    handler.on_selection_change(handler.user, &change);
+    if (out->selection_count == SIZE_MAX)
+        out->count_overflow = true;
+    else
+        ++out->selection_count;
+}
+static bool cui_tree_expand_observed(cui_tree_model *model, size_t index, bool expanded,
+    cui_tree_handler handler, cui_tree_event_result *out,
+    const cui_component_event_metadata *evidence) {
+    cui_id key = model->nodes[index].key;
+    bool previous = model->expanded[index];
+    bool changed = cui_tree_set_expanded(model, key, expanded);
+    if (evidence && handler.on_expansion_change && previous != model->expanded[index]) {
+        cui_tree_expansion_change event = {*evidence, key, index, previous, model->expanded[index]};
+        handler.on_expansion_change(handler.user, &event);
+        if (out->expansion_count == SIZE_MAX)
+            out->count_overflow = true;
+        else
+            ++out->expansion_count;
+    }
+    return changed;
+}
+static cui_tree_result cui_tree_reduce_common(
+    cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
+    cui_tree_options o, cui_tree_handler handler, cui_tree_event_result *out) {
     cui_tree_result result = {0};
     if (!ui || !m || !s || !selected) {
         result.error = CUI_TREE_INVALID;
@@ -372,15 +423,22 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
             continue;
         if (hit == SIZE_MAX || m->nodes[hit].disabled)
             continue;
+        cui_component_event_metadata evidence;
+        bool observe = out && (handler.on_selection_change || handler.on_expansion_change) &&
+                       cui_tree_event_evidence(ui, id, e, events[e].type, &evidence);
         if (activation == cui_tree_toggle_id(id, m->nodes[hit].key)) {
-            if (cui_tree_set_expanded(m, m->nodes[hit].key, !m->expanded[hit]))
+            if (cui_tree_expand_observed(m, hit, !m->expanded[hit], handler, out,
+                                          observe ? &evidence : NULL))
                 result.expansion_changed = true;
             s->cursor = m->nodes[hit].key;
             cui_focus(ui, cui_tree_row_id(id, s->cursor));
             continue;
         }
         if (activation == cui_tree_row_id(id, m->nodes[hit].key)) {
+            cui_id previous = *selected;
             *selected = m->nodes[hit].key;
+            if (observe)
+                cui_tree_selection_notify(out, handler, evidence, previous, *selected, hit);
             s->cursor = *selected;
             result.activated = *selected;
         }
@@ -405,7 +463,8 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                 }
             } else if (key == CUI_KEY_LEFT) {
                 if (cui_tree_is_branch(m, cursor) && m->expanded[cursor])
-                    result.expansion_changed |= cui_tree_set_expanded(m, s->cursor, false);
+                    result.expansion_changed |= cui_tree_expand_observed(
+                        m, cursor, false, handler, out, observe ? &evidence : NULL);
                 else {
                     size_t parent = cursor;
                     while (cui_tree_parent(m, parent, &parent))
@@ -416,7 +475,8 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                 }
             } else if (key == CUI_KEY_RIGHT && cui_tree_is_branch(m, cursor)) {
                 if (!m->expanded[cursor])
-                    result.expansion_changed |= cui_tree_set_expanded(m, s->cursor, true);
+                    result.expansion_changed |= cui_tree_expand_observed(
+                        m, cursor, true, handler, out, observe ? &evidence : NULL);
                 else {
                     for (size_t candidate = position + 1; candidate < m->visible_count;
                          ++candidate) {
@@ -463,8 +523,12 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
             reveal = true;
             cursor = m->banks[m->active].visible[next];
             s->cursor = m->nodes[cursor].key;
-            if (!o.manual_selection)
+            if (!o.manual_selection) {
+                cui_id previous = *selected;
                 *selected = s->cursor;
+                if (observe)
+                    cui_tree_selection_notify(out, handler, evidence, previous, *selected, cursor);
+            }
             cui_focus(ui, cui_tree_row_id(id, s->cursor));
         }
     }
@@ -492,6 +556,22 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
     if (result.selection_changed || result.expansion_changed || result.activated)
         cui_invalidate(ui);
     return result;
+}
+
+cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s,
+                                cui_id *selected, cui_tree_options options) {
+    return cui_tree_reduce_common(ui, id, m, s, selected, options, (cui_tree_handler){0}, NULL);
+}
+cui_tree_event_result cui_tree_reduce_events(
+    cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
+    cui_tree_options options, cui_tree_handler handler) {
+    cui_tree_event_result out = {0};
+    if (!ui || !id || !m || !s || !selected) {
+        out.result.error = CUI_TREE_INVALID;
+        return out;
+    }
+    out.result = cui_tree_reduce_common(ui, id, m, s, selected, options, handler, &out);
+    return out;
 }
 
 void cui_tree_submit(cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s,
@@ -543,6 +623,15 @@ cui_tree_result cui_base_tree(cui_context *ui, cui_id id, cui_tree_model *m, cui
     return result;
 }
 
+cui_tree_event_result cui_base_tree_events(
+    cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
+    cui_tree_options options, cui_tree_handler handler) {
+    cui_tree_event_result out = cui_tree_reduce_events(ui, id, m, s, selected, options, handler);
+    if (ui && id && m && s && selected)
+        cui_tree_submit(ui, id, m, s, *selected, options);
+    return out;
+}
+
 /* src/components/cui_tree.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -552,8 +641,9 @@ cui_tree_result cui_base_tree(cui_context *ui, cui_id id, cui_tree_model *m, cui
 static cui_id cui_tree_style_id(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x18d9f87aab972b61) + UINT64_C(0x9e3779b97f4a7c15) * index);
 }
-cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tree_model *model,
-                         cui_tree_state *state, cui_id *selected, cui_tree_options options) {
+static cui_tree_result cui_tree_common(cui_context *ui, cui_id id, const cui_theme *t,
+    cui_tree_model *model, cui_tree_state *state, cui_id *selected, cui_tree_options options,
+    cui_tree_handler handler, cui_tree_event_result *out) {
     if (!ui || !t || !state || !model || !selected)
         return (cui_tree_result){.error = CUI_TREE_INVALID};
     float row = isfinite(options.row_height) && options.row_height > 0
@@ -561,7 +651,13 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
                     : 32;
     float height = isfinite(options.height) && options.height > 0 ? options.height : 240;
     float width = isfinite(options.width) && options.width > 0 ? options.width : 320;
-    cui_tree_result result = cui_tree_reduce(ui, id, model, state, selected, options);
+    cui_tree_result result;
+    if (out) {
+        *out = cui_tree_reduce_events(ui, id, model, state, selected, options, handler);
+        result = out->result;
+    } else {
+        result = cui_tree_reduce(ui, id, model, state, selected, options);
+    }
     cui_tree_view view = cui_tree_viewport(model, state->scroll, height, row, options.overscan);
     cui_scroll_options bars =
         cui_scroll_resolve(t, (cui_scroll_options){.vertical = true,
@@ -636,6 +732,23 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
                                 (cui_size){width, view.total}, bars);
     cui_end_box(ui);
     return result;
+}
+
+cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *theme, cui_tree_model *model,
+                         cui_tree_state *state, cui_id *selected, cui_tree_options options) {
+    return cui_tree_common(ui, id, theme, model, state, selected, options,
+                           (cui_tree_handler){0}, NULL);
+}
+cui_tree_event_result cui_tree_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_tree_model *model,
+    cui_tree_state *state, cui_id *selected, cui_tree_options options, cui_tree_handler handler) {
+    cui_tree_event_result out = {0};
+    if (!ui || !id || !theme || !model || !state || !selected) {
+        out.result.error = CUI_TREE_INVALID;
+        return out;
+    }
+    (void)cui_tree_common(ui, id, theme, model, state, selected, options, handler, &out);
+    return out;
 }
 
 #endif

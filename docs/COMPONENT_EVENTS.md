@@ -113,4 +113,7 @@ reuses the ordered selection seam after legacy activation/confirmation callbacks
 Accordion, multi-list and ToggleGroup also report each applied transition; see
 [disclosure events](DISCLOSURE_EVENTS.md) and [List events](LIST_EVENTS.md).
 The [opt-in bridge value API](BRIDGE_VALUE_NOTIFICATIONS.md) currently supports
-scalar and plain-text notifications; existing polling and language wrappers retain their contracts.
+scalar, plain-text and selection notifications; existing polling and language wrappers retain their contracts.
+
+[Tree events](TREE_EVENTS.md) observe each applied selection and expansion
+transition without replaying reduction; callbacks precede later semantics and paint.

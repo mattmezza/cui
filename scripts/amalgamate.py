@@ -24,6 +24,8 @@ def generate(name,sources):
         lines += ['#include "cui_multiline_events.h"']
     if name == "cui_editor":
         lines += ['#include "cui_editor_events.h"']
+    if name == "cui_tree":
+        lines += ['#include "cui_tree_events.h"']
     if name == "cui_disclosure":
         lines += ['#include "cui_disclosure_events.h"']
     if name == "cui_choice":

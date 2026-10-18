@@ -345,7 +345,7 @@ typedef struct {
 #define CUI_BRIDGE_PAYLOAD_BOOLEAN 1u
 #define CUI_BRIDGE_PAYLOAD_SCALAR 2u /* opt-in only; old V1 poll returns LEGACY */
 #define CUI_BRIDGE_PAYLOAD_TEXT 3u /* opt-in plain-text snapshot */
-#define CUI_BRIDGE_PAYLOAD_SELECTION 4u /* reserved */
+#define CUI_BRIDGE_PAYLOAD_SELECTION 4u /* opt-in selected handle */
 #define CUI_BRIDGE_PAYLOAD_TABLE 5u
 #define CUI_BRIDGE_PAYLOAD_SURFACE 6u
 #define CUI_BRIDGE_PAYLOAD_LEGACY 7u
@@ -358,7 +358,7 @@ typedef struct {
 typedef union {
     uint32_t boolean_value; /* exactly0 or1 */
     double scalar_value; /* opt-in scalar notification view */
-    cui_bridge_node selected; /* reserved */
+    cui_bridge_node selected; /* opt-in full slot/generation snapshot */
     cui_bridge_table_notification_v1 table;
     uint32_t surface_result;
 } cui_bridge_notification_value_v1;
@@ -390,8 +390,10 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_notification_v1(
  * downgrades newly captured categories to complete LEGACY snapshots. */
 #define CUI_BRIDGE_VALUE_SCALAR_V1 (1u << CUI_BRIDGE_PAYLOAD_SCALAR)
 #define CUI_BRIDGE_VALUE_TEXT_V1 (1u << CUI_BRIDGE_PAYLOAD_TEXT)
+#define CUI_BRIDGE_VALUE_SELECTION_V1 (1u << CUI_BRIDGE_PAYLOAD_SELECTION)
 /* SCALAR: Slider/NumberInput/Rating/Pagination.
- * TEXT: plain Input/Textarea/Editor/InputGroup only, copied separately. */
+ * TEXT: plain Input/Textarea/Editor/InputGroup only, copied separately.
+ * SELECTION: RadioGroup/Tabs/Select/List/Stepper only. */
 CUI_BRIDGE_API uint32_t cui_bridge_notification_value_payloads_v1(void);
 /* Unsupported mask bits/invalid size fail before queue cleanup or consumption.
  * Unrequested categories return LEGACY; all existing typed tags stay unchanged.

@@ -183,3 +183,12 @@ reconcile only on later submissions and do not retain handlers. Run native tests
 with `python scripts/test_local.py --build-dir build`; browser tests remain
 headless. Hardware/GPU claims remain deferred. This documentation-only checkpoint
 needs diff checking, not a new runtime test or build.
+
+## Implemented VirtualList slice
+
+`cui_virtual_events.h` now provides the Base/Styled call-local wrappers described
+above. Read [VIRTUAL_EVENTS](../VIRTUAL_EVENTS.md) for the exact implemented
+contract. Existing row/measurement callback contracts and permitted behavior are
+unchanged: the no-active-mutation restriction applies to the new observer only.
+MessageScroller production APIs in this checkpoint remain proposals. Virtual
+window completion remains result-only. No manifest or binding parity promotion.

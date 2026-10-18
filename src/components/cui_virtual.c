@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_virtual_scroll.h"
+#include "cui/cui_virtual_events.h"
 #include <limits.h>
 #include <math.h>
 cui_virtual_widget_result cui_virtual_list_draw(cui_context *ui, cui_id id, const cui_theme *t,
@@ -109,4 +110,35 @@ cui_virtual_widget_result cui_virtual_list_draw(cui_context *ui, cui_id id, cons
         cui_scrollbar(ui, id, t, &s->scroll, g, scroll, false);
     cui_end_box(ui); /* root */
     return out;
+}
+
+cui_virtual_event_result cui_virtual_list_draw_events(cui_context *ui, cui_id id, const cui_theme *theme, const cui_virtual_list *model,
+    cui_virtual_widget_state *state, cui_virtual_widget_options options,
+    cui_virtual_render_item_fn render, void *user, cui_scroll_handler handler) {
+    cui_virtual_event_result result = {.control_result = {.error = CUI_VIRTUAL_INVALID}};
+    if (!ui || !id || !model || !state || !theme || !render || !cui_frame_is_submitting(ui))
+        return result;
+    cui_scroll_offset previous = {state->scroll.x, state->scroll.y};
+    uint64_t frame = cui_frame_sequence(ui);
+    result.control_result = cui_virtual_list_draw(ui, id, theme, model, state, options, render, user);
+    if (result.control_result.error != CUI_VIRTUAL_OK ||
+        !isfinite(state->scroll.x) || !isfinite(state->scroll.y))
+        return result;
+    cui_scroll_change change = {0};
+    change.has_previous = isfinite(previous.x) && isfinite(previous.y);
+    if (change.has_previous)
+        change.previous = previous;
+    change.value = (cui_scroll_offset){state->scroll.x, state->scroll.y};
+    result.valid = true;
+    result.changed = !change.has_previous || previous.x != change.value.x ||
+                     previous.y != change.value.y;
+    if (result.changed && frame && handler.on_change) {
+        (void)cui_component_event_init(&change.event, CUI_COMPONENT_EVENT_CHANGE, id,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        change.event.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+        change.event.frame_sequence = frame;
+        result.change_count = 1;
+        handler.on_change(handler.user, &change);
+    }
+    return result;
 }

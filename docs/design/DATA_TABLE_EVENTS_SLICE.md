@@ -115,10 +115,10 @@ unchanged legacy behavior. Missing callbacks ignore userdata and preserve writes
 This restriction belongs only to the additive facade, never the old API. Root
 must review it before production; full multi support is the next independent slice.
 
-## Multi-selection revision: exact API and workspace (review required)
+## Multi-selection: reviewed API and workspace
 
-This is a proposal only; none of these declarations is implemented. Keep the
-scalar API's `on_selection + multiple_selection` rejection. Add a distinct
+This reviewed interface is now implemented in the independent multi-set slice.
+Keep the scalar API's `on_selection + multiple_selection` rejection. Add a distinct
 set-observation family, rather than changing scalar payload interpretation:
 
 ```c
@@ -266,7 +266,9 @@ Pair NULL observer behavior and passive/disabled/loading cases with legacy paths
 Test sorted/reverse/equal-key maximum-size heapsort cases, comparator edge IDs,
 and instrument comparison counts with a generous O(n log n) bound; do not use
 wall-clock thresholds. Public C11/C++ header checks and private-wrapper CTest
-remain required. No multi production work is approved by this revision itself.
+remain required. The independent multi-set slice verifies maximum-size snapshots
+and uses an external instrumented comparator check for the complexity bound.
+No test instrumentation hook is added to the public API or production source.
 
 ## Subsequent independent slices and aggregate exceptions
 
@@ -339,5 +341,7 @@ fields were public at the sort checkpoint. Single selection now adds an optional
 primary-pair handler at actual selection operations and Escape, preserving their
 order relative to sort and later result/semantic work. Non-NULL selection handler
 with multiple_selection is rejected before reduction/paint; nil/sort-only handlers
-keep old multi behavior. Multi-set/workspace APIs remain unimplemented and require
-the separate exact-interface/algorithm review described above.
+keep old multi behavior. Multi-set/workspace APIs now use the reviewed separate
+facade, atomic preflight,
+exclusive scratch buffers and iterative exact multiset comparison described above.
+No subsequent column/activation/viewport slice is included.

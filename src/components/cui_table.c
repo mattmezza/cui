@@ -388,10 +388,12 @@ static void group_header_row(cui_context *ui, cui_id id, const cui_theme *t, cui
     }
     cui_end_box(ui);
 }
-static cui_table_result cui_data_table_common(cui_context *ui, cui_id id, const cui_theme *t,
-    cui_table_model *m, cui_table_state *s, cui_table_options o, cui_table_label_fn label,
-    cui_table_cell_fn render, void *data, const cui_table_event_handler *handler,
-    cui_table_event_result *events) {
+static cui_table_result cui_data_table_common(
+    cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m, cui_table_state *s,
+    cui_table_options o, cui_table_label_fn label, cui_table_cell_fn render, void *data,
+    const cui_table_event_handler *handler, cui_table_event_result *events,
+    const cui_table_set_event_handler *set_handler, cui_table_selection_workspace workspace,
+    cui_table_set_event_result *set_events) {
     if (!ui || !t || !m || !s)
         return (cui_table_result){.error = CUI_TABLE_INVALID};
     if (!o.scrollbar_style)
@@ -402,7 +404,10 @@ static cui_table_result cui_data_table_common(cui_context *ui, cui_id id, const 
              o.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE)
         o.scrollbars = true;
     cui_table_result result;
-    if (handler) {
+    if (set_handler) {
+        *set_events = cui_table_reduce_set_events(ui, id, m, s, o, workspace, *set_handler);
+        result = set_events->events.control;
+    } else if (handler) {
         *events = cui_table_reduce_events(ui, id, m, s, o, *handler);
         result = events->control;
     } else
@@ -583,13 +588,29 @@ static cui_table_result cui_data_table_common(cui_context *ui, cui_id id, const 
 cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *theme,
     cui_table_model *model, cui_table_state *state, cui_table_options options,
     cui_table_label_fn label, cui_table_cell_fn render, void *user) {
-    return cui_data_table_common(ui, id, theme, model, state, options, label, render, user, NULL, NULL);
+    return cui_data_table_common(ui, id, theme, model, state, options, label, render, user, NULL,
+                                 NULL, NULL, (cui_table_selection_workspace){0}, NULL);
 }
 cui_table_event_result cui_data_table_events(cui_context *ui, cui_id id, const cui_theme *theme,
     cui_table_model *model, cui_table_state *state, cui_table_options options,
     cui_table_label_fn label, cui_table_cell_fn render, void *user, cui_table_event_handler handler) {
     cui_table_event_result result = {0};
-    result.control = cui_data_table_common(ui, id, theme, model, state, options, label, render, user,
-                                            &handler, &result);
+    result.control =
+        cui_data_table_common(ui, id, theme, model, state, options, label, render, user, &handler,
+                              &result, NULL, (cui_table_selection_workspace){0}, NULL);
+    return result;
+}
+
+cui_table_set_event_result
+cui_data_table_set_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                          cui_table_model *model, cui_table_state *state, cui_table_options options,
+                          cui_table_label_fn label, cui_table_cell_fn render, void *user,
+                          cui_table_selection_workspace workspace,
+                          cui_table_set_event_handler handler) {
+    cui_table_set_event_result result = {0};
+    result.preflight = CUI_TABLE_SET_PREFLIGHT_INVALID;
+    result.events.control =
+        cui_data_table_common(ui, id, theme, model, state, options, label, render, user, NULL, NULL,
+                              &handler, workspace, &result);
     return result;
 }

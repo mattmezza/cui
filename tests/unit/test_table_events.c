@@ -195,4 +195,282 @@ static void selections(unsigned mode){
         cui_table_event_result ar=frame(&a,mode,true,false,passive,o),br=frame(&b,mode,false,true,passive,o);compare(&a,&b,ar.control,br.control);
         assert(br.selection_count==((!passive&&!restricted)?1u:0u));finish(&a);finish(&b);}
 }
-int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);}progress_and_consumption();return 0;}
+/* Set snapshots deliberately copy entries: retaining the payload's spans is invalid. */
+typedef struct {
+    fixture f; /* First: existing label/sort test callbacks borrow this fixture. */
+    cui_table_selection owner[8], before[8], after[8];
+    cui_table_selection copied_before[32][8], copied_after[32][8];
+    cui_table_selection_set_change changes[32];
+    size_t calls;
+    bool sort_only;
+} set_fixture;
+static bool selection_less(cui_table_selection a,cui_table_selection b) {
+    return a.row<b.row||(a.row==b.row&&a.column<b.column);
+}
+static void set_changed(void *user,const cui_table_selection_set_change *change) {
+    set_fixture *s=user;fixture *f=&s->f;assert(s->calls<32&&!f->render_started);
+    assert(change->event.target==90&&change->event.kind==CUI_COMPONENT_EVENT_CHANGE);
+    assert(change->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX);
+    assert(change->event.frame_sequence==cui_frame_sequence(f->ui));
+    assert(change->value_primary.row==f->state.row&&change->value_primary.column==f->state.column);
+    assert(change->value.count==f->state.selection_count);
+    const cui_table_selection_span spans[2]={change->previous,change->value};
+    for(size_t j=0;j<2;j++)for(size_t i=1;i<spans[j].count;i++)
+        assert(!selection_less(spans[j].items[i],spans[j].items[i-1]));
+    size_t n=s->calls++;s->changes[n]=*change;
+    if(change->previous.count<=8) {
+        if(change->previous.count)memcpy(s->copied_before[n],change->previous.items,change->previous.count*sizeof(cui_table_selection));
+        s->changes[n].previous.items=s->copied_before[n];
+    } else s->changes[n].previous.items=NULL; /* Max-size case checks all entries below. */
+    if(change->value.count<=8) {
+        if(change->value.count)memcpy(s->copied_after[n],change->value.items,change->value.count*sizeof(cui_table_selection));
+        s->changes[n].value.items=s->copied_after[n];
+    } else s->changes[n].value.items=NULL;
+    f->remove_requested=true;assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='M';
+}
+static void set_init(set_fixture *s) {
+    memset(s,0,sizeof *s);init(&s->f);s->f.state.selection=s->owner;s->f.state.selection_capacity=8;
+}
+static cui_table_selection_workspace workspace(set_fixture *s) {
+    return (cui_table_selection_workspace){s->before,s->after,8};
+}
+static cui_table_set_event_result set_frame(set_fixture *s,unsigned mode,bool legacy,bool handler,
+    unsigned passive,cui_table_options o,cui_table_selection_workspace w) {
+    fixture *f=&s->f;assert(cui_begin_frame(f->ui,600,300,.016f));f->render_started=false;
+    cui_begin_box(f->ui,900,(cui_box){.width=500,.height=250,.inert=passive==1,.layout_only=passive==2});
+    size_t input_count;cui_frame_events(f->ui,&input_count);assert(input_count<=128);
+    bool consumed[128];for(size_t i=0;i<input_count;i++)consumed[i]=cui_event_consumed(f->ui,i);
+    cui_theme t=cui_theme_light();cui_table_set_event_result r={0};
+    cui_table_set_event_handler h={.on_selection=handler&&!s->sort_only?set_changed:NULL,.on_sort=handler?sort_changed:NULL,.user=s};
+    if(mode==2) {
+        if(legacy)r.events.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
+        else r=cui_data_table_set_events(f->ui,90,&t,f->model,&f->state,o,label,NULL,f,w,h);
+    } else if(mode==1) {
+        if(legacy)r.events.control=cui_base_data_table(f->ui,90,f->model,&f->state,o);
+        else r=cui_base_data_table_set_events(f->ui,90,f->model,&f->state,o,w,h);
+    } else {
+        if(legacy)r.events.control=cui_table_reduce(f->ui,90,f->model,&f->state,o);
+        else r=cui_table_reduce_set_events(f->ui,90,f->model,&f->state,o,w,h);
+        if(r.events.control.error==CUI_TABLE_OK||r.events.control.error==CUI_TABLE_CAPACITY) {
+            cui_table_submit_root(f->ui,90,f->model,&f->state,o);
+            cui_table_submit_header(f->ui,90,f->model,&f->state,o);
+            cui_table_submit_body(f->ui,90,f->model,&f->state,o,NULL,NULL);
+        }
+    }
+    if(!legacy&&r.preflight!=CUI_TABLE_SET_PREFLIGHT_OK)
+        for(size_t i=0;i<input_count;i++)assert(consumed[i]==cui_event_consumed(f->ui,i));
+    cui_end_box(f->ui);f->draw=cui_end_frame(f->ui);assert(cui_last_error(f->ui)==CUI_OK);return r;
+}
+static void modified_key(fixture *f,cui_key code,unsigned mods) {
+    assert(cui_queue_event(f->ui,(cui_event){.type=CUI_EVENT_KEY_DOWN,.key=code,.modifiers=mods}));
+}
+static void set_compare(set_fixture *a,set_fixture *b,cui_table_result ar,cui_table_result br) {
+    compare(&a->f,&b->f,ar,br);assert(a->f.state.selection_count==b->f.state.selection_count);
+    assert(!memcmp(a->f.state.selection,b->f.state.selection,a->f.state.selection_count*sizeof(cui_table_selection)));
+}
+static void set_transitions(unsigned mode) {
+    set_fixture a,b;set_init(&a);set_init(&b);cui_table_options o=options();o.multiple_selection=true;
+    cui_table_set_event_result ar=set_frame(&a,mode,true,false,0,o,workspace(&a));
+    cui_table_set_event_result br=set_frame(&b,mode,false,true,0,o,workspace(&b));
+    set_compare(&a,&b,ar.events.control,br.events.control);assert(br.events.valid&&!br.events.selection_count);
+    cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));
+    key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);key(&a.f,CUI_KEY_DOWN);key(&b.f,CUI_KEY_DOWN);
+    key(&a.f,CUI_KEY_UP);key(&b.f,CUI_KEY_UP);
+    ar=set_frame(&a,mode,true,false,0,o,workspace(&a));br=set_frame(&b,mode,false,true,0,o,workspace(&b));
+    set_compare(&a,&b,ar.events.control,br.events.control);assert(br.events.selection_count==3&&b.calls==3);
+    assert(b.changes[0].previous.count==0&&b.changes[0].value.items[0].row==1);
+    assert(b.changes[1].previous.items[0].row==1&&b.changes[1].value.items[0].row==2);
+    assert(b.changes[2].previous.items[0].row==2&&b.changes[2].value.items[0].row==1);
+    key(&b.f,CUI_KEY_DOWN);key(&b.f,CUI_KEY_UP);
+    br=set_frame(&b,mode,false,true,0,o,workspace(&b));assert(br.events.selection_count==2&&!br.events.control.selection_changed);
+    key(&b.f,CUI_KEY_ENTER);assert(!set_frame(&b,mode,false,true,0,o,workspace(&b)).events.selection_count);
+    /* Callback copies remain independent of later scratch reuse. */
+    assert(b.changes[1].value.items[0].row==2&&b.f.remove_requested);
+    key(&b.f,CUI_KEY_ESCAPE);br=set_frame(&b,mode,false,true,0,o,workspace(&b));assert(br.events.selection_count==1&&b.f.state.selection_count==0);
+    key(&b.f,CUI_KEY_ESCAPE);assert(!set_frame(&b,mode,false,true,0,o,workspace(&b)).events.selection_count);
+    finish(&a.f);finish(&b.f);
+    /* Ctrl removes only one duplicate, preserving truthful multiplicity. */
+    set_init(&b);b.owner[0]=b.owner[1]=(cui_table_selection){1,COL_A};b.f.state.selection_count=2;
+    b.f.state.row=1;b.f.state.column=COL_A;set_frame(&b,mode,false,true,0,o,workspace(&b));
+    cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));modified_key(&b.f,CUI_KEY_ENTER,CUI_MOD_CTRL);
+    br=set_frame(&b,mode,false,true,0,o,workspace(&b));assert(br.events.selection_count==1&&b.changes[0].previous.count==2&&b.changes[0].value.count==1);
+    modified_key(&b.f,CUI_KEY_ENTER,CUI_MOD_CTRL);modified_key(&b.f,CUI_KEY_ENTER,CUI_MOD_CTRL);
+    br=set_frame(&b,mode,false,true,0,o,workspace(&b));assert(br.events.selection_count==2&&!br.events.control.selection_changed);
+    finish(&b.f);
+    /* Range rebuild changes storage order only: canonical equal sets emit nothing. */
+    set_init(&b);b.owner[0]=(cui_table_selection){2,COL_B};b.owner[1]=(cui_table_selection){2,COL_A};
+    b.owner[2]=(cui_table_selection){1,COL_B};b.owner[3]=(cui_table_selection){1,COL_A};b.f.state.selection_count=4;
+    b.f.state.row=2;b.f.state.column=COL_B;b.f.state.anchor_row=1;b.f.state.anchor_column=COL_A;
+    set_frame(&b,mode,false,true,0,o,workspace(&b));cui_focus(b.f.ui,cui_table_cell_id(90,2,COL_B));
+    modified_key(&b.f,CUI_KEY_ENTER,CUI_MOD_SHIFT);br=set_frame(&b,mode,false,true,0,o,workspace(&b));
+    assert(!br.events.selection_count&&!br.events.control.selection_changed&&b.owner[0].row==1&&b.owner[0].column==COL_A);
+    finish(&b.f);
+    /* Earlier success remains observable when a later operation exceeds capacity. */
+    set_init(&a);set_init(&b);a.f.state.selection_capacity=b.f.state.selection_capacity=1;
+    set_frame(&a,mode,true,false,0,o,workspace(&a));set_frame(&b,mode,false,true,0,o,workspace(&b));
+    cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));
+    key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);modified_key(&a.f,CUI_KEY_DOWN,CUI_MOD_CTRL);modified_key(&b.f,CUI_KEY_DOWN,CUI_MOD_CTRL);
+    ar=set_frame(&a,mode,true,false,0,o,workspace(&a));br=set_frame(&b,mode,false,true,0,o,workspace(&b));
+    set_compare(&a,&b,ar.events.control,br.events.control);assert(br.events.control.error==CUI_TABLE_CAPACITY&&br.events.selection_count==1&&br.preflight==CUI_TABLE_SET_PREFLIGHT_OK);
+    modified_key(&a.f,CUI_KEY_ENTER,CUI_MOD_SHIFT);modified_key(&b.f,CUI_KEY_ENTER,CUI_MOD_SHIFT);
+    ar=set_frame(&a,mode,true,false,0,o,workspace(&a));br=set_frame(&b,mode,false,true,0,o,workspace(&b));
+    set_compare(&a,&b,ar.events.control,br.events.control);assert(br.events.control.error==CUI_TABLE_CAPACITY&&!br.events.selection_count&&b.calls==1);
+
+    finish(&a.f);finish(&b.f);
+    /* Row-header effective ROW mode and column selection followed by sort. */
+    set_init(&b);o.row_header=true;set_frame(&b,mode,false,true,0,o,workspace(&b));
+    cui_focus(b.f.ui,cui_table_row_header_id(90,2));key(&b.f,CUI_KEY_ENTER);
+    br=set_frame(&b,mode,false,true,0,o,workspace(&b));assert(br.events.selection_count==1&&b.changes[0].mode==CUI_TABLE_SELECT_ROW&&b.changes[0].value.items[0].column==0&&br.events.control.selection_mode_requested);finish(&b.f);
+    set_init(&b);o.row_header=false;o.selection_mode=CUI_TABLE_SELECT_COLUMN;
+    set_frame(&b,mode,false,true,0,o,workspace(&b));cui_focus(b.f.ui,cui_table_header_id(90,COL_B));key(&b.f,CUI_KEY_ENTER);
+    br=set_frame(&b,mode,false,true,0,o,workspace(&b));assert(br.events.selection_count==1&&br.events.sort_count==1&&b.changes[0].value.items[0].row==0);
+    assert(b.f.trace_length==2&&b.f.trace[0]=='M'&&b.f.trace[1]=='O');finish(&b.f);
+    for(unsigned passive=0;passive<3;passive++)for(unsigned policy=0;policy<3;policy++) {
+        set_init(&a);set_init(&b);o=options();o.multiple_selection=true;
+        set_frame(&a,mode,true,false,0,o,workspace(&a));set_frame(&b,mode,false,true,0,o,workspace(&b));
+        cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));
+        key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);o.disabled=policy==1;o.loading=policy==2;
+        ar=set_frame(&a,mode,true,false,passive,o,workspace(&a));br=set_frame(&b,mode,false,true,passive,o,workspace(&b));
+        set_compare(&a,&b,ar.events.control,br.events.control);assert(br.events.selection_count==((!passive&&!policy)?1u:0u));finish(&a.f);finish(&b.f);
+    }
+    if(mode==2) {
+        set_init(&b);o=options();o.multiple_selection=true;set_frame(&b,mode,false,true,0,o,workspace(&b));
+        click(&b.f,cui_table_cell_id(90,2,COL_B));assert(set_frame(&b,mode,false,true,0,o,workspace(&b)).events.selection_count==1);
+        assert(b.changes[0].event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER&&b.changes[0].value.items[0].column==COL_B);finish(&b.f);
+    }
+}
+static void set_ranges_and_keys(unsigned mode) {
+    set_fixture s;set_init(&s);cui_table_options o=options();o.multiple_selection=true;
+    s.owner[0]=(cui_table_selection){1,COL_A};s.owner[1]=(cui_table_selection){2,COL_A};s.f.state.selection_count=2;
+    s.f.state.row=1;s.f.state.column=COL_A;s.f.state.anchor_row=1;s.f.state.anchor_column=COL_A;
+    set_frame(&s,mode,false,true,0,o,workspace(&s));cui_focus(s.f.ui,cui_table_cell_id(90,1,COL_A));
+    modified_key(&s.f,CUI_KEY_DOWN,CUI_MOD_SHIFT);
+    cui_table_set_event_result primary=set_frame(&s,mode,false,true,0,o,workspace(&s));
+    assert(primary.events.selection_count==1&&s.changes[0].previous.count==2&&s.changes[0].value.count==2);
+    assert(!memcmp(s.changes[0].previous.items,s.changes[0].value.items,2*sizeof(cui_table_selection))&&s.changes[0].previous_primary.row==1&&s.changes[0].value_primary.row==2);
+    finish(&s.f);set_init(&s);
+
+    const cui_id first=UINT64_C(9007199254740995),last=UINT64_MAX-3;
+    s.f.rows[0].key=first;s.f.rows[1].key=last;
+    assert(cui_table_bind(s.f.model,s.f.rows,2,s.f.columns,2)==CUI_TABLE_OK);
+    set_frame(&s,mode,false,true,0,o,workspace(&s));cui_focus(s.f.ui,cui_table_cell_id(90,first,COL_A));
+    key(&s.f,CUI_KEY_ENTER);set_frame(&s,mode,false,true,0,o,workspace(&s));
+    modified_key(&s.f,CUI_KEY_DOWN,CUI_MOD_SHIFT);modified_key(&s.f,CUI_KEY_RIGHT,CUI_MOD_SHIFT);
+    cui_table_set_event_result r=set_frame(&s,mode,false,true,0,o,workspace(&s));
+    assert(r.events.selection_count==2&&s.changes[1].previous.count==1&&s.changes[1].value.count==2&&s.changes[2].value.count==4);
+    assert(s.changes[2].value.items[0].row==first&&s.changes[2].value.items[0].column==COL_A&&s.changes[2].value.items[3].row==last&&s.changes[2].value.items[3].column==COL_B);
+    finish(&s.f);
+    for(unsigned selection_mode=0;selection_mode<3;selection_mode++) {
+        set_init(&s);o=options();o.multiple_selection=true;o.selection_mode=(cui_table_selection_mode)selection_mode;
+        o.row_selection_disabled=selection_mode==CUI_TABLE_SELECT_ROW;
+        o.column_selection_disabled=selection_mode==CUI_TABLE_SELECT_COLUMN;
+        o.cell_selection_disabled=selection_mode==CUI_TABLE_SELECT_CELL;
+        set_frame(&s,mode,false,true,0,o,workspace(&s));
+        cui_focus(s.f.ui,selection_mode==CUI_TABLE_SELECT_COLUMN?cui_table_header_id(90,COL_A):cui_table_cell_id(90,1,COL_A));
+        key(&s.f,CUI_KEY_ENTER);r=set_frame(&s,mode,false,true,0,o,workspace(&s));assert(!r.events.selection_count&&!s.f.state.selection_count);
+        if(selection_mode==CUI_TABLE_SELECT_COLUMN)assert(r.events.sort_count==1);
+        finish(&s.f);
+    }
+    set_init(&s);o=options();o.multiple_selection=true;s.f.columns[0].nonselectable=true;
+    set_frame(&s,mode,false,true,0,o,workspace(&s));cui_focus(s.f.ui,cui_table_cell_id(90,1,COL_A));key(&s.f,CUI_KEY_ENTER);
+    assert(!set_frame(&s,mode,false,true,0,o,workspace(&s)).events.selection_count);
+    /* Missing observer still applies selection; no workspace is needed. */
+    s.f.columns[0].nonselectable=false;key(&s.f,CUI_KEY_ENTER);
+    r=set_frame(&s,mode,false,false,0,o,(cui_table_selection_workspace){0});assert(r.events.valid&&!r.events.selection_count&&s.f.state.selection_count==1);
+    finish(&s.f);
+}
+static void set_preflight(unsigned mode) {
+    set_fixture s;set_init(&s);cui_table_options o=options();o.multiple_selection=true;
+    set_frame(&s,mode,false,true,0,o,workspace(&s));cui_focus(s.f.ui,cui_table_cell_id(90,1,COL_A));key(&s.f,CUI_KEY_ENTER);
+    cui_table_selection_workspace bad[12];cui_table_set_preflight expected[12];size_t n=0;
+#define BAD(w,e) do {bad[n]=(w);expected[n++]=(e);}while(0)
+    BAD(((cui_table_selection_workspace){s.before,s.after,7}),CUI_TABLE_SET_PREFLIGHT_WORKSPACE_CAPACITY);
+    BAD(((cui_table_selection_workspace){s.before,s.before,8}),CUI_TABLE_SET_PREFLIGHT_OVERLAP);
+    BAD(((cui_table_selection_workspace){s.before,s.before+1,7}),CUI_TABLE_SET_PREFLIGHT_WORKSPACE_CAPACITY);
+    BAD(((cui_table_selection_workspace){s.owner,s.after,8}),CUI_TABLE_SET_PREFLIGHT_OVERLAP);
+    BAD(((cui_table_selection_workspace){(cui_table_selection *)&s.f.state,s.after,8}),CUI_TABLE_SET_PREFLIGHT_OVERLAP);
+    BAD(((cui_table_selection_workspace){(cui_table_selection *)s.f.rows,s.after,8}),CUI_TABLE_SET_PREFLIGHT_OVERLAP);
+    BAD(((cui_table_selection_workspace){(cui_table_selection *)s.f.columns,s.after,8}),CUI_TABLE_SET_PREFLIGHT_OVERLAP);
+    BAD(((cui_table_selection_workspace){(cui_table_selection *)s.f.model,s.after,8}),CUI_TABLE_SET_PREFLIGHT_OVERLAP);
+    BAD(((cui_table_selection_workspace){NULL,s.after,8}),CUI_TABLE_SET_PREFLIGHT_INVALID);
+    BAD(((cui_table_selection_workspace){s.before,s.after,4097}),CUI_TABLE_SET_PREFLIGHT_INVALID);
+    BAD(((cui_table_selection_workspace){(cui_table_selection *)((unsigned char *)s.before+1),s.after,8}),CUI_TABLE_SET_PREFLIGHT_INVALID);
+    BAD(((cui_table_selection_workspace){(cui_table_selection *)(UINTPTR_MAX-(_Alignof(cui_table_selection)-1)),s.after,8}),CUI_TABLE_SET_PREFLIGHT_INVALID);
+#undef BAD
+    for(size_t i=0;i<n;i++) {
+        size_t renders=s.f.renders;
+        cui_table_state state=s.f.state;cui_table_column cols[2];memcpy(cols,s.f.columns,sizeof cols);
+        cui_table_selection before[8],after[8],owner[8];memcpy(before,s.before,sizeof before);memcpy(after,s.after,sizeof after);memcpy(owner,s.owner,sizeof owner);
+        cui_table_set_event_result r=set_frame(&s,mode,false,true,0,o,bad[i]);
+        assert(r.preflight==expected[i]&&!r.events.valid&&!r.events.submitted&&!r.events.selection_count&&!r.events.sort_count&&!r.events.count_overflow);
+        assert(r.events.control.error==CUI_TABLE_INVALID&&!s.calls&&s.f.renders==renders);
+        assert(!memcmp(&state,&s.f.state,sizeof state)&&!memcmp(cols,s.f.columns,sizeof cols)&&!memcmp(before,s.before,sizeof before)&&!memcmp(after,s.after,sizeof after)&&!memcmp(owner,s.owner,sizeof owner));
+        /* Requeue after each rejected frame; no failed call may consume input. */
+        key(&s.f,CUI_KEY_ENTER);
+    }
+    set_frame(&s,mode,false,true,0,o,workspace(&s)); /* Restore semantics omitted by failed submissions. */
+    cui_focus(s.f.ui,cui_table_cell_id(90,1,COL_A));key(&s.f,CUI_KEY_ENTER);
+    assert(set_frame(&s,mode,false,true,0,o,workspace(&s)).events.selection_count==1);
+    o.multiple_selection=false;cui_table_state saved=s.f.state;
+    assert(set_frame(&s,mode,false,true,0,o,workspace(&s)).preflight==CUI_TABLE_SET_PREFLIGHT_INVALID&&!memcmp(&saved,&s.f.state,sizeof saved));
+    /* Nil handler ignores even invalid scratch and preserves ordinary single mode. */
+    assert(set_frame(&s,mode,false,false,0,o,bad[n-1]).events.valid);finish(&s.f);
+    set_init(&s);o=options();o.multiple_selection=true;s.f.state.selection_count=9;
+    saved=s.f.state;assert(set_frame(&s,mode,false,true,0,o,workspace(&s)).preflight==CUI_TABLE_SET_PREFLIGHT_INVALID);
+    assert(!memcmp(&saved,&s.f.state,sizeof saved));finish(&s.f);
+    set_init(&s);s.sort_only=true;o=options();o.multiple_selection=true;
+    set_frame(&s,mode,false,true,0,o,bad[n-1]);cui_focus(s.f.ui,cui_table_header_id(90,COL_A));key(&s.f,CUI_KEY_ENTER);
+    cui_table_set_event_result sorted=set_frame(&s,mode,false,true,0,o,bad[n-1]);
+    assert(sorted.events.valid&&sorted.events.sort_count==1&&!sorted.events.selection_count&&!s.calls);finish(&s.f);
+    /* Genuine partial overlap, with valid full allocations and enough capacity. */
+    set_init(&s);o.multiple_selection=true;s.f.state.selection_capacity=7;
+    assert(set_frame(&s,mode,false,true,0,o,(cui_table_selection_workspace){s.before,s.before+1,7}).preflight==CUI_TABLE_SET_PREFLIGHT_OVERLAP);finish(&s.f);
+    set_init(&s);o=options();o.multiple_selection=true;s.f.state.selection=NULL;s.f.state.selection_capacity=0;
+    set_frame(&s,mode,false,true,0,o,(cui_table_selection_workspace){0});cui_focus(s.f.ui,cui_table_cell_id(90,1,COL_A));key(&s.f,CUI_KEY_ENTER);
+    cui_table_set_event_result r=set_frame(&s,mode,false,true,0,o,(cui_table_selection_workspace){0});
+    assert(r.events.valid&&r.events.control.error==CUI_TABLE_CAPACITY&&!r.events.selection_count);
+    s.f.state.row=1;s.f.state.column=COL_A;key(&s.f,CUI_KEY_ESCAPE);
+    r=set_frame(&s,mode,false,true,0,o,(cui_table_selection_workspace){0});assert(r.events.selection_count==1&&s.changes[0].previous.count==0&&s.changes[0].value.count==0);finish(&s.f);
+}
+static cui_table_selection max_owner[4096],max_before[4096],max_after[4096];
+static cui_table_row max_rows[4096];
+static void set_maximum(void) {
+    for(unsigned pattern=0;pattern<3;pattern++) {
+        set_fixture s;set_init(&s);cui_table_options o=options();o.multiple_selection=true;
+        for(size_t i=0;i<4096;i++)max_owner[i]=(cui_table_selection){
+            pattern==0?UINT64_MAX-i:pattern==1?UINT64_C(9007199254740993)+i:UINT64_MAX,
+            pattern==2?COL_B:COL_A};
+        s.f.state.selection=max_owner;s.f.state.selection_capacity=s.f.state.selection_count=4096;
+        cui_table_selection_workspace w={max_before,max_after,4096};
+        set_frame(&s,0,false,true,0,o,w);cui_focus(s.f.ui,cui_table_cell_id(90,1,COL_A));key(&s.f,CUI_KEY_ENTER);
+        cui_table_set_event_result r=set_frame(&s,0,false,true,0,o,w);
+        assert(r.events.selection_count==1&&s.changes[0].previous.count==4096&&s.changes[0].value.count==1);
+        for(size_t i=0;i<4096;i++) {
+            cui_id expected=pattern==0?UINT64_MAX-4095+i:pattern==1?UINT64_C(9007199254740993)+i:UINT64_MAX;
+            assert(max_before[i].row==expected&&max_before[i].column==(pattern==2?COL_B:COL_A));
+        }
+        /* Owner storage is never sorted; only original select's first entry changed. */
+        assert(max_owner[1].row==(pattern==0?UINT64_MAX-1:pattern==1?UINT64_C(9007199254740994):UINT64_MAX));
+        finish(&s.f);
+    }
+    /* A real Shift+End row-range operation creates the maximum AFTER snapshot. */
+    set_fixture s;set_init(&s);cui_table_destroy(s.f.model);s.f.model=cui_table_create(4096);assert(s.f.model);
+    for(size_t i=0;i<4096;i++)max_rows[i]=(cui_table_row){.key=UINT64_MAX-i};
+    assert(cui_table_bind(s.f.model,max_rows,4096,s.f.columns,1)==CUI_TABLE_OK);
+    s.f.state.selection=max_owner;s.f.state.selection_capacity=4096;s.f.state.selection_count=1;
+    max_owner[0]=(cui_table_selection){UINT64_MAX,0};s.f.state.row=UINT64_MAX;
+    s.f.state.anchor_row=UINT64_MAX;s.f.state.anchor_column=COL_A;
+    cui_table_options o=options();o.multiple_selection=true;o.selection_mode=CUI_TABLE_SELECT_ROW;
+    cui_table_selection_workspace w={max_before,max_after,4096};
+    set_frame(&s,0,false,true,0,o,w);cui_focus(s.f.ui,cui_table_cell_id(90,UINT64_MAX,COL_A));
+    modified_key(&s.f,CUI_KEY_END,CUI_MOD_SHIFT);
+    cui_table_set_event_result r=set_frame(&s,0,false,true,0,o,w);
+    assert(r.events.selection_count==1&&s.changes[0].previous.count==1&&s.changes[0].value.count==4096);
+    for(size_t i=0;i<4096;i++)assert(max_after[i].row==UINT64_MAX-4095+i&&max_after[i].column==0);
+    assert(max_owner[0].row==UINT64_MAX&&max_owner[4095].row==UINT64_MAX-4095);
+    key(&s.f,CUI_KEY_ESCAPE);r=set_frame(&s,0,false,true,0,o,w);
+    assert(r.events.selection_count==1&&s.changes[1].previous.count==4096&&!s.changes[1].value.count);
+    finish(&s.f);
+}
+
+int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);}progress_and_consumption();set_maximum();return 0;}

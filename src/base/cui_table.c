@@ -468,11 +468,79 @@ typedef struct {
     cui_event input;
     const cui_table_event_handler *handler;
     cui_table_event_result *events;
+    const cui_table_set_event_handler *set_handler;
+    cui_table_selection_workspace workspace;
+    size_t previous_count;
 } cui_table_selection_observer;
+/* Iterative heapsort of scratch only: bounded indices, O(n log n), O(1) extra. */
+static bool cui_table_selection_less(cui_table_selection a, cui_table_selection b) {
+    return a.row < b.row || (a.row == b.row && a.column < b.column);
+}
+static void cui_table_selection_sift(cui_table_selection *items, size_t root, size_t count) {
+    while (root < count / 2) {
+        size_t child = root * 2 + 1;
+        if (child + 1 < count && cui_table_selection_less(items[child], items[child + 1]))
+            child++;
+        if (!cui_table_selection_less(items[root], items[child]))
+            break;
+        cui_table_selection temp = items[root];
+        items[root] = items[child];
+        items[child] = temp;
+        root = child;
+    }
+}
+static void cui_table_selection_sort(cui_table_selection *items, size_t count) {
+    for (size_t i = count / 2; i > 0; i--)
+        cui_table_selection_sift(items, i - 1, count);
+    for (size_t end = count; end > 1; end--) {
+        cui_table_selection temp = items[0];
+        items[0] = items[end - 1];
+        items[end - 1] = temp;
+        cui_table_selection_sift(items, 0, end - 1);
+    }
+}
+static void cui_table_snapshot_selection(cui_table_selection_observer *observer,
+                                         const cui_table_state *state) {
+    if (!observer || !observer->set_handler)
+        return;
+    observer->previous_count = state->selection_count;
+    if (state->selection_count)
+        memcpy(observer->workspace.previous, state->selection,
+               state->selection_count * sizeof(*state->selection));
+}
+
 static void cui_table_notify_selection(const cui_table_selection_observer *observer,
-    cui_table_selection previous, cui_table_selection value, cui_table_selection_mode mode,
-    cui_component_event_metadata metadata) {
-    if (!observer || (previous.row == value.row && previous.column == value.column)) return;
+                                       cui_table_selection previous, cui_table_selection value,
+                                       cui_table_selection_mode mode,
+                                       cui_component_event_metadata metadata,
+                                       const cui_table_state *state) {
+    if (!observer)
+        return;
+    if (observer->set_handler) {
+        cui_table_selection_workspace w = observer->workspace;
+        size_t before = observer->previous_count, after = state->selection_count;
+        if (after)
+            memcpy(w.value, state->selection, after * sizeof(*state->selection));
+        cui_table_selection_sort(w.previous, before);
+        cui_table_selection_sort(w.value, after);
+        bool changed =
+            previous.row != value.row || previous.column != value.column || before != after;
+        for (size_t i = 0; !changed && i < before; i++)
+            changed =
+                w.previous[i].row != w.value[i].row || w.previous[i].column != w.value[i].column;
+        if (!changed)
+            return;
+        cui_table_selection_set_change change = {
+            metadata, previous, value, mode, {w.previous, before}, {w.value, after}};
+        if (observer->events->selection_count == SIZE_MAX)
+            observer->events->count_overflow = true;
+        else
+            observer->events->selection_count++;
+        observer->set_handler->on_selection(observer->set_handler->user, &change);
+        return;
+    }
+    if (previous.row == value.row && previous.column == value.column)
+        return;
     cui_table_selection_change change = {metadata, previous, value, mode};
     if (observer->events->selection_count == SIZE_MAX) observer->events->count_overflow = true;
     else observer->events->selection_count++;
@@ -480,16 +548,18 @@ static void cui_table_notify_selection(const cui_table_selection_observer *obser
 }
 static void apply_selection(cui_table_model *m, cui_table_state *s, cui_table_options o, cui_id row,
                             cui_id col, unsigned mods, cui_table_result *out,
-    const cui_table_selection_observer *observer) {
+                            cui_table_selection_observer *observer) {
     if (!selection_allowed(m, o, col))
         return;
     cui_table_selection previous = {s->row, s->column};
     cui_component_event_metadata metadata = {0};
     if (observer) metadata = cui_table_event_metadata(observer->ui, observer->table, observer->index, observer->input);
+    cui_table_snapshot_selection(observer, s);
     cui_table_error error = select(m, s, o, row, col, mods);
     if (error != CUI_TABLE_OK)
         out->error = error;
-    cui_table_notify_selection(observer, previous, (cui_table_selection){s->row, s->column}, o.selection_mode, metadata);
+    cui_table_notify_selection(observer, previous, (cui_table_selection){s->row, s->column},
+                               o.selection_mode, metadata, s);
 }
 static size_t enabled_row(const cui_table_model *m, size_t start, int direction, bool loop) {
     if (!m->count)
@@ -569,7 +639,7 @@ static bool drop_column(cui_context *ui, cui_id id, cui_table_model *m, cui_tabl
 static bool row_header_event(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
                              cui_table_options o, const cui_event *event, cui_id target,
                              cui_id activation, cui_id *previous, bool *reveal,
-                             cui_table_result *out, const cui_table_selection_observer *observer) {
+                             cui_table_result *out, cui_table_selection_observer *observer) {
     if (!o.row_header)
         return false;
     cui_table_view view = cui_table_viewport(m, s->scroll_y, height(o), row_height(o), o.overscan);
@@ -649,8 +719,11 @@ static cui_component_event_metadata cui_table_event_metadata(cui_context *ui, cu
     return metadata;
 }
 static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_table_model *m,
-    cui_table_state *s, cui_table_options o, const cui_table_event_handler *handler,
-    cui_table_event_result *events) {
+                                                cui_table_state *s, cui_table_options o,
+                                                const cui_table_event_handler *handler,
+                                                cui_table_event_result *events,
+                                                const cui_table_set_event_handler *set_handler,
+                                                cui_table_selection_workspace workspace) {
     cui_table_result out = {0};
     if (!ui || !m || !s || !m->columns ||
         (o.selection_mode != CUI_TABLE_SELECT_ROW && o.selection_mode != CUI_TABLE_SELECT_COLUMN &&
@@ -721,9 +794,13 @@ static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_
     bool reveal = false;
     for (size_t e = 0; e < count && !o.disabled && !o.loading; e++) {
         cui_id target = cui_event_target(ui, e), activation = cui_event_activation(ui, e);
-        cui_table_selection_observer selection_observer = {ui, id, e, ev[e], handler, events};
-        const cui_table_selection_observer *observer =
-            handler && handler->on_selection && cui_frame_sequence(ui) != 0 ? &selection_observer : NULL;
+        cui_table_selection_observer selection_observer = {
+            ui, id, e, ev[e], handler, events, set_handler, workspace, 0};
+        cui_table_selection_observer *observer =
+            ((handler && handler->on_selection) || (set_handler && set_handler->on_selection)) &&
+                    cui_frame_sequence(ui) != 0
+                ? &selection_observer
+                : NULL;
         if (ev[e].type == CUI_EVENT_CANCEL) {
             s->resizing = 0;
             s->dragging = 0;
@@ -766,9 +843,11 @@ static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_
                 cui_component_event_metadata metadata = {0};
                 if (observer) metadata = cui_table_event_metadata(ui, id, e, ev[e]);
                 out.selection_changed |= s->row != 0 || s->column != 0 || s->selection_count != 0;
+                cui_table_snapshot_selection(observer, s);
                 s->row = s->column = s->anchor_row = s->anchor_column = 0;
                 s->selection_count = 0;
-                cui_table_notify_selection(observer, previous_selection, (cui_table_selection){0}, o.selection_mode, metadata);
+                cui_table_notify_selection(observer, previous_selection, (cui_table_selection){0},
+                                           o.selection_mode, metadata, s);
                 s->resizing = 0;
                 continue;
             }
@@ -1050,13 +1129,99 @@ static cui_table_result cui_table_reduce_common(cui_context *ui, cui_id id, cui_
 }
 cui_table_result cui_table_reduce(cui_context *ui, cui_id id, cui_table_model *model,
     cui_table_state *state, cui_table_options options) {
-    return cui_table_reduce_common(ui, id, model, state, options, NULL, NULL);
+    return cui_table_reduce_common(ui, id, model, state, options, NULL, NULL, NULL,
+                                   (cui_table_selection_workspace){0});
 }
 cui_table_event_result cui_table_reduce_events(cui_context *ui, cui_id id, cui_table_model *model,
     cui_table_state *state, cui_table_options options, cui_table_event_handler handler) {
     cui_table_event_result result = {0};
     if (!ui || !id || (handler.on_selection && options.multiple_selection)) { result.control.error = CUI_TABLE_INVALID; return result; }
-    result.control = cui_table_reduce_common(ui, id, model, state, options, &handler, &result);
+    result.control = cui_table_reduce_common(ui, id, model, state, options, &handler, &result, NULL,
+                                             (cui_table_selection_workspace){0});
+    return result;
+}
+/* Checked half-open integer intervals; never relationally compare C pointers. */
+typedef struct {
+    uintptr_t begin, end;
+} cui_table_memory_range;
+static bool cui_table_memory(const void *pointer, size_t count, size_t size, size_t alignment,
+                             cui_table_memory_range *range) {
+    range->begin = range->end = 0;
+    if (!count)
+        return true;
+    if (!pointer || count > SIZE_MAX / size)
+        return false;
+    uintptr_t begin = (uintptr_t)pointer;
+    size_t bytes = count * size;
+    if (begin % alignment || bytes > UINTPTR_MAX - begin)
+        return false;
+    range->begin = begin;
+    range->end = begin + bytes;
+    return true;
+}
+static bool cui_table_memory_overlaps(cui_table_memory_range a, cui_table_memory_range b) {
+    return a.begin < a.end && b.begin < b.end && a.begin < b.end && b.begin < a.end;
+}
+static cui_table_set_preflight cui_table_set_preflight_check(
+    cui_context *ui, cui_id id, const cui_table_model *m, const cui_table_state *s,
+    cui_table_options o, cui_table_selection_workspace w, cui_table_set_event_handler handler) {
+    if (!ui || !id || !m || !s || !m->columns ||
+        (o.selection_mode != CUI_TABLE_SELECT_ROW && o.selection_mode != CUI_TABLE_SELECT_COLUMN &&
+         o.selection_mode != CUI_TABLE_SELECT_CELL) ||
+        (o.sort_cycle != CUI_TABLE_SORT_CYCLE_LEGACY &&
+         o.sort_cycle != CUI_TABLE_SORT_CYCLE_SOURCE) ||
+        (o.accessible_name.length && !o.accessible_name.data) ||
+        (s->sort != CUI_TABLE_SORT_DEFAULT && s->sort != CUI_TABLE_SORT_ASCENDING &&
+         s->sort != CUI_TABLE_SORT_DESCENDING) ||
+        (o.multiple_selection &&
+         ((!s->selection && s->selection_capacity) || s->selection_capacity > 4096 ||
+          s->selection_count > s->selection_capacity)) ||
+        (handler.on_selection && !o.multiple_selection))
+        return CUI_TABLE_SET_PREFLIGHT_INVALID;
+    if (!handler.on_selection)
+        return CUI_TABLE_SET_PREFLIGHT_OK;
+    cui_table_memory_range scratch[2], owned[5];
+    if (w.capacity > 4096 ||
+        !cui_table_memory(w.previous, w.capacity, sizeof(*w.previous),
+                          _Alignof(cui_table_selection), &scratch[0]) ||
+        !cui_table_memory(w.value, w.capacity, sizeof(*w.value), _Alignof(cui_table_selection),
+                          &scratch[1]) ||
+        !cui_table_memory(s, 1, sizeof(*s), _Alignof(cui_table_state), &owned[0]) ||
+        !cui_table_memory(s->selection, s->selection_capacity, sizeof(*s->selection),
+                          _Alignof(cui_table_selection), &owned[1]) ||
+        !cui_table_memory(m, 1, sizeof(*m), _Alignof(cui_table_model), &owned[2]) ||
+        !cui_table_memory(m->rows, m->count, sizeof(*m->rows), _Alignof(cui_table_row),
+                          &owned[3]) ||
+        !cui_table_memory(m->cols, m->columns, sizeof(*m->cols), _Alignof(cui_table_column),
+                          &owned[4]))
+        return CUI_TABLE_SET_PREFLIGHT_INVALID;
+    if (w.capacity < s->selection_capacity)
+        return CUI_TABLE_SET_PREFLIGHT_WORKSPACE_CAPACITY;
+    if (cui_table_memory_overlaps(scratch[0], scratch[1]))
+        return CUI_TABLE_SET_PREFLIGHT_OVERLAP;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 5; j++)
+            if (cui_table_memory_overlaps(scratch[i], owned[j]))
+                return CUI_TABLE_SET_PREFLIGHT_OVERLAP;
+    return CUI_TABLE_SET_PREFLIGHT_OK;
+}
+cui_table_set_event_result cui_table_reduce_set_events(cui_context *ui, cui_id id,
+                                                       cui_table_model *model,
+                                                       cui_table_state *state,
+                                                       cui_table_options options,
+                                                       cui_table_selection_workspace workspace,
+                                                       cui_table_set_event_handler handler) {
+    cui_table_set_event_result result = {0};
+    result.preflight =
+        cui_table_set_preflight_check(ui, id, model, state, options, workspace, handler);
+    if (result.preflight != CUI_TABLE_SET_PREFLIGHT_OK) {
+        result.events.control.error = CUI_TABLE_INVALID;
+        return result;
+    }
+    cui_table_event_handler scalar = {.on_sort = handler.on_sort, .user = handler.user};
+    result.events.control =
+        cui_table_reduce_common(ui, id, model, state, options, &scalar, &result.events,
+                                handler.on_selection ? &handler : NULL, workspace);
     return result;
 }
 void cui_table_submit_root(cui_context *ui, cui_id id, cui_table_model *m, cui_table_state *s,
@@ -1259,6 +1424,23 @@ cui_table_event_result cui_base_data_table_events(cui_context *ui, cui_id id, cu
     cui_table_state *state, cui_table_options options, cui_table_event_handler handler) {
     cui_table_event_result result = cui_table_reduce_events(ui, id, model, state, options, handler);
     if (result.control.error == CUI_TABLE_OK || result.control.error == CUI_TABLE_CAPACITY) {
+        cui_table_submit_root(ui, id, model, state, options);
+        cui_table_submit_header(ui, id, model, state, options);
+        cui_table_submit_body(ui, id, model, state, options, NULL, NULL);
+    }
+    return result;
+}
+
+cui_table_set_event_result cui_base_data_table_set_events(cui_context *ui, cui_id id,
+                                                          cui_table_model *model,
+                                                          cui_table_state *state,
+                                                          cui_table_options options,
+                                                          cui_table_selection_workspace workspace,
+                                                          cui_table_set_event_handler handler) {
+    cui_table_set_event_result result =
+        cui_table_reduce_set_events(ui, id, model, state, options, workspace, handler);
+    if (result.events.control.error == CUI_TABLE_OK ||
+        result.events.control.error == CUI_TABLE_CAPACITY) {
         cui_table_submit_root(ui, id, model, state, options);
         cui_table_submit_header(ui, id, model, state, options);
         cui_table_submit_body(ui, id, model, state, options, NULL, NULL);

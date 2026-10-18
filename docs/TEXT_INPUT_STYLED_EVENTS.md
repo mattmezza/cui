@@ -33,7 +33,8 @@ precondition, not a runtime guard. Defer removal/destruction until after the fra
 and renderer have consumed its borrowed resources.
 
 The additive facade does not change `cui_input`, `cui_input_ex`, their options or
-results. It does not add Editor, Textarea or language-binding observer APIs.
+results. [Editor and Textarea observers](MULTILINE_EVENTS.md) have separate
+aggregation and timing contracts. Language bindings do not expose these C observers.
 
 `tests/unit/test_text_input_styled_events.c` compares legacy and facade results,
 selection/revision and draw commands, ordered intermediate copies, masked IME,

@@ -8,6 +8,7 @@
 #include "cui_edit.h"
 #include "cui_overlay.h"
 #include "cui_theme.h"
+#include "cui_selection_events.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -219,6 +220,16 @@ bool cui_list(cui_context *, cui_id container, const cui_theme *, const cui_choi
 bool cui_select(cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_str placeholder,
                 const cui_choice_item *, size_t count, cui_id *selected, cui_choice_popup *,
                 cui_choice_popup_options);
+/* Synchronous post-mutation Select observer; missing handler preserves writes.
+ * Full list pass precedes existing popup close. No request/rejection semantics. */
+typedef struct {
+    cui_selection_event_result events;
+    bool legacy_changed;
+} cui_select_event_result;
+cui_select_event_result cui_select_events(
+    cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_str placeholder,
+    const cui_choice_item *, size_t count, cui_id *selected, cui_choice_popup *,
+    cui_choice_popup_options, cui_selection_handler);
 /* Menu returns true when an action ID was activated, including reactivation
  * of the currently selected action. The caller owns the command dispatch. */
 bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
@@ -1059,8 +1070,10 @@ static bool cui_choice_scroll_event(cui_context *ui, const cui_choice_item *item
     cui_invalidate(ui);
     return true;
 }
-bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
-                   cui_list_state *state, cui_list_options options) {
+/* Private forwarding seam; no new List callback API or option layout. */
+bool cui_choice_private_list_events(cui_context *ui, const cui_choice_item *items, size_t count,
+    cui_id *selected, cui_list_state *state, cui_list_options options, cui_id control,
+    cui_selection_handler handler, cui_selection_event_result *observed) {
     if ((!items && count) || !selected || !state)
         return false;
     if (!count) {
@@ -1130,7 +1143,29 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
         if (cui_event_activation(ui, e) && !(scrolled && event.type == CUI_EVENT_POINTER_UP) &&
             (events[e].type != CUI_EVENT_KEY_UP || items[from].id == cui_event_activation(ui, e))) {
             size_t chosen = events[e].type == CUI_EVENT_POINTER_UP ? target : from;
-            *selected = state->active = items[chosen].id;
+            cui_id previous = *selected, item = items[chosen].id;
+            cui_component_event_metadata metadata;
+            memset(&metadata, 0, sizeof(metadata));
+            bool notify = observed && handler.on_change && cui_frame_sequence(ui) != 0;
+            if (notify) {
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, e, &snapshot) ||
+                    !cui_component_event_from_activation(&metadata, CUI_COMPONENT_EVENT_CHANGE,
+                                                         &snapshot)) {
+                    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+                    if (event.type == CUI_EVENT_POINTER_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+                    else if (event.type == CUI_EVENT_KEY_DOWN || event.type == CUI_EVENT_KEY_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                    else if (event.type == CUI_EVENT_ACCESSIBILITY_ACTION)
+                        source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+                    (void)cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE,
+                                                    control, source);
+                    (void)cui_component_event_set_frame_index(&metadata, cui_frame_sequence(ui), e);
+                }
+                metadata.target = control;
+            }
+            *selected = state->active = item;
             activated = true;
             state->secondary_active = 0;
             if (options.on_activate)
@@ -1140,6 +1175,16 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
                                                                  : CUI_MOD_CTRL | CUI_MOD_META;
                 options.on_confirm(items[chosen].id, (event.modifiers & modifiers) != 0,
                                    options.activation_user);
+            }
+            cui_id value = *selected;
+            if (notify && previous != value) {
+                cui_selection_change change = {metadata, previous, value, item,
+                                                CUI_SELECTION_REASON_ACTIVATION};
+                if (observed->change_count == SIZE_MAX)
+                    observed->count_overflow = true;
+                else
+                    observed->change_count++;
+                handler.on_change(handler.user, &change);
             }
         }
         if (events[e].type == CUI_EVENT_KEY_DOWN) {
@@ -1238,6 +1283,12 @@ bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, 
         cui_set_tab_stop(ui, items[i].id, i == stop);
     }
     return activated;
+}
+
+bool cui_base_list(cui_context *ui, const cui_choice_item *items, size_t count, cui_id *selected,
+                   cui_list_state *state, cui_list_options options) {
+    return cui_choice_private_list_events(ui, items, count, selected, state, options, 0,
+                                          (cui_selection_handler){0}, NULL);
 }
 
 void cui_base_choice_popup_trigger(cui_context *ui, cui_id trigger, cui_str name, bool disabled,
@@ -2149,6 +2200,10 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
 
 
 #include <math.h>
+/* Private Base reducer forwarding; not an application-facing List facade. */
+bool cui_choice_private_list_events(cui_context *, const cui_choice_item *, size_t,
+    cui_id *, cui_list_state *, cui_list_options, cui_id, cui_selection_handler,
+    cui_selection_event_result *);
 static void cui_choice_menu_level(cui_context *, const cui_theme *, const cui_menu_entry *, size_t,
                                   cui_menu_tree_state *, size_t, cui_rect, cui_menu_tree_options,
                                   cui_str);
@@ -3264,7 +3319,8 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
 static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_theme *theme,
                                     cui_str name, cui_str placeholder, const cui_choice_item *items,
                                     size_t count, cui_id *selected, cui_choice_popup *state,
-                                    cui_choice_popup_options options, bool menu) {
+                                    cui_choice_popup_options options, bool menu,
+                                    cui_selection_handler handler, cui_selection_event_result *observed) {
     if (!theme || !selected || !state || !state->overlay.id || (!items && count) ||
         !isfinite(options.viewport.x) || !isfinite(options.viewport.y) ||
         !isfinite(options.viewport.w) || !isfinite(options.viewport.h) || options.viewport.w <= 0 ||
@@ -3274,6 +3330,10 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
     cui_theme trigger_theme;
     if (!cui_choice_design_theme(theme, options.design_size, &trigger_theme))
         return false;
+    if (observed) {
+        observed->valid = true;
+        observed->submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
+    }
     cui_base_choice_popup_trigger(ui, trigger, name, options.disabled, items, count, *selected,
                                   state);
     cui_str display = menu ? name : placeholder;
@@ -3327,7 +3387,10 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                          state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11)};
     cui_id old = *selected;
     bool activated =
-        count ? cui_base_list(ui, items, count, selected, &state->list, list_options) : false;
+        count ? (observed ? cui_choice_private_list_events(ui, items, count, selected,
+                    &state->list, list_options, trigger, handler, observed)
+                         : cui_base_list(ui, items, count, selected, &state->list, list_options))
+              : false;
     if (activated) {
         cui_id scope = state->overlay.id;
         cui_overlay_close(ui, &state->overlay);
@@ -3369,13 +3432,26 @@ bool cui_select(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str
                 cui_str placeholder, const cui_choice_item *items, size_t count, cui_id *selected,
                 cui_choice_popup *state, cui_choice_popup_options options) {
     return cui_choice_popup_render(ui, trigger, theme, name, placeholder, items, count, selected,
-                                   state, options, false);
+                                   state, options, false, (cui_selection_handler){0}, NULL);
 }
+cui_select_event_result cui_select_events(cui_context *ui, cui_id trigger, const cui_theme *theme,
+    cui_str name, cui_str placeholder, const cui_choice_item *items, size_t count,
+    cui_id *selected, cui_choice_popup *state, cui_choice_popup_options options,
+    cui_selection_handler handler) {
+    cui_select_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !trigger)
+        return result;
+    result.legacy_changed = cui_choice_popup_render(ui, trigger, theme, name, placeholder,
+        items, count, selected, state, options, false, handler, &result.events);
+    return result;
+}
+
 bool cui_menu(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
               const cui_choice_item *items, size_t count, cui_id *action, cui_choice_popup *state,
               cui_choice_popup_options options) {
     return cui_choice_popup_render(ui, trigger, theme, name, name, items, count, action, state,
-                                   options, true);
+                                   options, true, (cui_selection_handler){0}, NULL);
 }
 
 static void cui_choice_paint_query(cui_context *ui, cui_id input, const cui_theme *theme,

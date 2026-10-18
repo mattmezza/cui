@@ -197,7 +197,8 @@
     "cui_slider_events": [],
     "cui_text_input_events": [],
     "cui_selection_events": [],
-    "cui_multiline_events": []
+    "cui_multiline_events": [],
+    "cui_editor_events": []
   },
   "native": {
     "text": [

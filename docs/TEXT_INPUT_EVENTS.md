@@ -6,8 +6,9 @@ Include `cui/cui_text_input_events.h` for two additive Base-only APIs:
 already register their textbox and reduce events in queue order. Existing Input
 signatures, options/results, validation, presentation and mutation policy remain
 unchanged. A [Styled Input facade](TEXT_INPUT_STYLED_EVENTS.md) adds the same
-observer at its existing reduction seam. Textarea, Editor and foreign bindings
-have no corresponding new facade.
+observer at its existing reduction seam. [Textarea and Editor](MULTILINE_EVENTS.md)
+have separately documented aggregate observers. Foreign bindings do not expose
+these synchronous C observers.
 
 ```c
 static void input_event(void *user, const cui_component_text_event *event) {
@@ -109,6 +110,6 @@ remain the behavioral regressions; native tests use
 `python scripts/test_local.py --build-dir <build>`.
 
 This establishes Base Input notification behavior, not browser/OS IME acceptance,
-Styled/Editor/Textarea notifications, foreign request rejection, full event-family
-uniformity or general callback reentrancy. Integrators register the new test and
+foreign request rejection, full event-family uniformity or general callback
+reentrancy. Styled and multiline observer guarantees have their own guides. Integrators register the new test and
 refresh source metadata/generated distributions/SDKs with normal tooling.

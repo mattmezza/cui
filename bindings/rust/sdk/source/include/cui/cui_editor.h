@@ -195,6 +195,7 @@ size_t cui_editor_match_count(const cui_editor_state *, cui_str query);
 cui_editor_search_result cui_editor_find_bar(cui_context *, cui_id, cui_id editor_id,
                                              const cui_theme *, cui_editor_state *,
                                              cui_editor_search_state *, float width, bool disabled);
+/* Additive aggregate CHANGE facades are declared in cui_editor_events.h. */
 cui_textarea_result cui_base_editor(cui_context *, cui_id, cui_str name, cui_editor_state *,
                                     cui_editor_options, cui_textarea_metrics);
 cui_textarea_result cui_editor(cui_context *, cui_id, const cui_theme *, cui_str name,

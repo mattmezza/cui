@@ -83,4 +83,6 @@ The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_I
 
 [RadioGroup observers](SELECTION_EVENTS.md) report actual owner selection transitions after the existing request callback. Select/Combobox and general selection requests remain outside that slice; RadioGroup activation snapshots are unavailable at its preserved reducer step.
 
-[Textarea observers](MULTILINE_EVENTS.md) deliberately aggregate committed revision changes into at most one notification per submission. They do not claim a single input cause, per-event delivery or submission intent; Editor observers remain separate work.
+[Textarea observers](MULTILINE_EVENTS.md) deliberately aggregate committed revision changes into at most one notification per submission. They do not claim a single input cause, per-event delivery or submission intent; Editor observers use the same aggregation, after its entire completion/multicursor/painting pass.
+
+[Select observers](SELECT_EVENTS.md) report each actual selection transition, preserving the full list pass and popup-close timing. Combobox remains separate work; option accessibility limitations are explicit in the guide.

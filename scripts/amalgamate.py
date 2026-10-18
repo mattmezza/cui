@@ -22,6 +22,8 @@ def generate(name,sources):
         lines += ['#include "cui_slider_events.h"', '#include "cui_text_input_events.h"']
     if name == "cui_textarea":
         lines += ['#include "cui_multiline_events.h"']
+    if name == "cui_editor":
+        lines += ['#include "cui_editor_events.h"']
     if name == "cui_video_controls":
         for module in ["cui_components", "cui_video"]:
             lines += [f'#ifndef {module.upper()}_IMPLEMENTATION', f'#define {module.upper()}_IMPLEMENTATION', '#endif', f'#include "{module}.h"']

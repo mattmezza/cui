@@ -196,6 +196,7 @@ size_t cui_editor_match_count(const cui_editor_state *, cui_str query);
 cui_editor_search_result cui_editor_find_bar(cui_context *, cui_id, cui_id editor_id,
                                              const cui_theme *, cui_editor_state *,
                                              cui_editor_search_state *, float width, bool disabled);
+/* Additive aggregate CHANGE facades are declared in cui_editor_events.h. */
 cui_textarea_result cui_base_editor(cui_context *, cui_id, cui_str name, cui_editor_state *,
                                     cui_editor_options, cui_textarea_metrics);
 cui_textarea_result cui_editor(cui_context *, cui_id, const cui_theme *, cui_str name,
@@ -209,8 +210,10 @@ cui_textarea_result cui_editor(cui_context *, cui_id, const cui_theme *, cui_str
 #if defined(CUI_EDITOR_IMPLEMENTATION) && defined(CUI_EDITOR_DECLARATIONS_READY) && !defined(CUI_EDITOR_IMPLEMENTATION_ONCE)
 #define CUI_EDITOR_IMPLEMENTATION_ONCE
 #include "cui_components.h"
+#include "cui_editor_events.h"
 /* src/base/cui_editor.c */
 /* SPDX-License-Identifier: MIT */
+
 
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_TEXTAREA_GEOMETRY_H
@@ -1769,8 +1772,32 @@ cui_edit_result cui_editor_accept_completion(cui_editor_state *state) {
     return result;
 }
 
+cui_multiline_event_result cui_base_editor_events(
+    cui_context *ui, cui_id id, cui_str name, cui_editor_state *state, cui_editor_options options,
+    cui_textarea_metrics metrics, cui_component_text_handler handler) {
+    cui_multiline_event_result result = {0};
+    cui_edit *edit = state ? state->edit : NULL;
+    cui_edit_state before = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    result.control = cui_base_editor(ui, id, name, state, options, metrics);
+    cui_edit_state after = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    if (ui && edit && handler.callback && before.revision != after.revision) {
+        uint64_t frame = cui_frame_sequence(ui);
+        cui_component_text_event event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = frame ? CUI_COMPONENT_EVENT_HAS_FRAME : 0,
+                      .frame_sequence = frame},
+            .before = before, .after = after, .has_text = true,
+            .text = cui_edit_get_text(edit)};
+        handler.callback(handler.user, &event);
+        result.change_count = 1;
+    }
+    return result;
+}
+
 /* src/components/cui_editor.c */
 /* SPDX-License-Identifier: MIT */
+
 
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_TEXTAREA_GEOMETRY_H
@@ -2575,6 +2602,29 @@ cui_editor_search_result cui_editor_find_bar(cui_context *ui, cui_id id, cui_id 
         result.closed = true;
         cui_focus(ui, editor_id);
         cui_invalidate(ui);
+    }
+    return result;
+}
+
+cui_multiline_event_result cui_editor_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_editor_state *state,
+    cui_editor_options options, cui_component_text_handler handler) {
+    cui_multiline_event_result result = {0};
+    cui_edit *edit = state ? state->edit : NULL;
+    cui_edit_state before = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    result.control = cui_editor(ui, id, theme, name, state, options);
+    cui_edit_state after = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
+    if (ui && edit && handler.callback && before.revision != after.revision) {
+        uint64_t frame = cui_frame_sequence(ui);
+        cui_component_text_event event = {
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                      .flags = frame ? CUI_COMPONENT_EVENT_HAS_FRAME : 0,
+                      .frame_sequence = frame},
+            .before = before, .after = after, .has_text = true,
+            .text = cui_edit_get_text(edit)};
+        handler.callback(handler.user, &event);
+        result.change_count = 1;
     }
     return result;
 }

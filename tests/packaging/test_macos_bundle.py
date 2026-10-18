@@ -16,15 +16,18 @@ class MacOSBundleTests(unittest.TestCase):
         source = pathlib.Path(temp.name)
         (source / 'main.c').write_text('int main(void) { return 0; }\n')
         (source / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.20)
-project(bundle_probe C)
-include("{ROOT / 'cmake/CUIMacOSBundle.cmake'}")
+project(bundle_probe NONE)
+# Configuration-only fixture: do not select or invoke a host/target compiler.
+set(CMAKE_C_LINK_EXECUTABLE "unused-configuration-only-linker")
+include("{(ROOT / 'cmake/CUIMacOSBundle.cmake').as_posix()}")
 add_executable(probe main.c)
-cui_macos_bundle(probe FONT_DIR "{ROOT / 'third_party/inter'}")
+set_target_properties(probe PROPERTIES LINKER_LANGUAGE C)
+cui_macos_bundle(probe FONT_DIR "{(ROOT / 'third_party/inter').as_posix()}")
 get_target_property(bundle probe MACOSX_BUNDLE)
 get_target_property(sources probe SOURCES)
 file(WRITE "${{CMAKE_BINARY_DIR}}/properties.txt" "${{bundle}}\\n${{sources}}")
 ''')
-        command = ['cmake', '-S', str(source), '-B', str(source / 'build'),
+        command = ['cmake', '-G', 'Ninja', '-S', str(source), '-B', str(source / 'build'),
                    '-DCUI_MACOS_BUNDLE=ON', '-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY',
                    f'-DCUI_MACOS_DEPLOY_DEPENDENCIES={"ON" if deploy else "OFF"}']
         if darwin:
@@ -35,6 +38,9 @@ file(WRITE "${{CMAKE_BINARY_DIR}}/properties.txt" "${{bundle}}\\n${{sources}}")
     def test_cross_bundle_has_pinned_fonts_and_license(self):
         build, result = self.configure()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # This is a CMake resource/guard contract, not a cross-compiler test.
+        self.assertNotIn('CMAKE_C_COMPILER:FILEPATH=',
+                         (build / 'CMakeCache.txt').read_text())
         properties = (build / 'properties.txt').read_text()
         self.assertTrue(properties.startswith('TRUE\n'))
         for asset in ('Inter-Regular.otf', 'Inter-Bold.otf', 'LICENSE.txt', 'manifest.json'):
@@ -89,7 +95,9 @@ int main(void) {{
             app = root / 'Probe.app'
             library = app / 'Contents/MacOS/libprobe.dylib'
             library.parent.mkdir(parents=True)
-            library.touch()
+            actual_library = library.with_name('actual.dylib')
+            actual_library.touch()
+            library.symlink_to(actual_library)
             log = root / 'calls.txt'
             signer = root / 'codesign'
             signer.write_text(f'''#!/bin/sh
@@ -106,7 +114,7 @@ cui_sign_macos_development_bundle("{app}")
             result = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(log.read_text().splitlines(), [
-                f'--force --sign - {library}', f'--force --sign - {app}',
+                f'--force --sign - {library.resolve()}', f'--force --sign - {app}',
                 f'--verify --deep --strict {app}'])
             signer.write_text('#!/bin/sh\nexit 1\n')
             result = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True)

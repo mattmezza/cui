@@ -37,10 +37,23 @@ class MacOSCrossTests(unittest.TestCase):
         self.assertEqual(env["PKG_CONFIG_PATH"], "")
         self.assertNotIn("CFLAGS", env)
         self.assertNotIn("CPATH", env)
-        self.assertTrue(env["PKG_CONFIG_LIBDIR"].startswith(str(self.prefix)))
+        self.assertEqual(env["PKG_CONFIG_LIBDIR"].split(os.pathsep),
+                         [str(self.prefix.resolve() / "lib/pkgconfig"),
+                          str(self.prefix.resolve() / "share/pkgconfig")])
         self.assertIn("-DCUI_REQUIRE_NATIVE=ON", configure)
         self.assertIn("-DCUI_BUILD_CPP_EXAMPLE=OFF", configure)
         self.assertEqual(build[-2:], ["--target", "cui_native_starter"])
+
+    @unittest.skipIf(os.name == "nt", "directory symlink privilege is not guaranteed")
+    def test_dependency_prefix_alias_is_canonicalized(self):
+        alias = self.root / "dependency alias"
+        alias.symlink_to(self.prefix, target_is_directory=True)
+        self.args.prefix = str(alias)
+        configure, _, env = cross.commands(self.args)
+        self.assertEqual(env["PKG_CONFIG_LIBDIR"].split(os.pathsep),
+                         [str(self.prefix.resolve() / "lib/pkgconfig"),
+                          str(self.prefix.resolve() / "share/pkgconfig")])
+        self.assertIn("-DCUI_MACOS_PREFIX=" + str(self.prefix.resolve()), configure)
 
     def test_compiler_symlink_name_is_preserved(self):
         wrapper = self.root / "wrapper"
@@ -57,13 +70,13 @@ class MacOSCrossTests(unittest.TestCase):
         cxx.chmod(0o755)
         toolchain = Path(__file__).resolve().parents[1] / "cmake/toolchains/macos-osxcross.cmake"
         script = self.root / "check.cmake"
-        script.write_text(f'''set(CUI_MACOS_CC "{self.cc}")
-set(CUI_MACOS_SDK "{self.sdk}")
-set(CUI_MACOS_PREFIX "{self.prefix}")
+        script.write_text(f'''set(CUI_MACOS_CC "{self.cc.as_posix()}")
+set(CUI_MACOS_SDK "{self.sdk.as_posix()}")
+set(CUI_MACOS_PREFIX "{self.prefix.as_posix()}")
 set(CUI_MACOS_ARCH arm64)
 set(CUI_MACOS_DEPLOYMENT_TARGET 11.0)
-include("{toolchain}")
-if(NOT CMAKE_CXX_COMPILER STREQUAL "{cxx}")
+include("{toolchain.as_posix()}")
+if(NOT CMAKE_CXX_COMPILER STREQUAL "{cxx.as_posix()}")
  message(FATAL_ERROR "Host C++ compiler selected")
 endif()
 ''')

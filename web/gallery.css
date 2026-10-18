@@ -25,3 +25,6 @@
 .icon-catalog-row{display:flex;align-items:center;flex-wrap:wrap;gap:1rem;padding:.5rem 0;border-bottom:1px solid var(--border)}
 .icon-catalog-row code{min-width:12rem}.icon-catalog-row span{flex:1}
 .icon-catalog-row button{padding:.4rem .7rem}
+
+.video-host-status{margin:0;padding:12px 20px;color:var(--muted);font-size:.875rem;overflow-wrap:anywhere}
+#preview-card:fullscreen{background:var(--bg,#fff);overflow:auto;padding:20px}

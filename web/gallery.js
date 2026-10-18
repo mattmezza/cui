@@ -120,7 +120,7 @@ function paintBitmap(i,x,y,w,h,radii){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,radii);ctx.clip();ctx.globalAlpha=field(7);
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(bitmap,sx,sy,sw,sh,x,y,w,h);ctx.restore();
 }
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79,Video:81};
 const modelStories = new Set(['Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -366,13 +366,144 @@ function settingsPreviewHeight(scale,density){
  // Search, two page entries, selected header, group heading, first setting and scroll room.
  return Math.max(640,48+2*heights[scale]*density+12*font+8*gaps[scale]*density);
 }
+// The decoder is a host service, never an HTML control overlay. Its bounded
+// staging copy is completed before CUI composition and Canvas consumption.
+const videoHost=(()=>{
+ let active=null,serial=0,decodedFrames=0;
+ const snapshot=()=>active?{active:true,decodedFrames,session:active.session,generation:active.generation,
+  time:active.media.currentTime,duration:active.media.duration,paused:active.media.paused,
+  rate:active.media.playbackRate,frames:active.frames,checksum:active.checksum,
+  requests:active.requests.slice(),error:active.error,source:active.media.currentSrc,asset:active.asset,
+  seeking:active.media.seeking,muted:active.media.muted,loop:active.media.loop}: {active:false,decodedFrames};
+ const valid=s=>active===s;
+ function status(s,message='',failed=false){
+  if(!valid(s))return;
+  if(message){s.error=message;s.failed=failed;}
+  $('video-host-status').textContent=s.error||'Silent browser-decoded sample. CUI controls below the video; skip ±2 seconds, rate 1× / 1.5×.';
+ }
+ function sync(){
+  const s=active;if(!s)return;
+  const m=s.media,duration=Number.isFinite(m.duration)?m.duration:0;
+  if(!m.seeking&&!s.scrubbing&&!m.paused&&m.currentTime+.5<s.lastTime){s.generation++;s.ticket++;cancelFrame(s);}
+  s.lastTime=m.currentTime;
+  const ready=m.readyState>=2;
+  const state=s.failed?3:!duration?1:m.seeking&&!s.scrubbing?2:ready?0:2;
+  wasm.gallery_video_sync(s.session,s.generation,Math.max(0,m.currentTime),duration,m.playbackRate,
+   Number(!m.paused&&!m.ended),state,1|8|(m.seekable.length&&m.seekable.end(m.seekable.length-1)>0?2:0)|(document.fullscreenEnabled?4:0),Number(!!document.fullscreenElement));
+ }
+ function cancelFrame(s){
+  if(s.frameCallback!==null){if(s.media.cancelVideoFrameCallback)s.media.cancelVideoFrameCallback(s.frameCallback);else cancelAnimationFrame(s.frameCallback);s.frameCallback=null;}
+ }
+ function capture(s,ticket=s.ticket){
+  if(!valid(s)||ticket!==s.ticket||s.media.seeking||s.media.readyState<2)return;
+  if(s.media.videoWidth!==320||s.media.videoHeight!==180){status(s,'Sample dimensions must be 320 × 180.',true);requestFrame();return;}
+  try{
+   sync();s.context.drawImage(s.media,0,0,320,180);
+   const bytes=s.context.getImageData(0,0,320,180).data;
+   const pointer=wasm.gallery_video_buffer(s.session,s.generation);
+   if(!pointer||!valid(s)||ticket!==s.ticket)return;
+   new Uint8Array(wasm.memory.buffer,pointer,bytes.length).set(bytes);
+   if(wasm.gallery_video_commit(s.session,s.generation,s.media.currentTime)){
+    s.frames++;decodedFrames++;let hash=2166136261;for(let i=0;i<bytes.length;i+=97)hash=Math.imul(hash^bytes[i],16777619);s.checksum=hash>>>0;requestFrame();
+   }
+  }catch(error){status(s,`Frame transfer failed: ${error.message}`,true);requestFrame();}
+ }
+ function schedule(s){
+  if(!valid(s)||s.media.paused||s.frameCallback!==null||s.media.seeking)return;
+  const ticket=s.ticket;
+  const frame=()=>{s.frameCallback=null;if(!valid(s)||ticket!==s.ticket)return;capture(s,ticket);schedule(s);};
+  s.frameCallback=s.media.requestVideoFrameCallback?s.media.requestVideoFrameCallback(frame):requestAnimationFrame(frame);
+ }
+ function seek(s,time,terminal){
+  cancelFrame(s);s.ticket++;
+  if(terminal){s.generation++;s.scrubbing=false;}
+  s.media.currentTime=Math.max(0,Math.min(s.media.duration,time));sync();
+ }
+ function stop(){
+  const s=active;if(!s)return;active=null;cancelFrame(s);
+  for(const [event,fn] of s.listeners)s.media.removeEventListener(event,fn);
+  if(document.fullscreenElement===$('preview-card'))void document.exitFullscreen().catch(()=>{});
+  s.abort.abort();s.media.pause();s.media.removeAttribute('src');s.media.load();
+  if(s.url)URL.revokeObjectURL(s.url);
+  wasm.gallery_video_session(0);$('video-host-status').hidden=true;
+ }
+ function start(){
+  if(active)return;
+  const media=document.createElement('video'),decoder=document.createElement('canvas');
+  decoder.width=320;decoder.height=180;media.muted=true;media.loop=true;media.playsInline=true;media.preload='auto';
+  const s={media,decoder,context:decoder.getContext('2d',{willReadFrequently:true}),session:++serial,
+   generation:1,ticket:1,frames:0,checksum:0,frameCallback:null,listeners:[],requests:[],error:'',failed:false,scrubbing:false,seekOrigin:0,lastTime:0,operation:0,abort:new AbortController(),url:null,asset:''};
+  active=s;wasm.gallery_video_session(s.session);$('video-host-status').hidden=false;status(s);
+  const on=(event,fn)=>{s.listeners.push([event,fn]);media.addEventListener(event,fn);};
+  for(const event of ['loadedmetadata','loadeddata','canplay','timeupdate','ratechange','waiting','playing','pause','ended'])on(event,()=>{
+   if(!valid(s))return;if(event==='pause'||event==='ended')cancelFrame(s);
+   sync();if(event==='loadeddata')capture(s);schedule(s);requestFrame();
+  });
+  on('seeked',()=>{if(valid(s)){capture(s);schedule(s);requestFrame();}});
+  const sources=[['video/webm; codecs="vp8"','./assets/video/sample.webm'],['video/mp4','./assets/video/sample.mp4']];
+  const available=sources.filter(([type])=>media.canPlayType(type));let source=0;
+  async function loadSource(){
+   const candidate=available[source];
+   if(!candidate){status(s,'This browser advertises neither VP8 WebM nor H.264 MP4 decoding.',true);sync();requestFrame();return;}
+   try{
+    // Fully buffered small fixture: Pages need not support byte ranges. Never
+    // accept an unbounded body, even when Content-Length is absent or untrusted.
+    const response=await fetch(candidate[1],{signal:s.abort.signal});
+    if(!response.ok||!response.body)throw Error(`Sample fetch failed (${response.status})`);
+    const limit=512*1024,reader=response.body.getReader(),chunks=[];let size=0;
+    try{for(;;){const {done,value}=await reader.read();if(done)break;
+     size+=value.byteLength;if(size>limit)throw Error('Encoded sample exceeds 512 KiB limit');chunks.push(value);
+    }}catch(error){await reader.cancel();throw error;}finally{reader.releaseLock();}
+    if(!valid(s))return;
+    if(s.url)URL.revokeObjectURL(s.url);
+    s.url=URL.createObjectURL(new Blob(chunks,{type:candidate[0].split(';')[0]}));
+    s.asset=candidate[1];media.src=s.url;media.load();
+   }catch(error){if(valid(s)&&error.name!=='AbortError'){status(s,error.message,true);sync();requestFrame();}}
+  }
+  on('error',()=>{if(!valid(s))return;
+   if(source+1<available.length){source++;s.ticket++;s.generation++;cancelFrame(s);s.error='';void loadSource();}
+   else{status(s,`Sample cannot be decoded (media error ${media.error?.code||'unknown'}).`,true);sync();requestFrame();}
+  });
+  void loadSource();
+  sync();
+ }
+ function drain(){
+  const s=active;if(!s)return;
+  const requests=Array.from({length:wasm.gallery_video_request_count()},(_,i)=>Array.from({length:5},(_,f)=>wasm.gallery_video_request(i,f)));
+  const overflow=wasm.gallery_video_overflow();
+  wasm.gallery_video_drain(); // Never reenter CUI from a request callback.
+  if(overflow){
+   if(s.scrubbing)seek(s,s.seekOrigin,true);
+   else{s.generation++;s.ticket++;cancelFrame(s);}
+   status(s,'Video request limit: batch exceeds 32 requests; entire batch rejected.');sync();requestFrame();return;
+  }
+  const generation=s.generation;
+  for(const [kind,phase,source,epoch,value] of requests){
+   if(!valid(s)||source!==s.session||epoch!==generation)continue;
+   s.requests.push({kind,phase,value});if(s.requests.length>32)s.requests.shift();s.error='';status(s);
+   const operation=++s.operation,ticket=s.ticket;
+   const current=()=>valid(s)&&operation===s.operation&&ticket===s.ticket;
+   try{
+    if(kind===0){if(value){s.media.play().catch(error=>{if(current()){status(s,`Play rejected: ${error.message}`);sync();requestFrame();}});}else s.media.pause();}
+    else if(kind===1){if(phase===0){s.seekOrigin=s.media.currentTime;s.scrubbing=true;}else seek(s,phase===3?s.seekOrigin:value,phase===2||phase===3);}
+    else if(kind===2)seek(s,s.media.currentTime+value,true);
+    else if(kind===3){const operation=value?$('preview-card').requestFullscreen?.():document.exitFullscreen?.();if(!operation)status(s,'Fullscreen is unavailable.');else operation.catch(error=>{if(current()){status(s,`Fullscreen rejected: ${error.message}`);requestFrame();}});}
+    else if(kind===4)s.media.playbackRate=value;
+   }catch(error){status(s,`Media request rejected: ${error.message}`);}
+  }
+  sync();if(requests.length)requestFrame();
+ }
+ document.addEventListener('fullscreenchange',()=>{if(active){sync();requestFrame();}});
+ return {start,stop,sync,drain,snapshot};
+})();
+
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
  canvas.style.minWidth=selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Video'?Math.min(640,Math.max(160,width-48))*180/320+290:selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -429,6 +560,7 @@ function render(){
  const frameReducedMotion=reducedMotion.matches;
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(frameReducedMotion));lastTime=now;
  wasm.gallery_theme_preset(themeChoice==='high-contrast'?-1:selectedPreset());
+ if(selected.name==='Video')videoHost.sync();
  if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
  applyTouchPageFallback();
  const commands=Array.from({length:wasm.gallery_count()},(_,i)=>{
@@ -478,6 +610,7 @@ function render(){
  syncImeTarget();
  canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed','crosshair','grab','grabbing','zoom-in','zoom-out','wait','help'][wasm.gallery_cursor()]||'default';
  syncSemantics();
+ if(selected.name==='Video')videoHost.drain();
  if(selected.name==='Button'||selected.name==='Input'){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
@@ -568,7 +701,7 @@ function fuzzyScore(value,query){
 }
 function navigation(){
  const query=$('search').value, nav=$('catalog');nav.replaceChildren();let category='';
- const results=catalog.components.map(item=>({item,score:fuzzyScore(item.name,query)})).filter(result=>result.score>=0);
+ const results=[...catalog.components,...(catalog.extensions||[])].map(item=>({item,score:fuzzyScore(item.name,query)})).filter(result=>result.score>=0);
  if(query.trim())results.sort((a,b)=>b.score-a.score||a.item.name.localeCompare(b.item.name));
  for(const {item} of results){
   if(!query.trim()&&item.category!==category){category=item.category;const h=document.createElement('h3');h.textContent=category.replaceAll('_',' ');nav.append(h);}
@@ -625,6 +758,7 @@ $('icon-catalog-search').addEventListener('input',renderIconCatalog);
 $('icon-catalog-embedded').addEventListener('change',renderIconCatalog);
 
 function route(){
+ if((location.hash.slice(1)||document.body.dataset.route)!=='Video')videoHost.stop();
  const raw=location.hash.slice(1)||document.body.dataset.route||'home';
  if(!raw||raw==='home'){
   selected=null;$('home-page').hidden=false;$('docs-page').hidden=true;$('gallery-page').hidden=true;$('catalog').hidden=false;$('docs-nav').hidden=true;
@@ -679,8 +813,14 @@ async function pickScreenColor(){
 function cancelScreenColor(){if(screenColorRequest){const request=screenColorRequest;screenColorRequest=null;request.abort();}screenColorControls();}
 $('screen-color').addEventListener('click',pickScreenColor);
 const exampleDescriptor={name:'Northstar workspace',example:true,status:'tested',public_header:'examples/composed_apps/app.h',reference_url:'https://github.com/mattmezza/cui/tree/main/examples/composed_apps',features:[],limitations:['Session-local demo state; sign-in and pricing actions are examples without a server.','Native Linux/X11 and portable headless interactions are validated; other native platforms remain unverified.'],usage:{composition:'Application model + immediate frame composition',state_ownership:'Retain composed_app until its draw lists finish rendering.',interaction:'Pass app_callback to composed_app_create for navigation, session, plan and save events.',usage:'Open Overview, try a plan CTA, use the account menu, then edit and save workspace settings.',docs:['docs/COMPOSED_APPS.md']}};
+snippets.Video = `/* Browser host decodes actual RGBA; CUI renders the controls. */
+cui_video_player(ui, id, &theme, &controls, confirmed_view,
+                 decoded_frame, player_options);
+/* Queue typed on_request values; apply after rendering.
+   Borrow pixels unchanged through renderer completion. */`;
 function selectComponent(){
- let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=name==='examples/northstar'?exampleDescriptor:catalog.components.find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
+ let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=name==='examples/northstar'?exampleDescriptor:[...catalog.components,...(catalog.extensions||[])].find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
+ if(selected.name==='Video')videoHost.start();else videoHost.stop();
  document.title=`${selected.name} · CUI`;shareRoute(selected.example?'examples/northstar/':`components/${componentSlug(selected.name)}/`,selected.example?'examples/northstar':encodeURIComponent(selected.name),document.title,`Explore CUI ${selected.name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. Complete component coverage remains in progress.`); $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
  const live=selected.example||selected.name in stories;
  window.cuiGallery.renderedComponent=live?'':selected.name;
@@ -984,7 +1124,7 @@ try{
  const instance=await WebAssembly.instantiate(module,imports);wasm=instance.exports;wasm._initialize();shadowRenderer=createCuiShadowRenderer(cuiShadowWasmRasterizer(wasm));if(!wasm.gallery_init())throw Error('CUI initialization failed');
  let saved;try{saved=localStorage.getItem('cui.theme');}catch{}themeChoice=saved==='system'||saved==='high-contrast'||themes.some(theme=>theme.id===saved)?saved:'system';buildPaletteMenu();syncTheme();
  const regexOption=$('input-mode').querySelector('option[value="9"]');regexOption.disabled=!wasm.gallery_regex_available();regexOption.textContent=regexOption.disabled?'Unicode letters · regex (unavailable)':'Unicode letters · regex';
- window.cuiGallery={exports:wasm,stories,catalog,documents,themes,render,shadowStats:()=>shadowRenderer.stats(),get themeChoice(){return themeChoice;}};$('home-story-count').textContent=String(Object.keys(stories).length);route();
+ window.cuiGallery={exports:wasm,stories,catalog,documents,themes,video:videoHost,render,shadowStats:()=>shadowRenderer.stats(),get themeChoice(){return themeChoice;}};$('home-story-count').textContent=String(Object.keys(stories).length);route();
 }catch(error){fatal(error);}
 
 for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic'])$(id).addEventListener('change',requestFrame);

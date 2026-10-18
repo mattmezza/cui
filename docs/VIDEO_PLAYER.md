@@ -78,3 +78,58 @@ requests. Its strict external harness runs portable controls, software decoded
 pixels and private-Xvfb native decoded captures. It supplies no built-in codec or
 universal format/browser/audio support; see its exact evidence and version/license
 recording before using it as a host-adapter starting point.
+
+## Browser gallery extension
+
+The gallery's **Video** entry is an extension outside the frozen 78-family GPUI
+baseline. Build and exercise it locally (Chromium runs headless):
+
+```sh
+python scripts/build_web.py --output /tmp/cui-video-web
+uv run tests/web/test_video_gallery.py --offline
+uv run tests/web/test_video_gallery.py --directory /tmp/cui-video-web
+python -m http.server --directory /tmp/cui-video-web
+# Open http://localhost:8000/#Video
+```
+
+The browser decodes a checked-in original, silent 12-second 320×180 sample using
+`HTMLVideoElement`. The visible surface, buttons and timeline are CUI draw lists;
+there are no HTML media controls. Play/pause, two-second skips, keyboard timeline
+seeks and 1× / 1.5× rate requests are acknowledged from actual media state. The
+sample is muted and loops. Fullscreen is a browser capability and may reject a
+request; host errors are displayed explicitly. This is not audio playback or
+universal codec/browser support, and Safari has not been validated.
+
+The host chooses VP8 WebM or H.264 MP4 using `canPlayType`, with the alternate
+encoding available if decoding fails. It fetches at most 512 KiB into a Blob so
+this small sample can seek even when static hosting does not implement byte
+ranges. Fetches are aborted and Blob URLs revoked on route exit. Larger streaming
+applications need a separate buffering/range policy. Rebuild the original assets
+with `python web/assets/video/generate.py`; its receipt records local FFmpeg
+version, exact commands and output hashes. The generator requires local `libvpx`
+and `libx264` encoders and uses bit-exact output settings; two consecutive local
+runs produce identical files. FFmpeg is a fixture-generation tool,
+not a browser runtime dependency; no media is downloaded during generation.
+
+Decoded frames are copied into one fixed 230,400-byte WASM buffer. Session and
+timeline generation checks reject stale submission. A separate decode ticket
+retires pending frame callbacks during every seek; the timeline generation changes
+on commit/cancel/skip so active scrubbing survives updates. Seek cancel restores
+the position captured at begin; browser decoder completion remains asynchronous.
+Pixels stay unchanged throughout synchronous Canvas consumption, and revisions
+advance on each accepted frame. Host requests are copied into a 32-entry queue
+and drained after rendering, never through CUI reentry. A batch exceeding 32 requests
+is rejected in full with a visible limit message, resetting scrub presentation
+and restoring an already-active scrub origin. This sample does not promise
+unbounded gesture batching. Late operation promises are fenced by session,
+operation sequence and decode ticket. No frame callback loop runs while paused;
+leaving the route cancels scheduling, unloads media and exits only fullscreen
+owned by this preview.
+
+The focused Chromium test decodes both the actual WebM and MP4 assets, including
+alternate-source recovery after a deliberately invalid preferred encoding. It
+separates real encoded decoding/CUI interaction from
+injected host-error protocol checks. It checks rendered pixel changes, confirmed
+play/pause/seek/rate, keyboard routing, mobile DPR2 geometry, stale frame rejection,
+route cleanup and the separate extension catalog. Other browser/platform codec
+and fullscreen combinations remain unverified.

@@ -1,0 +1,75 @@
+{
+  "origin": "Original FFmpeg lavfi testsrc2; no external media; silent",
+  "license": "CC0-1.0",
+  "tool": "ffmpeg version n9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "commands": [
+    [
+      "ffmpeg",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=320x180:rate=15:duration=12",
+      "-an",
+      "-fflags",
+      "+bitexact",
+      "-flags:v",
+      "+bitexact",
+      "-map_metadata",
+      "-1",
+      "-pix_fmt",
+      "yuv420p",
+      "-threads",
+      "1",
+      "-c:v",
+      "libvpx",
+      "-b:v",
+      "140k",
+      "-deadline",
+      "best",
+      "sample.webm"
+    ],
+    [
+      "ffmpeg",
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-y",
+      "-f",
+      "lavfi",
+      "-i",
+      "testsrc2=size=320x180:rate=15:duration=12",
+      "-an",
+      "-fflags",
+      "+bitexact",
+      "-flags:v",
+      "+bitexact",
+      "-map_metadata",
+      "-1",
+      "-pix_fmt",
+      "yuv420p",
+      "-threads",
+      "1",
+      "-c:v",
+      "libx264",
+      "-crf",
+      "30",
+      "-movflags",
+      "+faststart",
+      "sample.mp4"
+    ]
+  ],
+  "files": {
+    "sample.webm": {
+      "sha256": "9d39a9c8f884df170ea626b1f958e80a3177c68b448458d9967964ea453fa8a0",
+      "bytes": 211499
+    },
+    "sample.mp4": {
+      "sha256": "7762a18424bd42983c8dd442fc70e9e0aed7bb36aa8ceea093965944a2704ac8",
+      "bytes": 145653
+    }
+  }
+}

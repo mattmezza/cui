@@ -41,11 +41,21 @@ def build(output, site_url=DEFAULT_SITE):
     site = urlsplit(site_url)
     if site.scheme != 'https' or not site.netloc or site.query or site.fragment or not site.path.endswith('/'):
         raise ValueError('Site URL must be an absolute HTTPS directory without query/fragment')
-    template = (ROOT / 'web/index.html').read_text()
-    components = json.loads((output / 'catalog.json').read_text())['components']
+    template = (output / 'index.html').read_text()
+    # Reuse the resolved template; replace our prior block for deterministic rebuilds.
+    template = re.sub(r'<!--cui-sharing:start-->.*?<!--cui-sharing:end-->',
+                      '<title>CUI · Portable C11 UI</title>', template, flags=re.S)
+    template = re.sub(r'<noscript><main>.*?</main></noscript>', '', template, flags=re.S)
+    template = re.sub(r' data-(?:site-url|route)="[^"]*"', '', template)
+    catalog = json.loads((output / 'catalog.json').read_text())
+    components = catalog['components']
     documents = json.loads((output / 'docs.json').read_text())
     if len(components) != 78:
         raise ValueError('Sharing catalog must retain all 78 components')
+    extensions = catalog.get('extensions', [])
+    if not isinstance(extensions, list) or any(not isinstance(c, dict) or not isinstance(c.get('name'), str) or not c['name'].strip() for c in extensions):
+        raise ValueError('Invalid extension catalog')
+    components = [*components, *extensions]
     slugs = [component_slug(c['name']) for c in components]
     if len(set(slugs)) != len(slugs) or any(not s for s in slugs):
         raise ValueError('Component slugs must be unique and nonempty')
@@ -65,7 +75,7 @@ def build(output, site_url=DEFAULT_SITE):
 
     def page(path, title, description, route, fallback):
         canonical = urljoin(site_url, path)
-        html = re.sub(r'<title>.*?</title>', lambda _match: metadata(title, description, canonical, image, alt), template, count=1, flags=re.S)
+        html = re.sub(r'<title>.*?</title>', lambda _match: '<!--cui-sharing:start-->'+metadata(title, description, canonical, image, alt)+'<!--cui-sharing:end-->', template, count=1, flags=re.S)
         if path:
             html = html.replace('<head>', '<head><base href="../../">', 1)
         html = html.replace('<body ', f'<body data-site-url="{escape(site_url, quote=True)}" data-route="{escape(route, quote=True)}" ', 1)

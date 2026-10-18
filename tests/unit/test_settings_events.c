@@ -757,7 +757,137 @@ static void text_changes(void) {
     assert(copy.after_bytes > 0 && copy.before_revision != copy.after_revision);
 }
 
+typedef struct {
+    bool boolean;
+    double number;
+    cui_id choice;
+    cui_edit *edit;
+    size_t old_calls, calls, custom_calls;
+    char order[32], copy[64];
+    size_t order_count;
+    bool redirect;
+    cui_settings_text_change text;
+} reset_fixture;
+static void reset_old(void *user) {
+    reset_fixture *f = user;
+    ++f->old_calls;
+    f->order[f->order_count++] = 'L';
+    if (f->redirect) {
+        f->number = INFINITY;
+        assert(cui_edit_replace_range(f->edit, 0, cui_edit_get_state(f->edit).length,
+                                      cui_string("redirect")) == CUI_EDIT_OK);
+    }
+}
+static void reset_custom(void *user) {
+    reset_fixture *f = user;
+    ++f->custom_calls;
+    f->boolean = !f->boolean;
+}
+static void reset_metadata(reset_fixture *f, const cui_component_event_metadata *e,
+                           cui_id field, size_t page, size_t group, size_t item,
+                           cui_settings_change_reason reason) {
+    assert(reason == CUI_SETTINGS_CHANGE_RESET);
+    assert(e->kind == CUI_COMPONENT_EVENT_CHANGE && e->target == 11);
+    assert(e->source == CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC);
+    assert(e->flags == CUI_COMPONENT_EVENT_HAS_SOURCE);
+    assert(field == cui_settings_part_id(11, 7, 0, item, 24) && page == 7 && group == 0);
+    assert(f->order_count && f->order[f->order_count - 1] == 'L');
+    f->order[f->order_count++] = 'O';
+    ++f->calls;
+}
+static void reset_boolean(void *user, const cui_settings_bool_change *e) {
+    reset_fixture *f = user;
+    reset_metadata(f, &e->event, e->field_id, e->page, e->group, e->item, e->reason);
+    assert(e->value == f->boolean && e->previous != e->value);
+}
+static void reset_number(void *user, const cui_settings_number_change *e) {
+    reset_fixture *f = user;
+    reset_metadata(f, &e->event, e->field_id, e->page, e->group, e->item, e->reason);
+    assert(e->value == f->number && e->previous_finite);
+    assert(e->value_finite == isfinite(f->number));
+}
+static void reset_choice(void *user, const cui_settings_choice_change *e) {
+    reset_fixture *f = user;
+    reset_metadata(f, &e->event, e->field_id, e->page, e->group, e->item, e->reason);
+    assert(e->value == f->choice);
+}
+static void reset_text(void *user, const cui_settings_text_change *e) {
+    reset_fixture *f = user;
+    reset_metadata(f, &e->event, e->field_id, e->page, e->group, e->item, e->reason);
+    f->text = *e;
+    cui_str copy;
+    assert(cui_component_event_copy_utf8(e->text, 63, f->copy, sizeof f->copy, &copy)
+           == CUI_COMPONENT_EVENT_COPY_OK);
+}
+static void programmatic_resets(void) {
+    reset_fixture f = {.number = 3, .choice = 101};
+    char buffer[64] = "seed";
+    f.edit = cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+    assert(f.edit);
+    cui_setting_item items[] = {
+        {.kind = CUI_SETTING_CHECKBOX, .boolean = &f.boolean, .default_boolean = true},
+        {.kind = CUI_SETTING_NUMBER, .number = &f.number, .default_number = 20},
+        {.kind = CUI_SETTING_DROPDOWN, .choice = &f.choice, .default_choice = 102},
+        {.kind = CUI_SETTING_INPUT, .edit = f.edit, .default_text = {"default", 7}}};
+    for (size_t i = 0; i < 4; ++i) {
+        items[i].title = cui_string("Match");
+        items[i].has_default = true;
+        items[i].disabled = true; /* Explicit reset includes disabled fields. */
+        items[i].on_change = reset_old;
+        items[i].user = &f;
+    }
+    cui_setting_group groups[2] = {0};
+    groups[0].items = items;
+    groups[0].count = 4;
+    cui_setting_page page = {.groups = groups, .count = 1};
+    cui_settings_handler h = {.user = &f, .on_boolean = reset_boolean, .on_number = reset_number,
+                              .on_choice = reset_choice, .on_text = reset_text};
+    cui_settings_reset_event_result r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(r.reset && r.boolean_count == 1 && r.number_count == 1 && r.choice_count == 1 && r.text_count == 1);
+    assert(f.old_calls == 4 && f.calls == 4 && !memcmp(f.order, "LOLOLOLO", 8));
+    f.order_count = 0;
+    r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(r.reset && !r.boolean_count && !r.number_count && !r.choice_count && !r.text_count);
+    assert(f.old_calls == 8 && f.calls == 4); /* Same-value legacy callbacks still run. */
+    assert(!cui_settings_reset_page_events(0, 7, &page, (cui_str){0}, h).reset && f.old_calls == 8);
+    assert(!cui_settings_reset_page_events(11, 7, &page, cui_string("unmatched"), h).reset);
+    f.order_count = 0;
+    items[0].reset = reset_custom;
+    r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(r.reset && f.custom_calls == 1 && f.old_calls == 11 && !r.boolean_count);
+    items[0].reset = NULL;
+    f.number = 3;
+    f.redirect = true;
+    f.order_count = 0;
+    page.groups = groups;
+    groups[0].items = items + 1;
+    groups[0].count = 1;
+    /* Keep original source item index 0 for this reduced model. */
+    r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(r.number_count == 1 && isinf(f.number));
+    f.redirect = false;
+    f.number = 3;
+    f.order_count = 0;
+    groups[1].count = 1; /* Malformed later group after real mutation. */
+    page.count = 2;
+    r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(!r.reset && r.number_count == 1 && f.number == 20);
+    page.count = 1;
+    groups[0].items = items + 3;
+    items[3].default_text = cui_string("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz");
+    f.order_count = 0;
+    size_t old = f.old_calls;
+    r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, h);
+    assert(!r.reset && !r.text_count && f.old_calls == old);
+    items[3].default_text = cui_string("done");
+    r = cui_settings_reset_page_events(11, 7, &page, (cui_str){0}, (cui_settings_handler){0});
+    assert(r.reset && !r.text_count && !strcmp(buffer, "done"));
+    cui_edit_destroy(f.edit);
+    assert(f.text.before_revision != f.text.after_revision && !strcmp(f.copy, "default"));
+}
+
 int main(void) {
+    programmatic_resets();
     text_changes();
     navigation_events();
     narrow_and_admission();

@@ -112,7 +112,7 @@ Old callbacks must leave observed scalar owner pointers readable through typed
 notification. The new observer cannot mutate active owners or other active model
 resources; use unrelated flags and defer teardown. Entry is captured at each field,
 not at Settings-call entry, so earlier host changes are not independently reported.
-Reset helpers and reset-button effects have no new typed reset notification.
+Reset-button effects are described separately below.
 This extends the new C structs and requires rebuilding consumers with this header;
 existing legacy Settings options/state/result layouts and function remain unchanged.
 
@@ -137,6 +137,29 @@ an invented input index, activation or submit. The editor and its storage must
 remain live and unchanged by observers until the outer call and renderer finish.
 
 Bool, number, choice and text payloads now expose `reason`, currently EDIT.
-The RESET enumerator reserves the approved reset slice; no reset observations are
-implemented yet. These **unreleased event structs** changed size: rebuild all C
+The explicit reset helper reports RESET as described below. These **unreleased event structs** changed size: rebuild all C
 consumers. Legacy Settings options/state/results and entrypoints are unchanged.
+
+
+`cui_settings_reset_page_events(root, page_index, page, query, handler)` is the
+explicit programmatic reset facade. `reset` is the exact old helper result;
+`boolean_count`, `number_count`, `choice_count` and `text_count` count actual typed
+callbacks. Root must be nonzero; page must be supplied; `page_index` is your real
+source page index. Metadata has SOURCE_PROGRAMMATIC only, without input index,
+frame or activation. Payload target is root; field IDs use the original item index.
+
+Each matching built-in is reset once, its old `on_change` runs at its old time,
+then the observer compares the final owner/revision. Disabled fields are included.
+Same-value defaults still run old callbacks but produce no typed callback unless
+that callback changes the final value. Number equality and finite flags match
+EDIT. Text compares revision even if final bytes equal entry; UTF-8 is borrowed.
+No draft, Number bounds or `last_value` synchronization is added by the helper.
+
+Custom `reset` wins, returns legacy success, does not call old `on_change`, and has
+no typed observation, even if the item has scalar pointers. Custom rendering alone
+does not disable a built-in reset. Missing defaults and unmatched items are silent.
+A failed text replacement preserves its old failure/no-callback behavior and later
+items still run. A malformed later group returns `reset=false` after prior effects;
+counts and notifications remain, with no rollback. Missing handlers preserve all
+old work. The old helper remains available unchanged. This slice does not yet
+attach these observations to the Styled reset button.

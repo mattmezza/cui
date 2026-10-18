@@ -334,3 +334,13 @@ semantics and errors, including multiple inputs, callback redirect, byte-net-zer
 revision changes, IME preedit/commit, progress before capacity error, absent
 observer, passive/inert/disabled silence and bounded copy. No reset implementation
 or wrapper support is implied by this checkpoint.
+
+
+### Programmatic reset implementation checkpoint
+
+The explicit helper now shares the exact old traversal/reset operation, with
+optional final-owner observations after legacy callbacks. No reset-button wiring
+is claimed yet. Tests cover ordered callbacks, same-value defaults, disabled
+fields, custom-reset exclusion, nonfinite callback redirect, partial progress then
+malformed group, text capacity failure, missing handlers, copied text and atomic
+root admission. Programmatic metadata has no UI evidence.

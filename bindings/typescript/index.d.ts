@@ -26,6 +26,7 @@ export class App {
   /** Submit without dispatch. Caller owns draining the shared queue. */
   step_only(dt?: number): this;
   poll_notification_v1(): NotificationV1 | undefined;
+  poll_value_notification_v1(): ValueNotificationV1 | undefined;
 
   constructor(options?: AppOptions);
   mount(root: Row | Column): this;
@@ -237,3 +238,11 @@ export interface SurfaceCloseNotificationV1 extends NotificationBaseV1 {readonly
 export interface LegacyNotificationV1 extends NotificationBaseV1 {readonly kind: 'legacy'; readonly selectedNode?: Node}
 export type NotificationV1 = ActivationNotificationV1 | BooleanChangeNotificationV1 |
   TableChangeNotificationV1 | SurfaceCloseNotificationV1 | LegacyNotificationV1;
+
+/** Opt-in owning value views; same queue as legacy/V1 polling. */
+export interface ScalarChangeNotificationV1 extends NotificationBaseV1 {readonly kind: 'scalar-change'; readonly value: number}
+export interface TextChangeNotificationV1 extends NotificationBaseV1 {readonly kind: 'text-change'; readonly text: string}
+export interface SelectionChangeNotificationV1 extends NotificationBaseV1 {
+  readonly kind: 'selection-change'; readonly selectedHandle: NotificationHandleV1; readonly selectedNode?: Node;
+}
+export type ValueNotificationV1 = NotificationV1 | ScalarChangeNotificationV1 | TextChangeNotificationV1 | SelectionChangeNotificationV1;

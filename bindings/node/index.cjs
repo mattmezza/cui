@@ -437,6 +437,30 @@ class App {
       default: return Object.freeze({...common, kind: 'legacy', selectedNode: this.nodes.get(keyFor(selectedHandle))});
     }
   }
+  poll_value_notification_v1() {
+    this._alive();
+    if (typeof native.pollValueNotificationV1 !== 'function') throw new Error('V1 notification addon unavailable');
+    const raw = native.pollValueNotificationV1(this.handle);
+    if (raw === undefined) return undefined;
+    const handle = Object.freeze({slot: raw.slot, generation: raw.generation});
+    const selectedHandle = Object.freeze({slot: raw.selectedSlot, generation: raw.selectedGeneration});
+    const legacy = Object.freeze({type: raw.type, checkedRaw: raw.checkedRaw, value: raw.value,
+      text: raw.text, selectedHandle});
+    const common = {schemaVersion: 1, handle, node: this.nodes.get(keyFor(handle)),
+      frame: raw.frame, hasFrame: raw.hasFrame, nodeKind: raw.nodeKind, legacy};
+    switch (raw.payloadKind) {
+      case 0: return Object.freeze({...common, kind: 'activation'});
+      case 1: return Object.freeze({...common, kind: 'boolean-change', value: raw.booleanValue});
+      case 2: return Object.freeze({...common, kind: 'scalar-change', value: raw.value});
+      case 3: return Object.freeze({...common, kind: 'text-change', text: raw.text});
+      case 4: return Object.freeze({...common, kind: 'selection-change', selectedHandle,
+        selectedNode: this.nodes.get(keyFor(selectedHandle))});
+      case 5: return Object.freeze({...common, kind: 'table-change', reason: raw.reason === 1 ? 'selection' : 'sort',
+        row: raw.row, column: raw.column, sortColumn: raw.sortColumn, sortDirection: raw.sortDirection});
+      case 6: return Object.freeze({...common, kind: 'surface-close', result: raw.result});
+      default: return Object.freeze({...common, kind: 'legacy', selectedNode: this.nodes.get(keyFor(selectedHandle))});
+    }
+  }
   _dispatch() {
     let event; let delivered = 0;
     while ((event = native.poll(this.handle)) !== undefined) {

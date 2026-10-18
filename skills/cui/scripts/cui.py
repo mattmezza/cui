@@ -389,7 +389,10 @@ def main(argv=None):
                 print('Canonical status, platforms, limitations and features (unabridged):')
                 emit(result['status'], True)
                 c = next(c for c in data['components'] if c['name'] == result['name'])
-                print('Handler types: ' + json.dumps(c.get('handler_types', []), ensure_ascii=False))
+                handlers = c.get('handler_types')
+                print('Indexed handler types (not exhaustive): ' +
+                      (json.dumps(handlers, ensure_ascii=False) if handlers else
+                       'not indexed; inspect API/owning headers'))
                 resource_index(data, [c['public_header']] + c.get('additional_public_headers', []), args.source)
                 print('Incomplete contract; use --show api, --show examples and --full for progressive detail.')
             elif section == 'examples':

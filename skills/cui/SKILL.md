@@ -33,7 +33,8 @@ labelled partial matches when no entry matches every word. Human output defaults
 to five results, JSON to ten; use `--limit N` to request more. Ranking is unchanged.
 `component NAME` summarizes usage and retains ALL canonical status, platform,
 limitation and feature information, plus canonical public-header paths and handler
-types with source-aware full-read commands. `--show examples` indexes guides, sample and
+types with source-aware full-read commands. Handler-type indexes are not exhaustive;
+an empty/missing index means inspect the API and owning headers, not no handlers. `--show examples` indexes guides, sample and
 test references rather than printing every shared guide. Read chosen resources.
 `component --show all` or `--full` restores the complete previous human output.
 
@@ -57,6 +58,11 @@ extension. Duplicate titles, missing headings and unterminated fences fail; use 
 than guessing. Select the relevant contract sections, example and shared ownership
 headers; use full reads whenever omitted context is required. This saves output,
 not the obligation to read the chosen API's complete applicable contracts.
+
+For an existing app, reuse already-understood Core/host setup contracts instead of
+rereading them solely for a component lookup. For broad guides inspect `--headings`
+first, then retrieve the relevant exact sections. Read complete applicable contracts
+and owning headers; use full reads whenever section context or coverage is unclear.
 
 Existing `--json` search/component/api/read shapes and full content are unchanged.
 The new summary/declaration/headings/section selectors are human-only and reject

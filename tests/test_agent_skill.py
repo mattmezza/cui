@@ -45,7 +45,11 @@ class AgentSkillTests(unittest.TestCase):
             self.assertIn(json.dumps(full['status'], indent=2, ensure_ascii=False), summary)
             self.assertNotIn(full['header']['text'], summary)
             canonical = next(c for c in self.data['components'] if c['name'] == name)
-            self.assertIn(json.dumps(canonical.get('handler_types', []), ensure_ascii=False), summary)
+            self.assertIn('Indexed handler types (not exhaustive):', summary)
+            if canonical.get('handler_types'):
+                self.assertIn(json.dumps(canonical['handler_types'], ensure_ascii=False), summary)
+            else:
+                self.assertIn('not indexed; inspect API/owning headers', summary)
             for header in [canonical['public_header']] + canonical.get('additional_public_headers', []):
                 self.assertIn(header, summary)
             index = self.invoke(['component', name, '--show', 'examples'])[1]
@@ -76,6 +80,25 @@ class AgentSkillTests(unittest.TestCase):
                 self.assertIn(match['header'], api_index)
         self.assertIn(matches[0]['declaration'], concise)
         self.assertLess(len(concise), len(expected))
+
+    def test_handler_index_missing_empty_and_populated_are_not_exhaustive(self):
+        for handlers in (None, [], ['cui_selection_handler']):
+            data = json.loads(json.dumps(self.data))
+            selected = next(c for c in data['components'] if c['name'] == 'Select')
+            if handlers is None:
+                selected.pop('handler_types', None)
+            else:
+                selected['handler_types'] = handlers
+            code, out, _ = self.invoke(['component', 'Select'], data)
+            self.assertEqual(code, 0)
+            self.assertIn('Indexed handler types (not exhaustive):', out)
+            if handlers:
+                self.assertIn(json.dumps(handlers), out)
+                self.assertNotIn('not indexed;', out)
+            else:
+                self.assertIn('not indexed; inspect API/owning headers', out)
+            self.assertEqual(json.loads(self.invoke(['component', 'Select', '--json'], data)[1]),
+                             cui.component(data, 'Select', 'all'))
 
     def test_search_defaults_ranking_and_flag_errors(self):
         expected = cui.search(self.data, 'cui', limit=10)

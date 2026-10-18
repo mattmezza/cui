@@ -1,6 +1,6 @@
 # Remaining component event coverage
 
-Source checkpoint: `18715985` (78 frozen manifest families). Documentation-only
+Source checkpoint: `18d3c17d` (78 frozen manifest families). Documentation-only
 audit, not a parity/status promotion or a claim of 78 uniform event APIs. The
 [contract](COMPONENT_EVENTS_CONTRACT.md), original [matrix](COMPONENT_EVENTS_COVERAGE.md)
 and [binding audit](COMPONENT_EVENTS_BINDINGS.md) retain their historical scope;
@@ -119,60 +119,26 @@ Command Base/Styled forwarding and Scrollable Base/Styled pairing are implemente
 
 HoverCard and Tooltip now have final open-model observers. Focus Trap bracketing and virtual-window completion are explicitly accepted primitive/result exceptions in the [lifecycle checkpoint](LIFECYCLE_RESULT_EVENTS_SLICE.md). VirtualList now exposes aggregate final-offset observers. MessageScroller now exposes exact double-offset/following-tail observers. Deferred window completion remains result-only and is not a claimed callback API. No universal lifecycle coverage is asserted. Foreign binding allowlists remain separately bounded. The follow-up list records the original review plan; the status above supersedes completed/in-flight descriptions in that historical plan.
 
-## Independently reviewable follow-ups
+## Remaining review boundaries
 
-1. **Finish Styled Command forwarding**, already in flight; do not implement a
-   competing path. [Base reducer](../../src/base/cui_command.c),
-   [Styled reducer](../../src/components/cui_command.c),
-   [current tests](../../tests/unit/test_command_events.c) and
-   [checkpoint](COMMAND_EVENTS_SLICE.md) establish query/selection/confirmation
-   ordering. Require multiple confirmations, old-hook model/query replacement,
-   cancellation, passive work, borrowed query copies and actual Styled evidence.
-   Base PROGRAMMATIC metadata must not acquire synthetic UI evidence.
-2. **Review TitleBar proposal before code**: [exact seams](TITLE_BAR_EVENTS_SLICE.md),
-   [Base](../../src/base/cui_chrome.c), [Styled](../../src/components/cui_chrome.c),
-   [fake-host tests](../../tests/unit/test_chrome.c). A typed dispatch observer
-   should report the host operation and actual return, not window destruction or
-   accepted physical drag. Preserve coalesced control actions, close override,
-   decoration/capability gates, gesture-before-controls ordering and callback
-   mutation behavior. Headless fake-host proof is distinct from OS proof.
-3. **Scroll observation checkpoint**: [scroll API](../../include/cui/cui_scroll.h),
-   [Base](../../src/base/cui_scroll.c), [tests](../../tests/unit/test_scroll.c),
-   [virtual implementation](../../src/base/cui_virtual_scroll.c),
-   [virtual tests](../../tests/unit/test_virtual_styled.c) and
-   [message implementation](../../src/components/cui_message.c). Start with one
-   explicitly bounded final-offset observer after finish; separately review
-   virtual-window completion and MessageScroller. Prove wheel, keyboard,
-   scrollbar drag, child reveal/deferred scroll, clamping/normalization, no-op,
-   inert work and repeated events. Do not turn final offsets into fabricated
-   per-input transitions or equate row rendering with data insertion.
-4. **Optional visibility lifecycle**, only if applications need it: use
-   [content reduction](../../src/components/cui_content.c) and
-   [overlay operations](../../src/base/cui_overlay.c), with
-   [content](../../tests/unit/test_content.c) and
-   [overlay tests](../../tests/unit/test_overlay.c). Audit hover/focus delay,
-   dismissal, omitted submission and motion completion before defining OPEN/CLOSE.
-   Focus Trap is a child scope, not another Dialog; avoid duplicate close delivery.
-5. **TextView narrowly typed link/selection observation**: audit
-   [link and reveal dispatch](../../src/components/cui_text_view.c) and
-   [tests](../../tests/unit/test_text_view.c). Keep decoded URI ownership explicit;
-   selection changes, reveal requests and link activation need separate payloads.
-   Require pointer/key supported paths, copy bounds, callback mutation constraints
-   and selection changes returning to their initial state. Existing typed callback
-   is useful now; absence of the shared envelope is not absence of interaction.
-6. **Retained APIs only on demonstrated need**: Carousel, Notification,
-   Questionnaire, Resizable and Dock already have typed notifications. Their
-   [original ownership evidence](COMPONENT_EVENTS_COVERAGE.md) remains relevant.
-   Any shared-metadata adapter must first specify registration replacement,
-   retained user lifetime, snapshot versus live-state borrowing, programmatic
-   operations and detach/dispose. Speech must preserve bounded owner-thread pump
-   delivery and provider generation checks. No blanket immediate wrapper is safe.
+The earlier follow-up plan has landed for Command forwarding, Scrollable,
+HoverCard/Tooltip, VirtualList and MessageScroller. TitleBar, Focus Trap and
+TextView retain the documented typed/host/composition exceptions. Current
+classification is A43, N20, H8, T7, G0 across exactly 78 families. This is a
+**disposition count**, not uniform event semantics or complete family parity.
 
-These are proposals, not authorization or implemented contracts. Each production
-slice needs strict C11/C++ public-header checks, meaningful legacy comparisons,
-multiple/no-op/passive inputs, correct counts and owned-copy tests, plus CTest via
-`python scripts/test_local.py --build-dir <isolated-build>` on Linux. Browser
-checks remain headless; private Xvfb is not hardware/Wayland/physical-drag proof.
+Further work must target demonstrated application needs rather than repeat those
+slices. Deferred virtual-window/render completion stays result-only; applied
+notification is not a controlled request or veto. Optional visibility observers
+describe the open model, not pixels or animation completion. Retained Carousel,
+Notification, Questionnaire, Resizable, Dock and Speech keep their explicit
+registration/pump/user-lifetime rules. A future metadata adapter must separately
+preserve those rules and existing mutation/ordering behavior.
+
+Foreign binding coverage below remains narrower than direct C. Full platform and
+accessibility acceptance also remains separate from headless event evidence. Each
+future behavior change needs strict public headers, legacy comparisons, owned-copy
+and ordering tests plus private-display CTest; no desktop or GPU proof is implied.
 
 ## Binding coverage is a separate axis
 

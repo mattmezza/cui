@@ -3,7 +3,10 @@
 This document prepares **v0.1.0-alpha.2**; it is not evidence that publication
 has occurred or that the release source is frozen. The next batch includes the
 implemented component event slices, documented typed/host-service exceptions,
-secure InputGroup rendering and IME lifetime/focus fixes. Concise skill discovery
+secure InputGroup rendering and IME lifetime/focus fixes, precise virtual/message
+scroll observers, bounded Questionnaire styles/labels and the decoded Video gallery
+extension. These additions preserve the original 78 baseline; no full parity or
+foreign-event uniformity is claimed. Concise skill discovery
 and explicit partial Markdown reads are implemented. Final integrated validation,
 source freeze and artifact checks remain pending; implementation is not publication.
 Final release notes must describe the actual frozen commit.

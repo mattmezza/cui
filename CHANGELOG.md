@@ -13,6 +13,8 @@
   consumers for the extended by-value options structure.
 - Makes human skill discovery concise, preserves full/JSON output and adds explicit
   partial Markdown section reads without clipping canonical limitations.
+- Adds a real browser-decoded Video gallery extension with bounded WebM/MP4
+  assets, CUI controls and explicit decoder/audio limitations; baseline remains 78.
 - Final source freeze, integrated checks and release artifact validation remain
   pending. No registry publication is implied.
 - Alpha.1 versions, tags and published assets remain immutable.

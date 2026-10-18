@@ -11,6 +11,9 @@
 bool cui_choice_private_list_events(cui_context *, const cui_choice_item *, size_t,
     cui_id *, cui_list_state *, cui_list_options, cui_id, cui_selection_handler,
     cui_selection_event_result *);
+bool cui_choice_private_list_commands(cui_context *, const cui_choice_item *, size_t,
+    cui_id *, cui_list_state *, cui_list_options, cui_id, cui_menu_command_handler,
+    cui_menu_command_result *);
 static void cui_choice_menu_level(cui_context *, const cui_theme *, const cui_menu_entry *, size_t,
                                   cui_menu_tree_state *, size_t, cui_rect, cui_menu_tree_options,
                                   cui_str);
@@ -1152,7 +1155,8 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                     cui_str name, cui_str placeholder, const cui_choice_item *items,
                                     size_t count, cui_id *selected, cui_choice_popup *state,
                                     cui_choice_popup_options options, bool menu,
-                                    cui_selection_handler handler, cui_selection_event_result *observed) {
+                                    cui_selection_handler handler, cui_selection_event_result *observed,
+                                    cui_menu_command_handler commands, cui_menu_command_result *command_result) {
     if (!theme || !selected || !state || !state->overlay.id || (!items && count) ||
         !isfinite(options.viewport.x) || !isfinite(options.viewport.y) ||
         !isfinite(options.viewport.w) || !isfinite(options.viewport.h) || options.viewport.w <= 0 ||
@@ -1165,6 +1169,10 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
     if (observed) {
         observed->valid = true;
         observed->submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
+    }
+    if (command_result) {
+        command_result->valid = true;
+        command_result->submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
     }
     cui_base_choice_popup_trigger(ui, trigger, name, options.disabled, items, count, *selected,
                                   state);
@@ -1219,7 +1227,9 @@ static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_t
                                          state->overlay.id ^ UINT64_C(0xd1bc905ee4216f11)};
     cui_id old = *selected;
     bool activated =
-        count ? (observed ? cui_choice_private_list_events(ui, items, count, selected,
+        count ? (command_result ? cui_choice_private_list_commands(ui, items, count, selected,
+                    &state->list, list_options, trigger, commands, command_result)
+                         : observed ? cui_choice_private_list_events(ui, items, count, selected,
                     &state->list, list_options, trigger, handler, observed)
                          : cui_base_list(ui, items, count, selected, &state->list, list_options))
               : false;
@@ -1264,7 +1274,7 @@ bool cui_select(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str
                 cui_str placeholder, const cui_choice_item *items, size_t count, cui_id *selected,
                 cui_choice_popup *state, cui_choice_popup_options options) {
     return cui_choice_popup_render(ui, trigger, theme, name, placeholder, items, count, selected,
-                                   state, options, false, (cui_selection_handler){0}, NULL);
+                                   state, options, false, (cui_selection_handler){0}, NULL, (cui_menu_command_handler){0}, NULL);
 }
 cui_select_event_result cui_select_events(cui_context *ui, cui_id trigger, const cui_theme *theme,
     cui_str name, cui_str placeholder, const cui_choice_item *items, size_t count,
@@ -1275,7 +1285,7 @@ cui_select_event_result cui_select_events(cui_context *ui, cui_id trigger, const
     if (!ui || !trigger)
         return result;
     result.legacy_changed = cui_choice_popup_render(ui, trigger, theme, name, placeholder,
-        items, count, selected, state, options, false, handler, &result.events);
+        items, count, selected, state, options, false, handler, &result.events, (cui_menu_command_handler){0}, NULL);
     return result;
 }
 
@@ -1283,7 +1293,20 @@ bool cui_menu(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str n
               const cui_choice_item *items, size_t count, cui_id *action, cui_choice_popup *state,
               cui_choice_popup_options options) {
     return cui_choice_popup_render(ui, trigger, theme, name, name, items, count, action, state,
-                                   options, true, (cui_selection_handler){0}, NULL);
+                                   options, true, (cui_selection_handler){0}, NULL, (cui_menu_command_handler){0}, NULL);
+}
+
+cui_menu_command_result cui_menu_events(cui_context *ui, cui_id trigger, const cui_theme *theme,
+    cui_str name, const cui_choice_item *items, size_t count, cui_id *action,
+    cui_choice_popup *state, cui_choice_popup_options options, cui_menu_command_handler handler) {
+    cui_menu_command_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !trigger)
+        return result;
+    result.legacy_activated = cui_choice_popup_render(ui, trigger, theme, name, name,
+        items, count, action, state, options, true, (cui_selection_handler){0}, NULL,
+        handler, &result);
+    return result;
 }
 
 static void cui_choice_paint_query(cui_context *ui, cui_id input, const cui_theme *theme,

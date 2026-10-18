@@ -1,6 +1,6 @@
 # Menu forwarding event checkpoints
 
-Status: ContextMenu slice implemented in this branch; Simple Menu and DropdownButton remain proposals. Original source audit: `b4146c89`. See [ContextMenu events](../CONTEXT_MENU_EVENTS.md) for the implemented API and proof. Preserve [MenuTree's implemented per-command contract](../MENU_EVENTS.md), [event ownership/timing rules](COMPONENT_EVENTS_CONTRACT.md), all legacy entry points/layouts, and the 78-family manifest. No Core/surface change, new queue, capture/bubble routing or binding request hook is proposed. No builds were run for this read-only checkpoint.
+Status: ContextMenu and Simple Menu slices implemented in this branch; DropdownButton remains proposed. See [Simple Menu events](../SIMPLE_MENU_EVENTS.md). Original source audit: `b4146c89`. See [ContextMenu events](../CONTEXT_MENU_EVENTS.md) for the implemented API and proof. Preserve [MenuTree's implemented per-command contract](../MENU_EVENTS.md), [event ownership/timing rules](COMPONENT_EVENTS_CONTRACT.md), all legacy entry points/layouts, and the 78-family manifest. No Core/surface change, new queue, capture/bubble routing or binding request hook is proposed. No builds were run for this read-only checkpoint.
 
 ## Actual entry points and seams
 
@@ -37,7 +37,7 @@ Proof: real right-click open/reanchor without command; nested action/check/radio
 
 ## Slice 2: Simple Menu flat command observer
 
-Proposed exact signature reuses existing command payload/result:
+Implemented exact signature reuses existing command payload/result:
 
 ```c
 cui_menu_command_result cui_menu_events(

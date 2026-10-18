@@ -113,6 +113,8 @@ The checkbox updates the application's bool. Controlled Switch/Toggle `on_change
 
 API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md).
 
+Additional event includes: `cui/cui_disclosure_events.h`.
+
 ## AlertDialog
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -124,6 +126,8 @@ API: `cui_accordion`. [Public header](../include/cui/cui_disclosure.h); [guide](
 **Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.
 
 API: `cui_surface_init`, `cui_alert_dialog`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
+
+Additional event includes: `cui/cui_surface_events.h`.
 
 ## Alert
 
@@ -148,6 +152,8 @@ API: `cui_alert`. [Public header](../include/cui/cui_content.h); [guide](CONTENT
 **Usage:** Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks.
 
 API: `cui_attachment`. [Public header](../include/cui/cui_media.h); [guide](MEDIA.md).
+
+Additional event includes: `cui/cui_media_events.h`.
 
 ## Avatar
 
@@ -232,6 +238,8 @@ API: `cui_sdl3_clipboard_interface`. [Public header](../include/cui/cui_sdl3.h);
 **Usage:** Submit stable item IDs and current expansion each frame; keep motion and style arrays alive through end_frame.
 
 API: `cui_collapsible`, `cui_collapsible_ex`. [Public header](../include/cui/cui_disclosure.h); [guide](DISCLOSURE.md).
+
+Additional event includes: `cui/cui_disclosure_events.h`.
 
 ## DropdownButton
 
@@ -401,6 +409,8 @@ API: `cui_notification_init`, `cui_notification_push`, `cui_notifications`. [Pub
 
 API: `cui_pagination`. [Public header](../include/cui/cui_numeric.h); [guide](NUMERIC.md).
 
+Additional event includes: `cui/cui_numeric_selection_events.h`.
+
 ## Progress
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
@@ -436,6 +446,8 @@ API: `cui_radio`, `cui_radio_ex`. [Public header](../include/cui/cui_components.
 **Usage:** Pass the current rating by pointer and save it in the change branch.
 
 API: `cui_rating`. [Public header](../include/cui/cui_numeric.h); [guide](NUMERIC.md).
+
+Additional event includes: `cui/cui_numeric_selection_events.h`.
 
 ## Shimmer
 
@@ -485,6 +497,8 @@ API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loadin
 
 API: `cui_stepper`. [Public header](../include/cui/cui_numeric.h); [guide](NUMERIC.md).
 
+Additional event includes: `cui/cui_numeric_selection_events.h`.
+
 ## Switch
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -521,6 +535,8 @@ API: `cui_tag`, `cui_begin_tag`, `cui_end_tag`. [Public header](../include/cui/c
 
 API: `cui_toggle`, `cui_toggle_ex`. [Public header](../include/cui/cui_components.h); [guide](CONTROLS.md).
 
+Additional event includes: `cui/cui_list_events.h`.
+
 ## Tooltip
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -545,6 +561,8 @@ API: `cui_tooltip`. [Public header](../include/cui/cui_content.h); [guide](CONTE
 
 API: `cui_calendar_init`, `cui_calendar`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
 
+Additional event includes: `cui/cui_picker_events.h`.
+
 ## ColorPicker
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -556,6 +574,8 @@ API: `cui_calendar_init`, `cui_calendar`. [Public header](../include/cui/cui_pic
 **Usage:** Submit persistent channel/editor state; use the accepted color in the next frame theme or preview.
 
 API: `cui_color_picker`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
+
+Additional event includes: `cui/cui_picker_events.h`.
 
 ## Combobox
 
@@ -580,6 +600,8 @@ API: `cui_combobox`. [Public header](../include/cui/cui_choice.h); [guide](CHOIC
 **Usage:** Initialize stable popup identity once; resubmit state and accepted selection each frame.
 
 API: `cui_date_picker_init`, `cui_date_picker`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
+
+Additional event includes: `cui/cui_picker_events.h`.
 
 ## Editor
 
@@ -629,6 +651,10 @@ API: `cui_input`, `cui_input_ex`. [Public header](../include/cui/cui_components.
 
 API: `cui_input_group`. [Public header](../include/cui/cui_form.h); [guide](FORMS.md).
 
+cui_input_group_result reports edit behavior; cui_input_group_content_fn composes addons. Opt-in observers report accepted addon activations and per-event nested text changes/submissions; results never replay callbacks.
+
+Additional event includes: `cui/cui_form_events.h`.
+
 ## NumberInput
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -641,6 +667,8 @@ API: `cui_input_group`. [Public header](../include/cui/cui_form.h); [guide](FORM
 
 API: `cui_number_input`. [Public header](../include/cui/cui_numeric.h); [guide](NUMERIC.md).
 
+Additional event includes: `cui/cui_number_events.h`.
+
 ## OtpInput
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -652,6 +680,8 @@ API: `cui_number_input`. [Public header](../include/cui/cui_numeric.h); [guide](
 **Usage:** Initialize bounded storage once, submit cells each frame and consume the returned completion event.
 
 API: `cui_otp_init`, `cui_otp`. [Public header](../include/cui/cui_otp.h); [guide](OTP.md).
+
+Additional event includes: `cui/cui_otp_events.h`.
 
 ## Questionnaire
 
@@ -689,6 +719,8 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 API: `cui_slider`. [Public header](../include/cui/cui_components.h); [guide](CONTROLS.md).
 
+Additional event includes: `cui/cui_styled_slider_events.h`.
+
 ## Speech
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -713,6 +745,8 @@ API: `cui_speech_init`, `cui_speech_pump`, `cui_speech_button`, `cui_speech_disp
 
 API: `cui_textarea`. [Public header](../include/cui/cui_textarea.h); [guide](TEXTAREA.md).
 
+Additional event includes: `cui/cui_multiline_events.h`.
+
 ## TimeField
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -724,6 +758,8 @@ API: `cui_textarea`. [Public header](../include/cui/cui_textarea.h); [guide](TEX
 **Usage:** Submit segment state and time by pointer; persist accepted time in the change branch.
 
 API: `cui_time_field`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
+
+Additional event includes: `cui/cui_picker_events.h`.
 
 ## Carousel
 
@@ -761,6 +797,8 @@ API: `cui_description_list`. [Public header](../include/cui/cui_description.h); 
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
+Additional event includes: `cui/cui_surface_events.h`.
+
 ## Dock
 
 **Composition:** application model + frame composition. **Scope:** styled frame adapter + retained base model.
@@ -785,6 +823,8 @@ API: `cui_dock_view_create`, `cui_dock_view_render`, `cui_dock_view_destroy`. [P
 
 API: `cui_list`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.md).
 
+Additional event includes: `cui/cui_list_events.h`.
+
 ## Menu
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -808,6 +848,8 @@ API: `cui_menu_tree`, `cui_menu`. [Public header](../include/cui/cui_choice.h); 
 **Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
+
+Additional event includes: `cui/cui_surface_events.h`.
 
 ## Resizable
 
@@ -857,6 +899,8 @@ API: `cui_scrollable_begin`, `cui_scrollable_end_ex`. [Public header](../include
 
 API: `cui_settings_state_init`, `cui_settings`. [Public header](../include/cui/cui_settings.h); [guide](SETTINGS.md).
 
+Additional event includes: `cui/cui_settings_events.h`.
+
 ## Sheet
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -868,6 +912,8 @@ API: `cui_settings_state_init`, `cui_settings`. [Public header](../include/cui/c
 **Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
+
+Additional event includes: `cui/cui_surface_events.h`.
 
 ## Sidebar
 
@@ -941,6 +987,8 @@ API: `cui_title_bar`. [Public header](../include/cui/cui_chrome.h); [guide](CHRO
 
 API: `cui_toolbar`, `cui_toolbar_command_render`. [Public header](../include/cui/cui_toolbar.h); [guide](TOOLBAR.md).
 
+Additional event includes: `cui/cui_toolbar_events.h`.
+
 ## Tree
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
@@ -1002,6 +1050,8 @@ API: `cui_command_init`, `cui_command`. [Public header](../include/cui/cui_comma
 **Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result.
 
 API: `cui_table_create`, `cui_data_table`, `cui_table_destroy`. [Public header](../include/cui/cui_table.h); [guide](TABLE.md).
+
+Additional event includes: `cui/cui_table_events.h`.
 
 ## Plot
 

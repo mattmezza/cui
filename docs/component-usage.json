@@ -24,7 +24,10 @@
       "scope": "styled frame component",
       "name": "Accordion",
       "public_header": "include/cui/cui_disclosure.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_disclosure_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -50,7 +53,10 @@
       "scope": "styled frame component",
       "name": "AlertDialog",
       "public_header": "include/cui/cui_surface.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_surface_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -94,7 +100,10 @@
       "scope": "styled frame component",
       "name": "Attachment",
       "public_header": "include/cui/cui_media.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_media_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -244,7 +253,10 @@
       "scope": "styled frame component",
       "name": "Collapsible",
       "public_header": "include/cui/cui_disclosure.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_disclosure_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -545,7 +557,10 @@
       "scope": "styled frame component",
       "name": "Pagination",
       "public_header": "include/cui/cui_numeric.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_numeric_selection_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -614,7 +629,10 @@
       "scope": "styled frame component",
       "name": "Rating",
       "public_header": "include/cui/cui_numeric.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_numeric_selection_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -700,7 +718,10 @@
       "scope": "styled frame component",
       "name": "Stepper",
       "public_header": "include/cui/cui_numeric.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_numeric_selection_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -770,7 +791,10 @@
       "scope": "styled frame component",
       "name": "Toggle",
       "public_header": "include/cui/cui_components.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_list_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -814,7 +838,10 @@
       "scope": "styled frame component",
       "name": "Calendar",
       "public_header": "include/cui/cui_picker.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_picker_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -835,7 +862,10 @@
       "scope": "styled frame component",
       "name": "ColorPicker",
       "public_header": "include/cui/cui_picker.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_picker_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -884,7 +914,10 @@
       "scope": "styled frame component",
       "name": "DatePicker",
       "public_header": "include/cui/cui_picker.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_picker_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -921,7 +954,10 @@
       "scope": "styled frame adapter + retained base model",
       "name": "Editor",
       "public_header": "include/cui/cui_editor.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_editor_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -990,13 +1026,18 @@
         "docs/INPUT_GROUP_EVENTS.md"
       ],
       "callback_symbols": [
-        "cui_input_group_content_fn",
-        "cui_input_group_handler"
+        "cui_input_group_content_fn"
       ],
       "scope": "styled frame component",
       "name": "Input Group",
       "public_header": "include/cui/cui_form.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_form_events.h"
+      ],
+      "handler_types": [
+        "cui_input_group_handler"
+      ]
     },
     {
       "api_symbols": [
@@ -1019,7 +1060,10 @@
       "scope": "styled frame component",
       "name": "NumberInput",
       "public_header": "include/cui/cui_numeric.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_number_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1041,7 +1085,10 @@
       "scope": "styled frame component",
       "name": "OtpInput",
       "public_header": "include/cui/cui_otp.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_otp_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1109,7 +1156,10 @@
       "scope": "styled frame component",
       "name": "Slider",
       "public_header": "include/cui/cui_components.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_styled_slider_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1156,7 +1206,10 @@
       "scope": "styled frame component",
       "name": "Textarea",
       "public_header": "include/cui/cui_textarea.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_multiline_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1178,7 +1231,10 @@
       "scope": "styled frame component",
       "name": "TimeField",
       "public_header": "include/cui/cui_picker.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_picker_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1250,7 +1306,10 @@
       "scope": "styled frame component",
       "name": "Dialog",
       "public_header": "include/cui/cui_surface.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_surface_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1305,7 +1364,10 @@
       "scope": "styled frame component",
       "name": "List",
       "public_header": "include/cui/cui_choice.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_list_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1359,7 +1421,10 @@
       "scope": "styled frame component",
       "name": "Popover",
       "public_header": "include/cui/cui_surface.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_surface_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1456,7 +1521,10 @@
       "scope": "styled frame component",
       "name": "Settings",
       "public_header": "include/cui/cui_settings.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_settings_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1483,7 +1551,10 @@
       "scope": "styled frame component",
       "name": "Sheet",
       "public_header": "include/cui/cui_surface.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_surface_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1555,7 +1626,10 @@
       "scope": "styled frame component",
       "name": "Tabs",
       "public_header": "include/cui/cui_choice.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_tabs_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1604,7 +1678,8 @@
     {
       "api_symbols": [
         "cui_toolbar",
-        "cui_toolbar_command_render"
+        "cui_toolbar_command_render",
+        "cui_toolbar_command_events"
       ],
       "state_types": [
         "cui_toolbar_item",
@@ -1614,7 +1689,8 @@
       "interaction": "cui_toolbar_render_fn composes items; cui_toolbar_command.on_activate handles command activation.",
       "usage": "Submit command descriptors each frame and perform application actions in on_activate.",
       "docs": [
-        "docs/TOOLBAR.md"
+        "docs/TOOLBAR.md",
+        "docs/TOOLBAR_EVENTS.md"
       ],
       "callback_symbols": [
         "cui_toolbar_render_fn",
@@ -1623,7 +1699,13 @@
       "scope": "styled frame component",
       "name": "Toolbar",
       "public_header": "include/cui/cui_toolbar.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_toolbar_events.h"
+      ],
+      "handler_types": [
+        "cui_component_activation_handler"
+      ]
     },
     {
       "api_symbols": [
@@ -1648,7 +1730,10 @@
       "scope": "styled frame component",
       "name": "Tree",
       "public_header": "include/cui/cui_tree.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_tree_events.h"
+      ]
     },
     {
       "api_symbols": [
@@ -1758,7 +1843,10 @@
       "scope": "styled frame component",
       "name": "DataTable",
       "public_header": "include/cui/cui_table.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_table_events.h"
+      ]
     },
     {
       "api_symbols": [

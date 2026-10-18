@@ -82,6 +82,7 @@ bool cui_toolbar_group(cui_context *, cui_id, const cui_theme *, const cui_toolb
 
 #if defined(CUI_TOOLBAR_IMPLEMENTATION) && defined(CUI_TOOLBAR_DECLARATIONS_READY) && !defined(CUI_TOOLBAR_IMPLEMENTATION_ONCE)
 #define CUI_TOOLBAR_IMPLEMENTATION_ONCE
+#include "cui_toolbar_events.h"
 /* src/base/cui_toolbar.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -153,7 +154,6 @@ void cui_base_toolbar_group_end(cui_context *ui) {
 
 /* src/components/cui_toolbar.c */
 /* SPDX-License-Identifier: MIT */
-
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_PRIVATE_DESIGN_METRICS_H
 #define CUI_PRIVATE_DESIGN_METRICS_H
@@ -184,6 +184,7 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
     return true;
 }
 #endif
+
 
 #include <math.h>
 static bool cui_toolbar_items_valid(cui_id id, const cui_toolbar_item *items, size_t count) {
@@ -255,23 +256,48 @@ bool cui_toolbar_group(cui_context *ui, cui_id id, const cui_theme *theme,
                        const cui_toolbar_item *items, size_t count, cui_toolbar_options o) {
     return cui_toolbar_render_items(ui, id, theme, items, count, o, true);
 }
-void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
-                                const cui_toolbar_presentation *p, void *user) {
-    cui_toolbar_command *c = user;
+static cui_toolbar_command_event_result
+cui_toolbar_command_common(cui_context *ui, const cui_theme *theme,
+                           const cui_toolbar_presentation *p, cui_toolbar_command *c,
+                           cui_component_activation_handler handler) {
+    cui_toolbar_command_event_result result = {0};
     if (!ui || !theme || !p || !c || !cui_design_valid(p->metrics.design_size) || !c->id ||
         (!c->label.data && c->label.length) ||
         (!c->accessible_name.data && c->accessible_name.length))
-        return;
+        return result;
     cui_toolbar_presentation normalized = *p;
     if (!p->metrics.design_size &&
         !cui_toolbar_measure(p->metrics.size, p->metrics.custom_size, &normalized.metrics))
-        return;
+        return result;
     p = &normalized;
     cui_str name = c->accessible_name.length ? c->accessible_name : c->label;
     if (!name.length)
-        return;
+        return result;
+    result.valid = true;
+    result.submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
     cui_interaction state =
         cui_interact(ui, c->id, CUI_ROLE_BUTTON, name, c->disabled, c->selected, 0);
+    cui_component_event_metadata evidence = {0};
+    bool notify = handler.callback && result.submitted && state.activated;
+    if (notify) {
+        (void)cui_component_event_init(&evidence, CUI_COMPONENT_EVENT_ACTIVATE, c->id,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        evidence.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
+        evidence.frame_sequence = cui_frame_sequence(ui);
+        size_t count = 0, matches = 0;
+        (void)cui_frame_events(ui, &count);
+        cui_activation_snapshot snapshot = {0};
+        for (size_t i = 0; i < count; ++i) {
+            if (cui_event_accepted_activation(ui, i) == c->id) {
+                ++matches;
+                if (matches == 1)
+                    (void)cui_event_activation_snapshot(ui, i, &snapshot);
+            }
+        }
+        if (matches == 1)
+            (void)cui_component_event_from_activation(&evidence, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                      &snapshot);
+    }
     cui_set_semantic_details(ui, c->id, (cui_semantic_details){.cursor = CUI_CURSOR_DEFAULT});
     float height = p->metrics.control_height;
     float padding = p->metrics.size == CUI_TOOLBAR_XSMALL  ? 4
@@ -338,6 +364,21 @@ void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
     cui_end_box(ui);
     if (state.activated && c->on_activate)
         c->on_activate(c->activate_user);
+    if (notify) {
+        handler.callback(handler.user, &evidence);
+        result.activation_count = 1;
+    }
+    return result;
+}
+void cui_toolbar_command_render(cui_context *ui, const cui_theme *theme,
+                                const cui_toolbar_presentation *p, void *command) {
+    (void)cui_toolbar_command_common(ui, theme, p, command, (cui_component_activation_handler){0});
+}
+cui_toolbar_command_event_result
+cui_toolbar_command_events(cui_context *ui, const cui_theme *theme,
+                           const cui_toolbar_presentation *p, cui_toolbar_command *command,
+                           cui_component_activation_handler handler) {
+    return cui_toolbar_command_common(ui, theme, p, command, handler);
 }
 
 #endif

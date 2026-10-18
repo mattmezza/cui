@@ -1364,7 +1364,7 @@ target_link_libraries(test_settings_events PRIVATE cui)
 cui_warnings(test_settings_events)
 add_test(NAME settings_events COMMAND test_settings_events)
 
-foreach(name sidebar_events time_field_events attachment_events input_group_events)
+foreach(name sidebar_events time_field_events attachment_events input_group_events toolbar_events)
  add_executable(test_${name} tests/unit/test_${name}.c)
  target_link_libraries(test_${name} PRIVATE cui)
  cui_warnings(test_${name})

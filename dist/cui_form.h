@@ -573,7 +573,7 @@ static void cui_form_private_addons(cui_context *ui, const cui_theme *t,
         if (a[i].alignment == alignment)
             cui_form_private_addon(ui, t, &a[i], o, height, rem_size);
 }
-static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id group, cui_id input,
+static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input,
                                        const cui_theme *theme, cui_edit *edit,
                                        cui_input_group_state *state, const cui_input_group_addon *a,
                                        size_t count, cui_input_group_options o,
@@ -754,7 +754,7 @@ static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id gro
 cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id input,
     const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
     const cui_input_group_addon *addons, size_t count, cui_input_group_options options) {
-    return cui_form_private_group(ui, group, input, theme, edit, state, addons, count, options,
+    return cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count, options,
                                   (cui_input_group_handler){0}, NULL);
 }
 cui_input_group_event_result cui_input_group_events(cui_context *ui, cui_id group, cui_id input,
@@ -762,7 +762,7 @@ cui_input_group_event_result cui_input_group_events(cui_context *ui, cui_id grou
     const cui_input_group_addon *addons, size_t count, cui_input_group_options options,
     cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
-    result.control = cui_form_private_group(ui, group, input, theme, edit, state, addons, count,
+    result.control = cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count,
                                             options, handler, &result);
     return result;
 }

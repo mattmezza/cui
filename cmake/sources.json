@@ -230,7 +230,8 @@
     "cui_settings_events": [],
     "cui_sidebar_events": [],
     "cui_media_events": [],
-    "cui_form_events": []
+    "cui_form_events": [],
+    "cui_toolbar_events": []
   },
   "native": {
     "text": [

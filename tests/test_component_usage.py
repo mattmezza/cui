@@ -65,13 +65,21 @@ class ComponentUsageTests(unittest.TestCase):
         for entry in self.entries:
             with self.subTest(component=entry['name']):
                 header = public_header_closure(self.headers, entry['public_header'])
+                for extra in entry.get('additional_public_headers', []):
+                    self.assertIn(extra, self.headers)
+                    header += '\n' + public_header_closure(self.headers, extra)
                 self.assertTrue(entry['api_symbols'])
                 for api in entry['api_symbols']:
                     self.assertRegex(header, r'\b' + re.escape(api) + r'\s*\(')
                 for typename in entry['state_types']:
                     # A real typedef or named struct, not a guessed component name.
                     self.assertRegex(self.all_headers, r'(?:}\s*|\bstruct\s+)' + re.escape(typename) + r'\b')
-                callback_header = public_header_closure(self.headers, entry['public_header'])
+                callback_header = header
+                for handler in entry.get('handler_types', []):
+                    self.assertRegex(callback_header, r'}\s*' + re.escape(handler) + r'\b')
+                for extra in entry.get('additional_public_headers', []):
+                    self.assertIn(extra, self.headers)
+                    header += '\n' + public_header_closure(self.headers, extra)
                 for callback in entry['callback_symbols']:
                     self.assertRegex(callback_header, r'\b' + re.escape(callback) + r'\b')
                     if callback.startswith('cui_'):

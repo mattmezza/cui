@@ -66,20 +66,13 @@ Do not infer value change or suppression from its aggregate bool.
    No new side-effect replay when reading result counts. Each adapter is an
    aggregate operation; do not claim per-input multiplicity inside nested controls.
    Preserve partial-error changes and Number's additional bounds policy.
-3. **Built-in text values.** Separate proposal revision before production:
-   use editor revision and borrowed final UTF-8/length with caller-controlled
-   copying. A previous text snapshot requires explicit bounded caller workspace;
-   do not allocate an unbounded hidden before-copy or claim struct copies own text.
-   Audit legacy callback-driven editor mutation and existing Input error paths.
-   Settings has no secure-input configuration; do not infer redaction support
-   from the separate direct Input facade.
-4. **Reset observations.** Separate helper/common reset seams, preserving source
-   order, custom reset behavior, same-value old callbacks, disabled behavior and
-   failure after progress. Reuse typed value comparisons where supported, with
-   explicit operation/reason metadata distinguishing reset from field editing.
-   Custom reset cannot produce a typed value without a separate host contract.
-   Programmatic reset has UNKNOWN source/no fabricated input or activation. Do
-   not call reset success ACTIVATE or COMMIT merely because a button may invoke it.
+3. **Built-in text values.** The revised exact proposal below supersedes the
+   earlier before-text snapshot/workspace option. Observe committed revision and
+   byte-count snapshots plus callback-borrowed final UTF-8 after old callbacks.
+   No hidden or caller-required before-text copy, per-input multiplicity or SUBMIT.
+4. **Reset observations.** The revised proposal below reuses the implemented typed
+   value observers with explicit EDIT/RESET reasons; no invented reset action or
+   lifecycle event. Preserve all existing helper/callback/order/failure behavior.
 5. **Search, resize and viewport.** Audit independently. Search can reuse its
    actual text revision semantics; width/scroll may need honest aggregate final
    completion observations. Do not turn filter maintenance into user navigation,
@@ -144,3 +137,189 @@ or callbacks. Aggregate field metadata is frame-only UNKNOWN, with compound targ
 and separate derived field ID/source indices. No input reconstruction or text/reset
 observer was added; custom render overrides remain outside built-in scalar hooks.
 New handler/result fields require consumer rebuild; old legacy layouts stay intact.
+
+
+## Revised text/reset checkpoint — design only
+
+This section proposes the next slices; it does not declare shipped APIs. The
+navigation/scalar checkpoints above describe their prior implemented scope. No
+production, generated or binding files change in this revision.
+
+### Exact text API and compatibility
+
+In `cui_settings_events.h`, propose:
+
+```c
+typedef enum {
+    CUI_SETTINGS_CHANGE_EDIT = 0,
+    CUI_SETTINGS_CHANGE_RESET
+} cui_settings_change_reason;
+
+typedef struct {
+    cui_component_event_metadata event;
+    cui_id field_id;
+    size_t page, group, item;
+    uint64_t before_revision, after_revision;
+    size_t before_bytes, after_bytes;
+    cui_str text; /* final committed UTF-8, borrowed only through this callback */
+    cui_settings_change_reason reason;
+} cui_settings_text_change;
+/* Append to the new handler: */
+/* void (*on_text)(void *, const cui_settings_text_change *); */
+/* Append to the new event result: size_t text_count; */
+```
+
+Append `reason` to the existing new bool/number/choice payloads as well. Existing
+adapter notifications use EDIT; reset observations use RESET. Navigation has no
+reason change. These event structs/handler/result are **unreleased** additions:
+changing their ABI requires rebuilding all consumers/generated copies before a
+release. Use designated initializers. EDIT=0 preserves zero/default interpretation;
+there is no claim of binary compatibility with the preceding event-struct layout.
+Do not change old Settings functions/options/state/result or old callback types.
+Add fields only with the independently implemented slice, not reserved stubs.
+
+`cui_settings_events` keeps its signature; on_text shares the existing handler user.
+Capture the Input editor's `cui_edit_get_state` revision/length immediately before
+the old built-in adapter. Run the same Input once, preserve its aggregate error and
+old on_change predicate/timing, then read the **same still-live editor's** final
+state and `cui_edit_get_text`. Emit zero/one text CHANGE if revisions differ, even
+when old changed is false or a later edit error exists. The final byte count equals
+text.length; before_bytes is the old committed UTF-8 length, not characters/caret.
+Use revision inequality, not ordering/subtraction. Multiple changes/undo/redo can
+end with identical bytes but a different revision; that is one revision-change
+notification, not proof of differing old/final strings. No before string, changed
+range, selection transaction, request, COMMIT or SUBMIT is promised.
+
+The callback follows old on_change, so it observes callback-driven committed edits
+and redirects, including undo to the prior bytes. Only actual revision difference
+matters. Selection/scroll/caret changes and IME preedit without committed revision
+change are silent; commit/undo/redo may notify. Do not reposition old paint or
+rerender to match callback-redirection text. Preserve the first aggregate edit_error
+exactly; unchanged revision on failure is silent, changed revision before/through
+an error is still notified. Legacy callback edit errors are not reconstructible
+from its void return and must not be invented in the payload/result.
+
+EDIT metadata stays frame-only UNKNOWN, compound target plus explicit field ID
+and source indices. A whole Input plus host callback is not a unique input event.
+Enabled only: preserve disabled/passive/inert old work while suppressing new EDIT
+notifications. Custom render overrides remain outside built-in text observation.
+Settings supplies no secure/masked Input option; this proposal exposes committed
+bytes and adds no implicit password redaction or before-text retention.
+
+Payload pointer/text are borrowed only during callback. Copy text using existing
+`cui_component_event_copy_utf8` with caller maximum/capacity; failure is atomic,
+no truncation/allocation. Copying the struct retains only a borrowed string pointer.
+Legacy callbacks must leave the editor/owner storage readable through the typed
+notification, and must not replace/destroy the editor while the opted-in operation
+is active. Typed observers cannot edit/rebind/free active resources, submit UI,
+change input or destroy context. Unrelated flags allowed; defer omission/teardown
+until outer return plus frame/render consumption. No new runtime guard is implied.
+
+### Reset helper and exact observation order
+
+Current authority is `src/base/cui_settings.c:reset_item/cui_settings_reset_page`:
+custom reset wins first and returns true without old on_change; otherwise missing
+default/custom_item returns false. Built-in bool/double/choice writes and successful
+text replace call old on_change even if the value/revision was already unchanged.
+`cui_edit_replace_range` can accept same bytes without revision increment (while
+changing selection). Matching is evaluated once per visited item in source order;
+disabled is not a reset exclusion. A malformed later group's nonnull-count/null-
+items case immediately returns false, discarding the aggregate earlier-success bool
+but not earlier writes/effects. Failed item text replacements return false and do
+not call old on_change; subsequent items still run. No transaction/rollback exists.
+
+Propose an additive helper using the **same** typed field handlers:
+
+```c
+typedef struct {
+    bool reset; /* exact legacy helper bool, including false after progress */
+    size_t boolean_count, number_count, choice_count, text_count;
+    bool count_overflow;
+} cui_settings_reset_event_result;
+cui_settings_reset_event_result cui_settings_reset_page_events(
+    cui_id root, size_t page_index, const cui_setting_page *page,
+    cui_str query, cui_settings_handler handler);
+```
+
+Root and page_index are necessary: the old single-page pointer has neither a root
+identity nor its position in a host page array. Require nonzero root and nonnull
+page before invoking the old common helper; invalid new admission returns a zero
+result. The caller supplies the truthful source page index; no invented zero index,
+global ID lookup, artificial page cap or context is introduced. Group/item indices
+come from the existing loop. Preserve old page/query/no_reset validation and all
+matching calls. Missing handlers still execute the same resets; navigation handler
+is ignored by this helper. Keep old helper signature/return and no-observer path.
+
+At each matching **built-in** reset, capture the corresponding scalar or text
+revision/byte snapshot, run exactly the existing reset and old on_change sequence,
+then notify actual final inequality/revision difference with reason RESET. Reuse
+the same equality, finite flags and typed payloads; Number reset does not introduce
+bounds checks or update number_state.last_value. Same-value successful old callbacks
+still run: no typed event if final value remains equal, but callback redirect to a
+different final owner does notify. Text replacement rejection with no revision
+change emits none. Do not gate observation on helper aggregate bool or operation
+success: delivered callbacks/counts survive a later false return. This helper
+retains only the old reset bool, not a fabricated per-item error/atomicity guarantee.
+
+A custom reset stays an explicit typed-value omission even if an item also has a
+scalar pointer: arbitrary host reset may affect multiple owners or replace its
+own model, and its opaque callback has no typed return/lifetime contract. Invoke
+it once, preserve true/no-old-on_change, emit no built-in typed RESET. Custom render
+alone does not override reset: when reset==NULL, has_default is true and custom_item
+is false, existing built-in reset still applies and can be observed. No-default
+and unmatched items remain untouched/silent. There is no reset ACTIVATE, LIFECYCLE,
+COMMIT, synthesized request or new standalone reset callback.
+
+Programmatic helper metadata is known PROGRAMMATIC source, compound target, **no
+frame/index/activation** (the API has no context). Typed RESET intentionally reports
+actual built-in changes to disabled items too: explicit reset already includes them;
+this is not a disabled-input event. This differs deliberately from EDIT suppression.
+Custom reset's omission does not alter reset bool, old effects or source order.
+
+### Styled reset composition
+
+Use a private common reset implementation/evidence argument, not a call to the new
+programmatic public helper that would mislabel UI reset as PROGRAMMATIC. Existing
+Styled button_ex runs once at the same header point; keep result.reset assignment
+and complete all matching resets before old content proceeds. Freeze cause before
+the first reset write: if there is exactly one actual matching button activation
+and its genuine accepted snapshot is available, copy it, retaining the reset
+button's original activation.target while event.target remains Settings. Multiple
+coalesced activations or unavailable evidence get only proven active frame/UNKNOWN,
+never a guessed first/last event. No early registration/replay/consume. New metadata
+kind is CHANGE, reason RESET; accepted activation is supporting evidence only.
+
+Suppress new Styled RESET observations for passive/layout-only/inert work while
+preserving any old writes/callbacks. Active reset still includes disabled items.
+Reset is before the field adapters. Therefore default Number20 can produce RESET
+3→20, then the old later Number bounds pass can produce EDIT20→10 in the same call;
+text formatting/host redirects can similarly create later adapter work. Preserve
+and document these ordered operations rather than collapsing them or mutating
+last_value/drafts early. Navigation counts/results stay independent. Reset errors
+are not added to old Settings edit_error: only existing adapters set that field.
+
+### Independent proof and proposed ownership
+
+Implement text EDIT first; then reset helper/Styled composition in a separate
+verified commit. Extend only the existing Settings event header/common Base reset
+seam/Styled seams/test/guide/proposal and discovery comment after approval; root
+owns wiring/generation. No Core/Input/editor mutation redesign or bridge change.
+
+Pair old/new complete operation outputs/state/callback counts and paint timing.
+Text tests: real text/paste/multi-input, IME preedit/commit/cancel, undo/redo and
+same-byte revised text, legacy on_change redirect, failure after earlier committed
+mutation, unchanged failure/selection-only silence, null handler, disabled/passive/
+inert, custom render omission, exact UTF-8 byte counts, bounded copy success/failure,
+borrowed pointer versus owned copy, deferred omission and model lifetime limits.
+
+Reset tests: programmatic no-frame PROGRAMMATIC metadata; Styled unique real snapshot
+versus multi-activation honest fallback; source-index IDs; match order/disabled/
+no-default/no_reset policy; built-in same-value old callbacks with and without
+redirect; text acceptance/presentation/capacity failures followed by later items;
+custom reset true/no-old-on_change/no-typed-event; malformed group after earlier
+observations returning false with retained counts; Number nonfinite defaults/finite
+flags/unchanged state synchronization; same-frame RESET then EDIT order; copied
+scalar/text payload lifetimes; null handlers and passive UI suppression. Existing
+Settings/Input/Number/Choice/edit acceptance regressions remain mandatory through
+the private wrapper, plus strict C/C++ headers. No foreign wrapper or full parity
+claim follows from those checks. No builds or production changes in this revision.

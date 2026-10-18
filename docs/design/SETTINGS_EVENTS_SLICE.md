@@ -120,3 +120,14 @@ per-navigation counts, reset reasons or synchronous requests. New opt-in scalar/
 text polling does not automatically classify Settings or its nested item slots.
 Document and test any bridge extension separately, without changing old queue
 order, after-mutation semantics or foreign lifetime contracts.
+
+## Navigation implementation checkpoint
+
+The first slice implements only Styled `cui_settings_events` navigation. Its
+private per-trigger descriptor uses a monotonic actual-activation lookup matching
+Sidebar's synchronous per-item callback loop; accepted snapshots are copied before
+writes. This is evidence lookup only, without Sidebar modification or replay.
+Unexpected mismatch retains only proven frame/UNKNOWN evidence. Notification follows
+original pair/pending-scroll writes and invalidation, before content. Existing item
+traversal order (not global event order), filter repairs and all field/reset paths
+are preserved. No unimplemented scalar/text/reset handler fields were added.

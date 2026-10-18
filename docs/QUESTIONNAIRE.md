@@ -28,7 +28,7 @@ Port source behavioral cases for schema rejection, silent setters, draft preserv
 
 The portable retained model tests cover schema errors, disabled answer restoration, effective-answer change detection, input drafts, capacity/UTF-8 atomicity, optional skip validation, delayed/reduced-motion confirmation, and completion-before-submit ordering. Styled tests exercise all four card sizes, pointer activation and updated checkbox semantics, minimum card height, error/action visibility, Skip completion, actual text editing into a freeform answer, and disabled input suppression. Standalone strict C11 and ASan/UBSan checks pass; the existing branch CTest suite passes73/73.
 
-Remaining work includes slot style refinements, localization hooks, comprehensive keyboard/callback coverage, batched text/key event ordering and platform accessibility integration. Existing styled code is a development checkpoint, not evidence that these gaps are complete.
+Remaining work includes typography/general layout refinements, comprehensive keyboard/callback coverage and platform accessibility integration. Bounded box-slot refinements and action/error localization are implemented below; ordered text/key reduction is also documented below. Existing styled code is a development checkpoint, not evidence that these gaps are complete.
 
 Input Enter confirmation and radio Left/Right wrapping now have native and sanitizer tests, including disabled-choice skipping, repeat suppression, event consumption, and no delayed confirmation from arrow selection. The explicit radio key helper must be called before choice rendering; complete root keyboard/callback coverage remains unfinished.
 
@@ -42,11 +42,11 @@ The browser story now exercises required validation, delayed radio navigation, o
 
 Arrow entry from a non-answer control now restores the first (Down) or last (Up) filled answer in schema order before choosing an unfilled answer. Restoring focus leaves the answer unchanged and does not schedule confirmation. A failing-before/passing-after headless regression covers both directions from an action button.
 
-Choice-card paint now follows the pinned selected/hover/invalid/disabled colors, transparent light or 20%-input dark idle background, size-specific card/indicator/shortcut radii and shortcut font sizes. The shared theme exposes explicit palette mode and the muted background token, populated from all 38 pinned palettes. Headless draw assertions exercise four sizes and idle/selected/hover/disabled states across every palette. Focus-ring composition and instance style refinements remain unfinished.
+Choice-card paint now follows the pinned selected/hover/invalid/disabled colors, transparent light or 20%-input dark idle background, size-specific card/indicator/shortcut radii and shortcut font sizes. The shared theme exposes explicit palette mode and the muted background token, populated from all 38 pinned palettes. Headless draw assertions exercise four sizes and idle/selected/hover/disabled states across every palette. The later focus band and bounded slot refinements below extend this checkpoint; arbitrary instance style refinement remains unfinished.
 
 Choice options now accept `render_indicator`, `render_content`, and `render_shortcut` callbacks plus a shared `render_user`. Each receives a borrowed `cui_questionnaire_choice_view` snapshot (item/choice indices, size, selected/multiple/disabled/invalid/focused state and shortcut character) and a stable slot ID. Callbacks emit balanced CUI child elements. Content replaces the default label/description rendering while the card retains its definition's accessible name, role and behavior. Indicator and shortcut wrappers apply the pinned source's offset from the answer line using the default adornment size, including when custom artwork has a different intrinsic height. A custom shortcut renderer still runs when the default shortcut is unavailable. Disabled opacity is inherited across custom content.
 
-Headless composition tests cover both radio and checkbox cards at all four sizes, intrinsic-size alignment, replacement precedence, pointer selection/focus, retained semantics, disabled/invalid snapshots and opacity. Null callbacks retain the default graphical parts, already covered across all 38 palettes. Slot style refinement, comprehensive root event coverage and full accessibility remain unfinished. Source contract: pinned `crates/component/src/questionnaire/components.rs` choice renderers and `center_on_answer_line`.
+Headless composition tests cover both radio and checkbox cards at all four sizes, intrinsic-size alignment, replacement precedence, pointer selection/focus, retained semantics, disabled/invalid snapshots and opacity. Null callbacks retain the default graphical parts, already covered across all 38 palettes. Bounded box-slot refinement is implemented below; typography/general layout refinement, comprehensive root event coverage and full accessibility remain unfinished. Source contract: pinned `crates/component/src/questionnaire/components.rs` choice renderers and `center_on_answer_line`.
 
 `cui_questionnaire_item_begin`, `cui_questionnaire_choices_begin`, and `cui_questionnaire_actions_begin` provide source-aligned composition containers. Pair each successful begin with `cui_questionnaire_part_end`. Item and Choices omit unknown, inactive and disabled items without opening layout nodes. Item carries the definition's accessible label/description and accepts programmatic focus while staying outside Tab order. Choices uses a Group for multiple answers and the appended RadioGroup semantic role for single answers. Item gaps are XS/S/M/L 8/12/16/24; choice and action gaps are 4/6/8/10. Actions arrange children horizontally with centered cross-axis alignment and remain renderable without an active item.
 
@@ -96,3 +96,79 @@ ordering, final completion, old-item event isolation, disabled/reduced-motion
 behavior, and single-event invalid/delegated-key handling. The text-plus-Enter
 regression fails against the previous Questionnaire component implementation.
 This fixes batch ordering; it does not establish full Questionnaire parity.
+
+
+Bounded choice slot refinements and localized labels
+---------------------------------------------------
+
+`cui_questionnaire_options` accepts optional `indicator_style`, `content_style`
+and `shortcut_style` pointers to `cui_questionnaire_slot_style`. These refine a
+bounded subset of the existing portable `cui_box`: dimensions, uniform padding,
+gap, radius, background, border color/width, physical alignment and opacity.
+`fields` selects independent overrides, including transparent colors, zero border
+or radius and zero opacity. Unmasked values are ignored. Width/height accept
+`-1` for grow, explicit fixed `0`, or positive logical pixels through4096. Other
+lengths accept0..4096, opacity0..1, and alignment START/CENTER/END. The content
+wrapper retains its default grow width unless WIDTH is selected.
+
+Refinement follows the frozen source's three distinct seams: indicator and
+shortcut styles affect only their default elements; a custom renderer replaces
+that default element and therefore its style. Content style affects the wrapper
+around either default text or custom content. The adornment's vertical offset
+continues to use the default size metrics, so changing its dimensions does not
+recenter it against a multiline description. Card input, role, accessible name,
+selected/invalid state and disabled ancestor opacity stay independent. Slot
+opacity multiplies inherited opacity. No text color/font/weight inheritance,
+percentage/flex policy, per-edge styling or general GPUI `StyleRefinement`
+parity is claimed by this box-only descriptor.
+
+```c
+cui_questionnaire_slot_style content = {
+    .fields = CUI_QUESTIONNAIRE_SLOT_BACKGROUND | CUI_QUESTIONNAIRE_SLOT_PADDING,
+    .box = {.background = {240, 245, 255, 255}, .padding = 4}
+};
+cui_questionnaire_labels labels = {
+    .fields = CUI_QUESTIONNAIRE_LABEL_SUBMIT | CUI_QUESTIONNAIRE_LABEL_REQUIRED,
+    .submit = {"Absenden", 8},
+    .required = {"Bitte beantworten", 17}
+};
+cui_questionnaire_options options = {.content_style = &content, .labels = &labels};
+/* Pass options explicitly to the relevant parts; root options do not publish
+ * styles or translations to child submissions. */
+```
+
+`cui_questionnaire_labels` independently masks Previous, Skip, Next, Submit,
+Required and Unfilled labels. Missing fields keep existing English defaults;
+a masked empty UTF-8 string deliberately supplies an empty label. A nonempty
+explicit label passed to `cui_questionnaire_action_control` wins over localization.
+Custom validator/external MESSAGE text stays exact. The progress sentence,
+item/choice text, input labels and keyboard identities are not translated by this
+bundle; applications already own their definition strings. There is no ambient
+locale registry or retained translation callback.
+
+Every options-taking part copies all supplied descriptor values at entry and
+validates them before routing, tick, model interaction or custom renderers.
+Unknown mask bits, invalid active dimensions/alignment/opacity and invalid active
+UTF-8 strings (including NULL data with nonzero length) reject the entire
+submission. This applies even to descriptors unused by that part, or refinements
+replaced by custom renderers. Bool entry points return false, input returns
+`CUI_QUESTIONNAIRE_INVALID`, and void entry points emit nothing; invalid options
+consume no events or opening scopes. As with other borrowed C inputs, descriptor
+pointers must address readable storage while copied. String bytes remain borrowed
+through completed-frame draw consumption. Root size inheritance is unchanged;
+these styles and translations have no root-to-part inheritance.
+
+Appending these fields preserves source defaults for zero/designated-initialized
+options but changes `sizeof(cui_questionnaire_options)` and its by-value ABI.
+Rebuild C consumers and use matched SDK/distribution snapshots; this is not an
+old-binary ABI compatibility guarantee.
+
+The headless `test_questionnaire_styled.c` regressions cover all four sizes,
+independent slot geometry/paint, default-based offsets, custom replacement,
+content grow/zero dimensions, transparent/zero overrides, disabled opacity and
+semantics, descriptor copying before a renderer mutates the original, translated
+action/error paint and semantic names, explicit/default/custom-message precedence,
+and invalid-option rejection before automatic root routing and callbacks. These
+are portable headless contracts, not browser/native screen-reader acceptance or
+complete Questionnaire source parity. Nested roots, comprehensive callback
+choreography, broader part/style methods and platform integration remain open.

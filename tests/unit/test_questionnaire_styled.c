@@ -992,7 +992,269 @@ static void automatic_capacity_failure(void) {
     assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_ERROR_CAPACITY);
     cui_destroy(ui);
 }
+static const cui_draw_command *slot_rect(cui_draw_list draws, cui_color color) {
+    for (size_t i = 0; i < draws.count; ++i)
+        if (draws.commands[i].type == CUI_DRAW_RECT && same_color(draws.commands[i].color, color))
+            return &draws.commands[i];
+    return NULL;
+}
+static void mutate_slot_style(cui_context *ui, cui_id id, const cui_questionnaire_choice_view *view,
+                              void *user) {
+    (void)view;
+    cui_questionnaire_slot_style *style = user;
+    style->box.background = (cui_color){99, 98, 97, 255};
+    cui_begin_box(ui, id, (cui_box){.width = 9, .height = 9});
+    cui_end_box(ui);
+}
+static void slot_refinements(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_questionnaire_choice choice = {.value = cui_string("answer"),
+                                       .description = cui_string("two lines of content")};
+    cui_questionnaire_item item = {
+        .name = cui_string("question"), .choices = &choice, .choice_count = 1};
+    cui_questionnaire_item_runtime runtime;
+    cui_questionnaire_choice_runtime selected;
+    cui_questionnaire_state state = {0};
+    assert(cui_questionnaire_init(&state, &item, 1,
+                                  (cui_questionnaire_workspace){.items = &runtime,
+                                                                .item_capacity = 1,
+                                                                .choices = &selected,
+                                                                .choice_capacity = 1},
+                                  NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    cui_theme theme = cui_theme_light();
+    cui_color colors[] = {{21, 31, 41, 255}, {22, 32, 42, 255}, {23, 33, 43, 255}};
+    cui_questionnaire_slot_style styles[3] = {0};
+    for (unsigned i = 0; i < 3; ++i) {
+        styles[i].fields = CUI_QUESTIONNAIRE_SLOT_WIDTH | CUI_QUESTIONNAIRE_SLOT_HEIGHT |
+                           CUI_QUESTIONNAIRE_SLOT_BACKGROUND | CUI_QUESTIONNAIRE_SLOT_BORDER |
+                           CUI_QUESTIONNAIRE_SLOT_RADIUS;
+        styles[i].box = (cui_box){.width = 30 + i * 10,
+                                  .height = 35 + i * 10,
+                                  .background = colors[i],
+                                  .border_width = 0,
+                                  .radius = 0};
+    }
+    for (unsigned size = 0; size < 4; ++size) {
+        cui_questionnaire_options o = {.size = (cui_questionnaire_size)size,
+                                       .indicator_style = &styles[0],
+                                       .content_style = &styles[1],
+                                       .shortcut_style = &styles[2]};
+        cui_draw_list draws = card_frame(ui, &state, &theme, o);
+        const float offsets[][2] = {{4, 2}, {3, 1}, {5, 2}, {2, 0}};
+        const cui_draw_command *content = slot_rect(draws, colors[1]);
+        assert(content);
+        for (unsigned i = 0; i < 3; ++i) {
+            const cui_draw_command *draw = slot_rect(draws, colors[i]);
+            assert(draw && draw->bounds.w == 30 + i * 10 && draw->bounds.h == 35 + i * 10);
+            assert(draw->corner_radii.top_left == 0);
+            if (i != 1)
+                assert(draw->bounds.y == content->bounds.y + offsets[size][i == 2]);
+        }
+        assert(container_semantic(ui, 12)->role == CUI_ROLE_RADIO);
+        assert(container_semantic(ui, 12)->name.length == 6);
+        /* Only content wrapper styles survive custom slot replacement. */
+        slot_probe probe = {0};
+        o.render_indicator = indicator_slot;
+        o.render_content = content_slot;
+        o.render_shortcut = shortcut_slot;
+        o.render_user = &probe;
+        draws = card_frame(ui, &state, &theme, o);
+        assert(!slot_rect(draws, colors[0]) && slot_rect(draws, colors[1]) &&
+               !slot_rect(draws, colors[2]));
+        assert(probe.calls[0] == 1 && probe.calls[1] == 1 && probe.calls[2] == 1);
+        o.disabled = true;
+        draws = card_frame(ui, &state, &theme, o);
+        cui_color faded = colors[1];
+        faded.a = 127;
+        assert(slot_rect(draws, faded) && container_semantic(ui, 12)->disabled);
+    }
+    styles[1].fields |= CUI_QUESTIONNAIRE_SLOT_OPACITY;
+    styles[1].box.opacity = .5f;
+    cui_questionnaire_options faded_options = {.content_style = &styles[1], .disabled = true};
+    cui_color twice_faded = colors[1];
+    twice_faded.a = 63;
+    assert(slot_rect(card_frame(ui, &state, &theme, faded_options), twice_faded));
+    styles[1].fields &= ~CUI_QUESTIONNAIRE_SLOT_OPACITY;
+    /* Descriptor storage is copied before any renderer can change it. */
+    cui_questionnaire_options o = {.indicator_style = &styles[0],
+                                   .content_style = &styles[1],
+                                   .render_indicator = mutate_slot_style,
+                                   .render_user = &styles[1]};
+    cui_draw_list draws = card_frame(ui, &state, &theme, o);
+    assert(slot_rect(draws, colors[1]));
+    styles[1].box.background = colors[1];
+    styles[1].fields = CUI_QUESTIONNAIRE_SLOT_BACKGROUND;
+    o = (cui_questionnaire_options){.content_style = &styles[1]};
+    draws = card_frame(ui, &state, &theme, o);
+    const cui_draw_command *grow = slot_rect(draws, colors[1]);
+    assert(grow && grow->bounds.w > 100); /* unmasked width retains -1 */
+    styles[1].fields |= CUI_QUESTIONNAIRE_SLOT_WIDTH;
+    styles[1].box.width = 0;
+    draws = card_frame(ui, &state, &theme, o);
+    const cui_draw_command *zero = slot_rect(draws, colors[1]);
+    assert(!zero || zero->bounds.w == 0);
+    styles[1].box.width = -1;
+    styles[1].fields |= CUI_QUESTIONNAIRE_SLOT_OPACITY;
+    styles[1].box.opacity = 0;
+    draws = card_frame(ui, &state, &theme, o);
+    assert(!slot_rect(draws, colors[1]));
+    styles[1].fields = CUI_QUESTIONNAIRE_SLOT_BACKGROUND;
+    styles[1].box.background.a = 0;
+    draws = card_frame(ui, &state, &theme, o);
+    assert(!slot_rect(draws, colors[1]));
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+static bool text_is(cui_str text, const char *value) {
+    return text.length == strlen(value) && (!text.length || !memcmp(text.data, value, text.length));
+}
+static void localized_labels(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_questionnaire_item items[] = {{.name = cui_string("one")},
+                                      {.name = cui_string("two")},
+                                      {.name = cui_string("three"), .required = true}};
+    cui_questionnaire_item_runtime runtime[3];
+    cui_questionnaire_state state = {0};
+    assert(
+        cui_questionnaire_init(&state, items, 3,
+                               (cui_questionnaire_workspace){.items = runtime, .item_capacity = 3},
+                               NULL, NULL) == CUI_QUESTIONNAIRE_OK);
+    cui_questionnaire_labels labels = {
+        .fields = 63,
+        .previous = cui_string("Zurück zur vorherigen Frage"),
+        .skip = cui_string("Überspringen"),
+        .next = cui_string("Weiter zur nächsten Frage"),
+        .submit = cui_string("Antworten absenden"),
+        .required = cui_string("Bitte beantworten Sie diese erforderliche Frage"),
+        .unfilled = cui_string("Bitte antworten oder diese Frage überspringen")};
+    cui_questionnaire_options o = {.labels = &labels};
+    cui_theme theme = cui_theme_light();
+    for (unsigned size = 0; size < 4; ++size) {
+        o.size = (cui_questionnaire_size)size;
+        assert(cui_questionnaire_set_current(&state, 1, false) == CUI_QUESTIONNAIRE_OK);
+        assert(!cui_questionnaire_validate_item(&state, 1));
+        assert(cui_begin_frame(ui, 500, 400, .016f));
+        cui_questionnaire_error_control(ui, 14, &theme, &state, 1, o);
+        for (unsigned a = 0; a < 3; ++a)
+            (void)cui_questionnaire_action_control(ui, 20 + a, &theme, &state,
+                                                   (cui_questionnaire_action)a, (cui_str){0}, o);
+        cui_draw_list draws = cui_end_frame(ui);
+        const char *expected[] = {"Zurück zur vorherigen Frage", "Überspringen",
+                                  "Weiter zur nächsten Frage"};
+        for (unsigned a = 0; a < 3; ++a)
+            assert(text_is(container_semantic(ui, 20 + a)->name, expected[a]));
+        assert(text_is(container_semantic(ui, 14)->name,
+                       "Bitte antworten oder diese Frage überspringen"));
+        bool painted = false;
+        for (size_t i = 0; i < draws.count; ++i)
+            if (draws.commands[i].type == CUI_DRAW_TEXT &&
+                text_is(draws.commands[i].text, "Weiter zur nächsten Frage"))
+                painted = true;
+        assert(painted);
+        assert(cui_questionnaire_set_current(&state, 2, false) == CUI_QUESTIONNAIRE_OK);
+        assert(!cui_questionnaire_validate_item(&state, 2));
+        assert(cui_begin_frame(ui, 500, 400, .016f));
+        cui_questionnaire_error_control(ui, 14, &theme, &state, 2, o);
+        (void)cui_questionnaire_action_control(ui, 23, &theme, &state, CUI_QUESTIONNAIRE_FINISH,
+                                               (cui_str){0}, o);
+        cui_end_frame(ui);
+        assert(text_is(container_semantic(ui, 23)->name, "Antworten absenden"));
+        assert(text_is(container_semantic(ui, 14)->name,
+                       "Bitte beantworten Sie diese erforderliche Frage"));
+    }
+    cui_str custom_error = cui_string("server says no");
+    assert(cui_questionnaire_external_error(&state, 2, &custom_error) == CUI_QUESTIONNAIRE_OK);
+    labels.submit = (cui_str){0}; /* masked empty differs from omitted */
+    assert(cui_begin_frame(ui, 500, 400, .016f));
+    cui_questionnaire_error_control(ui, 14, &theme, &state, 2, o);
+    (void)cui_questionnaire_action_control(ui, 23, &theme, &state, CUI_QUESTIONNAIRE_FINISH,
+                                           (cui_str){0}, o);
+    (void)cui_questionnaire_action_control(ui, 24, &theme, &state, CUI_QUESTIONNAIRE_FINISH,
+                                           cui_string("Explicit"), o);
+    cui_end_frame(ui);
+    assert(text_is(container_semantic(ui, 14)->name, "server says no"));
+    assert(container_semantic(ui, 23)->name.length == 0);
+    assert(text_is(container_semantic(ui, 24)->name, "Explicit"));
+    labels.fields = 0;
+    assert(cui_begin_frame(ui, 500, 400, .016f));
+    (void)cui_questionnaire_action_control(ui, 23, &theme, &state, CUI_QUESTIONNAIRE_FINISH,
+                                           (cui_str){0}, o);
+    cui_end_frame(ui);
+    assert(text_is(container_semantic(ui, 23)->name, "Submit"));
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
+static void rejected_option_event(const cui_questionnaire_state *state,
+                                  cui_questionnaire_event event, void *user) {
+    (void)state;
+    (void)event;
+    ++*(unsigned *)user;
+}
+static void invalid_options_preflight(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    assert(ui);
+    cui_questionnaire_choice choice = {.value = cui_string("yes")};
+    cui_questionnaire_item item = {
+        .name = cui_string("question"), .choices = &choice, .choice_count = 1};
+    cui_questionnaire_item_runtime runtime;
+    cui_questionnaire_choice_runtime selected;
+    cui_questionnaire_state state = {0};
+    unsigned events = 0;
+    assert(cui_questionnaire_init(&state, &item, 1,
+                                  (cui_questionnaire_workspace){.items = &runtime,
+                                                                .item_capacity = 1,
+                                                                .choices = &selected,
+                                                                .choice_capacity = 1},
+                                  rejected_option_event, &events) == CUI_QUESTIONNAIRE_OK);
+    cui_theme theme = cui_theme_light();
+    (void)card_frame(ui, &state, &theme, (cui_questionnaire_options){0});
+    cui_focus(ui, 12);
+    cui_questionnaire_slot_style bad[] = {
+        {.fields = 1u << 30},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_WIDTH, .box.width = -.5f},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_HEIGHT, .box.height = INFINITY},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_PADDING, .box.padding = NAN},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_GAP, .box.gap = -1},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_RADIUS, .box.radius = 4097},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_BORDER, .box.border_width = -1},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_ALIGN, .box.align_y = (cui_align)-1},
+        {.fields = CUI_QUESTIONNAIRE_SLOT_OPACITY, .box.opacity = 1.1f}};
+    cui_questionnaire_labels bad_labels[] = {
+        {.fields = 64},
+        {.fields = CUI_QUESTIONNAIRE_LABEL_NEXT, .next = {NULL, 1}},
+        {.fields = CUI_QUESTIONNAIRE_LABEL_REQUIRED, .required = {"\xff", 1}}};
+    for (size_t i = 0; i < sizeof bad / sizeof *bad + sizeof bad_labels / sizeof *bad_labels; ++i) {
+        slot_probe probe = {0};
+        cui_questionnaire_options o = {.render_indicator = indicator_slot, .render_user = &probe};
+        if (i < sizeof bad / sizeof *bad)
+            o.content_style = &bad[i];
+        else
+            o.labels = &bad_labels[i - sizeof bad / sizeof *bad];
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+        cui_questionnaire_state before = state;
+        cui_questionnaire_item_runtime before_item = runtime;
+        cui_questionnaire_choice_runtime before_choice = selected;
+        assert(cui_begin_frame(ui, 400, 300, .016f));
+        assert(!cui_questionnaire_begin(ui, 10, &theme, &state, o));
+        assert(!cui_questionnaire_choice_control(ui, 12, &theme, &state, 0, 0, o));
+        assert(!cui_questionnaire_action_control(ui, 18, &theme, &state, CUI_QUESTIONNAIRE_FINISH,
+                                                 (cui_str){0}, o));
+        assert(!cui_event_consumed(ui, 0));
+        assert(cui_end_frame(ui).count == 0);
+        assert(!memcmp(&state, &before, sizeof state) &&
+               !memcmp(&runtime, &before_item, sizeof runtime) &&
+               !memcmp(&selected, &before_choice, sizeof selected));
+        assert(!probe.calls[0] && events == 0);
+    }
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_destroy(ui);
+}
 int main(void) {
+    slot_refinements();
+    localized_labels();
+    invalid_options_preflight();
     batched_input_confirmation();
     automatic_root_keyboard();
     automatic_capacity_failure();

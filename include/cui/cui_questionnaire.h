@@ -165,6 +165,38 @@ typedef struct {
 typedef void (*cui_questionnaire_choice_render_fn)(cui_context *, cui_id,
                                                    const cui_questionnaire_choice_view *,
                                                    void *user);
+/* Optional box-only refinements; not a general Styled or typography cascade.
+ * Only masked cui_box members are read. Unknown bits and invalid active values
+ * reject the entire options submission before routing, callbacks or interaction.
+ * Dimensions accept -1 (grow), 0 (explicit fixed zero), or [0,4096]. Other
+ * lengths are [0,4096], opacity [0,1], alignment START/CENTER/END. */
+enum {
+    CUI_QUESTIONNAIRE_SLOT_WIDTH = 1u << 0,
+    CUI_QUESTIONNAIRE_SLOT_HEIGHT = 1u << 1,
+    CUI_QUESTIONNAIRE_SLOT_PADDING = 1u << 2,
+    CUI_QUESTIONNAIRE_SLOT_GAP = 1u << 3,
+    CUI_QUESTIONNAIRE_SLOT_RADIUS = 1u << 4,
+    CUI_QUESTIONNAIRE_SLOT_BACKGROUND = 1u << 5,
+    CUI_QUESTIONNAIRE_SLOT_BORDER = 1u << 6, /* border and border_width */
+    CUI_QUESTIONNAIRE_SLOT_ALIGN = 1u << 7,  /* align_x and align_y */
+    CUI_QUESTIONNAIRE_SLOT_OPACITY = 1u << 8
+};
+typedef struct {
+    uint32_t fields;
+    cui_box box;
+} cui_questionnaire_slot_style;
+enum {
+    CUI_QUESTIONNAIRE_LABEL_PREVIOUS = 1u << 0,
+    CUI_QUESTIONNAIRE_LABEL_SKIP = 1u << 1,
+    CUI_QUESTIONNAIRE_LABEL_NEXT = 1u << 2,
+    CUI_QUESTIONNAIRE_LABEL_SUBMIT = 1u << 3,
+    CUI_QUESTIONNAIRE_LABEL_REQUIRED = 1u << 4,
+    CUI_QUESTIONNAIRE_LABEL_UNFILLED = 1u << 5
+};
+typedef struct {
+    uint32_t fields;
+    cui_str previous, skip, next, submit, required, unfilled;
+} cui_questionnaire_labels;
 typedef struct {
     cui_questionnaire_size size;
     float width;
@@ -177,6 +209,19 @@ typedef struct {
     bool custom_size;
     cui_design_size design_size; /* INHERIT preserves legacy metrics. */
     float density;               /* zero inherits root theme density, or1 for standalone parts. */
+    /* Borrowed descriptors copied at entry. Indicator/shortcut refine only the
+     * default element, so a custom renderer replaces their refinement. Content
+     * refines the wrapper around default or custom content. Alignment offsets
+     * remain based on default adornment metrics, independent of refined size.
+     * Disabled ancestor opacity still multiplies slot opacity. */
+    const cui_questionnaire_slot_style *indicator_style, *content_style, *shortcut_style;
+    /* Masked UTF-8 labels, including explicit empty strings; unmasked labels
+     * keep English defaults. Descriptors are copied, string bytes are borrowed
+     * through completed-frame draw consumption. No root-to-part inheritance.
+     * Nonempty action label argument wins; custom validation messages stay exact.
+     * Unknown mask bits, invalid UTF-8 or NULL data with nonzero length reject
+     * the entire options submission, even on parts not using these labels. */
+    const cui_questionnaire_labels *labels;
 } cui_questionnaire_options;
 /* Composable containers. Item/choices begin returns false for inactive, unknown
  * or disabled items and opens nothing. Call part_end only after a true result.

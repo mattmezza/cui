@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_content.h"
+#include "cui/cui_hover_events.h"
 #include <math.h>
 #include <string.h>
 static size_t cui_content_scalar(const char *text, size_t length) {
@@ -147,4 +148,28 @@ bool cui_hover_update(cui_hover_state *s, bool trigger, bool content, bool focus
         s->elapsed = 0;
     }
     return old != s->open;
+}
+
+cui_hover_event_result cui_hover_update_events(
+    cui_id target, cui_hover_state *state, bool trigger, bool content, bool focus,
+    bool escape, bool disabled, float dt, float opening, float closing, cui_hover_handler handler) {
+    cui_hover_event_result result;
+    memset(&result, 0, sizeof(result));
+    if (!target || !state)
+        return result;
+    bool previous = state->open;
+    result.valid = true;
+    result.control_result = cui_hover_update(state, trigger, content, focus, escape, disabled,
+                                             dt, opening, closing);
+    if (previous != state->open && handler.on_change) {
+        cui_hover_lifecycle_event event;
+        memset(&event, 0, sizeof(event));
+        (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_LIFECYCLE, target,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        event.previous_open = previous;
+        event.open = state->open;
+        result.change_count = 1;
+        handler.on_change(handler.user, &event);
+    }
+    return result;
 }

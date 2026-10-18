@@ -1,7 +1,8 @@
 # Lifecycle and result observer checkpoint
 
-Design-only audit at `ea5a3e40`; no production API, metadata promotion or new
-manifest family. Read with the [remaining audit](COMPONENT_EVENTS_REMAINING.md),
+Original design audit at `ea5a3e40`; the Base hover observer is now implemented,
+as recorded at the end. Other proposals remain unimplemented; no metadata promotion
+or new manifest family. Read with the [remaining audit](COMPONENT_EVENTS_REMAINING.md),
 [contract](COMPONENT_EVENTS_CONTRACT.md) and [scroll checkpoint](SCROLL_EVENTS_SLICE.md).
 Existing headers remain authoritative. No build/test was run for this document;
 linked assertions are existing source evidence, not fresh verification.
@@ -284,3 +285,15 @@ legacy equivalence, placement/anchor failure and net-zero fallback, allocation
 failure where deterministically injectable, passive suppression, composition
 admission separate from open change, old/new paint/semantics/geometry, callback
 order and borrowed lifetime. No platform desktop is needed for these tests.
+
+## Implemented Base hover slice
+
+`cui_hover_events.h` now exposes `cui_hover_update_events`,
+`cui_hover_lifecycle_event` (`event, previous_open, open`), borrowed
+`cui_hover_handler` and `cui_hover_event_result` (`valid, control_result,
+count_overflow, change_count`). It preserves the pure reducer once, validates
+nonzero target/state before work and reports actual open transitions only.
+UNKNOWN metadata has no context/frame/index/source-presence/activation/reason.
+Disabled pure close is eligible notification. Read [HOVER_EVENTS](../HOVER_EVENTS.md)
+for examples, timing, copies and unsupported mutation. Styled names in this
+checkpoint remain proposals; no Core/overlay/virtual/message behavior changed.

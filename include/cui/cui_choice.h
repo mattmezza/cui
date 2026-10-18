@@ -7,6 +7,7 @@
 #include "cui_edit.h"
 #include "cui_overlay.h"
 #include "cui_theme.h"
+#include "cui_selection_events.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -218,6 +219,16 @@ bool cui_list(cui_context *, cui_id container, const cui_theme *, const cui_choi
 bool cui_select(cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_str placeholder,
                 const cui_choice_item *, size_t count, cui_id *selected, cui_choice_popup *,
                 cui_choice_popup_options);
+/* Synchronous post-mutation Select observer; missing handler preserves writes.
+ * Full list pass precedes existing popup close. No request/rejection semantics. */
+typedef struct {
+    cui_selection_event_result events;
+    bool legacy_changed;
+} cui_select_event_result;
+cui_select_event_result cui_select_events(
+    cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_str placeholder,
+    const cui_choice_item *, size_t count, cui_id *selected, cui_choice_popup *,
+    cui_choice_popup_options, cui_selection_handler);
 /* Menu returns true when an action ID was activated, including reactivation
  * of the currently selected action. The caller owns the command dispatch. */
 bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,

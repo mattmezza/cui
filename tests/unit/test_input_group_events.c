@@ -362,7 +362,42 @@ static void secure_paint(void) {
     assert(!strcmp(b.bytes, "123") && drawn(&b, "•••")); secret(&b);
     cui_destroy(a.ui); cui_destroy(b.ui); cui_edit_destroy(a.edit); cui_edit_destroy(b.edit);
 }
+static void expired_owned_composition(bool per_event) {
+    fixture f;
+    init(&f, false);
+    f.options.input.masked = true;
+    frame(&f, false, false);
+    cui_focus(f.ui, 20);
+    assert(cui_queue_event(f.ui, (cui_event){.type=CUI_EVENT_COMPOSITION_START,
+        .composition_target=20}));
+    frame(&f, false, false);
+    assert(f.state.behavior.composition_owned && f.state.behavior.composition &&
+           f.state.behavior.composition->active);
+    /* Two omitted frames cause collection; never inspect the old pointer. */
+    f.omit=true;
+    frame(&f, false, false);
+    frame(&f, false, false);
+    f.omit=false;
+    f.options.input.masked=false;
+    if (per_event) {
+        assert(cui_queue_event(f.ui, (cui_event){.type=CUI_EVENT_TEXT, .text="fresh"}));
+        assert(cui_begin_frame(f.ui, 600, 300, .016f));
+        (void)cui_interact(f.ui, 20, CUI_ROLE_TEXTBOX, cui_string("Field"), false, false, 0);
+        cui_focus(f.ui, 20);
+        cui_input_result r=cui_base_input_reduce_event(f.ui, 20, f.edit,
+            &f.state.behavior, f.options.input, 0);
+        assert(r.error == CUI_EDIT_OK);
+        cui_end_frame(f.ui);
+    } else {
+        assert(frame(&f, false, false).control.input.error == CUI_EDIT_OK);
+    }
+    assert(f.state.behavior.composition_owned && f.state.behavior.composition &&
+           !f.state.behavior.composition->active && !f.state.behavior.was_masked);
+    cui_destroy(f.ui); cui_edit_destroy(f.edit);
+}
 int main(void) {
+    expired_owned_composition(false);
+    expired_owned_composition(true);
     secure_paint();
     exercise(false, false);
     exercise(true, false);

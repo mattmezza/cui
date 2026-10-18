@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "activation_assert.h"
 #include "cui/cui_form_events.h"
 #include <assert.h>
 #include <string.h>
@@ -24,7 +25,7 @@ static void addon(void *user, const cui_component_event_metadata *event) {
                             CUI_COMPONENT_EVENT_HAS_SOURCE | CUI_COMPONENT_EVENT_HAS_ACTIVATION));
     cui_activation_snapshot actual;
     assert(cui_event_activation_snapshot(f->ui, event->event_index, &actual));
-    assert(!memcmp(&actual, &event->activation, sizeof actual));
+    assert_activation_equal(actual, event->activation);
     size_t count;
     const cui_semantic *semantics = cui_semantics(f->ui, &count);
     assert(count >= 2 && semantics[count - 1].id == event->target);

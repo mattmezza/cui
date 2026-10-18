@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "activation_assert.h"
 #include "cui/cui_media_events.h"
 #include <assert.h>
 #include <string.h>
@@ -59,7 +60,7 @@ static void observed(void *user, const cui_attachment_action_event *event) {
         if (!f->change_focus) {
             cui_activation_snapshot actual;
             assert(cui_event_activation_snapshot(f->ui, event->event.event_index, &actual));
-            assert(!memcmp(&actual, &event->event.activation, sizeof actual));
+            assert_activation_equal(actual, event->event.activation);
         }
     }
     if (f->old_mask & (1u << action))

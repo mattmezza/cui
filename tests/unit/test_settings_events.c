@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "activation_assert.h"
 #include "cui/cui_settings_events.h"
 #include <assert.h>
 #include <math.h>
@@ -375,7 +376,7 @@ static void scalar_metadata(scalar_fixture *f, cui_settings_change_reason reason
                            CUI_COMPONENT_EVENT_HAS_SOURCE | CUI_COMPONENT_EVENT_HAS_ACTIVATION));
         cui_activation_snapshot snapshot;
         assert(cui_event_activation_snapshot(f->ui, e.event_index, &snapshot));
-        assert(!memcmp(&snapshot, &e.activation, sizeof snapshot));
+        assert_activation_equal(snapshot, e.activation);
         assert(snapshot.target == cui_settings_part_id(11, 0, 0, 0, 34));
     }
     assert(!p && !g && field == cui_settings_part_id(11, p, g, i, 24));

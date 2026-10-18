@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "activation_assert.h"
 #include "cui/cui_component_events.h"
 #include <assert.h>
 #include <stdio.h>
@@ -23,7 +24,7 @@ static cui_component_event_metadata accepted(cui_context *ui, size_t index) {
                               CUI_COMPONENT_EVENT_HAS_SOURCE | CUI_COMPONENT_EVENT_HAS_ACTIVATION));
     assert(metadata.target == 10 && metadata.event_index == index);
     assert(metadata.frame_sequence == cui_frame_sequence(ui));
-    assert(memcmp(&metadata.activation, &snapshot, sizeof snapshot) == 0);
+    assert_activation_equal(metadata.activation, snapshot);
     assert(cui_consume_event(ui, index));
     /* Consumption rules differ by input channel; retained metadata is independent. */
     assert(metadata.activation.target == 10);

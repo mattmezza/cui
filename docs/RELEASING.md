@@ -1,22 +1,30 @@
-# First prerelease: v0.1.0-alpha.1
+# Prerelease preparation: v0.1.0-alpha.2
 
-This is a release procedure, not evidence that publication has occurred. The audit
-at `3e7e83ed` supports a first GitHub **prerelease**, with registry publication
-separately gated below. No package-name ownership, registry authentication, trusted
-publisher configuration, or cross-platform native compatibility was verified.
+This document prepares **v0.1.0-alpha.2**; it is not evidence that publication
+has occurred or that the release source is frozen. The next batch includes the
+implemented component event slices, documented typed/host-service exceptions,
+secure InputGroup rendering and IME lifetime/focus fixes. Skill implementation
+and final integration remain pending; this preparation does not claim that work
+has shipped. Final release notes must describe the actual frozen commit.
+
+Keep alpha.1 (`v0.1.0-alpha.1`, Python `0.1.0a1`) and any associated published
+assets immutable. This version update does not retag or replace alpha.1. No
+package-name ownership, registry authentication, trusted publisher configuration,
+or cross-platform native compatibility is established by changing metadata.
 Publish a coherent release after each major completed body of work; batch related
 commits together. Do not turn each implementation commit into a release.
 
 ## Version and source freeze
 
-| Surface | First version |
+| Surface | Prepared version |
 | --- | --- |
-| Repository/GitHub release | `v0.1.0-alpha.1` |
+| Repository/GitHub release | `v0.1.0-alpha.2` |
 | CMake ABI/base project version | `0.1.0` |
-| Python / wheel metadata | `0.1.0a1` |
-| npm / Cargo | `0.1.0-alpha.1` |
-| Go proxy version | `v0.1.0-alpha.1` |
-| Public nested Go module tag | `bindings/go/v0.1.0-alpha.1` |
+| Public C `CUI_VERSION` | `0.1.0-alpha.2` |
+| Python / wheel metadata | `0.1.0a2` |
+| npm / Cargo | `0.1.0-alpha.2` |
+| Go proxy version | `v0.1.0-alpha.2` |
+| Public nested Go module tag | `bindings/go/v0.1.0-alpha.2` |
 
 The Go module is `github.com/mattmezza/cui/bindings/go`; its public Git tag needs
 the subdirectory prefix. A repository release tag alone does not publish this
@@ -38,7 +46,7 @@ The checker below requires Python 3.11 or newer and deliberately checks the
 existing format rather than rewriting binding manifests:
 
 ```sh
-python scripts/test_release_metadata.py --tag v0.1.0-alpha.1
+python scripts/test_release_metadata.py --tag v0.1.0-alpha.2
 python scripts/test_release_metadata.py --self-test
 ```
 
@@ -104,7 +112,7 @@ basenames. Prepare release notes describing the tested subset, explicit platform
 and runtime requirements, known limitations, and source revision.
 
 ```sh
-tag=v0.1.0-alpha.1
+tag=v0.1.0-alpha.2
 git tag -a "$tag" "$release_sha" -m "CUI $tag"
 git push origin "refs/tags/$tag"
 gh release create "$tag" --repo mattmezza/cui --verify-tag --draft --prerelease \
@@ -154,7 +162,7 @@ consumer builds. The current packaging helper uses `--allow-dirty --no-verify
 See [Cargo manifest publication controls](https://doc.rust-lang.org/cargo/reference/manifest.html#the-publish-field).
 
 **Go:** validate a clean external consumer without local `replace` paths, then
-push the separate `bindings/go/v0.1.0-alpha.1` tag at the same release SHA if
+push the separate `bindings/go/v0.1.0-alpha.2` tag at the same release SHA if
 publishing that module is intended. Check public source retrieval and module
 checksums. A local proxy archive is not proof that public proxy ingestion works.
 
@@ -163,7 +171,8 @@ checksums. A local proxy archive is not proof that public proxy ingestion works.
 Keep published versions and tags immutable. Before publishing a draft, replace
 incorrect draft assets and regenerate checksums. After publication, document the
 problem, use registry-supported deprecation/yank mechanisms when appropriate,
-and issue `v0.1.0-alpha.2` (Python `0.1.0a2`) with corrected assets. Never retag,
+and issue a new version (for example, `v0.1.0-alpha.3`, Python `0.1.0a3`)
+with corrected assets. Never retag,
 force-push, or upload different bytes under an already published version. A
 website rollback can deploy a known-good revision independently while clearly
 identifying which library release its instructions describe.

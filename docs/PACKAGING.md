@@ -1,5 +1,10 @@
 # Install local alpha binding artifacts
 
+Current artifact examples use prepared alpha.2 versions (`0.1.0-alpha.2`, Python
+`0.1.0a2`). Metadata preparation is not publication or a final source freeze;
+see [RELEASING.md](RELEASING.md). Existing alpha.1 tags/assets stay immutable.
+
+
 The packages expose the [tested binding subset](BRIDGE_COMPONENTS.md), not full
 GPUI feature parity. Commands below build and consume local files; no registry
 publication or public Go tag is assumed. npm is `private: true` and Cargo has
@@ -76,7 +81,7 @@ CUI_PACKAGE_NATIVE=1 python scripts/package_bindings.py node --prebuilt --output
 mkdir -p /tmp/cui-node-consumer
 cd /tmp/cui-node-consumer
 npm init -y
-CUI_PACKAGE_NATIVE=1 npm install /tmp/cui-node-native/cui-native-0.1.0-alpha.1.tgz
+CUI_PACKAGE_NATIVE=1 npm install /tmp/cui-node-native/cui-native-0.1.0-alpha.2.tgz
 ```
 
 Save this as `/tmp/cui-node-consumer/counter.cjs`:
@@ -127,7 +132,7 @@ mkdir -p /tmp/cui-go-consumer
 cp tests/packaging/go_smoke.go /tmp/cui-go-consumer/main.go
 cd /tmp/cui-go-consumer
 go mod init example.local/cui-counter
-go mod edit -require=github.com/mattmezza/cui/bindings/go@v0.1.0-alpha.1
+go mod edit -require=github.com/mattmezza/cui/bindings/go@v0.1.0-alpha.2
 GOPROXY=file:///tmp/cui-go-artifacts GOSUMDB=off go mod tidy
 GOPROXY=file:///tmp/cui-go-artifacts GOSUMDB=off go build -o counter .
 ./counter
@@ -160,7 +165,7 @@ new process.
 
 Go resolves this public repository directly; it needs no Go registry account.
 A repository commit or `@main` becomes fetchable when those files are published.
-The versioned `v0.1.0-alpha.1` tag used above remains a local artifact version;
+The versioned `v0.1.0-alpha.2` tag used above remains a local artifact version;
 no command here assumes that public tag has been created.
 
 ## Rust: local crate and statically linked executable
@@ -171,12 +176,12 @@ At the repository root:
 python scripts/package_bindings.py rust --output /tmp/cui-rust-artifacts
 mkdir -p /tmp/cui-rust-consumer/vendor
 cp tests/packaging/rust_smoke.rs /tmp/cui-rust-main.rs
-tar -xzf /tmp/cui-rust-artifacts/cui-builders-0.1.0-alpha.1.crate -C /tmp/cui-rust-consumer/vendor
+tar -xzf /tmp/cui-rust-artifacts/cui-builders-0.1.0-alpha.2.crate -C /tmp/cui-rust-consumer/vendor
 cd /tmp/cui-rust-consumer
 cargo init --name cui-counter
 cp /tmp/cui-rust-main.rs src/main.rs
 cat >> Cargo.toml <<'TOML'
-cui-builders = { path = "vendor/cui-builders-0.1.0-alpha.1" }
+cui-builders = { path = "vendor/cui-builders-0.1.0-alpha.2" }
 TOML
 cargo build --offline
 ./target/debug/cui-counter

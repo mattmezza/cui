@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check local first-prerelease version coherence; never contacts a registry."""
+"""Check local prerelease version coherence; never contacts a registry."""
 import argparse
 import ast
 import json
@@ -24,7 +24,7 @@ def check(root, tag, registries=False):
     errors = []
     match = re.fullmatch(r"v(\d+\.\d+\.\d+)-alpha\.(\d+)", tag)
     if not match:
-        return ["expected first-release tag vMAJOR.MINOR.PATCH-alpha.N"]
+        return ["expected prerelease tag vMAJOR.MINOR.PATCH-alpha.N"]
     base, alpha = match.groups()
     semver, python_version = tag[1:], base + "a" + alpha
     read = lambda path: (root / path).read_text()
@@ -37,7 +37,9 @@ def check(root, tag, registries=False):
                    if entry.get("name") == rust.get("name")]
     backend = read("bindings/python/packaging/wheel_backend.py")
     packaging = literal_assignments(read("scripts/package_bindings.py"))
+    public_version = re.search(r'^#define CUI_VERSION "([^"\n]+)"', read("include/cui/cui.h"), re.MULTILINE)
     expected = {
+        "Public C version": (public_version.group(1) if public_version else None, semver),
         "CMake base": (cmake.group(1) if cmake else None, base),
         "Python project": (python.get("version"), python_version),
         "Python wheel basename": (literal_assignments(backend).get("NAME"), "cui_bridge-" + python_version),
@@ -72,13 +74,19 @@ class ParserTests(unittest.TestCase):
         self.assertTrue(check(root, "invalid"))
         with tempfile.TemporaryDirectory() as temporary:
             staged = Path(temporary)
-            for relative in ("CMakeLists.txt", "bindings/python/pyproject.toml",
+            for relative in ("include/cui/cui.h", "CMakeLists.txt", "bindings/python/pyproject.toml",
                              "bindings/python/packaging/wheel_backend.py", "bindings/node/package.json",
                              "bindings/rust/Cargo.toml", "bindings/rust/Cargo.lock",
                              "bindings/go/go.mod", "scripts/package_bindings.py"):
                 target = staged / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text((root / relative).read_text())
+            public_header = staged / "include/cui/cui.h"
+            original_header = public_header.read_text()
+            public_header.write_text(original_header.replace('#define CUI_VERSION "' + tag[1:] + '"',
+                                                              '#define CUI_VERSION "0.1.0-dev"'))
+            self.assertTrue(any(e.startswith("Public C version:") for e in check(staged, tag)))
+            public_header.write_text(original_header)
             lockfile = staged / "bindings/rust/Cargo.lock"
             original_lock = lockfile.read_text()
             lockfile.write_text(original_lock.replace('version = "' + tag[1:] + '"',
@@ -98,7 +106,7 @@ class ParserTests(unittest.TestCase):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--tag", default="v0.1.0-alpha.1")
+    parser.add_argument("--tag", default="v0.1.0-alpha.2")
     parser.add_argument("--registries", action="store_true", help="also reject explicit npm/Cargo publication gates; does not prove registry ownership or OIDC readiness")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()

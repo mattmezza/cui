@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.2 — preparation (not published)
+
+- Adds implemented component event facades while retaining explicit typed and
+  host-service exceptions; this does not imply uniform APIs or full binding parity.
+- Fixes secure Styled InputGroup masking and owned IME composition lifetime, and
+  same-frame IME caret ownership during Find-to-Editor focus transfer.
+- Adds focused callback-contract and distribution compiler regressions.
+- Final source freeze, skill implementation/integration, regenerated snapshots and
+  release artifact validation remain pending. No registry publication is implied.
+- Alpha.1 versions, tags and published assets remain immutable.
+
 ## 0.1.0-dev
 
 Initial experimental C11/Clay foundation. No stable ABI or production-readiness commitment.

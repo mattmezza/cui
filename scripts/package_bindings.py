@@ -103,7 +103,7 @@ def package_go(package, output, temporary, source_only=True):
             "build_type": os.environ.get("CUI_PACKAGE_BUILD_TYPE", "Release"),
             "system_development_versions": subprocess.check_output(["pkg-config", "--modversion", "sdl3", "freetype2", "harfbuzz"], text=True).splitlines() if os.environ.get("CUI_PACKAGE_NATIVE") == "1" else [],
             "system_runtime_dependencies": [line.split()[0] for line in subprocess.check_output(["ldd", str(library)], text=True).splitlines() if line.split()]}, indent=2))
-    version = "v0.1.0-alpha.1"
+    version = "v0.1.0-alpha.2"
     module = "github.com/mattmezza/cui/bindings/go"
     proxy = output / module / "@v"
     proxy.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
 {
   "name": "@cui/native",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "Alpha CUI native builders; tested subset, not full binding parity",
   "main": "index.cjs",

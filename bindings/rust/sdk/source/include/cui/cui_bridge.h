@@ -344,7 +344,7 @@ typedef struct {
 #define CUI_BRIDGE_PAYLOAD_NONE 0u
 #define CUI_BRIDGE_PAYLOAD_BOOLEAN 1u
 #define CUI_BRIDGE_PAYLOAD_SCALAR 2u /* opt-in only; old V1 poll returns LEGACY */
-#define CUI_BRIDGE_PAYLOAD_TEXT 3u /* reserved */
+#define CUI_BRIDGE_PAYLOAD_TEXT 3u /* opt-in plain-text snapshot */
 #define CUI_BRIDGE_PAYLOAD_SELECTION 4u /* reserved */
 #define CUI_BRIDGE_PAYLOAD_TABLE 5u
 #define CUI_BRIDGE_PAYLOAD_SURFACE 6u
@@ -389,7 +389,9 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_poll_notification_v1(
 /* Opt-in categories for the SAME queue and unchanged V1 layout. Old V1 polling
  * downgrades newly captured categories to complete LEGACY snapshots. */
 #define CUI_BRIDGE_VALUE_SCALAR_V1 (1u << CUI_BRIDGE_PAYLOAD_SCALAR)
-/* Only SCALAR is supported: Slider, NumberInput, Rating, Pagination. */
+#define CUI_BRIDGE_VALUE_TEXT_V1 (1u << CUI_BRIDGE_PAYLOAD_TEXT)
+/* SCALAR: Slider/NumberInput/Rating/Pagination.
+ * TEXT: plain Input/Textarea/Editor/InputGroup only, copied separately. */
 CUI_BRIDGE_API uint32_t cui_bridge_notification_value_payloads_v1(void);
 /* Unsupported mask bits/invalid size fail before queue cleanup or consumption.
  * Unrequested categories return LEGACY; all existing typed tags stay unchanged.

@@ -308,3 +308,10 @@ and cannot be treated as a documentation-only or backward-compatible normalizati
 ## Implemented notification follow-up
 
 The additive [V1 manual notification API](../BRIDGE_NOTIFICATIONS.md) now has owning Python/JavaScript/TypeScript views and [Go/Rust views](../BRIDGE_NOTIFICATIONS_GO_RUST.md). Its initial typed allowlist is activation, applied boolean changes, table changes and surface close outcomes; other payloads remain legacy. It preserves the existing shared queue and delivery timing. These views do not expose synchronous C value requests, Slider phase callbacks or Base Input observers to foreign handlers. Those omissions and the architectural decision above remain applicable.
+
+The separate [opt-in C value poll](../BRIDGE_VALUE_NOTIFICATIONS.md) additionally
+supports scalar and plain-text snapshots for its explicit producer allowlists.
+Python/JS/TypeScript/Go/Rust owning value-poll wrappers are not implemented yet;
+existing V1 methods keep their initial allowlist and receive LEGACY snapshots for
+these categories. Consumers must negotiate the new optional symbols and category
+mask rather than enabling reserved tags through the old method.

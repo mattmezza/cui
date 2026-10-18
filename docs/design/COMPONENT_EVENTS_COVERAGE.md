@@ -206,5 +206,5 @@ allowlist. They do not automatically expose these direct C facades, synchronous
 requests, text, scalar or selection events. See the [binding audit](COMPONENT_EVENTS_BINDINGS.md).
 
 Opt-in C bridge scalar notifications are implemented for Slider, NumberInput,
-Rating and Pagination; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
-Text, selection and owning language wrappers remain separate slices.
+Rating and Pagination, and plain text for Input, Textarea, Editor and InputGroup; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
+Selection and owning language wrappers remain separate slices.

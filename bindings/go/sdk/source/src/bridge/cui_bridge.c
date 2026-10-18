@@ -2745,6 +2745,9 @@ static void bridge_change(cui_bridge_app *app, uint32_t slot) {
         memcpy(payload.text, value.data, value.length);
         payload.text[value.length] = 0;
         payload.text_length = (uint32_t)value.length;
+        if (node->kind == CUI_BRIDGE_INPUT || node->kind == CUI_BRIDGE_TEXTAREA ||
+            node->kind == CUI_BRIDGE_EDITOR || node->kind == CUI_BRIDGE_INPUT_GROUP)
+            payload.payload_kind = CUI_BRIDGE_PAYLOAD_TEXT;
     } else if (node->kind == CUI_BRIDGE_TIME_FIELD) {
         char formatted[16];
         size_t length = cui_time_format(node->time, true, formatted, sizeof formatted);
@@ -4849,7 +4852,7 @@ static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32
     if (status != CUI_BRIDGE_OK)
         return status;
     if (!out || !required_capacity || struct_size != sizeof(*out) ||
-        (enabled_payloads & ~CUI_BRIDGE_VALUE_SCALAR_V1))
+        (enabled_payloads & ~(CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1)))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     while (app->event_count) {
         uint32_t index = app->event_head;
@@ -4874,8 +4877,9 @@ static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32
         value.kind = event.type == CUI_BRIDGE_EVENT_CLICK ? CUI_BRIDGE_NOTIFY_ACTIVATE
                      : event.type == CUI_BRIDGE_EVENT_CLOSE ? CUI_BRIDGE_NOTIFY_LIFECYCLE
                                                            : CUI_BRIDGE_NOTIFY_CHANGE;
-        value.payload_kind = payload.payload_kind == CUI_BRIDGE_PAYLOAD_SCALAR &&
-                             !(enabled_payloads & CUI_BRIDGE_VALUE_SCALAR_V1)
+        value.payload_kind = (payload.payload_kind == CUI_BRIDGE_PAYLOAD_SCALAR ||
+                              payload.payload_kind == CUI_BRIDGE_PAYLOAD_TEXT) &&
+                             !(enabled_payloads & (1u << payload.payload_kind))
                                  ? CUI_BRIDGE_PAYLOAD_LEGACY : payload.payload_kind;
         value.node_kind = payload.node_kind;
         value.node = event.node;
@@ -4902,7 +4906,7 @@ static cui_bridge_status bridge_poll_notification_v1(cui_bridge_app *app, uint32
 }
 
 uint32_t cui_bridge_notification_value_payloads_v1(void) {
-    return CUI_BRIDGE_VALUE_SCALAR_V1;
+    return CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1;
 }
 cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
     cui_bridge_notification_v1 *out, char *text, uint32_t capacity, uint32_t *required_capacity) {

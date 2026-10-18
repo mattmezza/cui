@@ -113,4 +113,4 @@ reuses the ordered selection seam after legacy activation/confirmation callbacks
 Accordion, multi-list and ToggleGroup also report each applied transition; see
 [disclosure events](DISCLOSURE_EVENTS.md) and [List events](LIST_EVENTS.md).
 The [opt-in bridge value API](BRIDGE_VALUE_NOTIFICATIONS.md) currently supports
-scalar notifications only; existing polling and language wrappers retain their contracts.
+scalar and plain-text notifications; existing polling and language wrappers retain their contracts.

@@ -43,7 +43,7 @@ Existing evidence: [`test_disclosure.c`](../../tests/unit/test_disclosure.c), no
 disabled, keyboard-focus and panel-count assertions. These tests prove old behavior,
 not new dispatch.
 
-## Recommended bounded slices and exact shape
+## Initial aggregate option (superseded recommendation; retained for comparison)
 
 Start with aggregate final-delta notifications. Use a new `cui_disclosure_events.h`
 including the existing disclosure and metadata headers:
@@ -155,3 +155,149 @@ notifications need a separate schema/wrapper slice with full stable IDs, typed
 expanded state, bounded ownership and exception containment; queued notifications
 cannot reject past writes. See [binding audit](COMPONENT_EVENTS_BINDINGS.md).
 This checkpoint ran no builds and changes no production source, manifests or ledgers.
+
+
+## Revised preferred slice: per-transition reducer hooks
+
+This amendment supersedes the aggregate/workspace recommendation above. Actual
+write sites are narrow and available in `src/base/cui_disclosure.c`; neither
+family needs caller snapshots, allocation, a command queue, nor a new dispatch
+architecture. Keep the typed change/handler/result declarations above, but define
+`change_count` as the number of **actual applied bool-transition callbacks**, with
+a saturating `count_overflow` flag added to the result. `changed` remains the exact
+legacy bool. The same entrypoint names are proposed, with **no workspace argument**:
+
+```c
+typedef struct {
+    bool changed;
+    size_t change_count;
+    bool count_overflow;
+} cui_disclosure_event_result;
+cui_disclosure_event_result cui_base_collapsible_events(
+    cui_context *, cui_id, cui_str label, bool *open, bool disabled,
+    cui_disclosure_handler);
+cui_disclosure_event_result cui_collapsible_events(
+    cui_context *, cui_id, const cui_theme *, cui_str label, bool *open,
+    cui_collapsible_options, cui_disclosure_panel_fn, void *panel_user,
+    cui_disclosure_handler);
+cui_disclosure_event_result cui_base_accordion_events(
+    cui_context *, cui_id target, const cui_disclosure_item *, size_t count,
+    bool *open, cui_accordion_options, cui_disclosure_handler);
+cui_disclosure_event_result cui_accordion_events(
+    cui_context *, cui_id container, const cui_theme *, const cui_disclosure_item *, size_t count,
+    bool *open, cui_accordion_options, cui_disclosure_panel_fn, void *panel_user,
+    cui_disclosure_handler);
+```
+
+### Exact assignment and notification sequence
+
+Refactor each existing Base reducer into a private common implementation with an
+optional dispatcher/result sink. Legacy functions pass NULL and preserve the old
+statements/order, admission, semantics, routing, bool result and callback-free
+behavior. Styled private common implementations choose the new Base entry at the
+existing seam; do not wrap the old aggregate bool or reduce twice.
+
+Collapsible's existing matching-activation loop executes `*open = !*open`, then
+sets its local changed=true. Capture previous, perform that write and old bookkeeping,
+then notify immediately, before the next input and before final semantic updates.
+Two accepted toggles therefore emit true→false and false→true (or the inverse),
+even if final state equals entry state. Missing handler never changes reduction.
+
+Accordion processes inputs in existing event-loop order. When the current cursor
+is eligible and `!open[cursor] || collapsible`:
+
+1. Compute `next_open = !open[cursor]` as today.
+2. If next_open and !multiple, visit j=0..count-1 exactly as today. For each
+   `open[j] = false`, capture its preceding bool, do the write, and notify only if
+   it was true. Already-false assignments stay silent. This includes disabled
+   siblings, because the existing single-open policy clears them too.
+3. Perform the existing `open[cursor] = next_open`, set changed=true as today,
+   and notify for its actual bool transition. If closing a collapsible open item,
+   no sibling reset occurs. With multiple=true, only this final assignment occurs.
+4. Continue the existing keyboard focus logic and subsequent events, then execute
+   the original final group semantic update loop without moving it earlier.
+
+On opening, the selected cursor was false, so its reset-to-false assignment is
+silent and its later false→true transition emits once. Opening another item can
+emit several true→false siblings in model order, followed by the opened item's
+false→true. There is no duplicate observer for an assignment that leaves a bool
+equal. Do not suppress a real sibling close merely because that sibling is disabled.
+Do not normalize arbitrary idle multi-open input or create events for animation.
+
+### Metadata and timing honesty
+
+At the accepted activation branch, before the **first** affected write/callback,
+freeze the originating event's actual local frame/index and known event-type source.
+Pointer-up is POINTER, key-down/up KEYBOARD, accessibility-action ACCESSIBILITY;
+unrecognized event types remain UNKNOWN. Metadata target is the explicit compound
+ID; payload item/item_index identifies the affected bool slot. Every transition
+caused by the same activation shares that original frame/index, including automatic
+sibling closes. An event index is genuine causal input identity, not a separate
+activation of the affected sibling. Do not infer its physical device/timestamp.
+
+Do not add HAS_ACTIVATION in this initial slice. Registration order differs between
+Collapsible/Accordion and accepted snapshot availability needs a separate proof;
+frame/index/source facts suffice. Never register semantics early just to manufacture
+snapshot evidence. Build metadata only with nonzero active frame and ordinary
+painted, globally enabled submission. Core's inert target/activation suppression
+remains authoritative. If metadata cannot be proven, preserve legacy writes but
+do not emit a fabricated callback. Capture it once before the closure loop so an
+observer cannot indirectly change the recorded cause by consuming input. The new
+observer itself must not mutate active dispatch/input state.
+
+Callbacks are synchronous **immediately after each applied bool write**, not after
+whole-event/group semantic finalization. They can read an intermediate group:
+while opening in single mode, some siblings may have closed while later ones are
+still open; immediately before the final open there may be no open panel. Existing
+invalid multi-open input remains visible until its existing reset loop finishes.
+No exactly-one-open invariant is promised inside the callback. `open` has the newly
+written value, but semantic expanded flags, motion and Styled panels still reflect
+their original later update points. Do not read them as already-finalized state.
+Do not reposition semantics, render callbacks or spring stepping to conceal this.
+
+Observer callbacks must not mutate, rebind, free or destroy the active expanded
+array, items, context, states, style/motion arrays or callback resources, consume
+input, or reenter UI. This includes owner writes to a sibling bool: these are
+post-mutation notifications, not owner-rejectable requests. Unrelated application
+flags may change, with omission/removal/reorder/teardown deferred until outer return
+plus frame/render consumption. No new runtime mutation guard is implied. Legacy
+render/header/panel callback order and ownership remain unchanged; new observer
+rules do not authorize reordering their arbitrary child UI. The observer is not a
+render slot and cannot submit CUI. Retained measurement still survives end_frame.
+
+### Alternatives, risks and proof obligations
+
+Immediate hooks are preferred because they preserve every actual transition with
+constant auxiliary memory and no externally owned snapshot workspace. Their cost
+is explicit intermediate-state/stale-semantics visibility and more callbacks than
+an aggregate result suggests. Consumers needing only final state should coalesce
+copied payloads in unrelated application storage and apply effects after submission;
+that does not change native observer timing.
+
+Dispatching all closures only after the opening write would preserve a stronger
+within-event model invariant, but storing arbitrary changed siblings/previous bools
+requires bounded caller/frame storage or a new count cap; the existing model has no
+such bound. Reconstructing the old true set from the now-false array loses data.
+A two-pass notification scan cannot recover it without storage. Do not introduce
+hidden allocation, truncate callbacks or reorder writes for convenience. The initial
+aggregate-workspace option is valid only as a separately chosen API and loses
+repeated/net-zero transition information; it is not the preferred implementation.
+
+New tests must assert exact ordered transition tuples, not only final state:
+Collapsible double toggle gives two callbacks with unchanged final state; Accordion
+single-open closes prior true slots in index order then opens cursor, including a
+disabled-open sibling; multiple=true never closes siblings; collapsible=false open
+activation produces none. Verify every callback's current slot value and explicitly
+sample allowed intermediate arrays/stale semantics. Confirm metadata is frozen once
+per cause, source/index same for sibling closes, no HAS_ACTIVATION, and repeated
+same-frame inputs each retain their own index. Missing observers keep old results
+and writes, counts are actual invocations, unused user ignored, saturation is safe.
+
+Pair old/new contexts for state/focus/semantics/draw/motion/render-callback equivalence
+after reduction; prove no early semantics, no double input, and unchanged custom
+header child routing. Cover pointer/key/accessibility where genuinely supported,
+consumed/inert/layout/disabled suppression without altering old maintenance,
+copy-after-frame/destruction and flags-driven deferred omission. Run strict C11/C++
+headers plus existing Disclosure tests via the private wrapper after approval.
+This remains a signed design amendment only; no production implementation or tests
+were added or run, and no foreign binding/lifecycle/parity claim follows.

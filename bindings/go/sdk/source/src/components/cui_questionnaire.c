@@ -7,6 +7,96 @@
 #include <stdio.h>
 #include <string.h>
 typedef struct {
+    cui_questionnaire_slot_style styles[3];
+    cui_questionnaire_labels labels;
+} cui_questionnaire_options_snapshot;
+static bool cui_questionnaire_length(float value, bool dimension) {
+    return isfinite(value) && ((dimension && value == -1) || (value >= 0 && value <= 4096));
+}
+static bool cui_questionnaire_style_valid(cui_questionnaire_slot_style style) {
+    uint32_t f = style.fields;
+    cui_box b = style.box;
+    return !(f & ~UINT32_C(511)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_WIDTH) || cui_questionnaire_length(b.width, true)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_HEIGHT) || cui_questionnaire_length(b.height, true)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_PADDING) || cui_questionnaire_length(b.padding, false)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_GAP) || cui_questionnaire_length(b.gap, false)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_RADIUS) || cui_questionnaire_length(b.radius, false)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_BORDER) ||
+            cui_questionnaire_length(b.border_width, false)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_ALIGN) ||
+            ((unsigned)b.align_x <= CUI_ALIGN_END && (unsigned)b.align_y <= CUI_ALIGN_END)) &&
+           (!(f & CUI_QUESTIONNAIRE_SLOT_OPACITY) ||
+            (isfinite(b.opacity) && b.opacity >= 0 && b.opacity <= 1));
+}
+static bool cui_questionnaire_snapshot(cui_questionnaire_options *o,
+                                       cui_questionnaire_options_snapshot *snapshot) {
+    if (!cui_design_valid(o->design_size) || !isfinite(o->density) || o->density < 0 ||
+        o->density > 32)
+        return false;
+    const cui_questionnaire_slot_style *styles[] = {o->indicator_style, o->content_style,
+                                                    o->shortcut_style};
+    for (size_t i = 0; i < 3; ++i)
+        if (styles[i]) {
+            snapshot->styles[i] = *styles[i];
+            if (!cui_questionnaire_style_valid(snapshot->styles[i]))
+                return false;
+        }
+    if (o->labels) {
+        snapshot->labels = *o->labels;
+        cui_questionnaire_labels l = snapshot->labels;
+        cui_str values[] = {l.previous, l.skip, l.next, l.submit, l.required, l.unfilled};
+        if (l.fields & ~UINT32_C(63))
+            return false;
+        for (size_t i = 0; i < 6; ++i)
+            if ((l.fields & (1u << i)) && !cui_edit_valid_utf8(values[i]))
+                return false;
+        o->labels = &snapshot->labels;
+    }
+    if (o->indicator_style)
+        o->indicator_style = &snapshot->styles[0];
+    if (o->content_style)
+        o->content_style = &snapshot->styles[1];
+    if (o->shortcut_style)
+        o->shortcut_style = &snapshot->styles[2];
+    return true;
+}
+static cui_box cui_questionnaire_refine(cui_box b, const cui_questionnaire_slot_style *style) {
+    if (!style)
+        return b;
+    cui_box v = style->box;
+    uint32_t f = style->fields;
+    if (f & CUI_QUESTIONNAIRE_SLOT_WIDTH) {
+        b.width = v.width;
+        b.fixed_width = v.width == 0;
+    }
+    if (f & CUI_QUESTIONNAIRE_SLOT_HEIGHT) {
+        b.height = v.height;
+        b.fixed_height = v.height == 0;
+    }
+    if (f & CUI_QUESTIONNAIRE_SLOT_PADDING)
+        b.padding = v.padding;
+    if (f & CUI_QUESTIONNAIRE_SLOT_GAP)
+        b.gap = v.gap;
+    if (f & CUI_QUESTIONNAIRE_SLOT_RADIUS)
+        b.radius = v.radius;
+    if (f & CUI_QUESTIONNAIRE_SLOT_BACKGROUND)
+        b.background = v.background;
+    if (f & CUI_QUESTIONNAIRE_SLOT_BORDER) {
+        b.border = v.border;
+        b.border_width = v.border_width;
+    }
+    if (f & CUI_QUESTIONNAIRE_SLOT_ALIGN) {
+        b.align_x = v.align_x;
+        b.align_y = v.align_y;
+    }
+    if (f & CUI_QUESTIONNAIRE_SLOT_OPACITY) {
+        b.custom_opacity = true;
+        b.opacity = v.opacity;
+    }
+    return b;
+}
+typedef struct {
     float root_gap, gap, content_gap, px, py, height, indicator, mark, shortcut, font, line;
 } cui_questionnaire_metrics;
 static cui_questionnaire_metrics cui_questionnaire_measure(cui_questionnaire_options o) {
@@ -294,7 +384,8 @@ static void cui_questionnaire_root_capture(cui_context *ui, cui_questionnaire_ro
 }
 bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
                              cui_questionnaire_state *s, cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !theme || !s || !s->initialized)
         return false;
@@ -389,7 +480,8 @@ static float cui_questionnaire_choices_gap(cui_questionnaire_size size) {
 }
 bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
                                   size_t item, cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
@@ -407,7 +499,8 @@ bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_question
 }
 bool cui_questionnaire_choices_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
                                      size_t item, cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
@@ -422,7 +515,8 @@ bool cui_questionnaire_choices_begin(cui_context *ui, cui_id id, const cui_quest
 }
 bool cui_questionnaire_actions_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
                                      cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !s || !s->initialized)
         return false;
@@ -440,7 +534,8 @@ void cui_questionnaire_part_end(cui_context *ui) {
 }
 void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
                                 const cui_questionnaire_state *s, cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return;
     if (!ui || !id || !t || !s || !s->initialized)
         return;
@@ -465,7 +560,8 @@ void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
 bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_theme *t,
                                       cui_questionnaire_state *s, size_t item, size_t choice,
                                       cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !t || !s || !s->initialized || item != s->current || item >= s->count ||
         choice >= s->items[item].choice_count)
@@ -551,16 +647,24 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
         o.render_indicator(ui, id ^ UINT64_C(0x751ec681a5920310), &view, o.render_user);
         cui_end_box(ui);
     } else {
-        cui_begin_box(ui, 0, (cui_box){.height = m.line, .align_y = CUI_ALIGN_CENTER});
         cui_begin_box(ui, 0,
-                      (cui_box){.width = m.indicator,
-                                .height = m.indicator,
-                                .radius = d->multiple ? t->radius / 2 : m.indicator / 2,
-                                .border_width = 1,
-                                .border = selected ? t->primary : t->input,
-                                .background = selected ? t->primary : t->input_background,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER});
+                      (cui_box){.height = m.line,
+                                .align_y = o.indicator_style ? CUI_ALIGN_START : CUI_ALIGN_CENTER});
+        if (o.indicator_style) {
+            cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.indicator) / 2)});
+            cui_end_box(ui);
+        }
+        cui_begin_box(ui, 0,
+                      cui_questionnaire_refine(
+                          (cui_box){.width = m.indicator,
+                                    .height = m.indicator,
+                                    .radius = d->multiple ? t->radius / 2 : m.indicator / 2,
+                                    .border_width = 1,
+                                    .border = selected ? t->primary : t->input,
+                                    .background = selected ? t->primary : t->input_background,
+                                    .align_x = CUI_ALIGN_CENTER,
+                                    .align_y = CUI_ALIGN_CENTER},
+                          o.indicator_style));
         if (selected) {
             if (d->multiple)
                 cui_checkmark(ui, m.indicator - 2, t->on_primary);
@@ -576,7 +680,9 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
         cui_end_box(ui);
         cui_end_box(ui);
     }
-    cui_begin_box(ui, 0, (cui_box){.width = -1, .gap = m.content_gap});
+    cui_begin_box(
+        ui, 0,
+        cui_questionnaire_refine((cui_box){.width = -1, .gap = m.content_gap}, o.content_style));
     if (o.render_content)
         o.render_content(ui, id ^ UINT64_C(0x1f0e69b892345708), &view, o.render_user);
     else {
@@ -593,19 +699,27 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
         o.render_shortcut(ui, id ^ UINT64_C(0x931ac84625c0a917), &view, o.render_user);
         cui_end_box(ui);
     } else if (key) {
-        cui_begin_box(
-            ui, 0, (cui_box){.width = m.shortcut, .height = m.line, .align_y = CUI_ALIGN_CENTER});
         cui_begin_box(ui, 0,
-                      (cui_box){.width = m.shortcut,
-                                .height = m.shortcut,
-                                .background = t->background,
-                                .border_width = 1,
-                                .border = t->input,
-                                .radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius / 2
-                                          : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius_lg
-                                                                              : t->radius,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER});
+                      (cui_box){.width = o.shortcut_style ? 0 : m.shortcut,
+                                .height = m.line,
+                                .align_y = o.shortcut_style ? CUI_ALIGN_START : CUI_ALIGN_CENTER});
+        if (o.shortcut_style) {
+            cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.shortcut) / 2)});
+            cui_end_box(ui);
+        }
+        cui_begin_box(ui, 0,
+                      cui_questionnaire_refine(
+                          (cui_box){.width = m.shortcut,
+                                    .height = m.shortcut,
+                                    .background = t->background,
+                                    .border_width = 1,
+                                    .border = t->input,
+                                    .radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius / 2
+                                              : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius_lg
+                                                                                  : t->radius,
+                                    .align_x = CUI_ALIGN_CENTER,
+                                    .align_y = CUI_ALIGN_CENTER},
+                          o.shortcut_style));
         float shortcut_font = o.design_size                        ? m.font * .625f
                               : o.size == CUI_QUESTIONNAIRE_XSMALL ? 8
                               : o.size == CUI_QUESTIONNAIRE_SMALL  ? 9
@@ -625,7 +739,8 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
 void cui_questionnaire_heading(cui_context *ui, cui_id id, const cui_theme *t,
                                const cui_questionnaire_state *s, size_t item,
                                cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return;
     if (!ui || !id || !t || !s || !s->initialized || item >= s->count || item != s->current)
         return;
@@ -643,7 +758,8 @@ void cui_questionnaire_heading(cui_context *ui, cui_id id, const cui_theme *t,
 void cui_questionnaire_error_control(cui_context *ui, cui_id id, const cui_theme *t,
                                      const cui_questionnaire_state *s, size_t item,
                                      cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return;
     if (!ui || !id || !t || !s || !s->initialized || item >= s->count || item != s->current)
         return;
@@ -655,6 +771,12 @@ void cui_questionnaire_error_control(cui_context *ui, cui_id id, const cui_theme
                       : e.kind == CUI_QUESTIONNAIRE_REQUIRED
                           ? cui_string("This question is required")
                           : cui_string("Answer or skip this question");
+    if (o.labels && e.kind == CUI_QUESTIONNAIRE_REQUIRED &&
+        (o.labels->fields & CUI_QUESTIONNAIRE_LABEL_REQUIRED))
+        message = o.labels->required;
+    if (o.labels && e.kind == CUI_QUESTIONNAIRE_UNFILLED &&
+        (o.labels->fields & CUI_QUESTIONNAIRE_LABEL_UNFILLED))
+        message = o.labels->unfilled;
     cui_interact(ui, id, CUI_ROLE_ALERT, message, false, false, 0);
     cui_begin_box(ui, id, (cui_box){.width = -1});
     cui_text(ui, message,
@@ -667,7 +789,8 @@ void cui_questionnaire_error_control(cui_context *ui, cui_id id, const cui_theme
 bool cui_questionnaire_action_control(cui_context *ui, cui_id id, const cui_theme *t,
                                       cui_questionnaire_state *s, cui_questionnaire_action action,
                                       cui_str label, cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !t || !s || !s->initialized || s->current >= s->count)
         return false;
@@ -680,11 +803,18 @@ bool cui_questionnaire_action_control(cui_context *ui, cui_id id, const cui_them
                        : action == CUI_QUESTIONNAIRE_FINISH && position + 1 == total;
     if (!visible)
         return false;
-    if (!label.length)
+    if (!cui_edit_valid_utf8(label))
+        return false;
+    bool explicit_label = label.length != 0;
+    if (!explicit_label)
         label = cui_string(action == CUI_QUESTIONNAIRE_PREVIOUS ? "Previous"
                            : action == CUI_QUESTIONNAIRE_SKIP   ? "Skip"
                            : action == CUI_QUESTIONNAIRE_NEXT   ? "Next"
                                                                 : "Submit");
+    if (!explicit_label && o.labels && (o.labels->fields & (1u << (unsigned)action))) {
+        cui_str values[] = {o.labels->previous, o.labels->skip, o.labels->next, o.labels->submit};
+        label = values[(unsigned)action];
+    }
     cui_theme action_theme = *t;
     if (o.design_size && o.density > 0)
         action_theme.font_size = 16 * o.density;
@@ -711,7 +841,8 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
                                                          cui_questionnaire_input_state *view,
                                                          const cui_platform *clipboard,
                                                          cui_questionnaire_options o) {
-    if (!cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 || o.density > 32)
+    cui_questionnaire_options_snapshot snapshot;
+    if (!cui_questionnaire_snapshot(&o, &snapshot))
         return CUI_QUESTIONNAIRE_INVALID;
     if (!ui || !id || !t || !s || !s->initialized || !view)
         return CUI_QUESTIONNAIRE_INVALID;

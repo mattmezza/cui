@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_message.h"
+#include "cui/cui_message_events.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_virtual.h"
 #include <float.h>
@@ -323,4 +324,43 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
     }
     cui_end_box(ui);
     return r;
+}
+
+/* Internal read-only snapshot; no layout, allocation or model mutation. */
+void cui_message_private_event_snapshot(const cui_message_scroller_state *, double *, bool *);
+
+cui_message_scroller_event_result cui_message_scroller_events(cui_context *ui, cui_id id, const cui_theme *theme, cui_message_scroller_state *state,
+    cui_message_row_render_fn render, void *user, cui_message_scroller_options options, cui_message_scroller_handler handler) {
+    cui_message_scroller_event_result result = {0};
+    if (!ui || !id || !state || !theme || !render || !cui_frame_is_submitting(ui))
+        return result;
+    double previous, value;
+    bool previous_tail, tail;
+    cui_message_private_event_snapshot(state, &previous, &previous_tail);
+    uint64_t frame = cui_frame_sequence(ui);
+    result.control_result = cui_message_scroller(ui, id, theme, state, render, user, options);
+    cui_message_private_event_snapshot(state, &value, &tail);
+    if (!result.control_result.valid || !isfinite(previous) || !isfinite(value))
+        return result;
+    result.valid = true;
+    result.offset_changed = previous != value;
+    result.tail_changed = previous_tail != tail;
+    cui_message_offset_change offset_change = {.previous = previous, .value = value};
+    cui_message_tail_change tail_change = {.previous = previous_tail, .value = tail};
+    if (frame) {
+        (void)cui_component_event_init(&offset_change.event, CUI_COMPONENT_EVENT_CHANGE, id,
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        offset_change.event.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+        offset_change.event.frame_sequence = frame;
+        tail_change.event = offset_change.event;
+        if (result.offset_changed && handler.on_offset_change) {
+            result.offset_change_count = 1;
+            handler.on_offset_change(handler.user, &offset_change);
+        }
+        if (result.tail_changed && handler.on_tail_change) {
+            result.tail_change_count = 1;
+            handler.on_tail_change(handler.user, &tail_change);
+        }
+    }
+    return result;
 }

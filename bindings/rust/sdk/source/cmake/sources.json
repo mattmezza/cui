@@ -234,7 +234,9 @@
     "cui_toolbar_events": [],
     "cui_command_events": [],
     "cui_scroll_events": [],
-    "cui_hover_events": []
+    "cui_hover_events": [],
+    "cui_virtual_events": [],
+    "cui_message_events": []
   },
   "native": {
     "text": [

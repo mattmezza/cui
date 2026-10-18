@@ -8,6 +8,51 @@ endif()
 option(CUI_MACOS_DEPLOY_DEPENDENCIES "Copy native macOS runtime dependencies into the app" ${_cui_deploy_default})
 unset(_cui_deploy_default)
 
+# Follow resolved link providers rather than assuming runtimes live beside the
+# executable. PkgConfig imported interfaces expose absolute library paths;
+# shared/unknown imported targets may instead select a configuration at generate
+# time. Walk static/interface providers too, with cycle protection.
+function(_cui_macos_dependency_directories target output)
+  set(pending "${target}")
+  set(visited)
+  set(directories "$<TARGET_FILE_DIR:${target}>")
+  while(pending)
+    list(POP_FRONT pending provider)
+    if(provider IN_LIST visited OR NOT TARGET "${provider}")
+      continue()
+    endif()
+    list(APPEND visited "${provider}")
+    get_target_property(kind "${provider}" TYPE)
+    if(kind MATCHES "^(SHARED_LIBRARY|MODULE_LIBRARY|UNKNOWN_LIBRARY)$")
+      list(APPEND directories "$<TARGET_FILE_DIR:${provider}>")
+    endif()
+    foreach(property LINK_DIRECTORIES INTERFACE_LINK_DIRECTORIES)
+      get_target_property(paths "${provider}" "${property}")
+      if(paths)
+        list(APPEND directories ${paths})
+      endif()
+    endforeach()
+    foreach(property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
+      get_target_property(links "${provider}" "${property}")
+      foreach(link IN LISTS links)
+        # Static PRIVATE edges and build-only interfaces use these common
+        # wrappers. Other generator expressions are not file names or targets.
+        while(link MATCHES "^\\$<(LINK_ONLY|BUILD_INTERFACE):(.+)>$")
+          set(link "${CMAKE_MATCH_2}")
+        endwhile()
+        if(TARGET "${link}")
+          list(APPEND pending "${link}")
+        elseif(IS_ABSOLUTE "${link}")
+          get_filename_component(directory "${link}" DIRECTORY)
+          list(APPEND directories "${directory}")
+        endif()
+      endforeach()
+    endforeach()
+  endwhile()
+  list(REMOVE_DUPLICATES directories)
+  set(${output} "${directories}" PARENT_SCOPE)
+endfunction()
+
 # FONT_DIR must contain the pinned Inter fonts and their license. This helper
 # works at configure time for Darwin cross builds; deployment requires macOS.
 function(cui_macos_bundle target)
@@ -63,7 +108,18 @@ function(cui_macos_bundle target)
       message(FATAL_ERROR "Dependency deployment requires a native macOS build; cross builds must stage target dylibs and fix install names separately")
     endif()
     # Only run during installation, after the bundle and its resources exist.
-    install(CODE "include(BundleUtilities)\nfixup_bundle(\"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_BUNDLE_DIR_NAME:${target}>\" \"\" \"$<TARGET_FILE_DIR:${target}>\")")
+    _cui_macos_dependency_directories(${target} dependency_directories)
+    # Resolve configuration-specific target locations as data, not CMake code:
+    # even dollar signs/bracket delimiters in generated paths stay literal.
+    set(search_file "${CMAKE_CURRENT_BINARY_DIR}/cui-bundle-${target}-$<CONFIG>-directories.txt")
+    file(GENERATE OUTPUT "${search_file}" CONTENT "${dependency_directories}")
+    set(delimiter "=")
+    string(FIND "${search_file}" "]${delimiter}]" closing)
+    while(NOT closing EQUAL -1)
+      string(APPEND delimiter "=")
+      string(FIND "${search_file}" "]${delimiter}]" closing)
+    endwhile()
+    install(CODE "include(BundleUtilities)\nfile(READ [${delimiter}[${search_file}]${delimiter}] _cui_bundle_search)\nlist(REMOVE_DUPLICATES _cui_bundle_search)\nfixup_bundle(\"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_BUNDLE_DIR_NAME:${target}>\" \"\" \"\${_cui_bundle_search}\")")
     # No identity or keychain is used. Re-sign changed Mach-O files for local
     # Apple Silicon development; Developer ID distribution is separate.
     install(CODE "include(\"${CMAKE_CURRENT_FUNCTION_LIST_DIR}/CUISignMacOS.cmake\")\ncui_sign_macos_development_bundle(\"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/$<TARGET_BUNDLE_DIR_NAME:${target}>\")")

@@ -1,6 +1,6 @@
 # Remaining component event coverage
 
-Source checkpoint: `07d26c6d` (78 frozen manifest families). Documentation-only
+Source checkpoint: `5b417b67` (78 frozen manifest families). Documentation-only
 audit, not a parity/status promotion or a claim of 78 uniform event APIs. The
 [contract](COMPONENT_EVENTS_CONTRACT.md), original [matrix](COMPONENT_EVENTS_COVERAGE.md)
 and [binding audit](COMPONENT_EVENTS_BINDINGS.md) retain their historical scope;
@@ -95,23 +95,29 @@ full-family verification. Each family links its authoritative public header.
 | [Popover](../../include/cui/cui_surface.h) | A | [SURFACE_EVENTS](../SURFACE_EVENTS.md): Retained completed-close only; existing decision policy separate; open/request/veto not notifications. |
 | [Resizable](../../include/cui/cui_resizable.h) | T | Retained on_resize receives borrowed live state; typed changed/completed/phase results. Immutable snapshot facade would need independent lifetime review. |
 | [Root View](../../include/cui/cui_root.h) | H | Retained plugin build/render/destroy/copy services; explicit dispose ordering, not value notifications. |
-| [Scrollable](../../include/cui/cui_scroll.h) | G | No common scroll observer. Begin/reduce and finish/deferred-child paths can both update offsets; cannot infer one callback per wheel input from final bool. |
+| [Scrollable](../../include/cui/cui_scroll.h) | A | [SCROLL_EVENTS](../SCROLL_EVENTS.md): Paired Base/Styled final-offset observer after children/finish; aggregate normalization included, no fabricated per-input transitions. Overlay, virtual and message paths remain separate. |
 | [Settings](../../include/cui/cui_settings.h) | A | [SETTINGS_EVENTS](../SETTINGS_EVENTS.md): Applied navigation/built-in values/text/reset; custom controls and custom reset hooks separate. |
 | [Sheet](../../include/cui/cui_surface.h) | A | [SURFACE_EVENTS](../SURFACE_EVENTS.md): Retained completed-close only; existing decision policy separate; open/request/veto not notifications. |
 | [Sidebar](../../include/cui/cui_sidebar.h) | A | [SIDEBAR_EVENTS](../SIDEBAR_EVENTS.md): Rows, expansion, collapse and header/footer complete; GROUP pointer_activatable supports a11y, TREEITEM limitation remains. |
 | [StatusBar](../../include/cui/cui_chrome.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [Tabs](../../include/cui/cui_choice.h) | A | [TABS_EVENTS](../TABS_EVENTS.md): Aggregate stable-ID selection; reorder/overflow/scroll lifecycle excluded. |
 | [Theme](../../include/cui/cui_theme.h) | H | Explicit value projection/loading and icon-loader policy; no ambient theme-change event bus. |
-| [TitleBar](../../include/cui/cui_chrome.h) | G | Design proposal only (TITLE_BAR_EVENTS_SLICE); host dispatch acceptance is not confirmed OS window state. Preserve Base gestures before Styled controls and existing coalescing. |
+| [TitleBar](../../include/cui/cui_chrome.h) | H | Reviewed host-service exception in [checkpoint](TITLE_BAR_EVENTS_SLICE.md): existing perform/close hooks remain synchronous services, not confirmed OS lifecycle or value notifications. No proposed observer implemented. |
 | [Toolbar](../../include/cui/cui_toolbar.h) | A | [TOOLBAR_EVENTS](../TOOLBAR_EVENTS.md): Aggregate command activation after paint/legacy callback; custom renderer opt-in. |
 | [Tree](../../include/cui/cui_tree.h) | A | [TREE_EVENTS](../TREE_EVENTS.md): Applied selection/expansion and invocation; intermediate reducer state preserved. |
 | [VirtualList](../../include/cui/cui_virtual_scroll.h) | G | Typed scroll_changed/window_pending result and child renderers; no scroll/window notification facade. Deferred window can lag one frame; rows own item events. |
 | [Chart](../../include/cui/cui_chart.h) | H | Typed hover/result and tooltip/render policy; callbacks may run during layout/prepaint/paint with current-frame borrowed data. |
-| [Command](../../include/cui/cui_command.h) | G | Base operation observers implemented (COMMAND_EVENTS); Styled forwarding in flight, not shipped at this checkpoint. Query-before-old-hook exception preserves borrowed query lifetime; cancel separate. |
+| [Command](../../include/cui/cui_command.h) | A | [COMMAND_EVENTS](../COMMAND_EVENTS.md): Base operations and Styled forwarding implemented. Query-before-old-hook exception preserves borrowed query lifetime; cancel is separate. |
 | [DataTable](../../include/cui/cui_table.h) | A | [TABLE_EVENTS](../TABLE_EVENTS.md): Sort/selection/set snapshots/columns/actions/ROW requests; viewport/load-edge still result-only. |
 | [Plot](../../include/cui/cui_plot_view.h) | H | Existing prepaint appearance callback and hover/result; deferred resolver/paint lifetimes must remain through render completion. |
 | [Table](../../include/cui/cui_table.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [TextView](../../include/cui/cui_text_view.h) | T | Existing on_link borrows decoded URI/event, on_reveal requests viewport movement. No common selection/link metadata facade; copying struct does not own URI. |
+
+## Updated implementation disposition
+
+Command Base/Styled forwarding and Scrollable Base/Styled pairing are implemented. TitleBar remains an explicitly reviewed host-service exception: host dispatch success is not confirmed OS state, and existing host/close hooks already provide synchronous extension points. TextView keeps its typed link/reveal callbacks; focused contract tests and copying guidance were added without changing dispatch. The original coverage matrix remains a historical checkpoint, not a current absence claim.
+
+Focus Trap, HoverCard, Tooltip, VirtualList and MessageScroller remain marked G below until their lifecycle/result-only dispositions are independently settled; do not count them as newly uniform APIs. Foreign binding allowlists remain separately bounded. The follow-up list records the original review plan; the status above supersedes completed/in-flight descriptions in that historical plan.
 
 ## Independently reviewable follow-ups
 

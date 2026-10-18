@@ -883,11 +883,11 @@ API: `cui_root_init`, `cui_root_render`, `cui_root_dispose`. [Public header](../
 
 **State:** Caller retains cui_scroll_state offsets and supplies content/viewport dimensions.
 
-**Interaction:** Begin/end reduce scroll input; child controls handle application actions.
+**Interaction:** Legacy begin/end reduce scroll input. Optional paired observers report one applied final offset after children and finish; normalization is not evidence of user input.
 
-**Usage:** Pair active scrollable begin/end around children and preserve updated offsets across frames.
+**Usage:** Preserve caller offsets. Base observer begin may return false for a valid no-change pair and must still be finished. Styled observer begin returns admission: end only after true. Handlers are borrowed by finish/end; do not mix pairing layers.
 
-API: `cui_scrollable_begin`, `cui_scrollable_end_ex`. [Public header](../include/cui/cui_scroll.h); [guide](SCROLL.md).
+API: `cui_scrollable_begin`, `cui_scrollable_end_ex`, `cui_base_scrollable_events`, `cui_base_scrollable_finish_events`, `cui_scrollable_begin_events`, `cui_scrollable_end_events`. [Public header](../include/cui/cui_scroll.h); [event header](../include/cui/cui_scroll_events.h); [guide](SCROLL.md); [event guide](SCROLL_EVENTS.md).
 
 ## Settings
 

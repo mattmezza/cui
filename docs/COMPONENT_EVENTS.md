@@ -1,6 +1,6 @@
 # Shared component event metadata
 
-The additive `cui_component_events.h` utility supplies common metadata and a bounded text-copy helper. It does **not** change any existing component callback, result, state owner or dispatch timing. The [78-family coverage](design/COMPONENT_EVENTS_COVERAGE.md), [binding audit](design/COMPONENT_EVENTS_BINDINGS.md) and [design contract](design/COMPONENT_EVENTS_CONTRACT.md) describe the wider work. The first [Button and Check facades](CONTROL_EVENTS.md) are implemented; [Switch/Toggle facades](BOOLEAN_EVENTS.md) are also implemented; other family facades remain future slices. This utility is not full component parity.
+The additive `cui_component_events.h` utility supplies common metadata and a bounded text-copy helper. It does **not** change any existing component callback, result, state owner or dispatch timing. The [78-family coverage](design/COMPONENT_EVENTS_COVERAGE.md), [binding audit](design/COMPONENT_EVENTS_BINDINGS.md) and [design contract](design/COMPONENT_EVENTS_CONTRACT.md) describe the wider work. The first [Button and Check facades](CONTROL_EVENTS.md) are implemented; [Switch/Toggle facades](BOOLEAN_EVENTS.md) are also implemented; implemented family guides below describe their precise scope. The [current coverage audit](design/COMPONENT_EVENTS_REMAINING.md) records remaining gaps and justified exceptions. This utility is not full component parity.
 
 ## Names and meanings
 
@@ -132,3 +132,5 @@ Collapse and header/footer actions remain separate slices; no generic TREEITEM a
 [Attachment actions](ATTACHMENT_EVENTS.md) observe OPEN/REMOVE/RETRY at the
 original category callback seams, with aggregate zero/one counts per category.
 They report requested host actions, not completed deletion/upload work.
+
+[Scrollable final-offset observers](SCROLL_EVENTS.md) pair Base reduction or Styled composition with one final notification after children. They preserve legacy input consumption and report aggregate offsets, including normalization, without inventing an input cause. VirtualList and MessageScroller retain their separate typed result contracts.

@@ -1478,22 +1478,38 @@
     {
       "api_symbols": [
         "cui_scrollable_begin",
-        "cui_scrollable_end_ex"
+        "cui_scrollable_end_ex",
+        "cui_base_scrollable_events",
+        "cui_base_scrollable_finish_events",
+        "cui_scrollable_begin_events",
+        "cui_scrollable_end_events"
       ],
       "state_types": [
-        "cui_scroll_state"
+        "cui_scroll_state",
+        "cui_scroll_event_scope",
+        "cui_scroll_event_result",
+        "cui_scroll_change"
       ],
       "state_ownership": "Caller retains cui_scroll_state offsets and supplies content/viewport dimensions.",
-      "interaction": "Begin/end reduce scroll input; child controls handle application actions.",
-      "usage": "Pair active scrollable begin/end around children and preserve updated offsets across frames.",
+      "interaction": "Legacy begin/end reduce scroll input. Optional paired observers report one applied final offset after children and finish; normalization is not evidence of user input.",
+      "usage": "Preserve caller offsets. Base observer begin may return false for a valid no-change pair and must still be finished. Styled observer begin returns admission: end only after true. Handlers are borrowed by finish/end; do not mix pairing layers.",
       "docs": [
-        "docs/SCROLL.md"
+        "docs/SCROLL.md",
+        "docs/SCROLL_EVENTS.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_scroll_change_fn"
+      ],
       "scope": "styled frame component",
       "name": "Scrollable",
       "public_header": "include/cui/cui_scroll.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_scroll_events.h"
+      ],
+      "handler_types": [
+        "cui_scroll_handler"
+      ]
     },
     {
       "api_symbols": [

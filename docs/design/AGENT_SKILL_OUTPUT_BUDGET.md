@@ -428,3 +428,152 @@ who only need discovery benefit immediately; implementation users must still rea
 the applicable contracts. Report observed savings and remaining large reads honestly.
 Production stays blocked on Scroll/API batch completion and root's subsequent
 implementation authorization, as requested by the user.
+
+### Scoped resource reads: explicit partial retrieval proposal
+
+Preparation only, continuing from `cfe80acc542beee8e717f47432b041b5aca56854`.
+The current `read` branch looks up one exact `data.documents` path, then prints
+its complete string (or JSON-encodes that string). It has no section/line selector.
+Do not change that default or its newline/JSON behavior. The following additive
+human modes make a large-guide follow-up optional without pretending to recover
+an entire API contract:
+
+```sh
+python "$HELPER" read docs/CHOICE.md --headings --source "$CUI_SOURCE"
+python "$HELPER" read docs/CHOICE.md --section 'List, Select and Menu' --source "$CUI_SOURCE"
+python "$HELPER" read docs/INPUT_ACCEPTANCE.md --section 'Ownership, bounds and rollback' --source "$CUI_SOURCE"
+python "$HELPER" read docs/INPUT.md --lines 1:14 --source "$CUI_SOURCE"
+```
+
+These flags are proposed, not currently callable. Exact semantics:
+
+- `--headings`: for Markdown only, list all supported ATX headings in source
+  order, their level, exact heading text and inclusive line span. Print path,
+  digest and exact follow-up section/full-read commands. This is an index, not
+  a guide summary or inferred dependency graph; do not expand bodies.
+- `--section TEXT`: for Markdown only, match one exact unique heading text;
+  retain Markdown punctuation rather than inventing slugs/rendered-text matches.
+  Include that heading, its entire body and descendant subsections, stopping
+  immediately before the next heading of equal or smaller level or EOF. Do not
+  stop at a child heading or select only the first paragraph/example. Preserve
+  selected text and blank lines; never cut by byte/token budget.
+- Duplicate heading text fails nonzero with every matching line/ancestor path
+  and `--lines`/full-read guidance; never silently choose the first. Empty or
+  absent heading is an explicit error, not an empty successful partial read.
+  Do not add fuzzy fallback. A top-level heading can select nearly the whole
+  document; report its actual span rather than promising a saving.
+- `--lines START:END`: any existing text resource, strict positive decimal,
+  one-based inclusive endpoints with `START <= END <= source line count`.
+  No negative indexing, omitted endpoints, clamping or implicit last-N behavior.
+  Invalid/out-of-bounds ranges fail without partial stdout. Preserve those exact
+  lines. This is an explicitly arbitrary excerpt, not a declaration extractor
+  or runnable-example API. It may omit a declaration/type/lifetime condition.
+- Selectors are mutually exclusive (`--headings`, `--section`, `--lines`).
+  Initially reject each with `--json`, leaving existing `read PATH --json` a
+  JSON string with the complete unchanged document. No silent string-to-envelope
+  migration. A later explicitly versioned partial-JSON schema needs its own review.
+
+The heading scanner is deliberately a documented Markdown subset: ATX levels 1–6,
+up to three leading spaces, required heading whitespace, optional CommonMark
+closing hashes. Ignore headings inside fenced backtick/tilde blocks and indented
+code; distinguish closing fences by matching character, sufficient length and
+whitespace-only tail. Unterminated/ambiguous fenced structure at a requested
+boundary fails rather than offering a clipped runnable block. Setext/HTML/other
+unsupported heading syntax is not heuristically interpreted; full reads and
+explicit line ranges remain available. Tests must include hashes inside C/Python
+code fences, longer/nested fences, trailing hashes, Unicode/punctuation, duplicate
+headings, children, CRLF as represented by the existing collected document string,
+last line without newline and empty documents. This needs no third-party parser
+or new dependency and does not claim a full CommonMark implementation.
+
+Every selected-body response begins with an explicit envelope:
+
+```text
+PARTIAL RESOURCE EXCERPT — not a complete contract or standalone program
+Path: docs/CHOICE.md | digest <actual selected source digest>
+Selection: section 'List, Select and Menu' | lines 76:170 of 805
+Omitted: 75 lines before; 635 lines after (not automatically irrelevant)
+Full: python "$HELPER" read docs/CHOICE.md --source <same source>
+```
+
+Then the intact selected section follows. For arbitrary `--lines`, present the
+substring in an explicitly plaintext display envelope (choose an outer backtick
+fence longer than any run in the excerpt), so a cut inner Markdown/C fence does
+not masquerade as complete runnable code. Do not append invented code/fence
+contents to the resource body. Output metadata/fences belong to the partial view;
+default full `read` remains unchanged. Even a section spanning all lines does not
+prove dependency closure or complete usage guidance. Nonzero omitted counts and
+explicit source identity make partial retrieval visible; no keyword safety filter
+or automatic assertion that omitted material is irrelevant.
+
+API/default summaries should offer these scoped commands where an exact heading
+is actually present, alongside the complete resource command. This is retrieval,
+not a new claim of curated relevance: initially list the heading index so the
+consumer chooses. Do not hardcode `--lines 76:170` across future digests or treat
+section titles as stable IDs. A stale/renamed heading must fail clearly. Required
+header reads and dedicated event/lifetime guides still apply; section reads do
+not authorize silently removing canonical limitations from component summaries.
+
+### Actual heading evidence and discovery-to-example cost
+
+Measured source content at `cfe80acc542beee8e717f47432b041b5aca56854`; live digest
+remains `0b73f7a749067e4502ccb0ef15f020143af679b5bf377a35159435688216d24e`
+because design checkpoints are excluded from exported consumer resources. The
+bundled/source mismatch recorded above remains; this does not regenerate it.
+
+| Actual document / exact section | Inclusive lines | Body bytes | Scope caveat |
+| --- | ---: | ---: | --- |
+| `docs/CHOICE.md` / `List, Select and Menu` | 76–170 | 6,221 | Includes the existing Select snippet, popup/state/ID/lifetime/scroll/gap discussion, plus List/Menu/split-button context; not a Select-only complete contract. |
+| `docs/CHOICE.md` / `Combobox` | 171–218 | 2,985 | Separate selected section; must not substitute for Select. |
+| `docs/CHOICE.md` / `Tab drag reorder requests` | 428–805 | 26,397 | Contains later appended material under the final heading; headings alone do not guarantee relevance or small output. |
+| `docs/INPUT_ACCEPTANCE.md` / `Ownership, bounds and rollback` | 68–99 | 2,160 | Relevant ownership slice, not the whole acceptance/engine contract. |
+| `docs/INPUT.md` / `Source sizes and fixed-height centering` | 15–41 | 3,081 | Metrics slice. Its top-level section instead spans the whole 6,241-byte document, including this child. |
+| `docs/SELECT_EVENTS.md` / top-level heading | 1–42 | 5,813 | Dedicated compact guide already; full read is sensible. |
+| `docs/TEXT_INPUT_STYLED_EVENTS.md` / top-level heading | 1–42 | 2,347 | Dedicated compact guide; section retrieval adds no content saving. |
+
+A plausible **existing-app single Select observer discovery → contract/example**
+flow was measured, not just default summary size. This scenario assumes the
+consumer already understands its project's Core/context/theme/host/build setup;
+it is not the complete dependency closure of a new application. It deliberately
+keeps the full 27,429-byte Choice header response and full shared event header,
+reads dedicated Select/shared selection guides, and uses the Select snippet in
+those guides/the chosen Choice section. It neither reads nor calls a clipped
+`web/gallery.c` a standalone example. New-host setup/build documentation, extra
+optional behavior, compiler logs and verification are additional costs, not zero.
+
+Current calls were executed offline with the existing CLI and `--source`; proposed
+summary/declaration/index/envelope strings were formatted by a temporary external
+measurement probe. **Proposed values are estimates from concrete formatting,
+not implemented CLI output or a completed app validation.** Both retain all
+canonical Select metadata limitations and full required reads in this scenario.
+
+| Current targeted flow | Bytes | Proposed flow | Bytes |
+| --- | ---: | --- | ---: |
+| `component Select --show usage` | 597 | Summary prototype with complete usage/limitations metadata | 1,971 |
+| `component Select --show limitations` | 1,294 | Declaration/index prototype | 521 |
+| `api cui_select_events` (complete matching header) | 27,713 | Example-index prototype | 244 |
+| `component Select --show examples` (both whole guides) | 59,082 | Full `read include/cui/cui_choice.h` | 27,429 |
+| `read docs/SELECTION_EVENTS.md` | 5,212 | Scoped Choice section including prototype partial envelope | 6,412 |
+| `read include/cui/cui_selection_events.h` | 1,094 | Full `read docs/SELECT_EVENTS.md` | 5,814 |
+| — | — | Full `read docs/SELECTION_EVENTS.md` | 5,212 |
+| — | — | Full `read include/cui/cui_selection_events.h` | 1,094 |
+| **Total** | **94,992** | **Total** | **48,697** |
+
+This prototype is 46,295 bytes (~48.7%) smaller; byte/4 token estimates are 23,748
+versus 12,174, not tokenizer counts. Exact production envelope/read-command/title
+formatting and a requested heading-index call add bytes and must be remeasured.
+The savings are not the ~98% suggested by comparing an 89 KB default against only a
+2 KB summary. Most remaining cost is deliberate full-header/contract material.
+Consumers needing the whole shared guide can still choose the full read; their
+flow saves less. Input with validation, password staging or format providers needs
+its additional specific guides; no Select estimate is generalized to it.
+
+External probe evidence:
+`/home/matteo/.cache/cui-validation/skill-output-current/scoped-read-measurements.json`,
+SHA256 `b49fbd374d92be7c5a80be40f18db1e3a0852b98877e7513b65f205a82d092f6`.
+It records actual section body hashes, source spans/digest and each flow call.
+No file from that probe enters the shipped skill; no production CLI/exporter/
+generator or generated resources changed, and no build/native/browser test ran.
+After Scroll/API completion and root approval, implement these bounded selectors
+with semantic tests, preserve old JSON/full reads, and rerun the measured flows
+against frozen bundled/live/packaged sources before claiming savings.

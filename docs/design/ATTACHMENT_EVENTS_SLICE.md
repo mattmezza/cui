@@ -86,9 +86,9 @@ accepted activation with a genuine snapshot retains its original source/index
 and activation target; metadata target remains the attachment compound. Multiple
 causal activations coalesce and cannot be represented by an arbitrary first/last
 snapshot: report proven frame with UNKNOWN source and no index/activation then.
-Do not guess a description retry ID from the card retry ID. Unsupported native
-GROUP/LINK accessibility actions remain documented legacy limitations, not a new
-allowlist or invented keyboard support.
+Do not guess a description retry ID from the card retry ID. Current Core accepts LINK accessibility ACTIVATE and pointer-activatable GROUP
+ACTIVATE after prior semantic registration. Preserve this existing allowlist; do
+not fabricate support before registration or invent keyboard behavior.
 
 New notification eligibility requires an active, paint-enabled, non-inert frame.
 Preserve passive/layout/omitted and status-dependent legacy work; never globally
@@ -165,7 +165,24 @@ Actual IDs and eligibility audited in current Styled/Base media:
   child eligibility logic in an outer scan.
 
 The collector observes accepted activation evidence only, never reducers or input
-consumption. It does not add support for GROUP/LINK accessibility ACTIVATE. Tests
+consumption. It does not change GROUP/LINK accessibility routing. Current Core accepts LINK
+and pointer-activatable GROUP ACTIVATE after previous semantics exist; before
+first registration queue admission correctly fails with INVALID_ACTION. Tests
 must include media/description retry, unchanged shared userdata/order, and a late
 legacy callback that changes focus after evidence was frozen, plus payload copying.
 Production is authorized only after this refinement is committed.
+
+
+## Implementation checkpoint
+
+The common hook and three fixed collector slots are implemented in Styled media;
+Base and Core remain untouched. Tests compare legacy/facade paint, semantics,
+tracked bounds, focus/redraw, aggregate results and old callback counts; prove
+unchanged userdata/category order, typed-only and mixed-handler availability,
+media/description retry, repeated activation coalescing, unique pointer/key/a11y
+snapshots, late old callback consuming live evidence, custom action isolation,
+status/identified/touch/media matrix, passive/inert suppression, uploading
+OPEN/REMOVE, copied payload and deferred omission. Existing media suite passes.
+The earlier overbroad GROUP/LINK limitation is corrected against current Core;
+new fixture explicitly verifies failed queue admission before first semantics.
+No foreign binding or complete family parity claim follows from this slice.

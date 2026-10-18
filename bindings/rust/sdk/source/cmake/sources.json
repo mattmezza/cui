@@ -205,7 +205,8 @@
     ],
     "cui_styled_slider_events": [
       "src/components/cui_styled_slider_events.c"
-    ]
+    ],
+    "cui_menu_events": []
   },
   "native": {
     "text": [

@@ -1348,11 +1348,16 @@ static bool cui_menu_scroll_event(cui_context *ui, const cui_menu_entry *entries
     cui_invalidate(ui);
     return true;
 }
-bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui_menu_entry *items,
+static bool cui_choice_reduce_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui_menu_entry *items,
                         size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
-                        float dt, bool keep_open_checks) {
+                        float dt, bool keep_open_checks, cui_menu_command_handler handler,
+                        cui_menu_command_result *observed) {
     if (!state || !state->overlay.id || !action || (!items && count))
         return false;
+    if (observed) {
+        observed->valid = true;
+        observed->submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
+    }
     if (!state->drag_scroll)
         state->scroll_pending = state->scroll_dragging = false;
     bool was_open = state->overlay.open;
@@ -1605,6 +1610,29 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
             continue;
         }
         if (activation && entry->kind != CUI_MENU_SUBMENU) {
+            cui_menu_command command;
+            memset(&command, 0, sizeof(command));
+            command.command = entry->id;
+            bool notify = observed && handler.on_activate && cui_frame_sequence(ui) != 0;
+            if (notify) {
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, e, &snapshot) ||
+                    !cui_component_event_from_activation(&command.event,
+                        CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+                    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+                    if (event.type == CUI_EVENT_POINTER_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+                    else if (event.type == CUI_EVENT_KEY_DOWN || event.type == CUI_EVENT_KEY_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                    else if (event.type == CUI_EVENT_ACCESSIBILITY_ACTION)
+                        source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+                    (void)cui_component_event_init(&command.event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                    trigger, source);
+                    (void)cui_component_event_set_frame_index(&command.event,
+                                                              cui_frame_sequence(ui), e);
+                }
+                command.event.target = trigger;
+            }
             state->levels[level].active = entry->id;
             if (!keyboard)
                 state->depth = level + 1;
@@ -1619,7 +1647,15 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
                 state->depth = 0;
             }
             activated_any = true;
-            if (!state->overlay.open)
+            bool exit_after_command = !state->overlay.open;
+            if (notify) {
+                if (observed->command_count == SIZE_MAX)
+                    observed->count_overflow = true;
+                else
+                    observed->command_count++;
+                handler.on_activate(handler.user, &command);
+            }
+            if (exit_after_command)
                 return true;
             continue;
         }
@@ -1672,6 +1708,24 @@ bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name, const cui
         }
     }
     return activated_any;
+}
+
+bool cui_base_menu_tree(cui_context *ui, cui_id trigger, cui_str name,
+    const cui_menu_entry *items, size_t count, cui_id *action, cui_menu_tree_state *state,
+    bool disabled, float dt, bool keep_open_checks) {
+    return cui_choice_reduce_menu_tree(ui, trigger, name, items, count, action, state, disabled,
+        dt, keep_open_checks, (cui_menu_command_handler){0}, NULL);
+}
+cui_menu_command_result cui_base_menu_tree_events(cui_context *ui, cui_id trigger, cui_str name,
+    const cui_menu_entry *items, size_t count, cui_id *action, cui_menu_tree_state *state,
+    bool disabled, float dt, bool keep_open_checks, cui_menu_command_handler handler) {
+    cui_menu_command_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !trigger)
+        return result;
+    result.legacy_activated = cui_choice_reduce_menu_tree(ui, trigger, name, items, count,
+        action, state, disabled, dt, keep_open_checks, handler, &result);
+    return result;
 }
 
 void cui_context_menu_open(cui_context *ui, cui_menu_tree_state *state, cui_id restore_focus,

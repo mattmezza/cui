@@ -88,3 +88,7 @@ The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_I
 [Select observers](SELECT_EVENTS.md) report each actual selection transition, preserving the full list pass and popup-close timing. [Combobox observers](COMBOBOX_EVENTS.md) preserve Base/query and popup-list phase ordering; option accessibility limitations are explicit in both guides.
 
 [Surface completed-close observers](SURFACE_EVENTS.md) use caller-owned retained registration, unlike render-call-only handlers. Existing close decisions and result consumption stay separate from lifecycle notification.
+
+[MenuTree observers](MENU_EVENTS.md) report each applied command synchronously,
+including repeated commands. Simple Menu, ContextMenu and Dropdown forwarding
+remain separate work; this is not complete menu-family coverage.

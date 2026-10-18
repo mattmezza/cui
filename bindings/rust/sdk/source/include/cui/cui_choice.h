@@ -8,6 +8,7 @@
 #include "cui_overlay.h"
 #include "cui_theme.h"
 #include "cui_selection_events.h"
+#include "cui_menu_events.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -363,6 +364,17 @@ void cui_base_menu_entry(cui_context *, const cui_menu_entry *, bool disabled, b
 bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
                    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                    cui_menu_tree_options);
+/* Per-command synchronous ACTIVATE observer after applied check/radio/action
+ * writes and close policy. Missing observer preserves normal mutation.
+ * No context destruction, active storage freeing or recursive submission. */
+cui_menu_command_result cui_base_menu_tree_events(
+    cui_context *, cui_id trigger, cui_str name, const cui_menu_entry *, size_t count,
+    cui_id *action, cui_menu_tree_state *, bool disabled, float dt,
+    bool keep_open_checks, cui_menu_command_handler);
+cui_menu_command_result cui_menu_tree_events(
+    cui_context *, cui_id trigger, const cui_theme *, cui_str name,
+    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
+    cui_menu_tree_options, cui_menu_command_handler);
 /* Paint an already reduced Menu popup anchored to a caller-painted trigger.
  * Does not submit the trigger, reduce events or mutate action/check values.
  * Registers visible popup/row semantics and retains measured window metrics. */

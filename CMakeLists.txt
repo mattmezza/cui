@@ -1276,3 +1276,8 @@ add_executable(test_styled_slider_events tests/unit/test_styled_slider_events.c)
 target_link_libraries(test_styled_slider_events PRIVATE cui cui_software)
 cui_warnings(test_styled_slider_events)
 add_test(NAME styled_slider_events COMMAND test_styled_slider_events)
+
+add_executable(test_menu_events tests/unit/test_menu_events.c)
+target_link_libraries(test_menu_events PRIVATE cui)
+cui_warnings(test_menu_events)
+add_test(NAME menu_events COMMAND test_menu_events)

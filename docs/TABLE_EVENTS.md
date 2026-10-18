@@ -3,7 +3,8 @@
 Include `cui/cui_table_events.h`. The additive `cui_table_reduce_events`,
 `cui_base_data_table_events` and `cui_data_table_events` take a `cui_table_event_handler`
 and return unchanged legacy `control`, validity/submission flags and actual
-`selection_count`, `sort_count`, `column_width_count` and `column_move_count`
+`selection_count`, `sort_count`, `column_width_count`, `column_move_count`,
+`activation_count` and `context_request_count`
 (saturating with `count_overflow`). A missing callback ignores user and preserves
 reduction, including multi-selection behavior.
 
@@ -43,8 +44,8 @@ A non-NULL `on_selection` with `multiple_selection=true` returns `valid=false`,
 There is no silent primary-only multi observation. Nil selection/sort-only handlers
 still support legacy multi reduction, including accepted progress before errors.
 The separate set-observation API below supports complete multi selection. Column
-movement/resize are covered below; activation, requests and viewport/load events
-remain separate slices. Existing bridge V1 table notifications remain aggregate post-step snapshots; native multiplicity and
+movement/resize and activation/context are covered below; mode requests remain
+a separate slice, while viewport/load remain aggregate result observations. Existing bridge V1 table notifications remain aggregate post-step snapshots; native multiplicity and
 64-bit keys here do not imply binding parity.
 
 
@@ -146,3 +147,51 @@ Handlers/user remain borrowed, and the mutation/reentrancy/teardown restrictions
 above apply. Base only submits semantics, so pointer routing requires actual
 caller-provided geometry (the tests prime with Styled geometry). No new dispatch,
 GPU validation or bridge/binding event coverage is implied.
+
+
+## Activation and context requests
+
+Both scalar and set handlers add optional `on_activate` and `on_context_request`.
+`activation_count` and `context_request_count` count actual synchronous calls,
+saturating with `count_overflow`. Missing callbacks ignore unused userdata and
+preserve all legacy writes. Set facades with no set-selection callback need no
+workspace to observe these actions; existing preflight rules remain unchanged.
+
+`cui_table_activation` copies ACTIVATE metadata, `area`, `row` and `column` for
+each accepted cell or row-header activation. CELL uses both effective cursor keys;
+ROW_HEADER always has column=0. A repeated same-item action still activates even
+when selection is unchanged, nonselectable, selection-disabled or rejected for
+capacity. It does not imply selection applied/committed. Header sorting remains
+covered by sort/selection events; no generic header action is added.
+
+Facts and metadata freeze before selection observers run. Notification follows
+that branch's selection attempt/CHANGE and legacy activated-field writes, before
+later mode-request bookkeeping, focus/reveal work and final semantics/paint.
+Keyboard facts use the effective cursor, which can differ from the original
+routed child after earlier navigation. The old result remains a last-write
+aggregate: row-header activation writes only activated_row, so activated_column
+can carry from an earlier cell action. Typed ROW_HEADER payloads explicitly use
+column=0 without altering that legacy behavior.
+
+`cui_table_context_request` copies REQUEST metadata, `area`, `row` and `column`
+for each eligible secondary POINTER_DOWN on a cell, row header or column header.
+COLUMN_HEADER uses row=0, ROW_HEADER column=0. It notifies immediately after the
+old context fields are written, before subsequent cursor/selection handling.
+The context item need not be selected. A request neither selects it nor opens a
+popup, and has no rejection return. Disabled row/column and global/passive policies
+keep their existing distinctions; nonselectable alone does not suppress context.
+
+Metadata has the table root target and genuine frame/index/source. Secondary
+press is POINTER source without fabricated activation evidence. HAS_ACTIVATION
+is present only when the existing accepted-activation snapshot API supplies it;
+absence does not invalidate an accepted raw Table action. Callback facts survive
+an earlier selection observer consuming input; no new consumed-event filter is
+introduced. Standard Table roles support accessibility focus but currently reject
+ACTIVATE without a pointer_activatable override; no role remap or parity claim.
+
+Both payloads are pointer-free and copyable beyond the callback/frame/context.
+Handler/user and active resources retain the borrowed lifetimes and mutation/
+reentrancy/destruction restrictions above. Record intent and defer teardown.
+Mode-request callbacks are not implemented. Read viewport/load observations from
+`control` after submission: they remain completion aggregates, not per-input
+callbacks or a networking API. The bridge/bindings do not gain these native events.

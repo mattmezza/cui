@@ -1,10 +1,13 @@
 # Remaining DataTable events checkpoint
 
-Design only, audited at `4aa3c3d0`. This supplements the
+Audited at `4aa3c3d0`. The independently approved activation/context slice is now
+implemented; mode requests below remain a design checkpoint awaiting their own
+production slice. This supplements the
 [original checkpoint](DATA_TABLE_EVENTS_SLICE.md), follows the
 [shared contract](COMPONENT_EVENTS_CONTRACT.md), and preserves the current
-[implemented facades](../TABLE_EVENTS.md). No production declarations, dispatch,
-Core behavior, bridge schema, generated files or 78-family manifest entries change.
+[implemented facades](../TABLE_EVENTS.md). The activation/context implementation
+adds only the reviewed native facade fields/counters and narrow reducer seams. No new dispatch, Core behavior, bridge
+schema, generated files or 78-family manifest entries change.
 
 ## What the remaining results mean
 
@@ -55,7 +58,7 @@ Important compatibility details:
   such a filter or treating observer input consumption as rejection would change
   behavior. A real header drop is not a cell action or context request.
 
-## Proposed input slices and exact payloads
+## Reviewed input slices and exact payloads
 
 Extend only the existing additive `cui_table_events.h` facades; preserve old public
 state/options/result layouts and all entrypoints. Both scalar and set handlers
@@ -102,14 +105,14 @@ typedef struct {
 typedef void (*cui_table_mode_request_fn)(void *user, const cui_table_mode_request *event);
 ```
 
-1. **Activation and context slice:** add optional `on_activate` and
+1. **Implemented activation and context slice:** add optional `on_activate` and
    `on_context_request`, and shared result counters `activation_count` and
    `context_request_count`. These recover repeated accepted attempts and repeated
    requests hidden by the old last-value results. Count actual synchronous calls,
    saturating with the existing `count_overflow`. Context does not synthesize
    activation. No coordinates, menu ownership, acceptance return or popup lifecycle
    are promised; caller can identify the item with keys/area and existing ID helpers.
-2. **Mode-request slice:** independently add `on_mode_request` and
+2. **Pending independent mode-request slice:** independently add `on_mode_request` and
    `mode_request_count`. This is deliberately separate from selection CHANGE:
    the application decides next submission's options, but ignoring the request
    does not undo the current effective ROW selection attempt. No generalized
@@ -237,3 +240,22 @@ activation/context/mode multiplicity, exact cui_id keys and completion facts are
 not exposed by initial V1 or the additive value extension. Python/Node/Go/Rust
 polling remains a separate post-step owned-copy contract; these C proposals add
 no queued binding events, immediate handlers, request rejection or reordering.
+
+
+## Activation/context implementation evidence
+
+The narrow reducer seam freezes effective IDs and metadata before selection
+observers, then delivers accepted actions at the old write points, including
+unchanged/selection-disabled/nonselectable/capacity attempts. Context remains a
+secondary-press request at its existing fields, with no activation or owner write.
+Scalar/set facades share the new fields/counters; NULL set-selection permits
+ignored workspace. No mode-request/completion callback is exposed.
+
+Tests preserve the bounded 256-element/1024-command context fixture while keeping
+4096-entry selection coverage. Actual queued keys/pointers cover repeated actions,
+effective keyboard cursor IDs, mixed cell/row-header legacy column carry, metadata
+before selection-observer consumption, all three context areas, disabled versus
+nonselectable distinctions, passive/loading policies, optional observers,
+callback-before-paint and paired legacy owner/result/semantics/geometry/paint.
+Accessibility focus is exercised and ACTIVATE rejection checked at the public
+queue API. Payload copies/deferred teardown intent retain existing lifetime rules.

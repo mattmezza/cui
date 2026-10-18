@@ -15,6 +15,10 @@ typedef struct {
     cui_table_column_width_change widths[32];
     cui_table_column_move_change moves[32];
     size_t width_calls, move_calls;
+    cui_table_activation activations[32];
+    cui_table_context_request contexts[32];
+    size_t activation_calls, context_calls;
+    bool observe_actions, consume_selection;
     size_t selection_calls, trace_length;
     char trace[128];
     bool observe_selection;
@@ -55,6 +59,7 @@ static void selection_changed(void *user,const cui_table_selection_change *event
     assert(event->previous.row!=event->value.row||event->previous.column!=event->value.column);
     f->selections[f->selection_calls++]=*event;f->remove_requested=true;
     assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='S';
+    if(f->consume_selection)assert(cui_consume_event(f->ui,event->event.event_index));
 }
 static void width_changed(void *user,const cui_table_column_width_change *change) {
     fixture *f=user;assert(!f->render_started&&f->width_calls<32);
@@ -72,6 +77,21 @@ static void column_moved(void *user,const cui_table_column_move_change *change) 
     if(change->event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER)assert(f->state.dragging==change->column&&f->state.drag_active);
     f->moves[f->move_calls++]=*change;f->remove_requested=true;f->trace[f->trace_length++]='P';
 }
+static void activated(void *user,const cui_table_activation *event) {
+    fixture *f=user;assert(!f->render_started&&f->activation_calls<32);
+    assert(event->event.target==90&&event->event.kind==CUI_COMPONENT_EVENT_ACTIVATE&&(event->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX));
+    assert(event->event.frame_sequence==cui_frame_sequence(f->ui));
+    assert(event->area==CUI_TABLE_ACTION_CELL||event->area==CUI_TABLE_ACTION_ROW_HEADER);
+    if(event->area==CUI_TABLE_ACTION_ROW_HEADER)assert(!event->column);
+    f->activations[f->activation_calls++]=*event;f->remove_requested=true;assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='A';
+}
+static void context_requested(void *user,const cui_table_context_request *event) {
+    fixture *f=user;assert(!f->render_started&&f->context_calls<32);
+    assert(event->event.target==90&&event->event.kind==CUI_COMPONENT_EVENT_REQUEST&&(event->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX));
+    assert(event->event.frame_sequence==cui_frame_sequence(f->ui)&&event->event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER);
+    assert(!(event->event.flags&CUI_COMPONENT_EVENT_HAS_ACTIVATION));
+    f->contexts[f->context_calls++]=*event;f->remove_requested=true;assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='Q';
+}
 static cui_str label(void *user,size_t row,cui_id column){
     fixture *f=user;assert(row<2&&(column==COL_A||column==COL_B));f->render_started=true;f->renders++;
     return f->rows[row].label;
@@ -84,7 +104,9 @@ static cui_table_event_result frame(fixture *f,unsigned mode,bool legacy,bool ha
     cui_theme t=cui_theme_light();cui_table_event_result r={0};
     cui_table_event_handler h={.on_selection=handler&&f->observe_selection?selection_changed:NULL,
         .on_sort=handler?sort_changed:NULL,
-        .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,.user=f};
+        .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,
+        .on_activate=handler&&f->observe_actions?activated:NULL,
+        .on_context_request=handler&&f->observe_actions?context_requested:NULL,.user=f};
     if(mode==2) {
         if(legacy)r.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
         else r=cui_data_table_events(f->ui,90,&t,f->model,&f->state,o,label,NULL,f,h);
@@ -251,6 +273,7 @@ static void set_changed(void *user,const cui_table_selection_set_change *change)
         s->changes[n].value.items=s->copied_after[n];
     } else s->changes[n].value.items=NULL;
     f->remove_requested=true;assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='M';
+    if(f->consume_selection)assert(cui_consume_event(f->ui,change->event.event_index));
 }
 static void set_init(set_fixture *s) {
     memset(s,0,sizeof *s);init(&s->f);s->f.state.selection=s->owner;s->f.state.selection_capacity=8;
@@ -266,7 +289,9 @@ static cui_table_set_event_result set_frame(set_fixture *s,unsigned mode,bool le
     bool consumed[128];for(size_t i=0;i<input_count;i++)consumed[i]=cui_event_consumed(f->ui,i);
     cui_theme t=cui_theme_light();cui_table_set_event_result r={0};
     cui_table_set_event_handler h={.on_selection=handler&&!s->sort_only?set_changed:NULL,.on_sort=handler?sort_changed:NULL,
-        .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,.user=s};
+        .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,
+        .on_activate=handler&&f->observe_actions?activated:NULL,
+        .on_context_request=handler&&f->observe_actions?context_requested:NULL,.user=s};
     if(mode==2) {
         if(legacy)r.events.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
         else r=cui_data_table_set_events(f->ui,90,&t,f->model,&f->state,o,label,NULL,f,w,h);
@@ -631,4 +656,137 @@ static void column_changes(unsigned mode,bool sets) {
     }
 }
 
-int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);column_changes(mode,false);column_changes(mode,true);}progress_and_consumption();set_maximum();return 0;}
+static cui_table_event_result action_frame(set_fixture *s,unsigned mode,bool sets,bool legacy,
+    bool handlers,unsigned passive,cui_table_options options_value) {
+    options_value.multiple_selection=sets;
+    return sets?set_frame(s,mode,legacy,handlers,passive,options_value,
+        s->sort_only?(cui_table_selection_workspace){0}:workspace(s)).events:
+        frame(&s->f,mode,legacy,handlers,passive,options_value);
+}
+static void action_init(set_fixture *s) {
+    set_init(s);s->f.observe_actions=true;s->f.observe_selection=true;
+}
+static void secondary(fixture *f,cui_id id) {
+    cui_rect bounds=cui_bounds(f->ui,id);assert(bounds.w>0&&bounds.h>0);
+    pointer(f,CUI_EVENT_POINTER_DOWN,bounds.x+bounds.w/2,bounds.y+bounds.h/2,CUI_POINTER_SECONDARY);
+    pointer(f,CUI_EVENT_POINTER_UP,bounds.x+bounds.w/2,bounds.y+bounds.h/2,CUI_POINTER_SECONDARY);
+}
+static void actions(unsigned mode,bool sets) {
+    set_fixture a,b;action_init(&a);action_init(&b);cui_table_options o=options();
+    action_frame(&a,mode,sets,true,false,0,o);action_frame(&b,mode,sets,false,true,0,o);
+    cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));
+    for(size_t i=0;i<3;i++){key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);}
+    cui_table_event_result ar=action_frame(&a,mode,sets,true,false,0,o),br=action_frame(&b,mode,sets,false,true,0,o);
+    set_compare(&a,&b,ar.control,br.control);assert(br.activation_count==3&&br.selection_count==1&&!br.context_request_count);
+    assert(b.f.trace_length==4&&!memcmp(b.f.trace,sets?"MAAA":"SAAA",4));
+    for(size_t i=0;i<3;i++)assert(b.f.activations[i].area==CUI_TABLE_ACTION_CELL&&b.f.activations[i].row==1&&b.f.activations[i].column==COL_A);
+    key(&a.f,CUI_KEY_DOWN);key(&b.f,CUI_KEY_DOWN);key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);
+    ar=action_frame(&a,mode,sets,true,false,0,o);br=action_frame(&b,mode,sets,false,true,0,o);
+    set_compare(&a,&b,ar.control,br.control);assert(br.activation_count==1&&b.f.activations[3].row==2&&b.f.activations[3].event.source==CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+    /* Copies retain exact facts after later actions and scratch reuse. */
+    assert(b.f.activations[0].row==1&&b.f.remove_requested);finish(&a.f);finish(&b.f);
+    assert(b.f.activations[0].row==1&&b.f.activations[0].column==COL_A); /* Copied facts outlive context. */
+    /* A selection observer consumes input; action metadata was already frozen. */
+    action_init(&b);b.f.consume_selection=true;action_frame(&b,mode,sets,false,true,0,o);
+    cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));key(&b.f,CUI_KEY_ENTER);
+    br=action_frame(&b,mode,sets,false,true,0,o);assert(br.activation_count==1&&br.selection_count==1);
+    cui_component_event_metadata before=sets?b.changes[0].event:b.f.selections[0].event;
+    cui_component_event_metadata after=b.f.activations[0].event;
+    assert(before.flags==after.flags&&before.frame_sequence==after.frame_sequence&&before.event_index==after.event_index&&before.source==after.source);
+    if(before.flags&CUI_COMPONENT_EVENT_HAS_ACTIVATION)assert(before.activation.target==after.activation.target);
+    finish(&b.f);
+    /* No selection observer/workspace is needed for action/context observation. */
+    action_init(&b);b.f.observe_selection=false;b.sort_only=true;action_frame(&b,mode,sets,false,true,0,o);
+    cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));key(&b.f,CUI_KEY_ENTER);
+    br=action_frame(&b,mode,sets,false,true,0,o);assert(br.activation_count==1&&!br.selection_count&&b.f.state.row==1);
+    key(&b.f,CUI_KEY_ENTER);br=action_frame(&b,mode,sets,false,false,0,o);assert(!br.activation_count&&b.f.activation_calls==1);finish(&b.f);
+    for(unsigned policy=0;policy<2;policy++) {
+        action_init(&a);action_init(&b);
+        if(policy==0)a.f.columns[0].nonselectable=b.f.columns[0].nonselectable=true;
+        else o.cell_selection_disabled=true;
+        action_frame(&a,mode,sets,true,false,0,o);action_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);
+        ar=action_frame(&a,mode,sets,true,false,0,o);br=action_frame(&b,mode,sets,false,true,0,o);
+        set_compare(&a,&b,ar.control,br.control);assert(br.activation_count==1&&!br.selection_count&&!b.f.state.row);finish(&a.f);finish(&b.f);o=options();
+    }
+    if(sets) {
+        action_init(&a);action_init(&b);a.f.state.selection_capacity=b.f.state.selection_capacity=0;
+        action_frame(&a,mode,true,true,false,0,o);action_frame(&b,mode,true,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);
+        ar=action_frame(&a,mode,true,true,false,0,o);br=action_frame(&b,mode,true,false,true,0,o);
+        set_compare(&a,&b,ar.control,br.control);assert(br.control.error==CUI_TABLE_CAPACITY&&br.activation_count==1&&!br.selection_count);finish(&a.f);finish(&b.f);
+    }
+    /* Row selection may be disabled, but the accepted row-header action remains. */
+    action_init(&b);o.row_header=true;o.row_selection_disabled=true;
+    action_frame(&b,mode,sets,false,true,0,o);cui_focus(b.f.ui,cui_table_row_header_id(90,2));key(&b.f,CUI_KEY_ENTER);
+    br=action_frame(&b,mode,sets,false,true,0,o);assert(br.activation_count==1&&!br.selection_count&&!br.control.selection_mode_requested);
+    assert(b.f.activations[0].area==CUI_TABLE_ACTION_ROW_HEADER&&b.f.activations[0].row==2&&!b.f.activations[0].column);finish(&b.f);o=options();
+    for(unsigned passive=0;passive<3;passive++)for(unsigned policy=0;policy<3;policy++) {
+        action_init(&a);action_init(&b);action_frame(&a,mode,sets,true,false,0,o);action_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_cell_id(90,1,COL_A));cui_focus(b.f.ui,cui_table_cell_id(90,1,COL_A));key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);
+        o.disabled=policy==1;o.loading=policy==2;
+        ar=action_frame(&a,mode,sets,true,false,passive,o);br=action_frame(&b,mode,sets,false,true,passive,o);
+        set_compare(&a,&b,ar.control,br.control);assert(br.activation_count==((!passive&&!policy)?1u:0u));finish(&a.f);finish(&b.f);o=options();
+    }
+    /* Real pointer routing uses Styled geometry for all three reducer facades. */
+    action_init(&a);action_init(&b);o.row_header=true;
+    const cui_id first=UINT64_C(9007199254740995),last=UINT64_MAX-3;
+    a.f.rows[0].key=b.f.rows[0].key=first;a.f.rows[1].key=b.f.rows[1].key=last;
+    assert(cui_table_bind(a.f.model,a.f.rows,2,a.f.columns,2)==CUI_TABLE_OK);
+    assert(cui_table_bind(b.f.model,b.f.rows,2,b.f.columns,2)==CUI_TABLE_OK);
+    action_frame(&a,2,sets,true,false,0,o);action_frame(&b,2,sets,false,true,0,o);
+    click(&a.f,cui_table_cell_id(90,first,COL_B));click(&b.f,cui_table_cell_id(90,first,COL_B));
+    click(&a.f,cui_table_row_header_id(90,last));click(&b.f,cui_table_row_header_id(90,last));
+    ar=action_frame(&a,mode,sets,true,false,0,o);br=action_frame(&b,mode,sets,false,true,0,o);
+    set_compare(&a,&b,ar.control,br.control);assert(br.activation_count==2&&br.control.activated_row==last&&br.control.activated_column==COL_B);
+    assert(b.f.activations[0].row==first&&b.f.activations[0].column==COL_B&&b.f.activations[1].row==last&&!b.f.activations[1].column&&b.f.activations[1].area==CUI_TABLE_ACTION_ROW_HEADER);
+    assert(b.f.activations[0].event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER);finish(&a.f);finish(&b.f);
+    /* Default table roles support a11y focus, but not ACTIVATE. Do not remap. */
+    action_init(&b);o=options();action_frame(&b,mode,sets,false,true,0,o);
+    cui_id cell=cui_table_cell_id(90,1,COL_A);
+    assert(cui_accessibility_action_supported(b.f.ui,cell,CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_accessibility_action_supported(b.f.ui,cell,CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_queue_accessibility_action(b.f.ui,cell,CUI_ACCESSIBILITY_FOCUS));
+    assert(!action_frame(&b,mode,sets,false,true,0,o).activation_count&&cui_focused(b.f.ui)==cell);
+    assert(!cui_queue_accessibility_action(b.f.ui,cell,CUI_ACCESSIBILITY_ACTIVATE));
+    assert(cui_last_error(b.f.ui)==CUI_ERROR_INVALID_ACTION&&!b.f.activation_calls);finish(&b.f);
+}
+static void contexts(unsigned mode,bool sets) {
+    set_fixture a,b;action_init(&a);action_init(&b);cui_table_options o=options();o.row_header=true;
+    b.sort_only=true;b.f.observe_selection=false; /* Context-only set handling with no workspace. */
+    a.f.state.row=b.f.state.row=1;a.f.state.column=b.f.state.column=COL_A;
+    if(sets){a.owner[0]=b.owner[0]=(cui_table_selection){1,COL_A};a.f.state.selection_count=b.f.state.selection_count=1;}
+    action_frame(&a,2,sets,true,false,0,o);action_frame(&b,2,sets,false,true,0,o);
+    cui_id targets[]={cui_table_cell_id(90,2,COL_B),cui_table_row_header_id(90,2),cui_table_header_id(90,COL_A),cui_table_cell_id(90,2,COL_B)};
+    for(size_t i=0;i<4;i++){secondary(&a.f,targets[i]);secondary(&b.f,targets[i]);}
+    cui_table_event_result ar=action_frame(&a,mode,sets,true,false,0,o),br=action_frame(&b,mode,sets,false,true,0,o);
+    set_compare(&a,&b,ar.control,br.control);assert(br.context_request_count==4&&!br.activation_count&&!br.selection_count&&b.f.state.row==1&&b.f.state.column==COL_A);
+    assert(b.f.contexts[0].area==CUI_TABLE_CONTEXT_CELL&&b.f.contexts[0].row==2&&b.f.contexts[0].column==COL_B);
+    assert(b.f.contexts[1].area==CUI_TABLE_CONTEXT_ROW_HEADER&&b.f.contexts[1].row==2&&!b.f.contexts[1].column);
+    assert(b.f.contexts[2].area==CUI_TABLE_CONTEXT_COLUMN_HEADER&&!b.f.contexts[2].row&&b.f.contexts[2].column==COL_A);
+    assert(b.f.contexts[3].row==2&&br.control.context_row==2&&br.control.context_column==COL_B&&b.f.trace_length==4&&!memcmp(b.f.trace,"QQQQ",4));
+    action_frame(&b,2,sets,false,true,0,o);secondary(&b.f,cui_table_cell_id(90,2,COL_B));
+    br=action_frame(&b,mode,sets,false,false,0,o);assert(br.control.context_requested&&!br.context_request_count&&b.f.context_calls==4);
+    finish(&a.f);finish(&b.f);assert(b.f.contexts[0].row==2&&b.f.contexts[0].column==COL_B);
+    for(unsigned policy=0;policy<3;policy++) {
+        action_init(&a);action_init(&b);o=options();o.row_header=true;
+        if(policy==0)a.f.rows[1].disabled=b.f.rows[1].disabled=true;
+        if(policy==1)a.f.columns[1].disabled=b.f.columns[1].disabled=true;
+        if(policy==2)a.f.columns[1].nonselectable=b.f.columns[1].nonselectable=true;
+        action_frame(&a,2,sets,true,false,0,o);action_frame(&b,2,sets,false,true,0,o);
+        secondary(&a.f,cui_table_cell_id(90,2,COL_B));secondary(&b.f,cui_table_cell_id(90,2,COL_B));
+        secondary(&a.f,cui_table_row_header_id(90,2));secondary(&b.f,cui_table_row_header_id(90,2));
+        ar=action_frame(&a,mode,sets,true,false,0,o);br=action_frame(&b,mode,sets,false,true,0,o);
+        set_compare(&a,&b,ar.control,br.control);assert(br.context_request_count==(policy==0?0u:policy==1?1u:2u));
+        if(policy==1){assert(b.f.contexts[0].area==CUI_TABLE_CONTEXT_ROW_HEADER);}
+        finish(&a.f);finish(&b.f);
+    }
+    for(unsigned passive=0;passive<3;passive++)for(unsigned policy=0;policy<3;policy++) {
+        action_init(&a);action_init(&b);o=options();action_frame(&a,2,sets,true,false,0,o);action_frame(&b,2,sets,false,true,0,o);
+        secondary(&a.f,cui_table_cell_id(90,2,COL_A));secondary(&b.f,cui_table_cell_id(90,2,COL_A));o.disabled=policy==1;o.loading=policy==2;
+        ar=action_frame(&a,mode,sets,true,false,passive,o);br=action_frame(&b,mode,sets,false,true,passive,o);
+        set_compare(&a,&b,ar.control,br.control);assert(br.context_request_count==((!passive&&!policy)?1u:0u));finish(&a.f);finish(&b.f);
+    }
+}
+
+int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);column_changes(mode,false);column_changes(mode,true);actions(mode,false);actions(mode,true);contexts(mode,false);contexts(mode,true);}progress_and_consumption();set_maximum();return 0;}

@@ -63,3 +63,28 @@ validation/copying before attributing these costs to viewport painting. Cold
 layout and middle edits still process substantial document content. Actual font
 providers, Unicode, long lines, wrapping, folds, multiple selections, search,
 IME, renderer execution and GPU presentation need separate measurements.
+
+## Validated ASCII model-motion change
+
+The follow-up change routes Edit model grapheme motion through the existing
+validated-buffer helpers already used for grapheme erasure. Adjacent ASCII
+scalars admit a local answer, with CR/LF handled as one cluster. Non-ASCII
+context still uses the complete Unicode grapheme scan. The standalone public
+`cui_grapheme_*` functions retain whole-input validation and their behavior for
+malformed UTF-8 and arbitrary offsets. This does not introduce a Unicode
+backward scan or a new segmentation algorithm.
+
+The same executable source, flags, document sizes and machine produced these
+Left-key medians after the change: 0.116 ms at 2K lines, 0.179 ms at 20K, and
+0.182 ms at 200K (200K range 0.165–0.193 ms). Raw samples are in
+[editor-operations-ascii-motion-2026-10-18.csv](editor-operations-ascii-motion-2026-10-18.csv).
+These sequential runs are illustrative, without a controlled machine load;
+the removed whole-document scan is also evident from the code path. Tail and
+middle insertion medians at 200K remain 21.946 and 43.101 ms. Unicode navigation
+and ordinary edits can still scale with document size.
+
+`test_model_grapheme_motion` compares model previous/next motion against the
+public segmenter at every scalar offset of every pinned Unicode grapheme test
+case, surrounded by ASCII context. It includes offsets within clusters,
+extended selections, and CR/LF selection collapse. Existing malformed-input
+and byte-interior public API tests remain in force.

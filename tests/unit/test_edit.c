@@ -403,6 +403,47 @@ static void test_grapheme_conformance(void) {
     assert(cui_grapheme_previous(text, 1) == SIZE_MAX);
     assert(cui_grapheme_next(text, 3) == SIZE_MAX);
 }
+/* Compare model motion to the independently validated public segmentation at
+ * every scalar offset, including offsets inside clusters and CR/LF. */
+static void test_model_grapheme_motion(void) {
+    for (size_t i = 0; i < sizeof grapheme_cases / sizeof grapheme_cases[0]; ++i) {
+        size_t length = grapheme_cases[i].length;
+        char buffer[1024];
+        assert(length + 5 < sizeof buffer);
+        memcpy(buffer, "ab\n", 3);
+        memcpy(buffer + 3, grapheme_cases[i].text, length);
+        memcpy(buffer + 3 + length, "xy", 3);
+        cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+            .capacity = sizeof buffer, .multiline = true});
+        assert(edit);
+        cui_str text = cui_edit_get_text(edit);
+        for (size_t offset = 0; offset <= text.length; ++offset) {
+            if (offset < text.length && ((unsigned char)buffer[offset] & 0xc0u) == 0x80u)
+                continue;
+            size_t previous = cui_grapheme_previous(text, offset);
+            size_t next = cui_grapheme_next(text, offset);
+            assert(cui_edit_select(edit, offset, offset) == CUI_EDIT_OK);
+            assert(cui_edit_move(edit, CUI_EDIT_GRAPHEME_PREVIOUS, false) == CUI_EDIT_OK);
+            assert(cui_edit_get_state(edit).cursor == previous);
+            assert(cui_edit_select(edit, offset, offset) == CUI_EDIT_OK);
+            assert(cui_edit_move(edit, CUI_EDIT_GRAPHEME_NEXT, true) == CUI_EDIT_OK);
+            assert(cui_edit_get_state(edit).cursor == next);
+            assert(cui_edit_get_state(edit).anchor == offset);
+        }
+        cui_edit_destroy(edit);
+    }
+    /* Collapsing a scalar selection inside CRLF snaps to the outer cluster. */
+    char buffer[] = "ab\r\ncd";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+        .capacity = sizeof buffer, .multiline = true});
+    assert(edit && cui_edit_select(edit, 3, 5) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_GRAPHEME_PREVIOUS, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 2);
+    assert(cui_edit_select(edit, 1, 3) == CUI_EDIT_OK);
+    assert(cui_edit_move(edit, CUI_EDIT_GRAPHEME_NEXT, false) == CUI_EDIT_OK);
+    assert(cui_edit_get_state(edit).cursor == 4);
+    cui_edit_destroy(edit);
+}
 static void test_grapheme_editing(void) {
     const char *clusters[] = {"é", "👩🏽‍💻", "🇨🇭", "क्‍ष", "\r\n", "각"};
     for (size_t i = 0; i < sizeof clusters / sizeof clusters[0]; i++) {
@@ -1470,6 +1511,7 @@ int main(void) {
     test_word_conformance();
     test_grapheme_conformance();
     test_grapheme_editing();
+    test_model_grapheme_motion();
     test_composition_keys();
     test_word_and_vertical_navigation();
     test_atomic_range();

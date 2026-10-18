@@ -532,6 +532,15 @@ plus 400,000 document bytes. These are single-run CPU measurements; host font
 providers, document content, and load change the results. No 60 Hz guarantee
 follows from this headless workload.
 
+The actual Editor workload (gutter, highlight callback, 80-byte lines, keyboard
+input, wheel scrolling and pointer dispatch) and raw 2K/20K/200K samples are in
+[the Editor operations benchmark](benchmarks/EDITOR_OPERATIONS.md). Model ASCII
+grapheme navigation reuses validated-buffer local helpers, including CR/LF
+handling; non-ASCII context retains the full Unicode scan. Public grapheme
+utilities still validate the whole input. Document editing/history and affected
+layout rebuilding can remain linear; these measurements do not establish
+Unicode navigation or renderer performance guarantees.
+
 Consecutive interactive text or same-direction grapheme deletion batches with
 unchanged cursor collection coalesce by intent into one Undo step, up to 1000
 cursor changes. Newlines, navigation, selection changes, folds, clipboard

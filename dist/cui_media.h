@@ -219,6 +219,7 @@ cui_attachment_group_result cui_attachment_group(cui_context *, cui_id,
 
 #if defined(CUI_MEDIA_IMPLEMENTATION) && defined(CUI_MEDIA_DECLARATIONS_READY) && !defined(CUI_MEDIA_IMPLEMENTATION_ONCE)
 #define CUI_MEDIA_IMPLEMENTATION_ONCE
+#include "cui_media_events.h"
 /* src/base/cui_media.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -646,10 +647,74 @@ cui_image_result cui_image(cui_context *ui, cui_id id, cui_image_state *state,
         cui_invalidate(ui);
     return result;
 }
+typedef struct {
+    cui_component_event_metadata evidence;
+    unsigned matches; /* Saturates at two: unique versus aggregate ambiguity. */
+    bool missing;
+} cui_media_action_slot;
+typedef struct {
+    cui_id id;
+    uint64_t frame;
+    cui_attachment_handler handler;
+    cui_attachment_event_result *result;
+    cui_media_action_slot slots[3];
+} cui_media_action_observer;
+static void cui_media_action_capture(cui_context *ui, cui_media_action_observer *observer,
+                                     cui_attachment_action action, cui_id control, bool activated) {
+    if (!observer || !observer->frame || !activated)
+        return;
+    cui_media_action_slot *slot = &observer->slots[action];
+    size_t count;
+    (void)cui_frame_events(ui, &count);
+    bool found = false;
+    for (size_t e = 0; e < count; ++e) {
+        if (cui_event_accepted_activation(ui, e) != control)
+            continue;
+        found = true;
+        if (slot->matches < 2)
+            ++slot->matches;
+        cui_activation_snapshot snapshot;
+        cui_component_event_metadata evidence;
+        if (slot->matches == 1 && cui_event_activation_snapshot(ui, e, &snapshot) &&
+            cui_component_event_from_activation(&evidence, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+            slot->evidence = evidence;
+            slot->evidence.target = observer->id;
+        } else
+            slot->missing = true;
+    }
+    if (!found)
+        slot->missing = true;
+}
+static void cui_media_action_notify(cui_media_action_observer *observer, cui_attachment_action action) {
+    if (!observer || !observer->frame)
+        return;
+    cui_attachment_event_fn handler = action == CUI_ATTACHMENT_ACTION_OPEN ? observer->handler.on_activate
+                                      : action == CUI_ATTACHMENT_ACTION_REMOVE ? observer->handler.on_remove
+                                                                              : observer->handler.on_retry;
+    if (!handler)
+        return;
+    cui_media_action_slot slot = observer->slots[action];
+    if (slot.matches != 1 || slot.missing) {
+        (void)cui_component_event_init(&slot.evidence, CUI_COMPONENT_EVENT_ACTIVATE, observer->id,
+                                      CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        slot.evidence.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+        slot.evidence.frame_sequence = observer->frame;
+    }
+    cui_attachment_action_event event = {slot.evidence, action};
+    handler(observer->handler.user, &event);
+    if (action == CUI_ATTACHMENT_ACTION_OPEN)
+        ++observer->result->activation_count;
+    else if (action == CUI_ATTACHMENT_ACTION_REMOVE)
+        ++observer->result->remove_count;
+    else
+        ++observer->result->retry_count;
+}
 static bool cui_media_control(cui_context *ui, const cui_theme *theme, cui_id id, cui_str label,
                               cui_str glyph, cui_color fg, cui_color bg, cui_color border,
-                              float size, float font) {
+                              float size, float font, cui_media_action_observer *observer,
+                              cui_attachment_action action) {
     cui_interaction interaction = cui_interact(ui, id, CUI_ROLE_BUTTON, label, false, false, 0);
+    cui_media_action_capture(ui, observer, action, id, interaction.activated);
     cui_begin_box(ui, id,
                   (cui_box){.width = size,
                             .height = size,
@@ -698,7 +763,8 @@ static void cui_media_busy(cui_context *ui, cui_id id, const cui_theme *t, cui_a
 }
 static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
                                cui_attachment_state *state, cui_attachment_options o,
-                               cui_attachment_plan p, float width, cui_attachment_result *result) {
+                               cui_attachment_plan p, float width, cui_attachment_result *result,
+                               cui_media_action_observer *observer) {
     cui_begin_box(ui, id, (cui_box){.width = width, .gap = 2, .clip = true});
     bool retry_used = false;
     for (size_t i = 0; i < o.child_count; i++) {
@@ -751,6 +817,7 @@ static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
             cui_id retry_id = cui_media_id(cui_attachment_retry_id(id), i + 1);
             cui_interaction action =
                 cui_interact(ui, retry_id, CUI_ROLE_LINK, o.retry_label, false, false, 0);
+            cui_media_action_capture(ui, observer, CUI_ATTACHMENT_ACTION_RETRY, retry_id, action.activated);
             cui_begin_box(ui, retry_id, (cui_box){.height = font * 1.25f});
             cui_text(ui, o.retry_label, font, t->primary);
             cui_end_box(ui);
@@ -816,8 +883,9 @@ static void cui_media_card_treatment(cui_context *ui, cui_id id, cui_rect b, cui
                 cui_end_box(ui);
             }
 }
-cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme *t,
-                                     cui_attachment_state *state, cui_attachment_options o) {
+static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t,
+                                     cui_attachment_state *state, cui_attachment_options o,
+                                     cui_media_action_observer *observer) {
     cui_attachment_result r = {0};
     if (!ui || !id || !t || !state || !isfinite(t->radius) || t->radius < 0 ||
         (o.name.length && !o.name.data) || (o.remove_label.length && !o.remove_label.data) ||
@@ -845,8 +913,8 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
     o.model.actions = o.actions != NULL;
     o.model.image = o.image_state && o.image_loader;
     o.model.media = o.model.media || o.model.image || o.media_content;
-    o.model.remove = o.on_remove != NULL;
-    o.model.retry = o.on_retry != NULL;
+    o.model.remove = o.on_remove != NULL || (observer && observer->handler.on_remove);
+    o.model.retry = o.on_retry != NULL || (observer && observer->handler.on_retry);
     o.model.hovered = cui_hover_within(ui, id);
     if (!cui_base_attachment(o.model, &r.plan))
         return r;
@@ -867,13 +935,14 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
         r.plan.width = p.width;
     }
     float radius = o.model.size == CUI_MEDIA_XSMALL ? t->radius : t->radius * 1.5f;
-    bool click = o.model.identified && o.on_click;
+    bool click = o.model.identified && (o.on_click || (observer && observer->handler.on_activate));
     cui_interaction root = cui_interact(ui, id, CUI_ROLE_GROUP, o.name, false, false, 0);
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.pointer_activatable = click,
                                .busy = cui_attachment_in_progress(o.model.status)});
     r.clicked = click && root.activated;
+    cui_media_action_capture(ui, observer, CUI_ATTACHMENT_ACTION_OPEN, id, r.clicked);
     cui_begin_box(ui, cui_media_id(id, 1), (cui_box){.width = p.width + p.overhang});
     cui_begin_box(ui, cui_media_id(id, 9), (cui_box){.height = p.overhang, .fixed_height = true});
     cui_end_box(ui);
@@ -948,7 +1017,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
             else if (p.retry_media)
                 r.retried |= cui_media_control(ui, t, cui_attachment_retry_id(id), o.retry_label,
                                                cui_string("refresh-cw"), t->danger, t->background,
-                                               (cui_color){0}, 24, 12);
+                                               (cui_color){0}, 24, 12, observer, CUI_ATTACHMENT_ACTION_RETRY);
             else if (p.rejection)
                 (void)cui_icon_named(ui, cui_media_id(media_id, 88), t, cui_string("ban"),
                                      (cui_icon_options){.size = CUI_ICON_CUSTOM,
@@ -976,7 +1045,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                                              (o.model.media ? p.metrics.media + p.metrics.gap : 0) -
                                              (o.actions ? o.actions_width + p.metrics.gap : 0));
     if (o.model.content)
-        cui_media_metadata(ui, cui_media_id(id, 4), t, state, o, p, content_width, &r);
+        cui_media_metadata(ui, cui_media_id(id, 4), t, state, o, p, content_width, &r, observer);
     if (!o.model.vertical && o.model.content && o.actions) {
         cui_begin_box(ui, cui_media_id(id, 14),
                       (cui_box){.width = p.metrics.gap, .fixed_width = true});
@@ -1020,7 +1089,7 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                          (cui_rect){b.x + b.w - 14, b.y - 6, 20, 20}, 4);
         r.removed =
             cui_media_control(ui, t, cui_attachment_remove_id(id), o.remove_label,
-                              cui_string("close"), t->text, t->background, t->border, 20, 10);
+                              cui_string("close"), t->text, t->background, t->border, 20, 10, observer, CUI_ATTACHMENT_ACTION_REMOVE);
         cui_end_box(ui);
     }
     if (o.model.identified && o.tooltip.length) {
@@ -1029,14 +1098,41 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
         tooltip.dt = o.delta_seconds;
         cui_tooltip(ui, cui_media_id(id, 12), t, &state->tooltip, o.tooltip, tooltip);
     }
-    if (r.clicked)
-        o.on_click(o.action_user, id);
-    if (r.removed)
-        o.on_remove(o.action_user, id);
-    if (r.retried)
-        o.on_retry(o.action_user, id);
+    if (r.clicked) {
+        if (o.on_click)
+            o.on_click(o.action_user, id);
+        cui_media_action_notify(observer, CUI_ATTACHMENT_ACTION_OPEN);
+    }
+    if (r.removed) {
+        if (o.on_remove)
+            o.on_remove(o.action_user, id);
+        cui_media_action_notify(observer, CUI_ATTACHMENT_ACTION_REMOVE);
+    }
+    if (r.retried) {
+        if (o.on_retry)
+            o.on_retry(o.action_user, id);
+        cui_media_action_notify(observer, CUI_ATTACHMENT_ACTION_RETRY);
+    }
     cui_end_focus_scope(ui);
     return r;
+}
+
+cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme *theme,
+                                     cui_attachment_state *state, cui_attachment_options options) {
+    return cui_attachment_common(ui, id, theme, state, options, NULL);
+}
+cui_attachment_event_result cui_attachment_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_attachment_state *state,
+    cui_attachment_options options, cui_attachment_handler handler) {
+    cui_attachment_event_result result = {0};
+    if (!handler.on_activate && !handler.on_remove && !handler.on_retry) {
+        result.control = cui_attachment(ui, id, theme, state, options);
+        return result;
+    }
+    cui_media_action_observer observer = {.id = id, .handler = handler, .result = &result};
+    observer.frame = cui_frame_paint_enabled(ui) ? cui_frame_sequence(ui) : 0;
+    result.control = cui_attachment_common(ui, id, theme, state, options, &observer);
+    return result;
 }
 
 static float cui_media_transition(float value, float *start, float *target, double *epoch,

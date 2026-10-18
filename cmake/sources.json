@@ -228,7 +228,8 @@
     "cui_tree_events": [],
     "cui_table_events": [],
     "cui_settings_events": [],
-    "cui_sidebar_events": []
+    "cui_sidebar_events": [],
+    "cui_media_events": []
   },
   "native": {
     "text": [

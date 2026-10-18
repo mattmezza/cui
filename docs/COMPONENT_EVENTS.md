@@ -124,6 +124,11 @@ number and choice fields plus committed text revisions. Explicit programmatic an
 
 [TimeField events](TIME_FIELD_EVENTS.md) report zero or one final typed time
 change after the complete Base/Styled operation; draft/focus changes are separate.
-[Sidebar events](SIDEBAR_EVENTS.md) currently report each row invocation after
-legacy callbacks. Expansion, collapse and header/footer actions remain separate
-slices; no generic TREEITEM accessibility activation support is implied.
+[Sidebar events](SIDEBAR_EVENTS.md) report each row invocation and distinguish
+controlled expansion REQUEST from actual uncontrolled CHANGE after legacy callbacks.
+Collapse and header/footer actions remain separate slices; no generic TREEITEM accessibility activation support is implied.
+
+
+[Attachment actions](ATTACHMENT_EVENTS.md) observe OPEN/REMOVE/RETRY at the
+original category callback seams, with aggregate zero/one counts per category.
+They report requested host actions, not completed deletion/upload work.

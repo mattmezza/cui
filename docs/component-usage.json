@@ -73,7 +73,8 @@
     },
     {
       "api_symbols": [
-        "cui_attachment"
+        "cui_attachment",
+        "cui_attachment_events"
       ],
       "state_types": [
         "cui_attachment_model",
@@ -83,7 +84,8 @@
       "interaction": "cui_attachment_result reports actions; cui_attachment_action_fn receives remove/retry activation.",
       "usage": "Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks.",
       "docs": [
-        "docs/MEDIA.md"
+        "docs/MEDIA.md",
+        "docs/ATTACHMENT_EVENTS.md"
       ],
       "callback_symbols": [
         "cui_attachment_action_fn",

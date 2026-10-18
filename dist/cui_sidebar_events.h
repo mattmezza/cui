@@ -15,20 +15,32 @@ typedef struct {
 } cui_sidebar_activation;
 typedef void (*cui_sidebar_activation_fn)(void *, const cui_sidebar_activation *);
 typedef struct {
+    cui_component_event_metadata event;
+    cui_id item;
+    unsigned level;
+    bool previous, value;
+} cui_sidebar_expansion_event;
+typedef void (*cui_sidebar_expansion_fn)(void *, const cui_sidebar_expansion_event *);
+typedef struct {
     cui_sidebar_activation_fn on_activate;
     void *user;
+    cui_sidebar_expansion_fn on_expand_request, on_expand_change;
 } cui_sidebar_item_handler;
 typedef struct {
     cui_sidebar_item_result control;
     size_t activation_count; /* Actual observer calls; missing observer means zero. */
     bool valid, count_overflow;
+    size_t request_count, change_count;
 } cui_sidebar_item_event_result;
 typedef struct {
     bool valid, submitted, count_overflow;
     size_t activation_count;
+    size_t request_count, change_count;
 } cui_sidebar_menu_event_result;
-/* No retained handler; no expansion/collapse/header/footer events in this slice.
- * Typed observers must not mutate active item/input storage, recurse or destroy ui. */
+/* No retained handler; collapse/header/footer events remain separate.
+ * Only a controlled REQUEST observer may assign its explicit expanded bool.
+ * Other active item/input mutation, recursive composition and ui destruction are unsupported.
+ * Expansion fields extend an unreleased branch API: rebuild all consumers. */
 cui_sidebar_item_event_result cui_base_sidebar_item_events(cui_context *,
                                                            const cui_sidebar_menu_item *,
                                                            bool collapsed, unsigned level,

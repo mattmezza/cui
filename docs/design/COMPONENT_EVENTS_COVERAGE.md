@@ -193,9 +193,10 @@ reviewable. None of these additions promotes a parity level.
 | [Collapsible and Accordion](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
 | [List and ToggleGroup](../LIST_EVENTS.md) | Ordered single-ID or per-item bool transitions; List observes after legacy activation/confirmation callbacks. | Same-item confirmation is separate; ToggleGroup preserves intermediate sibling closures. |
 | [Tree](../TREE_EVENTS.md) | Each applied selection and expansion transition and every row invocation. | Observer sees intermediate cursor/focus/semantic state; model mutation during callback is unsupported. |
-| [DataTable](../TABLE_EVENTS.md) | Per-transition sort, single selection, exact multi-set snapshots and column width/move observations. | Scalar selection observers reject multi mode; separate set API requires bounded exclusive caller workspace. |
+| [DataTable](../TABLE_EVENTS.md) | Per-transition sort, single selection, exact multi-set snapshots, column width/move, activation and context requests. | Scalar selection observers reject multi mode; separate set API requires bounded exclusive caller workspace. |
+| [Attachment](../ATTACHMENT_EVENTS.md) | OPEN/REMOVE/RETRY after corresponding legacy callback in fixed category order. | Each category coalesces to zero/one; host work completion is not implied. |
 | [TimeField](../TIME_FIELD_EVENTS.md) | Final typed time CHANGE after the whole Base/Styled operation. | Aggregate zero/one notification; no draft, submit or per-input cause claim. |
-| [Sidebar](../SIDEBAR_EVENTS.md) | Each row invocation after legacy callbacks, before later paint. | Expansion/collapse and header/footer are separate slices; TREEITEM accessibility activation remains unsupported. |
+| [Sidebar](../SIDEBAR_EVENTS.md) | Each row invocation plus controlled expansion REQUEST and uncontrolled CHANGE after legacy callbacks, before later paint. | Collapse and header/footer are separate slices; TREEITEM accessibility activation remains unsupported. |
 | [Settings](../SETTINGS_EVENTS.md) | Applied navigation plus built-in bool/double/choice owner changes and committed text revisions after legacy callbacks, including explicit RESET. | Filter reconciliation is silent; custom reset hooks keep their existing untyped contract. |
 
 Counts summarize actual observer invocations except where a guide explicitly

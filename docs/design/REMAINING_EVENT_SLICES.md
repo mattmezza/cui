@@ -128,8 +128,7 @@ The landed [V1 notifications](../BRIDGE_NOTIFICATIONS.md) and
 (activation, applied boolean/table changes and surface close outcomes), preserving
 legacy queues/timing. They do not expose native synchronous controlled requests,
 Slider phases, Input per-event observers or multiline observers. The separate [opt-in C value poll](../BRIDGE_VALUE_NOTIFICATIONS.md) additionally
-classifies its explicit scalar/text/selection allowlists; Python/JS/TypeScript/Go owning value wrappers are implemented; Rust remains
-in progress. Other payloads remain legacy; typed C facades alone do not complete Python/JS/TS/Go/Rust coverage.
+classifies its explicit scalar/text/selection allowlists; Python/JS/TypeScript/Go/Rust owning value wrappers are implemented. Other payloads remain legacy; typed C facades alone do not complete Python/JS/TS/Go/Rust coverage.
 Do not retime queued handlers into rejectable requests. Future slices need tagged
 owned payloads, bounded queue/copy behavior, full-width IDs/frame values, handler
 retention/removal, exception/panic containment and stale-object tests. Follow

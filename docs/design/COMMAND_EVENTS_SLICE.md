@@ -337,3 +337,21 @@ oldquery NULL and oldquery itself, with observer-owned copies before either edit
 ASan additionally checks allocation actually moved. Legacy-only/new paired traces
 preserve redirects, action identity and old bool/state semantics. No Styled,
 Core, dispatch, build wiring, generated SDK or binding edits in this slice.
+
+### Styled implementation checkpoint
+
+Implemented independently after Base review: private cause context shared through
+`src/base/cui_command_events_private.h`, with globally unique
+`cui_command_events_private_*` seams for amalgamation. Public Base entrypoints
+still create only contextless PROGRAMMATIC observers. Styled uses the same actual
+reducers once, preserving early query ordering, legacy paint/callback/focus/consume,
+leading passive PROGRAMMATIC rebuilds and late-error progress. Added implemented
+cancel type/field/count and Styled declaration, no reserved field.
+
+Focused paired tests cover keyboard multiplicity, aggregate query/clear/cancel,
+custom content consuming pointer evidence, legacy selection redirects and actual
+confirmed identity, unique/ambiguous row activations, actual OPTION accessibility
+FOCUS/ACTIVATE eligibility, disabled/loading/inert/layout-only, leading and input
+rebuild notifications before geometry failure. Existing Base realloc regressions
+remain in the same strict/sanitizer test. No Core/dispatch/role/wiring/generator or
+foreign schema changes. Root must inline the new private header in amalgamation.

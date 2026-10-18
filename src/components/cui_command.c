@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_command.h"
+#include "../base/cui_command_events_private.h"
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
 #include "cui/cui_icon.h"
@@ -73,15 +73,51 @@ static bool cui_command_geometry(cui_context *ui, cui_command_state *s, float co
     *out = total;
     return true;
 }
-bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_state *s,
-                 const cui_command_entry *entries, size_t n, cui_command_options o) {
+static cui_component_event_metadata cui_command_styled_events_frame(cui_context *ui, cui_id id) {
+    cui_component_event_metadata event = {0};
+    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_CHANGE, id,
+                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    event.frame_sequence = cui_frame_sequence(ui);
+    if (event.frame_sequence)
+        event.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+    return event;
+}
+static void cui_command_styled_events_cause(cui_command_events_private_observer *observer,
+                                            cui_component_event_metadata cause) {
+    if (observer) {
+        observer->cause = cause;
+        observer->has_cause = true;
+        observer->suppress = !(cause.flags & CUI_COMPONENT_EVENT_HAS_FRAME);
+    }
+}
+static cui_component_event_metadata cui_command_styled_events_row(cui_context *ui, cui_id id,
+                                                                  cui_id row) {
+    cui_component_event_metadata cause = cui_command_styled_events_frame(ui, id);
+    size_t count = 0, matches = 0;
+    (void)cui_frame_events(ui, &count);
+    cui_activation_snapshot snapshot = {0};
+    for (size_t i = 0; i < count; ++i)
+        if (cui_event_accepted_activation(ui, i) == row) {
+            if (++matches == 1)
+                (void)cui_event_activation_snapshot(ui, i, &snapshot);
+        }
+    if (matches == 1 &&
+        cui_component_event_from_activation(&cause, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot))
+        cause.target = id;
+    return cause;
+}
+static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const cui_theme *t,
+                                             cui_command_state *s, const cui_command_entry *entries,
+                                             size_t n, cui_command_options o,
+                                             cui_command_events_private_observer *observer) {
+
     if (!ui || !id || !t || !s || !s->query || !isfinite(o.width) || !isfinite(o.max_height) ||
         o.max_height <= 0 || o.width == 0)
         return false;
     cui_str q = cui_edit_get_text(s->query);
     uint64_t hash = cui_command_hash(q);
     bool changed = s->initialized && hash != s->query_hash;
-    if (!cui_command_rebuild(s, entries, n, q, changed, o))
+    if (!cui_command_events_private_rebuild(s, entries, n, q, changed, o, observer))
         return false;
     s->query_hash = hash;
     float density = t->font_size / 16;
@@ -161,8 +197,9 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
         cui_end_box(ui);
         cui_end_box(ui);
         if (result.changed) {
+            cui_command_styled_events_cause(observer, cui_command_styled_events_frame(ui, id));
             q = cui_edit_get_text(s->query);
-            if (!cui_command_rebuild(s, entries, n, q, true, o)) {
+            if (!cui_command_events_private_rebuild(s, entries, n, q, true, o, observer)) {
                 cui_end_box(ui);
                 cui_end_focus_scope(ui);
                 return false;
@@ -216,6 +253,8 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
                                  : id ^ UINT64_C(0x90cc548000000000) ^ (uint64_t)i;
             bool selected = s->selected == i && r->item && !r->item->disabled;
             cui_interaction interaction = {0};
+            cui_component_event_metadata row_cause = {0};
+            cui_command_index interaction_index = r->index;
             if (r->item) {
                 interaction = cui_interact(ui, row, CUI_ROLE_OPTION, r->item->label,
                                            o.disabled || r->item->disabled, selected, 0);
@@ -225,10 +264,15 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
                                                                 .pos_in_set = position,
                                                                 .set_size = s->matched_count});
                 cui_set_tab_stop(ui, row, false);
+                if (observer && interaction.activated)
+                    row_cause = cui_command_styled_events_row(ui, id, row);
                 if (interaction.hovered && !o.disabled && !r->item->disabled) {
                     hovered = row;
-                    if (s->hovered_row != row)
-                        (void)cui_command_select(s, r->index, false, o);
+                    if (s->hovered_row != row) {
+                        cui_command_styled_events_cause(observer,
+                                                        cui_command_styled_events_frame(ui, id));
+                        (void)cui_command_events_private_select(s, r->index, false, o, observer);
+                    }
                 }
                 selected = s->selected == i && !r->item->disabled;
             }
@@ -291,8 +335,15 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
             cui_end_box(ui);
             cui_end_box(ui);
             if (interaction.activated && !o.disabled) {
-                (void)cui_command_select(s, r->index, false, o);
-                (void)cui_command_confirm(s, o);
+                cui_command_styled_events_cause(observer, row_cause);
+                (void)cui_command_events_private_select(s, r->index, false, o, observer);
+                cui_command_index confirmed;
+                if (observer && cui_command_selected(s, &confirmed) &&
+                    !cui_command_index_equal(interaction_index, confirmed)) {
+                    observer->cause.flags &= ~CUI_COMPONENT_EVENT_HAS_ACTIVATION;
+                    memset(&observer->cause.activation, 0, sizeof observer->cause.activation);
+                }
+                (void)cui_command_events_private_confirm(s, o, observer);
                 cui_command_focus(ui, id, o);
             }
         }
@@ -315,27 +366,61 @@ bool cui_command(cui_context *ui, cui_id id, const cui_theme *t, cui_command_sta
             const cui_event *e = &events[i];
             if (cui_event_consumed(ui, i) || e->type != CUI_EVENT_KEY_DOWN || e->modifiers)
                 continue;
+            cui_component_event_metadata cause = cui_command_styled_events_frame(ui, id);
+            if (cause.flags & CUI_COMPONENT_EVENT_HAS_FRAME) {
+                (void)cui_component_event_set_frame_index(&cause, cause.frame_sequence, i);
+                cause.source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                cause.flags |= CUI_COMPONENT_EVENT_HAS_SOURCE;
+            }
+            cui_command_styled_events_cause(observer, cause);
             if (e->key == CUI_KEY_UP || e->key == CUI_KEY_DOWN) {
-                (void)cui_command_move(s, e->key == CUI_KEY_DOWN, o);
+                (void)cui_command_events_private_move(s, e->key == CUI_KEY_DOWN, o, observer);
                 (void)cui_consume_event(ui, i);
                 cui_invalidate(ui);
             } else if (e->key == CUI_KEY_ENTER) {
-                (void)cui_command_confirm(s, o);
+                (void)cui_command_events_private_confirm(s, o, observer);
                 (void)cui_consume_event(ui, i);
             } else if (e->key == CUI_KEY_ESCAPE) {
                 q = cui_edit_get_text(s->query);
                 if (o.searchable && q.length) {
                     (void)cui_edit_select(s->query, 0, q.length);
                     (void)cui_edit_insert(s->query, cui_string(""));
-                    (void)cui_command_rebuild(s, entries, n, cui_edit_get_text(s->query), true, o);
+                    (void)cui_command_events_private_rebuild(
+                        s, entries, n, cui_edit_get_text(s->query), true, o, observer);
                     s->query_hash = cui_command_hash(cui_edit_get_text(s->query));
                     (void)cui_consume_event(ui, i);
                     cui_invalidate(ui);
-                } else if (o.on_cancel)
-                    o.on_cancel(o.user);
+                } else if (o.on_cancel || (observer && observer->handler.on_cancel)) {
+                    cui_command_cancel_request request = {cause};
+                    request.event.kind = CUI_COMPONENT_EVENT_REQUEST;
+                    if (o.on_cancel)
+                        o.on_cancel(o.user);
+                    if (observer && !observer->suppress && observer->handler.on_cancel) {
+                        if (observer->result.cancel_request_count == SIZE_MAX)
+                            observer->result.count_overflow = true;
+                        else
+                            observer->result.cancel_request_count++;
+                        observer->handler.on_cancel(observer->handler.user, &request);
+                    }
+                }
             }
         }
     cui_end_box(ui);
     cui_end_focus_scope(ui);
     return true;
+}
+
+bool cui_command(cui_context *ui, cui_id id, const cui_theme *theme, cui_command_state *state,
+                 const cui_command_entry *entries, size_t count, cui_command_options options) {
+    return cui_command_styled_events_common(ui, id, theme, state, entries, count, options, NULL);
+}
+cui_command_event_result cui_command_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                            cui_command_state *state,
+                                            const cui_command_entry *entries, size_t count,
+                                            cui_command_options options,
+                                            cui_command_event_handler handler) {
+    cui_command_events_private_observer observer = {.target = id, .handler = handler};
+    observer.result.control =
+        cui_command_styled_events_common(ui, id, theme, state, entries, count, options, &observer);
+    return observer.result;
 }

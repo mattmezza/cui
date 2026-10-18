@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_command_events.h"
+#include "cui_command_events_private.h"
 #include <ctype.h>
 #include <math.h>
 #include <string.h>
@@ -79,33 +79,36 @@ static bool cui_command_match(const cui_command_item *i, cui_str q, cui_command_
     return !o.searchable || !o.filterable ||
            (o.matches ? o.matches(i, q, o.match_user) : cui_command_matches(i, q));
 }
-typedef struct {
-    cui_id target;
-    cui_command_event_handler handler;
-    cui_command_event_result result;
-} cui_command_observer;
-static cui_component_event_metadata cui_command_metadata(cui_id target,
-                                                         cui_component_event_kind kind) {
+static cui_component_event_metadata
+cui_command_events_private_metadata(const cui_command_events_private_observer *observer,
+                                    cui_component_event_kind kind) {
     cui_component_event_metadata event = {0};
-    (void)cui_component_event_init(&event, kind, target, CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC);
+    if (observer->has_cause) {
+        event = observer->cause;
+        event.kind = kind;
+    } else
+        (void)cui_component_event_init(&event, kind, observer->target,
+                                       CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC);
     return event;
 }
-static void cui_command_count(size_t *count, bool *overflow) {
+static void cui_command_events_private_count(size_t *count, bool *overflow) {
     if (*count == SIZE_MAX)
         *overflow = true;
     else
         ++*count;
 }
-static void cui_command_notify_selection(cui_command_observer *observer,
-                                         const cui_command_selection_change *change) {
-    if (!observer || !observer->handler.on_selection)
+static void
+cui_command_events_private_notify_selection(cui_command_events_private_observer *observer,
+                                            const cui_command_selection_change *change) {
+    if (!observer || observer->suppress || !observer->handler.on_selection)
         return;
-    cui_command_count(&observer->result.selection_count, &observer->result.count_overflow);
+    cui_command_events_private_count(&observer->result.selection_count,
+                                     &observer->result.count_overflow);
     observer->handler.on_selection(observer->handler.user, change);
 }
-static bool cui_command_rebuild_common(cui_command_state *s, const cui_command_entry *entries,
-                                       size_t n, cui_str q, bool changed, cui_command_options o,
-                                       cui_command_observer *observer) {
+bool cui_command_events_private_rebuild(cui_command_state *s, const cui_command_entry *entries,
+                                        size_t n, cui_str q, bool changed, cui_command_options o,
+                                        cui_command_events_private_observer *observer) {
     if (!s || !s->rows || !s->capacity || s->capacity > CUI_COMMAND_LIMIT ||
         n > CUI_COMMAND_LIMIT || (n && !entries) || !cui_command_str_valid(q))
         return false;
@@ -200,29 +203,32 @@ static bool cui_command_rebuild_common(cui_command_state *s, const cui_command_e
         changed && cui_command_selected(s, &now) && (!had || !cui_command_index_equal(old, now));
     cui_command_selection_change selection = {0};
     if (observer) {
-        selection.event = cui_command_metadata(observer->target, CUI_COMPONENT_EVENT_CHANGE);
+        selection.event = cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_CHANGE);
         selection.has_previous = had;
         selection.previous = old;
         selection.value = now;
         /* Borrowed query must be observed before either legacy hook can replace it. */
-        if (changed && o.searchable && observer->handler.on_query) {
+        if (changed && o.searchable && !observer->suppress && observer->handler.on_query) {
             cui_command_query_change query = {
-                cui_command_metadata(observer->target, CUI_COMPONENT_EVENT_CHANGE), raw_query};
-            cui_command_count(&observer->result.query_count, &observer->result.count_overflow);
+                cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_CHANGE),
+                raw_query};
+            cui_command_events_private_count(&observer->result.query_count,
+                                             &observer->result.count_overflow);
             observer->handler.on_query(observer->handler.user, &query);
         }
     }
     if (selection_changed) {
         if (o.on_select)
             o.on_select(now, o.user);
-        cui_command_notify_selection(observer, &selection);
+        cui_command_events_private_notify_selection(observer, &selection);
     }
     if (changed && o.searchable && o.on_query)
         o.on_query(raw_query, o.user);
     return true;
 }
-static bool cui_command_select_common(cui_command_state *s, cui_command_index index, bool scroll,
-                                      cui_command_options o, cui_command_observer *observer) {
+bool cui_command_events_private_select(cui_command_state *s, cui_command_index index, bool scroll,
+                                       cui_command_options o,
+                                       cui_command_events_private_observer *observer) {
     if (!s)
         return false;
     for (size_t i = 0; i < s->row_count; ++i)
@@ -232,7 +238,8 @@ static bool cui_command_select_common(cui_command_state *s, cui_command_index in
                 return false;
             cui_command_selection_change change = {0};
             if (observer) {
-                change.event = cui_command_metadata(observer->target, CUI_COMPONENT_EVENT_CHANGE);
+                change.event =
+                    cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_CHANGE);
                 change.has_previous = cui_command_selected(s, &change.previous);
                 change.value = index;
             }
@@ -241,7 +248,7 @@ static bool cui_command_select_common(cui_command_state *s, cui_command_index in
             s->pending_scroll = scroll;
             if (o.on_select)
                 o.on_select(index, o.user);
-            cui_command_notify_selection(observer, &change);
+            cui_command_events_private_notify_selection(observer, &change);
             return true;
         }
     return false;
@@ -253,20 +260,20 @@ void cui_command_clear_selection(cui_command_state *s) {
         s->pending_scroll = false;
     }
 }
-static bool cui_command_move_common(cui_command_state *s, bool forward, cui_command_options o,
-                                    cui_command_observer *observer) {
+bool cui_command_events_private_move(cui_command_state *s, bool forward, cui_command_options o,
+                                     cui_command_events_private_observer *observer) {
     if (!s || !s->row_count)
         return false;
     size_t i = s->selected < s->row_count ? s->selected : forward ? s->row_count - 1 : 0;
     for (size_t k = 0; k < s->row_count; ++k) {
         i = forward ? (i + 1) % s->row_count : (i + s->row_count - 1) % s->row_count;
         if (s->rows[i].item && !s->rows[i].item->disabled)
-            return cui_command_select_common(s, s->rows[i].index, true, o, observer);
+            return cui_command_events_private_select(s, s->rows[i].index, true, o, observer);
     }
     return false;
 }
-static bool cui_command_confirm_common(cui_command_state *s, cui_command_options o,
-                                       cui_command_observer *observer) {
+bool cui_command_events_private_confirm(cui_command_state *s, cui_command_options o,
+                                        cui_command_events_private_observer *observer) {
     if (!s || o.disabled || s->selected >= s->row_count)
         return false;
     cui_command_row row = s->rows[s->selected];
@@ -276,15 +283,17 @@ static bool cui_command_confirm_common(cui_command_state *s, cui_command_options
     void *user = o.user;
     cui_command_activation activation = {0};
     if (observer) {
-        activation.event = cui_command_metadata(observer->target, CUI_COMPONENT_EVENT_ACTIVATE);
+        activation.event =
+            cui_command_events_private_metadata(observer, CUI_COMPONENT_EVENT_ACTIVATE);
         activation.value = row.index;
     }
     if (row.item->action)
         row.item->action(row.item->action_user);
     if (confirm)
         confirm(row.index, user);
-    if (observer && observer->handler.on_activate) {
-        cui_command_count(&observer->result.activation_count, &observer->result.count_overflow);
+    if (observer && !observer->suppress && observer->handler.on_activate) {
+        cui_command_events_private_count(&observer->result.activation_count,
+                                         &observer->result.count_overflow);
         observer->handler.on_activate(observer->handler.user, &activation);
     }
     return true;
@@ -292,51 +301,52 @@ static bool cui_command_confirm_common(cui_command_state *s, cui_command_options
 
 bool cui_command_rebuild(cui_command_state *s, const cui_command_entry *entries, size_t n,
                          cui_str query, bool changed, cui_command_options options) {
-    return cui_command_rebuild_common(s, entries, n, query, changed, options, NULL);
+    return cui_command_events_private_rebuild(s, entries, n, query, changed, options, NULL);
 }
 bool cui_command_select(cui_command_state *s, cui_command_index index, bool scroll,
                         cui_command_options options) {
-    return cui_command_select_common(s, index, scroll, options, NULL);
+    return cui_command_events_private_select(s, index, scroll, options, NULL);
 }
 bool cui_command_move(cui_command_state *s, bool forward, cui_command_options options) {
-    return cui_command_move_common(s, forward, options, NULL);
+    return cui_command_events_private_move(s, forward, options, NULL);
 }
 bool cui_command_confirm(cui_command_state *s, cui_command_options options) {
-    return cui_command_confirm_common(s, options, NULL);
+    return cui_command_events_private_confirm(s, options, NULL);
 }
 cui_command_event_result cui_command_rebuild_events(cui_command_state *s, cui_id target,
                                                     const cui_command_entry *entries, size_t n,
                                                     cui_str query, bool changed,
                                                     cui_command_options options,
                                                     cui_command_event_handler handler) {
-    cui_command_observer observer = {.target = target, .handler = handler};
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
     if (target)
         observer.result.control =
-            cui_command_rebuild_common(s, entries, n, query, changed, options, &observer);
+            cui_command_events_private_rebuild(s, entries, n, query, changed, options, &observer);
     return observer.result;
 }
 cui_command_event_result cui_command_select_events(cui_command_state *s, cui_id target,
                                                    cui_command_index index, bool scroll,
                                                    cui_command_options options,
                                                    cui_command_event_handler handler) {
-    cui_command_observer observer = {.target = target, .handler = handler};
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
     if (target)
-        observer.result.control = cui_command_select_common(s, index, scroll, options, &observer);
+        observer.result.control =
+            cui_command_events_private_select(s, index, scroll, options, &observer);
     return observer.result;
 }
 cui_command_event_result cui_command_move_events(cui_command_state *s, cui_id target, bool forward,
                                                  cui_command_options options,
                                                  cui_command_event_handler handler) {
-    cui_command_observer observer = {.target = target, .handler = handler};
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
     if (target)
-        observer.result.control = cui_command_move_common(s, forward, options, &observer);
+        observer.result.control = cui_command_events_private_move(s, forward, options, &observer);
     return observer.result;
 }
 cui_command_event_result cui_command_confirm_events(cui_command_state *s, cui_id target,
                                                     cui_command_options options,
                                                     cui_command_event_handler handler) {
-    cui_command_observer observer = {.target = target, .handler = handler};
+    cui_command_events_private_observer observer = {.target = target, .handler = handler};
     if (target)
-        observer.result.control = cui_command_confirm_common(s, options, &observer);
+        observer.result.control = cui_command_events_private_confirm(s, options, &observer);
     return observer.result;
 }

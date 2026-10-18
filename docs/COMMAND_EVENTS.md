@@ -1,11 +1,10 @@
-# Base Command observers
+# Command observers
 
 Include `cui/cui_command_events.h`. The additive `cui_command_rebuild_events`,
 `cui_command_select_events`, `cui_command_move_events` and
 `cui_command_confirm_events` accept the existing arguments, an explicit nonzero
 metadata target after state, and a `cui_command_event_handler`. Existing functions
-and public layouts remain unchanged. This slice implements Base operations only;
-Styled UI causes, cancel requests and foreign bindings remain separate work.
+and public layouts remain unchanged. Base and Styled submission are available; foreign bindings remain separate work.
 
 ```c
 static void confirmed(void *user, const cui_command_activation *event) {
@@ -60,4 +59,49 @@ state/editor/model/resources, recurse into the same operation, destroy resources
 or unwind across C. Legacy mutations retain their existing timing. Defer removal
 and teardown until the outer operation and any renderer consumption complete.
 Missing callbacks do not make controls read-only. Clearing selection remains the
-existing silent helper. No Styled observer parity is claimed by Base coverage.
+existing silent helper. Styled behavior is specified below; Base always remains contextless.
+
+## Styled submission and causes
+
+`cui_command_events(ui, id, theme, state, entries, count, options, handler)`
+returns the same typed result with the legacy Styled bool in `control` and counts
+across all operations actually observed during that call. No final-state replay,
+extra model interaction or allocation is added. A later false return retains
+successful earlier query/selection notifications, including before invalid custom
+geometry. The same early-query exception and callback lifetime rules apply.
+
+The leading rebuild detects an externally edited query by the existing hash. It
+is PROGRAMMATIC with no invented frame/input evidence, including under disabled,
+inert/layout-only ancestry or loading. Initial/unchanged rebuild remains silent.
+An aggregate query-input change reports UNKNOWN with the proven active frame,
+without picking a text event/index; Escape query-clear has its actual keyboard
+frame/index/source. Hover selection is aggregate and may be stationary: it reports
+UNKNOWN/frame-only, not a fabricated pointer event. No per-edit query claim.
+
+A row's activation evidence is captured after its current semantic interaction,
+before hover-selection or custom content/binding/old callbacks can consume input
+or redirect state. One genuine accepted activation supplies its exact snapshot;
+multiple/missing evidence reports frame-only UNKNOWN. Shared event target is the
+Command root; the snapshot keeps its actual row target. Confirm snapshots the
+actual selected path at confirm entry, including legacy redirects. If it differs
+from the clicked row, the copied clicked-row activation snapshot is omitted;
+known causal input index/source remains. Action changes after confirm entry do
+not rewrite that identity. Keyboard loop observations have actual frame/index/
+KEYBOARD evidence, without inventing accepted activation for a query-editor target.
+
+`on_cancel(user, const cui_command_cancel_request *)` reports REQUEST to dismiss
+the host, not completed dismissal. It runs after legacy on_cancel, or independently
+when only the new observer is installed, on the same eligible empty-query Escape
+branch. `cancel_request_count` counts actual observer calls. No additional consume,
+invalidation, overlay close or veto is introduced. Nonempty searchable Escape
+still clears/rebuilds query rather than requesting cancellation.
+
+UI observations require a nonzero ordinary active frame; inert/layout-only,
+measurement and out-of-frame work emit no new UI callbacks. Legacy callback and
+mutation rules remain unchanged. Disabled suppresses UI interaction; loading is
+busy presentation and does not suppress existing nonempty-row confirmation.
+No submission emits nothing and registers no callback. Command rows retain OPTION with the existing pointer_activatable detail; actual
+accessibility FOCUS and ACTIVATE are supported without a role remap. This does not
+claim broader foreign/platform accessibility parity. Custom content, matching and binding
+callbacks remain separate APIs. Native synchronous observers do not add bridge or
+Python/Node/Go/Rust event categories.

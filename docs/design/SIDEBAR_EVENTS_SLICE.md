@@ -1,6 +1,6 @@
 # Sidebar event checkpoint
 
-Activation-only Base/Styled slice implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Expansion, collapse and header/footer remain proposals. Original audit: `2d7e16d1`. Only activation payload/handler/result fields are exposed now.
+Activation and item expansion Base/Styled slices implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Collapse and header/footer remain proposals. Original audit: `2d7e16d1`. Activation and expansion payload/handler/result fields are exposed now.
 Preserve the shared component event contract, existing public layouts and all old
 callbacks/results. This is an additive seam proposal, not new input routing.
 
@@ -155,5 +155,18 @@ then Enter sequence lacks a current accepted snapshot, so only genuine keyboard,
 frame and index metadata is carried there. TREEITEM ACTIVATE is rejected at ingress.
 Generic consumption of later ordinary mouse events does not cancel cached activation;
 explicit cancellation does. Both legacy outcomes remain unchanged. These are existing
-Core facts, not new acceptance/propagation rules. No expansion/collapse/section event
-fields have been exposed.
+Core facts, not new acceptance/propagation rules. Expansion fields have now been appended to the unreleased handler/results as approved; rebuild consumers. Collapse/section fields remain unexposed.
+
+## Expansion implementation checkpoint
+
+Controlled REQUEST runs after the legacy on_expand with frozen previous/requested
+values, regardless of earlier acceptance; only its explicit owner bool may be
+assigned. Uncontrolled CHANGE reads actual state.open after the legacy callback,
+suppressing redirected net-zero transitions. Existing attempt flags remain unchanged.
+Shared evidence is frozen before any legacy callback and reused for related row
+activation; caret evidence retains its actual Button identity. Tests prove both
+controlled acceptance paths/rejection/repeated requests, precise synchronous order,
+legacy cancellation after capture, missing observers, caret accessibility/touch,
+passive work and Styled compound forwarding. This is an unreleased struct extension,
+not an ABI-preserving change to a published event handler. Legacy Sidebar layouts
+are unchanged; collapse/header/footer remain separate review checkpoints.

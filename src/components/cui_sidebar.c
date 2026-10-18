@@ -70,6 +70,18 @@ static void cui_sidebar_menu_notify(void *user, const cui_sidebar_activation *ev
     else
         observer->result->activation_count++;
 }
+static void cui_sidebar_menu_expansion(void *user, const cui_sidebar_expansion_event *event) {
+    cui_sidebar_menu_observer *observer = user;
+    cui_sidebar_expansion_event copy = *event;
+    copy.event.target = observer->target;
+    bool request = copy.event.kind == CUI_COMPONENT_EVENT_REQUEST;
+    cui_sidebar_expansion_fn callback = request ? observer->handler.on_expand_request
+                                              : observer->handler.on_expand_change;
+    callback(observer->handler.user, &copy);
+    size_t *count = request ? &observer->result->request_count : &observer->result->change_count;
+    if (*count == SIZE_MAX) observer->result->count_overflow = true;
+    else (*count)++;
+}
 static void cui_sidebar_menu_render(cui_context *ui, const cui_theme *t,
                                     const cui_sidebar_menu_item *items, size_t count,
                                     bool parent_collapsed, unsigned level,
@@ -78,9 +90,14 @@ static void cui_sidebar_menu_render(cui_context *ui, const cui_theme *t,
         const cui_sidebar_menu_item *item = &items[i];
         bool collapsed = level > 1 ? item->collapsed : parent_collapsed;
         cui_sidebar_item_result state;
-        if (observer && observer->handler.on_activate) {
+        if (observer && (observer->handler.on_activate || observer->handler.on_expand_request ||
+                         observer->handler.on_expand_change)) {
             cui_sidebar_item_event_result result = cui_base_sidebar_item_events(ui, item, collapsed, level,
-                (cui_sidebar_item_handler){cui_sidebar_menu_notify, observer});
+                (cui_sidebar_item_handler){
+                    .on_activate = observer->handler.on_activate ? cui_sidebar_menu_notify : NULL,
+                    .user = observer,
+                    .on_expand_request = observer->handler.on_expand_request ? cui_sidebar_menu_expansion : NULL,
+                    .on_expand_change = observer->handler.on_expand_change ? cui_sidebar_menu_expansion : NULL});
             state = result.control;
         } else
             state = cui_base_sidebar_item(ui, item, collapsed, level);

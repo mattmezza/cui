@@ -74,7 +74,7 @@ struct cui_sidebar_menu_item {
     cui_box label_box;
     bool active, disabled, disable_caret, default_open, click_to_open, click_to_toggle;
     bool collapsed; /* Nested children retain this; top-level menu overrides with its flag. */
-    bool *expanded; /* Optional controlled value; owner updates in on_expand. */
+    bool *expanded; /* Optional controlled value; owner updates in on_expand or typed REQUEST. */
     cui_sidebar_item_state *state; /* Required for submenu or collapsed tooltip. */
     const cui_sidebar_menu_item *children;
     size_t child_count;

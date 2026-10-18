@@ -147,7 +147,7 @@ cui_settings_result cui_settings_filter(const cui_setting_page *, size_t, cui_se
 bool cui_setting_item_dirty(const cui_setting_item *);
 bool cui_settings_reset_page(const cui_setting_page *, cui_str query);
 cui_id cui_settings_part_id(cui_id, size_t page, size_t group, size_t item, unsigned part);
-/* Applied navigation observer: see cui_settings_events.h. */
+/* Applied navigation/scalar observers: see cui_settings_events.h. */
 cui_settings_result cui_settings(cui_context *, cui_id, const cui_theme *, const cui_setting_page *,
                                  size_t, cui_settings_state *, cui_settings_options);
 #ifdef __cplusplus
@@ -791,11 +791,66 @@ static void sidebar(cui_context *ui, void *user) {
     }
     cui_end_box(ui);
 }
+typedef struct {
+    bool boolean;
+    double number;
+    cui_id choice;
+} settings_scalar_before;
+static void scalar_count(settings_frame *f, size_t *count) {
+    if (*count == SIZE_MAX)
+        f->events->count_overflow = true;
+    else
+        ++*count;
+}
+static void scalar_observe(settings_frame *f, const cui_setting_item *item, cui_id id,
+    cui_settings_render_options render, settings_scalar_before before, uint64_t frame) {
+    if (!frame)
+        return;
+    cui_component_event_metadata evidence;
+    if (!cui_component_event_init(&evidence, CUI_COMPONENT_EVENT_CHANGE, f->id,
+                                  CUI_COMPONENT_EVENT_SOURCE_UNKNOWN))
+        return;
+    evidence.frame_sequence = frame;
+    evidence.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+    if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
+        item->boolean && f->handler.on_boolean && before.boolean != *item->boolean) {
+        cui_settings_bool_change event = {evidence, id, render.page, render.group, render.item,
+                                          before.boolean, *item->boolean};
+        f->handler.on_boolean(f->handler.user, &event);
+        scalar_count(f, &f->events->boolean_count);
+    } else if (item->kind == CUI_SETTING_NUMBER && item->number && item->number_state &&
+               f->handler.on_number && before.number != *item->number &&
+               !(isnan(before.number) && isnan(*item->number))) {
+        cui_settings_number_change event = {evidence, id, render.page, render.group, render.item,
+            before.number, *item->number, isfinite(before.number), isfinite(*item->number)};
+        f->handler.on_number(f->handler.user, &event);
+        scalar_count(f, &f->events->number_count);
+    } else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && f->handler.on_choice &&
+               before.choice != *item->choice) {
+        cui_settings_choice_change event = {evidence, id, render.page, render.group, render.item,
+                                            before.choice, *item->choice};
+        f->handler.on_choice(f->handler.user, &event);
+        scalar_count(f, &f->events->choice_count);
+    }
+}
 static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
                   cui_settings_render_options render) {
     if (item->render) {
         item->render(f->ui, id, f->control_theme, render, item->user);
         return false;
+    }
+    settings_scalar_before before = {0};
+    uint64_t observer_frame = f->events && !render.disabled && cui_frame_paint_enabled(f->ui)
+                                  ? cui_frame_sequence(f->ui) : 0;
+    if (observer_frame) {
+        if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
+            item->boolean && f->handler.on_boolean)
+            before.boolean = *item->boolean;
+        else if (item->kind == CUI_SETTING_NUMBER && item->number && item->number_state &&
+                 f->handler.on_number)
+            before.number = *item->number;
+        else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && f->handler.on_choice)
+            before.choice = *item->choice;
     }
     bool changed = false;
     cui_edit_result error = CUI_EDIT_OK;
@@ -884,6 +939,7 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
         f->result->edit_error = error;
     if (changed && item->on_change)
         item->on_change(item->user);
+    scalar_observe(f, item, id, render, before, observer_frame);
     return changed;
 }
 static void render_group(settings_frame *f, size_t p, size_t g, bool stacked) {

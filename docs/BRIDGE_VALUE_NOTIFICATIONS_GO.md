@@ -108,3 +108,16 @@ to the provider and run only `TestValueNotificationV1Protocol`, fresh process pe
 unknown capability filtering, optional exports, malformed output and bounded copies.
 
 Rust value wrappers and generated SDK publication remain separate integration work.
+
+The repository integrator runner also stages current SDK sources and registers
+static, dynamic, legacy, protocol and actual older-library cases offline:
+
+```sh
+python scripts/test_notification_bindings.py --build-dir /absolute/validation-dir \
+  --library /absolute/current/libcui_bridge.so \
+  --value-older-library /absolute/initial-v1/libcui_bridge.so
+```
+
+The older value library must expose initial V1 but lack the new value symbols.
+Without it, missing-export/older-library no-drain cases are explicitly deferred.
+The independent `--older-library` option tests a genuinely pre-V1 library instead.

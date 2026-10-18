@@ -14,6 +14,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+VALUE_MODES = ('edges', 'capacity', 'size', 'unavailable', 'missing', 'limit', 'zero', 'repeat', 'tag', 'kind', 'utf8', 'nul', 'flags')
 MODES = ('edges', 'capacity', 'limit', 'zero', 'repeat', 'size', 'unavailable')
 
 
@@ -32,6 +33,7 @@ def main():
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--library', type=Path, required=True)
     parser.add_argument('--older-library', type=Path, help='Optional genuine pre-V1 bridge')
+    parser.add_argument('--value-older-library', type=Path, help='Actual initial-V1 bridge without value exports')
     args = parser.parse_args()
     if not sys.platform.startswith('linux'):
         parser.error('This isolated runner validates Linux only')
@@ -45,13 +47,16 @@ def main():
     older = args.older_library.resolve(strict=True) if args.older_library else None
     if older and older.name != 'libcui_bridge.so':
         parser.error('--older-library must be named libcui_bridge.so')
+    value_older = args.value_older_library.resolve(strict=True) if args.value_older_library else None
+    if value_older and value_older.name != 'libcui_bridge.so':
+        parser.error('--value-older-library must be named libcui_bridge.so')
     build.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ)
     for key in ('DISPLAY', 'WAYLAND_DISPLAY', 'MIR_SOCKET', 'SDL_VIDEODRIVER',
                 'XDG_RUNTIME_DIR', 'CUI_TEST_VIRTUAL_DISPLAY', 'CUI_BRIDGE_LIBRARY',
                 'CUI_BRIDGE_LIB_DIR', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'GOFLAGS',
                 'RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'CUI_NOTIFICATION_FIXTURE',
-                'CUI_NOTIFICATION_UNAVAILABLE'):
+                'CUI_NOTIFICATION_UNAVAILABLE', 'CUI_VALUE_REAL', 'CUI_VALUE_OLD', 'CUI_VALUE_FIXTURE'):
         env.pop(key, None)
     env.update({'CGO_ENABLED': '1', 'GOPROXY': 'off', 'GOSUMDB': 'off',
                 'GOTOOLCHAIN': 'local', 'GOWORK': 'off', 'GO111MODULE': 'on',
@@ -87,12 +92,12 @@ def main():
     rust = ['cargo', 'test', '--offline', '--manifest-path', stage / 'rust/Cargo.toml']
     # Full existing portable tests also prove legacy behavior; native lifecycle
     # tests are explicitly disabled, since these contracts need no visible UI.
-    add('go_static_legacy_and_v1', go + ['./cui', '-count=1'])
+    add('go_static_legacy_and_v1', go + ['./cui', '-count=1'], {'CUI_VALUE_REAL': '1'})
     add('rust_static_legacy_and_v1', rust + ['--', '--test-threads=1'],
         {'CARGO_TARGET_DIR': build / 'rust-static' / stage.name})
     dynamic = {'CUI_BRIDGE_LIB_DIR': library.parent, 'CARGO_TARGET_DIR': build / 'rust-dynamic'}
     add('go_dynamic_legacy_and_v1', go + ['-tags', 'cui_dynamic', './cui', '-count=1'],
-        {'CUI_BRIDGE_LIBRARY': library})
+        {'CUI_BRIDGE_LIBRARY': library, 'CUI_VALUE_REAL': '1'})
     add('rust_dynamic_legacy_and_v1', rust + ['--', '--test-threads=1'], dynamic)
     for mode in MODES:
         add('go_protocol_' + mode,
@@ -106,6 +111,34 @@ def main():
             {'CUI_BRIDGE_LIBRARY': older, 'CUI_NOTIFICATION_UNAVAILABLE': '1'})
         add('rust_older_library', rust + ['--test', 'notifications_v1', 'unavailable_old_library', '--', '--exact'],
             {'CUI_BRIDGE_LIB_DIR': older.parent, 'CARGO_TARGET_DIR': build / 'rust-old', 'CUI_NOTIFICATION_UNAVAILABLE': '1'})
+    value_fixture = build / 'libcui_go_value_fixture.so'
+    value_missing_fixture = build / 'libcui_go_value_missing_fixture.so'
+    value_dependency = value_older or library
+    value_source = source / 'bindings/go/cui/testdata/value_notifications_provider.c'
+    for output, definitions in ((value_fixture, []), (value_missing_fixture, ['-DCUI_VALUE_FIXTURE_MISSING'])):
+        if definitions and not value_older:
+            continue
+        run([env.get('CC', 'cc'), '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic',
+             '-fPIC', '-shared', '-I' + str(source / 'include'), *definitions,
+             value_source, '-Wl,--no-as-needed', value_dependency,
+             '-Wl,-rpath,' + str(value_dependency.parent), '-o', output], source, env)
+    for mode in VALUE_MODES:
+        if mode == 'missing' and not value_older:
+            continue
+        provider = value_missing_fixture if mode == 'missing' else value_fixture
+        add('go_value_protocol_' + mode,
+            go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestValueNotificationV1Protocol$', '-count=1'],
+            {'CUI_BRIDGE_LIBRARY': provider, 'CUI_VALUE_FIXTURE': mode})
+    if value_older:
+        add('go_value_older_library',
+            go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestValueNotificationV1TextFIFO$', '-count=1'],
+            {'CUI_BRIDGE_LIBRARY': value_older, 'CUI_VALUE_OLD': '1'})
+        for mode, provider in (('unavailable', value_fixture), ('missing', value_missing_fixture)):
+            add('go_value_no_drain_' + mode,
+                go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestValueNotificationV1TextFIFO$', '-count=1'],
+                {'CUI_BRIDGE_LIBRARY': provider, 'CUI_VALUE_FIXTURE': mode, 'CUI_VALUE_OLD': '1'})
+    else:
+        print('Value older-library, missing-export and no-drain compatibility cases deferred: supply --value-older-library', flush=True)
     harness = build / 'harness'
     harness.mkdir(exist_ok=True)
     (harness / 'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.20)\n'

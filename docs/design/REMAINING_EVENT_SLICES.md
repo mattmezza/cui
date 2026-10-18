@@ -31,8 +31,8 @@ Additional implemented slices: [Styled controlled Slider](../STYLED_SLIDER_EVENT
 [OTP](../OTP_EVENTS.md), [Collapsible/Accordion](../DISCLOSURE_EVENTS.md),
 [List/ToggleGroup](../LIST_EVENTS.md), and [Tree](../TREE_EVENTS.md).
 Tree covers selection, expansion and row invocation. DataTable currently has
-[sort observers](../TABLE_EVENTS.md); further Table and Settings slices remain
-in progress. Proposals must not be read as implemented APIs.
+[sort and scalar/set-selection observers](../TABLE_EVENTS.md); Settings navigation and built-in scalar fields are implemented; further Table
+and Settings domains remain in progress. Proposals must not be read as implemented APIs.
 
 ## Highest-value independent slices
 
@@ -128,8 +128,8 @@ The landed [V1 notifications](../BRIDGE_NOTIFICATIONS.md) and
 (activation, applied boolean/table changes and surface close outcomes), preserving
 legacy queues/timing. They do not expose native synchronous controlled requests,
 Slider phases, Input per-event observers or multiline observers. The separate [opt-in C value poll](../BRIDGE_VALUE_NOTIFICATIONS.md) additionally
-classifies its explicit scalar/text/selection allowlists; owning language value
-wrappers remain in progress. Other payloads remain legacy; typed C facades alone do not complete Python/JS/TS/Go/Rust coverage.
+classifies its explicit scalar/text/selection allowlists; Python/JS/TypeScript/Go owning value wrappers are implemented; Rust remains
+in progress. Other payloads remain legacy; typed C facades alone do not complete Python/JS/TS/Go/Rust coverage.
 Do not retime queued handlers into rejectable requests. Future slices need tagged
 owned payloads, bounded queue/copy behavior, full-width IDs/frame values, handler
 retention/removal, exception/panic containment and stale-object tests. Follow

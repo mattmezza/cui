@@ -241,14 +241,14 @@ defaults change; new explicit flags are opt-in, not implemented by this checkpoi
 
 | Command | Proposed exact semantic output |
 | --- | --- |
-| `component NAME` | Summary: name/digest; complete scope/composition/state ownership/interaction/usage; state types/callback names; selected public declarations and header paths; **all** limitation/platform/status/feature facts; complete required contract blocks (or labelled full fallback) with references; retrieval commands. No automatic guide/header/example/test bodies. |
+| `component NAME` | Summary: name/digest; complete canonical scope/composition/state ownership/interaction/usage strings; state types/callback names; indexed public declarations and exact header paths; **all** canonical limitation/platform/status/feature facts; explicit incomplete-contract label and required header/linked-guide read commands. No automatic guide/header/example/test bodies; no claim to reproduce header contracts. |
 | `component NAME --show summary` | Explicit spelling for that same human summary. If JSON is requested, reject this new section initially rather than accidentally returning the legacy all schema under a new meaning. A concise JSON format needs a separately named/versioned contract. |
 | `component NAME --full` | Exact existing all-section human output; alias of existing explicit `--show all`. With `--json`, exact existing `--show all --json` dictionary/values. Reject conflicting `--full --show usage/limitations/...`; do not guess precedence. |
 | `component NAME --show usage` / `--show limitations` | Preserve existing section meaning. Limitations prints all current status/platforms/limitations/features, without count-only replacement, keyword filtering or suppressed unsupported states. |
 | `component NAME --show examples` | Human **index**, preserving every linked document, sample and test reference. Each entry has canonical path, actual title when available, source role (guide/sample/test reference), and exact `read PATH` command. Broad guide must be labelled guide, not claimed component-only runnable example. No bodies. |
-| `component NAME --show api` | Initially preserve existing full API-section contract; declaration-only view is explicit below. Avoid silently dropping header typedefs/comments while claiming a callable API contract. |
-| `api SYMBOL --declaration` | Exact indexed declaration(s), owning header(s), digest and warning `Declaration-only; read the owning header and linked contract before calling.` No complete-contract or ownership claim. If symbol is only a type/macro and lacks indexed function declarations, say so and give exact header reads; never invent a declaration. |
-| `api SYMBOL` / `api SYMBOL --full` | Initially preserve current full matching-header behavior. Default declaration-only replacement is deferred until curated complete contract blocks/types are available, because current exporter strips comments and cannot reliably identify all required lifetime/unsupported conditions. |
+| `component NAME --show api` | Human declaration/index view using existing `symbols`, exact canonical header/linked-guide read commands and explicit incomplete-contract warning. JSON keeps its full existing API/header section. `--show all` / `--full` restores the old full human content. |
+| `api SYMBOL` / `api SYMBOL --declaration` | Human default and explicit alias: exact indexed declaration(s), owning header path(s), digest, known linked guide paths and executable `read PATH` commands, plus `Declaration/index only: incomplete contract; read authoritative headers and linked guides before calling.` No inferred ownership/type/macro code or contract extraction. If no indexed function exists, print only exact matching resource paths and retrieval guidance, with `No indexed function declaration; this lookup does not prove a type or macro definition.` |
+| `api SYMBOL --full` | Restore the exact old human text: indexed function declarations followed by every complete matching header. No clipping or implicit limit. Reject conflicting `--full --declaration`. JSON remains the existing full object by default and with `--full`. |
 | `read PATH` | Preserve exact existing content plus CLI's existing final print newline; no silent size limit, section slicing or JSON-shape change. Deliberate exact read remains available for offline consumers. |
 
 For legacy machine users, all existing `component --json` invocations (including
@@ -275,8 +275,10 @@ Interaction: <complete canonical interaction/usage/scope/composition>
 API: cui_select; cui_select_events
 Header: include/cui/cui_choice.h
 Limitations/platforms/features: <ALL canonical facts, not an omitted count>
-Contracts: <complete reviewed contract blocks or labelled full fallback>
-Sources: docs/SELECT_EVENTS.md; relevant Choice contract section
+Contract: INCOMPLETE summary; read these authoritative resources before calling.
+  read include/cui/cui_choice.h
+  read docs/SELECT_EVENTS.md
+  read docs/CHOICE.md
 Examples: component Select --show examples
 Full: component Select --full
 ```
@@ -286,7 +288,9 @@ permission to omit content. The implementation must populate complete source
 facts and distinguish current legacy usage text from the added native observer
 contract; current Select interaction metadata still says only `Returns selection
 change...`, while the event guide carries multiplicity/lifetimes. Merely using
-that short usage sentence would drop critical event contracts.
+that short usage sentence does not establish the event contract. The summary must
+say the contract is incomplete and give those exact required reads; it must not
+claim all header/guide conditions were preserved inline.
 
 A Select example index can accurately say:
 
@@ -309,20 +313,24 @@ section plus separate multiple-selection/context/dropdown sections; its first ti
 is not a safe automatic Select slice. Input guides often have only one top-level
 heading, so heading slicing would not solve their output cost by itself.
 
-**Critical contracts cannot be classified with the current regex index.** Before
-reducing contract text, add reviewed canonical references in
-`docs/component-usage.json`, e.g. complete contract-section references (path + unique
-heading), or reuse a complete dedicated event guide. The exporter may resolve those
-exact boundaries and preserve their full contents; ambiguity/missing anchors must
-fail validation or fall back to complete authoritative text. This is an explicit
-canonical metadata change requiring review, not heuristic keyword extraction.
-Until that exists, include relevant complete contract guide/header text when
-necessary and label why the summary exceeds its nominal budget. Targets are
-4 KiB summary / 2 KiB example index, with **no hard cut-off**: Input's all-limitations
-payload and any ownership/security/build contracts are permitted exceptions.
-A declaration view is an explicitly incomplete inspection tool, never an automatic
-substitute for these contracts. Do not claim an 80% complete-contract reduction
-until end-to-end measurements include the required follow-up contract reads.
+**Critical contracts cannot be extracted with the current regex index.** The
+first implementation is a cohesive **presentation-only** change: use existing
+`data.symbols` declarations and canonical component metadata, label the default
+view incomplete, and route explicitly to complete authoritative header/guide
+reads. Do not infer ownership from declaration syntax, classify safety by keywords,
+clip a header, or claim that a concise summary contains all header contracts.
+All actual canonical limitation/status/platform/feature facts remain inline;
+required build/lifetime/security instructions already in SKILL.md remain visible.
+Targets are 4 KiB summary / 2 KiB example index with no hard cut-off: complete Input
+limitations and other oversized canonical facts may exceed them. No new source
+metadata is a prerequisite for this presentation slice.
+
+If a future reviewed iteration wants **complete inline contract excerpts**, it
+needs explicit canonical section references and validated boundaries, with full
+fallback on ambiguity. That is separate from default declaration/index discovery;
+do not delay the useful presentation-only step or silently invent such metadata.
+Do not claim an 80% complete-building-flow reduction from a small initial response:
+include all mandatory contract and chosen-example/build reads in end-to-end totals.
 
 Essential SKILL.md rules remain visible: actual stack and matching `--source`,
 pinned setup/offline provenance, explicit optional dependencies, stable IDs and
@@ -349,8 +357,8 @@ no-launch setup. Extend it rather than replacing those contracts with byte-only
 assertions. Add bundled/live/packaged cases for unchanged legacy JSON dictionaries
 and complete guide/header bodies; human summary/index/full and conflict errors;
 exact limitation/feature/platform retention including Input; explicit declaration
-absence for types/macros; broad-guide labels and correct read commands; every
-required contract preserved or clearly-labelled full fallback; no byte clipping;
+absence for types/macros; broad-guide labels and correct read commands; explicit incomplete-contract labels and authoritative full-read commands;
+no inferred contract/typedef extraction or byte clipping;
 non-ASCII and metadata larger than target; 5-vs-10 human/JSON search semantics and
 honest counts. Exact `read` stays unchanged. Verify changed-digest source mode
 actually changes identity, not just byte counts.
@@ -359,3 +367,64 @@ Measure real flows (summary → selected declaration → mandatory contract → 
 example/build context) with both output modes after implementation. Report bytes/
 lines and labelled estimates per call and total. No dependency installs, automatic
 UI launch, production CLI changes or generated edits occurred in this preparation.
+
+
+### API-default refinement for final review (still no implementation)
+
+This refinement supersedes the earlier suggestion to keep human `api` full until
+curated contract blocks exist. Human default discovery is concise and explicitly
+incomplete; full contract reads are required next, not claimed to have vanished.
+No CLI, SKILL, exporter, canonical metadata or generated files change here.
+
+For a known indexed function the proposed human default is structurally:
+
+```text
+API: cui_select_events | digest <actual selected source digest>
+<exact declaration from data.symbols, without guessed companion definitions>
+Declaration/index only: INCOMPLETE CONTRACT.
+Required authoritative reads before calling:
+  python "$HELPER" read include/cui/cui_choice.h [same --source context]
+  python "$HELPER" read docs/CHOICE.md [same --source context]
+  python "$HELPER" read docs/SELECT_EVENTS.md [same --source context]
+Full matching-header output:
+  python "$HELPER" api cui_select_events --full [same --source context]
+```
+
+Placeholders above describe formatting, not runnable emitted commands. Actual
+output uses exact paths/source selection and shell-safe quoting for the helper
+and source path. Known owning headers come from exact indexed-function matches;
+related component guides come only from canonical `api_symbols` membership and
+its `docs` paths. Do not claim this list is a complete automatically derived type
+or ownership dependency graph. Other matching headers may be listed separately as
+`matching resource`, never incorrectly labelled the owning declaration.
+
+For `api TYPE_OR_MACRO` without an indexed function, print `No indexed function
+declaration; exact matching resources only.` and all exact matching header paths
+with full read commands. Do not reconstruct struct bodies, macros, enum constants
+or typedefs with the function regex. If no indexed declaration or matching header
+exists, preserve the existing unknown-symbol error/nonzero status; no invented
+code, broad fuzzy replacement or successful empty-contract response. `--full`
+provides the old complete matching-header text even for such resource-only hits.
+
+All existing `api --json` defaults remain `{functions, matching_headers}` with
+complete header strings, including resource-only hits. The default change is
+human presentation only; `--declaration --json` remains an explicit error until a
+separate new schema is reviewed. Component JSON and examples JSON remain unchanged.
+Human component summaries preserve all canonical limitations and prominently mark
+missing complete header contracts; human example indexes retain every path.
+Human search defaults 5 versus JSON 10 as above, without changing legacy JSON list
+shape or ranking. Exact `read` and full escape hatches remain unbounded and offline.
+
+Acceptance measures a **complete building flow**, not just the first lookup:
+inspect existing integration and pinned source, component summary (all limitations),
+API declaration/index, each required authoritative contract, one selected example
+with build context, compile and meaningful headless behavior check. Track bytes/
+lines per discovery/read response and their sum in bundled, live-source and
+packaged modes. A 59 KB shared Choice guide remains a 59 KB required read until a
+separate reviewed section-read/curated example feature exists; example indexing
+avoids automatic unrelated guide dumps but does not justify hiding required
+contracts or asserting every consumer flow saves the same amount. Targeted users
+who only need discovery benefit immediately; implementation users must still read
+the applicable contracts. Report observed savings and remaining large reads honestly.
+Production stays blocked on Scroll/API batch completion and root's subsequent
+implementation authorization, as requested by the user.

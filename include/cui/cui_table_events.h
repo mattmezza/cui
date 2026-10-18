@@ -12,13 +12,26 @@ typedef struct {
     cui_table_sort previous, value;
 } cui_table_sort_change;
 typedef void (*cui_table_sort_change_fn)(void *user, const cui_table_sort_change *event);
-typedef struct { cui_table_sort_change_fn on_sort; void *user; } cui_table_event_handler;
+typedef struct {
+    cui_component_event_metadata event;
+    cui_table_selection previous, value;
+    cui_table_selection_mode mode;
+} cui_table_selection_change;
+typedef void (*cui_table_selection_change_fn)(void *user, const cui_table_selection_change *event);
+typedef struct {
+    cui_table_selection_change_fn on_selection;
+    cui_table_sort_change_fn on_sort;
+    void *user;
+} cui_table_event_handler;
 typedef struct {
     cui_table_result control;
     bool valid, submitted, count_overflow;
-    size_t sort_count; /* Actual synchronous calls, not the legacy result flag. */
+    size_t selection_count, sort_count; /* Actual synchronous calls, not the legacy result flag. */
 } cui_table_event_result;
-/* Applied sort transitions inside reduction, before final semantics/rendering.
+/* Applied single-selection/sort transitions inside reduction, before final
+ * semantics/rendering. on_selection + multiple_selection is rejected atomically
+ * with valid=false/control.error=INVALID. Sort-only/nil observers preserve multi.
+ * Selection payload captures primary IDs/effective operation mode, not multi sets.
  * No sorting of caller data, request rejection, retained registration or replay.
  * Missing observer ignores user; passive/disabled/loading paths preserve behavior.
  * Payload is pointer-free; handler/user borrow synchronously. During callbacks no

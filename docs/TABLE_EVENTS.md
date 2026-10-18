@@ -1,9 +1,9 @@
-# DataTable sort transitions
+# DataTable scalar transitions
 
 Include `cui/cui_table_events.h`. The additive `cui_table_reduce_events`,
-`cui_base_data_table_events` and `cui_data_table_events` take `{on_sort, user}`
+`cui_base_data_table_events` and `cui_data_table_events` take `{on_selection, on_sort, user}`
 and return unchanged legacy `control`, validity/submission flags and actual
-`sort_count` (saturating with `count_overflow`). A missing callback ignores user
+`selection_count`/`sort_count` (saturating with `count_overflow`). A missing callback ignores user
 and preserves reduction, including multi-selection behavior.
 
 Each applied sort key/direction transition notifies inside reduction, before
@@ -27,7 +27,21 @@ Defer model edits/removal/teardown until outer submission and renderer consumpti
 finish. Existing render/label callback arguments and virtual-window timing remain
 unchanged. New facades require a nonzero root ID; legacy APIs remain unchanged.
 
-This checkpoint exposes sort only. Selection, column movement/resize, activation,
-requests and viewport/load events are separate slices. Existing bridge V1 table
+Single selection emits `cui_table_selection_change` for each actual primary
+row/column pair transition, with the effective operation mode. Navigation in
+manual mode does not select; activation may still select. Same-pair activation
+emits no CHANGE, while A->B->A emits twice even though the legacy final
+`selection_changed` is false. Escape clearing is observed. Row-header operations
+can apply ROW selection while also producing the old mode-request result; the
+callback precedes later result bookkeeping and does not reject that selection.
+A column activation can emit selection then sort in the existing write order.
+Selection-disabled/nonselectable policies do not disable independent sorting.
+
+A non-NULL `on_selection` with `multiple_selection=true` returns `valid=false`,
+`control.error=CUI_TABLE_INVALID` before reduction, state/column mutation or paint.
+There is no silent primary-only multi observation. Nil selection/sort-only handlers
+still support legacy multi reduction, including accepted progress before errors.
+No multi workspace API is implemented. Column movement/resize, activation,
+requests and viewport/load events remain separate slices. Existing bridge V1 table
 notifications remain aggregate post-step snapshots; native multiplicity and
 64-bit keys here do not imply binding parity.

@@ -207,4 +207,9 @@ Do not replace it or claim native observer parity from these new C declarations.
 Sort now has a private common reducer with optional typed observation and additive
 reduce/Base/Styled facades. Old paths call the reducer without an observer and
 retain legacy flags/consumed-event handling. Only implemented sort handler/count
-fields are public; selection remains a subsequent independently tested slice.
+fields were public at the sort checkpoint. Single selection now adds an optional
+primary-pair handler at actual selection operations and Escape, preserving their
+order relative to sort and later result/semantic work. Non-NULL selection handler
+with multiple_selection is rejected before reduction/paint; nil/sort-only handlers
+keep old multi behavior. Multi-set/workspace APIs remain unimplemented and require
+the separate exact-interface/algorithm review described above.

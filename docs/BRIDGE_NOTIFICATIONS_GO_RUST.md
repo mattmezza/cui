@@ -78,3 +78,31 @@ A local external CTest harness invokes these suites through `scripts/test_local.
 with private Xvfb. The shim compiles as C11 with `-Wall -Wextra -Werror -pedantic`.
 The wrappers also compile against source-built static SDKs. Generated SDK copies
 are validation inputs only; their regeneration belongs to the integrator.
+
+Run the reproducible offline Linux matrix from a fresh, regenerated SDK checkout:
+
+```sh
+python scripts/test_notification_bindings.py \
+  --build-dir /absolute/external/notification-checks \
+  --library /absolute/native-build/libcui_bridge.so
+```
+
+Requires an existing Git checkout, Go (cgo/C11), Cargo, CMake, `cc`, and `xvfb-run`; the supplied
+shared bridge must already implement V1. No dependency installation or network
+resolution is performed (`GOTOOLCHAIN=local`, Go proxy/checksum lookup disabled,
+Cargo offline). Use an external build directory. The script stages the binding
+sources without modifying SDKs, checks bridge header/source freshness, builds the
+existing test-only fixture with strict warnings, and runs CTest through the
+private display wrapper. Full Go/Rust portable static and dynamic suites cover
+real V1 queues and legacy compatibility; fourteen further cases cover the seven
+injected protocol modes in both languages. Native window lifecycle tests are
+explicitly excluded from this font-free notification matrix; the separate native
+runner suite owns those checks.
+
+Optionally pass `--older-library /absolute/pre-v1-build/libcui_bridge.so` to add
+two genuine missing-symbol compatibility cases (twenty total). Synthetic
+`unavailable` mode otherwise checks version negotiation, not missing symbols.
+Every compiler/test failure exits nonzero. Staged inputs, language build caches,
+CTest configuration and `ctest/Testing/Temporary/LastTest.log` remain under the
+build directory for diagnosis. Repeated runs preserve prior staged inputs; save
+CTest logs separately when retaining historical run evidence.

@@ -19,16 +19,36 @@ typedef struct {
 } cui_table_selection_change;
 typedef void (*cui_table_selection_change_fn)(void *user, const cui_table_selection_change *event);
 typedef struct {
+    cui_component_event_metadata event;
+    cui_id column;
+    float previous_width, width;
+} cui_table_column_width_change;
+typedef struct {
+    cui_component_event_metadata event;
+    cui_id column;
+    size_t previous_index, index;
+} cui_table_column_move_change;
+typedef void (*cui_table_column_width_change_fn)(void *user,
+                                                 const cui_table_column_width_change *event);
+typedef void (*cui_table_column_move_change_fn)(void *user,
+                                                const cui_table_column_move_change *event);
+typedef struct {
     cui_table_selection_change_fn on_selection;
     cui_table_sort_change_fn on_sort;
+    cui_table_column_width_change_fn on_column_width;
+    cui_table_column_move_change_fn on_column_move;
     void *user;
 } cui_table_event_handler;
 typedef struct {
     cui_table_result control;
     bool valid, submitted, count_overflow;
     size_t selection_count, sort_count; /* Actual synchronous calls, not the legacy result flag. */
+    size_t column_width_count, column_move_count;
 } cui_table_event_result;
-/* Applied single-selection/sort transitions inside reduction, before final
+/* Width/move observers report successful reducer operations only; programmatic
+ * cui_table_resize/cui_table_move_column remain silent. Indices are operation-time
+ * positions; the copied column key stays authoritative. Cancel does not roll back.
+ * Applied single-selection/sort transitions inside reduction, before final
  * semantics/rendering. on_selection + multiple_selection is rejected atomically
  * with valid=false/control.error=INVALID. Sort-only/nil observers preserve multi.
  * Selection payload captures primary IDs/effective operation mode, not multi sets.
@@ -72,6 +92,8 @@ typedef void (*cui_table_selection_set_change_fn)(void *user,
 typedef struct {
     cui_table_selection_set_change_fn on_selection;
     cui_table_sort_change_fn on_sort;
+    cui_table_column_width_change_fn on_column_width;
+    cui_table_column_move_change_fn on_column_move;
     void *user;
 } cui_table_set_event_handler;
 typedef enum {

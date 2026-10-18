@@ -113,10 +113,10 @@ reuses the ordered selection seam after legacy activation/confirmation callbacks
 Accordion, multi-list and ToggleGroup also report each applied transition; see
 [disclosure events](DISCLOSURE_EVENTS.md) and [List events](LIST_EVENTS.md).
 The [opt-in bridge value API](BRIDGE_VALUE_NOTIFICATIONS.md) currently supports
-scalar, plain-text and selection notifications; existing polling retains its contract, and Python, JS/TypeScript and Go expose separate owning value polls.
+scalar, plain-text and selection notifications; existing polling retains its contract, and Python, JS/TypeScript, Go and Rust expose separate owning value polls.
 
 [Tree events](TREE_EVENTS.md) observe each applied selection and expansion transition and every row invocation without replaying reduction; callbacks precede later semantics and paint.
 
-[DataTable events](TABLE_EVENTS.md) cover sort, single selection and exact multi-selection sets;
+[DataTable events](TABLE_EVENTS.md) cover sort, single selection, exact multi-selection sets and column width/move transitions;
 [Settings events](SETTINGS_EVENTS.md) cover navigation and built-in boolean,
-number and choice fields. Settings text/reset remain separate slices.
+number and choice fields plus committed text revisions. Settings reset remains a separate slice.

@@ -31,7 +31,7 @@ Additional implemented slices: [Styled controlled Slider](../STYLED_SLIDER_EVENT
 [OTP](../OTP_EVENTS.md), [Collapsible/Accordion](../DISCLOSURE_EVENTS.md),
 [List/ToggleGroup](../LIST_EVENTS.md), and [Tree](../TREE_EVENTS.md).
 Tree covers selection, expansion and row invocation. DataTable currently has
-[sort and scalar/set-selection observers](../TABLE_EVENTS.md); Settings navigation and built-in scalar fields are implemented; further Table
+[sort, scalar/set-selection and column width/move observers](../TABLE_EVENTS.md); Settings navigation, built-in scalar fields and committed text edits are implemented; further Table
 and Settings domains remain in progress. Proposals must not be read as implemented APIs.
 
 ## Highest-value independent slices

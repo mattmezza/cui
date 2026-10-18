@@ -193,8 +193,8 @@ reviewable. None of these additions promotes a parity level.
 | [Collapsible and Accordion](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
 | [List and ToggleGroup](../LIST_EVENTS.md) | Ordered single-ID or per-item bool transitions; List observes after legacy activation/confirmation callbacks. | Same-item confirmation is separate; ToggleGroup preserves intermediate sibling closures. |
 | [Tree](../TREE_EVENTS.md) | Each applied selection and expansion transition and every row invocation. | Observer sees intermediate cursor/focus/semantic state; model mutation during callback is unsupported. |
-| [DataTable](../TABLE_EVENTS.md) | Per-transition sort, single selection and exact multi-set snapshots. | Scalar selection observers reject multi mode; separate set API requires bounded exclusive caller workspace. |
-| [Settings](../SETTINGS_EVENTS.md) | Applied navigation plus built-in bool/double/choice owner changes after legacy callbacks. | Filter reconciliation is silent; text/reset remain separate domains. |
+| [DataTable](../TABLE_EVENTS.md) | Per-transition sort, single selection, exact multi-set snapshots and column width/move observations. | Scalar selection observers reject multi mode; separate set API requires bounded exclusive caller workspace. |
+| [Settings](../SETTINGS_EVENTS.md) | Applied navigation plus built-in bool/double/choice owner changes and committed text revisions after legacy callbacks. | Filter reconciliation is silent; reset remains a separate domain. |
 
 Counts summarize actual observer invocations except where a guide explicitly
 preserves another established result convention. Reading results is passive.
@@ -210,4 +210,4 @@ requests, text, scalar or selection events. See the [binding audit](COMPONENT_EV
 Opt-in C bridge scalar notifications are implemented for Slider, NumberInput,
 Rating and Pagination, and plain text for Input, Textarea, Editor and InputGroup; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
 Selection snapshots are also supported for the explicit RadioGroup/Tabs/Select/List/Stepper
-allowlist. Python, JS/TypeScript and Go have owning value polls; Rust remains a separate slice.
+allowlist. Python, JS/TypeScript, Go and Rust have owning value polls; Rust static builds require their paired SDK.

@@ -313,8 +313,9 @@ The separate [opt-in C value poll](../BRIDGE_VALUE_NOTIFICATIONS.md) additionall
 supports scalar, plain-text and selection snapshots for its explicit producer allowlists.
 [Python](../BRIDGE_VALUE_NOTIFICATIONS_PYTHON.md) and
 [JS/TypeScript](../BRIDGE_VALUE_NOTIFICATIONS_JS.md) and
-[Go](../BRIDGE_VALUE_NOTIFICATIONS_GO.md) owning value polling are implemented;
-Rust value-poll wrappers remain deferred;
+[Go](../BRIDGE_VALUE_NOTIFICATIONS_GO.md) and
+[Rust](../BRIDGE_VALUE_NOTIFICATIONS_RUST.md) owning value polling are implemented;
+Rust static builds require the paired SDK, while dynamic builds negotiate optional exports;
 existing V1 methods keep their initial allowlist and receive LEGACY snapshots for
 these categories. Consumers must negotiate the new optional symbols and category
 mask rather than enabling reserved tags through the old method.

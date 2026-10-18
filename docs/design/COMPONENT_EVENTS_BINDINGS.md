@@ -17,8 +17,9 @@ Button preserves legacy callback order and adds typed activation metadata;
 Check offers immutable typed requests with per-invocation counts. These are
 submission-borrowed synchronous handlers. The original rows below remain the
 checkpoint baseline, not an assertion that later additions are absent.
-No Python, JavaScript/TypeScript, Go or Rust wrapper for these new handlers is
-implemented yet; existing queued notifications retain their audited behavior.
+No Python, JavaScript/TypeScript, Go or Rust wrapper for these synchronous
+handlers is implemented; owning manual queued views were added later. See the
+current dated snapshot below. Original sections retain their historical scope.
 
 ## What exists at the C boundary
 
@@ -319,3 +320,159 @@ Rust static builds require the paired SDK, while dynamic builds negotiate option
 existing V1 methods keep their initial allowlist and receive LEGACY snapshots for
 these categories. Consumers must negotiate the new optional symbols and category
 mask rather than enabling reserved tags through the old method.
+
+
+## Current source snapshot — 2026-10-18 (`9ba9c78c`)
+
+This section supersedes historical **current availability** claims above, not the
+baseline's evidence. Read-only inspection of canonical C, Python, JS/TypeScript,
+Go and Rust sources/tests/docs; no suites rerun for this documentation update.
+All 78 manifest entries remain present. SDK header distribution, a component
+builder and a passing legacy UI test each establish different facts; none means
+all direct-C observer semantics are implemented in a foreign runtime.
+
+### Two manual protocols over one queue
+
+| API boundary | Complete typed producer eligibility | Not supplied |
+| --- | --- | --- |
+| Initial `cui_bridge_poll_notification_v1` | Existing CLICK → ACTIVATE/NONE; Checkbox/Switch/Toggle → CHANGE/BOOLEAN; DataTable existing selection/sort enqueue → CHANGE/TABLE; existing surface/Notification CLOSE → LIFECYCLE/SURFACE | Every other CHANGE remains LEGACY, including producers that the separate value method can decode. No input evidence/index/source or synchronous veto. |
+| Opt-in `cui_bridge_poll_value_notification_v1` | Initial categories plus requested/negotiated SCALAR (Slider, NumberInput, Rating, Pagination), TEXT (Input, Textarea, Editor, Input Group), SELECTION (Radio group, Tabs, Select, List, Stepper) | Unrequested categories, unsupported producers and mask0 stay complete LEGACY. No automatic mapping from native typed facades. |
+
+The exact [initial contract](../BRIDGE_NOTIFICATIONS.md), [value contract and
+allowlists](../BRIDGE_VALUE_NOTIFICATIONS.md), [C declarations](../../include/cui/cui_bridge.h)
+and [enqueue implementation](../../src/bridge/cui_bridge.c) are authoritative.
+Both methods consume the same FIFO as old extended/filtered polling and dispatch;
+there is no duplicate queue, subscription/fanout, implicit getter or replay.
+Polling only owns a snapshot and never invokes a handler. Filtered old CLICK polling
+still discards non-CLICK records. Capacity failure preserves the live record;
+stale-origin cleanup before it is not rolled back. Queue-full error can follow
+already-applied model mutation. Neither API is a transaction or request decision.
+
+Initial schema/size/version checks remain mandatory; value polling additionally
+negotiates optional value-category and poll exports and requests only compiled-known
+advertised bits. Old libraries remain usable through old methods; missing/incompatible
+optional exports fail explicitly **before draining**, without fallback to another
+consumer. Malformed records detected after successful consuming C reads cannot be
+restored. Genuine older-library no-drain tests and injected malformed-provider tests
+prove different properties and must be reported separately.
+
+Typed table row/column/sort values are exact uint32 one-based bridge indices (zero
+absent), not Core IDs or C observer operation keys. BOOLEAN reports already-applied
+state, not immutable entry/requested-value controlled Check/Switch/Toggle semantics.
+SCALAR copies binary64: NumberInput retains its actual double, while Slider/Rating
+cannot regain precision lost in their float models. TEXT is the existing aggregate
+plain UTF-8 snapshot, not each edit/commit/submit, and inherits no native secure
+redaction. The bridge exposes no secure/password configuration; OTP remains Legacy.
+SELECTION holds historical Item slot/generation, not an owned live node or a
+per-transition native selection event. Select's net-zero frame can remain silent;
+List can repeat the same item on activation. Menu/Dropdown/Combobox retain Legacy
+classification even when old fields contain text or selected handles.
+
+### Canonical owning wrapper entrypoints
+
+| Language | Initial manual API / opt-in value API | Ownership, precision and stepping |
+| --- | --- | --- |
+| Python | `App.poll_notifications_v1()` / `App.poll_value_notifications_v1()` iterators | Frozen dataclass variants with owned strings, exact Python integer frame and uint32 handle tuples; optional live Widget references are not immutable model ownership. `step()` does not dispatch; manual iterator consumes only when advanced. |
+| JavaScript | `App.poll_notification_v1()` / `App.poll_value_notification_v1()` → record or `undefined` | Frozen discriminated records, copied strings/handle objects, exact uint64 `frame: bigint`; optional Node references can later become invalid. Use `step_only()` to avoid legacy automatic dispatch by `step()`/`run()`. |
+| TypeScript | `NotificationV1` / separate `ValueNotificationV1` unions over those JS methods | Runtime is the Node addon, not another implementation. Readonly/discriminated declarations require BigInt-capable tooling; typecheck evidence is not runtime proof. |
+| Go | `App.PollNotificationV1()` / `App.PollValueNotificationV1()` → value, present bool, error | Separate kind enums and kind-selected typed fields; strings/uint64 frame/uint32 handle are copied, optional `*Node` remains live. `Step` and `Dispatch` remain separate. |
+| Rust | `App::poll_notification_v1()` / `App::poll_value_notification_v1()` → `Result<Option<...>>` | Separate exhaustive owning enums, `String`, u64 frame and u32 handles; tokens do not own live native nodes. `step` and `dispatch` remain separate (`frame` combines them). Static Rust requires paired SDK; dynamic optional exports are negotiated. |
+
+Representative canonical references:
+[Python methods/types](../../bindings/python/cui_bridge/__init__.py),
+[JS manual methods](../../bindings/node/index.cjs),
+[Node FFI/protocol checks](../../bindings/node/addon.c),
+[TypeScript unions](../../bindings/typescript/index.d.ts),
+[Go owning decoder](../../bindings/go/cui/native.go),
+[Rust owning decoder](../../bindings/rust/src/lib.rs).
+Language-specific [Python](../BRIDGE_VALUE_NOTIFICATIONS_PYTHON.md),
+[JS/TS](../BRIDGE_VALUE_NOTIFICATIONS_JS.md), [Go](../BRIDGE_VALUE_NOTIFICATIONS_GO.md)
+and [Rust](../BRIDGE_VALUE_NOTIFICATIONS_RUST.md) guides specify exact errors.
+
+All four owning manual decoders start with 4097 bytes and allow one strictly larger
+capacity retry, capped at 1 MiB **including NUL**. This replaces the historical
+fixed-buffer limitation for these manual methods only; it does not rewrite old
+legacy dispatch buffers, bool conversions or JS Number frame behavior. No silent
+truncation. Copies outlive queue reuse, later model edits/removal and app teardown;
+optional node resolution uses complete slot+generation and must not resolve a
+historical selection to a replacement slot occupant. Record immutability does
+not freeze a referenced node. Handler retention/exception/timing differences in
+the historical dispatch audit remain separate from manual owning records.
+
+### All 78 families: explicit omission boundary
+
+This partition checks the exact names in [gpui-parity.json](../gpui-parity.json),
+not every possible enqueue branch. The rows below account for all 78 once. Common
+initial ACTIVATE/NONE can also originate from existing simple CLICK adapters in
+other rows; it does not grant an extra typed component-specific payload. A row
+with no dedicated typed value can still emit Legacy/CLOSE/CLICK through existing
+adapters, host interactive children, be noninteractive, or lack a foreign node
+representation. **No notification emission promise is inferred from membership.**
+
+| Manifest families (disjoint accounting) | Current dedicated typed view / omission |
+| --- | --- |
+| Button | Initial ACTIVATE/NONE for existing CLICK; native accepted pointer/key evidence and per-input handler semantics are not exported. |
+| Checkbox, Switch, Toggle | Initial applied BOOLEAN; native controlled request/readonly/entry snapshot facades are not exported. |
+| DataTable | Initial TABLE at existing selection/sort enqueues only; newer native set/span workspace, per-transition multiplicity, stable uint64 keys, column width/move, activation/context/mode requests are not exported. |
+| AlertDialog, Dialog, Sheet, Popover, Notification | Initial SURFACE at existing CLOSE enqueues; not the retained native completed-CLOSED observer registration/update/lifetime contract, synchronous decide/veto or general lifecycle stream. |
+| Slider, NumberInput, Rating, Pagination | Opt-in SCALAR only; native phases/reasons/before-after/counts/commit policies are not exported. |
+| Input, Textarea, Editor, Input Group | Opt-in aggregate plain TEXT only; native per-edit payloads/selection/redaction, Input Group addon observer details and submit/commit are not exported. |
+| Radio, Tabs, Select, List, Stepper | Opt-in SELECTION applies only to the bridge's RadioGroup producer (catalog Radio), Tabs, Select, single List and Stepper; not every radio item, Listmulti/ToggleGroup arrays or native per-transition facade. |
+| Accordion, Alert, Attachment, Avatar, Badge, Bubble, Clipboard, Collapsible, DropdownButton, Empty, Focus Trap, GroupBox, HoverCard, Icon | No additional dedicated typed value allowlist. Existing producer-specific Legacy/common initial records only where implemented; native family observers/results/host services do not automatically cross this bridge. |
+| Image, Kbd, Label, Marker, Message, MessageScroller, Progress, Shimmer, Skeleton, Spinner, Tag, Tooltip, Calendar, ColorPicker | No additional dedicated typed value allowlist. Existing producer-specific Legacy/common initial records only where implemented; native family observers/results/host services do not automatically cross this bridge. |
+| Combobox, DatePicker, Form, OtpInput, Questionnaire, Speech, TimeField, Carousel, DescriptionList, Dock, Menu, Resizable, Root View, Scrollable | No additional dedicated typed value allowlist. Existing producer-specific Legacy/common initial records only where implemented; native family observers/results/host services do not automatically cross this bridge. |
+| Settings, Sidebar, StatusBar, Theme, TitleBar, Toolbar, Tree, VirtualList, Chart, Command, Plot, Table, TextView | No additional dedicated typed value allowlist. Existing producer-specific Legacy/common initial records only where implemented; native family observers/results/host services do not automatically cross this bridge. |
+
+Command, Toolbar and Sidebar in that remainder now have direct-C typed facades,
+as do numerous other families audited in their guides. That does not add foreign
+handlers, direct-C synchronous execution timing or callback veto. Tree activation,
+retained surface completion, Command early query/confirmed-path semantics, Toolbar
+aggregate ambiguity and Sidebar collapse details all remain native contracts.
+Shared C metadata's input source/index/activation evidence is absent from bridge V1
+beyond captured frame presence. No capture/bubble/default-prevention layer, foreign
+controlled request, synchronous lifecycle veto or async completion protocol is
+implied. Native render/match/content and retained lifecycle callbacks additionally
+have distinct lifetime rules that cannot be replaced by a queued notification.
+
+### Inspected tests versus executed historical evidence
+
+Current real-queue C tests:
+[initial V1](../../tests/unit/test_bridge_notifications.c),
+[scalar](../../tests/unit/test_bridge_value_notifications.c),
+[text](../../tests/unit/test_bridge_text_notifications.c),
+[selection](../../tests/unit/test_bridge_selection_notifications.c).
+Owning wrapper tests are
+[Python initial](../../bindings/python/test_notifications_v1.py)/[values](../../bindings/python/test_value_notifications_v1.py),
+[Node initial](../../bindings/node/test/notifications-v1.test.cjs)/[values](../../bindings/node/test/value-notifications-v1.test.cjs),
+[Go initial](../../bindings/go/cui/notifications_v1_test.go)/[values](../../bindings/go/cui/value_notifications_v1_test.go),
+[Rust initial](../../bindings/rust/tests/notifications_v1.rs)/[values](../../bindings/rust/tests/value_notifications_v1.rs).
+They distinguish real queue FIFO/interleaving, copied text, table columns above 1,
+stale selected generations and later setters from synthetic protocol values.
+Node [initial](../../bindings/node/test/notifications-v1-protocol.test.cjs)/[value](../../bindings/node/test/value-notifications-protocol.test.cjs)
+and language-specific providers cover malformed negotiation/capacity/union output;
+maximal uint64 frames and oversized synthetic payloads are **not** real UI proof.
+
+Observed historical evidence, not a fresh run: integrator's offline Linux
+[`test_notification_bindings.py`](../../scripts/test_notification_bindings.py)
+log `/tmp/cui-next39-rust-value-bindings.log` records source
+`4aa3c3d02bac4a5b3b24320d08790a667fbc6ce3`, shared bridge SHA256
+`fa9cb17db1317ac3c3ae23959f4091ca12f5f85dc5db80cdb5ed4f1d1082b946`,
+**52/52 passed, 122.78 s**. The integrator separately recorded unchanged library
+hash before/after. This precedes later native component-event slices; it is not
+validation of current `9ba9c78c` binaries, Python/Node runtime cases, macOS/Windows,
+native SDL lifecycle windows or all 78 family semantics.
+
+That 52-case configuration includes four Go/Rust static/dynamic real+legacy suites
+with `CUI_VALUE_REAL=1`, fourteen initial protocol cases (seven modes per language),
+two genuine pre-V1 unavailable cases, 26 value protocol cases (13 separate provider
+modes per language), and six genuine initial-V1/optional-unavailable no-drain cases.
+Older-library flags are required for those optional cases; a shorter run with
+skips/omitted flags is not 52-case proof. Rust static uses paired SDK; injected and
+older-library interposition remain dynamic only. The runner disables downloads,
+checks SDK source freshness, builds separate strict C11 providers and uses private
+`test_local.py`; it does not run the separate native window lifecycle suite.
+
+No suite was executed and no manifest status was promoted by this documentation
+refresh. Future foreign typed/controlled/lifecycle work needs its own reviewed
+protocol, exception/reentrancy/storage and real-input tests; native source-header
+availability alone is insufficient.

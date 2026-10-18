@@ -193,7 +193,8 @@
     "cui_control_events": [],
     "cui_boolean_events": [
       "src/base/cui_boolean_events.c"
-    ]
+    ],
+    "cui_slider_events": []
   },
   "native": {
     "text": [

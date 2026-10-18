@@ -90,9 +90,9 @@ file(WRITE "${{CMAKE_BINARY_DIR}}/properties.txt" "${{bundle}}\\n${{sources}}")
         search_file = build / 'cui-bundle-probe-Release-directories.txt'
         search = search_file.read_text()
         for suffix in ('sdl', 'text', 'runtime'):
-            self.assertIn(str(initial / suffix), search)
+            self.assertIn((initial / suffix).as_posix(), search)
         self.assertNotIn('ignored-provider', search)
-        self.assertIn(str(search_file), install)
+        self.assertIn(search_file.as_posix(), install)
         self.assertNotIn('$<LINK_ONLY:', search)
         self.assertIn('$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/probe.app', install)
         self.assertIn('cui_sign_macos_development_bundle', install)
@@ -112,17 +112,19 @@ endfunction()
         script = build / 'fixup-probe.cmake'
         prefix = '/install prefix with spaces'
         stage = build / 'DESTDIR with spaces'
-        script.write_text(f'set(CMAKE_MODULE_PATH [==[{module}]==])\n'
+        script.write_text(f'set(CMAKE_MODULE_PATH [==[{module.as_posix()}]==])\n'
                           f'set(CMAKE_INSTALL_PREFIX [==[{prefix}]==])\n' + fragment + '\n')
+        # DESTDIR is an environment value, not a CMake-generated path literal.
+        # Preserve its native spelling in both the input and observed prefix.
         env = dict(os.environ, DESTDIR=str(stage))
         run = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True, env=env)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         observed = (build / 'observed.txt').read_text().splitlines()
         self.assertEqual(observed[0], str(stage) + prefix + '/probe.app')
         directories = observed[1].split(';')
-        self.assertEqual(directories.count(str(initial / 'text')), 1)
+        self.assertEqual(directories.count((initial / 'text').as_posix()), 1)
         for suffix in ('sdl', 'text', 'runtime'):
-            self.assertIn(str(initial / suffix), directories)
+            self.assertIn((initial / suffix).as_posix(), directories)
         # No cached search list may retain a previous resolved dependency prefix.
         replacement = build / 'replacement providers'
         run = subprocess.run(['cmake', '-S', str(build.parent), '-B', str(build),
@@ -130,9 +132,27 @@ endfunction()
                              capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         regenerated = install_path.read_text()
-        self.assertIn(str(search_file), regenerated)
-        self.assertNotIn(str(initial), search_file.read_text())
-        self.assertIn(str(replacement / 'sdl'), search_file.read_text())
+        self.assertIn(search_file.as_posix(), regenerated)
+        self.assertNotIn(initial.as_posix(), search_file.read_text())
+        self.assertIn((replacement / 'sdl').as_posix(), search_file.read_text())
+
+    def test_windows_module_path_literal_has_no_backslash_escapes(self):
+        # Exercise Windows spelling on every host, including characters used by
+        # the provider fixture. This is a CMake parser test, not filesystem I/O
+        # against the synthetic Windows path.
+        module = pathlib.PureWindowsPath(r'C:\Users\fixture\build\pinned deps ${cash} ]=]\modules')
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            observed = root / 'observed.txt'
+            script = root / 'windows-path.cmake'
+            script.write_text(
+                f'set(CMAKE_MODULE_PATH [==[{module.as_posix()}]==])\n'
+                f'file(WRITE [==[{observed.as_posix()}]==] "${{CMAKE_MODULE_PATH}}")\n')
+            result = subprocess.run(['cmake', '-P', str(script)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(observed.read_text(),
+                             'C:/Users/fixture/build/pinned deps ${cash} ]=]/modules')
+            self.assertNotIn('\\', observed.read_text())
 
     @unittest.skipUnless(sys.platform.startswith('linux'),
                          'uses the Linux linker to test the isolated resolver')

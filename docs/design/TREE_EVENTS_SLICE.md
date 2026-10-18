@@ -182,3 +182,10 @@ Root retains build/source registration, generated exports/SDKs and binding work.
 Aggregate-only wrappers are simpler but lose exact transitions/invocations; there
 are narrow real assignment seams here, so they are not the preferred alternative.
 No production edits or builds were performed for this checkpoint.
+
+## Selection implementation checkpoint
+
+The first approved slice implements Base/reduce-only/Styled per-write selection
+notifications through a shared reducer seam. Expansion and activation observers
+remain pending independent commits. Legacy aggregate results and public layouts
+are unchanged; no model setter or binding callback is added by this slice.

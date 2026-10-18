@@ -61,6 +61,7 @@ typedef struct {
 } cui_tree_result;
 cui_id cui_tree_row_id(cui_id container, cui_id node_key);
 cui_id cui_tree_toggle_id(cui_id container, cui_id node_key);
+/* Applied input observers: see cui_tree_events.h. */
 /* Base handles input/semantics without drawing; layout visible row/toggle IDs. */
 cui_tree_result cui_tree_reduce(cui_context *, cui_id, cui_tree_model *, cui_tree_state *,
                                 cui_id *selected, cui_tree_options);

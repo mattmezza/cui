@@ -1,13 +1,14 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_tree.h"
+#include "cui/cui_tree_events.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_scroll.h"
 #include <math.h>
 static cui_id cui_tree_style_id(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x18d9f87aab972b61) + UINT64_C(0x9e3779b97f4a7c15) * index);
 }
-cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tree_model *model,
-                         cui_tree_state *state, cui_id *selected, cui_tree_options options) {
+static cui_tree_result cui_tree_common(cui_context *ui, cui_id id, const cui_theme *t,
+    cui_tree_model *model, cui_tree_state *state, cui_id *selected, cui_tree_options options,
+    cui_tree_handler handler, cui_tree_event_result *out) {
     if (!ui || !t || !state || !model || !selected)
         return (cui_tree_result){.error = CUI_TREE_INVALID};
     float row = isfinite(options.row_height) && options.row_height > 0
@@ -15,7 +16,13 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
                     : 32;
     float height = isfinite(options.height) && options.height > 0 ? options.height : 240;
     float width = isfinite(options.width) && options.width > 0 ? options.width : 320;
-    cui_tree_result result = cui_tree_reduce(ui, id, model, state, selected, options);
+    cui_tree_result result;
+    if (out) {
+        *out = cui_tree_reduce_events(ui, id, model, state, selected, options, handler);
+        result = out->result;
+    } else {
+        result = cui_tree_reduce(ui, id, model, state, selected, options);
+    }
     cui_tree_view view = cui_tree_viewport(model, state->scroll, height, row, options.overscan);
     cui_scroll_options bars =
         cui_scroll_resolve(t, (cui_scroll_options){.vertical = true,
@@ -90,4 +97,21 @@ cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *t, cui_tre
                                 (cui_size){width, view.total}, bars);
     cui_end_box(ui);
     return result;
+}
+
+cui_tree_result cui_tree(cui_context *ui, cui_id id, const cui_theme *theme, cui_tree_model *model,
+                         cui_tree_state *state, cui_id *selected, cui_tree_options options) {
+    return cui_tree_common(ui, id, theme, model, state, selected, options,
+                           (cui_tree_handler){0}, NULL);
+}
+cui_tree_event_result cui_tree_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_tree_model *model,
+    cui_tree_state *state, cui_id *selected, cui_tree_options options, cui_tree_handler handler) {
+    cui_tree_event_result out = {0};
+    if (!ui || !id || !theme || !model || !state || !selected) {
+        out.result.error = CUI_TREE_INVALID;
+        return out;
+    }
+    (void)cui_tree_common(ui, id, theme, model, state, selected, options, handler, &out);
+    return out;
 }

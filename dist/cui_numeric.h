@@ -107,6 +107,9 @@ bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_s
 
 #if defined(CUI_NUMERIC_IMPLEMENTATION) && defined(CUI_NUMERIC_DECLARATIONS_READY) && !defined(CUI_NUMERIC_IMPLEMENTATION_ONCE)
 #define CUI_NUMERIC_IMPLEMENTATION_ONCE
+#ifndef CUI_NUMBER_EVENTS_IMPLEMENTATION
+#define CUI_NUMBER_EVENTS_IMPLEMENTATION
+#endif
 #include "cui_number_events.h"
 /* src/base/cui_numeric.c */
 /* SPDX-License-Identifier: MIT */

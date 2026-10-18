@@ -69,4 +69,8 @@ The focused `tests/unit/test_component_events.c` exercises actual accepted point
 python scripts/test_local.py --build-dir build -- -R component_events
 ```
 
-The integrator owns build/test registration and generated distribution, SDK and human/LLM API indexes. Until those generators are run, this source guide is the authority for the new helper; do not infer wrapper availability from the public C header alone.
+The helper is registered in native and WASI tests and included in generated distributions, the Go/Rust source SDKs and the agent resource index. Inclusion of a C header in a source SDK does not expose a language wrapper. Binding event facades remain documented omissions.
+
+## Nonblocking application work
+
+The separate [async HTTPS fetch example](../examples/async_fetch/README.md) builds an actual native UI using the existing synchronous Button callback. It copies requests to a worker, shows loading, prevents duplicate requests, delivers completions through a bounded mailbox and wakes the idle UI. Its guide covers failure, retry, stale responses, cancellation and joined shutdown, with deterministic offline tests. Networking and worker code belong to the optional Linux host example; they are not Core APIs or a replacement event-dispatch architecture.

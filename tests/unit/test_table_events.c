@@ -18,7 +18,10 @@ typedef struct {
     cui_table_activation activations[32];
     cui_table_context_request contexts[32];
     size_t activation_calls, context_calls;
-    bool observe_actions, consume_selection;
+    bool observe_actions, consume_selection, observe_mode;
+    cui_table_mode_request modes[32];
+    size_t mode_calls;
+    cui_id mode_focus[32];
     size_t selection_calls, trace_length;
     char trace[128];
     bool observe_selection;
@@ -92,6 +95,15 @@ static void context_requested(void *user,const cui_table_context_request *event)
     assert(!(event->event.flags&CUI_COMPONENT_EVENT_HAS_ACTIVATION));
     f->contexts[f->context_calls++]=*event;f->remove_requested=true;assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='Q';
 }
+static void mode_requested(void *user,const cui_table_mode_request *event) {
+    fixture *f=user;assert(!f->render_started&&f->mode_calls<32);
+    assert(event->event.kind==CUI_COMPONENT_EVENT_REQUEST&&event->event.target==90);
+    assert(event->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX);
+    assert(event->event.frame_sequence==cui_frame_sequence(f->ui));
+    assert(event->requested==CUI_TABLE_SELECT_ROW);
+    f->mode_focus[f->mode_calls]=cui_focused(f->ui);
+    f->modes[f->mode_calls++]=*event;f->trace[f->trace_length++]='R';
+}
 static cui_str label(void *user,size_t row,cui_id column){
     fixture *f=user;assert(row<2&&(column==COL_A||column==COL_B));f->render_started=true;f->renders++;
     return f->rows[row].label;
@@ -106,6 +118,7 @@ static cui_table_event_result frame(fixture *f,unsigned mode,bool legacy,bool ha
         .on_sort=handler?sort_changed:NULL,
         .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,
         .on_activate=handler&&f->observe_actions?activated:NULL,
+        .on_mode_request=handler&&f->observe_mode?mode_requested:NULL,
         .on_context_request=handler&&f->observe_actions?context_requested:NULL,.user=f};
     if(mode==2) {
         if(legacy)r.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
@@ -291,6 +304,7 @@ static cui_table_set_event_result set_frame(set_fixture *s,unsigned mode,bool le
     cui_table_set_event_handler h={.on_selection=handler&&!s->sort_only?set_changed:NULL,.on_sort=handler?sort_changed:NULL,
         .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,
         .on_activate=handler&&f->observe_actions?activated:NULL,
+        .on_mode_request=handler&&f->observe_mode?mode_requested:NULL,
         .on_context_request=handler&&f->observe_actions?context_requested:NULL,.user=s};
     if(mode==2) {
         if(legacy)r.events.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
@@ -789,4 +803,65 @@ static void contexts(unsigned mode,bool sets) {
     }
 }
 
-int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);column_changes(mode,false);column_changes(mode,true);actions(mode,false);actions(mode,true);contexts(mode,false);contexts(mode,true);}progress_and_consumption();set_maximum();return 0;}
+static void mode_requests(unsigned mode,bool sets) {
+    for(unsigned policy=0;policy<7;policy++) {
+        set_fixture a,b;action_init(&a);action_init(&b);b.f.observe_mode=true;
+        cui_table_options o=options();o.row_header=true;
+        if(policy==1)o.selection_mode=CUI_TABLE_SELECT_ROW;
+        if(policy==2)o.row_selection_disabled=true;
+        if(policy==3)o.manual_selection=true;
+        if(policy==4)o.disabled=true;
+        if(policy==5)o.loading=true;
+        if(policy==6){b.sort_only=true;b.f.observe_selection=false;}
+        action_frame(&a,mode,sets,true,false,0,o);action_frame(&b,mode,sets,false,true,0,o);
+        cui_id id=cui_table_row_header_id(90,1);
+        cui_focus(a.f.ui,id);cui_focus(b.f.ui,id);
+        for(size_t i=0;i<2;i++){key(&a.f,CUI_KEY_ENTER);key(&b.f,CUI_KEY_ENTER);}
+        cui_table_event_result ar=action_frame(&a,mode,sets,true,false,0,o);
+        cui_table_event_result br=action_frame(&b,mode,sets,false,true,0,o);
+        set_compare(&a,&b,ar.control,br.control);
+        size_t expected=(policy==2||policy==4||policy==5)?0:2;
+        assert(br.mode_request_count==expected&&b.f.mode_calls==expected);
+        for(size_t i=0;i<expected;i++)assert(b.f.modes[i].row==1&&b.f.modes[i].current==o.selection_mode&&b.f.modes[i].reason==CUI_TABLE_MODE_FROM_ACTIVATION);
+        if(policy<2)assert(b.f.trace_length==5&&!memcmp(b.f.trace,sets?"MARAR":"SARAR",5));
+        /* HOME retains repeated same-row intent; manual navigation is silent. */
+        for(size_t i=0;i<2;i++){key(&a.f,CUI_KEY_HOME);key(&b.f,CUI_KEY_HOME);}
+        ar=action_frame(&a,mode,sets,true,false,0,o);br=action_frame(&b,mode,sets,false,true,0,o);
+        set_compare(&a,&b,ar.control,br.control);
+        size_t navigation=(policy==2||policy==3||policy==4||policy==5)?0:2;
+        assert(br.mode_request_count==navigation);
+        for(size_t i=expected;i<b.f.mode_calls;i++)assert(b.f.modes[i].reason==CUI_TABLE_MODE_FROM_NAVIGATION&&b.f.modes[i].row==1);
+        finish(&a.f);finish(&b.f);
+    }
+    /* Input consumption by a selection callback cannot erase frozen evidence. */
+    set_fixture b;action_init(&b);b.f.observe_mode=true;b.f.consume_selection=true;
+    cui_table_options o=options();o.row_header=true;action_frame(&b,mode,sets,false,true,0,o);
+    cui_focus(b.f.ui,cui_table_row_header_id(90,1));key(&b.f,CUI_KEY_DOWN);
+    cui_table_event_result br=action_frame(&b,mode,sets,false,true,0,o);
+    assert(br.mode_request_count==1&&br.selection_count==1&&b.f.modes[0].row==2);
+    assert(b.f.mode_focus[0]==cui_table_row_header_id(90,1)&&cui_focused(b.f.ui)==cui_table_row_header_id(90,2));
+    cui_component_event_metadata first=sets?b.changes[0].event:b.f.selections[0].event;
+    assert(first.flags==b.f.modes[0].event.flags&&first.event_index==b.f.modes[0].event.event_index&&first.source==b.f.modes[0].event.source);
+    finish(&b.f);assert(b.f.modes[0].row==2);
+    /* Pointer intent keeps exact row keys; capacity failure does not veto it. */
+    set_fixture a;action_init(&a);action_init(&b);b.f.observe_mode=true;
+    const cui_id exact=UINT64_MAX-3;
+    a.f.rows[0].key=b.f.rows[0].key=exact;
+    assert(cui_table_bind(a.f.model,a.f.rows,2,a.f.columns,2)==CUI_TABLE_OK);
+    assert(cui_table_bind(b.f.model,b.f.rows,2,b.f.columns,2)==CUI_TABLE_OK);
+    if(sets)a.f.state.selection_capacity=b.f.state.selection_capacity=0;
+    action_frame(&a,2,sets,true,false,0,o);action_frame(&b,2,sets,false,true,0,o);
+    click(&a.f,cui_table_row_header_id(90,exact));click(&b.f,cui_table_row_header_id(90,exact));
+    cui_table_event_result ar=action_frame(&a,mode,sets,true,false,0,o);
+    br=action_frame(&b,mode,sets,false,true,0,o);set_compare(&a,&b,ar.control,br.control);
+    assert(br.mode_request_count==1&&br.activation_count==1&&br.control.selection_mode_requested);
+    assert(b.f.modes[0].row==exact&&b.f.modes[0].event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER);
+    if(sets)assert(br.control.error==CUI_TABLE_CAPACITY&&!br.selection_count);
+    finish(&a.f);finish(&b.f);assert(b.f.modes[0].row==exact);
+    for(unsigned passive=1;passive<3;passive++) {
+        action_init(&b);b.f.observe_mode=true;action_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(b.f.ui,cui_table_row_header_id(90,1));key(&b.f,CUI_KEY_ENTER);
+        br=action_frame(&b,mode,sets,false,true,passive,o);assert(!br.mode_request_count);finish(&b.f);
+    }
+}
+int main(void){for(unsigned mode=0;mode<3;++mode){mode_requests(mode,false);mode_requests(mode,true);sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);column_changes(mode,false);column_changes(mode,true);actions(mode,false);actions(mode,true);contexts(mode,false);contexts(mode,true);}progress_and_consumption();set_maximum();return 0;}

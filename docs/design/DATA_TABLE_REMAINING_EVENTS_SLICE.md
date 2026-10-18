@@ -112,7 +112,7 @@ typedef void (*cui_table_mode_request_fn)(void *user, const cui_table_mode_reque
    saturating with the existing `count_overflow`. Context does not synthesize
    activation. No coordinates, menu ownership, acceptance return or popup lifecycle
    are promised; caller can identify the item with keys/area and existing ID helpers.
-2. **Pending independent mode-request slice:** independently add `on_mode_request` and
+2. **Implemented independent mode-request slice:** independently add `on_mode_request` and
    `mode_request_count`. This is deliberately separate from selection CHANGE:
    the application decides next submission's options, but ignoring the request
    does not undo the current effective ROW selection attempt. No generalized
@@ -249,7 +249,7 @@ observers, then delivers accepted actions at the old write points, including
 unchanged/selection-disabled/nonselectable/capacity attempts. Context remains a
 secondary-press request at its existing fields, with no activation or owner write.
 Scalar/set facades share the new fields/counters; NULL set-selection permits
-ignored workspace. No mode-request/completion callback is exposed.
+ignored workspace. Mode-request callbacks are now implemented independently; completion remains result-only.
 
 Tests preserve the bounded 256-element/1024-command context fixture while keeping
 4096-entry selection coverage. Actual queued keys/pointers cover repeated actions,
@@ -259,3 +259,10 @@ nonselectable distinctions, passive/loading policies, optional observers,
 callback-before-paint and paired legacy owner/result/semantics/geometry/paint.
 Accessibility focus is exercised and ACTIVATE rejection checked at the public
 queue API. Payload copies/deferred teardown intent retain existing lifetime rules.
+
+Mode-request implementation checkpoint: both scalar/set facades report actual
+legacy ROW requests with causal facts frozen before selection observers and
+notification after old flag writes, before navigation focus/reveal. Verified
+legacy/facade comparisons across reducer/Base/Styled, repeated intents, manual/
+disabled/loading/passive paths, nil-selection workspace, consumed input, exact
+pointer row keys and selection-capacity errors. No completion hook added.

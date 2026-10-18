@@ -192,6 +192,31 @@ ACTIVATE without a pointer_activatable override; no role remap or parity claim.
 Both payloads are pointer-free and copyable beyond the callback/frame/context.
 Handler/user and active resources retain the borrowed lifetimes and mutation/
 reentrancy/destruction restrictions above. Record intent and defer teardown.
-Mode-request callbacks are not implemented. Read viewport/load observations from
+Read viewport/load observations from
 `control` after submission: they remain completion aggregates, not per-input
 callbacks or a networking API. The bridge/bindings do not gain these native events.
+
+## Row-mode intent requests
+
+Both handler types accept `on_mode_request(user, const cui_table_mode_request *)`;
+`mode_request_count` counts actual synchronous calls, saturating with
+`count_overflow`. The pointer-free REQUEST contains `current` (the submitted
+options selection mode), `requested` (ROW), effective `row`, and `reason`
+(`CUI_TABLE_MODE_FROM_ACTIVATION` or `CUI_TABLE_MODE_FROM_NAVIGATION`).
+
+Row-header activation runs selection CHANGE, ACTIVATE, legacy mode-request flag
+writes, then mode REQUEST. Automatic row-header navigation runs selection CHANGE,
+flag writes, REQUEST, then the existing focus/reveal work. Facts and real input
+evidence freeze before the first selection observer. Requests survive failed or
+unchanged selection, including repeated HOME and already-ROW intents. This is
+notification of existing intent: no options mutation, veto, commit or rollback.
+Manual navigation and disabled row selection do not request mode; manual
+activation retains the legacy request behavior. Disabled/loading/inert/layout-only
+paths remain unchanged. Missing callbacks ignore user; a set facade with no
+selection observer ignores its workspace even with a mode observer installed.
+
+Callbacks run before paint and may copy facts or update unrelated state. Do not
+mutate active options/owner/model/workspace, recurse, destroy resources or unwind
+across C. Defer teardown until submission and renderer consumption finish.
+Viewport/load remain result-only completion observations. No bridge/binding API
+or accessibility ACTIVATE support is added by this slice.

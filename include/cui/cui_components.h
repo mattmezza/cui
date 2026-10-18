@@ -3,6 +3,7 @@
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
 #include "cui_control_events.h"
+#include "cui_boolean_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
@@ -290,6 +291,14 @@ cui_id cui_switch_thumb_id(cui_id);
 bool cui_switch_ex(cui_context *, cui_id, const cui_theme *, cui_str label, bool *value,
                    cui_switch_state *, cui_switch_options);
 bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+/* Immutable controlled snapshot. Legacy on_change/change_user must both be NULL;
+ * conflicts fail before semantics/state/paint. Handler may accept externally;
+ * requests, semantics and painting retain entry value for this call. Optional
+ * state retains spring/tooltip presentation only. Same teardown preconditions
+ * as cui_base_switch_events; no handler means read-only. */
+cui_component_action_result cui_switch_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                               bool, cui_switch_state *, cui_switch_options,
+                                               cui_component_boolean_handler);
 typedef enum { CUI_TOGGLE_GHOST, CUI_TOGGLE_OUTLINE } cui_toggle_variant;
 typedef struct {
     cui_toggle_variant variant;
@@ -313,6 +322,11 @@ cui_toggle_options cui_toggle_options_default(void);
 void cui_toggle_paint(cui_context *, cui_id, const cui_theme *, cui_str, bool, cui_toggle_options);
 bool cui_toggle_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
                    cui_hover_state *tooltip_state, cui_toggle_options);
+/* Same immutable/request/conflict rules as cui_switch_events. Tooltip state is
+ * optional presentation storage; passive ancestors do not mutate it. */
+cui_component_action_result cui_toggle_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                               bool, cui_hover_state *, cui_toggle_options,
+                                               cui_component_boolean_handler);
 typedef struct {
     cui_id id;
     cui_str label;

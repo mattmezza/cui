@@ -5,7 +5,8 @@
 one inside its same-ID layout box. Switch retains `CUI_ROLE_SWITCH`; Toggle
 retains `CUI_ROLE_BUTTON`. Neither is implemented by remapping Check semantics.
 The separate shared `cui_control_events.h` provides the result and metadata types.
-Styled facades, language bindings and build/export registration are separate work.
+`cui_components.h` adds Styled `cui_switch_events` and `cui_toggle_events`.
+Language bindings and generated build/export registration remain separate work.
 
 ```c
 #include <cui/cui_boolean_events.h>
@@ -84,3 +85,56 @@ protected phases, inert/layout-only/omitted/disabled submissions, exact role/foc
 policy, disabled-parent routing, and legacy aggregate compatibility. Build
 registration and generated SDK resources must be integrated by the module owner;
 this guide does not claim those snapshots already contain the new API.
+
+
+## Styled Switch and Toggle
+
+The additive Styled facades accept the same bool snapshot and typed handler as
+Base, plus existing appearance options and optional presentation state:
+
+```c
+/* During an ordinary frame, inside the application's parent layout box: */
+cui_component_action_result submit_styled_flag(cui_context *ui, cui_id id,
+                                               const cui_theme *theme, model *state,
+                                               cui_switch_state *motion) {
+    return cui_switch_events(ui, id, theme, cui_string("Enabled"), state->enabled,
+        motion, (cui_switch_options){.size = CUI_CONTROL_SMALL},
+        (cui_component_boolean_handler){requested, state});
+}
+```
+
+Switch owns its root, track, thumb and label/content layout. Optional
+`cui_switch_state` retains spring and tooltip presentation; it never owns the
+boolean model. Toggle uses existing `cui_toggle_paint` and optional
+`cui_hover_state` for its tooltip. Accessibility names, size/design metrics,
+custom content, focus styling, disabled appearance and tooltip options retain
+their existing roles. Do not wrap these Styled calls in another same-ID box;
+that same-ID box requirement applies to the headless Base entry points.
+
+Both legacy `on_change` **and** `change_user` option fields must be NULL, even
+when the new handler is absent. Any conflict fails preflight with `valid=false`
+before semantic submission, content callbacks, spring/tooltip mutation or paint.
+Missing new handler remains read-only, rather than selecting legacy mutation.
+
+A handler assignment changes application state immediately, while all requests,
+semantics and paint in this invocation keep the original bool. The next
+submission reflects the assignment. Passive inert/layout-only composition can
+still measure/paint content, but emits no requests and does not mutate caller
+spring or tooltip storage. Outside submission/protected phases the new facades
+return without invoking content or touching presentation state.
+
+Legacy `cui_switch_ex` and `cui_toggle_ex` remain aggregate. Their callbacks still
+run before reading the external bool for semantic/paint updates. Switch's private
+paint extraction retains its old dereference sequence: label-left content may
+change the external value after spring-target calculation and before track-color
+selection. The new facade deliberately supplies a local entry snapshot to that
+same paint path; it does not retime legacy behavior.
+
+`test_boolean_styled_events.c` checks controlled accept/reject painting and
+semantics, pointer/key/accessibility multiplicity, read-only and disabled behavior,
+all frozen size metrics and an explicit design size, custom content geometry,
+all callback/user conflict combinations, passive storage preservation, and legacy
+callback/content mutation timing. Existing Button/Check and Base boolean fixtures
+remain independent regression coverage. Active-context destruction and recursive
+submission remain unsupported as documented above; no cross-language event
+coverage is implied.

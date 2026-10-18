@@ -322,7 +322,8 @@ static void placeholder_alignment(void) {
             float factor = align == CUI_ALIGN_CENTER ? .5f : align == CUI_ALIGN_END ? 1 : 0;
             assert(fabsf(text.x - (viewport.x + (viewport.w - text.w) * factor)) < .001f);
             if (focused) {
-                cui_rect caret = cui_bounds(ui, 1 ^ UINT64_C(0xb1642b97583fbd65));
+                cui_rect caret;
+                assert(cui_text_input_rect(ui, &caret));
                 assert(fabsf(caret.x - (viewport.x + (viewport.w - 1) * factor)) < .001f);
             }
         }

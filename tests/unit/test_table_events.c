@@ -23,7 +23,11 @@ typedef struct {
     cui_draw_list draw;
 } fixture;
 static void init(fixture *f) {
-    memset(f,0,sizeof *f);f->ui=cui_create((cui_config){.width=600,.height=300});assert(f->ui);
+    /* Virtualized fixtures submit a small viewport even for the 4096-row model.
+     * Bound context storage to that viewport instead of repeatedly zeroing the
+     * application-sized defaults across the legacy/facade comparison matrix. */
+    memset(f,0,sizeof *f);f->ui=cui_create((cui_config){.width=600,.height=300,
+        .max_elements=256,.max_commands=1024});assert(f->ui);
     f->model=cui_table_create(2);assert(f->model);
     f->rows[0]=(cui_table_row){1,{"One",3},false};f->rows[1]=(cui_table_row){2,{"Two",3},false};
     f->columns[0]=(cui_table_column){.key=COL_A,.label={"Alpha",5},.width=150,.sortable=true};

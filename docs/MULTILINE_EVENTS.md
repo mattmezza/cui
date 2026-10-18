@@ -1,4 +1,4 @@
-# Textarea aggregate CHANGE observers
+# Multiline aggregate CHANGE observers
 
 Include `cui/cui_multiline_events.h` for `cui_base_textarea_events` and
 `cui_textarea_events`. Each mirrors its existing Textarea entrypoint, appends a
@@ -57,10 +57,8 @@ guard. To close or remove the control, set an application flag and omit it on a
 later frame; defer destruction until the frame and renderer have consumed borrowed
 resources. An observer cannot reject an already committed edit.
 
-This slice does not add Editor, multi-cursor selection, REQUEST, COMMIT, SUBMIT,
-or language-binding observers. Editor's completion/multi-cursor/Textarea passes
-need a separately owned outer notification seam; wrapping its nested Textarea
-would miss mutations.
+These facades do not add multi-cursor selection notifications, REQUEST, COMMIT,
+SUBMIT, or language-binding observers.
 
 `tests/unit/test_textarea_events.c` checks old/new text, selection, revision/history,
 aggregate results, semantic identity/value and draw-command equivalence; multiple
@@ -69,3 +67,40 @@ readonly/disabled and Enter behavior; bounded copies; deferred omission; committ
 edits followed by row-capacity failure; and the direct Base type-then-Undo case.
 Legacy Textarea and Editor tests remain required. Native test execution uses the
 private-display `scripts/test_local.py` wrapper. No browser/binding parity is claimed.
+
+
+## Editor observers
+
+Include `cui/cui_editor_events.h` for `cui_base_editor_events` and
+`cui_editor_events`. They mirror the corresponding legacy signatures, append the
+same text handler, and return `cui_multiline_event_result`. Editor's committed text
+is borrowed and not redacted, with scalar primary-selection snapshots only.
+
+Base Editor notifies after the entire existing call, including completion,
+multi-cursor, nested Textarea and final search/cursor synchronization. Styled
+Editor notifies after its **whole call**, including main painting and completion
+popup pointer acceptance. This timing differs from Styled Textarea, which notifies
+at its Base seam before paint. The nested Textarea is never observed or replayed.
+Keyboard and pointer completion acceptance and simultaneous multi-cursor edits all
+coalesce into at most one final revision notification.
+
+Editor metadata uses UNKNOWN source, no index/activation, and HAS_FRAME only when
+the actual frame sequence is nonzero. Its callback count derives from committed
+revision change even when the legacy result contains an error; `control` remains
+exactly the original result. Existing popup paint and mutation timing is preserved:
+the observer does not force a new paint to show a just-accepted completion. A later
+frame follows the existing invalidation behavior. Initial validation failures with
+no revision change do not notify. No cause is inferred from consumed events.
+
+The same no-mutation/reentry/destruction preconditions apply to Editor and its
+completion items, search matcher, folds, multi-cursor anchors/history/selection
+storage, clipboard scratch and highlight resources. Defer teardown until the outer
+facade returns and renderer consumption finishes. Set unrelated flags in the
+callback to omit the editor in a later frame.
+
+`tests/unit/test_editor_events.c` checks legacy result/paint/semantic equivalence,
+aggregate text batches, keyboard and pointer completion, multi-cursor edits, IME
+success/failure, null observer editing, copy lifetime, deferred omission, row
+capacity errors after mutation and failures before mutation. It also checks the
+Base facade with type-then-Undo returning to the same bytes. Legacy Editor and
+Textarea suites remain required; no browser or foreign-binding coverage is implied.

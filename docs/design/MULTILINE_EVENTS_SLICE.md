@@ -139,3 +139,8 @@ moves popup callbacks/paint. Tests must demonstrate pointer completion, exact ol
 return equivalence, and one final notification. Teardown remains deferred until
 the outer facade returns and renderer consumption finishes. The earlier proposed
 before-Styled-paint Editor seam is superseded by this concrete source finding.
+
+The current popup path already ORs its before/after revision comparison into
+`result.changed`; pointer acceptance is not evidence of an incorrect legacy flag.
+The facade must preserve that behavior and tests compare it directly. The outer
+seam is required because the mutation is later than Base, regardless of flags.

@@ -247,13 +247,18 @@ if (x < 2) puts("<script>");
             full = (output / 'llms-full.txt').read_text()
             layout = (output / 'tasks/layout.md').read_text()
             native = (output / 'tasks/native-app.md').read_text()
-            for guide in ('RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS'):
+            for guide in ('RESPONSIVE_LAYOUT', 'TYPOGRAPHY_TOKENS', 'LETTER_SPACING', 'COMPONENT_EVENTS'):
                 self.assertIn('./markdown/docs/' + guide + '.md', index)
                 self.assertIn(DOCS.markdown_for_agents(ROOT / 'docs' / (guide + '.md'), ROOT).strip(), full)
                 page = next(page for page in pages if page['slug'] == guide.lower())
                 self.assertEqual(page['category'], 'Guides')
             self.assertIn('cui_responsive_query', layout)
             self.assertIn('cui_typography_resolve', native)
+            events = (output / 'tasks/events.md').read_text()
+            self.assertIn('cui_component_event_metadata', events)
+            self.assertIn('async_fetch', events)
+            async_page = next(page for page in pages if page['source'].endswith('/examples/async_fetch/README.md'))
+            self.assertIn('async_fetch', async_page['html'])
 
     def test_collisions_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

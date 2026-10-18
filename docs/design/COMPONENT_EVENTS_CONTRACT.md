@@ -1,6 +1,9 @@
 # Component events: proposed contract and implementation slices
 
-Status: design proposal only. No API in this document is shipped. The committed
+Status: committed design checkpoint. The shared metadata utility is now
+[implemented](../COMPONENT_EVENTS.md); component-family facades and other
+contracts proposed below remain unimplemented unless explicitly linked to an
+implementation guide. The committed
 [78-family inventory](COMPONENT_EVENTS_COVERAGE.md) and
 [binding audit](COMPONENT_EVENTS_BINDINGS.md) accompany this checkpoint. Their
 source evidence establishes existing contracts and identifies missing proof;

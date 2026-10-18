@@ -1,9 +1,9 @@
 # Settings applied events
 
 Include `cui/cui_settings_events.h`. `cui_settings_events` preserves the existing
-Styled Settings operation and adds navigation and built-in scalar observers.
+Styled Settings operation and adds navigation and built-in value observers.
 `on_navigation` reports applied page/group selection, not an owner-rejectable request. Missing observers permit all legacy
-work and ignore user. No Base filter/reset helper or field callback contract changes.
+work and ignore user. Legacy Base filter/reset helper and field callback contracts stay unchanged.
 
 ```c
 static void navigation_changed(void *user, const cui_settings_navigation_change *change) {
@@ -55,8 +55,8 @@ Unrelated application flags may change; defer removal/omission/teardown until ou
 return plus renderer consumption. Legacy custom search/render/change/reset callbacks
 keep their timing and must preserve resources needed by the remaining old operation.
 
-Navigation and built-in scalar field changes are typed here. Text, reset, search
-and viewport observers need their own slices. C bridge and Python/JS/TS/Go/Rust still use their existing
+Navigation and built-in scalar/text changes, including explicit resets, are typed
+here. Search and viewport observers remain outside this facade. C bridge and Python/JS/TS/Go/Rust still use their existing
 Settings callback/polling paths; no per-navigation foreign callback or synchronous
 request is implied. Focused C tests do not establish browser or binding parity.
 
@@ -73,7 +73,8 @@ remains the Settings compound. Payloads are pointer-free and copyable by value.
 Boolean covers built-in Switch and Checkbox; Number carries actual doubles; choice
 carries owner choice IDs for both Menu-backed dropdown and legacy Select. Custom
 render overrides bypass these observers even when host rendering edits an owner.
-No text value, reset reason, request, COMMIT or per-input event is invented.
+Scalar adapters do not invent requests, COMMIT or per-input events. Text and RESET
+observations have the separate contracts below.
 
 Capture occurs immediately before one existing built-in adapter. The adapter runs
 once, records the existing first edit error, and invokes the old item `on_change`
@@ -89,11 +90,11 @@ are **aggregate notifications**, unlike per-navigation transitions.
 saturating at SIZE_MAX and setting shared `count_overflow`. Missing typed handlers
 preserve all old writes/callbacks. Disabled fields and passive/layout-only/inert
 submissions retain legacy maintenance, including Number bounds/last-value writes
-and old callbacks, but emit no new typed scalar notification. Enabled real final
+and old callbacks, but emit no new typed scalar EDIT notification. Enabled real final
 owner changes can be notified even with a nested edit error; errors and invalid
 flags are preserved, never used as an artificial change gate.
 
-Scalar metadata has a proven nonzero active frame, UNKNOWN source and no input
+Scalar EDIT metadata has a proven nonzero active frame, UNKNOWN source and no input
 index/activation. A whole adapter and its legacy callback may combine inputs or
 apply bounds without input, so a unique causal event cannot honestly be inferred.
 An enabled bounds adjustment is an applied change, not proof of user interaction.
@@ -161,5 +162,22 @@ does not disable a built-in reset. Missing defaults and unmatched items are sile
 A failed text replacement preserves its old failure/no-callback behavior and later
 items still run. A malformed later group returns `reset=false` after prior effects;
 counts and notifications remain, with no rollback. Missing handlers preserve all
-old work. The old helper remains available unchanged. This slice does not yet
-attach these observations to the Styled reset button.
+old work. The old helper remains available unchanged.
+
+
+The Styled reset button uses this same reset operation once, at its original place
+before field submission. RESET callbacks therefore precede any ensuing EDIT
+callbacks. For example, a Number default of 20 with maximum 10 reports RESET to 20,
+then the old adapter bounds pass reports EDIT to 10; no bounds or draft work moves.
+Reset success and old callback ordering remain unchanged, including same-value
+callbacks and custom-reset omission. Counts in `cui_settings_event_result` include
+both reasons and saturate independently.
+
+UI reset metadata is frozen before the first reset write. Exactly one matching
+activation with a genuine accepted snapshot retains its source/index/activation;
+`activation.target` stays the reset button ID while metadata target is Settings.
+Multiple matching activations, or unavailable snapshot evidence, get only the
+proven frame with UNKNOWN cause. The old Button aggregate remains one reset; input
+is never replayed. Passive/layout-only/inert calls preserve legacy work but do not
+notify. Disabled **fields** remain eligible for an explicit enabled reset action.
+No reset activation/lifecycle/COMMIT event or rejection semantics is introduced.

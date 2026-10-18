@@ -344,3 +344,14 @@ is claimed yet. Tests cover ordered callbacks, same-value defaults, disabled
 fields, custom-reset exclusion, nonfinite callback redirect, partial progress then
 malformed group, text capacity failure, missing handlers, copied text and atomic
 root admission. Programmatic metadata has no UI evidence.
+
+
+### Styled reset implementation checkpoint
+
+The old reset-button aggregate now calls the same optional observation seam once.
+Evidence is frozen before writes: one actual matching activation with accepted
+snapshot is copied; ambiguous/missing evidence gets frame-only UNKNOWN. Tests
+compare legacy and opt-in state, paint, semantics, focus, errors and callbacks;
+cover disabled-field inclusion, single/repeated keyboard activation, real copied
+snapshot identity, RESET20 then bounded EDIT10 order, missing handlers, text reset
+and passive/inert silence. No new dispatch, filter/reset policy or wrapper support.

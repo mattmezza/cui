@@ -1,6 +1,6 @@
 # Bridge scalar, text and selection notification checkpoint
 
-Status: **C opt-in poll, four-producer SCALAR and four-producer plain TEXT slices implemented in this branch**; see [the scalar guide](../BRIDGE_VALUE_NOTIFICATIONS.md). Selection and all value-poll wrappers remain proposals. Original read-only audit: `7bb03cd8`; the implementation preserves ABI/layout, generated SDKs and timing. This extends [the shipped V1 guide](../BRIDGE_NOTIFICATIONS.md) and [original bridge checkpoint](BRIDGE_TYPED_EVENTS_SLICE.md). All new names below require review. Preserve the 78-family manifest and queued notification boundary; this is not foreign synchronous veto, a new queue or direct-C event-facade forwarding.
+Status: **C opt-in poll, four-producer SCALAR, four-producer plain TEXT and five-producer SELECTION slices implemented in this branch**; see [the scalar guide](../BRIDGE_VALUE_NOTIFICATIONS.md). All value-poll wrappers remain proposals. Original read-only audit: `7bb03cd8`; the implementation preserves ABI/layout, generated SDKs and timing. This extends [the shipped V1 guide](../BRIDGE_NOTIFICATIONS.md) and [original bridge checkpoint](BRIDGE_TYPED_EVENTS_SLICE.md). All new names below require review. Preserve the 78-family manifest and queued notification boundary; this is not foreign synchronous veto, a new queue or direct-C event-facade forwarding.
 
 ## Blocking compatibility decision: reserved is not automatically deployable
 

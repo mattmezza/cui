@@ -69,7 +69,7 @@ static void capacity_and_interleave(void) {
     char maximum[4097]; memset(maximum, 'x', 4096); maximum[4096] = 0; type(app, maximum, CUI_BRIDGE_OK);
     cui_bridge_notification_v1 value, before; memset(&value, 0xa5, sizeof value); before = value;
     char text[4097] = "same"; uint32_t required = 77;
-    assert(cui_bridge_poll_value_notification_v1(app, sizeof value, 1u << CUI_BRIDGE_PAYLOAD_SELECTION,
+    assert(cui_bridge_poll_value_notification_v1(app, sizeof value, 1u << CUI_BRIDGE_PAYLOAD_LEGACY,
         &value, text, sizeof text, &required) == CUI_BRIDGE_INVALID_ARGUMENT);
     assert(!memcmp(&value, &before, sizeof value) && required == 77 && !strcmp(text, "same"));
     assert(cui_bridge_poll_value_notification_v1(app, sizeof value - 1, CUI_BRIDGE_VALUE_TEXT_V1,
@@ -105,6 +105,6 @@ static void overflow(void) {
     assert(value.text_length == 1 && !strcmp(text, "a")); empty(app); cui_bridge_destroy(app);
 }
 int main(void) {
-    assert(cui_bridge_notification_value_payloads_v1() == (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1));
+    assert(cui_bridge_notification_value_payloads_v1() == (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1 | CUI_BRIDGE_VALUE_SELECTION_V1));
     producers(); capacity_and_interleave(); overflow(); return 0;
 }

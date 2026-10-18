@@ -192,3 +192,14 @@ contract. Existing row/measurement callback contracts and permitted behavior are
 unchanged: the no-active-mutation restriction applies to the new observer only.
 MessageScroller production APIs in this checkpoint remain proposals. Virtual
 window completion remains result-only. No manifest or binding parity promotion.
+
+## Implemented MessageScroller slice
+
+`cui_message_events.h` now provides the proposed independent double-offset and
+following-tail Base/Styled observers. Read [MESSAGE_EVENTS](../MESSAGE_EVENTS.md).
+A private read-only Base-owned snapshot function reads actual opaque state before
+all reconciliation; no model layout getter or float conversion obtains entry data.
+Both existing private struct layouts are unchanged, with no retained observer.
+Explicit model mutators remain result-only, as approved above. The new observer's
+mutation restrictions do not alter legacy renderer/jump callback behavior.
+Window/render/data lifecycle, bridge exports and global propagation remain absent.

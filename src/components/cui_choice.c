@@ -1883,7 +1883,9 @@ static void cui_choice_menu_level(cui_context *ui, const cui_theme *theme,
             cui_begin_box(ui, 0, (cui_box){.width = metrics.padding_x - 4 * density});
             cui_end_box(ui);
             if (has_left_icon) {
-                cui_begin_box(ui, entry->id ^ UINT64_C(0x9e3f5d2a91bca001),
+                /* Paint-only wrapper: derive anonymous identity from its row,
+                 * avoiding cross-entry collisions with named icon resources. */
+                cui_begin_box(ui, 0,
                               (cui_box){.width = icon_size,
                                         .height = icon_size,
                                         .align_x = CUI_ALIGN_CENTER,

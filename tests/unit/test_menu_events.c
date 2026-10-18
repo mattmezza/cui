@@ -2,15 +2,9 @@
 #include "cui/cui_choice.h"
 #include <assert.h>
 #include <string.h>
-/* Opt-in known renderer collision reproducer, retained for the separate fix.
- * Compile this fixture with CUI_MENU_COMPACT_ID_REPRO to exercise compact IDs. */
-#ifdef CUI_MENU_COMPACT_ID_REPRO
+/* Compact IDs intentionally retain the radio12/submenu15 paint-ID regression. */
 enum { ACTION_ID = 10, CHECK_ID = 11, RADIO_ID = 12, DISABLED_ID = 13,
        LABEL_ID = 14, SUBMENU_ID = 15, CHILD_ID = 21 };
-#else
-enum { ACTION_ID = 1000, CHECK_ID = 2000, RADIO_ID = 3000, DISABLED_ID = 4000,
-       LABEL_ID = 5000, SUBMENU_ID = 6000, CHILD_ID = 7000 };
-#endif
 static cui_context *ui;
 static cui_menu_tree_state menu;
 static cui_id action;
@@ -72,7 +66,28 @@ static cui_menu_command_result frame(bool styled, bool observer, bool disabled,
             cui_end_box(ui); cui_overlay_end(ui);
         }
     }
-    cui_end_box(ui); cui_end_frame(ui);
+    cui_end_box(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    if (styled && menu.overlay.open && radio == 7) {
+        bool radio_glyph = false, submenu_glyph = false;
+        cui_rect radio_bounds = cui_bounds(ui, RADIO_ID), sub_bounds = cui_bounds(ui, SUBMENU_ID);
+        for (size_t i = 0; i < draw.count; i++) {
+            const cui_draw_command *command = &draw.commands[i];
+            if (command->type != CUI_DRAW_IMAGE) continue;
+            cui_bitmap bitmap = command->bitmap.bitmap;
+            size_t coverage = 0;
+            for (unsigned y = 0; y < bitmap.height; y++)
+                for (unsigned x = 0; x < bitmap.width; x++)
+                    coverage += bitmap.pixels[y * bitmap.stride + x * 4 + 3] != 0;
+            if (command->bounds.y >= radio_bounds.y &&
+                command->bounds.y + command->bounds.h <= radio_bounds.y + radio_bounds.h)
+                radio_glyph |= bitmap.width == 16 && coverage > 10;
+            if (command->bounds.y >= sub_bounds.y &&
+                command->bounds.y + command->bounds.h <= sub_bounds.y + sub_bounds.h)
+                submenu_glyph |= bitmap.width == 12 && coverage > 10;
+        }
+        assert(radio_glyph && submenu_glyph); /* Both real raster glyphs survive. */
+    }
     assert(cui_last_error(ui) == CUI_OK);
     if (!legacy) assert(result.valid);
     return result;

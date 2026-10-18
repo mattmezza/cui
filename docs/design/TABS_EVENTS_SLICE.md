@@ -145,3 +145,13 @@ new C proposal. Their queues retain post-frame timing and explicit payload
 allowlists; see [binding audit](COMPONENT_EVENTS_BINDINGS.md). Typed Tabs selection
 would require a separately owned queue/schema/wrapper slice with stable full-width
 IDs, bounded ownership and no synchronous owner-rejection claim.
+
+## Implementation status
+
+The approved aggregate slice is implemented in `cui_tabs_events.h`, with a whole
+Base wrapper in `src/base/cui_tabs_events.c` and the narrow Styled Base-call seam.
+See [the implementation guide](../TABS_EVENTS.md). Legacy maintenance still runs;
+notification is restricted to an active painted, non-disabled selection transition
+with a proven nonzero frame. Inert routing produces no synthetic selection event.
+This does not implement the per-transition alternative or foreign wrappers, and
+no parity status is promoted.

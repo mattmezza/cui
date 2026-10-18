@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "cui/cui_tabs_events.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_base.h"
 #include "cui/cui_components.h"
@@ -439,9 +440,10 @@ static void cui_tab_overflow_artwork(cui_context *ui, const cui_choice_item *ite
                                             .custom_color = true,
                                             .color = color});
 }
-bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
+static bool cui_tabs_common(cui_context *ui, cui_id container, const cui_theme *theme,
               const cui_choice_item *items, size_t count, cui_id *selected,
-              cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
+              cui_tabs_options options, cui_tab_panel_fn panel, void *user,
+              cui_tabs_handler handler, cui_tabs_event_result *events) {
     if (!theme || !items || !selected || !cui_design_valid(options.design_size) ||
         !cui_tabs_shadow_policy_valid(options))
         return false;
@@ -516,7 +518,13 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
 
     } else
         options.scroll = NULL;
-    bool changed = cui_base_tabs(ui, items, count, selected, options);
+    bool changed;
+    if (events) {
+        *events = cui_base_tabs_events(ui, container, items, count, selected, options, handler);
+        changed = events->changed;
+    } else {
+        changed = cui_base_tabs(ui, items, count, selected, options);
+    }
     if (scrollable) {
         cui_tab_scroll_state *scroll = options.scroll;
         if (options.reveal_selected && scroll->last_selected != *selected && !scroll->reveal_id)
@@ -866,6 +874,24 @@ bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
     cui_end_box(ui);
     return changed;
 }
+bool cui_tabs(cui_context *ui, cui_id container, const cui_theme *theme,
+              const cui_choice_item *items, size_t count, cui_id *selected,
+              cui_tabs_options options, cui_tab_panel_fn panel, void *user) {
+    return cui_tabs_common(ui, container, theme, items, count, selected, options, panel, user,
+                           (cui_tabs_handler){0}, NULL);
+}
+cui_tabs_event_result cui_tabs_events(
+    cui_context *ui, cui_id container, const cui_theme *theme, const cui_choice_item *items,
+    size_t count, cui_id *selected, cui_tabs_options options, cui_tab_panel_fn panel,
+    void *panel_user, cui_tabs_handler handler) {
+    cui_tabs_event_result result = {0};
+    if (!ui || !container || !selected)
+        return result;
+    result.changed = cui_tabs_common(ui, container, theme, items, count, selected, options,
+                                     panel, panel_user, handler, &result);
+    return result;
+}
+
 bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
                       const cui_choice_item *items, size_t count, bool *selected,
                       cui_toggle_group_options options) {

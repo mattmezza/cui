@@ -128,6 +128,7 @@ typedef void (*cui_tab_panel_fn)(cui_context *, size_t index, void *user);
  * they produce no visible panel. Base controls draw nothing. */
 /* Reveal content coordinates in an existing bounded scroll range. */
 bool cui_tab_scroll_reveal(cui_tab_scroll_state *, float start, float extent, float viewport);
+/* Additive aggregate selection observers: include cui_tabs_events.h. */
 bool cui_base_tabs(cui_context *, const cui_choice_item *, size_t count, cui_id *selected,
                    cui_tabs_options);
 bool cui_base_toggle_group(cui_context *, const cui_choice_item *, size_t count, bool *selected,

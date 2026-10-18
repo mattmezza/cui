@@ -71,7 +71,7 @@ static void number_and_protocol(void) {
     /* This is a real key mutation, not a setter-generated event. */
     cui_bridge_notification_v1 output, before; memset(&output, 0xa5, sizeof output); before = output;
     char text[8] = "same"; uint32_t required = 42;
-    uint32_t masks[] = {1u << CUI_BRIDGE_PAYLOAD_TEXT, 1u << CUI_BRIDGE_PAYLOAD_SELECTION, UINT32_MAX};
+    uint32_t masks[] = {1u << CUI_BRIDGE_PAYLOAD_SELECTION, UINT32_MAX};
     for (size_t i = 0; i < sizeof masks / sizeof masks[0]; i++) {
         assert(cui_bridge_poll_value_notification_v1(app, sizeof output, masks[i], &output,
             text, sizeof text, &required) == CUI_BRIDGE_INVALID_ARGUMENT);
@@ -185,6 +185,6 @@ static void non_scalar_and_hidden(void) {
 }
 int main(void) {
     assert(cui_bridge_notification_versions() == 1 && cui_bridge_notification_v1_size() == sizeof(cui_bridge_notification_v1));
-    assert(cui_bridge_notification_value_payloads_v1() == CUI_BRIDGE_VALUE_SCALAR_V1);
+    assert(cui_bridge_notification_value_payloads_v1() == (CUI_BRIDGE_VALUE_SCALAR_V1 | CUI_BRIDGE_VALUE_TEXT_V1));
     number_and_protocol(); other_scalars(); overflow_and_interleave(); non_scalar_and_hidden(); return 0;
 }

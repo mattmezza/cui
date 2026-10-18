@@ -115,30 +115,158 @@ unchanged legacy behavior. Missing callbacks ignore userdata and preserve writes
 This restriction belongs only to the additive facade, never the old API. Root
 must review it before production; full multi support is the next independent slice.
 
-## Multi-selection requires its own bounded snapshot contract
+## Multi-selection revision: exact API and workspace (review required)
 
-Do not report only primary IDs as the complete selected set or reconstruct
-changes from the final XOR hash. Add a separately reviewed set-observation API
-with explicit caller workspace: two disjoint arrays of `cui_table_selection`,
-each capacity at least the validated state selection capacity (legacy cap4096).
-Preflight sizes/disjointness before any mutation; no hidden allocation or oversized
-stack array. Copy before each real `apply_selection`/Escape operation and after
-it, preserving primary IDs separately. Canonicalize the two scratch snapshots by
-(row,column) key and compare exactly, including duplicate multiplicity; this
-avoids hash-collision claims and ignores storage-order-only changes. Do not rewrite
-or sort the actual caller selection array. Callback receives borrowed const
-before/after spans, primary IDs, effective mode and operation metadata. Copy spans
-explicitly for retention; struct copies alone are insufficient.
+This is a proposal only; none of these declarations is implemented. Keep the
+scalar API's `on_selection + multiple_selection` rejection. Add a distinct
+set-observation family, rather than changing scalar payload interpretation:
 
-Observe each actual logical set/primary transition after the operation completes,
-including multiple transitions per frame, not every internal range-array write.
-A rejected range/capacity operation produces no event unless it actually changed
-logical selection; earlier successful events remain delivered. Snapshot semantics
-are independently documented and may reveal changes hidden by the old aggregate
-hash, while leaving that old result untouched. This operation-level atomicity and
-workspace requirement justify a separate slice from scalar selection. Do not
-promise per-item deltas, full row payloads, an undo transaction or safe arbitrary
-workspace mutation during callbacks.
+```c
+typedef struct {
+    const cui_table_selection *items;
+    size_t count;
+} cui_table_selection_span;
+typedef struct {
+    cui_table_selection *previous, *value;
+    size_t capacity; /* Entries in EACH array, not combined bytes. */
+} cui_table_selection_workspace;
+typedef struct {
+    cui_component_event_metadata event;
+    cui_table_selection previous_primary, value_primary;
+    cui_table_selection_mode mode; /* Effective operation mode. */
+    cui_table_selection_span previous, value;
+} cui_table_selection_set_change;
+typedef void (*cui_table_selection_set_change_fn)(void *user,
+    const cui_table_selection_set_change *change);
+typedef struct {
+    cui_table_selection_set_change_fn on_selection;
+    cui_table_sort_change_fn on_sort;
+    void *user;
+} cui_table_set_event_handler;
+typedef enum {
+    CUI_TABLE_SET_PREFLIGHT_OK,
+    CUI_TABLE_SET_PREFLIGHT_INVALID,
+    CUI_TABLE_SET_PREFLIGHT_WORKSPACE_CAPACITY,
+    CUI_TABLE_SET_PREFLIGHT_OVERLAP
+} cui_table_set_preflight;
+typedef struct {
+    cui_table_event_result events;
+    cui_table_set_preflight preflight;
+} cui_table_set_event_result;
+cui_table_set_event_result cui_table_reduce_set_events(cui_context *, cui_id,
+    cui_table_model *, cui_table_state *, cui_table_options,
+    cui_table_selection_workspace, cui_table_set_event_handler);
+cui_table_set_event_result cui_base_data_table_set_events(cui_context *, cui_id,
+    cui_table_model *, cui_table_state *, cui_table_options,
+    cui_table_selection_workspace, cui_table_set_event_handler);
+cui_table_set_event_result cui_data_table_set_events(cui_context *, cui_id,
+    const cui_theme *, cui_table_model *, cui_table_state *, cui_table_options,
+    cui_table_label_fn, cui_table_cell_fn, void *,
+    cui_table_selection_workspace, cui_table_set_event_handler);
+```
+
+`events.control` remains the legacy result, including aggregate flags and partial
+operation errors. `events.selection_count` counts actual set callback calls,
+`sort_count` actual sort calls, with existing saturation/overflow policy. Callback
+order follows existing write points. No other handler fields are exposed. With a
+NULL set callback, ignore workspace and userdata (unless sort uses userdata),
+allow either selection mode, and preserve the sort-only/legacy path. With a
+non-NULL set callback, require `multiple_selection=true`; this family does not
+silently reinterpret single-selection state as a set.
+
+### Atomic preflight and alias contract
+
+Before **any** reducer bookkeeping, callback, semantics or Styled painting:
+
+1. Validate existing reducer arguments and multi count/capacity invariants without
+   normalization/writes. Require nonzero root ID and valid mode/sort fields, as in
+   the scalar facade. Non-NULL set callback with single selection is INVALID.
+2. For set observation, require `state.selection_capacity <= workspace.capacity
+   <= 4096`. Both scratch arrays contain `workspace.capacity` writable entries.
+   A zero capacity permits NULL arrays; a nonzero capacity requires both pointers,
+   suitable alignment and overflow-safe byte extents. Count must not exceed state
+   capacity; the state selection pointer is required when that capacity is nonzero.
+   Scratch shortage reports WORKSPACE_CAPACITY; invalid pointer/alignment/extent,
+   impossible count/capacity or oversized declared capacity reports INVALID.
+3. Reject overlap between the **full declared** scratch byte extents, and between
+   either scratch extent and the state object, state selection's full capacity,
+   opaque model object, bound row descriptors or bound mutable column descriptors.
+   These known ranges are available to the private Base implementation. Empty
+   ranges do not overlap. Reject unrepresentable extent/address endpoints before
+   arithmetic; compare checked integer address intervals on supported targets
+   providing `uintptr_t`, never order unrelated C pointers or subtract IDs.
+   Any detected overlap reports OVERLAP. Do not accept two partially overlapping
+   views just because their currently used counts are small.
+
+For multiple simultaneous errors, use the above order, with argument/extent
+INVALID checks preceding capacity shortage and overlap checks. A failure returns
+`events.valid=false`, `events.submitted=false`, zero counts/overflow,
+`events.control.error=CUI_TABLE_INVALID`, and the separate precise preflight code.
+State, columns, both scratch arrays and input consumption remain byte-for-byte
+unchanged. This intentionally distinguishes facade workspace failure from a
+later **legacy selection operation** returning CUI_TABLE_CAPACITY. Once preflight
+succeeds, `preflight=OK` even if a subsequent operation fails; preserve earlier
+mutations/notifications and legacy Base semantics-on-OK/CAPACITY policy.
+
+Scratch is caller-owned exclusive storage for the complete call, including
+callbacks and render consumption. It must also not alias context/internal model
+allocations, label/group/string bytes, render or handler userdata, or other live
+resources. Those arbitrary/opaque allocations cannot all be introspected: their
+nonaliasing and actual allocation size/readability are explicit caller
+preconditions, **not** claimed runtime checks. Passing a dangling pointer is not
+made safe by interval checking. Workspace is passed by value, so no retained
+workspace descriptor or descriptor lifetime/alias rule is needed. The proposal
+must not claim universal alias validation from the enumerated checks.
+
+### Exact operation snapshots without allocation
+
+Capture primary IDs and copy the current selection entries to `previous` before
+each actual selection helper/Escape operation. Run the original operation once,
+then capture primary IDs and copy entries to `value`, even on a partial error.
+Do not snapshot merely cursor movement or every internal range-array write.
+Canonicalize each copied span by unsigned lexicographic `(row, column)` order
+using an iterative in-place binary heapsort: bottom-up heap construction, then
+max-root extraction/sift-down. Use bounded indices (`root < count/2` before
+forming children), direct ID comparisons, no subtraction comparator, recursion,
+`qsort`, variable-size stack array, allocator or sorting of the owner's array.
+Maximum scratch is exactly `2 * workspace.capacity * sizeof(cui_table_selection)`
+bytes, supplied by the caller; extra algorithm storage is O(1).
+
+Compare counts, primary pairs and sorted entries exactly. Duplicate multiplicity
+is retained, not deduplicated or repaired: caller-populated duplicates remain
+truthfully visible under legacy behavior. Storage-order-only changes produce no
+CHANGE; same set with changed primary does. Deliver one callback per operation
+with a real multiset/primary difference, including A->B->A in one frame. An
+accepted no-op or rejected range with no change emits none. Operation failure
+after actual change must notify that observed change without changing its error.
+Effective row-header mode and genuine input metadata follow scalar conventions.
+
+For a logical operation with n before/m after entries, observation costs
+O(n log n + m log m) time and O(n+m) copies/comparison, bounded by 4096 entries
+per snapshot. The existing reducer's range-generation/model lookup cost is
+unchanged; this is not a claim that the whole reducer is O(n log n). No quadratic
+set-membership scan is introduced. Scratch reuse avoids per-input allocation.
+Payload spans are sorted, borrowed and readable **only during the callback**;
+copy their entries explicitly for retention. Copying the payload struct alone
+retains dangling/overwritten views. Handlers cannot mutate owner/workspace/model
+or recurse; no per-item delta, rollback, safe owner mutation or undo promise.
+
+### Required independent production evidence
+
+Test all three facades against unchanged legacy results/owner/paint; set+primary
+changes, same-set order permutations, duplicate multiplicity, exact UINT64 keys,
+Ctrl toggles, Shift ranges, row/column/cell and row-header mode, Escape, repeated
+net-zero input, no-ops and capacity errors after progress. Freeze callback spans
+into test-owned storage and verify subsequent scratch reuse. Exercise both
+identical and partially overlapping buffers, aliases into state/selection/rows/
+columns/model, zero/max capacity, short scratch, count overflow, misalignment and
+checked extent overflow; failed preflight must preserve state/columns/scratch and
+input consumption. Do not dereference fabricated invalid pointers in such tests.
+Pair NULL observer behavior and passive/disabled/loading cases with legacy paths.
+Test sorted/reverse/equal-key maximum-size heapsort cases, comparator edge IDs,
+and instrument comparison counts with a generous O(n log n) bound; do not use
+wall-clock thresholds. Public C11/C++ header checks and private-wrapper CTest
+remain required. No multi production work is approved by this revision itself.
 
 ## Subsequent independent slices and aggregate exceptions
 

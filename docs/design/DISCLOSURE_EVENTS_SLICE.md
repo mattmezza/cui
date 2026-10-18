@@ -307,3 +307,9 @@ copy-after-frame/destruction and flags-driven deferred omission. Run strict C11/
 headers plus existing Disclosure tests via the private wrapper after approval.
 This remains a signed design amendment only; no production implementation or tests
 were added or run, and no foreign binding/lifecycle/parity claim follows.
+
+### Collapsible implementation checkpoint
+
+Base and Styled Collapsible now use the approved immediate-write seam. Accepted
+activation snapshots are copied before writes; legacy entry points remain available.
+Accordion production remains pending its independent implementation/test commit.

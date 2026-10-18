@@ -52,6 +52,7 @@ typedef struct {
     bool reduced_motion;
 } cui_collapsible_options;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
+/* Applied transition observers: see cui_disclosure_events.h. */
 /* Base submits semantic triggers without layout or painting. */
 bool cui_base_collapsible(cui_context *, cui_id, cui_str, bool *open, bool disabled);
 bool cui_base_accordion(cui_context *, const cui_disclosure_item *, size_t count, bool *open,

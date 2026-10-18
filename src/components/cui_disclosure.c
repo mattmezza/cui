@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_disclosure.h"
+#include "cui/cui_disclosure_events.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 static void cui_disclosure_trigger(cui_context *ui, cui_id id, const cui_theme *theme,
@@ -79,12 +79,16 @@ static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent,
     if (motion)
         cui_end_box(ui);
 }
-bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+static cui_disclosure_event_result cui_collapsible_styled_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                         bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
-                        void *user) {
+                        void *user, cui_disclosure_handler handler) {
     if (!theme || !open)
-        return false;
-    bool changed = cui_base_collapsible(ui, id, label, open, options.disabled);
+        return (cui_disclosure_event_result){0};
+    cui_disclosure_event_result result = {0};
+    if (handler.on_change)
+        result = cui_base_collapsible_events(ui, id, label, open, options.disabled, handler);
+    else
+        result.changed = cui_base_collapsible(ui, id, label, open, options.disabled);
     cui_begin_box(ui, id ^ UINT64_C(0xb7c1c9d453922783), (cui_box){.gap = theme->gap});
     cui_disclosure_item item = {.id = id, .label = label, .disabled = options.disabled};
     cui_disclosure_trigger(ui, id, theme, label, *open, options.disabled, !options.borderless,
@@ -96,7 +100,21 @@ bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                          options.response, theme->spring_control, options.reduced_motion, 0, panel,
                          user);
     cui_end_box(ui);
-    return changed;
+    return result;
+}
+bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                        bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
+                        void *user) {
+    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user,
+                                         (cui_disclosure_handler){0}).changed;
+}
+cui_disclosure_event_result cui_collapsible_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
+    cui_collapsible_options options, cui_disclosure_panel_fn panel, void *user,
+    cui_disclosure_handler handler) {
+    if (!ui || !id || !theme || !open)
+        return (cui_disclosure_event_result){0};
+    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler);
 }
 bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
                      bool disabled, cui_disclosure_panel_fn panel, void *user) {

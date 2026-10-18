@@ -10,12 +10,6 @@ jobs:
       CC: gcc
       CXX: g++
     steps:
-      - name: Configure private dependency paths
-        # runner is unavailable in job-level env expressions.
-        run: |
-          echo "PKG_CONFIG_PATH=$RUNNER_TEMP/cui-run-deps/lib/pkgconfig" >> "$GITHUB_ENV"
-          # The validator removes LD_LIBRARY_PATH; embed the ELF search path.
-          echo "LD_RUN_PATH=$RUNNER_TEMP/cui-run-deps/lib" >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -32,6 +26,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ninja-build pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev libxss-dev libwayland-dev libxkbcommon-dev libegl1-mesa-dev libgl1-mesa-dev xvfb xauth xdotool
           rustup toolchain install 1.85.1 --profile minimal
+      - name: Configure private dependency paths
+        # runner is unavailable in job-level env expressions.
+        run: |
+          echo "PKG_CONFIG_PATH=$RUNNER_TEMP/cui-run-deps/lib/pkgconfig" >> "$GITHUB_ENV"
+          # The validator removes LD_LIBRARY_PATH; embed the ELF search path.
+          echo "LD_RUN_PATH=$RUNNER_TEMP/cui-run-deps/lib" >> "$GITHUB_ENV"
       - name: Reject stale embedded SDKs before native builds
         run: |
           python tests/test_binding_run_workflow.py

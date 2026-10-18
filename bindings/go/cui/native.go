@@ -1,7 +1,10 @@
 package cui
 
 /*
-#cgo CFLAGS: -std=c11 -Wall -Wextra -Werror -I${SRCDIR}/../sdk/source/include
+#cgo CFLAGS: -std=c11 -Wall -Wextra -Werror -Wno-error=unused-parameter -I${SRCDIR}/../sdk/source/include
+// Go 1.23 generates an empty export stub with an unused parameter in _cgo_main.c.
+// Keep that diagnostic visible without failing generated code; canonical C sources
+// are compiled independently with all warnings fatal by the CMake checks.
 #cgo linux LDFLAGS: -ldl -pthread
 #include "cui/cui_bridge.h"
 #if defined(_WIN32)

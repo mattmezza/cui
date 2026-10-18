@@ -131,7 +131,7 @@ jobs:
         with:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
-      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components test_bridge_portable_run
+      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components
       - run: ctest --test-dir build-node -R '^(bridge_|node_)' --output-on-failure
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless

@@ -1519,7 +1519,7 @@ static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_them
                 unsigned index = row * 7 + col;
                 if (cui_date_valid(grid[index]) && grid[index].month == month.month &&
                     grid[index].year == month.year) {
-                    char label[8];
+                    char label[16];
                     snprintf(label, sizeof(label), "%d", grid[index].day);
                     cui_picker_paint_cell(
                         ui, cui_calendar_day_id(id, grid[index]), t, cui_string(label), cell,

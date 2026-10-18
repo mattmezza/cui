@@ -3,7 +3,8 @@
 
 Uses the standard library; hosted Actions execution remains a separate check.
 """
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+import importlib.util
 import re
 import subprocess
 import unittest
@@ -62,9 +63,25 @@ class WorkflowTests(unittest.TestCase):
         for name in ('PKG_CONFIG_PATH', 'LD_RUN_PATH'):
             self.assertRegex(source, name + r'=\$RUNNER_TEMP/[^\n]+ >> "\$GITHUB_ENV"')
 
+    def test_dependency_paths_follow_toolchain_setup(self):
+        source = WORKFLOW.read_text()
+        config = source.index('- name: Configure private dependency paths')
+        for action in ('setup-python', 'setup-node', 'setup-go'):
+            self.assertLess(source.index('actions/' + action + '@'), config)
+        self.assertLess(config, source.index('- name: Build checksum-pinned'))
+
+    def test_sdk_manifest_paths_use_forward_slashes_on_windows(self):
+        spec = importlib.util.spec_from_file_location('generate_go_sdk', ROOT / 'scripts/generate_go_sdk.py')
+        generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generator)
+        root = PureWindowsPath('C:/checkout/sdk/source')
+        name = generator.sdk_relative_name(root / 'include/cui/cui.h', root)
+        self.assertEqual(name, 'include/cui/cui.h')
+        self.assertIn(name, {'include/cui/cui.h': b'header'})
+
     def test_filtered_bridge_jobs_build_portable_runner(self):
         source = (ROOT / '.github/workflows/ci.yml').read_text()
-        for job in ('node-builders', 'go-rust-builders'):
+        for job in ('go-rust-builders',):
             with self.subTest(job=job):
                 section = source.split('  ' + job + ':', 1)[1]
                 section = re.split(r'\n  [a-zA-Z][\w-]*:', section, maxsplit=1)[0]

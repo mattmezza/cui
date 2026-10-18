@@ -4,6 +4,7 @@
 #include "cui_base.h"
 #include "cui_control_events.h"
 #include "cui_boolean_events.h"
+#include "cui_text_input_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
@@ -418,6 +419,11 @@ void cui_input_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_edit
                      cui_input_state *, cui_input_options);
 cui_input_result cui_input_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                               cui_input_state *, cui_input_options);
+/* CHANGE/SUBMIT observers follow Base Input timing and lifetime rules. Secure text
+ * is redacted. Defer model/context destruction until frame/render consumption. */
+cui_input_event_result cui_input_events(cui_context *, cui_id, const cui_theme *, cui_str name,
+                                         cui_edit *, cui_input_state *, cui_input_options,
+                                         cui_component_text_handler);
 cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);

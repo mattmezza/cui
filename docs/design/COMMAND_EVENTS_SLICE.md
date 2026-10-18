@@ -324,3 +324,16 @@ cover presentation/busy, not suppression of confirmation. Existing tests do not
 prove legacy action redirects, passive observer classification or new metadata;
 the new focused tests above must supply that proof. No builds run for this
 checkpoint and no foreign binding coverage is claimed.
+
+### Base implementation checkpoint
+
+The independent Base slice implements only rebuild/select/move/confirm event
+entrypoints, selection/query/activation payloads, handler fields and counts.
+Cancel types/handler/count and Styled declaration are deferred until that slice is
+approved; no reserved silently ignored public field ships here. Early query
+exception is implemented after installation/all path snapshots and before legacy
+hooks. Actual editor detach/realloc/recreate regressions cover oldselect with
+oldquery NULL and oldquery itself, with observer-owned copies before either edit;
+ASan additionally checks allocation actually moved. Legacy-only/new paired traces
+preserve redirects, action identity and old bool/state semantics. No Styled,
+Core, dispatch, build wiring, generated SDK or binding edits in this slice.

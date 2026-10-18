@@ -34,8 +34,10 @@ void cui_surface_events_init(cui_surface_event_state *s, cui_id id, cui_surface_
     s->control.close_user = s;
 }
 bool cui_surface_events_set_handler(cui_surface_event_state *s, cui_surface_event_handler handler) {
-    if (!cui_surface_events_ready(s) || (!handler.closed && handler.user))
+    if (!cui_surface_events_ready(s))
         return false;
+    if (!handler.closed)
+        handler.user = NULL;
     s->handler = handler;
     return true;
 }

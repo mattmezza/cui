@@ -173,7 +173,8 @@ copying/moving an attached state is unsupported. Init is for fresh or detached,
 closed storage only; it is not an implicit teardown/reinitialization operation.
 
 `set_handler` replaces one retained registration; it does not append listeners.
-Reject NULL/detached state, a non-NULL user with NULL function, unexpected legacy callback
+A NULL function ignores user data and clears the stored user pointer.
+Reject NULL/detached state, unexpected legacy callback
 fields, and calls during an active wrapper/trampoline. Failure changes nothing.
 Changing the handler while open is allowed between component calls: the latest
 handler receives a subsequent completed close, including an already-started Sheet

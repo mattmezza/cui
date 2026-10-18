@@ -182,9 +182,9 @@ static void retained_after_begin(void) {
     cui_surface_options output;
     assert(!cui_surface_events_options(&copied, options, &output));
     assert(!cui_surface_events_detach(&copied));
-    cui_surface_event_state before = state;
-    assert(!cui_surface_events_set_handler(&state, (cui_surface_event_handler){NULL, &o}));
-    assert(memcmp(&before, &state, sizeof state) == 0);
+    assert(cui_surface_events_set_handler(&state, (cui_surface_event_handler){NULL, &o}));
+    assert(state.handler.closed == NULL && state.handler.user == NULL);
+    assert(o.calls == 1); /* Removing the observer never replays a close. */
     assert(cui_surface_events_detach(&state));
     assert(o.saved.result == CUI_SURFACE_CLOSED && o.saved.event.target == 100);
     cui_destroy(ui);

@@ -1271,3 +1271,8 @@ foreach(event_family combobox surface)
  cui_warnings(test_${event_family}_events)
  add_test(NAME ${event_family}_events COMMAND test_${event_family}_events)
 endforeach()
+
+add_executable(test_styled_slider_events tests/unit/test_styled_slider_events.c)
+target_link_libraries(test_styled_slider_events PRIVATE cui cui_software)
+cui_warnings(test_styled_slider_events)
+add_test(NAME styled_slider_events COMMAND test_styled_slider_events)

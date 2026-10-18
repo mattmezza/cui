@@ -202,6 +202,9 @@
     "cui_surface_events": [
       "src/base/cui_surface_events.c",
       "src/components/cui_surface_events.c"
+    ],
+    "cui_styled_slider_events": [
+      "src/components/cui_styled_slider_events.c"
     ]
   },
   "native": {

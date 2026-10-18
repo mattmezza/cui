@@ -356,6 +356,7 @@ typedef cui_checkbox_options cui_radio_options;
 bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                   cui_radio_options);
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
+/* Double controlled Styled facade: include cui_styled_slider_events.h. */
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);
 /* Optional three disjoint caller-owned staging buffers; capacities include NUL.

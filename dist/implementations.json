@@ -401,6 +401,13 @@
         "src/base/cui_surface_events.c",
         "src/components/cui_surface_events.c"
       ]
+    },
+    {
+      "header": "cui_styled_slider_events.h",
+      "macro": "CUI_STYLED_SLIDER_EVENTS_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_styled_slider_events.c"
+      ]
     }
   ]
 }

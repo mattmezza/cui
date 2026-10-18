@@ -59,8 +59,8 @@ Storage and handler user data must outlive all possible closes. Never copy or mo
 an attached `cui_surface_event_state`, edit adapter fields, or replace its retained
 `control.on_close/close_user`. A Sheet observer runs only at completed exit, with
 the latest handler installed between calls; it can outlive the request's frame.
-`set_handler` replaces one listener, never appends, and rejects a user pointer
-without a function. An empty handler keeps the adapter installed.
+`set_handler` replaces one listener, never appends, and ignores user data
+when no function is supplied (the stored user pointer is cleared). An empty handler keeps the adapter installed.
 
 Incoming options with either legacy close callback field populated are rejected
 before any state/UI mutation. `decide` is allowed. Reentrant wrapper calls,

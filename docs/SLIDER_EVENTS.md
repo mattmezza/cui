@@ -23,8 +23,8 @@ cui_component_slider_result result = cui_base_slider_events(
     (cui_component_slider_handler){position_request, &position});
 ```
 
-This is a Base reducer, not a new Styled Slider or a foreign binding API. Render
-the track/thumb using your existing controlled presentation. Source bounds,
+This header exposes the Base reducer. Use the separate
+[Styled facade](STYLED_SLIDER_EVENTS.md) for themed track/thumb rendering. Source bounds,
 clamping, step rounding, pointer capture and normalized float semantics match the
 old controlled reducer; requested values and owner snapshots remain double.
 
@@ -106,8 +106,10 @@ invalid/conflicting-option atomicity. Existing `test_slider_controlled.c` and
 `test_base.c` remain behavioral regressions for the original path. Native tests
 run through `python scripts/test_local.py --build-dir <build>`.
 
-This slice establishes portable Base behavior, not Styled visuals, all-family
-uniformity, browser/physical-touch/GPU acceptance or bridge/binding exposure.
-Root integration must register the new test and distribute the new header through
-normal source metadata/amalgamation/SDK tooling; generated copies are not edited
-by the implementation worker.
+Base and Styled tests establish portable reducer behavior and software rendering.
+They do not establish all-family uniformity, browser/physical-touch/GPU acceptance
+or bridge/binding exposure. Headers and sources are distributed through the normal
+source metadata/amalgamation/SDK tooling.
+
+For themed rendering with the same double-valued phases, use the implemented
+[Styled Slider facade](STYLED_SLIDER_EVENTS.md). Foreign request handlers remain unsupported.

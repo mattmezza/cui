@@ -88,4 +88,5 @@ set(CUI_SOURCES
  src/base/cui_boolean_events.c
  src/base/cui_surface_events.c
  src/components/cui_surface_events.c
+ src/components/cui_styled_slider_events.c
 )

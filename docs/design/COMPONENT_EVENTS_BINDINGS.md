@@ -311,7 +311,8 @@ The additive [V1 manual notification API](../BRIDGE_NOTIFICATIONS.md) now has ow
 
 The separate [opt-in C value poll](../BRIDGE_VALUE_NOTIFICATIONS.md) additionally
 supports scalar, plain-text and selection snapshots for its explicit producer allowlists.
-Python/JS/TypeScript/Go/Rust owning value-poll wrappers are not implemented yet;
+[Python owning value polling](../BRIDGE_VALUE_NOTIFICATIONS_PYTHON.md) is implemented;
+JS/TypeScript/Go/Rust owning value-poll wrappers remain deferred;
 existing V1 methods keep their initial allowlist and receive LEGACY snapshots for
 these categories. Consumers must negotiate the new optional symbols and category
 mask rather than enabling reserved tags through the old method.

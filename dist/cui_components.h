@@ -3264,7 +3264,9 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                             .clip = true,
                             .align_x = options.text_align,
                             .offset_x = -state->scroll_x});
-    cui_begin_box(ui, id ^ UINT64_C(0xb1642b97583fbd64),
+    /* Paint-only text wrapper: neighboring owner IDs must not alias another
+     * field's tracked viewport. No routing or geometry refers to this box. */
+    cui_begin_box(ui, 0,
                   (cui_box){.width = fmaxf(text_width, 1),
                             .fixed_width = true,
                             .height = metrics.line_height,
@@ -3335,13 +3337,12 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
             ui, id,
             (cui_rect){viewport.x + caret - state->scroll_x, viewport.y, 1, metrics.line_height});
         float height = metrics.line_height * .85f;
-        cui_begin_absolute_box(ui, id ^ UINT64_C(0xb1642b97583fbd65),
+        cui_begin_absolute_box(ui, id ^ UINT64_C(0x847d1eb65930ac28),
                                (cui_box){.background = t->caret},
                                (cui_rect){caret, (metrics.line_height - height) * .5f, 1, height});
         cui_end_box(ui);
-        if (visual)
-            (void)cui_set_text_input_geometry_rect(ui, id, id ^ UINT64_C(0xb1642b97583fbd65),
-                                                   metrics.line_height);
+        (void)cui_set_text_input_geometry_rect(ui, id, id ^ UINT64_C(0x847d1eb65930ac28),
+                                               metrics.line_height);
     }
     cui_end_box(ui);
     cui_end_box(ui);

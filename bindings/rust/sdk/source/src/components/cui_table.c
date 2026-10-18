@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_table.h"
+#include "cui/cui_table_events.h"
 #include "cui/cui_icon.h"
 #include <limits.h>
 #include <math.h>
@@ -387,9 +388,10 @@ static void group_header_row(cui_context *ui, cui_id id, const cui_theme *t, cui
     }
     cui_end_box(ui);
 }
-cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, cui_table_model *m,
-                                cui_table_state *s, cui_table_options o, cui_table_label_fn label,
-                                cui_table_cell_fn render, void *data) {
+static cui_table_result cui_data_table_common(cui_context *ui, cui_id id, const cui_theme *t,
+    cui_table_model *m, cui_table_state *s, cui_table_options o, cui_table_label_fn label,
+    cui_table_cell_fn render, void *data, const cui_table_event_handler *handler,
+    cui_table_event_result *events) {
     if (!ui || !t || !m || !s)
         return (cui_table_result){.error = CUI_TABLE_INVALID};
     if (!o.scrollbar_style)
@@ -399,7 +401,12 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
     else if (o.scrollbar_style->visibility == CUI_SCROLLBAR_VISIBLE ||
              o.scrollbar_style->visibility == CUI_SCROLLBAR_AUTO_HIDE)
         o.scrollbars = true;
-    cui_table_result result = cui_table_reduce(ui, id, m, s, o);
+    cui_table_result result;
+    if (handler) {
+        *events = cui_table_reduce_events(ui, id, m, s, o, *handler);
+        result = events->control;
+    } else
+        result = cui_table_reduce(ui, id, m, s, o);
     if (result.error != CUI_TABLE_OK && result.error != CUI_TABLE_CAPACITY)
         return result;
     cui_table_options original = o;
@@ -570,5 +577,19 @@ cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *t, 
             cui_scrollbar(ui, id, t, &s->scrollbar, geometry, bars, false);
     }
     cui_end_box(ui);
+    return result;
+}
+
+cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_table_model *model, cui_table_state *state, cui_table_options options,
+    cui_table_label_fn label, cui_table_cell_fn render, void *user) {
+    return cui_data_table_common(ui, id, theme, model, state, options, label, render, user, NULL, NULL);
+}
+cui_table_event_result cui_data_table_events(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_table_model *model, cui_table_state *state, cui_table_options options,
+    cui_table_label_fn label, cui_table_cell_fn render, void *user, cui_table_event_handler handler) {
+    cui_table_event_result result = {0};
+    result.control = cui_data_table_common(ui, id, theme, model, state, options, label, render, user,
+                                            &handler, &result);
     return result;
 }

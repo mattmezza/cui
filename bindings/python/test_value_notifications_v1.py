@@ -44,6 +44,23 @@ class ValueNotifications(unittest.TestCase):
         self.assertEqual(typed_text.text, 'héllo ✓!')
         self.assertEqual(scalar.value, 16777216.5)
 
+    def test_adjacent_number_and_text_fields(self):
+        with c.App(width=800, height=800) as app:
+            number = c.number_input('number').range(0, 100000000, .25).value(16777216.25)
+            field = c.input('text', '')
+            app.mount(c.column().children(number, field))
+            app.step()
+            click(app, number)
+            app.queue_key('down', 'up'); app.step()
+            value = next(app.poll_value_notifications_v1())
+            self.assertIsInstance(value, c.ScalarChangeNotificationV1)
+            self.assertEqual(value.value, 16777216.5)
+            click(app, field)
+            app.queue_text('ready'); app.step()
+            text = next(app.poll_value_notifications_v1())
+            self.assertIsInstance(text, c.TextChangeNotificationV1)
+            self.assertEqual(text.text, 'ready')
+
     def test_real_selected_generation_reuse(self):
         with c.App(width=800, height=800) as app:
             first, second = c.item('first', 'First'), c.item('second', 'Second')

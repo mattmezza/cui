@@ -26,14 +26,20 @@ Additional implemented slices: [Styled controlled Slider](../STYLED_SLIDER_EVENT
 [MenuTree](../MENU_EVENTS.md), [ContextMenu](../CONTEXT_MENU_EVENTS.md),
 [NumberInput](../NUMBER_EVENTS.md), [Tabs](../TABS_EVENTS.md),
 [Pagination/Stepper/Rating](../NUMERIC_SELECTION_EVENTS.md), and
-[Calendar](../PICKER_EVENTS.md). Remaining menu forwarding and picker additions
-have separate checkpoints; proposals must not be read as implemented APIs.
+[Calendar/DatePicker/ColorPicker](../PICKER_EVENTS.md),
+[Simple Menu](../SIMPLE_MENU_EVENTS.md), [DropdownButton](../DROPDOWN_EVENTS.md),
+[OTP](../OTP_EVENTS.md), [Collapsible/Accordion](../DISCLOSURE_EVENTS.md),
+[List/ToggleGroup](../LIST_EVENTS.md), and [Tree](../TREE_EVENTS.md).
+Tree covers selection, expansion and row invocation. DataTable currently has
+[sort observers](../TABLE_EVENTS.md); further Table and Settings slices remain
+in progress. Proposals must not be read as implemented APIs.
 
 ## Highest-value independent slices
 
 The original proposals below are an audit baseline; the additions above supersede
 its Styled Slider, NumberInput, Rating, Stepper/Pagination and Tabs recommendations.
-List/ToggleGroup remains unimplemented. Prefer one family per review and preserve all
+List/ToggleGroup is also implemented; its row below is historical. Prefer one
+family per review and preserve all
 old signatures/options/results. An aggregate observer needs UNKNOWN source and no
 index; per-event evidence must be captured at the actual reducer seam. Neither
 approach supplies rejection for an already-mutated pointer value.
@@ -53,6 +59,11 @@ real mutation seam; do not assume all Styled controls only paint after Base.
 
 ## Subsequent interactive work
 
+The menu, picker, OTP, disclosure and Tree recommendations below describe the
+original audit. The implemented guides above supersede those missing-API claims;
+remaining work includes additional domains and explicit exceptions, rather than
+reimplementing those facades.
+
 - **Menu/DropdownButton:** follow the existing
   [menu/surface proposal](MENU_DIALOG_EVENTS_SLICE.md) after in-flight work settles.
   [`cui_choice.h`](../../include/cui/cui_choice.h) and
@@ -65,8 +76,8 @@ real mutation seam; do not assume all Styled controls only paint after Base.
   [`cui_picker.h`](../../include/cui/cui_picker.h),
   [`cui_otp.h`](../../include/cui/cui_otp.h),
   [`cui_disclosure.h`](../../include/cui/cui_disclosure.h), and
-  [`cui_tree.h`](../../include/cui/cui_tree.h). These still lack a common typed
-  notification facade. Split date selection from displayed-month navigation;
+  [`cui_tree.h`](../../include/cui/cui_tree.h). At the original audit these lacked a common typed
+  notification facade; the guides above now define the implemented additions. Split date selection from displayed-month navigation;
   OTP draft CHANGE from completion; Accordion per-panel changes from final array;
   Tree selection from expansion/activation. An aggregate observer is compatible
   only if documented as losing multiplicity/cause. Dedicated existing evidence:
@@ -116,8 +127,9 @@ The landed [V1 notifications](../BRIDGE_NOTIFICATIONS.md) and
 [Go/Rust views](../BRIDGE_NOTIFICATIONS_GO_RUST.md) cover their explicit allowlist
 (activation, applied boolean/table changes and surface close outcomes), preserving
 legacy queues/timing. They do not expose native synchronous controlled requests,
-Slider phases, Input per-event observers or multiline observers. Other payloads
-remain legacy; typed C facades alone do not complete Python/JS/TS/Go/Rust coverage.
+Slider phases, Input per-event observers or multiline observers. The separate [opt-in C value poll](../BRIDGE_VALUE_NOTIFICATIONS.md) additionally
+classifies its explicit scalar/text/selection allowlists; owning language value
+wrappers remain in progress. Other payloads remain legacy; typed C facades alone do not complete Python/JS/TS/Go/Rust coverage.
 Do not retime queued handlers into rejectable requests. Future slices need tagged
 owned payloads, bounded queue/copy behavior, full-width IDs/frame values, handler
 retention/removal, exception/panic containment and stale-object tests. Follow

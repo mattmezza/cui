@@ -147,6 +147,7 @@ cui_settings_result cui_settings_filter(const cui_setting_page *, size_t, cui_se
 bool cui_setting_item_dirty(const cui_setting_item *);
 bool cui_settings_reset_page(const cui_setting_page *, cui_str query);
 cui_id cui_settings_part_id(cui_id, size_t page, size_t group, size_t item, unsigned part);
+/* Applied navigation observer: see cui_settings_events.h. */
 cui_settings_result cui_settings(cui_context *, cui_id, const cui_theme *, const cui_setting_page *,
                                  size_t, cui_settings_state *, cui_settings_options);
 #ifdef __cplusplus
@@ -157,6 +158,7 @@ cui_settings_result cui_settings(cui_context *, cui_id, const cui_theme *, const
 
 #if defined(CUI_SETTINGS_IMPLEMENTATION) && defined(CUI_SETTINGS_DECLARATIONS_READY) && !defined(CUI_SETTINGS_IMPLEMENTATION_ONCE)
 #define CUI_SETTINGS_IMPLEMENTATION_ONCE
+#include "cui_settings_events.h"
 /* src/base/cui_settings.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -489,10 +491,14 @@ typedef struct {
     float content_width, height;
     const cui_theme *control_theme;
     bool stacked;
+    cui_settings_handler handler;
+    cui_settings_event_result *events;
 } settings_frame;
 typedef struct {
     settings_frame *frame;
     size_t page, group;
+    cui_id trigger;
+    size_t next_event;
 } settings_navigation;
 static cui_id part(settings_frame *f, size_t p, size_t g, size_t i, unsigned n) {
     return cui_settings_part_id(f->id, p, g, i, n);
@@ -649,15 +655,69 @@ static void label(settings_frame *f, cui_str text, float font, cui_color color) 
     if (text.length)
         cui_text_with_line_height(f->ui, text, font, color, 20 * density(f));
 }
+/* Sidebar invokes this descriptor synchronously for matching row activations in
+ * ascending input order. Lookup only: never register, reduce or consume again. */
+static bool navigation_evidence(settings_navigation *nav, cui_component_event_metadata *out) {
+    cui_context *ui = nav->frame->ui;
+    uint64_t frame = cui_frame_sequence(ui);
+    if (!frame || !cui_frame_paint_enabled(ui))
+        return false;
+    if (!cui_component_event_init(out, CUI_COMPONENT_EVENT_CHANGE, nav->frame->id,
+                                  CUI_COMPONENT_EVENT_SOURCE_UNKNOWN))
+        return false;
+    out->frame_sequence = frame;
+    out->flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t e = nav->next_event; e < count; ++e) {
+        if (cui_event_activation(ui, e) != nav->trigger)
+            continue;
+        nav->next_event = e + 1;
+        cui_activation_snapshot snapshot;
+        if (cui_event_activation_snapshot(ui, e, &snapshot) &&
+            cui_component_event_from_activation(out, CUI_COMPONENT_EVENT_CHANGE, &snapshot)) {
+            out->target = nav->frame->id;
+            return true;
+        }
+        switch (events[e].type) {
+        case CUI_EVENT_POINTER_UP: out->source = CUI_COMPONENT_EVENT_SOURCE_POINTER; break;
+        case CUI_EVENT_KEY_DOWN:
+        case CUI_EVENT_KEY_UP: out->source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD; break;
+        case CUI_EVENT_ACCESSIBILITY_ACTION:
+            out->source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY; break;
+        default: break;
+        }
+        if (out->source != CUI_COMPONENT_EVENT_SOURCE_UNKNOWN)
+            out->flags |= CUI_COMPONENT_EVENT_HAS_SOURCE;
+        (void)cui_component_event_set_frame_index(out, frame, e);
+        return true;
+    }
+    /* Unexpected callback/activation mismatch: proven frame only, no guessed cause. */
+    nav->next_event = count;
+    return true;
+}
 static void navigate(void *user) {
     settings_navigation *nav = user;
     cui_settings_state *s = nav->frame->state;
+    size_t previous_page = s->selected_page, previous_group = s->selected_group;
+    cui_component_event_metadata evidence;
+    bool observe = nav->frame->events && nav->frame->handler.on_navigation &&
+                   navigation_evidence(nav, &evidence);
     if (s->selected_page != nav->page || s->selected_group != nav->group)
         nav->frame->result->selection_changed = true;
     s->selected_page = nav->page;
     s->selected_group = nav->group;
     s->pending_group_scroll = nav->group != CUI_SETTINGS_NO_GROUP;
     cui_invalidate(nav->frame->ui);
+    if (observe && (previous_page != s->selected_page || previous_group != s->selected_group)) {
+        cui_settings_navigation_change change = {
+            evidence, previous_page, previous_group, s->selected_page, s->selected_group};
+        nav->frame->handler.on_navigation(nav->frame->handler.user, &change);
+        if (nav->frame->events->navigation_count == SIZE_MAX)
+            nav->frame->events->count_overflow = true;
+        else
+            ++nav->frame->events->navigation_count;
+    }
 }
 static void sidebar(cui_context *ui, void *user) {
     settings_frame *f = user;
@@ -704,7 +764,7 @@ static void sidebar(cui_context *ui, void *user) {
                 if (!page->groups[g].title.length ||
                     !cui_setting_group_matches(&page->groups[g], f->query))
                     continue;
-                nav[child_count] = (settings_navigation){f, p, g};
+                nav[child_count] = (settings_navigation){f, p, g, part(f, p, g, 0, 6), 0};
                 children[child_count] = (cui_sidebar_menu_item){
                     .id = part(f, p, g, 0, 6),
                     .label = page->groups[g].title,
@@ -713,7 +773,7 @@ static void sidebar(cui_context *ui, void *user) {
                     .user = &nav[child_count]};
                 child_count++;
             }
-        settings_navigation page_nav = {f, p, CUI_SETTINGS_NO_GROUP};
+        settings_navigation page_nav = {f, p, CUI_SETTINGS_NO_GROUP, part(f, p, 0, 0, 5), 0};
         cui_sidebar_menu_item item = {
             .id = part(f, p, 0, 0, 5),
             .label = page->title,
@@ -1032,9 +1092,9 @@ static void content(cui_context *ui, void *user) {
     f->result->scrolled |= previous != state->scroll;
     cui_end_box(ui);
 }
-cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *theme,
-                                 const cui_setting_page *pages, size_t count,
-                                 cui_settings_state *state, cui_settings_options options) {
+static cui_settings_result settings_common(cui_context *ui, cui_id id, const cui_theme *theme,
+    const cui_setting_page *pages, size_t count, cui_settings_state *state,
+    cui_settings_options options, cui_settings_handler handler, cui_settings_event_result *events) {
     if (!ui || !id || !theme || !state || !cui_design_valid(options.design_size) ||
         !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(options.width) ||
         !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
@@ -1083,7 +1143,9 @@ cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *th
                             fmaxf(1, width - state->sidebar_width),
                             height,
                             control_theme,
-                            false};
+                            false,
+                            handler,
+                            events};
     if (!frame.options.search_placeholder.length)
         frame.options.search_placeholder = cui_string("Search settings");
     if (!frame.options.reset_label.length)
@@ -1133,6 +1195,24 @@ cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *th
     result.invalid |= error == CUI_RESIZABLE_INVALID || error == CUI_RESIZABLE_CAPACITY;
     cui_end_box(ui);
     return result;
+}
+
+cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *theme,
+    const cui_setting_page *pages, size_t count, cui_settings_state *state,
+    cui_settings_options options) {
+    return settings_common(ui, id, theme, pages, count, state, options,
+                            (cui_settings_handler){0}, NULL);
+}
+cui_settings_event_result cui_settings_events(cui_context *ui, cui_id id, const cui_theme *theme,
+    const cui_setting_page *pages, size_t count, cui_settings_state *state,
+    cui_settings_options options, cui_settings_handler handler) {
+    cui_settings_event_result out = {0};
+    if (!ui || !id || !theme || !state || (!pages && count)) {
+        out.result.invalid = true;
+        return out;
+    }
+    out.result = settings_common(ui, id, theme, pages, count, state, options, handler, &out);
+    return out;
 }
 
 #endif

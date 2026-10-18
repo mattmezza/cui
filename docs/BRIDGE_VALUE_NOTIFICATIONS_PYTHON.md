@@ -42,22 +42,14 @@ Text starts with4097 bytes including NUL and retries once for a strictly larger 
 
 Payloads are notifications of applied bridge behavior. Reading a record does not invoke its Widget callback; calling `dispatch()` separately drains later records through the existing legacy path. No callback fanout or ownership change is added. The borrowed C text is copied into Python strings before yielding; result reads do not reference a mutable C text buffer.
 
-## Tests and composition diagnostic
+## Tests and compatibility
 
 [The new Python fixture](../bindings/python/test_value_notifications_v1.py) covers real NumberInput key mutation beyond float precision, copied UTF-8, selection/live and historical generations, old/new shared draining, existing boolean/table views, immutable fields and snapshots surviving app close. Its synthetic Python protocol provider separately checks exact UINT64_MAX frames/uint32 handles, compiled-known capability masking, wrong layout, malformed typed output, large retry and capacity limits. These are conversion/protocol tests, not fabricated UI input evidence. Existing initial V1 and legacy Python suites remain required.
 
 The real old-library case requires `CUI_BRIDGE_OLD_LIBRARY` pointing to an actual initial-V1 library without value symbols. It queues text there, proves the new method reports unavailable, and then retrieves the same bytes through old V1 polling. Without this explicit library the old-library case skips; it must not be counted as proved merely by the synthetic provider.
 
-The integration fixture exposed a first-frame duplicate-element error with this composition, before any notification poll:
+Adjacent NumberInput and Input composition is also exercised through real input.
+A renderer identity collision exposed during this work is fixed; regression tests
+cover both ordinary and focused fields without changing public viewport IDs.
 
-```python
-with App(width=800, height=800) as app:
-    number = number_input("number").range(0, 100000000, .25).value(16777216.25)
-    field = input("text", "")
-    app.mount(column().children(number, field))
-    app.step()  # observed: CUI bridge10 Core error / CUI_ERROR_DUPLICATE_ID
-```
-
-Import `number_input` for this standalone repro. Observed at the C selection integration baseline: duplicate ID12782389571404938599, `cui_core_begin_box`, path `[1,2,4]`, bridge handles Number `(2,1)` and Input `(3,1)`. Separate Number/Input fixtures pass. The integrator identified collisions between existing Number/Input paint IDs (text wrapper versus another viewport, and focused caret versus another viewport) and is validating a separate narrow fix. That fix is pending integration into this branch; this wrapper commit does not change those paint paths or claim the diagnostic is harmless. The value tests isolate those compositions while still using real input and the shared polling queue.
-
-Native validation uses `python scripts/test_local.py --build-dir build`; the Python bridge backend is `none` for these fixtures. Root owns CMake registration, generated SDKs and human/LLM resource exports. No other language value wrapper is implemented by this change.
+Native validation uses `python scripts/test_local.py --build-dir build`; the Python bridge backend is `none` for these fixtures. CTest registers the fixture as `python_bridge_value_notifications`; set the explicit old-library environment variable to include its compatibility case. No other language value wrapper is implemented by this change.

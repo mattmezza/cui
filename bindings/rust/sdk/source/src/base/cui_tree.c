@@ -293,6 +293,18 @@ static bool cui_tree_expand_observed(cui_tree_model *model, size_t index, bool e
     }
     return changed;
 }
+static void cui_tree_activation_notify(cui_tree_event_result *out, cui_tree_handler handler,
+    cui_component_event_metadata evidence, cui_id key, size_t index) {
+    if (!handler.on_activate)
+        return;
+    evidence.kind = CUI_COMPONENT_EVENT_ACTIVATE;
+    cui_tree_activation event = {evidence, key, index};
+    handler.on_activate(handler.user, &event);
+    if (out->activation_count == SIZE_MAX)
+        out->count_overflow = true;
+    else
+        ++out->activation_count;
+}
 static cui_tree_result cui_tree_reduce_common(
     cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
     cui_tree_options o, cui_tree_handler handler, cui_tree_event_result *out) {
@@ -340,7 +352,9 @@ static cui_tree_result cui_tree_reduce_common(
         if (hit == SIZE_MAX || m->nodes[hit].disabled)
             continue;
         cui_component_event_metadata evidence;
-        bool observe = out && (handler.on_selection_change || handler.on_expansion_change) &&
+        bool observe = out &&
+                       (handler.on_selection_change || handler.on_expansion_change ||
+                        handler.on_activate) &&
                        cui_tree_event_evidence(ui, id, e, events[e].type, &evidence);
         if (activation == cui_tree_toggle_id(id, m->nodes[hit].key)) {
             if (cui_tree_expand_observed(m, hit, !m->expanded[hit], handler, out,
@@ -357,6 +371,8 @@ static cui_tree_result cui_tree_reduce_common(
                 cui_tree_selection_notify(out, handler, evidence, previous, *selected, hit);
             s->cursor = *selected;
             result.activated = *selected;
+            if (observe)
+                cui_tree_activation_notify(out, handler, evidence, *selected, hit);
         }
         if (source != target && (source || s->cursor != m->nodes[hit].key))
             s->cursor = m->nodes[hit].key;

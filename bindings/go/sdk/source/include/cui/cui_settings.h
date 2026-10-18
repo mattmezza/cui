@@ -146,6 +146,7 @@ cui_settings_result cui_settings_filter(const cui_setting_page *, size_t, cui_se
 bool cui_setting_item_dirty(const cui_setting_item *);
 bool cui_settings_reset_page(const cui_setting_page *, cui_str query);
 cui_id cui_settings_part_id(cui_id, size_t page, size_t group, size_t item, unsigned part);
+/* Applied navigation observer: see cui_settings_events.h. */
 cui_settings_result cui_settings(cui_context *, cui_id, const cui_theme *, const cui_setting_page *,
                                  size_t, cui_settings_state *, cui_settings_options);
 #ifdef __cplusplus

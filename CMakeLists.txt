@@ -1348,3 +1348,24 @@ add_executable(test_tree_events tests/unit/test_tree_events.c)
 target_link_libraries(test_tree_events PRIVATE cui)
 cui_warnings(test_tree_events)
 add_test(NAME tree_events COMMAND test_tree_events)
+
+add_executable(test_table_events tests/unit/test_table_events.c)
+target_link_libraries(test_table_events PRIVATE cui)
+cui_warnings(test_table_events)
+add_test(NAME table_events COMMAND test_table_events)
+
+add_executable(test_input_identity tests/unit/test_input_identity.c)
+target_link_libraries(test_input_identity PRIVATE cui)
+cui_warnings(test_input_identity)
+add_test(NAME input_identity COMMAND test_input_identity)
+
+add_executable(test_settings_events tests/unit/test_settings_events.c)
+target_link_libraries(test_settings_events PRIVATE cui)
+cui_warnings(test_settings_events)
+add_test(NAME settings_events COMMAND test_settings_events)
+if(TARGET cui_bridge)
+ add_test(NAME python_bridge_value_notifications COMMAND ${Python3_EXECUTABLE}
+   ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/test_value_notifications_v1.py)
+ set_tests_properties(python_bridge_value_notifications PROPERTIES ENVIRONMENT
+   "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/python;CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>")
+endif()

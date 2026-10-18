@@ -192,7 +192,9 @@ reviewable. None of these additions promotes a parity level.
 | [OTP](../OTP_EVENTS.md) | One aggregate CHANGE carrying accepted-operation/completion counts and final borrowed text. | Masked text is redacted; completion is not SUBMIT and final state may be incomplete. |
 | [Collapsible and Accordion](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
 | [List and ToggleGroup](../LIST_EVENTS.md) | Ordered single-ID or per-item bool transitions; List observes after legacy activation/confirmation callbacks. | Same-item confirmation is separate; ToggleGroup preserves intermediate sibling closures. |
-| [Tree](../TREE_EVENTS.md) | Each applied selection and expansion transition. | Observer sees intermediate cursor/focus/semantic state; model mutation during callback is unsupported. |
+| [Tree](../TREE_EVENTS.md) | Each applied selection and expansion transition and every row invocation. | Observer sees intermediate cursor/focus/semantic state; model mutation during callback is unsupported. |
+| [DataTable](../TABLE_EVENTS.md) | Per-transition sort and single selection. | Scalar selection observers reject multi mode atomically; set snapshots remain separate. |
+| [Settings](../SETTINGS_EVENTS.md) | Applied navigation page/group pair transitions. | Filter reconciliation is silent; nested fields/reset remain separate domains. |
 
 Counts summarize actual observer invocations except where a guide explicitly
 preserves another established result convention. Reading results is passive.
@@ -208,4 +210,4 @@ requests, text, scalar or selection events. See the [binding audit](COMPONENT_EV
 Opt-in C bridge scalar notifications are implemented for Slider, NumberInput,
 Rating and Pagination, and plain text for Input, Textarea, Editor and InputGroup; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
 Selection snapshots are also supported for the explicit RadioGroup/Tabs/Select/List/Stepper
-allowlist. Owning language wrappers remain separate slices.
+allowlist. Python has an owning value poll; JS/TypeScript/Go/Rust value wrappers remain separate slices.

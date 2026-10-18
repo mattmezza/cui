@@ -2,11 +2,11 @@
 #include "cui/cui_text.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <float.h>
 #include <hb-ft.h>
 #include <hb.h>
 #include <limits.h>
 #include <math.h>
-#include <float.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -773,8 +773,7 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
             cui_text_cluster *c = &layout->clusters[i];
             bool eligible = c->right > c->left;
             float gap = eligible && --remaining ? style.letter_spacing : 0;
-            if ((double)c->right - c->left + gap < 0 ||
-                !isfinite((double)c->right + shift + gap)) {
+            if ((double)c->right - c->left + gap < 0 || !isfinite((double)c->right + shift + gap)) {
                 status = CUI_TEXT_LAYOUT_INVALID;
                 goto done;
             }

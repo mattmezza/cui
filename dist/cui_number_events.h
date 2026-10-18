@@ -25,9 +25,11 @@ typedef struct {
  * A missing callback ignores user and still reduces. Passive, disabled and
  * readonly calls retain legacy reduction but never notify. */
 cui_number_event_result cui_base_number_input_events(cui_context *, cui_id, cui_str,
-    cui_number_state *, double *, cui_number_options, cui_number_event_handler);
+                                                     cui_number_state *, double *,
+                                                     cui_number_options, cui_number_event_handler);
 cui_number_event_result cui_number_input_events(cui_context *, cui_id, const cui_theme *, cui_str,
-    cui_number_state *, double *, cui_number_options, cui_number_event_handler);
+                                                cui_number_state *, double *, cui_number_options,
+                                                cui_number_event_handler);
 /* Callback may copy the pointer-free event and assign a finite owner value;
  * current semantics/paint retain the reduced draft, next submission syncs owner.
  * No editor/state mutation, rebind, recursive submission, destruction or foreign
@@ -50,8 +52,9 @@ cui_number_event_result cui_number_input_events(cui_context *, cui_id, const cui
 
 #include <math.h>
 cui_number_event_result cui_base_number_input_events(cui_context *ui, cui_id id, cui_str name,
-    cui_number_state *state, double *value, cui_number_options options,
-    cui_number_event_handler handler) {
+                                                     cui_number_state *state, double *value,
+                                                     cui_number_options options,
+                                                     cui_number_event_handler handler) {
     uint64_t frame = cui_frame_sequence(ui);
     bool observe = handler.change && frame && id && value && isfinite(*value) &&
                    !options.disabled && !options.readonly;
@@ -61,7 +64,7 @@ cui_number_event_result cui_base_number_input_events(cui_context *ui, cui_id id,
     if (observe && cui_frame_sequence(ui) == frame && isfinite(*value) && before != *value) {
         cui_number_change_event event = {0};
         (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_CHANGE, id,
-                                      CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
         event.event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
         event.event.frame_sequence = frame;
         event.before = before;

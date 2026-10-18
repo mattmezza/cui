@@ -2,8 +2,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_PICKER_EVENTS_H
 #define CUI_PICKER_EVENTS_H
-#include "cui_picker.h"
 #include "cui_component_events.h"
+#include "cui_picker.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,39 +31,46 @@ typedef struct {
  * Do not mutate/free/rebind active state, selection, options/policy resources or
  * context, nor recursively submit UI in the observer. Defer teardown until outer
  * return plus frame/render consumption. Unrelated application flags may change. */
-cui_calendar_event_result cui_calendar_reduce_events(
-    cui_context *, cui_id, cui_calendar_state *, cui_date_selection *, cui_calendar_options,
-    cui_date_selection_handler);
-cui_calendar_event_result cui_base_calendar_events(
-    cui_context *, cui_id, cui_calendar_state *, cui_date_selection *, cui_calendar_options,
-    cui_date_selection_handler);
-cui_calendar_event_result cui_calendar_events(
-    cui_context *, cui_id, const cui_theme *, cui_calendar_state *, cui_date_selection *,
-    cui_calendar_options, cui_date_selection_handler);
+cui_calendar_event_result cui_calendar_reduce_events(cui_context *, cui_id, cui_calendar_state *,
+                                                     cui_date_selection *, cui_calendar_options,
+                                                     cui_date_selection_handler);
+cui_calendar_event_result cui_base_calendar_events(cui_context *, cui_id, cui_calendar_state *,
+                                                   cui_date_selection *, cui_calendar_options,
+                                                   cui_date_selection_handler);
+cui_calendar_event_result cui_calendar_events(cui_context *, cui_id, const cui_theme *,
+                                              cui_calendar_state *, cui_date_selection *,
+                                              cui_calendar_options, cui_date_selection_handler);
 /* DatePicker wraps the entire outer operation, with trigger-ID metadata.
  * Popup open/close and same-date activation alone do not emit CHANGE. */
 typedef struct {
     bool changed;        /* Exact Styled legacy bool, including false on late errors. */
     size_t change_count; /* Zero or one actual callback. */
 } cui_picker_event_result;
-cui_calendar_event_result cui_base_date_picker_events(
-    cui_context *, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *,
-    cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
-cui_picker_event_result cui_date_picker_events(
-    cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_date_picker_state *,
-    cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
+cui_calendar_event_result cui_base_date_picker_events(cui_context *, cui_id trigger,
+                                                      cui_id calendar, cui_str name,
+                                                      cui_date_picker_state *, cui_date_selection *,
+                                                      cui_date_picker_options,
+                                                      cui_date_selection_handler);
+cui_picker_event_result cui_date_picker_events(cui_context *, cui_id trigger, const cui_theme *,
+                                               cui_str name, cui_date_picker_state *,
+                                               cui_date_selection *, cui_date_picker_options,
+                                               cui_date_selection_handler);
 /* Applied RGBA only. Latent HSV/capture/synchronization changes are not CHANGE. */
 typedef struct {
     cui_component_event_metadata event;
     cui_color previous, value;
 } cui_color_change;
 typedef void (*cui_color_change_fn)(void *, const cui_color_change *);
-typedef struct { cui_color_change_fn on_change; void *user; } cui_color_handler;
-cui_picker_event_result cui_base_color_picker_events(
-    cui_context *, cui_id, cui_color_state *, cui_color *, cui_color_picker_options, cui_color_handler);
-cui_picker_event_result cui_color_picker_events(
-    cui_context *, cui_id, const cui_theme *, cui_color_state *, cui_color *,
-    cui_color_picker_options, cui_color_handler);
+typedef struct {
+    cui_color_change_fn on_change;
+    void *user;
+} cui_color_handler;
+cui_picker_event_result cui_base_color_picker_events(cui_context *, cui_id, cui_color_state *,
+                                                     cui_color *, cui_color_picker_options,
+                                                     cui_color_handler);
+cui_picker_event_result cui_color_picker_events(cui_context *, cui_id, const cui_theme *,
+                                                cui_color_state *, cui_color *,
+                                                cui_color_picker_options, cui_color_handler);
 /* Applied final time only. Draft/focus changes and net-zero edits are silent.
  * Calls the complete legacy operation once, then observes after semantics (Base)
  * or paint (Styled). UNKNOWN cause, proven active frame only, no input index.
@@ -76,12 +83,15 @@ typedef struct {
     cui_time previous, value;
 } cui_time_change;
 typedef void (*cui_time_change_fn)(void *, const cui_time_change *);
-typedef struct { cui_time_change_fn on_change; void *user; } cui_time_handler;
-cui_picker_event_result cui_base_time_field_events(
-    cui_context *, cui_id, cui_str, cui_time_state *, cui_time *, cui_time_options, cui_time_handler);
-cui_picker_event_result cui_time_field_events(
-    cui_context *, cui_id, const cui_theme *, cui_str, cui_time_state *, cui_time *,
-    cui_time_options, cui_time_handler);
+typedef struct {
+    cui_time_change_fn on_change;
+    void *user;
+} cui_time_handler;
+cui_picker_event_result cui_base_time_field_events(cui_context *, cui_id, cui_str, cui_time_state *,
+                                                   cui_time *, cui_time_options, cui_time_handler);
+cui_picker_event_result cui_time_field_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                              cui_time_state *, cui_time *, cui_time_options,
+                                              cui_time_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -98,9 +108,10 @@ cui_picker_event_result cui_time_field_events(
 /* src/base/cui_picker_events.c */
 /* SPDX-License-Identifier: MIT */
 
-static cui_calendar_event_result cui_calendar_events_common(
-    cui_context *ui, cui_id id, cui_calendar_state *state, cui_date_selection *selection,
-    cui_calendar_options options, cui_date_selection_handler handler, bool reduce_only) {
+static cui_calendar_event_result
+cui_calendar_events_common(cui_context *ui, cui_id id, cui_calendar_state *state,
+                           cui_date_selection *selection, cui_calendar_options options,
+                           cui_date_selection_handler handler, bool reduce_only) {
     cui_calendar_event_result result = {0};
     if (!ui || !id || !state || !selection)
         return result;
@@ -111,91 +122,111 @@ static cui_calendar_event_result cui_calendar_events_common(
     if (frame && handler.on_change &&
         (cui_date_compare(before.start, selection->start) ||
          cui_date_compare(before.end, selection->end))) {
-        cui_date_selection_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *selection};
+        cui_date_selection_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                                     .target = id,
+                                                     .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                                     .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                                     .frame_sequence = frame},
+                                           .previous = before,
+                                           .value = *selection};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
     return result;
 }
-cui_calendar_event_result cui_calendar_reduce_events(
-    cui_context *ui, cui_id id, cui_calendar_state *state, cui_date_selection *selection,
-    cui_calendar_options options, cui_date_selection_handler handler) {
+cui_calendar_event_result cui_calendar_reduce_events(cui_context *ui, cui_id id,
+                                                     cui_calendar_state *state,
+                                                     cui_date_selection *selection,
+                                                     cui_calendar_options options,
+                                                     cui_date_selection_handler handler) {
     return cui_calendar_events_common(ui, id, state, selection, options, handler, true);
 }
-cui_calendar_event_result cui_base_calendar_events(
-    cui_context *ui, cui_id id, cui_calendar_state *state, cui_date_selection *selection,
-    cui_calendar_options options, cui_date_selection_handler handler) {
+cui_calendar_event_result cui_base_calendar_events(cui_context *ui, cui_id id,
+                                                   cui_calendar_state *state,
+                                                   cui_date_selection *selection,
+                                                   cui_calendar_options options,
+                                                   cui_date_selection_handler handler) {
     return cui_calendar_events_common(ui, id, state, selection, options, handler, false);
 }
 
-cui_calendar_event_result cui_base_date_picker_events(
-    cui_context *ui, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *state,
-    cui_date_selection *selection, cui_date_picker_options options, cui_date_selection_handler handler) {
+cui_calendar_event_result
+cui_base_date_picker_events(cui_context *ui, cui_id trigger, cui_id calendar, cui_str name,
+                            cui_date_picker_state *state, cui_date_selection *selection,
+                            cui_date_picker_options options, cui_date_selection_handler handler) {
     cui_calendar_event_result result = {0};
     if (!ui || !trigger || !calendar || !state || !selection)
         return result;
     cui_date_selection before = *selection;
     uint64_t frame = !options.disabled && !options.calendar.disabled && cui_frame_paint_enabled(ui)
-                         ? cui_frame_sequence(ui) : 0;
+                         ? cui_frame_sequence(ui)
+                         : 0;
     result.control = cui_base_date_picker(ui, trigger, calendar, name, state, selection, options);
     if (frame && handler.on_change &&
         (cui_date_compare(before.start, selection->start) ||
          cui_date_compare(before.end, selection->end))) {
-        cui_date_selection_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = trigger,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *selection};
+        cui_date_selection_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                                     .target = trigger,
+                                                     .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                                     .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                                     .frame_sequence = frame},
+                                           .previous = before,
+                                           .value = *selection};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
     return result;
 }
 
-cui_picker_event_result cui_base_color_picker_events(
-    cui_context *ui, cui_id id, cui_color_state *state, cui_color *color,
-    cui_color_picker_options options, cui_color_handler handler) {
+cui_picker_event_result cui_base_color_picker_events(cui_context *ui, cui_id id,
+                                                     cui_color_state *state, cui_color *color,
+                                                     cui_color_picker_options options,
+                                                     cui_color_handler handler) {
     cui_picker_event_result result = {0};
     if (!ui || !id || !state || !color)
         return result;
     cui_color before = *color;
     uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
-                         ? cui_frame_sequence(ui) : 0;
+                         ? cui_frame_sequence(ui)
+                         : 0;
     result.changed = cui_base_color_picker(ui, id, state, color, options);
-    if (frame && handler.on_change && (before.r != color->r || before.g != color->g ||
-                                       before.b != color->b || before.a != color->a)) {
-        cui_color_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *color};
+    if (frame && handler.on_change &&
+        (before.r != color->r || before.g != color->g || before.b != color->b ||
+         before.a != color->a)) {
+        cui_color_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                            .target = id,
+                                            .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                            .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                            .frame_sequence = frame},
+                                  .previous = before,
+                                  .value = *color};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
     return result;
 }
 
-cui_picker_event_result cui_base_time_field_events(
-    cui_context *ui, cui_id id, cui_str name, cui_time_state *state,
-    cui_time *time, cui_time_options options, cui_time_handler handler) {
+cui_picker_event_result cui_base_time_field_events(cui_context *ui, cui_id id, cui_str name,
+                                                   cui_time_state *state, cui_time *time,
+                                                   cui_time_options options,
+                                                   cui_time_handler handler) {
     cui_picker_event_result result = {0};
     if (!ui || !id || !state || !time)
         return result;
     cui_time before = *time;
     uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
-                         ? cui_frame_sequence(ui) : 0;
+                         ? cui_frame_sequence(ui)
+                         : 0;
     result.changed = cui_base_time_field(ui, id, name, state, time, options);
     if (frame && handler.on_change &&
-        (before.hour != time->hour || before.minute != time->minute || before.second != time->second)) {
-        cui_time_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *time};
+        (before.hour != time->hour || before.minute != time->minute ||
+         before.second != time->second)) {
+        cui_time_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                           .target = id,
+                                           .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                           .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                           .frame_sequence = frame},
+                                 .previous = before,
+                                 .value = *time};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
@@ -205,9 +236,11 @@ cui_picker_event_result cui_base_time_field_events(
 /* src/components/cui_picker_events.c */
 /* SPDX-License-Identifier: MIT */
 
-cui_calendar_event_result cui_calendar_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_calendar_state *state,
-    cui_date_selection *selection, cui_calendar_options options, cui_date_selection_handler handler) {
+cui_calendar_event_result cui_calendar_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                              cui_calendar_state *state,
+                                              cui_date_selection *selection,
+                                              cui_calendar_options options,
+                                              cui_date_selection_handler handler) {
     cui_calendar_event_result result = {0};
     if (!ui || !id || !theme || !state || !selection)
         return result;
@@ -217,82 +250,96 @@ cui_calendar_event_result cui_calendar_events(
     if (frame && handler.on_change &&
         (cui_date_compare(before.start, selection->start) ||
          cui_date_compare(before.end, selection->end))) {
-        cui_date_selection_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *selection};
+        cui_date_selection_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                                     .target = id,
+                                                     .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                                     .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                                     .frame_sequence = frame},
+                                           .previous = before,
+                                           .value = *selection};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
     return result;
 }
 
-cui_picker_event_result cui_date_picker_events(
-    cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
-    cui_date_picker_state *state, cui_date_selection *selection, cui_date_picker_options options,
-    cui_date_selection_handler handler) {
+cui_picker_event_result
+cui_date_picker_events(cui_context *ui, cui_id trigger, const cui_theme *theme, cui_str name,
+                       cui_date_picker_state *state, cui_date_selection *selection,
+                       cui_date_picker_options options, cui_date_selection_handler handler) {
     cui_picker_event_result result = {0};
     if (!ui || !trigger || !theme || !state || !selection)
         return result;
     cui_date_selection before = *selection;
     uint64_t frame = !options.disabled && !options.calendar.disabled && cui_frame_paint_enabled(ui)
-                         ? cui_frame_sequence(ui) : 0;
+                         ? cui_frame_sequence(ui)
+                         : 0;
     result.changed = cui_date_picker(ui, trigger, theme, name, state, selection, options);
     if (frame && handler.on_change &&
         (cui_date_compare(before.start, selection->start) ||
          cui_date_compare(before.end, selection->end))) {
-        cui_date_selection_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = trigger,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *selection};
+        cui_date_selection_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                                     .target = trigger,
+                                                     .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                                     .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                                     .frame_sequence = frame},
+                                           .previous = before,
+                                           .value = *selection};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
     return result;
 }
 
-cui_picker_event_result cui_color_picker_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_color_state *state, cui_color *color,
-    cui_color_picker_options options, cui_color_handler handler) {
+cui_picker_event_result cui_color_picker_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                                cui_color_state *state, cui_color *color,
+                                                cui_color_picker_options options,
+                                                cui_color_handler handler) {
     cui_picker_event_result result = {0};
     if (!ui || !id || !state || !color || !theme)
         return result;
     cui_color before = *color;
     uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
-                         ? cui_frame_sequence(ui) : 0;
+                         ? cui_frame_sequence(ui)
+                         : 0;
     result.changed = cui_color_picker(ui, id, theme, state, color, options);
-    if (frame && handler.on_change && (before.r != color->r || before.g != color->g ||
-                                       before.b != color->b || before.a != color->a)) {
-        cui_color_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *color};
+    if (frame && handler.on_change &&
+        (before.r != color->r || before.g != color->g || before.b != color->b ||
+         before.a != color->a)) {
+        cui_color_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                            .target = id,
+                                            .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                            .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                            .frame_sequence = frame},
+                                  .previous = before,
+                                  .value = *color};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }
     return result;
 }
 
-cui_picker_event_result cui_time_field_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_time_state *state,
-    cui_time *time, cui_time_options options, cui_time_handler handler) {
+cui_picker_event_result cui_time_field_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                              cui_str name, cui_time_state *state, cui_time *time,
+                                              cui_time_options options, cui_time_handler handler) {
     cui_picker_event_result result = {0};
     if (!ui || !id || !state || !time || !theme)
         return result;
     cui_time before = *time;
     uint64_t frame = !options.disabled && !options.readonly && cui_frame_paint_enabled(ui)
-                         ? cui_frame_sequence(ui) : 0;
+                         ? cui_frame_sequence(ui)
+                         : 0;
     result.changed = cui_time_field(ui, id, theme, name, state, time, options);
     if (frame && handler.on_change &&
-        (before.hour != time->hour || before.minute != time->minute || before.second != time->second)) {
-        cui_time_change event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
-                      .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
-                      .flags = CUI_COMPONENT_EVENT_HAS_FRAME, .frame_sequence = frame},
-            .previous = before, .value = *time};
+        (before.hour != time->hour || before.minute != time->minute ||
+         before.second != time->second)) {
+        cui_time_change event = {.event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                                           .target = id,
+                                           .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
+                                           .flags = CUI_COMPONENT_EVENT_HAS_FRAME,
+                                           .frame_sequence = frame},
+                                 .previous = before,
+                                 .value = *time};
         handler.on_change(handler.user, &event);
         result.change_count = 1;
     }

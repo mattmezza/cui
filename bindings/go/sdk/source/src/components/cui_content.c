@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_content.h"
-#include "cui/cui_hover_events.h"
 #include "cui/cui_components.h"
+#include "cui/cui_hover_events.h"
 #include "cui/cui_icon.h"
 #include <math.h>
 #include <stdio.h>

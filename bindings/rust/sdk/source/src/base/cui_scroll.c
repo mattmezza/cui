@@ -334,7 +334,7 @@ bool cui_base_scrollbar_overlay(cui_context *ui, cui_id id, float *x, float *y, 
 }
 
 bool cui_base_scrollable_events(cui_context *ui, cui_id id, cui_scroll_state *state,
-                               cui_scroll_options options, cui_scroll_event_scope *scope) {
+                                cui_scroll_options options, cui_scroll_event_scope *scope) {
     if (!ui || !id || !state || !scope || scope->private_active || !cui_frame_is_submitting(ui))
         return false;
     scope->private_context = ui;
@@ -347,9 +347,11 @@ bool cui_base_scrollable_events(cui_context *ui, cui_id id, cui_scroll_state *st
     return cui_base_scrollable(ui, id, state, options);
 }
 
-cui_scroll_event_result cui_base_scrollable_finish_events(
-    cui_context *ui, cui_id id, cui_scroll_state *state, cui_scroll_options options,
-    cui_scroll_event_scope *scope, cui_scroll_handler handler) {
+cui_scroll_event_result cui_base_scrollable_finish_events(cui_context *ui, cui_id id,
+                                                          cui_scroll_state *state,
+                                                          cui_scroll_options options,
+                                                          cui_scroll_event_scope *scope,
+                                                          cui_scroll_handler handler) {
     cui_scroll_event_result result;
     memset(&result, 0, sizeof(result));
     if (!ui || !id || !state || !scope || !scope->private_active || scope->private_styled ||

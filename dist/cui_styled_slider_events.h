@@ -22,9 +22,10 @@ typedef struct {
  * Acceptance appears next submission. Base event/lifetime/count rules apply.
  * Invalid input submits nothing and does not mutate capture state or dispatch.
  * No legacy float slider behavior changes; no thumb/vertical variant is implied. */
-cui_component_slider_result cui_slider_events(
-    cui_context *, cui_id, const cui_theme *, cui_str name, double value, cui_slider_state *,
-    cui_slider_options, cui_slider_style_options, cui_component_slider_handler);
+cui_component_slider_result cui_slider_events(cui_context *, cui_id, const cui_theme *,
+                                              cui_str name, double value, cui_slider_state *,
+                                              cui_slider_options, cui_slider_style_options,
+                                              cui_component_slider_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -44,19 +45,20 @@ cui_component_slider_result cui_slider_events(
 static bool cui_slider_dimension(float value) {
     return isfinite(value) && value > 0 && value <= 4096;
 }
-cui_component_slider_result cui_slider_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, double value,
-    cui_slider_state *state, cui_slider_options options, cui_slider_style_options style,
-    cui_component_slider_handler handler) {
+cui_component_slider_result cui_slider_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                              cui_str name, double value, cui_slider_state *state,
+                                              cui_slider_options options,
+                                              cui_slider_style_options style,
+                                              cui_component_slider_handler handler) {
     cui_component_slider_result invalid = {0};
     if (!ui || !cui_frame_is_submitting(ui) || !id || !theme || !state ||
         (name.length && !name.data) ||
         (options.value_description.length && !options.value_description.data) ||
-        options.on_request || options.user || !isfinite(value) ||
-        !isfinite(options.minimum) || !isfinite(options.maximum) ||
-        options.maximum < options.minimum || !isfinite(options.maximum - options.minimum) ||
-        value < options.minimum || value > options.maximum || !isfinite(options.step) ||
-        options.step < 0 || (state->id && state->id != id) ||
+        options.on_request || options.user || !isfinite(value) || !isfinite(options.minimum) ||
+        !isfinite(options.maximum) || options.maximum < options.minimum ||
+        !isfinite(options.maximum - options.minimum) || value < options.minimum ||
+        value > options.maximum || !isfinite(options.step) || options.step < 0 ||
+        (state->id && state->id != id) ||
         (state->dragging && (!isfinite(state->preview) || !isfinite(state->start))) ||
         !isfinite(theme->radius) || theme->radius < 0 || theme->radius > 4096)
         return invalid;
@@ -87,9 +89,12 @@ cui_component_slider_result cui_slider_events(
     if (!style.hide_label)
         cui_text(ui, name, font, options.disabled ? theme->muted : theme->text);
     cui_begin_box(ui, id,
-                  (cui_box){.width = width, .height = hit_height,
-                            .fixed_width = true, .fixed_height = true,
-                            .background = focus, .radius = fminf(theme->radius, hit_height / 2)});
+                  (cui_box){.width = width,
+                            .height = hit_height,
+                            .fixed_width = true,
+                            .fixed_height = true,
+                            .background = focus,
+                            .radius = fminf(theme->radius, hit_height / 2)});
     cui_component_slider_result result =
         cui_base_slider_events(ui, id, name, value, state, options, handler);
     /* All reducer admission checks precede boxes. The reducer is invoked once. */
@@ -106,13 +111,21 @@ cui_component_slider_result cui_slider_events(
         cui_end_box(ui);
     }
     cui_begin_box(ui, id ^ UINT64_C(0x7b1a0ed95e63cf28),
-                  (cui_box){.width = width, .height = track_height,
-                            .fixed_width = true, .fixed_height = true,
-                            .background = track, .radius = radius, .clip = true});
+                  (cui_box){.width = width,
+                            .height = track_height,
+                            .fixed_width = true,
+                            .fixed_height = true,
+                            .background = track,
+                            .radius = radius,
+                            .clip = true});
     if (fill_width > 0) {
-        cui_begin_box(ui, 0, (cui_box){.width = fill_width, .height = track_height,
-                                      .fixed_width = true, .fixed_height = true,
-                                      .background = fill, .radius = radius});
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = fill_width,
+                                .height = track_height,
+                                .fixed_width = true,
+                                .fixed_height = true,
+                                .background = fill,
+                                .radius = radius});
         cui_end_box(ui);
     }
     cui_end_box(ui);

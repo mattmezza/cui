@@ -24,9 +24,11 @@ typedef struct {
  * A missing callback ignores user and still reduces. Passive, disabled and
  * readonly calls retain legacy reduction but never notify. */
 cui_number_event_result cui_base_number_input_events(cui_context *, cui_id, cui_str,
-    cui_number_state *, double *, cui_number_options, cui_number_event_handler);
+                                                     cui_number_state *, double *,
+                                                     cui_number_options, cui_number_event_handler);
 cui_number_event_result cui_number_input_events(cui_context *, cui_id, const cui_theme *, cui_str,
-    cui_number_state *, double *, cui_number_options, cui_number_event_handler);
+                                                cui_number_state *, double *, cui_number_options,
+                                                cui_number_event_handler);
 /* Callback may copy the pointer-free event and assign a finite owner value;
  * current semantics/paint retain the reduced draft, next submission syncs owner.
  * No editor/state mutation, rebind, recursive submission, destruction or foreign

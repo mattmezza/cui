@@ -26,9 +26,9 @@ typedef struct {
     size_t call_close_count;
 } cui_surface_event_state;
 typedef struct {
-    bool valid; /* Adapter preflight only, not rendering success. */
+    bool valid;          /* Adapter preflight only, not rendering success. */
     bool control_result; /* Original update/begin result; false for void Alert. */
-    size_t close_count; /* Actual observer invocations during this call. */
+    size_t close_count;  /* Actual observer invocations during this call. */
 } cui_surface_event_result;
 /* Initialize fresh or closed detached storage only; not a teardown operation. */
 void cui_surface_events_init(cui_surface_event_state *, cui_id, cui_surface_kind);
@@ -41,15 +41,15 @@ bool cui_surface_events_detach(cui_surface_event_state *);
 bool cui_surface_events_options(cui_surface_event_state *, cui_surface_options,
                                 cui_surface_options *output);
 cui_surface_event_result cui_base_surface_update_events(cui_context *, cui_surface_event_state *,
-                                                       cui_surface_options);
+                                                        cui_surface_options);
 cui_surface_event_result cui_base_surface_begin_events(cui_context *, cui_surface_event_state *,
-                                                      cui_str, cui_str, cui_surface_options);
+                                                       cui_str, cui_str, cui_surface_options);
 cui_surface_event_result cui_surface_begin_events(cui_context *, const cui_theme *,
-                                                 cui_surface_event_state *, cui_str, cui_str,
-                                                 cui_surface_options);
+                                                  cui_surface_event_state *, cui_str, cui_str,
+                                                  cui_surface_options);
 cui_surface_event_result cui_alert_dialog_events(cui_context *, const cui_theme *,
-                                                cui_surface_event_state *, cui_str, cui_str,
-                                                cui_str, cui_str, cui_surface_options);
+                                                 cui_surface_event_state *, cui_str, cui_str,
+                                                 cui_str, cui_str, cui_surface_options);
 /* Use existing open/close/request_close/take_result on &state.control. Imperative
  * close needs an active frame for focus-scope restoration; between frames use
  * request_close and submit an update on the UI thread. Calls to
@@ -130,9 +130,8 @@ bool cui_surface_events_options(cui_surface_event_state *s, cui_surface_options 
     *output = input;
     return true;
 }
-cui_surface_event_result cui_base_surface_update_events(cui_context *ui,
-                                                       cui_surface_event_state *s,
-                                                       cui_surface_options options) {
+cui_surface_event_result cui_base_surface_update_events(cui_context *ui, cui_surface_event_state *s,
+                                                        cui_surface_options options) {
     cui_surface_event_result result = {0};
     if (!ui || !cui_surface_events_options(s, options, &options))
         return result;
@@ -144,10 +143,9 @@ cui_surface_event_result cui_base_surface_update_events(cui_context *ui,
     s->active = false;
     return result;
 }
-cui_surface_event_result cui_base_surface_begin_events(cui_context *ui,
-                                                      cui_surface_event_state *s,
-                                                      cui_str title, cui_str description,
-                                                      cui_surface_options options) {
+cui_surface_event_result cui_base_surface_begin_events(cui_context *ui, cui_surface_event_state *s,
+                                                       cui_str title, cui_str description,
+                                                       cui_surface_options options) {
     cui_surface_event_result result = {0};
     if (!ui || !cui_surface_events_options(s, options, &options))
         return result;
@@ -164,8 +162,9 @@ cui_surface_event_result cui_base_surface_begin_events(cui_context *ui,
 /* SPDX-License-Identifier: MIT */
 
 cui_surface_event_result cui_surface_begin_events(cui_context *ui, const cui_theme *theme,
-                                                 cui_surface_event_state *s, cui_str title,
-                                                 cui_str description, cui_surface_options options) {
+                                                  cui_surface_event_state *s, cui_str title,
+                                                  cui_str description,
+                                                  cui_surface_options options) {
     cui_surface_event_result result = {0};
     if (!ui || !theme || !cui_surface_events_options(s, options, &options))
         return result;
@@ -178,9 +177,9 @@ cui_surface_event_result cui_surface_begin_events(cui_context *ui, const cui_the
     return result;
 }
 cui_surface_event_result cui_alert_dialog_events(cui_context *ui, const cui_theme *theme,
-                                                cui_surface_event_state *s, cui_str title,
-                                                cui_str description, cui_str confirm,
-                                                cui_str cancel, cui_surface_options options) {
+                                                 cui_surface_event_state *s, cui_str title,
+                                                 cui_str description, cui_str confirm,
+                                                 cui_str cancel, cui_surface_options options) {
     cui_surface_event_result result = {0};
     if (!ui || !theme || !s || s->control.kind != CUI_SURFACE_ALERT ||
         !cui_surface_events_options(s, options, &options))

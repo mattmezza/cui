@@ -4,12 +4,12 @@
 #include "cui.h"
 #include "cui_base.h"
 #include "cui_content.h"
-#include "cui_edit.h"
-#include "cui_overlay.h"
-#include "cui_theme.h"
-#include "cui_selection_events.h"
-#include "cui_menu_events.h"
 #include "cui_control_events.h"
+#include "cui_edit.h"
+#include "cui_menu_events.h"
+#include "cui_overlay.h"
+#include "cui_selection_events.h"
+#include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -230,10 +230,11 @@ typedef struct {
     cui_selection_event_result events;
     bool legacy_changed;
 } cui_select_event_result;
-cui_select_event_result cui_select_events(
-    cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_str placeholder,
-    const cui_choice_item *, size_t count, cui_id *selected, cui_choice_popup *,
-    cui_choice_popup_options, cui_selection_handler);
+cui_select_event_result cui_select_events(cui_context *, cui_id trigger, const cui_theme *,
+                                          cui_str name, cui_str placeholder,
+                                          const cui_choice_item *, size_t count, cui_id *selected,
+                                          cui_choice_popup *, cui_choice_popup_options,
+                                          cui_selection_handler);
 /* Menu returns true when an action ID was activated, including reactivation
  * of the currently selected action. The caller owns the command dispatch. */
 bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
@@ -241,8 +242,9 @@ bool cui_menu(cui_context *, cui_id trigger, const cui_theme *, cui_str name,
               cui_choice_popup_options);
 /* Per-command notifications, including repeated same-ID activations. */
 cui_menu_command_result cui_menu_events(cui_context *, cui_id trigger, const cui_theme *,
-    cui_str name, const cui_choice_item *, size_t count, cui_id *action,
-    cui_choice_popup *, cui_choice_popup_options, cui_menu_command_handler);
+                                        cui_str name, const cui_choice_item *, size_t count,
+                                        cui_id *action, cui_choice_popup *,
+                                        cui_choice_popup_options, cui_menu_command_handler);
 
 bool cui_base_selection_remove(cui_context *, cui_id chip, cui_str name, bool *selected,
                                bool disabled);
@@ -277,14 +279,16 @@ typedef struct {
     cui_selection_event_result events;
     cui_combobox_result legacy;
 } cui_combobox_event_result;
-cui_combobox_event_result cui_base_combobox_events(
-    cui_context *, cui_id input, cui_str name, cui_edit *, const cui_choice_item *, size_t,
-    cui_choice_item *, size_t filtered_capacity, cui_id *selected, cui_choice_popup *,
-    bool disabled, cui_selection_handler);
-cui_combobox_event_result cui_combobox_events(
-    cui_context *, cui_id input, const cui_theme *, cui_str name, cui_edit *,
-    const cui_choice_item *, size_t, cui_choice_item *, size_t filtered_capacity,
-    cui_id *selected, cui_choice_popup *, cui_choice_popup_options, cui_selection_handler);
+cui_combobox_event_result cui_base_combobox_events(cui_context *, cui_id input, cui_str name,
+                                                   cui_edit *, const cui_choice_item *, size_t,
+                                                   cui_choice_item *, size_t filtered_capacity,
+                                                   cui_id *selected, cui_choice_popup *,
+                                                   bool disabled, cui_selection_handler);
+cui_combobox_event_result cui_combobox_events(cui_context *, cui_id input, const cui_theme *,
+                                              cui_str name, cui_edit *, const cui_choice_item *,
+                                              size_t, cui_choice_item *, size_t filtered_capacity,
+                                              cui_id *selected, cui_choice_popup *,
+                                              cui_choice_popup_options, cui_selection_handler);
 cui_combobox_result cui_base_combobox_multi(cui_context *, cui_id input, cui_str name, cui_edit *,
                                             const cui_choice_item *, size_t count,
                                             cui_choice_item *filtered, bool *filtered_selected,
@@ -376,14 +380,15 @@ bool cui_menu_tree(cui_context *, cui_id trigger, const cui_theme *, cui_str nam
 /* Per-command synchronous ACTIVATE observer after applied check/radio/action
  * writes and close policy. Missing observer preserves normal mutation.
  * No context destruction, active storage freeing or recursive submission. */
-cui_menu_command_result cui_base_menu_tree_events(
-    cui_context *, cui_id trigger, cui_str name, const cui_menu_entry *, size_t count,
-    cui_id *action, cui_menu_tree_state *, bool disabled, float dt,
-    bool keep_open_checks, cui_menu_command_handler);
-cui_menu_command_result cui_menu_tree_events(
-    cui_context *, cui_id trigger, const cui_theme *, cui_str name,
-    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
-    cui_menu_tree_options, cui_menu_command_handler);
+cui_menu_command_result cui_base_menu_tree_events(cui_context *, cui_id trigger, cui_str name,
+                                                  const cui_menu_entry *, size_t count,
+                                                  cui_id *action, cui_menu_tree_state *,
+                                                  bool disabled, float dt, bool keep_open_checks,
+                                                  cui_menu_command_handler);
+cui_menu_command_result cui_menu_tree_events(cui_context *, cui_id trigger, const cui_theme *,
+                                             cui_str name, const cui_menu_entry *, size_t count,
+                                             cui_id *action, cui_menu_tree_state *,
+                                             cui_menu_tree_options, cui_menu_command_handler);
 /* Paint an already reduced Menu popup anchored to a caller-painted trigger.
  * Does not submit the trigger, reduce events or mutate action/check values.
  * Registers visible popup/row semantics and retains measured window metrics. */
@@ -403,14 +408,15 @@ bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str n
                       cui_menu_tree_options);
 /* Per-command forwarding only: opening/reanchoring emits no command. Metadata
  * target is the receiving target ID, independent of restore-focus identity. */
-cui_menu_command_result cui_base_context_menu_events(
-    cui_context *, cui_id target, const cui_menu_entry *, size_t count,
-    cui_id *action, cui_menu_tree_state *, bool disabled, float dt,
-    bool keep_open_checks, cui_menu_command_handler);
-cui_menu_command_result cui_context_menu_events(
-    cui_context *, cui_id target, const cui_theme *, cui_str name,
-    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
-    cui_menu_tree_options, cui_menu_command_handler);
+cui_menu_command_result cui_base_context_menu_events(cui_context *, cui_id target,
+                                                     const cui_menu_entry *, size_t count,
+                                                     cui_id *action, cui_menu_tree_state *,
+                                                     bool disabled, float dt, bool keep_open_checks,
+                                                     cui_menu_command_handler);
+cui_menu_command_result cui_context_menu_events(cui_context *, cui_id target, const cui_theme *,
+                                                cui_str name, const cui_menu_entry *, size_t count,
+                                                cui_id *action, cui_menu_tree_state *,
+                                                cui_menu_tree_options, cui_menu_command_handler);
 /* Split action and menu trigger. Zero action/trigger IDs omit that half in the
  * base function; both zero is invalid. The explicit IDs remain independently
  * focusable; container is paint-only in the styled function. */
@@ -490,16 +496,18 @@ typedef struct {
     size_t action_count, command_count;
     cui_dropdown_button_result legacy;
 } cui_dropdown_event_result;
-cui_dropdown_event_result cui_base_dropdown_button_events(
-    cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
-    const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,
-    bool action_disabled, bool action_loading, float dt, bool keep_open_checks,
-    cui_dropdown_event_handlers);
-cui_dropdown_event_result cui_dropdown_button_events(
-    cui_context *, cui_id container, cui_id action_id, cui_id trigger_id, const cui_theme *,
-    cui_str action_name, cui_str menu_name, const cui_menu_entry *, size_t count,
-    cui_id *menu_action, cui_menu_tree_state *, cui_dropdown_button_options,
-    cui_dropdown_event_handlers);
+cui_dropdown_event_result
+cui_base_dropdown_button_events(cui_context *, cui_id action_id, cui_id trigger_id,
+                                cui_str action_name, cui_str menu_name, const cui_menu_entry *,
+                                size_t count, cui_id *menu_action, cui_menu_tree_state *,
+                                bool disabled, bool action_disabled, bool action_loading, float dt,
+                                bool keep_open_checks, cui_dropdown_event_handlers);
+cui_dropdown_event_result
+cui_dropdown_button_events(cui_context *, cui_id container, cui_id action_id, cui_id trigger_id,
+                           const cui_theme *, cui_str action_name, cui_str menu_name,
+                           const cui_menu_entry *, size_t count, cui_id *menu_action,
+                           cui_menu_tree_state *, cui_dropdown_button_options,
+                           cui_dropdown_event_handlers);
 cui_dropdown_button_result cui_base_dropdown_button(
     cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
     const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,

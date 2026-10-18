@@ -2,8 +2,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_TABLE_EVENTS_H
 #define CUI_TABLE_EVENTS_H
-#include "cui_table.h"
 #include "cui_component_events.h"
+#include "cui_table.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -100,13 +100,16 @@ typedef struct {
  * model/state/row/column/workspace mutation, rebind, recursion, destruction or
  * foreign unwinding. Copy facts/change unrelated state; defer edits/removal and
  * teardown until outer submission and renderer consumption are complete. */
-cui_table_event_result cui_table_reduce_events(cui_context *, cui_id,
-    cui_table_model *, cui_table_state *, cui_table_options, cui_table_event_handler);
-cui_table_event_result cui_base_data_table_events(cui_context *, cui_id,
-    cui_table_model *, cui_table_state *, cui_table_options, cui_table_event_handler);
+cui_table_event_result cui_table_reduce_events(cui_context *, cui_id, cui_table_model *,
+                                               cui_table_state *, cui_table_options,
+                                               cui_table_event_handler);
+cui_table_event_result cui_base_data_table_events(cui_context *, cui_id, cui_table_model *,
+                                                  cui_table_state *, cui_table_options,
+                                                  cui_table_event_handler);
 cui_table_event_result cui_data_table_events(cui_context *, cui_id, const cui_theme *,
-    cui_table_model *, cui_table_state *, cui_table_options,
-    cui_table_label_fn, cui_table_cell_fn, void *, cui_table_event_handler);
+                                             cui_table_model *, cui_table_state *,
+                                             cui_table_options, cui_table_label_fn,
+                                             cui_table_cell_fn, void *, cui_table_event_handler);
 /* Separate exact multiset observation. The two exclusive writable arrays each
  * contain capacity entries (<=4096), at least state.selection_capacity. Known
  * overlap/size checks fail before mutation. Scratch must additionally not alias

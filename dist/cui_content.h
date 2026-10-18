@@ -448,17 +448,18 @@ bool cui_hover_update(cui_hover_state *s, bool trigger, bool content, bool focus
     return old != s->open;
 }
 
-cui_hover_event_result cui_hover_update_events(
-    cui_id target, cui_hover_state *state, bool trigger, bool content, bool focus,
-    bool escape, bool disabled, float dt, float opening, float closing, cui_hover_handler handler) {
+cui_hover_event_result cui_hover_update_events(cui_id target, cui_hover_state *state, bool trigger,
+                                               bool content, bool focus, bool escape, bool disabled,
+                                               float dt, float opening, float closing,
+                                               cui_hover_handler handler) {
     cui_hover_event_result result;
     memset(&result, 0, sizeof(result));
     if (!target || !state)
         return result;
     bool previous = state->open;
     result.valid = true;
-    result.control_result = cui_hover_update(state, trigger, content, focus, escape, disabled,
-                                             dt, opening, closing);
+    result.control_result =
+        cui_hover_update(state, trigger, content, focus, escape, disabled, dt, opening, closing);
     result.changed = previous != state->open;
     if (result.changed && handler.on_change) {
         cui_hover_lifecycle_event event;

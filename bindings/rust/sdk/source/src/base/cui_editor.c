@@ -1545,9 +1545,11 @@ cui_edit_result cui_editor_accept_completion(cui_editor_state *state) {
     return result;
 }
 
-cui_multiline_event_result cui_base_editor_events(
-    cui_context *ui, cui_id id, cui_str name, cui_editor_state *state, cui_editor_options options,
-    cui_textarea_metrics metrics, cui_component_text_handler handler) {
+cui_multiline_event_result cui_base_editor_events(cui_context *ui, cui_id id, cui_str name,
+                                                  cui_editor_state *state,
+                                                  cui_editor_options options,
+                                                  cui_textarea_metrics metrics,
+                                                  cui_component_text_handler handler) {
     cui_multiline_event_result result = {0};
     cui_edit *edit = state ? state->edit : NULL;
     cui_edit_state before = edit ? cui_edit_get_state(edit) : (cui_edit_state){0};
@@ -1556,11 +1558,14 @@ cui_multiline_event_result cui_base_editor_events(
     if (ui && edit && handler.callback && before.revision != after.revision) {
         uint64_t frame = cui_frame_sequence(ui);
         cui_component_text_event event = {
-            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE, .target = id,
+            .event = {.kind = CUI_COMPONENT_EVENT_CHANGE,
+                      .target = id,
                       .source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN,
                       .flags = frame ? CUI_COMPONENT_EVENT_HAS_FRAME : 0,
                       .frame_sequence = frame},
-            .before = before, .after = after, .has_text = true,
+            .before = before,
+            .after = after,
+            .has_text = true,
             .text = cui_edit_get_text(edit)};
         handler.callback(handler.user, &event);
         result.change_count = 1;

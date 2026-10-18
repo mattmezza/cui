@@ -527,7 +527,6 @@ cui_attachment_group_options cui_attachment_group_options_default(void) {
 
 /* src/components/cui_media.c */
 /* SPDX-License-Identifier: MIT */
-
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_PRIVATE_DESIGN_METRICS_H
 #define CUI_PRIVATE_DESIGN_METRICS_H
@@ -558,6 +557,7 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
     return true;
 }
 #endif
+
 
 
 
@@ -676,7 +676,8 @@ static void cui_media_action_capture(cui_context *ui, cui_media_action_observer 
         cui_activation_snapshot snapshot;
         cui_component_event_metadata evidence;
         if (slot->matches == 1 && cui_event_activation_snapshot(ui, e, &snapshot) &&
-            cui_component_event_from_activation(&evidence, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+            cui_component_event_from_activation(&evidence, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                &snapshot)) {
             slot->evidence = evidence;
             slot->evidence.target = observer->id;
         } else
@@ -685,18 +686,20 @@ static void cui_media_action_capture(cui_context *ui, cui_media_action_observer 
     if (!found)
         slot->missing = true;
 }
-static void cui_media_action_notify(cui_media_action_observer *observer, cui_attachment_action action) {
+static void cui_media_action_notify(cui_media_action_observer *observer,
+                                    cui_attachment_action action) {
     if (!observer || !observer->frame)
         return;
-    cui_attachment_event_fn handler = action == CUI_ATTACHMENT_ACTION_OPEN ? observer->handler.on_activate
-                                      : action == CUI_ATTACHMENT_ACTION_REMOVE ? observer->handler.on_remove
-                                                                              : observer->handler.on_retry;
+    cui_attachment_event_fn handler =
+        action == CUI_ATTACHMENT_ACTION_OPEN     ? observer->handler.on_activate
+        : action == CUI_ATTACHMENT_ACTION_REMOVE ? observer->handler.on_remove
+                                                 : observer->handler.on_retry;
     if (!handler)
         return;
     cui_media_action_slot slot = observer->slots[action];
     if (slot.matches != 1 || slot.missing) {
         (void)cui_component_event_init(&slot.evidence, CUI_COMPONENT_EVENT_ACTIVATE, observer->id,
-                                      CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
         slot.evidence.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
         slot.evidence.frame_sequence = observer->frame;
     }
@@ -817,7 +820,8 @@ static void cui_media_metadata(cui_context *ui, cui_id id, const cui_theme *t,
             cui_id retry_id = cui_media_id(cui_attachment_retry_id(id), i + 1);
             cui_interaction action =
                 cui_interact(ui, retry_id, CUI_ROLE_LINK, o.retry_label, false, false, 0);
-            cui_media_action_capture(ui, observer, CUI_ATTACHMENT_ACTION_RETRY, retry_id, action.activated);
+            cui_media_action_capture(ui, observer, CUI_ATTACHMENT_ACTION_RETRY, retry_id,
+                                     action.activated);
             cui_begin_box(ui, retry_id, (cui_box){.height = font * 1.25f});
             cui_text(ui, o.retry_label, font, t->primary);
             cui_end_box(ui);
@@ -884,8 +888,9 @@ static void cui_media_card_treatment(cui_context *ui, cui_id id, cui_rect b, cui
             }
 }
 static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, const cui_theme *t,
-                                     cui_attachment_state *state, cui_attachment_options o,
-                                     cui_media_action_observer *observer) {
+                                                   cui_attachment_state *state,
+                                                   cui_attachment_options o,
+                                                   cui_media_action_observer *observer) {
     cui_attachment_result r = {0};
     if (!ui || !id || !t || !state || !isfinite(t->radius) || t->radius < 0 ||
         (o.name.length && !o.name.data) || (o.remove_label.length && !o.remove_label.data) ||
@@ -1017,7 +1022,8 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
             else if (p.retry_media)
                 r.retried |= cui_media_control(ui, t, cui_attachment_retry_id(id), o.retry_label,
                                                cui_string("refresh-cw"), t->danger, t->background,
-                                               (cui_color){0}, 24, 12, observer, CUI_ATTACHMENT_ACTION_RETRY);
+                                               (cui_color){0}, 24, 12, observer,
+                                               CUI_ATTACHMENT_ACTION_RETRY);
             else if (p.rejection)
                 (void)cui_icon_named(ui, cui_media_id(media_id, 88), t, cui_string("ban"),
                                      (cui_icon_options){.size = CUI_ICON_CUSTOM,
@@ -1087,9 +1093,9 @@ static cui_attachment_result cui_attachment_common(cui_context *ui, cui_id id, c
         cui_rect b = state->card;
         cui_begin_portal(ui, cui_media_id(id, 8), (cui_box){0},
                          (cui_rect){b.x + b.w - 14, b.y - 6, 20, 20}, 4);
-        r.removed =
-            cui_media_control(ui, t, cui_attachment_remove_id(id), o.remove_label,
-                              cui_string("close"), t->text, t->background, t->border, 20, 10, observer, CUI_ATTACHMENT_ACTION_REMOVE);
+        r.removed = cui_media_control(ui, t, cui_attachment_remove_id(id), o.remove_label,
+                                      cui_string("close"), t->text, t->background, t->border, 20,
+                                      10, observer, CUI_ATTACHMENT_ACTION_REMOVE);
         cui_end_box(ui);
     }
     if (o.model.identified && o.tooltip.length) {
@@ -1121,9 +1127,11 @@ cui_attachment_result cui_attachment(cui_context *ui, cui_id id, const cui_theme
                                      cui_attachment_state *state, cui_attachment_options options) {
     return cui_attachment_common(ui, id, theme, state, options, NULL);
 }
-cui_attachment_event_result cui_attachment_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_attachment_state *state,
-    cui_attachment_options options, cui_attachment_handler handler) {
+cui_attachment_event_result cui_attachment_events(cui_context *ui, cui_id id,
+                                                  const cui_theme *theme,
+                                                  cui_attachment_state *state,
+                                                  cui_attachment_options options,
+                                                  cui_attachment_handler handler) {
     cui_attachment_event_result result = {0};
     if (!handler.on_activate && !handler.on_remove && !handler.on_retry) {
         result.control = cui_attachment(ui, id, theme, state, options);

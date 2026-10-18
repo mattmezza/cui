@@ -68,8 +68,9 @@ typedef struct {
  * or frame evidence. Custom reset callbacks retain their legacy behavior and have
  * no typed observation. Requires nonzero root and page; page_index is caller's
  * original source index. Owner/callback lifetime restrictions below also apply. */
-cui_settings_reset_event_result cui_settings_reset_page_events(
-    cui_id root, size_t page_index, const cui_setting_page *, cui_str query, cui_settings_handler);
+cui_settings_reset_event_result cui_settings_reset_page_events(cui_id root, size_t page_index,
+                                                               const cui_setting_page *,
+                                                               cui_str query, cui_settings_handler);
 /* Notify each actual navigation pair transition after original writes/invalidation,
  * before content. Filter/default repair and same-pair pending-scroll work are silent.
  * Missing observer permits all legacy work; no passive/layout-only observations.
@@ -81,12 +82,12 @@ cui_settings_reset_event_result cui_settings_reset_page_events(
  * their existing timing; scalar owners must remain readable through the new observer.
  * Built-in bool/number/choice EDIT observers aggregate one adapter after legacy callback,
  * using UNKNOWN cause/frame only. Number payload finite flags describe validity;
- * two NaNs and signed zeros compare equal. Text observes committed revision differences after the legacy callback, including
- * net-zero byte changes. No preedit/selection/submit observation. Reset observes each built-in adapter
- * after its old callback, reason RESET; disabled fields remain eligible. UI reset
- * uses a unique genuine activation snapshot when available, otherwise frame only. Text UTF-8
- * is borrowed; use cui_component_event_copy_utf8 for an owned bounded copy.
- * These unreleased event payload additions require rebuilding consumers. */
+ * two NaNs and signed zeros compare equal. Text observes committed revision differences after the
+ * legacy callback, including net-zero byte changes. No preedit/selection/submit observation. Reset
+ * observes each built-in adapter after its old callback, reason RESET; disabled fields remain
+ * eligible. UI reset uses a unique genuine activation snapshot when available, otherwise frame
+ * only. Text UTF-8 is borrowed; use cui_component_event_copy_utf8 for an owned bounded copy. These
+ * unreleased event payload additions require rebuilding consumers. */
 cui_settings_event_result cui_settings_events(cui_context *, cui_id, const cui_theme *,
                                               const cui_setting_page *, size_t,
                                               cui_settings_state *, cui_settings_options,

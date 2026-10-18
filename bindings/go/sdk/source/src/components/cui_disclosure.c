@@ -79,9 +79,11 @@ static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent,
     if (motion)
         cui_end_box(ui);
 }
-static cui_disclosure_event_result cui_collapsible_styled_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
-                        bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
-                        void *user, cui_disclosure_handler handler) {
+static cui_disclosure_event_result
+cui_collapsible_styled_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                              bool *open, cui_collapsible_options options,
+                              cui_disclosure_panel_fn panel, void *user,
+                              cui_disclosure_handler handler) {
     if (!theme || !open)
         return (cui_disclosure_event_result){0};
     cui_disclosure_event_result result = {0};
@@ -106,12 +108,14 @@ bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                         bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
                         void *user) {
     return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user,
-                                         (cui_disclosure_handler){0}).changed;
+                                         (cui_disclosure_handler){0})
+        .changed;
 }
-cui_disclosure_event_result cui_collapsible_events(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
-    cui_collapsible_options options, cui_disclosure_panel_fn panel, void *user,
-    cui_disclosure_handler handler) {
+cui_disclosure_event_result cui_collapsible_events(cui_context *ui, cui_id id,
+                                                   const cui_theme *theme, cui_str label,
+                                                   bool *open, cui_collapsible_options options,
+                                                   cui_disclosure_panel_fn panel, void *user,
+                                                   cui_disclosure_handler handler) {
     if (!ui || !id || !theme || !open)
         return (cui_disclosure_event_result){0};
     return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler);
@@ -121,10 +125,11 @@ bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str
     return cui_collapsible_ex(ui, id, theme, label, open,
                               (cui_collapsible_options){.disabled = disabled}, panel, user);
 }
-static cui_disclosure_event_result cui_accordion_styled_common(
-    cui_context *ui, cui_id container, const cui_theme *theme, const cui_disclosure_item *items,
-    size_t count, bool *open, cui_accordion_options options, cui_disclosure_panel_fn panel,
-    void *user, cui_disclosure_handler handler) {
+static cui_disclosure_event_result
+cui_accordion_styled_common(cui_context *ui, cui_id container, const cui_theme *theme,
+                            const cui_disclosure_item *items, size_t count, bool *open,
+                            cui_accordion_options options, cui_disclosure_panel_fn panel,
+                            void *user, cui_disclosure_handler handler) {
     if (!theme || !items || !open)
         return (cui_disclosure_event_result){0};
     cui_disclosure_event_result result = {0};
@@ -162,18 +167,21 @@ static cui_disclosure_event_result cui_accordion_styled_common(
 bool cui_accordion(cui_context *ui, cui_id container, const cui_theme *theme,
                    const cui_disclosure_item *items, size_t count, bool *open,
                    cui_accordion_options options, cui_disclosure_panel_fn panel, void *user) {
-    return cui_accordion_styled_common(ui, container, theme, items, count, open, options,
-                                       panel, user, (cui_disclosure_handler){0}).changed;
+    return cui_accordion_styled_common(ui, container, theme, items, count, open, options, panel,
+                                       user, (cui_disclosure_handler){0})
+        .changed;
 }
-cui_disclosure_event_result cui_accordion_events(
-    cui_context *ui, cui_id container, const cui_theme *theme, const cui_disclosure_item *items,
-    size_t count, bool *open, cui_accordion_options options, cui_disclosure_panel_fn panel,
-    void *user, cui_disclosure_handler handler) {
+cui_disclosure_event_result cui_accordion_events(cui_context *ui, cui_id container,
+                                                 const cui_theme *theme,
+                                                 const cui_disclosure_item *items, size_t count,
+                                                 bool *open, cui_accordion_options options,
+                                                 cui_disclosure_panel_fn panel, void *user,
+                                                 cui_disclosure_handler handler) {
     if (!ui || !container || !theme || !items || !count || !open)
         return (cui_disclosure_event_result){0};
     for (size_t i = 0; i < count; ++i)
         if (!items[i].id)
             return (cui_disclosure_event_result){0};
-    return cui_accordion_styled_common(ui, container, theme, items, count, open, options,
-                                       panel, user, handler);
+    return cui_accordion_styled_common(ui, container, theme, items, count, open, options, panel,
+                                       user, handler);
 }

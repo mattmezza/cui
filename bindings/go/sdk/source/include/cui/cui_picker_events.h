@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_PICKER_EVENTS_H
 #define CUI_PICKER_EVENTS_H
-#include "cui_picker.h"
 #include "cui_component_events.h"
+#include "cui_picker.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,39 +30,46 @@ typedef struct {
  * Do not mutate/free/rebind active state, selection, options/policy resources or
  * context, nor recursively submit UI in the observer. Defer teardown until outer
  * return plus frame/render consumption. Unrelated application flags may change. */
-cui_calendar_event_result cui_calendar_reduce_events(
-    cui_context *, cui_id, cui_calendar_state *, cui_date_selection *, cui_calendar_options,
-    cui_date_selection_handler);
-cui_calendar_event_result cui_base_calendar_events(
-    cui_context *, cui_id, cui_calendar_state *, cui_date_selection *, cui_calendar_options,
-    cui_date_selection_handler);
-cui_calendar_event_result cui_calendar_events(
-    cui_context *, cui_id, const cui_theme *, cui_calendar_state *, cui_date_selection *,
-    cui_calendar_options, cui_date_selection_handler);
+cui_calendar_event_result cui_calendar_reduce_events(cui_context *, cui_id, cui_calendar_state *,
+                                                     cui_date_selection *, cui_calendar_options,
+                                                     cui_date_selection_handler);
+cui_calendar_event_result cui_base_calendar_events(cui_context *, cui_id, cui_calendar_state *,
+                                                   cui_date_selection *, cui_calendar_options,
+                                                   cui_date_selection_handler);
+cui_calendar_event_result cui_calendar_events(cui_context *, cui_id, const cui_theme *,
+                                              cui_calendar_state *, cui_date_selection *,
+                                              cui_calendar_options, cui_date_selection_handler);
 /* DatePicker wraps the entire outer operation, with trigger-ID metadata.
  * Popup open/close and same-date activation alone do not emit CHANGE. */
 typedef struct {
     bool changed;        /* Exact Styled legacy bool, including false on late errors. */
     size_t change_count; /* Zero or one actual callback. */
 } cui_picker_event_result;
-cui_calendar_event_result cui_base_date_picker_events(
-    cui_context *, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *,
-    cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
-cui_picker_event_result cui_date_picker_events(
-    cui_context *, cui_id trigger, const cui_theme *, cui_str name, cui_date_picker_state *,
-    cui_date_selection *, cui_date_picker_options, cui_date_selection_handler);
+cui_calendar_event_result cui_base_date_picker_events(cui_context *, cui_id trigger,
+                                                      cui_id calendar, cui_str name,
+                                                      cui_date_picker_state *, cui_date_selection *,
+                                                      cui_date_picker_options,
+                                                      cui_date_selection_handler);
+cui_picker_event_result cui_date_picker_events(cui_context *, cui_id trigger, const cui_theme *,
+                                               cui_str name, cui_date_picker_state *,
+                                               cui_date_selection *, cui_date_picker_options,
+                                               cui_date_selection_handler);
 /* Applied RGBA only. Latent HSV/capture/synchronization changes are not CHANGE. */
 typedef struct {
     cui_component_event_metadata event;
     cui_color previous, value;
 } cui_color_change;
 typedef void (*cui_color_change_fn)(void *, const cui_color_change *);
-typedef struct { cui_color_change_fn on_change; void *user; } cui_color_handler;
-cui_picker_event_result cui_base_color_picker_events(
-    cui_context *, cui_id, cui_color_state *, cui_color *, cui_color_picker_options, cui_color_handler);
-cui_picker_event_result cui_color_picker_events(
-    cui_context *, cui_id, const cui_theme *, cui_color_state *, cui_color *,
-    cui_color_picker_options, cui_color_handler);
+typedef struct {
+    cui_color_change_fn on_change;
+    void *user;
+} cui_color_handler;
+cui_picker_event_result cui_base_color_picker_events(cui_context *, cui_id, cui_color_state *,
+                                                     cui_color *, cui_color_picker_options,
+                                                     cui_color_handler);
+cui_picker_event_result cui_color_picker_events(cui_context *, cui_id, const cui_theme *,
+                                                cui_color_state *, cui_color *,
+                                                cui_color_picker_options, cui_color_handler);
 /* Applied final time only. Draft/focus changes and net-zero edits are silent.
  * Calls the complete legacy operation once, then observes after semantics (Base)
  * or paint (Styled). UNKNOWN cause, proven active frame only, no input index.
@@ -75,12 +82,15 @@ typedef struct {
     cui_time previous, value;
 } cui_time_change;
 typedef void (*cui_time_change_fn)(void *, const cui_time_change *);
-typedef struct { cui_time_change_fn on_change; void *user; } cui_time_handler;
-cui_picker_event_result cui_base_time_field_events(
-    cui_context *, cui_id, cui_str, cui_time_state *, cui_time *, cui_time_options, cui_time_handler);
-cui_picker_event_result cui_time_field_events(
-    cui_context *, cui_id, const cui_theme *, cui_str, cui_time_state *, cui_time *,
-    cui_time_options, cui_time_handler);
+typedef struct {
+    cui_time_change_fn on_change;
+    void *user;
+} cui_time_handler;
+cui_picker_event_result cui_base_time_field_events(cui_context *, cui_id, cui_str, cui_time_state *,
+                                                   cui_time *, cui_time_options, cui_time_handler);
+cui_picker_event_result cui_time_field_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                              cui_time_state *, cui_time *, cui_time_options,
+                                              cui_time_handler);
 #ifdef __cplusplus
 }
 #endif

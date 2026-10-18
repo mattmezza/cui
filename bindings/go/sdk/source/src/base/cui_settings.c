@@ -296,29 +296,46 @@ cui_settings_reset_event_result cui_settings_reset_page_events_internal(
             size_t *count = NULL;
             if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
                 item->boolean && handler.on_boolean && boolean != *item->boolean) {
-                cui_settings_bool_change event = {*evidence, field, page_index, g, i,
-                    boolean, *item->boolean, CUI_SETTINGS_CHANGE_RESET};
+                cui_settings_bool_change event = {
+                    *evidence, field,   page_index,     g,
+                    i,         boolean, *item->boolean, CUI_SETTINGS_CHANGE_RESET};
                 handler.on_boolean(handler.user, &event);
                 count = &out.boolean_count;
             } else if (item->kind == CUI_SETTING_NUMBER && item->number && handler.on_number &&
                        number != *item->number && !(isnan(number) && isnan(*item->number))) {
-                cui_settings_number_change event = {*evidence, field, page_index, g, i,
-                    number, *item->number, isfinite(number), isfinite(*item->number),
-                    CUI_SETTINGS_CHANGE_RESET};
+                cui_settings_number_change event = {*evidence,
+                                                    field,
+                                                    page_index,
+                                                    g,
+                                                    i,
+                                                    number,
+                                                    *item->number,
+                                                    isfinite(number),
+                                                    isfinite(*item->number),
+                                                    CUI_SETTINGS_CHANGE_RESET};
                 handler.on_number(handler.user, &event);
                 count = &out.number_count;
             } else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && handler.on_choice &&
                        choice != *item->choice) {
-                cui_settings_choice_change event = {*evidence, field, page_index, g, i,
-                    choice, *item->choice, CUI_SETTINGS_CHANGE_RESET};
+                cui_settings_choice_change event = {
+                    *evidence, field,  page_index,    g,
+                    i,         choice, *item->choice, CUI_SETTINGS_CHANGE_RESET};
                 handler.on_choice(handler.user, &event);
                 count = &out.choice_count;
             } else if (item->kind == CUI_SETTING_INPUT && item->edit && handler.on_text) {
                 cui_edit_state after = cui_edit_get_state(item->edit);
                 if (text.revision != after.revision) {
-                    cui_settings_text_change event = {*evidence, field, page_index, g, i,
-                        text.revision, after.revision, text.length, after.length,
-                        cui_edit_get_text(item->edit), CUI_SETTINGS_CHANGE_RESET};
+                    cui_settings_text_change event = {*evidence,
+                                                      field,
+                                                      page_index,
+                                                      g,
+                                                      i,
+                                                      text.revision,
+                                                      after.revision,
+                                                      text.length,
+                                                      after.length,
+                                                      cui_edit_get_text(item->edit),
+                                                      CUI_SETTINGS_CHANGE_RESET};
                     handler.on_text(handler.user, &event);
                     count = &out.text_count;
                 }
@@ -334,17 +351,21 @@ cui_settings_reset_event_result cui_settings_reset_page_events_internal(
     return out;
 }
 bool cui_settings_reset_page(const cui_setting_page *page, cui_str query) {
-    return cui_settings_reset_page_events_internal(0, 0, page, query,
-                                                  (cui_settings_handler){0}, NULL).reset;
+    return cui_settings_reset_page_events_internal(0, 0, page, query, (cui_settings_handler){0},
+                                                   NULL)
+        .reset;
 }
-cui_settings_reset_event_result cui_settings_reset_page_events(
-    cui_id root, size_t page_index, const cui_setting_page *page, cui_str query,
-    cui_settings_handler handler) {
+cui_settings_reset_event_result cui_settings_reset_page_events(cui_id root, size_t page_index,
+                                                               const cui_setting_page *page,
+                                                               cui_str query,
+                                                               cui_settings_handler handler) {
     cui_component_event_metadata evidence;
-    if (!root || !page || !cui_component_event_init(&evidence, CUI_COMPONENT_EVENT_CHANGE,
-                                                  root, CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC))
+    if (!root || !page ||
+        !cui_component_event_init(&evidence, CUI_COMPONENT_EVENT_CHANGE, root,
+                                  CUI_COMPONENT_EVENT_SOURCE_PROGRAMMATIC))
         return (cui_settings_reset_event_result){0};
-    return cui_settings_reset_page_events_internal(root, page_index, page, query, handler, &evidence);
+    return cui_settings_reset_page_events_internal(root, page_index, page, query, handler,
+                                                   &evidence);
 }
 cui_id cui_settings_part_id(cui_id root, size_t page, size_t group, size_t item, unsigned part) {
     uint64_t values[4] = {page, group, item, part}, hash = root ^ UINT64_C(0x612f695f419ab257);

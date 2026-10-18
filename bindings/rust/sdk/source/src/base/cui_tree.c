@@ -245,8 +245,8 @@ static size_t cui_tree_enabled_position(const cui_tree_model *m, size_t position
     }
     return SIZE_MAX;
 }
-static bool cui_tree_event_evidence(cui_context *ui, cui_id id, size_t index,
-                                    cui_event_type type, cui_component_event_metadata *out) {
+static bool cui_tree_event_evidence(cui_context *ui, cui_id id, size_t index, cui_event_type type,
+                                    cui_component_event_metadata *out) {
     if (!cui_frame_paint_enabled(ui) || !cui_frame_sequence(ui))
         return false;
     cui_activation_snapshot snapshot;
@@ -257,17 +257,25 @@ static bool cui_tree_event_evidence(cui_context *ui, cui_id id, size_t index,
     }
     cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
     switch (type) {
-    case CUI_EVENT_POINTER_UP: source = CUI_COMPONENT_EVENT_SOURCE_POINTER; break;
+    case CUI_EVENT_POINTER_UP:
+        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+        break;
     case CUI_EVENT_KEY_DOWN:
-    case CUI_EVENT_KEY_UP: source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD; break;
-    case CUI_EVENT_ACCESSIBILITY_ACTION: source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY; break;
-    default: break;
+    case CUI_EVENT_KEY_UP:
+        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+        break;
+    case CUI_EVENT_ACCESSIBILITY_ACTION:
+        source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+        break;
+    default:
+        break;
     }
     return cui_component_event_init(out, CUI_COMPONENT_EVENT_CHANGE, id, source) &&
            cui_component_event_set_frame_index(out, cui_frame_sequence(ui), index);
 }
 static void cui_tree_selection_notify(cui_tree_event_result *out, cui_tree_handler handler,
-    cui_component_event_metadata evidence, cui_id previous, cui_id value, size_t index) {
+                                      cui_component_event_metadata evidence, cui_id previous,
+                                      cui_id value, size_t index) {
     if (!handler.on_selection_change || previous == value)
         return;
     cui_tree_selection_change change = {evidence, previous, value, index};
@@ -278,8 +286,8 @@ static void cui_tree_selection_notify(cui_tree_event_result *out, cui_tree_handl
         ++out->selection_count;
 }
 static bool cui_tree_expand_observed(cui_tree_model *model, size_t index, bool expanded,
-    cui_tree_handler handler, cui_tree_event_result *out,
-    const cui_component_event_metadata *evidence) {
+                                     cui_tree_handler handler, cui_tree_event_result *out,
+                                     const cui_component_event_metadata *evidence) {
     cui_id key = model->nodes[index].key;
     bool previous = model->expanded[index];
     bool changed = cui_tree_set_expanded(model, key, expanded);
@@ -294,7 +302,8 @@ static bool cui_tree_expand_observed(cui_tree_model *model, size_t index, bool e
     return changed;
 }
 static void cui_tree_activation_notify(cui_tree_event_result *out, cui_tree_handler handler,
-    cui_component_event_metadata evidence, cui_id key, size_t index) {
+                                       cui_component_event_metadata evidence, cui_id key,
+                                       size_t index) {
     if (!handler.on_activate)
         return;
     evidence.kind = CUI_COMPONENT_EVENT_ACTIVATE;
@@ -305,9 +314,10 @@ static void cui_tree_activation_notify(cui_tree_event_result *out, cui_tree_hand
     else
         ++out->activation_count;
 }
-static cui_tree_result cui_tree_reduce_common(
-    cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
-    cui_tree_options o, cui_tree_handler handler, cui_tree_event_result *out) {
+static cui_tree_result cui_tree_reduce_common(cui_context *ui, cui_id id, cui_tree_model *m,
+                                              cui_tree_state *s, cui_id *selected,
+                                              cui_tree_options o, cui_tree_handler handler,
+                                              cui_tree_event_result *out) {
     cui_tree_result result = {0};
     if (!ui || !m || !s || !selected) {
         result.error = CUI_TREE_INVALID;
@@ -352,13 +362,13 @@ static cui_tree_result cui_tree_reduce_common(
         if (hit == SIZE_MAX || m->nodes[hit].disabled)
             continue;
         cui_component_event_metadata evidence;
-        bool observe = out &&
-                       (handler.on_selection_change || handler.on_expansion_change ||
-                        handler.on_activate) &&
-                       cui_tree_event_evidence(ui, id, e, events[e].type, &evidence);
+        bool observe =
+            out &&
+            (handler.on_selection_change || handler.on_expansion_change || handler.on_activate) &&
+            cui_tree_event_evidence(ui, id, e, events[e].type, &evidence);
         if (activation == cui_tree_toggle_id(id, m->nodes[hit].key)) {
             if (cui_tree_expand_observed(m, hit, !m->expanded[hit], handler, out,
-                                          observe ? &evidence : NULL))
+                                         observe ? &evidence : NULL))
                 result.expansion_changed = true;
             s->cursor = m->nodes[hit].key;
             cui_focus(ui, cui_tree_row_id(id, s->cursor));
@@ -494,9 +504,9 @@ cui_tree_result cui_tree_reduce(cui_context *ui, cui_id id, cui_tree_model *m, c
                                 cui_id *selected, cui_tree_options options) {
     return cui_tree_reduce_common(ui, id, m, s, selected, options, (cui_tree_handler){0}, NULL);
 }
-cui_tree_event_result cui_tree_reduce_events(
-    cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
-    cui_tree_options options, cui_tree_handler handler) {
+cui_tree_event_result cui_tree_reduce_events(cui_context *ui, cui_id id, cui_tree_model *m,
+                                             cui_tree_state *s, cui_id *selected,
+                                             cui_tree_options options, cui_tree_handler handler) {
     cui_tree_event_result out = {0};
     if (!ui || !id || !m || !s || !selected) {
         out.result.error = CUI_TREE_INVALID;
@@ -555,9 +565,9 @@ cui_tree_result cui_base_tree(cui_context *ui, cui_id id, cui_tree_model *m, cui
     return result;
 }
 
-cui_tree_event_result cui_base_tree_events(
-    cui_context *ui, cui_id id, cui_tree_model *m, cui_tree_state *s, cui_id *selected,
-    cui_tree_options options, cui_tree_handler handler) {
+cui_tree_event_result cui_base_tree_events(cui_context *ui, cui_id id, cui_tree_model *m,
+                                           cui_tree_state *s, cui_id *selected,
+                                           cui_tree_options options, cui_tree_handler handler) {
     cui_tree_event_result out = cui_tree_reduce_events(ui, id, m, s, selected, options, handler);
     if (ui && id && m && s && selected)
         cui_tree_submit(ui, id, m, s, *selected, options);

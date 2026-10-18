@@ -37,8 +37,9 @@ typedef struct {
     cui_component_check_handler handler;
     cui_component_action_result *result;
 } cui_control_events_private_check;
-static inline void cui_control_events_private_check_request(void *user, cui_check_state requested,
-                                                            const cui_activation_snapshot *snapshot) {
+static inline void
+cui_control_events_private_check_request(void *user, cui_check_state requested,
+                                         const cui_activation_snapshot *snapshot) {
     cui_control_events_private_check *forward = (cui_control_events_private_check *)user;
     cui_component_check_request request;
     if (!cui_component_event_from_activation(&request.event, CUI_COMPONENT_EVENT_REQUEST, snapshot))
@@ -62,12 +63,13 @@ static inline void cui_control_events_private_check_request(void *user, cui_chec
  * and perform it after frame completion. There is no runtime destruction guard. */
 static inline cui_component_action_result
 cui_base_check_events(cui_context *ui, cui_id id, cui_str name, cui_check_state value,
-                       cui_check_options options, cui_component_check_handler handler) {
+                      cui_check_options options, cui_component_check_handler handler) {
     cui_component_action_result result;
     memset(&result, 0, sizeof(result));
     if (!ui || !id || (name.length && !name.data) || value < CUI_CHECK_UNCHECKED ||
         value > CUI_CHECK_MIXED || options.on_change || options.change_user ||
-        (options.custom_role && (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)))
+        (options.custom_role &&
+         (options.role < CUI_ROLE_NONE || options.role > CUI_ROLE_RADIOGROUP)))
         return result;
     result.valid = true;
     result.submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;

@@ -124,13 +124,16 @@ cui_input_group_result cui_input_group(cui_context *, cui_id group, cui_id input
 #define CUI_FORM_PRIVATE_H
 
 /* Synchronous delegation at the original nested Input seam; Base-only types. */
-typedef cui_input_event_result (*cui_form_private_input_fn)(
-    void *, cui_context *, cui_id, cui_str, cui_edit *, cui_input_behavior_state *,
-    cui_base_input_options, bool synthetic_hit, cui_component_text_handler);
-cui_input_group_result cui_form_private_input_group(
-    cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
-    const cui_input_group_addon *, size_t, cui_input_group_options,
-    cui_input_group_handler, cui_input_group_event_result *, cui_form_private_input_fn, void *);
+typedef cui_input_event_result (*cui_form_private_input_fn)(void *, cui_context *, cui_id, cui_str,
+                                                            cui_edit *, cui_input_behavior_state *,
+                                                            cui_base_input_options,
+                                                            bool synthetic_hit,
+                                                            cui_component_text_handler);
+cui_input_group_result
+cui_form_private_input_group(cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
+                             const cui_input_group_addon *, size_t, cui_input_group_options,
+                             cui_input_group_handler, cui_input_group_event_result *,
+                             cui_form_private_input_fn, void *);
 #endif
 
 #include <math.h>
@@ -295,13 +298,11 @@ static bool cui_form_private_group_valid(cui_id group, cui_id input, const cui_i
     }
     return true;
 }
-cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id group, cui_id input,
-                                            cui_edit *edit, cui_input_group_state *state,
-                                            const cui_input_group_addon *a, size_t count,
-                                            cui_input_group_options o,
-                                            cui_input_group_handler handler,
-                                            cui_input_group_event_result *notifications,
-                                            cui_form_private_input_fn input_fn, void *input_user) {
+cui_input_group_result cui_form_private_input_group(
+    cui_context *ui, cui_id group, cui_id input, cui_edit *edit, cui_input_group_state *state,
+    const cui_input_group_addon *a, size_t count, cui_input_group_options o,
+    cui_input_group_handler handler, cui_input_group_event_result *notifications,
+    cui_form_private_input_fn input_fn, void *input_user) {
     cui_input_group_result result = {.input.error = CUI_EDIT_OK};
     if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
         result.error = CUI_FORM_INVALID;
@@ -328,8 +329,8 @@ cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id grou
                                    .busy = a[i].loading,
                                    .focus_target =
                                        a[i].kind == CUI_INPUT_GROUP_BUTTON ? 0 : input});
-        if (notifications && handler.on_addon && !disabled &&
-            a[i].kind == CUI_INPUT_GROUP_BUTTON && cui_frame_paint_enabled(ui) && cui_frame_sequence(ui)) {
+        if (notifications && handler.on_addon && !disabled && a[i].kind == CUI_INPUT_GROUP_BUTTON &&
+            cui_frame_paint_enabled(ui) && cui_frame_sequence(ui)) {
             size_t event_count;
             const cui_event *events = cui_frame_events(ui, &event_count);
             for (size_t e = 0; e < event_count; ++e) {
@@ -338,7 +339,8 @@ cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id grou
                 cui_component_event_metadata event;
                 cui_activation_snapshot snapshot;
                 if (!cui_event_activation_snapshot(ui, e, &snapshot) ||
-                    !cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+                    !cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                         &snapshot)) {
                     cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
                     if (events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP)
                         source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
@@ -346,7 +348,8 @@ cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id grou
                         source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
                     else if (events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION)
                         source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
-                    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_ACTIVATE, a[i].id, source);
+                    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_ACTIVATE, a[i].id,
+                                                   source);
                     (void)cui_component_event_set_frame_index(&event, cui_frame_sequence(ui), e);
                 }
                 if (notifications->addon_count == SIZE_MAX)
@@ -366,10 +369,13 @@ cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id grou
         behavior.hit_test_user = &hit;
     }
     if (input_fn || (notifications && handler.on_text)) {
-        cui_component_text_handler text_handler = {notifications ? handler.on_text : NULL, handler.user};
-        cui_input_event_result observed = input_fn
-            ? input_fn(input_user, ui, input, o.name, edit, &state->behavior, behavior, synthetic_hit, text_handler)
-            : cui_base_input_events(ui, input, o.name, edit, &state->behavior, behavior, text_handler);
+        cui_component_text_handler text_handler = {notifications ? handler.on_text : NULL,
+                                                   handler.user};
+        cui_input_event_result observed =
+            input_fn ? input_fn(input_user, ui, input, o.name, edit, &state->behavior, behavior,
+                                synthetic_hit, text_handler)
+                     : cui_base_input_events(ui, input, o.name, edit, &state->behavior, behavior,
+                                             text_handler);
         result.input = observed.control;
         if (notifications) {
             notifications->change_count = observed.change_count;
@@ -391,36 +397,43 @@ cui_input_group_result cui_form_private_input_group(cui_context *ui, cui_id grou
 }
 
 cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_id input,
-    cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
-    size_t count, cui_input_group_options options) {
+                                            cui_edit *edit, cui_input_group_state *state,
+                                            const cui_input_group_addon *addons, size_t count,
+                                            cui_input_group_options options) {
     return cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
-                                  (cui_input_group_handler){0}, NULL, NULL, NULL);
+                                        (cui_input_group_handler){0}, NULL, NULL, NULL);
 }
-cui_input_group_event_result cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input,
-    cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
-    size_t count, cui_input_group_options options, cui_input_group_handler handler) {
+cui_input_group_event_result
+cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input, cui_edit *edit,
+                            cui_input_group_state *state, const cui_input_group_addon *addons,
+                            size_t count, cui_input_group_options options,
+                            cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
-    result.control = cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
-                                            handler, &result, NULL, NULL);
+    result.control = cui_form_private_input_group(ui, group, input, edit, state, addons, count,
+                                                  options, handler, &result, NULL, NULL);
     return result;
 }
 
 /* src/components/cui_form.c */
 /* SPDX-License-Identifier: MIT */
-
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_FORM_PRIVATE_H
 #define CUI_FORM_PRIVATE_H
 
 /* Synchronous delegation at the original nested Input seam; Base-only types. */
-typedef cui_input_event_result (*cui_form_private_input_fn)(
-    void *, cui_context *, cui_id, cui_str, cui_edit *, cui_input_behavior_state *,
-    cui_base_input_options, bool synthetic_hit, cui_component_text_handler);
-cui_input_group_result cui_form_private_input_group(
-    cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
-    const cui_input_group_addon *, size_t, cui_input_group_options,
-    cui_input_group_handler, cui_input_group_event_result *, cui_form_private_input_fn, void *);
+typedef cui_input_event_result (*cui_form_private_input_fn)(void *, cui_context *, cui_id, cui_str,
+                                                            cui_edit *, cui_input_behavior_state *,
+                                                            cui_base_input_options,
+                                                            bool synthetic_hit,
+                                                            cui_component_text_handler);
+cui_input_group_result
+cui_form_private_input_group(cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
+                             const cui_input_group_addon *, size_t, cui_input_group_options,
+                             cui_input_group_handler, cui_input_group_event_result *,
+                             cui_form_private_input_fn, void *);
 #endif
+
+
 
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_INPUT_PRIVATE_H
@@ -428,12 +441,12 @@ cui_input_group_result cui_form_private_input_group(
 
 /* Prepare and reduce once, never paint. Actual behavior owner remains observable
  * during callbacks; local hit scratch does not escape the synchronous call. */
-cui_input_event_result cui_input_private_reduce(
-    cui_context *, cui_id, const cui_theme *, cui_str, cui_edit *, cui_input_state *,
-    cui_input_behavior_state *, cui_input_options *, cui_base_input_options,
-    cui_rect viewport, bool synthetic_hit, cui_component_text_handler);
+cui_input_event_result cui_input_private_reduce(cui_context *, cui_id, const cui_theme *, cui_str,
+                                                cui_edit *, cui_input_state *,
+                                                cui_input_behavior_state *, cui_input_options *,
+                                                cui_base_input_options, cui_rect viewport,
+                                                bool synthetic_hit, cui_component_text_handler);
 #endif
-
 
 #include <math.h>
 static float cui_form_private_form_gap(cui_form_options o) {
@@ -623,23 +636,24 @@ typedef struct {
     cui_input_group_state *state;
     cui_input_options *paint;
 } cui_form_private_secure;
-static cui_input_event_result cui_form_private_secure_input(
-    void *user, cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
-    cui_input_behavior_state *behavior, cui_base_input_options options, bool synthetic_hit,
-    cui_component_text_handler handler) {
+static cui_input_event_result
+cui_form_private_secure_input(void *user, cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
+                              cui_input_behavior_state *behavior, cui_base_input_options options,
+                              bool synthetic_hit, cui_component_text_handler handler) {
     cui_form_private_secure *secure = user;
     cui_input_state temporary = {.behavior = *behavior, .scroll_x = secure->state->scroll_x};
-    cui_input_event_result result = cui_input_private_reduce(ui, id, secure->theme, name, edit,
-        &temporary, behavior, secure->paint, options, secure->state->viewport, synthetic_hit, handler);
+    cui_input_event_result result = cui_input_private_reduce(
+        ui, id, secure->theme, name, edit, &temporary, behavior, secure->paint, options,
+        secure->state->viewport, synthetic_hit, handler);
     secure->state->scroll_x = temporary.scroll_x;
     return result;
 }
-static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input,
-                                       const cui_theme *theme, cui_edit *edit,
-                                       cui_input_group_state *state, const cui_input_group_addon *a,
-                                       size_t count, cui_input_group_options o,
-                                       cui_input_group_handler handler,
-                                       cui_input_group_event_result *notifications) {
+static cui_input_group_result
+cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input, const cui_theme *theme,
+                              cui_edit *edit, cui_input_group_state *state,
+                              const cui_input_group_addon *a, size_t count,
+                              cui_input_group_options o, cui_input_group_handler handler,
+                              cui_input_group_event_result *notifications) {
     if (!theme || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_input_group_result){.error = CUI_FORM_INVALID,
                                         .input.error = CUI_EDIT_INVALID_ARGUMENT};
@@ -761,11 +775,12 @@ static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui
     cui_input_group_result result;
     if (o.input.masked) {
         cui_form_private_secure secure = {&t, state, &paint_options};
-        result = cui_form_private_input_group(ui, group, input, edit, state, a, count, o,
-            handler, notifications, cui_form_private_secure_input, &secure);
+        result =
+            cui_form_private_input_group(ui, group, input, edit, state, a, count, o, handler,
+                                         notifications, cui_form_private_secure_input, &secure);
     } else if (notifications) {
-        cui_input_group_event_result observed = cui_base_input_group_events(
-            ui, group, input, edit, state, a, count, o, handler);
+        cui_input_group_event_result observed =
+            cui_base_input_group_events(ui, group, input, edit, state, a, count, o, handler);
         result = observed.control;
         notifications->addon_count = observed.addon_count;
         notifications->change_count = observed.change_count;
@@ -826,18 +841,22 @@ static cui_input_group_result cui_form_private_styled_group(cui_context *ui, cui
 }
 
 cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id input,
-    const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
-    const cui_input_group_addon *addons, size_t count, cui_input_group_options options) {
-    return cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count, options,
-                                  (cui_input_group_handler){0}, NULL);
+                                       const cui_theme *theme, cui_edit *edit,
+                                       cui_input_group_state *state,
+                                       const cui_input_group_addon *addons, size_t count,
+                                       cui_input_group_options options) {
+    return cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count,
+                                         options, (cui_input_group_handler){0}, NULL);
 }
 cui_input_group_event_result cui_input_group_events(cui_context *ui, cui_id group, cui_id input,
-    const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
-    const cui_input_group_addon *addons, size_t count, cui_input_group_options options,
-    cui_input_group_handler handler) {
+                                                    const cui_theme *theme, cui_edit *edit,
+                                                    cui_input_group_state *state,
+                                                    const cui_input_group_addon *addons,
+                                                    size_t count, cui_input_group_options options,
+                                                    cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
-    result.control = cui_form_private_styled_group(ui, group, input, theme, edit, state, addons, count,
-                                            options, handler, &result);
+    result.control = cui_form_private_styled_group(ui, group, input, theme, edit, state, addons,
+                                                   count, options, handler, &result);
     return result;
 }
 

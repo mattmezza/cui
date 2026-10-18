@@ -350,7 +350,8 @@ static bool cui_core_text_style_valid(cui_text_style style) {
 }
 uint32_t cui_text_capabilities(const cui_context *ui) {
     return ui && ui->config.measure_styled && ui->config.text_geometry_line
-               ? ui->config.text_capabilities : 0;
+               ? ui->config.text_capabilities
+               : 0;
 }
 static bool cui_core_tracking_supported(const cui_context *ui, cui_text_style style) {
     return style.letter_spacing == 0 ||
@@ -2458,8 +2459,8 @@ static const cui_core_text_source *cui_core_custom_wrap_record(cui_context *ui, 
 }
 /* Tracking must be resolved for this exact contextual line: a wrap removes
  * its final gap and may change joining at the new boundary. */
-static float cui_core_wrap_width(cui_context *ui, const cui_core_text_source *record,
-                                  size_t first, size_t last) {
+static float cui_core_wrap_width(cui_context *ui, const cui_core_text_source *record, size_t first,
+                                 size_t last) {
     if (record->style.letter_spacing != 0) {
         cui_text_line_source source = record->source;
         source.byte_start = record->wrap_clusters[first].start;
@@ -2502,8 +2503,8 @@ static void cui_core_custom_wrap_emit(Clay_Context *context, Clay_LayoutElement 
     ++element->textElementData.wrappedLines.length;
 }
 static size_t cui_core_custom_wrap_pass(Clay_Context *context, Clay_LayoutElement *element,
-                                        const cui_core_text_source *record, float height,
-                                        bool emit, cui_context *ui) {
+                                        const cui_core_text_source *record, float height, bool emit,
+                                        cui_context *ui) {
     const cui_core_wrap_cluster *clusters = record->wrap_clusters;
     size_t last = 0, candidate = SIZE_MAX, lines = 1;
     float x = 0, last_x = 0, candidate_x = 0;

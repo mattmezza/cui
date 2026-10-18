@@ -16,10 +16,13 @@ typedef struct {
     cui_str text; /* Final committed text borrowed only through callback; masked = empty. */
 } cui_otp_change_event;
 typedef void (*cui_otp_change_fn)(void *user, const cui_otp_change_event *event);
-typedef struct { cui_otp_change_fn change; void *user; } cui_otp_event_handler;
+typedef struct {
+    cui_otp_change_fn change;
+    void *user;
+} cui_otp_event_handler;
 typedef struct {
     cui_otp_result control; /* Original result including accepted counts and partial errors. */
-    size_t change_count; /* Actual aggregate callbacks, zero or one. */
+    size_t change_count;    /* Actual aggregate callbacks, zero or one. */
 } cui_otp_event_result;
 /* Aggregate accepted operations, including no-ops/net-zero; not SUBMIT or
  * validation. Completion counts are length matches during reduction; final text
@@ -30,10 +33,10 @@ typedef struct {
  * No model/state/composition/context mutation, rebind, destruction, recursion or
  * foreign unwinding in callbacks. Defer edits/removal/teardown until outer call
  * and renderer consumption complete. Unrelated application state may change. */
-cui_otp_event_result cui_base_otp_events(cui_context *, cui_id, cui_otp_state *,
-    cui_otp_options, cui_otp_event_handler);
-cui_otp_event_result cui_otp_events(cui_context *, cui_id, const cui_theme *,
-    cui_otp_state *, cui_otp_options, cui_otp_event_handler);
+cui_otp_event_result cui_base_otp_events(cui_context *, cui_id, cui_otp_state *, cui_otp_options,
+                                         cui_otp_event_handler);
+cui_otp_event_result cui_otp_events(cui_context *, cui_id, const cui_theme *, cui_otp_state *,
+                                    cui_otp_options, cui_otp_event_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -52,7 +55,7 @@ cui_otp_event_result cui_otp_events(cui_context *, cui_id, const cui_theme *,
 
 #include <string.h>
 cui_otp_event_result cui_base_otp_events(cui_context *ui, cui_id id, cui_otp_state *state,
-    cui_otp_options options, cui_otp_event_handler handler) {
+                                         cui_otp_options options, cui_otp_event_handler handler) {
     uint64_t frame = cui_frame_sequence(ui);
     bool observe = handler.change && frame && id && state && state->buffer && state->capacity &&
                    state->length <= 256 && !options.disabled;
@@ -65,7 +68,8 @@ cui_otp_event_result cui_base_otp_events(cui_context *ui, cui_id id, cui_otp_sta
         if (observe) {
             before = (cui_str){state->buffer, (size_t)(end - state->buffer)};
             observe = cui_edit_valid_utf8(before);
-            if (observe) before_count = cui_otp_count(state);
+            if (observe)
+                before_count = cui_otp_count(state);
         }
     }
     cui_otp_event_result result = {0};
@@ -74,17 +78,20 @@ cui_otp_event_result cui_base_otp_events(cui_context *ui, cui_id id, cui_otp_sta
         cui_str after = cui_otp_value(state);
         cui_otp_change_event event = {0};
         (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_CHANGE, id,
-                                      CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                                       CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
         event.event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
         event.event.frame_sequence = frame;
-        event.before_bytes = before.length; event.after_bytes = after.length;
-        event.before_count = before_count; event.after_count = cui_otp_count(state);
+        event.before_bytes = before.length;
+        event.after_bytes = after.length;
+        event.before_count = before_count;
+        event.after_count = cui_otp_count(state);
         event.target_length = state->length;
         event.accepted_count = result.control.change_count;
         event.completion_count = result.control.complete_count;
         event.final_complete = event.after_count == event.target_length;
         event.has_text = !state->masked;
-        if (event.has_text) event.text = after;
+        if (event.has_text)
+            event.text = after;
         result.change_count = 1;
         handler.change(handler.user, &event);
     }

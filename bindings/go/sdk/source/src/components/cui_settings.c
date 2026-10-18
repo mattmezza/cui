@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_settings_events.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_settings_events.h"
 #include <math.h>
 #include <string.h>
 typedef struct {
@@ -178,9 +178,9 @@ static bool dropdown(settings_frame *f, const cui_setting_item *item, cui_id id,
     return changed;
 }
 /* Private Base seam shared with the explicit programmatic helper. */
-extern cui_settings_reset_event_result cui_settings_reset_page_events_internal(
-    cui_id, size_t, const cui_setting_page *, cui_str, cui_settings_handler,
-    const cui_component_event_metadata *);
+extern cui_settings_reset_event_result
+cui_settings_reset_page_events_internal(cui_id, size_t, const cui_setting_page *, cui_str,
+                                        cui_settings_handler, const cui_component_event_metadata *);
 static bool reset_evidence(settings_frame *f, cui_id trigger, cui_component_event_metadata *out) {
     uint64_t frame = cui_frame_sequence(f->ui);
     if (!f->events || !frame || !cui_frame_paint_enabled(f->ui))
@@ -257,12 +257,18 @@ static bool navigation_evidence(settings_navigation *nav, cui_component_event_me
             return true;
         }
         switch (events[e].type) {
-        case CUI_EVENT_POINTER_UP: out->source = CUI_COMPONENT_EVENT_SOURCE_POINTER; break;
+        case CUI_EVENT_POINTER_UP:
+            out->source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+            break;
         case CUI_EVENT_KEY_DOWN:
-        case CUI_EVENT_KEY_UP: out->source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD; break;
+        case CUI_EVENT_KEY_UP:
+            out->source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+            break;
         case CUI_EVENT_ACCESSIBILITY_ACTION:
-            out->source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY; break;
-        default: break;
+            out->source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+            break;
+        default:
+            break;
         }
         if (out->source != CUI_COMPONENT_EVENT_SOURCE_UNKNOWN)
             out->flags |= CUI_COMPONENT_EVENT_HAS_SOURCE;
@@ -287,8 +293,8 @@ static void navigate(void *user) {
     s->pending_group_scroll = nav->group != CUI_SETTINGS_NO_GROUP;
     cui_invalidate(nav->frame->ui);
     if (observe && (previous_page != s->selected_page || previous_group != s->selected_group)) {
-        cui_settings_navigation_change change = {
-            evidence, previous_page, previous_group, s->selected_page, s->selected_group};
+        cui_settings_navigation_change change = {evidence, previous_page, previous_group,
+                                                 s->selected_page, s->selected_group};
         nav->frame->handler.on_navigation(nav->frame->handler.user, &change);
         if (nav->frame->events->navigation_count == SIZE_MAX)
             nav->frame->events->count_overflow = true;
@@ -381,7 +387,8 @@ static void scalar_count(settings_frame *f, size_t *count) {
         ++*count;
 }
 static void scalar_observe(settings_frame *f, const cui_setting_item *item, cui_id id,
-    cui_settings_render_options render, settings_scalar_before before, uint64_t frame) {
+                           cui_settings_render_options render, settings_scalar_before before,
+                           uint64_t frame) {
     if (!frame)
         return;
     cui_component_event_metadata evidence;
@@ -390,32 +397,52 @@ static void scalar_observe(settings_frame *f, const cui_setting_item *item, cui_
         return;
     evidence.frame_sequence = frame;
     evidence.flags |= CUI_COMPONENT_EVENT_HAS_FRAME;
-    if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
-        item->boolean && f->handler.on_boolean && before.boolean != *item->boolean) {
-        cui_settings_bool_change event = {evidence, id, render.page, render.group, render.item,
-                                          before.boolean, *item->boolean, CUI_SETTINGS_CHANGE_EDIT};
+    if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) && item->boolean &&
+        f->handler.on_boolean && before.boolean != *item->boolean) {
+        cui_settings_bool_change event = {evidence,       id,
+                                          render.page,    render.group,
+                                          render.item,    before.boolean,
+                                          *item->boolean, CUI_SETTINGS_CHANGE_EDIT};
         f->handler.on_boolean(f->handler.user, &event);
         scalar_count(f, &f->events->boolean_count);
     } else if (item->kind == CUI_SETTING_NUMBER && item->number && item->number_state &&
                f->handler.on_number && before.number != *item->number &&
                !(isnan(before.number) && isnan(*item->number))) {
-        cui_settings_number_change event = {evidence, id, render.page, render.group, render.item,
-            before.number, *item->number, isfinite(before.number), isfinite(*item->number), CUI_SETTINGS_CHANGE_EDIT};
+        cui_settings_number_change event = {evidence,
+                                            id,
+                                            render.page,
+                                            render.group,
+                                            render.item,
+                                            before.number,
+                                            *item->number,
+                                            isfinite(before.number),
+                                            isfinite(*item->number),
+                                            CUI_SETTINGS_CHANGE_EDIT};
         f->handler.on_number(f->handler.user, &event);
         scalar_count(f, &f->events->number_count);
     } else if (item->kind == CUI_SETTING_DROPDOWN && item->choice && f->handler.on_choice &&
                before.choice != *item->choice) {
-        cui_settings_choice_change event = {evidence, id, render.page, render.group, render.item,
-                                            before.choice, *item->choice, CUI_SETTINGS_CHANGE_EDIT};
+        cui_settings_choice_change event = {evidence,      id,
+                                            render.page,   render.group,
+                                            render.item,   before.choice,
+                                            *item->choice, CUI_SETTINGS_CHANGE_EDIT};
         f->handler.on_choice(f->handler.user, &event);
         scalar_count(f, &f->events->choice_count);
     } else if (item->kind == CUI_SETTING_INPUT && item->edit && item->input_state &&
                f->handler.on_text) {
         cui_edit_state after = cui_edit_get_state(item->edit);
         if (before.text.revision != after.revision) {
-            cui_settings_text_change event = {evidence, id, render.page, render.group, render.item,
-                before.text.revision, after.revision, before.text.length, after.length,
-                cui_edit_get_text(item->edit), CUI_SETTINGS_CHANGE_EDIT};
+            cui_settings_text_change event = {evidence,
+                                              id,
+                                              render.page,
+                                              render.group,
+                                              render.item,
+                                              before.text.revision,
+                                              after.revision,
+                                              before.text.length,
+                                              after.length,
+                                              cui_edit_get_text(item->edit),
+                                              CUI_SETTINGS_CHANGE_EDIT};
             f->handler.on_text(f->handler.user, &event);
             scalar_count(f, &f->events->text_count);
         }
@@ -429,7 +456,8 @@ static bool field(settings_frame *f, const cui_setting_item *item, cui_id id,
     }
     settings_scalar_before before = {0};
     uint64_t observer_frame = f->events && !render.disabled && cui_frame_paint_enabled(f->ui)
-                                  ? cui_frame_sequence(f->ui) : 0;
+                                  ? cui_frame_sequence(f->ui)
+                                  : 0;
     if (observer_frame) {
         if ((item->kind == CUI_SETTING_SWITCH || item->kind == CUI_SETTING_CHECKBOX) &&
             item->boolean && f->handler.on_boolean)
@@ -740,8 +768,10 @@ static void content(cui_context *ui, void *user) {
     cui_end_box(ui);
 }
 static cui_settings_result settings_common(cui_context *ui, cui_id id, const cui_theme *theme,
-    const cui_setting_page *pages, size_t count, cui_settings_state *state,
-    cui_settings_options options, cui_settings_handler handler, cui_settings_event_result *events) {
+                                           const cui_setting_page *pages, size_t count,
+                                           cui_settings_state *state, cui_settings_options options,
+                                           cui_settings_handler handler,
+                                           cui_settings_event_result *events) {
     if (!ui || !id || !theme || !state || !cui_design_valid(options.design_size) ||
         !isfinite(theme->font_size) || theme->font_size <= 0 || !isfinite(options.width) ||
         !isfinite(options.height) || options.height < 0 || options.height > 1000000 ||
@@ -845,14 +875,16 @@ static cui_settings_result settings_common(cui_context *ui, cui_id id, const cui
 }
 
 cui_settings_result cui_settings(cui_context *ui, cui_id id, const cui_theme *theme,
-    const cui_setting_page *pages, size_t count, cui_settings_state *state,
-    cui_settings_options options) {
-    return settings_common(ui, id, theme, pages, count, state, options,
-                            (cui_settings_handler){0}, NULL);
+                                 const cui_setting_page *pages, size_t count,
+                                 cui_settings_state *state, cui_settings_options options) {
+    return settings_common(ui, id, theme, pages, count, state, options, (cui_settings_handler){0},
+                           NULL);
 }
 cui_settings_event_result cui_settings_events(cui_context *ui, cui_id id, const cui_theme *theme,
-    const cui_setting_page *pages, size_t count, cui_settings_state *state,
-    cui_settings_options options, cui_settings_handler handler) {
+                                              const cui_setting_page *pages, size_t count,
+                                              cui_settings_state *state,
+                                              cui_settings_options options,
+                                              cui_settings_handler handler) {
     cui_settings_event_result out = {0};
     if (!ui || !id || !theme || !state || (!pages && count)) {
         out.result.invalid = true;

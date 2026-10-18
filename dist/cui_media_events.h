@@ -2,8 +2,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_MEDIA_EVENTS_H
 #define CUI_MEDIA_EVENTS_H
-#include "cui_media.h"
 #include "cui_component_events.h"
+#include "cui_media.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,9 +38,9 @@ typedef struct {
  * submit UI or destroy context in observer. Unrelated flags/copying allowed;
  * defer omission/teardown. Legacy callbacks keep old userdata/timing and must keep
  * resources needed by remaining work/observers live. No reject/CHANGE/COMMIT implied. */
-cui_attachment_event_result cui_attachment_events(
-    cui_context *, cui_id, const cui_theme *, cui_attachment_state *,
-    cui_attachment_options, cui_attachment_handler);
+cui_attachment_event_result cui_attachment_events(cui_context *, cui_id, const cui_theme *,
+                                                  cui_attachment_state *, cui_attachment_options,
+                                                  cui_attachment_handler);
 #ifdef __cplusplus
 }
 #endif

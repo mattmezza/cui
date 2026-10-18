@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
-#include "cui/cui_number_events.h"
-#include "cui/cui_numeric_selection_events.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_number_events.h"
+#include "cui/cui_numeric_selection_events.h"
 #include <math.h>
 #include <stdio.h>
 static void cui_numeric_paint_button(cui_context *ui, cui_id id, const cui_theme *t, cui_str text,
@@ -79,8 +79,10 @@ static void cui_number_step_paint(cui_context *ui, cui_id id, const cui_theme *t
     cui_end_box(ui);
 }
 static cui_number_result cui_number_input_common(cui_context *ui, cui_id id, const cui_theme *t,
-    cui_str name, cui_number_state *s, double *value, cui_number_options o,
-    const cui_number_event_handler *handler, size_t *change_count) {
+                                                 cui_str name, cui_number_state *s, double *value,
+                                                 cui_number_options o,
+                                                 const cui_number_event_handler *handler,
+                                                 size_t *change_count) {
     cui_number_metrics metrics;
     if (!ui || !id || !t || !cui_number_measure(o, t->font_size, &metrics) || !isfinite(o.width) ||
         (o.prefix.length && !o.prefix.data) || (o.suffix.length && !o.suffix.data) ||
@@ -88,7 +90,8 @@ static cui_number_result cui_number_input_common(cui_context *ui, cui_id id, con
         return (cui_number_result){.invalid = true, .error = CUI_EDIT_INVALID_ARGUMENT};
     cui_number_result result;
     if (handler) {
-        cui_number_event_result notification = cui_base_number_input_events(ui, id, name, s, value, o, *handler);
+        cui_number_event_result notification =
+            cui_base_number_input_events(ui, id, name, s, value, o, *handler);
         result = notification.control;
         *change_count = notification.change_count;
     } else
@@ -160,25 +163,30 @@ static cui_number_result cui_number_input_common(cui_context *ui, cui_id id, con
     cui_end_box(ui);
     return result;
 }
-cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *theme,
-    cui_str name, cui_number_state *state, double *value, cui_number_options options) {
+cui_number_result cui_number_input(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name,
+                                   cui_number_state *state, double *value,
+                                   cui_number_options options) {
     return cui_number_input_common(ui, id, theme, name, state, value, options, NULL, NULL);
 }
 cui_number_event_result cui_number_input_events(cui_context *ui, cui_id id, const cui_theme *theme,
-    cui_str name, cui_number_state *state, double *value, cui_number_options options,
-    cui_number_event_handler handler) {
+                                                cui_str name, cui_number_state *state,
+                                                double *value, cui_number_options options,
+                                                cui_number_event_handler handler) {
     cui_number_event_result result = {0};
-    result.control = cui_number_input_common(ui, id, theme, name, state, value, options,
-                                             &handler, &result.change_count);
+    result.control = cui_number_input_common(ui, id, theme, name, state, value, options, &handler,
+                                             &result.change_count);
     return result;
 }
-static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t, size_t *page, size_t total,
-    bool compact, bool disabled, const cui_pagination_event_handler *handler, size_t *change_count) {
+static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t, size_t *page,
+                                  size_t total, bool compact, bool disabled,
+                                  const cui_pagination_event_handler *handler,
+                                  size_t *change_count) {
     if (!t || !page)
         return false;
     bool changed;
     if (handler) {
-        cui_numeric_selection_event_result result = cui_base_pagination_events(ui, id, page, total, compact, disabled, *handler);
+        cui_numeric_selection_event_result result =
+            cui_base_pagination_events(ui, id, page, total, compact, disabled, *handler);
         changed = result.control;
         *change_count = result.change_count;
     } else
@@ -213,16 +221,17 @@ static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t
     cui_end_box(ui);
     return changed;
 }
-bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
-    size_t total, bool compact, bool disabled) {
+bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page, size_t total,
+                    bool compact, bool disabled) {
     return cui_pagination_common(ui, id, theme, page, total, compact, disabled, NULL, NULL);
 }
 cui_numeric_selection_event_result cui_pagination_events(cui_context *ui, cui_id id,
-    const cui_theme *theme, size_t *page, size_t total, bool compact, bool disabled,
-    cui_pagination_event_handler handler) {
+                                                         const cui_theme *theme, size_t *page,
+                                                         size_t total, bool compact, bool disabled,
+                                                         cui_pagination_event_handler handler) {
     cui_numeric_selection_event_result result = {0};
-    result.control = cui_pagination_common(ui, id, theme, page, total, compact, disabled,
-                                           &handler, &result.change_count);
+    result.control = cui_pagination_common(ui, id, theme, page, total, compact, disabled, &handler,
+                                           &result.change_count);
     return result;
 }
 typedef struct {
@@ -265,13 +274,15 @@ static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id, float 
         return NULL;
     return icons;
 }
-static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
-    cui_rating_options o, const cui_rating_event_handler *handler, size_t *change_count) {
+static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              float *value, cui_rating_options o,
+                              const cui_rating_event_handler *handler, size_t *change_count) {
     if (!t || !value)
         return false;
     bool changed;
     if (handler) {
-        cui_numeric_selection_event_result result = cui_base_rating_events(ui, id, name, value, o, *handler);
+        cui_numeric_selection_event_result result =
+            cui_base_rating_events(ui, id, name, value, o, *handler);
         changed = result.control;
         *change_count = result.change_count;
     } else
@@ -333,24 +344,28 @@ static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cu
     return changed;
 }
 bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
-    cui_rating_options options) {
+                cui_rating_options options) {
     return cui_rating_common(ui, id, theme, name, value, options, NULL, NULL);
 }
 cui_numeric_selection_event_result cui_rating_events(cui_context *ui, cui_id id,
-    const cui_theme *theme, cui_str name, float *value, cui_rating_options options,
-    cui_rating_event_handler handler) {
+                                                     const cui_theme *theme, cui_str name,
+                                                     float *value, cui_rating_options options,
+                                                     cui_rating_event_handler handler) {
     cui_numeric_selection_event_result result = {0};
-    result.control = cui_rating_common(ui, id, theme, name, value, options, &handler, &result.change_count);
+    result.control =
+        cui_rating_common(ui, id, theme, name, value, options, &handler, &result.change_count);
     return result;
 }
-static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t, const cui_step *steps,
-    size_t count, size_t *current, bool vertical, bool disabled,
-    const cui_stepper_event_handler *handler, size_t *change_count) {
+static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t,
+                               const cui_step *steps, size_t count, size_t *current, bool vertical,
+                               bool disabled, const cui_stepper_event_handler *handler,
+                               size_t *change_count) {
     if (!t || !current || (!steps && count) || count > 100)
         return false;
     bool changed;
     if (handler) {
-        cui_numeric_selection_event_result result = cui_base_stepper_events(ui, id, steps, count, current, disabled, *handler);
+        cui_numeric_selection_event_result result =
+            cui_base_stepper_events(ui, id, steps, count, current, disabled, *handler);
         changed = result.control;
         *change_count = result.change_count;
     } else
@@ -378,14 +393,16 @@ static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t, c
     return changed;
 }
 bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_step *steps,
-    size_t count, size_t *current, bool vertical, bool disabled) {
+                 size_t count, size_t *current, bool vertical, bool disabled) {
     return cui_stepper_common(ui, id, theme, steps, count, current, vertical, disabled, NULL, NULL);
 }
 cui_numeric_selection_event_result cui_stepper_events(cui_context *ui, cui_id id,
-    const cui_theme *theme, const cui_step *steps, size_t count, size_t *current,
-    bool vertical, bool disabled, cui_stepper_event_handler handler) {
+                                                      const cui_theme *theme, const cui_step *steps,
+                                                      size_t count, size_t *current, bool vertical,
+                                                      bool disabled,
+                                                      cui_stepper_event_handler handler) {
     cui_numeric_selection_event_result result = {0};
     result.control = cui_stepper_common(ui, id, theme, steps, count, current, vertical, disabled,
-                                       &handler, &result.change_count);
+                                        &handler, &result.change_count);
     return result;
 }

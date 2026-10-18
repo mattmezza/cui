@@ -82,8 +82,8 @@ bool cui_font_draw_styled(cui_font *font, cui_str text, float size, cui_text_sty
 typedef struct cui_text_layout cui_text_layout;
 typedef struct {
     uint32_t glyph_id;
-    size_t cluster_byte; /* Original paragraph UTF-8 byte offset; clusters may repeat. */
-    float x, y;          /* Positioned baseline-relative origin, y grows down. */
+    size_t cluster_byte;        /* Original paragraph UTF-8 byte offset; clusters may repeat. */
+    float x, y;                 /* Positioned baseline-relative origin, y grows down. */
     float x_advance, y_advance; /* Original shaped advances; tracking is in positions/clusters. */
 } cui_text_glyph;
 typedef struct {

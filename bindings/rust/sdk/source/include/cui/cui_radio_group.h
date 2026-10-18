@@ -47,12 +47,15 @@ typedef struct {
     cui_selection_event_result events;
     cui_radio_group_result legacy;
 } cui_radio_group_event_result;
-cui_radio_group_event_result cui_base_radio_group_events(
-    cui_context *, cui_id, const cui_radio_group_item *, size_t, cui_id *,
-    cui_radio_group_state *, cui_radio_group_options, cui_selection_handler);
-cui_radio_group_event_result cui_radio_group_events(
-    cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t,
-    cui_id *, cui_radio_group_state *, cui_radio_group_options, cui_selection_handler);
+cui_radio_group_event_result cui_base_radio_group_events(cui_context *, cui_id,
+                                                         const cui_radio_group_item *, size_t,
+                                                         cui_id *, cui_radio_group_state *,
+                                                         cui_radio_group_options,
+                                                         cui_selection_handler);
+cui_radio_group_event_result cui_radio_group_events(cui_context *, cui_id, const cui_theme *,
+                                                    const cui_radio_group_item *, size_t, cui_id *,
+                                                    cui_radio_group_state *,
+                                                    cui_radio_group_options, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif

@@ -65,7 +65,8 @@ static inline bool cui_component_event_init(cui_component_event_metadata *out,
  * a programmatic request. A copied activation's identity cannot be overwritten.
  * Zero frame and SIZE_MAX index are invalid. Failure preserves metadata. */
 static inline bool cui_component_event_set_frame_index(cui_component_event_metadata *metadata,
-                                                    uint64_t frame_sequence, size_t event_index) {
+                                                       uint64_t frame_sequence,
+                                                       size_t event_index) {
     if (!metadata || !metadata->target || !frame_sequence || event_index == SIZE_MAX ||
         ((metadata->flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION) &&
          (metadata->activation.frame_sequence != frame_sequence ||
@@ -126,8 +127,9 @@ typedef enum {
  * descriptor must be disjoint from source/storage and remain caller-owned.
  * Caller guarantees source.length readable bytes and capacity writable bytes.
  * This copies text only, not cui_event or arbitrary pointer-containing payloads. */
-static inline cui_component_event_copy_status cui_component_event_copy_utf8(cui_str source, size_t maximum_bytes, char *storage,
-                               size_t capacity, cui_str *out) {
+static inline cui_component_event_copy_status
+cui_component_event_copy_utf8(cui_str source, size_t maximum_bytes, char *storage, size_t capacity,
+                              cui_str *out) {
     if (!out || !storage || (source.length && !source.data))
         return CUI_COMPONENT_EVENT_COPY_INVALID_ARGUMENT;
     if (source.length > maximum_bytes || source.length == SIZE_MAX)

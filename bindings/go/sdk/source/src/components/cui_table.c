@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_table.h"
-#include "cui/cui_table_events.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_table_events.h"
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -586,14 +586,17 @@ static cui_table_result cui_data_table_common(
 }
 
 cui_table_result cui_data_table(cui_context *ui, cui_id id, const cui_theme *theme,
-    cui_table_model *model, cui_table_state *state, cui_table_options options,
-    cui_table_label_fn label, cui_table_cell_fn render, void *user) {
+                                cui_table_model *model, cui_table_state *state,
+                                cui_table_options options, cui_table_label_fn label,
+                                cui_table_cell_fn render, void *user) {
     return cui_data_table_common(ui, id, theme, model, state, options, label, render, user, NULL,
                                  NULL, NULL, (cui_table_selection_workspace){0}, NULL);
 }
 cui_table_event_result cui_data_table_events(cui_context *ui, cui_id id, const cui_theme *theme,
-    cui_table_model *model, cui_table_state *state, cui_table_options options,
-    cui_table_label_fn label, cui_table_cell_fn render, void *user, cui_table_event_handler handler) {
+                                             cui_table_model *model, cui_table_state *state,
+                                             cui_table_options options, cui_table_label_fn label,
+                                             cui_table_cell_fn render, void *user,
+                                             cui_table_event_handler handler) {
     cui_table_event_result result = {0};
     result.control =
         cui_data_table_common(ui, id, theme, model, state, options, label, render, user, &handler,

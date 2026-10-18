@@ -39,10 +39,13 @@ typedef struct {
  * legacy tracked bounds retain their existing lifetime. Existing legacy callback
  * behavior and restrictions are unchanged. No retained or completion listener. */
 cui_message_scroller_event_result cui_base_message_scroller_events(cui_context *, cui_id,
-    cui_message_scroller_state *, cui_message_scroller_options, cui_message_scroller_handler);
-cui_message_scroller_event_result cui_message_scroller_events(cui_context *, cui_id,
-    const cui_theme *, cui_message_scroller_state *, cui_message_row_render_fn, void *,
-    cui_message_scroller_options, cui_message_scroller_handler);
+                                                                   cui_message_scroller_state *,
+                                                                   cui_message_scroller_options,
+                                                                   cui_message_scroller_handler);
+cui_message_scroller_event_result
+cui_message_scroller_events(cui_context *, cui_id, const cui_theme *, cui_message_scroller_state *,
+                            cui_message_row_render_fn, void *, cui_message_scroller_options,
+                            cui_message_scroller_handler);
 #ifdef __cplusplus
 }
 #endif

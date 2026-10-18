@@ -59,9 +59,8 @@ bool cui_surface_events_options(cui_surface_event_state *s, cui_surface_options 
     *output = input;
     return true;
 }
-cui_surface_event_result cui_base_surface_update_events(cui_context *ui,
-                                                       cui_surface_event_state *s,
-                                                       cui_surface_options options) {
+cui_surface_event_result cui_base_surface_update_events(cui_context *ui, cui_surface_event_state *s,
+                                                        cui_surface_options options) {
     cui_surface_event_result result = {0};
     if (!ui || !cui_surface_events_options(s, options, &options))
         return result;
@@ -73,10 +72,9 @@ cui_surface_event_result cui_base_surface_update_events(cui_context *ui,
     s->active = false;
     return result;
 }
-cui_surface_event_result cui_base_surface_begin_events(cui_context *ui,
-                                                      cui_surface_event_state *s,
-                                                      cui_str title, cui_str description,
-                                                      cui_surface_options options) {
+cui_surface_event_result cui_base_surface_begin_events(cui_context *ui, cui_surface_event_state *s,
+                                                       cui_str title, cui_str description,
+                                                       cui_surface_options options) {
     cui_surface_event_result result = {0};
     if (!ui || !cui_surface_events_options(s, options, &options))
         return result;

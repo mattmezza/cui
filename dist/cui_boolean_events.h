@@ -14,7 +14,7 @@ typedef struct {
     bool current, requested;
 } cui_component_boolean_request;
 typedef void (*cui_component_boolean_request_fn)(void *user,
-                                                const cui_component_boolean_request *request);
+                                                 const cui_component_boolean_request *request);
 typedef struct {
     cui_component_boolean_request_fn callback;
     void *user;
@@ -54,9 +54,9 @@ static void count_event(size_t *count, bool *overflow) {
         ++*count;
 }
 static cui_component_action_result boolean_events(cui_context *ui, cui_id id, cui_str name,
-                                                   bool value, cui_role role,
-                                                   cui_boolean_event_options options,
-                                                   cui_component_boolean_handler handler) {
+                                                  bool value, cui_role role,
+                                                  cui_boolean_event_options options,
+                                                  cui_component_boolean_handler handler) {
     cui_component_action_result result = {0};
     if (!ui || !id || (name.length && !name.data))
         return result;
@@ -66,9 +66,10 @@ static cui_component_action_result boolean_events(cui_context *ui, cui_id id, cu
         return result;
     result.submitted = true;
     (void)cui_interact(ui, id, role, name, options.disabled, value, 0);
-    cui_set_semantic_details(ui, id,
-                            (cui_semantic_details){.no_pointer_focus = options.no_pointer_focus,
-                                                   .pointer_activatable = options.no_pointer_focus});
+    cui_set_semantic_details(
+        ui, id,
+        (cui_semantic_details){.no_pointer_focus = options.no_pointer_focus,
+                               .pointer_activatable = options.no_pointer_focus});
     cui_set_tab_index(ui, id, options.tab_index);
     cui_set_tab_stop(ui, id, !options.skip_tab);
     size_t count = 0;

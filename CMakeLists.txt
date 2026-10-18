@@ -490,6 +490,7 @@ add_test(NAME distribution COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_
 add_test(NAME content_distribution_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_content_distribution.py)
 add_test(NAME binding_sdk_freshness COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_go_sdk.py --check)
 add_test(NAME binding_package_display_guard COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_display_guard.py)
+add_test(NAME binding_package_source_manifest COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_source_manifest.py)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
  add_test(NAME resize_x11_probe COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_resize_x11_probe.py)
  set_tests_properties(resize_x11_probe PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 20)

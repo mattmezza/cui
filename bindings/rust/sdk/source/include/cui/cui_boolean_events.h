@@ -13,7 +13,7 @@ typedef struct {
     bool current, requested;
 } cui_component_boolean_request;
 typedef void (*cui_component_boolean_request_fn)(void *user,
-                                                const cui_component_boolean_request *request);
+                                                 const cui_component_boolean_request *request);
 typedef struct {
     cui_component_boolean_request_fn callback;
     void *user;

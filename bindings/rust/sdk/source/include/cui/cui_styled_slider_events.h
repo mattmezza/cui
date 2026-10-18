@@ -21,9 +21,10 @@ typedef struct {
  * Acceptance appears next submission. Base event/lifetime/count rules apply.
  * Invalid input submits nothing and does not mutate capture state or dispatch.
  * No legacy float slider behavior changes; no thumb/vertical variant is implied. */
-cui_component_slider_result cui_slider_events(
-    cui_context *, cui_id, const cui_theme *, cui_str name, double value, cui_slider_state *,
-    cui_slider_options, cui_slider_style_options, cui_component_slider_handler);
+cui_component_slider_result cui_slider_events(cui_context *, cui_id, const cui_theme *,
+                                              cui_str name, double value, cui_slider_state *,
+                                              cui_slider_options, cui_slider_style_options,
+                                              cui_component_slider_handler);
 #ifdef __cplusplus
 }
 #endif

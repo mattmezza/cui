@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_message.h"
-#include "cui/cui_message_events.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_message_events.h"
 #include "cui/cui_virtual.h"
 #include <float.h>
 #include <math.h>
@@ -329,8 +329,11 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
 /* Internal read-only snapshot; no layout, allocation or model mutation. */
 void cui_message_private_event_snapshot(const cui_message_scroller_state *, double *, bool *);
 
-cui_message_scroller_event_result cui_message_scroller_events(cui_context *ui, cui_id id, const cui_theme *theme, cui_message_scroller_state *state,
-    cui_message_row_render_fn render, void *user, cui_message_scroller_options options, cui_message_scroller_handler handler) {
+cui_message_scroller_event_result
+cui_message_scroller_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                            cui_message_scroller_state *state, cui_message_row_render_fn render,
+                            void *user, cui_message_scroller_options options,
+                            cui_message_scroller_handler handler) {
     cui_message_scroller_event_result result = {0};
     if (!ui || !id || !state || !theme || !render || !cui_frame_is_submitting(ui))
         return result;

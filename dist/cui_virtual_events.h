@@ -25,11 +25,14 @@ typedef struct {
  * submit, or destroy context; defer teardown through frame completion. Existing
  * legacy measure/row callback contracts and timing are unchanged. */
 cui_virtual_event_result cui_base_virtual_list_events(cui_context *, cui_id,
-    const cui_virtual_list *, cui_virtual_widget_state *, cui_virtual_widget_options,
-    cui_scroll_handler);
-cui_virtual_event_result cui_virtual_list_draw_events(cui_context *, cui_id,
-    const cui_theme *, const cui_virtual_list *, cui_virtual_widget_state *,
-    cui_virtual_widget_options, cui_virtual_render_item_fn, void *, cui_scroll_handler);
+                                                      const cui_virtual_list *,
+                                                      cui_virtual_widget_state *,
+                                                      cui_virtual_widget_options,
+                                                      cui_scroll_handler);
+cui_virtual_event_result
+cui_virtual_list_draw_events(cui_context *, cui_id, const cui_theme *, const cui_virtual_list *,
+                             cui_virtual_widget_state *, cui_virtual_widget_options,
+                             cui_virtual_render_item_fn, void *, cui_scroll_handler);
 #ifdef __cplusplus
 }
 #endif

@@ -361,7 +361,8 @@ cui_otp_result cui_base_otp(cui_context *ui, cui_id id, cui_otp_state *s, cui_ot
 
 #include <math.h>
 static cui_otp_result cui_otp_common(cui_context *ui, cui_id id, const cui_theme *t,
-    cui_otp_state *s, cui_otp_options o, const cui_otp_event_handler *handler, size_t *change_count) {
+                                     cui_otp_state *s, cui_otp_options o,
+                                     const cui_otp_event_handler *handler, size_t *change_count) {
     if (!t || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_otp_result){.error = CUI_EDIT_INVALID_ARGUMENT};
     cui_design_metrics design = {0};
@@ -481,12 +482,13 @@ static cui_otp_result cui_otp_common(cui_context *ui, cui_id id, const cui_theme
     }
     return out;
 }
-cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *theme,
-    cui_otp_state *state, cui_otp_options options) {
+cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *theme, cui_otp_state *state,
+                       cui_otp_options options) {
     return cui_otp_common(ui, id, theme, state, options, NULL, NULL);
 }
 cui_otp_event_result cui_otp_events(cui_context *ui, cui_id id, const cui_theme *theme,
-    cui_otp_state *state, cui_otp_options options, cui_otp_event_handler handler) {
+                                    cui_otp_state *state, cui_otp_options options,
+                                    cui_otp_event_handler handler) {
     cui_otp_event_result result = {0};
     result.control = cui_otp_common(ui, id, theme, state, options, &handler, &result.change_count);
     return result;

@@ -164,6 +164,11 @@ static cui_editor_search_result search_frame(cui_context *ui, cui_editor_state *
     assert(cui_editor(ui, 10, &theme, cui_string("Code"), editor, o).error == CUI_TEXTAREA_OK);
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
+    if (result.closed) {
+        cui_rect ime;
+        assert(cui_focused(ui) == 10 && cui_text_input_rect(ui, &ime));
+        assert(ime.w == 1 && ime.h > 0);
+    }
     return result;
 }
 static void find_panel(void) {

@@ -1732,6 +1732,56 @@ static void test_bounds_tracking(void) {
     cui_destroy(ui);
 }
 
+static void test_ime_geometry_owner_transfer(void) {
+    cui_context *ui = make();
+    cui_rect retained = {0}, actual;
+    begin(ui);
+    cui_begin_box(ui, 11, (cui_box){.width=1, .height=7}); cui_end_box(ui);
+    cui_begin_box(ui, 12, (cui_box){.width=1, .height=9}); cui_end_box(ui);
+    cui_begin_box(ui, 13, (cui_box){.width=1, .height=11}); cui_end_box(ui);
+    assert(cui_set_text_input_geometry_rect(ui, 100, 11, 7));
+    assert(cui_set_text_input_geometry_rect(ui, 100, 12, 9));
+    assert(cui_set_text_input_geometry_rect(ui, 200, 13, 11));
+    assert(!cui_set_text_input_geometry_rect(ui, 300, 0, 12));
+    assert(!cui_set_text_input_geometry_rect(ui, 300, 12, NAN));
+    assert(cui_track_bounds(ui, 14, &retained));
+    assert(!cui_set_text_input_geometry_rect(ui, 300, 14, 12));
+    assert(cui_last_error(ui) == CUI_ERROR_DUPLICATE_ID);
+    cui_clear_error(ui);
+    (void)cui_interact(ui, 200, CUI_ROLE_TEXTBOX, cui_string("Owner"), false, false, 0);
+    cui_focus(ui, 200);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && cui_text_input_rect(ui, &actual));
+    cui_rect final = cui_bounds(ui, 13);
+    assert(actual.x == final.x && actual.y == final.y && actual.h == final.h);
+    cui_destroy(ui);
+    /* Replacing the private slot needs no additional tracking capacity. */
+    ui=cui_create((cui_config){.max_elements=2});
+    assert(ui);
+    begin(ui);
+    assert(cui_set_text_input_geometry_rect(ui, 100, 1, 8));
+    assert(cui_track_bounds(ui, 2, &retained));
+    assert(cui_set_text_input_geometry_rect(ui, 200, 3, 9));
+    assert(cui_last_error(ui) == CUI_OK);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    /* Failed initial registration preserves an earlier explicit rectangle. */
+    ui=cui_create((cui_config){.max_elements=2});
+    assert(ui);
+    begin(ui);
+    (void)cui_interact(ui, 100, CUI_ROLE_TEXTBOX, cui_string("Owner"), false, false, 0);
+    cui_focus(ui, 100);
+    cui_set_text_input_rect(ui, 100, (cui_rect){2,3,1,8});
+    cui_rect a={0}, b={0};
+    assert(cui_track_bounds(ui, 1, &a) && cui_track_bounds(ui, 2, &b));
+    assert(!cui_set_text_input_geometry_rect(ui, 200, 3, 10));
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    cui_clear_error(ui);
+    cui_end_frame(ui);
+    assert(cui_text_input_rect(ui, &actual) && actual.x == 2 && actual.y == 3 && actual.h == 8);
+    cui_destroy(ui);
+}
+
 static void test_layout_only_and_zero_size(void) {
     cui_context *ui = make();
     cui_rect body = {0}, zero = {0}, child = {0};
@@ -3478,6 +3528,7 @@ int main(void) {
     test_transient_clip_lifecycle();
     test_many_simultaneous_clips();
     test_bounds_tracking();
+    test_ime_geometry_owner_transfer();
     test_menu_check_radio_roles();
     test_secondary_pointer();
     test_clipped_child_translation();

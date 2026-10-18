@@ -163,3 +163,11 @@ Go `TestTimeField` and Rust builder time validation. This slice neither removes
 those paths nor claims new typed callback bindings, previous-time serialization,
 readonly/twelve-hour option exposure, or identical callback timing across foreign
 runtimes. A later bridge/binding slice needs an explicit payload/lifetime decision.
+
+## Implementation checkpoint
+
+The proposed Base/Styled aggregate wrappers, typed payload/handler and guide are
+implemented without changing the legacy reducer/renderer. Tests compare legacy
+and facade behavior, including actual inert/layout-only scopes and invalid hidden
+seconds; no additional metadata, IME or binding support is claimed. Root build/test
+registration and generated exports remain integrator-owned.

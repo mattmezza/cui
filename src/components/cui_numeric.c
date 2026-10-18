@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
 #include "cui/cui_number_events.h"
+#include "cui/cui_numeric_selection_events.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include <math.h>
@@ -171,11 +172,17 @@ cui_number_event_result cui_number_input_events(cui_context *ui, cui_id id, cons
                                              &handler, &result.change_count);
     return result;
 }
-bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page, size_t total,
-                    bool compact, bool disabled) {
+static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t, size_t *page, size_t total,
+    bool compact, bool disabled, const cui_pagination_event_handler *handler, size_t *change_count) {
     if (!t || !page)
         return false;
-    bool changed = cui_base_pagination(ui, id, page, total, compact, disabled);
+    bool changed;
+    if (handler) {
+        cui_numeric_selection_event_result result = cui_base_pagination_events(ui, id, page, total, compact, disabled, *handler);
+        changed = result.control;
+        *change_count = result.change_count;
+    } else
+        changed = cui_base_pagination(ui, id, page, total, compact, disabled);
     cui_begin_box(ui, id, (cui_box){.row = true, .gap = t->gap, .align_y = CUI_ALIGN_CENTER});
     cui_numeric_paint_button(ui, cui_numeric_part_id(id, 1), t, cui_string("First"),
                              disabled || *page <= 1);
@@ -205,6 +212,18 @@ bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page
                              disabled || !total || *page >= total);
     cui_end_box(ui);
     return changed;
+}
+bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
+    size_t total, bool compact, bool disabled) {
+    return cui_pagination_common(ui, id, theme, page, total, compact, disabled, NULL, NULL);
+}
+cui_numeric_selection_event_result cui_pagination_events(cui_context *ui, cui_id id,
+    const cui_theme *theme, size_t *page, size_t total, bool compact, bool disabled,
+    cui_pagination_event_handler handler) {
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_pagination_common(ui, id, theme, page, total, compact, disabled,
+                                           &handler, &result.change_count);
+    return result;
 }
 typedef struct {
     cui_icon_state outline, fill;

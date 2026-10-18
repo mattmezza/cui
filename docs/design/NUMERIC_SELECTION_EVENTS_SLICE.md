@@ -196,3 +196,9 @@ V1 LEGACY payloads; reserved selection/scalar tags do not become supported becau
 these C facades exist. Exact native `size_t` values are not proof of exact existing
 bridge numeric transport. Binding subscriptions, controlled requests, per-input
 multiplicity and Tabs remain excluded.
+
+## Implementation checkpoints
+
+Pagination now has an additive Base wrapper and a narrow Styled common seam.
+Legacy paint and reduction remain on their original unobserved path. Stepper and
+Rating remain pending independent implementation and validation checkpoints.

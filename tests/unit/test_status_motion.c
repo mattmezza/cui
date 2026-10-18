@@ -14,6 +14,11 @@ static float invalid(float phase, void *user) {
     (void)user;
     return NAN;
 }
+static float overshoot(float phase, void *user) {
+    (void)phase;
+    (void)user;
+    return 1.25f;
+}
 typedef struct {
     unsigned calls;
     float radians;
@@ -64,6 +69,10 @@ static void pure(void) {
     cui_loading_motion old = s;
     cui_loading_motion_result saved = r;
     assert(!cui_loading_motion_sample(&s, 12, 2, false, true, invalid, NULL, &r));
+    assert(!memcmp(&s, &old, sizeof s) && !memcmp(&r, &saved, sizeof r));
+    /* Legacy/shared sampler and Skeleton retain their bounded opacity contract. */
+    assert(!cui_loading_motion_sample(&s, 12, 2, false, true, overshoot, NULL, &r));
+    assert(!cui_loading_motion_sample(&s, 12, 2, false, false, overshoot, NULL, &r));
     assert(!memcmp(&s, &old, sizeof s) && !memcmp(&r, &saved, sizeof r));
     const float periods[] = {0, -1, NAN, INFINITY, 61};
     for (size_t i = 0; i < sizeof periods / sizeof *periods; i++)

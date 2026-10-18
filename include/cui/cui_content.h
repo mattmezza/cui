@@ -193,28 +193,44 @@ typedef struct {
 } cui_loading_motion;
 typedef float (*cui_loading_ease_fn)(float phase, void *user);
 typedef struct {
-    float phase, opacity;
+    float phase, opacity; /* Spinner custom phase is finite turns, potentially outside [0,1]. */
     bool active;
     double next_wake_seconds; /* Absolute caller-clock deadline; zero when static. */
 } cui_loading_motion_result;
-/* Pure, atomic sampling; period in (0,60], now in [0,1e12]. Skeleton uses
- * a triangular bounce of the easing curve. Invalid callback output rejects. */
+/* Legacy bounded pure sampler; period in (0,60], now in [0,1e12]. Skeleton
+ * uses a triangular bounce. Easing must be finite [0,1]; reduced motion skips it.
+ * cui_spinner_ex separately accepts finite turns and evaluates reduced ease(0). */
 bool cui_loading_motion_sample(cui_loading_motion *, double now_seconds, float period,
                                bool reduced_motion, bool skeleton, cui_loading_ease_fn,
                                void *ease_user, cui_loading_motion_result *);
-/* Callback paints one icon; radians are center-relative rotation. No callback
+/* Callback paints one icon; radians are center-relative, modulo-one-turn rotation. No callback
  * userdata is retained. A failing callback must leave its own paint unchanged. */
 typedef bool (*cui_spinner_paint_fn)(cui_context *, cui_id, const cui_theme *, float size,
                                      cui_color, float radians, void *user);
+/* Optional source size identity. NULL sizing retains legacy options.size pixels.
+ * Named sizes resolve .75/.875/1/1.5 rem; rem_size=0 selects 16 logical pixels.
+ * CUSTOM uses pixels, independent of rem_size and theme font size. */
+typedef enum {
+    CUI_SPINNER_CUSTOM,
+    CUI_SPINNER_XSMALL,
+    CUI_SPINNER_SMALL,
+    CUI_SPINNER_MEDIUM,
+    CUI_SPINNER_LARGE
+} cui_spinner_size;
+typedef struct {
+    cui_spinner_size size;
+    float pixels, rem_size;
+} cui_spinner_sizing;
 typedef struct {
     float size, duration;
     double now_seconds;
     bool reduced_motion, custom_color;
     cui_color color;
-    cui_loading_ease_fn ease;
+    cui_loading_ease_fn ease; /* Finite turns; also evaluated at raw zero when reduced. */
     void *ease_user;
     cui_spinner_paint_fn paint;
     void *paint_user;
+    const cui_spinner_sizing *sizing; /* Borrowed for submission; overrides size. */
 } cui_spinner_options;
 typedef struct {
     float width, height, radius, duration;
@@ -224,7 +240,7 @@ typedef struct {
     void *ease_user;
 } cui_skeleton_options;
 /* Source Loader, 16 logical pixels, theme foreground, .8-second quadratic loop.
- * Preset source sizes are 12/14/16/24; size is also an explicit custom pixel size.
+ * Without sizing, size remains an explicit pixel size (legacy default 16).
  * Parent boxes provide layout/padding/opacity/clip; see docs/SPINNER.md. */
 cui_spinner_options cui_spinner_options_default(void);
 cui_skeleton_options cui_skeleton_options_default(void);

@@ -3,6 +3,8 @@
 Audit target: CUI `7b2b8f85905880adab3ac493a8c7103a582d6fb5`.
 Reference: GPUI Kit 0.7.1 `87d10ae5e1299d1be18670a37570c5402f952e34`.
 This is an evidence map, not a ledger promotion or a new component family.
+Follow-up at next39 (base `e6e4bb68`) implements the three bounded motion/size
+corrections below. Remaining inherited Icon/bridge/browser proof gaps stay open.
 **Recommendation: retain tested/partial; do not mark the entire family verified.**
 
 ## Source authority
@@ -35,10 +37,10 @@ behavior differences below; inspecting only Spinner's wrapper misses them.
 | --- | --- | --- |
 | Default Loader SVG, Medium, foreground, 0.8s quadratic repeating rotation | `include/cui/cui_content.h:229`, `src/base/cui_status.c:337`, `src/components/cui_content.c:735` | `test_status_motion.c` checks default options, sample angle, real mask/software pixels; `test_spinner_contract.c` checks default tint and decorative semantics. Default Loader and LoaderCircle embedded bytes exactly match frozen assets. |
 | Alternate LoaderCircle and arbitrary compatible Icon | `cui_spinner_options.paint`, `cui_icon_named`, caller-owned `cui_icon_state` | `test_spinner_contract.c` rotates loader-circle/arrow-right and checks raster changes; `test_status_motion.c` checks custom callback arguments. Generic raw-data/path ownership is tested by `test_icon.c`, not by a combined Spinner raw-data fixture. |
-| XS/S/M/L plus custom pixels | `options.size` gives explicit pixels; `cui_icon_spinner` separately supports `cui_icon_options` presets/rem | `test_spinner_contract.c` covers 12/14/16/24/64 at one root scale; gallery covers the same choices. Named rem identity is not represented by `cui_spinner_ex`; see gap below. |
+| XS/S/M/L plus custom pixels | `options.size` gives explicit pixels; `cui_icon_spinner` separately supports `cui_icon_options` presets/rem | `test_spinner_contract.c` covers 12/14/16/24/64 at one root scale; gallery covers the same choices. The additive `cui_spinner_sizing` now preserves named rem versus custom pixels; native descriptor tests cover rem 16/20/32, including custom paint. New browser cases remain pending. |
 | Explicit color, otherwise custom Icon color/ambient foreground | `options.custom_color/color`, theme foreground, arbitrary painter | Explicit/transparent colors and ancestor opacity pass software/gallery checks. Ambient text-scope inheritance remains unsupported by Core/Icon; custom Icon style precedence must be assembled by the painter. |
-| User-provided easing | `cui_loading_motion_sample`, callback user data | Standard default/linear timing and invalid-result atomicity are tested. Finite overshoot is rejected; source permits it. |
-| Reduced motion: static repeating animation, no requested frame | context/option reduced motion, inactive result and zero wake | Native/software and real gallery tests prove quiescence/static default output. Custom ease(0) differs from source. |
+| User-provided easing | `cui_loading_motion_sample`, callback user data | Standard default/linear timing and invalid-result atomicity are tested. Spinner now accepts all finite turns and reduces before radians; the legacy shared sampler/Skeleton remain bounded. |
+| Reduced motion: static repeating animation, no requested frame | context/option reduced motion, inactive result and zero wake | Native/software and real gallery tests prove quiescence/static default output. Spinner now evaluates custom ease(0) and preserves no-wake behavior; native tests cover shifted angles and nonfinite failure. |
 | Decorative/no native loading status or focus stop | `cui_spinner_ex` submits decorative Icon | `test_spinner_contract.c`, `test_status_motion.c`, `test_spinner_gallery.py`, `test_status_motion.py` inspect absent status/busy semantics and idle redraw. Completion/action callbacks are not upstream contracts. |
 | Custom Icon box style and leaf layout | `cui_icon_options.style/constraints`, `src/base/cui_icon_layout.h`, `src/components/cui_icon.c` | New `test_icon_style_source.c` proves padding/border floors, minima/maxima, transforms and retained masks; Spinner fixture proves background/radius and ancestor opacity/clip. General inherited Icon styling remains partial. |
 | Asset/callback lifetime | Icon owns SVG copy; source closures stored by Rust; C callbacks borrowed synchronously | `test_icon.c` tests source replacement, loader revisions, old masks; `test_icon_style_source.c` consumes three retained versions after replacement. Spinner motion/result rollback and resource exhaustion are in `test_status_motion.c`. A combined Spinner caller-owned-data/reload/destroy sequence is still absent. |
@@ -49,33 +51,30 @@ or gallery suites during this audit.
 
 ## Concrete remaining differences
 
-1. **Finite easing overshoot is rejected.** Source `Spinner::ease` accepts a
-   callback whose output is fed to rotation without clamping. Locked GPUI's
-   Animation explicitly allows finite outputs outside 0..1. Local
-   `src/base/cui_status.c:363` rejects them. A constant 1.25-turn callback succeeds
-   upstream but makes `cui_spinner_ex` fail locally. Do not simply relax the shared
-   sampler: Skeleton derives opacity from it and needs its separate bounded
-   contract. A Spinner-specific finite rotation sampler/policy can preserve phase
-   and reduce turns before multiplying by radians to avoid overflow.
+1. **Finite easing overshoot: corrected in the native source-style API.**
+   Spinner now reuses shared clock validation/default timing but applies a separate
+   finite-turn custom easing policy. It retains the callback value in result.phase
+   and normalizes in double before multiplying by radians. Negative and FLT_MAX
+   turns remain finite. `test_spinner_contract.c` checks asymmetric SVG software
+   pixels for equivalent rotations and rejects nonfinite output atomically.
+   `test_status_motion.c` locks shared sampler/Skeleton rejection of overshoot.
 
-2. **Reduced motion skips the easing callback.** Locked GPUI line 407 chooses raw phase 0
-   for repeating animations, then invokes its easing at line 444. Local
-   `src/base/cui_status.c:359` bypasses easing and forces the result to 0. For
-   `ease(t)=0.25+t`, upstream freezes at a quarter turn; local freezes unrotated.
-   Standard ease(0)=0 tests cannot detect this. Preserve no-wake behavior while
-   deciding explicitly whether to match this source contract. Existing local
-   tests deliberately expect a failing callback to be bypassed when reduced;
-   changing this requires updating that documented contract and targeted tests.
+2. **Reduced motion ease(0): corrected, observable behavior change.**
+   `cui_spinner_ex` now invokes custom easing at raw phase zero, even while reduced.
+   A shifted easing freezes shifted, without active motion/deadline/invalidation.
+   Nonfinite ease(0) now fails without advancing state/result or calling paint.
+   The legacy pure sampler and Skeleton deliberately retain their bypass policy.
+   Native tests cover both option and context reduction. Broader source curves
+   and gallery proof of these new cases remain unverified.
 
-3. **Named versus custom size identity is flattened in the source-style API.**
-   Upstream always applies Spinner's Size to its Icon; named sizes resolve in rem
-   units and explicit Pixels stay unscaled. Local `cui_spinner_ex` always passes
-   CUI_ICON_CUSTOM, so 12/14/16/24 stay fixed as the application rem changes.
-   `cui_icon_spinner` can express named/rem sizing, but cannot simultaneously
-   express the source Spinner's custom icon/easing. Applications can manually
-   resolve pixels/custom painters; that is compositional capability, not automatic
-   named-size parity. Recommend an additive preset/custom/rem descriptor reusing
-   `cui_icon_size`, without breaking existing explicit-pixel options.
+3. **Named/custom size identity: additive opt-in implemented.**
+   `cui_spinner_sizing` distinguishes XS/S/M/L rem multipliers from custom pixels.
+   NULL descriptor preserves the previous explicit options.size behavior; zero
+   named rem selects 16 logical pixels, explicit rem is supplied by the host.
+   Resolved size is shared by default/custom painters. Native tests cover every
+   preset at rem 16/20/32, fixed custom64, descriptor precedence and invalid
+   preflight atomicity. This does not add automatic ambient scope inheritance or
+   prove new descriptor behavior in browser/foreign bindings.
 
 4. **Ambient/custom Icon style support is not complete.** New numeric box-style
    tests resolve important gaps; they do not establish general flex/percentage
@@ -115,14 +114,14 @@ optimization is established by current evidence.
 
 ## Meaningful proof before reconsidering verification
 
-- Add callback fixtures producing finite negative/>1 turns, shifted ease(0),
-  nonfinite results, and reduced-motion transitions. Check both callback count
-  and actual asymmetric SVG pixels, with unchanged-state failure semantics.
+- Native fixtures now cover finite negative/>1 turns, shifted ease(0), nonfinite
+  rejection and reduced transitions with real asymmetric SVG pixels. Extend the
+  browser fixture to these new contracts before claiming equivalent browser proof.
 - Check complete deterministic 0/.2/.4/.6/.8/.2-next-cycle angles and no trailing
   wake after reduction/removal. Add source bounce/quint curves, independent
   instances mounted at different times, and omission/remount policy.
-- Exercise named sizes at at least two rem scales independently of text font
-  size, with custom 64 remaining fixed. Repeat in real gallery WASM.
+- Native named sizes now cover three rem values independently of text font size
+  with custom64 fixed. Repeat the new descriptor in real gallery WASM.
 - Combine a caller-owned raw-data Icon, style padding/border/min/max, explicit
   color precedence, rotation and source replacement in one Spinner frame; consume
   all returned draws before collect/destroy. Existing separate Icon tests are

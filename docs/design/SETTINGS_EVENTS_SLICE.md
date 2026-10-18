@@ -131,3 +131,16 @@ Unexpected mismatch retains only proven frame/UNKNOWN evidence. Notification fol
 original pair/pending-scroll writes and invalidation, before content. Existing item
 traversal order (not global event order), filter repairs and all field/reset paths
 are preserved. No unimplemented scalar/text/reset handler fields were added.
+
+
+## Scalar implementation checkpoint
+
+The second slice adds only boolean/double/choice-ID field observers. Each existing
+built-in adapter captures entry immediately before reduction, preserves error and
+old on_change timing, then observes actual final owner inequality. Number finite
+flags report nonfinite callback redirects; two NaNs and signed zeros are equal.
+Disabled/passive/inert maintenance remains unobserved without changing old writes
+or callbacks. Aggregate field metadata is frame-only UNKNOWN, with compound target
+and separate derived field ID/source indices. No input reconstruction or text/reset
+observer was added; custom render overrides remain outside built-in scalar hooks.
+New handler/result fields require consumer rebuild; old legacy layouts stay intact.

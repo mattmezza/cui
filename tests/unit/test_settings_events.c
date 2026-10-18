@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_settings_events.h"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 typedef struct {
     cui_context *ui;
@@ -55,8 +56,9 @@ static cui_settings_event_result frame(fixture *f, bool observe) {
     if (f->legacy)
         out.result = cui_settings(f->ui, 11, &theme, f->pages, 2, &f->state, f->options);
     else
-        out = cui_settings_events(f->ui, 11, &theme, f->pages, 2, &f->state, f->options,
-                                  (cui_settings_handler){observe ? navigation : NULL, f});
+        out = cui_settings_events(
+            f->ui, 11, &theme, f->pages, 2, &f->state, f->options,
+            (cui_settings_handler){.on_navigation = observe ? navigation : NULL, .user = f});
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
     assert(cui_last_error(f->ui) == CUI_OK && !out.result.invalid);
@@ -265,13 +267,402 @@ static void narrow_and_admission(void) {
     cui_settings_state before = b.state;
     cui_theme theme = cui_theme_light();
     r = cui_settings_events(b.ui, 0, &theme, b.pages, 2, &b.state, b.options,
-                            (cui_settings_handler){navigation, &b});
+                            (cui_settings_handler){.on_navigation = navigation, .user = &b});
     assert(r.result.invalid && !r.navigation_count && !memcmp(&before, &b.state, sizeof before));
     done(&a);
     done(&b);
 }
+typedef struct scalar_fixture scalar_fixture;
+typedef struct {
+    scalar_fixture *f;
+    size_t index;
+} scalar_user;
+struct scalar_fixture {
+    cui_context *ui;
+    cui_settings_state state;
+    cui_settings_page_state workspace[1];
+    cui_setting_item items[4];
+    cui_setting_group group;
+    cui_setting_page page;
+    cui_settings_options options;
+    bool booleans[2], before_bool[2];
+    double number, before_number;
+    cui_id choice, before_choice;
+    char draft[64];
+    cui_edit *edit;
+    cui_number_state number_state;
+    cui_choice_item choices[3];
+    cui_choice_popup popup;
+    cui_settings_dropdown_state menu;
+    cui_menu_entry entries[3];
+    bool checks[3];
+    scalar_user users[4];
+    unsigned mode[4]; /* 0 accept,1 restore entry,2 redirect,3 poison later Number */
+    size_t legacy_calls[4], boolean_calls, number_calls, choice_calls;
+    cui_settings_bool_change last_boolean;
+    cui_settings_number_change last_number;
+    cui_settings_choice_change last_choice;
+    bool legacy, passive, inert;
+    char order[32];
+    size_t order_count;
+    cui_draw_list draw;
+};
+static void scalar_order(scalar_fixture *f, char code) {
+    assert(f->order_count < sizeof f->order);
+    f->order[f->order_count++] = code;
+}
+static void scalar_legacy(void *user) {
+    scalar_user *u = user;
+    scalar_fixture *f = u->f;
+    size_t i = u->index;
+    ++f->legacy_calls[i];
+    scalar_order(f, 'L');
+    if (f->mode[i] == 1) {
+        if (i < 2)
+            f->booleans[i] = f->before_bool[i];
+        else if (i == 2)
+            f->number = f->before_number;
+        else
+            f->choice = f->before_choice;
+    } else if (f->mode[i] == 2) {
+        if (i == 2)
+            f->number = 7.5;
+        else if (i == 3)
+            f->choice = 102;
+    } else if (f->mode[i] == 3)
+        f->number = NAN;
+    else if (f->mode[i] == 4)
+        f->number = INFINITY;
+    else if (f->mode[i] == 5)
+        f->number = -0.0;
+}
+static void scalar_custom(cui_context *ui, cui_id id, const cui_theme *theme,
+                          cui_settings_render_options options, void *user) {
+    (void)ui;
+    (void)id;
+    (void)theme;
+    (void)options;
+    scalar_user *u = user;
+    u->f->booleans[u->index] = !u->f->booleans[u->index];
+}
+static void scalar_metadata(cui_component_event_metadata e, cui_id field, size_t p, size_t g,
+                            size_t i) {
+    assert(e.kind == CUI_COMPONENT_EVENT_CHANGE && e.target == 11);
+    assert(e.flags == CUI_COMPONENT_EVENT_HAS_FRAME && e.frame_sequence);
+    assert(e.source == CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+    assert(!p && !g && field == cui_settings_part_id(11, p, g, i, 24));
+}
+static void boolean_event(void *user, const cui_settings_bool_change *event) {
+    scalar_fixture *f = user;
+    assert(event->item < 2);
+    scalar_metadata(event->event, event->field_id, event->page, event->group, event->item);
+    assert(f->booleans[event->item] == event->value && event->previous != event->value);
+    assert(f->legacy_calls[event->item]);
+    f->last_boolean = *event;
+    f->boolean_calls++;
+    scalar_order(f, 'B');
+}
+static void number_event(void *user, const cui_settings_number_change *event) {
+    scalar_fixture *f = user;
+    scalar_metadata(event->event, event->field_id, event->page, event->group, event->item);
+    assert(event->item == 2 && f->number == event->value && f->legacy_calls[2]);
+    assert(event->previous_finite == isfinite(event->previous) &&
+           event->value_finite == isfinite(event->value));
+    f->last_number = *event;
+    f->number_calls++;
+    scalar_order(f, 'N');
+}
+static void choice_event(void *user, const cui_settings_choice_change *event) {
+    scalar_fixture *f = user;
+    scalar_metadata(event->event, event->field_id, event->page, event->group, event->item);
+    assert(event->item == 3 && f->choice == event->value && f->legacy_calls[3]);
+    f->last_choice = *event;
+    f->choice_calls++;
+    scalar_order(f, 'C');
+}
+static cui_settings_event_result scalar_frame(scalar_fixture *f, bool observe) {
+    f->before_bool[0] = f->booleans[0];
+    f->before_bool[1] = f->booleans[1];
+    f->before_number = f->number;
+    f->before_choice = f->choice;
+    f->order_count = 0;
+    assert(cui_begin_frame(f->ui, 1000, 800, .016f));
+    cui_begin_box(f->ui, 10000, (cui_box){.layout_only = f->passive, .inert = f->inert});
+    cui_theme t = cui_theme_light();
+    cui_settings_event_result out = {0};
+    if (f->legacy)
+        out.result = cui_settings(f->ui, 11, &t, &f->page, 1, &f->state, f->options);
+    else
+        out =
+            cui_settings_events(f->ui, 11, &t, &f->page, 1, &f->state, f->options,
+                                (cui_settings_handler){.user = f,
+                                                       .on_boolean = observe ? boolean_event : NULL,
+                                                       .on_number = observe ? number_event : NULL,
+                                                       .on_choice = observe ? choice_event : NULL});
+    cui_end_box(f->ui);
+    f->draw = cui_end_frame(f->ui);
+    assert(cui_last_error(f->ui) == CUI_OK);
+    return out;
+}
+static void scalar_init(scalar_fixture *f, bool legacy, bool menu) {
+    memset(f, 0, sizeof *f);
+    f->legacy = legacy;
+    f->number = 3;
+    f->choice = 101;
+    f->ui = cui_create((cui_config){.max_elements = 512, .max_commands = 1024});
+    assert(f->ui);
+    assert(cui_settings_state_init(&f->state, f->workspace, 1, NULL));
+    f->edit = cui_edit_create((cui_edit_config){.buffer = f->draft, .capacity = sizeof f->draft});
+    assert(f->edit);
+    f->number_state.edit = f->edit;
+    f->choices[0] = (cui_choice_item){101, {"First", 5}, false};
+    f->choices[1] = (cui_choice_item){102, {"Second", 6}, false};
+    f->choices[2] = (cui_choice_item){103, {"Third", 5}, false};
+    cui_choice_popup_init(&f->popup, 9000);
+    assert(cui_settings_dropdown_init(&f->menu, 9001, f->entries, f->checks, 3));
+    f->items[0] = (cui_setting_item){
+        .title = {"Switch", 6}, .kind = CUI_SETTING_SWITCH, .boolean = f->booleans};
+    f->items[1] = (cui_setting_item){
+        .title = {"Check", 5}, .kind = CUI_SETTING_CHECKBOX, .boolean = f->booleans + 1};
+    f->items[2] = (cui_setting_item){
+        .title = {"Number", 6},
+        .kind = CUI_SETTING_NUMBER,
+        .number = &f->number,
+        .number_state = &f->number_state,
+        .number_options = {.has_minimum = true, .minimum = 0, .has_maximum = true, .maximum = 10}};
+    f->items[3] = (cui_setting_item){.title = {"Mode", 4},
+                                     .kind = CUI_SETTING_DROPDOWN,
+                                     .choice = &f->choice,
+                                     .choices = f->choices,
+                                     .choice_count = 3,
+                                     .popup = &f->popup,
+                                     .dropdown_state = menu ? &f->menu : NULL};
+    for (size_t i = 0; i < 4; ++i) {
+        f->users[i] = (scalar_user){f, i};
+        f->items[i].on_change = scalar_legacy;
+        f->items[i].user = f->users + i;
+    }
+    f->group = (cui_setting_group){.items = f->items, .count = 4};
+    f->page = (cui_setting_page){.title = {"Settings", 8}, .groups = &f->group, .count = 1};
+    f->options = cui_settings_default();
+    f->options.width = 1000;
+    f->options.height = 700;
+    assert(!scalar_frame(f, true).result.invalid);
+}
+static void scalar_done(scalar_fixture *f) {
+    cui_destroy(f->ui);
+    cui_edit_destroy(f->edit);
+}
+static void scalar_key(scalar_fixture *f, size_t item, cui_key key) {
+    cui_focus(f->ui, cui_settings_part_id(11, 0, 0, item, 24));
+    assert(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = key}));
+}
+static void scalar_toggle(scalar_fixture *f, size_t item) {
+    scalar_key(f, item, CUI_KEY_SPACE);
+    assert(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+}
+static cui_settings_event_result scalar_pair(scalar_fixture *a, scalar_fixture *b, bool observe) {
+    cui_settings_event_result x = scalar_frame(a, false), y = scalar_frame(b, observe);
+    assert(x.result.invalid == y.result.invalid && x.result.edit_error == y.result.edit_error &&
+           x.result.selection_changed == y.result.selection_changed &&
+           x.result.reset == y.result.reset);
+    assert(a->booleans[0] == b->booleans[0] && a->booleans[1] == b->booleans[1]);
+    assert(a->choice == b->choice &&
+           (a->number == b->number || (isnan(a->number) && isnan(b->number))));
+    assert(a->number_state.last_value == b->number_state.last_value ||
+           (isnan(a->number_state.last_value) && isnan(b->number_state.last_value)));
+    assert(!memcmp(a->legacy_calls, b->legacy_calls, sizeof a->legacy_calls));
+    assert(!strcmp(a->draft, b->draft) && cui_focused(a->ui) == cui_focused(b->ui));
+    assert(a->popup.overlay.open == b->popup.overlay.open &&
+           a->menu.menu.overlay.open == b->menu.menu.overlay.open);
+    assert(a->draw.count == b->draw.count);
+    for (size_t i = 0; i < a->draw.count; ++i) {
+        const cui_draw_command *p = a->draw.commands + i, *q = b->draw.commands + i;
+        assert(p->type == q->type && !memcmp(&p->bounds, &q->bounds, sizeof p->bounds));
+        assert(!memcmp(&p->color, &q->color, sizeof p->color) && p->text.length == q->text.length);
+        if (p->text.length)
+            assert(!memcmp(p->text.data, q->text.data, p->text.length));
+    }
+    size_t na, nb;
+    const cui_semantic *sa = cui_semantics(a->ui, &na), *sb = cui_semantics(b->ui, &nb);
+    assert(na == nb);
+    for (size_t i = 0; i < na; ++i)
+        assert(sa[i].id == sb[i].id && sa[i].role == sb[i].role && sa[i].checked == sb[i].checked);
+    return y;
+}
+static void scalar_boolean_and_number(void) {
+    scalar_fixture a, b;
+    scalar_init(&a, true, true);
+    scalar_init(&b, false, true);
+    scalar_toggle(&a, 0);
+    scalar_toggle(&b, 0);
+    cui_settings_event_result r = scalar_pair(&a, &b, true);
+    assert(r.boolean_count == 1 && b.last_boolean.value && b.order_count == 2 &&
+           !memcmp(b.order, "LB", 2));
+    a.mode[1] = b.mode[1] = 1;
+    scalar_toggle(&a, 1);
+    scalar_toggle(&b, 1);
+    r = scalar_pair(&a, &b, true);
+    assert(!r.boolean_count && !b.booleans[1] && b.legacy_calls[1] == 1);
+    a.mode[1] = b.mode[1] = 0;
+    scalar_toggle(&a, 1);
+    scalar_toggle(&b, 1);
+    r = scalar_pair(&a, &b, true);
+    assert(r.boolean_count == 1 && b.last_boolean.item == 1);
+    /* Legacy Switch coalesces activations: preserve its single applied flip. */
+    scalar_toggle(&a, 0);
+    scalar_toggle(&b, 0);
+    scalar_toggle(&a, 0);
+    scalar_toggle(&b, 0);
+    assert(scalar_pair(&a, &b, true).boolean_count == 1);
+    scalar_toggle(&a, 0);
+    scalar_toggle(&b, 0);
+    assert(!scalar_pair(&a, &b, false).boolean_count);
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    r = scalar_pair(&a, &b, true);
+    assert(r.number_count == 1 && b.last_number.previous == 3 && b.last_number.value == 4);
+    assert(b.order_count == 2 && !memcmp(b.order, "LN", 2));
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    scalar_key(&a, 2, CUI_KEY_DOWN);
+    scalar_key(&b, 2, CUI_KEY_DOWN);
+    r = scalar_pair(&a, &b, true);
+    assert(!r.number_count && b.number == 4);
+    a.mode[2] = b.mode[2] = 1;
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    assert(!scalar_pair(&a, &b, true).number_count && b.number == 4);
+    a.mode[2] = b.mode[2] = 2;
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    r = scalar_pair(&a, &b, true);
+    assert(r.number_count == 1 && b.last_number.previous == 4 && b.last_number.value == 7.5);
+    assert(b.number_state.last_value == a.number_state.last_value &&
+           b.number_state.last_value == 5);
+    a.mode[2] = b.mode[2] = 0;
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    r = scalar_pair(&a, &b, false);
+    assert(!r.number_count && b.number == 8.5);
+    /* Extra Settings bounds execute even after nested control argument errors. */
+    a.number = b.number = 20;
+    a.items[2].number_options.prefix = b.items[2].number_options.prefix = (cui_str){NULL, 1};
+    r = scalar_pair(&a, &b, true);
+    assert(r.result.edit_error == CUI_EDIT_INVALID_ARGUMENT && r.number_count == 1 &&
+           b.number == 10);
+    assert(b.number_state.last_value == 10);
+    a.items[2].number_options.prefix = b.items[2].number_options.prefix = (cui_str){0};
+    a.items[2].disabled = b.items[2].disabled = true;
+    a.number = b.number = 20;
+    r = scalar_pair(&a, &b, true);
+    assert(!r.number_count && b.number == 10);
+    a.items[2].disabled = b.items[2].disabled = false;
+    a.passive = b.passive = true;
+    a.number = b.number = 20;
+    assert(!scalar_pair(&a, &b, true).number_count && b.number == 10);
+    a.passive = b.passive = false;
+    a.inert = b.inert = true;
+    a.number = b.number = 20;
+    assert(!scalar_pair(&a, &b, true).number_count && b.number == 10);
+    a.inert = b.inert = false;
+    a.number = b.number = 0;
+    a.mode[2] = b.mode[2] = 5;
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    r = scalar_pair(&a, &b, true);
+    assert(!r.number_count && signbit(b.number));
+    a.mode[2] = b.mode[2] = 0;
+    a.number = b.number = 3;
+    a.items[0].render = b.items[0].render = scalar_custom;
+    r = scalar_pair(&a, &b, true);
+    assert(!r.boolean_count);
+    a.items[0].render = b.items[0].render = NULL;
+    /* Legacy callback may redirect to nonfinite owner after the existing bounds pass. */
+    a.mode[2] = b.mode[2] = 4;
+    scalar_key(&a, 2, CUI_KEY_UP);
+    scalar_key(&b, 2, CUI_KEY_UP);
+    r = scalar_pair(&a, &b, true);
+    assert(r.number_count == 1 && !b.last_number.value_finite && b.last_number.previous_finite);
+    a.number = b.number = 3;
+    a.mode[2] = b.mode[2] = 0;
+    /* Earlier legacy field callback can poison Number after outer validation. */
+    a.mode[0] = b.mode[0] = 3;
+    scalar_toggle(&a, 0);
+    scalar_toggle(&b, 0);
+    r = scalar_pair(&a, &b, true);
+    assert(!r.number_count && r.result.edit_error == CUI_EDIT_INVALID_ARGUMENT);
+    cui_settings_number_change copy = b.last_number;
+    a.number = b.number = 3;
+    a.mode[2] = b.mode[2] = 2;
+    scalar_toggle(&a, 0);
+    scalar_toggle(&b, 0);
+    r = scalar_pair(&a, &b, true);
+    assert(r.number_count == 1 && !b.last_number.previous_finite && b.last_number.value_finite &&
+           b.number == 7.5);
+    scalar_done(&a);
+    scalar_done(&b);
+    assert(!copy.value_finite && isinf(copy.value));
+}
+static void scalar_choices(bool menu) {
+    scalar_fixture a, b;
+    scalar_init(&a, true, menu);
+    scalar_init(&b, false, menu);
+    scalar_key(&a, 3, CUI_KEY_DOWN);
+    scalar_key(&b, 3, CUI_KEY_DOWN);
+    scalar_pair(&a, &b, true);
+    assert(menu ? b.menu.menu.overlay.open : b.popup.overlay.open);
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_END}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_END}));
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    cui_settings_event_result r = scalar_pair(&a, &b, true);
+    assert(r.choice_count == 1 && b.choice == 103 && b.last_choice.previous == 101 &&
+           b.last_choice.value == 103);
+    assert(b.order_count == 2 && !memcmp(b.order, "LC", 2));
+    /* Owner restore is applied by old callback, so aggregate observer is silent. */
+    a.mode[3] = b.mode[3] = 1;
+    scalar_key(&a, 3, CUI_KEY_DOWN);
+    scalar_key(&b, 3, CUI_KEY_DOWN);
+    scalar_pair(&a, &b, true);
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    r = scalar_pair(&a, &b, true);
+    assert(!r.choice_count && b.choice == 103);
+    a.mode[3] = b.mode[3] = 2;
+    scalar_key(&a, 3, CUI_KEY_DOWN);
+    scalar_key(&b, 3, CUI_KEY_DOWN);
+    scalar_pair(&a, &b, true);
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    r = scalar_pair(&a, &b, true);
+    assert(r.choice_count == 1 && b.choice == 102);
+    assert(b.last_choice.previous == 103 && b.last_choice.value == 102);
+    a.mode[3] = b.mode[3] = 0;
+    scalar_key(&a, 3, CUI_KEY_DOWN);
+    scalar_key(&b, 3, CUI_KEY_DOWN);
+    scalar_pair(&a, &b, false);
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_HOME}));
+    assert(cui_queue_event(a.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    assert(cui_queue_event(b.ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+    r = scalar_pair(&a, &b, false);
+    assert(!r.choice_count && b.choice == 101);
+    cui_settings_choice_change copied = b.last_choice;
+    scalar_done(&a);
+    scalar_done(&b);
+    assert(copied.previous == 103 && copied.value == 102);
+}
+
 int main(void) {
     navigation_events();
     narrow_and_admission();
+    scalar_boolean_and_number();
+    scalar_choices(false);
+    scalar_choices(true);
     return 0;
 }

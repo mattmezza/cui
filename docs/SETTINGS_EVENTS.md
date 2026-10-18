@@ -1,8 +1,8 @@
-# Settings navigation events
+# Settings applied events
 
 Include `cui/cui_settings_events.h`. `cui_settings_events` preserves the existing
-Styled Settings operation and adds `on_navigation`. It reports applied page/group
-selection, not an owner-rejectable request. Missing observers permit all legacy
+Styled Settings operation and adds navigation and built-in scalar observers.
+`on_navigation` reports applied page/group selection, not an owner-rejectable request. Missing observers permit all legacy
 work and ignore user. No Base filter/reset helper or field callback contract changes.
 
 ```c
@@ -13,7 +13,7 @@ static void navigation_changed(void *user, const cui_settings_navigation_change 
 }
 /* During UI submission with existing caller-owned pages/state/options: */
 /* cui_settings_events(ui, id, theme, pages, count, &state, options,
-       (cui_settings_handler){navigation_changed, &save_navigation}); */
+       (cui_settings_handler){.on_navigation = navigation_changed, .user = &save_navigation}); */
 ```
 
 The payload contains `previous_page`, `previous_group`, `page`, `group` using
@@ -55,7 +55,63 @@ Unrelated application flags may change; defer removal/omission/teardown until ou
 return plus renderer consumption. Legacy custom search/render/change/reset callbacks
 keep their timing and must preserve resources needed by the remaining old operation.
 
-Only navigation is typed here. Scalar, text, reset, search and viewport observers
-need their own slices. C bridge and Python/JS/TS/Go/Rust still use their existing
+Navigation and built-in scalar field changes are typed here. Text, reset, search
+and viewport observers need their own slices. C bridge and Python/JS/TS/Go/Rust still use their existing
 Settings callback/polling paths; no per-navigation foreign callback or synchronous
 request is implied. Focused C tests do not establish browser or binding parity.
+
+
+## Built-in scalar fields
+
+Set `on_boolean`, `on_number` and/or `on_choice` in `cui_settings_handler` for the
+corresponding `cui_settings_bool_change`, `cui_settings_number_change` and
+`cui_settings_choice_change`. They share the borrowed handler user pointer.
+Each payload identifies `page`, `group`, `item` source indices and the derived
+`field_id` (`cui_settings_part_id(root, page, group, item, 24)`). Metadata target
+remains the Settings compound. Payloads are pointer-free and copyable by value.
+
+Boolean covers built-in Switch and Checkbox; Number carries actual doubles; choice
+carries owner choice IDs for both Menu-backed dropdown and legacy Select. Custom
+render overrides bypass these observers even when host rendering edits an owner.
+No text value, reset reason, request, COMMIT or per-input event is invented.
+
+Capture occurs immediately before one existing built-in adapter. The adapter runs
+once, records the existing first edit error, and invokes the old item `on_change`
+at its original point. Only then does the typed observer compare/read the actual
+final owner. A legacy callback restoring entry value produces no typed CHANGE;
+redirecting it reports the redirected value. Callback count does not replay effects.
+Two nested edits ending at entry produce no aggregate CHANGE. Existing Switch may
+coalesce several activations into one flip; the facade preserves that behavior.
+Each adapter emits at most one typed callback in existing content order. Scalars
+are **aggregate notifications**, unlike per-navigation transitions.
+
+`boolean_count`, `number_count`, `choice_count` independently count actual calls,
+saturating at SIZE_MAX and setting shared `count_overflow`. Missing typed handlers
+preserve all old writes/callbacks. Disabled fields and passive/layout-only/inert
+submissions retain legacy maintenance, including Number bounds/last-value writes
+and old callbacks, but emit no new typed scalar notification. Enabled real final
+owner changes can be notified even with a nested edit error; errors and invalid
+flags are preserved, never used as an artificial change gate.
+
+Scalar metadata has a proven nonzero active frame, UNKNOWN source and no input
+index/activation. A whole adapter and its legacy callback may combine inputs or
+apply bounds without input, so a unique causal event cannot honestly be inferred.
+An enabled bounds adjustment is an applied change, not proof of user interaction.
+
+Number equality treats both NaNs as unchanged and signed zeros as equal. Payload
+`previous_finite` and `value_finite` describe the actual numeric values, not their
+acceptance by Number. Settings initially validates finite owners, but old callbacks
+can redirect a valid edit to infinity/NaN or change a later field after validation.
+These facts remain visible; the observer does not clamp again, repair the owner,
+resynchronize the draft or rewrite `number_state.last_value` after the callback.
+Settings' existing extra bounds/last-value pass stays before old `on_change`;
+therefore the callback's final owner can intentionally differ from draft/last_value
+until later old synchronization. Invalid nonfinite owners may fail the next filter.
+
+Old callbacks must leave observed scalar owner pointers readable through typed
+notification. The new observer cannot mutate active owners or other active model
+resources; use unrelated flags and defer teardown. Entry is captured at each field,
+not at Settings-call entry, so earlier host changes are not independently reported.
+Reset helpers and reset-button effects have no new typed reset notification.
+This extends the new C structs and requires rebuilding consumers with this header;
+existing legacy Settings options/state/result layouts and function remain unchanged.

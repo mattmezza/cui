@@ -122,3 +122,20 @@ These C proposals do not supply Python/JS/TS/Go/Rust observers. Existing queued
 bridge events are a separate, post-frame contract with different payloads and
 ownership; see [binding audit](COMPONENT_EVENTS_BINDINGS.md). Binding exposure,
 exports, build registration and generated SDK copies need separately owned work.
+
+## Editor implementation audit correction
+
+Further inspection of `src/components/cui_editor.c:cui_editor_completion_popup`
+shows that pointer activation can accept a completion after the main Styled paint,
+near the end of `cui_editor`. Observing only its Base call would miss that change.
+The approved Editor slice therefore wraps the entire existing Styled call exactly
+once and notifies after its return, including popup acceptance and painting. Base
+Editor likewise wraps the complete legacy call, covering every post-mutation early
+return. Nested Base Textarea stays unobserved; no event pass or paint is replayed.
+
+The facade preserves the legacy `control.changed` verbatim, even where that flag
+and revision-derived notification differ. It never repairs aggregate flags or
+moves popup callbacks/paint. Tests must demonstrate pointer completion, exact old
+return equivalence, and one final notification. Teardown remains deferred until
+the outer facade returns and renderer consumption finishes. The earlier proposed
+before-Styled-paint Editor seam is superseded by this concrete source finding.

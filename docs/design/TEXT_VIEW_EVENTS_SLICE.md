@@ -124,3 +124,13 @@ disabled/inert/layout scopes; unrelated callback flags and deferred omission.
 Use public key/a11y routing tests separately before claiming support. Any behavior
 bug discovered needs its own approved production slice. No new API, dependency,
 workspace, shared event-kind change or full-family status update is proposed here.
+
+## Existing-contract proof slice
+
+Added focused tests and human-facing callback guidance without production/API
+changes: non-scrollable reveal pending/coordinate/timing behavior, scrollable
+callback silence, disabled and actual inert/layout parent programmatic reveal,
+link override and false-opener consumption, bounded URI copy surviving later
+frame/reparse, and deferred omission. Shared evidence remains an explicit exception;
+no foreign binding or full-family status is promoted. Native sanitizer validation
+is reported with the accompanying commit, not inferred from this checklist.

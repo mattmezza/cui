@@ -515,3 +515,48 @@ zero/invalid policies, replacement and reduced motion, Markdown completion,
 independent table-cell timings, transactional failed parses, and actual text
 command alpha. Complete parser/plugins, touch selection, shaping and other gaps
 listed above remain outside this change.
+
+## Callback ownership and timing
+
+`on_link(url, event, link_user)` runs synchronously while the matching link is
+painted. It overrides `open_url`; it does not run in addition to the opener.
+The event is consumed after callback return. The fallback opener's boolean is
+currently ignored: returning false still consumes the invocation and does not
+produce a confirmed navigation result. Primary activation and secondary release
+are distinct supported paths; selection dragging suppresses link activation.
+No callback return cancels a transaction or proves an external URL was opened.
+
+Decoded URI bytes and the event pointer are borrowed only during the callback.
+Copy URI bytes into bounded application storage before returning, checking
+`url.length` against capacity before copying and adding a terminator if needed.
+Do not retain `url.data`; copying `cui_event` alone does not own optional text data.
+For example, with a caller-owned `char saved[256]`, accept only
+`url.length < sizeof saved`, then `memcpy(saved, url.data, url.length)` and
+`saved[url.length] = 0`. Handle oversize input explicitly; never silently truncate
+an actionable URI. Copies survive later frames/document replacement independently
+of the borrowed workspace.
+
+`cui_text_view_reveal` queues a programmatic range. In scrollable mode submission
+adjusts internal scroll and clears the pending request without calling `on_reveal`.
+In non-scrollable mode a located range calls `on_reveal(window_line, reveal_user)`
+after layout/reduction and before viewport paint, then clears `reveal_pending`.
+The callback sees pending=true. Its rectangle uses the retained viewport origin
+plus the located current line bounds; it is a host scrolling request, not evidence
+that a parent scrolled. Disabled views and inert/layout parent scopes do not cancel
+this programmatic service callback. Do not set a replacement reveal from inside
+that callback: the outer operation clears pending after return.
+
+Callbacks may copy payloads and set unrelated application flags. Keep the active
+view, workspace, shared-selection registrations and context alive; do not reparse,
+rebind, destroy or recursively submit them during a callback. Apply document
+replacement or omission only after the outer call and renderer consumption.
+The view's boolean reports submission success, not link dispatch or selection
+change. Selection is already applied to caller-owned offsets; no rejectable
+selection event is implied. Bridge factories do not currently wire these C
+link/reveal callback hooks.
+
+`test_callback_contracts` in `tests/unit/test_text_view.c` covers reveal timing and
+coordinates, internal-scroll silence, disabled/programmatic parent scopes,
+link-over-opener precedence, false opener consumption, bounded decoded URI copy
+surviving reparse, and deferred omission. This is headless source/command coverage;
+it does not prove native URL opening or completion of host scrolling.

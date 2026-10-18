@@ -393,6 +393,16 @@ bool cui_base_context_menu(cui_context *, cui_id target, const cui_menu_entry *,
 bool cui_context_menu(cui_context *, cui_id target, const cui_theme *, cui_str name,
                       const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
                       cui_menu_tree_options);
+/* Per-command forwarding only: opening/reanchoring emits no command. Metadata
+ * target is the receiving target ID, independent of restore-focus identity. */
+cui_menu_command_result cui_base_context_menu_events(
+    cui_context *, cui_id target, const cui_menu_entry *, size_t count,
+    cui_id *action, cui_menu_tree_state *, bool disabled, float dt,
+    bool keep_open_checks, cui_menu_command_handler);
+cui_menu_command_result cui_context_menu_events(
+    cui_context *, cui_id target, const cui_theme *, cui_str name,
+    const cui_menu_entry *, size_t count, cui_id *action, cui_menu_tree_state *,
+    cui_menu_tree_options, cui_menu_command_handler);
 /* Split action and menu trigger. Zero action/trigger IDs omit that half in the
  * base function; both zero is invalid. The explicit IDs remain independently
  * focusable; container is paint-only in the styled function. */

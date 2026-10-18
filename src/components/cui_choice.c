@@ -2043,9 +2043,10 @@ bool cui_menu_popup_paint(cui_context *ui, const cui_theme *theme, cui_str name,
     return true;
 }
 
-bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cui_str name,
+static bool cui_choice_render_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cui_str name,
                       const cui_menu_entry *items, size_t count, cui_id *action,
-                      cui_menu_tree_state *state, cui_menu_tree_options options) {
+                      cui_menu_tree_state *state, cui_menu_tree_options options,
+                      cui_menu_command_handler handler, cui_menu_command_result *observed) {
     if (!theme || !state || !state->overlay.id || !action || (!items && count) ||
         !isfinite(theme->control_height) || theme->control_height <= 0 ||
         !isfinite(theme->padding) || theme->padding < 0 || !isfinite(options.popup.viewport.x) ||
@@ -2054,13 +2055,37 @@ bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cu
         options.popup.viewport.h <= 2 * theme->padding)
         return false;
     state->drag_scroll = options.drag_scroll;
-    bool activated =
-        cui_base_context_menu(ui, target, items, count, action, state, options.popup.disabled,
-                              options.popup.dt, options.keep_open_checks);
+    bool activated;
+    if (observed) {
+        *observed = cui_base_context_menu_events(ui, target, items, count, action, state,
+            options.popup.disabled, options.popup.dt, options.keep_open_checks, handler);
+        activated = observed->legacy_activated;
+    } else
+        activated = cui_base_context_menu(ui, target, items, count, action, state,
+            options.popup.disabled, options.popup.dt, options.keep_open_checks);
     cui_choice_menu_retain_metrics(state, cui_choice_menu_metrics(theme, options));
     if (state->overlay.open)
         cui_choice_menu_level(ui, theme, items, count, state, 0, state->anchor, options, name);
     return activated;
+}
+
+bool cui_context_menu(cui_context *ui, cui_id target, const cui_theme *theme, cui_str name,
+    const cui_menu_entry *items, size_t count, cui_id *action, cui_menu_tree_state *state,
+    cui_menu_tree_options options) {
+    return cui_choice_render_context_menu(ui, target, theme, name, items, count, action, state,
+        options, (cui_menu_command_handler){0}, NULL);
+}
+cui_menu_command_result cui_context_menu_events(cui_context *ui, cui_id target,
+    const cui_theme *theme, cui_str name, const cui_menu_entry *items, size_t count,
+    cui_id *action, cui_menu_tree_state *state, cui_menu_tree_options options,
+    cui_menu_command_handler handler) {
+    cui_menu_command_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !target)
+        return result;
+    result.legacy_activated = cui_choice_render_context_menu(ui, target, theme, name, items,
+        count, action, state, options, handler, &result);
+    return result;
 }
 
 static cui_color cui_dropdown_opacity(cui_color color, float factor) {

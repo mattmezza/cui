@@ -1,6 +1,6 @@
 # Menu forwarding event checkpoints
 
-Status: design only, audited at `b4146c89`. No new API below ships. Preserve [MenuTree's implemented per-command contract](../MENU_EVENTS.md), [event ownership/timing rules](COMPONENT_EVENTS_CONTRACT.md), all legacy entry points/layouts, and the 78-family manifest. No Core/surface change, new queue, capture/bubble routing or binding request hook is proposed. No builds were run for this read-only checkpoint.
+Status: ContextMenu slice implemented in this branch; Simple Menu and DropdownButton remain proposals. Original source audit: `b4146c89`. See [ContextMenu events](../CONTEXT_MENU_EVENTS.md) for the implemented API and proof. Preserve [MenuTree's implemented per-command contract](../MENU_EVENTS.md), [event ownership/timing rules](COMPONENT_EVENTS_CONTRACT.md), all legacy entry points/layouts, and the 78-family manifest. No Core/surface change, new queue, capture/bubble routing or binding request hook is proposed. No builds were run for this read-only checkpoint.
 
 ## Actual entry points and seams
 
@@ -16,7 +16,7 @@ Actual legacy proof in [test_choice.c](../../tests/unit/test_choice.c): `test_li
 
 ## Slice 1: ContextMenu command forwarding
 
-This is the smallest next implementation: reuse `cui_menu_command_handler/result` unchanged. Exact additive signatures append the handler to existing arguments:
+Implemented as the first slice: reuse `cui_menu_command_handler/result` unchanged. Exact additive signatures append the handler to existing arguments:
 
 ```c
 cui_menu_command_result cui_base_context_menu_events(

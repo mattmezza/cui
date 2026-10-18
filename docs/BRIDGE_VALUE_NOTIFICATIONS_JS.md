@@ -68,7 +68,21 @@ not drain its queued text. Legacy notification/binding/component tests also pass
 The separate Linux interposition fixture is **synthetic protocol evidence**, not UI
 input. It checks unknown capability filtering, partial exports, layout failure,
 malformed kind/tag/flags/UTF-8/NUL, retry limits, an 8192-byte copy and uint64 extremes.
-Compile the production addon and fixture without modifying repository build wiring:
+The Node CMake project registers the real-queue and Linux protocol cases:
+
+```sh
+cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
+cmake --build build-node --target cui_node_bindings cui_value_notification_fixture
+python scripts/test_local.py --build-dir build-node -R '^node_value_notifications'
+```
+
+To include actual old-library and missing-symbol cases, configure with
+`-DCUI_NODE_VALUE_OLD_LIBRARY=/absolute/path/to/older/libcui_bridge.so` and also
+build `cui_node_old_value_bindings` and `cui_value_notification_missing_fixture`.
+These cases are not registered without an explicitly supplied old library.
+The synthetic provider is test-only and never adds hooks to the production addon.
+
+For an external compatibility harness, compile the addon and fixture manually:
 
 ```sh
 # Set bridge_dir to the directory containing the desired libcui_bridge.so.

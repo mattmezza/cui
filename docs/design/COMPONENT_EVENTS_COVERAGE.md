@@ -210,4 +210,4 @@ requests, text, scalar or selection events. See the [binding audit](COMPONENT_EV
 Opt-in C bridge scalar notifications are implemented for Slider, NumberInput,
 Rating and Pagination, and plain text for Input, Textarea, Editor and InputGroup; see [support and legacy downgrade rules](../BRIDGE_VALUE_NOTIFICATIONS.md).
 Selection snapshots are also supported for the explicit RadioGroup/Tabs/Select/List/Stepper
-allowlist. Python has an owning value poll; JS/TypeScript/Go/Rust value wrappers remain separate slices.
+allowlist. Python and JS/TypeScript have owning value polls; Go/Rust wrappers remain separate slices.

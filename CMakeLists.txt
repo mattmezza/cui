@@ -1363,9 +1363,3 @@ add_executable(test_settings_events tests/unit/test_settings_events.c)
 target_link_libraries(test_settings_events PRIVATE cui)
 cui_warnings(test_settings_events)
 add_test(NAME settings_events COMMAND test_settings_events)
-if(TARGET cui_bridge)
- add_test(NAME python_bridge_value_notifications COMMAND ${Python3_EXECUTABLE}
-   ${CMAKE_CURRENT_SOURCE_DIR}/bindings/python/test_value_notifications_v1.py)
- set_tests_properties(python_bridge_value_notifications PROPERTIES ENVIRONMENT
-   "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/bindings/python;CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>")
-endif()

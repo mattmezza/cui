@@ -52,4 +52,4 @@ Adjacent NumberInput and Input composition is also exercised through real input.
 A renderer identity collision exposed during this work is fixed; regression tests
 cover both ordinary and focused fields without changing public viewport IDs.
 
-Native validation uses `python scripts/test_local.py --build-dir build`; the Python bridge backend is `none` for these fixtures. CTest registers the fixture as `python_bridge_value_notifications`; set the explicit old-library environment variable to include its compatibility case. No other language value wrapper is implemented by this change.
+Native validation uses `python scripts/test_local.py --build-dir build`; the Python bridge backend is `none` for these fixtures. CTest registers the fixture as `bridge_python_value_notifications`; set the explicit old-library environment variable to include its compatibility case. No other language value wrapper is implemented by this change.

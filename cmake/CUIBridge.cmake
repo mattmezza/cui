@@ -88,3 +88,7 @@ add_test(NAME bridge_python_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_notifications_v1.py)
+
+add_test(NAME bridge_python_value_notifications COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_value_notifications_v1.py)

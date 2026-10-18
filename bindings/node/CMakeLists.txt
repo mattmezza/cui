@@ -80,3 +80,40 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
    ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/notifications-v1-protocol.test.cjs)
  endforeach()
 endif()
+
+add_test(NAME node_value_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/value-notifications-v1.test.cjs)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_value_notification_fixture SHARED test/value-notifications-provider.c)
+ target_include_directories(cui_value_notification_fixture PRIVATE ../../include)
+ target_compile_options(cui_value_notification_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ foreach(mode edges capacity size unavailable limit zero repeat tag kind utf8 nul flags)
+  add_test(NAME node_value_notifications_protocol_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings>
+   LD_PRELOAD=$<TARGET_FILE:cui_value_notification_fixture> CUI_VALUE_FIXTURE=${mode}
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/value-notifications-protocol.test.cjs)
+ endforeach()
+ set(CUI_NODE_VALUE_OLD_LIBRARY "" CACHE FILEPATH "Optional actual pre-value bridge for compatibility tests")
+ if(CUI_NODE_VALUE_OLD_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_VALUE_OLD_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_VALUE_OLD_LIBRARY must name an existing actual older bridge")
+  endif()
+  add_library(cui_node_old_value_bindings MODULE addon.c)
+  target_include_directories(cui_node_old_value_bindings PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_old_value_bindings PRIVATE "${CUI_NODE_VALUE_OLD_LIBRARY}" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_old_value_bindings PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_old_value_bindings PROPERTIES PREFIX "" OUTPUT_NAME "cui_old_values" SUFFIX ".node")
+  add_library(cui_value_notification_missing_fixture SHARED test/value-notifications-provider.c)
+  target_include_directories(cui_value_notification_missing_fixture PRIVATE ../../include)
+  target_compile_definitions(cui_value_notification_missing_fixture PRIVATE CUI_VALUE_FIXTURE_MISSING)
+  target_compile_options(cui_value_notification_missing_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME node_value_notifications_old_library COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_value_bindings> CUI_EXPECT_OLD=1
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/value-notifications-v1.test.cjs)
+  add_test(NAME node_value_notifications_protocol_missing COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_value_bindings>
+   LD_PRELOAD=$<TARGET_FILE:cui_value_notification_missing_fixture> CUI_VALUE_FIXTURE=missing
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/value-notifications-protocol.test.cjs)
+ endif()
+endif()

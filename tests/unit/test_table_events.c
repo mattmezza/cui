@@ -12,6 +12,9 @@ typedef struct {
     cui_table_column columns[2];
     cui_table_sort_change sorts[32];
     cui_table_selection_change selections[32];
+    cui_table_column_width_change widths[32];
+    cui_table_column_move_change moves[32];
+    size_t width_calls, move_calls;
     size_t selection_calls, trace_length;
     char trace[128];
     bool observe_selection;
@@ -49,6 +52,22 @@ static void selection_changed(void *user,const cui_table_selection_change *event
     f->selections[f->selection_calls++]=*event;f->remove_requested=true;
     assert(f->trace_length<sizeof f->trace);f->trace[f->trace_length++]='S';
 }
+static void width_changed(void *user,const cui_table_column_width_change *change) {
+    fixture *f=user;assert(!f->render_started&&f->width_calls<32);
+    assert(change->event.target==90&&change->event.kind==CUI_COMPONENT_EVENT_CHANGE&&(change->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX));
+    assert(change->event.frame_sequence==cui_frame_sequence(f->ui)&&change->previous_width!=change->width);
+    cui_table_column col;bool found=false;for(size_t i=0;i<2;i++){assert(cui_table_get_column(f->model,i,&col));if(col.key==change->column){assert(col.width==change->width);found=true;}}
+    assert(found);if(change->event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER)assert(f->state.resizing==change->column);
+    f->widths[f->width_calls++]=*change;f->remove_requested=true;f->trace[f->trace_length++]='W';
+}
+static void column_moved(void *user,const cui_table_column_move_change *change) {
+    fixture *f=user;assert(!f->render_started&&f->move_calls<32);
+    assert(change->event.target==90&&change->event.kind==CUI_COMPONENT_EVENT_CHANGE&&(change->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX));
+    assert(change->event.frame_sequence==cui_frame_sequence(f->ui)&&change->previous_index!=change->index);
+    cui_table_column col;assert(cui_table_get_column(f->model,change->index,&col)&&col.key==change->column);
+    if(change->event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER)assert(f->state.dragging==change->column&&f->state.drag_active);
+    f->moves[f->move_calls++]=*change;f->remove_requested=true;f->trace[f->trace_length++]='P';
+}
 static cui_str label(void *user,size_t row,cui_id column){
     fixture *f=user;assert(row<2&&(column==COL_A||column==COL_B));f->render_started=true;f->renders++;
     return f->rows[row].label;
@@ -60,7 +79,8 @@ static cui_table_event_result frame(fixture *f,unsigned mode,bool legacy,bool ha
     if(f->consume_first)cui_consume_event(f->ui,0);
     cui_theme t=cui_theme_light();cui_table_event_result r={0};
     cui_table_event_handler h={.on_selection=handler&&f->observe_selection?selection_changed:NULL,
-        .on_sort=handler?sort_changed:NULL,.user=f};
+        .on_sort=handler?sort_changed:NULL,
+        .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,.user=f};
     if(mode==2) {
         if(legacy)r.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
         else r=cui_data_table_events(f->ui,90,&t,f->model,&f->state,o,label,NULL,f,h);
@@ -241,7 +261,8 @@ static cui_table_set_event_result set_frame(set_fixture *s,unsigned mode,bool le
     size_t input_count;cui_frame_events(f->ui,&input_count);assert(input_count<=128);
     bool consumed[128];for(size_t i=0;i<input_count;i++)consumed[i]=cui_event_consumed(f->ui,i);
     cui_theme t=cui_theme_light();cui_table_set_event_result r={0};
-    cui_table_set_event_handler h={.on_selection=handler&&!s->sort_only?set_changed:NULL,.on_sort=handler?sort_changed:NULL,.user=s};
+    cui_table_set_event_handler h={.on_selection=handler&&!s->sort_only?set_changed:NULL,.on_sort=handler?sort_changed:NULL,
+        .on_column_width=handler?width_changed:NULL,.on_column_move=handler?column_moved:NULL,.user=s};
     if(mode==2) {
         if(legacy)r.events.control=cui_data_table(f->ui,90,&t,f->model,&f->state,o,label,NULL,f);
         else r=cui_data_table_set_events(f->ui,90,&t,f->model,&f->state,o,label,NULL,f,w,h);
@@ -402,7 +423,7 @@ static void set_preflight(unsigned mode) {
         cui_table_state state=s.f.state;cui_table_column cols[2];memcpy(cols,s.f.columns,sizeof cols);
         cui_table_selection before[8],after[8],owner[8];memcpy(before,s.before,sizeof before);memcpy(after,s.after,sizeof after);memcpy(owner,s.owner,sizeof owner);
         cui_table_set_event_result r=set_frame(&s,mode,false,true,0,o,bad[i]);
-        assert(r.preflight==expected[i]&&!r.events.valid&&!r.events.submitted&&!r.events.selection_count&&!r.events.sort_count&&!r.events.count_overflow);
+        assert(r.preflight==expected[i]&&!r.events.valid&&!r.events.submitted&&!r.events.selection_count&&!r.events.sort_count&&!r.events.column_width_count&&!r.events.column_move_count&&!r.events.count_overflow);
         assert(r.events.control.error==CUI_TABLE_INVALID&&!s.calls&&s.f.renders==renders);
         assert(!memcmp(&state,&s.f.state,sizeof state)&&!memcmp(cols,s.f.columns,sizeof cols)&&!memcmp(before,s.before,sizeof before)&&!memcmp(after,s.after,sizeof after)&&!memcmp(owner,s.owner,sizeof owner));
         /* Requeue after each rejected frame; no failed call may consume input. */
@@ -473,4 +494,137 @@ static void set_maximum(void) {
     finish(&s.f);
 }
 
-int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);}progress_and_consumption();set_maximum();return 0;}
+static cui_table_event_result column_frame(set_fixture *s,unsigned mode,bool sets,bool legacy,
+    bool handler,unsigned passive,cui_table_options o) {
+    o.multiple_selection=sets;
+    return sets?set_frame(s,mode,legacy,handler,passive,o,workspace(s)).events:
+        frame(&s->f,mode,legacy,handler,passive,o);
+}
+static void column_init(set_fixture *s) {
+    set_init(s);
+    for(size_t i=0;i<2;i++){s->f.columns[i].resizable=true;s->f.columns[i].movable=true;}
+    s->f.columns[0].minimum=140;s->f.columns[0].maximum=166;
+}
+static void columns_compare(set_fixture *a,set_fixture *b,cui_table_event_result ar,cui_table_event_result br) {
+    set_compare(a,b,ar.control,br.control);
+    for(size_t i=0;i<2;i++)assert(a->f.columns[i].key==b->f.columns[i].key&&a->f.columns[i].width==b->f.columns[i].width);
+    assert(a->f.state.resizing==b->f.state.resizing&&a->f.state.dragging==b->f.state.dragging&&a->f.state.drag_active==b->f.state.drag_active);
+}
+static void pointer(fixture *f,cui_event_type type,float x,float y,cui_pointer_button button) {
+    assert(cui_queue_event(f->ui,(cui_event){.type=type,.x=x,.y=y,.pointer_button=button}));
+}
+static void pointer_resize_events(fixture *f,bool cancel,bool secondary) {
+    cui_rect grip=cui_bounds(f->ui,cui_table_resize_id(90,COL_A));assert(grip.w>0&&grip.h>0);
+    float x=grip.x+grip.w/2,y=grip.y+grip.h/2;
+    cui_pointer_button button=secondary?CUI_POINTER_SECONDARY:CUI_POINTER_PRIMARY;
+    pointer(f,CUI_EVENT_POINTER_DOWN,x,y,button);
+    pointer(f,CUI_EVENT_POINTER_MOVE,x+80,y,button);
+    pointer(f,CUI_EVENT_POINTER_MOVE,x+90,y,button); /* Clamped no-op. */
+    pointer(f,CUI_EVENT_POINTER_MOVE,x-80,y,button);
+    if(cancel)assert(cui_queue_event(f->ui,(cui_event){.type=CUI_EVENT_CANCEL}));
+    else pointer(f,CUI_EVENT_POINTER_UP,x-80,y,button);
+}
+static void pointer_drag_events(fixture *f,bool cancel,float distance) {
+    cui_rect first=cui_bounds(f->ui,cui_table_header_id(90,COL_A));
+    cui_rect last=cui_bounds(f->ui,cui_table_header_id(90,COL_B));
+    assert(first.w>0&&last.w>0);float x=first.x+20,y=first.y+first.h/2;
+    float destination=distance?x+distance:last.x+last.w-20;
+    pointer(f,CUI_EVENT_POINTER_DOWN,x,y,CUI_POINTER_PRIMARY);
+    pointer(f,CUI_EVENT_POINTER_MOVE,destination,y,CUI_POINTER_PRIMARY);
+    if(cancel)assert(cui_queue_event(f->ui,(cui_event){.type=CUI_EVENT_CANCEL}));
+    else pointer(f,CUI_EVENT_POINTER_UP,destination,y,CUI_POINTER_PRIMARY);
+}
+static void column_changes(unsigned mode,bool sets) {
+    set_fixture a,b;column_init(&a);column_init(&b);cui_table_options o=options();
+    column_frame(&a,mode,sets,true,false,0,o);column_frame(&b,mode,sets,false,true,0,o);
+    cui_focus(a.f.ui,cui_table_resize_id(90,COL_A));cui_focus(b.f.ui,cui_table_resize_id(90,COL_A));
+    key(&a.f,CUI_KEY_RIGHT);key(&b.f,CUI_KEY_RIGHT);key(&a.f,CUI_KEY_LEFT);key(&b.f,CUI_KEY_LEFT);
+    cui_table_event_result ar=column_frame(&a,mode,sets,true,false,0,o),br=column_frame(&b,mode,sets,false,true,0,o);
+    columns_compare(&a,&b,ar,br);assert(br.column_width_count==2&&br.control.columns_changed&&b.f.columns[0].width==150);
+    assert(b.f.widths[0].column==COL_A&&b.f.widths[0].previous_width==150&&b.f.widths[0].width==158);
+    assert(b.f.widths[1].previous_width==158&&b.f.widths[1].width==150&&b.f.widths[0].event.source==CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+    /* Optional observers preserve writes; programmatic helpers never notify. */
+    assert(cui_table_resize(b.f.model,COL_A,158)&&b.f.width_calls==2);
+    key(&b.f,CUI_KEY_LEFT);br=column_frame(&b,mode,sets,false,false,0,o);assert(!br.column_width_count&&b.f.width_calls==2&&b.f.columns[0].width==150);
+    finish(&a.f);finish(&b.f);
+    column_init(&a);column_init(&b);column_frame(&a,mode,sets,true,false,0,o);column_frame(&b,mode,sets,false,true,0,o);
+    cui_focus(a.f.ui,cui_table_header_id(90,COL_A));cui_focus(b.f.ui,cui_table_header_id(90,COL_A));
+    modified_key(&a.f,CUI_KEY_RIGHT,CUI_MOD_CTRL);modified_key(&b.f,CUI_KEY_RIGHT,CUI_MOD_CTRL);
+    modified_key(&a.f,CUI_KEY_LEFT,CUI_MOD_CTRL);modified_key(&b.f,CUI_KEY_LEFT,CUI_MOD_CTRL);
+    ar=column_frame(&a,mode,sets,true,false,0,o);br=column_frame(&b,mode,sets,false,true,0,o);
+    columns_compare(&a,&b,ar,br);assert(br.column_move_count==2&&br.control.columns_changed&&b.f.columns[0].key==COL_A);
+    assert(b.f.moves[0].column==COL_A&&b.f.moves[0].previous_index==0&&b.f.moves[0].index==1);
+    assert(b.f.moves[1].column==COL_A&&b.f.moves[1].previous_index==1&&b.f.moves[1].index==0);
+    assert(b.f.moves[0].event.source==CUI_COMPONENT_EVENT_SOURCE_KEYBOARD);
+    modified_key(&b.f,CUI_KEY_LEFT,CUI_MOD_CTRL);br=column_frame(&b,mode,sets,false,true,0,o);assert(!br.column_move_count&&!br.control.columns_changed);
+    assert(cui_table_move_column(b.f.model,COL_A,1)&&b.f.move_calls==2);
+    assert(cui_table_move_column(b.f.model,COL_A,0)&&b.f.move_calls==2);
+    finish(&a.f);finish(&b.f);
+    for(unsigned restriction=0;restriction<2;restriction++) {
+        column_init(&a);column_init(&b);
+        if(restriction==0)a.f.columns[0].disabled=b.f.columns[0].disabled=true;
+        else a.f.columns[0].resizable=b.f.columns[0].resizable=false;
+        column_frame(&a,mode,sets,true,false,0,o);column_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_resize_id(90,COL_A));cui_focus(b.f.ui,cui_table_resize_id(90,COL_A));
+        key(&a.f,CUI_KEY_RIGHT);key(&b.f,CUI_KEY_RIGHT);
+        ar=column_frame(&a,mode,sets,true,false,0,o);br=column_frame(&b,mode,sets,false,true,0,o);
+        columns_compare(&a,&b,ar,br);assert(!br.column_width_count&&!br.control.columns_changed);finish(&a.f);finish(&b.f);
+    }
+    /* Fixed-region, immovable and disabled restrictions keep their old meanings. */
+    for(unsigned restriction=0;restriction<4;restriction++) {
+        column_init(&a);column_init(&b);
+        if(restriction==0)a.f.columns[0].fixed_left=b.f.columns[0].fixed_left=true;
+        if(restriction==1)a.f.columns[1].movable=b.f.columns[1].movable=false;
+        if(restriction==2)a.f.columns[0].disabled=b.f.columns[0].disabled=true;
+        if(restriction==3)a.f.columns[0].movable=b.f.columns[0].movable=false;
+        column_frame(&a,mode,sets,true,false,0,o);column_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_header_id(90,COL_A));cui_focus(b.f.ui,cui_table_header_id(90,COL_A));
+        modified_key(&a.f,CUI_KEY_RIGHT,CUI_MOD_CTRL);modified_key(&b.f,CUI_KEY_RIGHT,CUI_MOD_CTRL);
+        ar=column_frame(&a,mode,sets,true,false,0,o);br=column_frame(&b,mode,sets,false,true,0,o);
+        columns_compare(&a,&b,ar,br);assert(!br.column_move_count&&!br.control.columns_changed);finish(&a.f);finish(&b.f);
+    }
+    for(unsigned passive=0;passive<3;passive++)for(unsigned restricted=0;restricted<3;restricted++) {
+        column_init(&a);column_init(&b);column_frame(&a,mode,sets,true,false,0,o);column_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_resize_id(90,COL_A));cui_focus(b.f.ui,cui_table_resize_id(90,COL_A));
+        key(&a.f,CUI_KEY_RIGHT);key(&b.f,CUI_KEY_RIGHT);o.disabled=restricted==1;o.loading=restricted==2;
+        ar=column_frame(&a,mode,sets,true,false,passive,o);br=column_frame(&b,mode,sets,false,true,passive,o);
+        columns_compare(&a,&b,ar,br);assert(br.column_width_count==((!passive&&!restricted)?1u:0u));finish(&a.f);finish(&b.f);
+        o=options();column_init(&a);column_init(&b);column_frame(&a,mode,sets,true,false,0,o);column_frame(&b,mode,sets,false,true,0,o);
+        cui_focus(a.f.ui,cui_table_header_id(90,COL_A));cui_focus(b.f.ui,cui_table_header_id(90,COL_A));
+        modified_key(&a.f,CUI_KEY_RIGHT,CUI_MOD_CTRL);modified_key(&b.f,CUI_KEY_RIGHT,CUI_MOD_CTRL);o.disabled=restricted==1;o.loading=restricted==2;
+        ar=column_frame(&a,mode,sets,true,false,passive,o);br=column_frame(&b,mode,sets,false,true,passive,o);
+        columns_compare(&a,&b,ar,br);assert(br.column_move_count==((!passive&&!restricted)?1u:0u));finish(&a.f);finish(&b.f);o=options();
+    }
+    /* Mixed input freezes payload facts before the moved descriptor changes slot. */
+    column_init(&a);column_init(&b);column_frame(&a,2,sets,true,false,0,o);column_frame(&b,2,sets,false,true,0,o);
+    pointer_resize_events(&a.f,false,false);pointer_resize_events(&b.f,false,false);
+    pointer_drag_events(&a.f,false,0);pointer_drag_events(&b.f,false,0);
+    ar=column_frame(&a,mode,sets,true,false,0,o);br=column_frame(&b,mode,sets,false,true,0,o);
+    columns_compare(&a,&b,ar,br);assert(br.column_width_count==2&&br.column_move_count==1&&!br.sort_count);
+    assert(b.f.trace_length==3&&!memcmp(b.f.trace,"WWP",3)&&b.f.columns[1].key==COL_A&&b.f.widths[1].column==COL_A&&b.f.widths[1].width==140);
+    assert(b.f.widths[0].event.event_index<b.f.widths[1].event.event_index&&b.f.widths[1].event.event_index<b.f.moves[0].event.event_index);
+    finish(&a.f);finish(&b.f);
+    /* Prime with real Styled geometry, then reduce through each facade. Base
+     * submission alone creates semantics, not painted resize/header bounds. */
+    for(unsigned variant=0;variant<3;variant++) {
+        column_init(&a);column_init(&b);column_frame(&a,2,sets,true,false,0,o);column_frame(&b,2,sets,false,true,0,o);
+        pointer_resize_events(&a.f,variant==1,variant==2);pointer_resize_events(&b.f,variant==1,variant==2);
+        ar=column_frame(&a,mode,sets,true,false,0,o);br=column_frame(&b,mode,sets,false,true,0,o);
+        columns_compare(&a,&b,ar,br);assert(br.column_width_count==(variant==2?0u:2u));
+        if(variant!=2){assert(b.f.widths[0].width==166&&b.f.widths[1].width==140&&b.f.columns[0].width==140);assert(b.f.widths[0].event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER);}
+        assert(!b.f.state.resizing);finish(&a.f);finish(&b.f);
+    }
+    for(unsigned variant=0;variant<4;variant++) {
+        column_init(&a);column_init(&b);
+        if(variant==3)a.f.columns[0].fixed_left=b.f.columns[0].fixed_left=true;
+        column_frame(&a,2,sets,true,false,0,o);column_frame(&b,2,sets,false,true,0,o);
+        pointer_drag_events(&a.f,variant==1,variant==2?3:0);pointer_drag_events(&b.f,variant==1,variant==2?3:0);
+        ar=column_frame(&a,mode,sets,true,false,0,o);br=column_frame(&b,mode,sets,false,true,0,o);
+        columns_compare(&a,&b,ar,br);assert(br.column_move_count==(variant==0?1u:0u));
+        if(variant==0)assert(b.f.moves[0].column==COL_A&&b.f.moves[0].previous_index==0&&b.f.moves[0].index==1&&b.f.moves[0].event.source==CUI_COMPONENT_EVENT_SOURCE_POINTER&&!br.control.sort_changed);
+        if(variant==2)assert(br.sort_count==1&&br.control.sort_changed); /* Below threshold remains a click. */
+        assert(!b.f.state.dragging&&!b.f.state.drag_active&&b.f.remove_requested==(variant==0||variant==2));finish(&a.f);finish(&b.f);
+    }
+}
+
+int main(void){for(unsigned mode=0;mode<3;++mode){sorts(mode);selections(mode);set_transitions(mode);set_ranges_and_keys(mode);set_preflight(mode);column_changes(mode,false);column_changes(mode,true);}progress_and_consumption();set_maximum();return 0;}

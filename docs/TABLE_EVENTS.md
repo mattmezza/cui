@@ -1,10 +1,11 @@
 # DataTable transitions
 
 Include `cui/cui_table_events.h`. The additive `cui_table_reduce_events`,
-`cui_base_data_table_events` and `cui_data_table_events` take `{on_selection, on_sort, user}`
+`cui_base_data_table_events` and `cui_data_table_events` take a `cui_table_event_handler`
 and return unchanged legacy `control`, validity/submission flags and actual
-`selection_count`/`sort_count` (saturating with `count_overflow`). A missing callback ignores user
-and preserves reduction, including multi-selection behavior.
+`selection_count`, `sort_count`, `column_width_count` and `column_move_count`
+(saturating with `count_overflow`). A missing callback ignores user and preserves
+reduction, including multi-selection behavior.
 
 Each applied sort key/direction transition notifies inside reduction, before
 final semantics and every Styled render callback. Three cycles can return to the
@@ -41,9 +42,9 @@ A non-NULL `on_selection` with `multiple_selection=true` returns `valid=false`,
 `control.error=CUI_TABLE_INVALID` before reduction, state/column mutation or paint.
 There is no silent primary-only multi observation. Nil selection/sort-only handlers
 still support legacy multi reduction, including accepted progress before errors.
-The separate set-observation API below supports complete multi selection. Column movement/resize, activation,
-requests and viewport/load events remain separate slices. Existing bridge V1 table
-notifications remain aggregate post-step snapshots; native multiplicity and
+The separate set-observation API below supports complete multi selection. Column
+movement/resize are covered below; activation, requests and viewport/load events
+remain separate slices. Existing bridge V1 table notifications remain aggregate post-step snapshots; native multiplicity and
 64-bit keys here do not imply binding parity.
 
 
@@ -51,7 +52,7 @@ notifications remain aggregate post-step snapshots; native multiplicity and
 
 Use `cui_table_reduce_set_events`, `cui_base_data_table_set_events` or
 `cui_data_table_set_events` with `cui_table_set_event_handler` and
-`cui_table_selection_workspace`. The handler has `{on_selection, on_sort, user}`;
+`cui_table_selection_workspace`. The handler supports selection, sort, column-width and column-move callbacks;
 its selection callback receives `cui_table_selection_set_change`, not the scalar
 payload. Its return is `cui_table_set_event_result`: `events` contains the same
 legacy result and actual callback counts as above, and `preflight` distinguishes
@@ -62,7 +63,9 @@ their existing explicit multi-observer rejection.
 ```c
 cui_table_selection before[32], after[32]; /* Each >= state.selection_capacity. */
 cui_table_selection_workspace scratch = {before, after, 32};
-cui_table_set_event_handler handler = {on_set_change, on_sort_change, application};
+cui_table_set_event_handler handler = {
+    .on_selection = on_set_change, .on_sort = on_sort_change, .user = application
+};
 cui_table_set_event_result result = cui_base_data_table_set_events(
     ui, table_id, model, &state, options, scratch, handler);
 /* Keep scratch and all owner resources alive until this call completes. */
@@ -105,3 +108,41 @@ caller preconditions, not a runtime memory-safety guarantee.
 A NULL selection callback ignores workspace entirely, preserves single/multi
 legacy reduction and still supports optional sort observation; unused userdata is
 ignored. Passive/disabled/loading behavior and bridge omissions above also apply.
+
+
+## Column width and movement
+
+Both scalar and set handlers add optional `on_column_width` and `on_column_move`.
+Use designated initializers for these unreleased structs and rebuild clients when
+updating the header. Legacy state/options/result layouts and entrypoints are
+unchanged. The shared result adds saturating `column_width_count` and
+`column_move_count`, with the existing `count_overflow` flag.
+
+`cui_table_column_width_change` copies `{event, column, previous_width, width}`
+with exact float widths after the old helper's clamps. It observes each successful
+pointer-move resize or grip Left/Right key resize. Repeated clamped no-ops do not
+notify. `cui_table_column_move_change` copies `{event, column, previous_index,
+index}` after a successful Ctrl+Left/Right header reorder or actual pointer drop.
+Indices are operation-time array positions; the stable exact `cui_id` identifies
+the column after subsequent moves. Both payloads are pointer-free. Capture facts
+inside the callback or copy the struct for later use.
+
+Notifications run immediately after the successful helper mutation, before later
+gesture cleanup, semantics and Styled paint. A drop callback still sees the active
+drag state; it must not mutate it. Event metadata is frozen before descriptor
+movement, uses the table root target and genuine triggering frame/index/source;
+a pointer-move resize has pointer provenance without inventing an activation.
+Callback order follows the reducer's existing operation order, including repeated
+changes and cycles returning to the entry width/order. No extra consumed-event
+filtering, focus changes or legacy result-flag reinterpretation is added.
+
+Programmatic `cui_table_resize`/`cui_table_move_column` calls stay silent. Fixed
+regions, immovable/disabled columns, finite/clamped widths, >4px drag threshold,
+passive/layout-only/loading and missing callback behavior remain unchanged.
+A below-threshold header gesture may still sort as an ordinary click; an actual
+drag suppresses that click. Cancel/Escape ends the existing gesture without
+rolling back an already-applied resize; no begin/commit/cancel event is invented.
+Handlers/user remain borrowed, and the mutation/reentrancy/teardown restrictions
+above apply. Base only submits semantics, so pointer routing requires actual
+caller-provided geometry (the tests prime with Styled geometry). No new dispatch,
+GPU validation or bridge/binding event coverage is implied.

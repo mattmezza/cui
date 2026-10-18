@@ -81,14 +81,31 @@ typedef struct {
 typedef void (*cui_table_selection_change_fn)(void *, const cui_table_selection_change *);
 typedef void (*cui_table_sort_change_fn)(void *, const cui_table_sort_change *);
 typedef struct {
+    cui_component_event_metadata event;
+    cui_id column;
+    float previous_width, width;
+} cui_table_column_width_change;
+typedef struct {
+    cui_component_event_metadata event;
+    cui_id column;
+    size_t previous_index, index;
+} cui_table_column_move_change;
+typedef void (*cui_table_column_width_change_fn)(void *user,
+    const cui_table_column_width_change *event);
+typedef void (*cui_table_column_move_change_fn)(void *user,
+    const cui_table_column_move_change *event);
+typedef struct {
     cui_table_selection_change_fn on_selection;
     cui_table_sort_change_fn on_sort;
+    cui_table_column_width_change_fn on_column_width;
+    cui_table_column_move_change_fn on_column_move;
     void *user;
 } cui_table_event_handler;
 typedef struct {
     cui_table_result control; /* Unchanged old result/error, not callback counts. */
     bool valid, submitted, count_overflow;
     size_t selection_count, sort_count; /* Actual synchronous calls. */
+    size_t column_width_count, column_move_count;
 } cui_table_event_result;
 cui_table_event_result cui_table_reduce_events(cui_context *, cui_id,
     cui_table_model *, cui_table_state *, cui_table_options, cui_table_event_handler);
@@ -141,6 +158,8 @@ typedef void (*cui_table_selection_set_change_fn)(void *user,
 typedef struct {
     cui_table_selection_set_change_fn on_selection;
     cui_table_sort_change_fn on_sort;
+    cui_table_column_width_change_fn on_column_width;
+    cui_table_column_move_change_fn on_column_move;
     void *user;
 } cui_table_set_event_handler;
 typedef enum {
@@ -272,8 +291,9 @@ No test instrumentation hook is added to the public API or production source.
 
 ## Subsequent independent slices and aggregate exceptions
 
-1. Column CHANGE: distinct pointer-free `{column, before_width, after_width}` and
-   `{column, before_index, after_index}` payloads at actual successful resize/move
+1. Implemented column CHANGE: distinct pointer-free
+   `{event, column, previous_width, width}` and
+   `{event, column, previous_index, index}` payloads at actual successful resize/move
    calls, including pointer moves, keyboard resize, Ctrl reorder and drag drop.
    Indices are operation-time positions; stable column key remains authoritative.
    No begin/commit/cancel gesture vocabulary until a separate lifecycle audit.
@@ -344,4 +364,8 @@ with multiple_selection is rejected before reduction/paint; nil/sort-only handle
 keep old multi behavior. Multi-set/workspace APIs now use the reviewed separate
 facade, atomic preflight,
 exclusive scratch buffers and iterative exact multiset comparison described above.
-No subsequent column/activation/viewport slice is included.
+Column width/move now notify only successful reducer helper calls, with copied
+stable keys, pre-operation metadata and actual before/after values/indices. Both
+scalar and set handlers/results expose the implemented callbacks/counts. Public
+programmatic helpers remain silent. No activation/context/mode/viewport slice is
+included. Legacy gesture/cancel and callback-before-paint timing are preserved.

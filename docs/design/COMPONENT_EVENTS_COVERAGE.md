@@ -166,3 +166,7 @@ No source contract was altered to fit the proposal. The separately committed [bi
 ## Audit validation
 
 Documentation validation checks exact family equality/count against `docs/gpui-parity.json` and resolves every relative Markdown file link. The 78-family matrix is an API coverage inventory with explicit unknowns. It does not establish upstream source parity or justify ledger promotion.
+
+## Subsequent compatible slices
+
+The checkpoint matrix above records the audited legacy baseline. Additive APIs now cover [Button/Checkbox activation and requests](../CONTROL_EVENTS.md), [Switch/Toggle requests](../BOOLEAN_EVENTS.md), [Base Slider phases](../SLIDER_EVENTS.md), and [Base Input changes/submissions](../TEXT_INPUT_EVENTS.md). Each linked guide specifies ownership, timing, evidence, counts and exceptions. This is partial family coverage: Styled/multiline text, selection, menu and dialog facades remain separate work. No matrix row or parity level is promoted by this note.

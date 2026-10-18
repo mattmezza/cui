@@ -304,3 +304,7 @@ path while preserving deferred legacy notifications, and whether any such path
 requires a new synchronous foreign boundary with explicit ownership/reentrancy
 rules. Changing existing callback timing to “make it consistent” is observable
 and cannot be treated as a documentation-only or backward-compatible normalization.
+
+## Implemented notification follow-up
+
+The additive [V1 manual notification API](../BRIDGE_NOTIFICATIONS.md) now has owning Python/JavaScript/TypeScript views and [Go/Rust views](../BRIDGE_NOTIFICATIONS_GO_RUST.md). Its initial typed allowlist is activation, applied boolean changes, table changes and surface close outcomes; other payloads remain legacy. It preserves the existing shared queue and delivery timing. These views do not expose synchronous C value requests, Slider phase callbacks or Base Input observers to foreign handlers. Those omissions and the architectural decision above remain applicable.

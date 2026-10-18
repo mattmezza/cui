@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_base.h"
 #include "cui/cui_slider_events.h"
+#include "cui/cui_text_input_events.h"
 #include <math.h>
 static float cui_progress_fraction(float value) {
     return isfinite(value) ? fmaxf(0, fminf(1, value)) : 0;
@@ -782,9 +783,69 @@ cui_input_result cui_base_input_reduce_event(cui_context *ui, cui_id id, cui_edi
     result.changed = before.revision != cui_edit_get_state(edit).revision;
     return result;
 }
-cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
-                                   cui_input_behavior_state *state,
-                                   cui_base_input_options options) {
+static void cui_input_notify(cui_context *ui, cui_id id, cui_edit *edit,
+                             cui_base_input_options options, cui_component_text_handler handler,
+                             cui_edit_state before, cui_edit_state after, cui_event_type type,
+                             size_t index, cui_component_event_kind kind,
+                             cui_input_event_result *result) {
+    cui_component_text_event event = {.before = before, .after = after};
+    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+    if (type == CUI_EVENT_KEY_DOWN || type == CUI_EVENT_KEY_UP)
+        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+    else if (type == CUI_EVENT_POINTER_DOWN || type == CUI_EVENT_POINTER_UP ||
+             type == CUI_EVENT_POINTER_MOVE)
+        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+    (void)cui_component_event_init(&event.event, kind, id, source);
+    (void)cui_component_event_set_frame_index(&event.event, cui_frame_sequence(ui), index);
+    event.has_text = !options.masked && options.content_type == CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED;
+    if (event.has_text)
+        event.text = cui_edit_get_text(edit);
+    size_t *count =
+        kind == CUI_COMPONENT_EVENT_CHANGE ? &result->change_count : &result->submit_count;
+    if (*count == SIZE_MAX)
+        result->count_overflow = true;
+    else
+        ++*count;
+    handler.callback(handler.user, &event);
+}
+cui_input_event_result
+cui_base_input_reduce_event_events(cui_context *ui, cui_id id, cui_edit *edit,
+                                   cui_input_behavior_state *state, cui_base_input_options options,
+                                   size_t index, cui_component_text_handler handler) {
+    cui_input_event_result result = {0};
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    bool snapshot = ui && id && edit && state && events && index < count;
+    cui_edit_state before = {0};
+    cui_event_type type = (cui_event_type)0;
+    if (snapshot) {
+        before = cui_edit_get_state(edit);
+        type = events[index].type;
+    }
+    result.control = cui_base_input_reduce_event(ui, id, edit, state, options, index);
+    if (!snapshot || !handler.callback)
+        return result;
+    cui_edit_state after = cui_edit_get_state(edit);
+    if (result.control.changed && before.revision != after.revision)
+        cui_input_notify(ui, id, edit, options, handler, before, after, type, index,
+                         CUI_COMPONENT_EVENT_CHANGE, &result);
+    if (result.control.submitted)
+        cui_input_notify(ui, id, edit, options, handler, before, after, type, index,
+                         CUI_COMPONENT_EVENT_SUBMIT, &result);
+    return result;
+}
+static void cui_input_add_count(size_t *count, size_t added, bool *overflow) {
+    if (added > SIZE_MAX - *count) {
+        *count = SIZE_MAX;
+        *overflow = true;
+    } else
+        *count += added;
+}
+static cui_input_result cui_input_events_common(cui_context *ui, cui_id id, cui_str name,
+                                                cui_edit *edit, cui_input_behavior_state *state,
+                                                cui_base_input_options options,
+                                                cui_component_text_handler handler,
+                                                cui_input_event_result *notifications) {
     cui_input_result result = {.error = CUI_EDIT_OK};
     if (!edit || !state || !ui || !id) {
         result.error = CUI_EDIT_INVALID_ARGUMENT;
@@ -821,7 +882,18 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
     if (options.disabled)
         state->dragging = false;
     for (size_t i = 0; i < count; ++i) {
-        cui_input_result event = cui_base_input_reduce_event(ui, id, edit, state, options, i);
+        cui_input_result event;
+        if (notifications) {
+            cui_input_event_result observed =
+                cui_base_input_reduce_event_events(ui, id, edit, state, options, i, handler);
+            event = observed.control;
+            cui_input_add_count(&notifications->change_count, observed.change_count,
+                                &notifications->count_overflow);
+            cui_input_add_count(&notifications->submit_count, observed.submit_count,
+                                &notifications->count_overflow);
+            notifications->count_overflow |= observed.count_overflow;
+        } else
+            event = cui_base_input_reduce_event(ui, id, edit, state, options, i);
         result.submitted |= event.submitted;
         result.rejected |= event.rejected;
         if (result.error == CUI_EDIT_OK && event.error != CUI_EDIT_OK)
@@ -849,6 +921,21 @@ cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui
                                 .purpose = options.content_type});
     return result;
 }
+cui_input_result cui_base_input_ex(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
+                                   cui_input_behavior_state *state,
+                                   cui_base_input_options options) {
+    return cui_input_events_common(ui, id, name, edit, state, options,
+                                   (cui_component_text_handler){0}, NULL);
+}
+cui_input_event_result cui_base_input_events(cui_context *ui, cui_id id, cui_str name,
+                                             cui_edit *edit, cui_input_behavior_state *state,
+                                             cui_base_input_options options,
+                                             cui_component_text_handler handler) {
+    cui_input_event_result result = {0};
+    result.control = cui_input_events_common(ui, id, name, edit, state, options, handler, &result);
+    return result;
+}
+
 cui_input_result cui_base_input(cui_context *ui, cui_id id, cui_str name, cui_edit *edit,
                                 bool disabled) {
     /* This legacy wrapper has no retained lifecycle state. Preserve its edit

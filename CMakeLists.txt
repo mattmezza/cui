@@ -1237,3 +1237,8 @@ add_executable(test_slider_events tests/unit/test_slider_events.c)
 target_link_libraries(test_slider_events PRIVATE cui)
 cui_warnings(test_slider_events)
 add_test(NAME slider_events COMMAND test_slider_events)
+
+add_executable(test_text_input_events tests/unit/test_text_input_events.c)
+target_link_libraries(test_text_input_events PRIVATE cui)
+cui_warnings(test_text_input_events)
+add_test(NAME text_input_events COMMAND test_text_input_events)

@@ -78,3 +78,5 @@ The separate [async HTTPS fetch example](../examples/async_fetch/README.md) buil
 The bridge separately supports [versioned typed manual notification polling](BRIDGE_NOTIFICATIONS.md). These queued post-mutation views preserve legacy dispatch timing and do not provide synchronous value rejection through language bindings.
 
 The controlled [Slider phase facade](SLIDER_EVENTS.md) preserves double values and distinguishes BEGIN/UPDATE/COMMIT/CANCEL, including cancellation without fabricated input evidence. It does not add a Styled or foreign-language request facade.
+
+The [Base Input observer](TEXT_INPUT_EVENTS.md) reports committed text changes and eligible submissions synchronously. It does not add rejectable edit requests or multiline observers. [Go and Rust manual notification views](BRIDGE_NOTIFICATIONS_GO_RUST.md) preserve typed queue values with owning payloads; their callbacks retain existing timing.

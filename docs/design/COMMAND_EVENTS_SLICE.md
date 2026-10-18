@@ -95,3 +95,201 @@ handler/userdata routing, disabled/loading/inert/passive/omitted components,
 pointer hover vs accepted activation, real keyboard and actual accessibility role
 eligibility. Verify counts never replay or mutate. Run warnings, portable C/C++
 headers, private-Xvfb native tests and applicable WASI/sanitizers. Never use desktop.
+
+## Refined review contract (audited `91fab8fc`)
+
+This section supersedes the provisional spellings/classification above. Production
+is still unapproved. No new public layout, behavior or generated file is changed.
+
+### Exact additive API
+
+`cui_command_events.h` includes Command and shared component metadata. Proposed
+public declarations (all callbacks are user-first):
+
+```c
+typedef struct {
+    cui_component_event_metadata event; /* CHANGE */
+    bool has_previous;
+    cui_command_index previous, value;
+} cui_command_selection_change;
+typedef struct {
+    cui_component_event_metadata event; /* CHANGE */
+    cui_str value; /* Borrowed raw, untrimmed UTF-8; not an owned snapshot. */
+} cui_command_query_change;
+typedef struct {
+    cui_component_event_metadata event; /* ACTIVATE */
+    cui_command_index value; /* Confirmed snapshot, not later selected state. */
+} cui_command_activation;
+typedef struct {
+    cui_component_event_metadata event; /* REQUEST to dismiss host */
+} cui_command_cancel_request;
+typedef void (*cui_command_selection_change_fn)(void *, const cui_command_selection_change *);
+typedef void (*cui_command_query_change_fn)(void *, const cui_command_query_change *);
+typedef void (*cui_command_activation_fn)(void *, const cui_command_activation *);
+typedef void (*cui_command_cancel_request_fn)(void *, const cui_command_cancel_request *);
+typedef struct {
+    cui_command_selection_change_fn on_selection;
+    cui_command_query_change_fn on_query;
+    cui_command_activation_fn on_activate;
+    cui_command_cancel_request_fn on_cancel;
+    void *user;
+} cui_command_event_handler;
+typedef struct {
+    bool control; /* Exact old bool return; false is not necessarily an error. */
+    bool count_overflow;
+    size_t selection_count, query_count, activation_count, cancel_request_count;
+} cui_command_event_result;
+
+cui_command_event_result cui_command_rebuild_events(
+    cui_command_state *, cui_id target, const cui_command_entry *, size_t,
+    cui_str query, bool query_changed, cui_command_options, cui_command_event_handler);
+cui_command_event_result cui_command_select_events(
+    cui_command_state *, cui_id target, cui_command_index, bool scroll,
+    cui_command_options, cui_command_event_handler);
+cui_command_event_result cui_command_move_events(
+    cui_command_state *, cui_id target, bool forward,
+    cui_command_options, cui_command_event_handler);
+cui_command_event_result cui_command_confirm_events(
+    cui_command_state *, cui_id target, cui_command_options, cui_command_event_handler);
+cui_command_event_result cui_command_events(
+    cui_context *, cui_id, const cui_theme *, cui_command_state *,
+    const cui_command_entry *, size_t, cui_command_options, cui_command_event_handler);
+```
+
+Base has no context/ID today; the explicit nonzero `target` provides metadata
+identity without retaining a context or inventing input provenance. Zero target
+is an additive preflight failure: zero result, no reducer call/mutation/callback.
+Other `control` values are exactly the old operation result. No `valid` or
+`submitted` field conflates no-change/invalid/late-error paths. Counts saturate
+with `count_overflow`, count only actual observer calls, and retain earlier calls
+when a later Styled operation fails. No public observed clear helper or Base
+cancel operation is proposed. Missing callbacks ignore `user`, including nonNULL.
+
+### Callbackless predicates and frozen operation facts
+
+The observer removes only the old callback-presence predicate, never the reducer
+predicate. Keep old options callbacks and `options.user` unchanged; do not install
+forwarders into those fields. Each old callback precedes its corresponding new
+observer. Freeze operation facts before the old callback so redirects cannot turn
+one operation into another. Observer snapshots describe the completed operation,
+not a promise that current owner state still equals the payload after legacy code.
+
+| Operation | Observer predicate independent of old callback presence | Order/facts |
+| --- | --- | --- |
+| Rebuild selection | Rebuild succeeds; `query_changed`; eligible selected path exists; no previous path or different path | Install all rebuilt rows/state, freeze previous/value, old `on_select`, new `on_selection` |
+| Rebuild query | Rebuild succeeds; `query_changed && options.searchable` | After the selection pair, freeze raw query view/metadata, old `on_query`, new `on_query` |
+| Select/move | Eligible item found and selected row index actually changes | Store selected/preserve/pending-scroll, freeze previous/value, old select, new selection |
+| Confirm | Existing confirm returns true: state exists, options not disabled, selected row/item exists and item enabled | Freeze selected row/path, action callback and old confirm/user as today; action, captured old confirm, new activation |
+| Styled cancel | Existing keyboard Escape branch reaches empty/nonsearchable query, enabled palette/focus, unconsumed unmodified KEY_DOWN; either old cancel or new cancel installed | Freeze REQUEST, old cancel if present, new cancel if present; no added consume/invalidate/host close |
+
+Important exclusions from these exact predicates:
+
+- `query_changed=false` rebuild may replace selection because an old row vanished
+  or became disabled; it remains silent. `query_changed=true` need not imply
+  different bytes in Base: it still reports query, even if the caller passes the
+  same raw text. No selected-to-none event is invented when filtering yields no
+  eligible item. `has_previous=false` makes `previous` absent (zero-filled).
+- Styled first submission computes `changed=false` because `initialized=false`,
+  so its initial highlight is silent. In contrast an explicit Base rebuild with
+  `query_changed=true` can notify even on an uninitialized state. The earlier
+  blanket “initial rebuild does not call hooks” refers only to Styled/false flag.
+- Direct Base select/move do not check `options.disabled` or `state.loading`;
+  preserve this policy. Confirm checks options/item disabled but not loading, and
+  can activate without item action or legacy `on_confirm`. Same-item confirm is
+  an ACTIVATE even when select first returned false. Repeated confirms are not
+  deduplicated; pointer row interaction retains its existing aggregate coalescing.
+- Never add a selection-loss callback, infer query previous text, replace query
+  aggregation with per-edit events, or make new handler presence enable movement,
+  selection, confirmation, consumption or focus. Only cancel gets the explicit
+  new-handler-only notification branch described above.
+
+### Initial, passive and input classification
+
+| Actual seam | Metadata |
+| --- | --- |
+| Explicit Base operation, even called during a UI frame | PROGRAMMATIC, target only; no context/frame/index/activation invention |
+| Styled leading rebuild detecting an externally modified editor hash | PROGRAMMATIC, target only, including disabled/loading/inert/layout-only/out-of-frame attempts |
+| Styled initial or unchanged leading rebuild | Silent under the existing `changed=false` predicate |
+| Aggregate query-input changed rebuild | UNKNOWN plus proven active frame only; do not choose an arbitrary input event/index or claim per-edit origin |
+| Escape clear-query rebuild | Genuine keyboard frame/index/source from that loop event; CHANGE, no fabricated accepted activation |
+| Hover-selected row | UNKNOWN plus proven frame; aggregate/stationary hover does not establish a causal event index or activation snapshot |
+| Pointer/accepted row activation | Freeze before hover/select/content/binding callbacks; exactly one genuine accepted row activation supplies shared snapshot, multiple/missing evidence gives UNKNOWN plus proven frame only |
+| Keyboard move/confirm/cancel loop | Freeze current event frame/index/KEYBOARD before callbacks; attach genuine accepted activation only if actually available for this operation/target, never copy a different target's snapshot |
+
+All Styled targets are the Command root ID, while selection/activation payloads
+carry exact section/row paths. Remapped accepted row evidence retains the actual
+row target in `activation.target`; the root `event.target` is the owning Command.
+Do not manufacture keyboard accepted snapshots for an Enter handled by the
+palette loop when the accepted target is its query editor or nothing.
+
+Only the leading externally changed rebuild is PROGRAMMATIC; a passive submission
+is not universally silent. It still rebuilds before Styled focus/container and
+geometry checks and may call old select/query hooks, so the new programmatic
+observers must also run there. This includes disabled palettes and inert/layout-only
+ancestry; suppressing those observers would lose actual model changes. Conversely,
+interaction observations require nonzero `cui_frame_sequence(ui)` at their seam:
+Core returns zero under inert/layout-only/measurement/out-of-frame work. Do not
+add guards that suppress legacy callbacks/mutations merely to impose this observer
+policy. Loading does not block existing nonempty-row navigation/confirmation;
+retain it, rather than treating busy as disabled. Omitted submission emits nothing.
+
+### Mutation, query lifetime and failure details
+
+Capture accepted row evidence immediately after interaction/current semantic
+registration and before hover selection or custom content/binding execution.
+The later confirm operation freezes the **actual selected row at confirm entry**:
+a legacy select callback may redirect it, and a content callback may change state.
+Do not overwrite that confirmed path with the clicked row. If it differs, retain
+only causal evidence that genuinely establishes origin, not an invented accepted
+activation for the redirected item. Confirmation must snapshot its old confirm
+callback/user before action, exactly as Base currently does; an action changing
+selection does not change the ensuing captured confirm/typed activation path.
+New observers must not mutate active state/editor/model/resources, recursively
+invoke the same UI/reducer, or destroy context; legacy permitted redirects remain.
+
+A query payload freezes its `cui_str` pointer/length, not its bytes. It borrows the
+same untrimmed raw view that old query receives; legacy query callbacks that edit
+those bytes can affect what the later observer reads. No immutable-byte promise,
+old-query reconstruction or hidden allocation is made. Legacy callbacks must keep
+borrowed storage live through the new observer; freeing/rebinding active resources
+is unsupported. Observers needing retention call `cui_component_event_copy_utf8`
+with explicit bound/storage and check its status; struct copy alone is insufficient.
+Selection/activation/cancel payloads are pointer-free copies and survive context
+teardown. All callbacks/users borrow only through the outer operation.
+
+Leading rebuild can notify and install new rows before density/geometry validation
+returns false. Input rebuild can notify before a custom measure failure. Retain
+that progress and counts; do not attempt rollback, withhold notifications until
+return, or relabel `control=false` as no work. Escape currently ignores rebuild's
+bool before updating hash/consuming; preserve that legacy sequence and report only
+actual successful reducer callbacks. No architecture/dispatch/teardown fixes here.
+
+### Evidence and independently reviewed implementation sequence
+
+1. Base only: shared types + four observed operations/private seams and tests.
+   Verify callbackless predicates, explicit changed=true initialization, silent
+   changed=false selection replacement/loss, select/move disabled policy, confirm
+   without action/hooks, redirects and action snapshot, raw query/copy bounds,
+   counts/zero-target failure and unchanged old bool returns. No Styled activation
+   claim from this slice.
+2. Styled submission: same private reducers with scoped cause contexts; leading
+   programmatic rebuild, aggregate query, hover/row confirm, keyboard/cancel.
+   Compare old/new paint/semantics/focus/consume and callback traces, including
+   nil legacy hooks, old hooks consuming input/changing selection, stationary
+   hover, actual accepted pointer/accessibility eligibility, repeated keyboard
+   confirms, disabled vs loading, inert/layout-only/measurement and omitted work,
+   changed editor before passive submission, late custom geometry failure.
+
+Source anchors: [Base rebuild](../../src/base/cui_command.c#L83) installs state
+then select/query at lines 172–178; [select/move/confirm](../../src/base/cui_command.c#L181)
+show selection predicates and captured confirm at 223–228. [Styled entry](../../src/components/cui_command.c#L76)
+rebuilds before geometry; aggregate query at 163–180, hover at 228–232, accepted row
+at 291–295, footer then keyboard at 309–335. [Core frame identity](../../src/core/cui.c#L4463)
+excludes inert/layout-only work. Existing [model tests](../../tests/unit/test_command.c#L40)
+cover callback ordering, clear/preserve, filtering/disabled selection and capacity;
+[render tests](../../tests/unit/test_command.c#L165) cover stationary hover, click
+focus, Escape and disabled consumption; [slots/loading](../../tests/unit/test_command.c#L392)
+cover presentation/busy, not suppression of confirmation. Existing tests do not
+prove legacy action redirects, passive observer classification or new metadata;
+the new focused tests above must supply that proof. No builds run for this
+checkpoint and no foreign binding coverage is claimed.

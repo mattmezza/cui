@@ -215,6 +215,7 @@ void cui_choice_popup_init(cui_choice_popup *, cui_id popup_id);
 void cui_base_choice_popup_trigger(cui_context *, cui_id trigger, cui_str name, bool disabled,
                                    const cui_choice_item *, size_t count, cui_id selected,
                                    cui_choice_popup *);
+/* Additive typed List observers: include cui_list_events.h. */
 bool cui_base_list(cui_context *, const cui_choice_item *, size_t count, cui_id *selected,
                    cui_list_state *, cui_list_options);
 bool cui_list(cui_context *, cui_id container, const cui_theme *, const cui_choice_item *,

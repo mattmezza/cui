@@ -185,3 +185,12 @@ proposal: their filtered/scratch arrays and removal paths require separate stabl
 mapping audits before forwarding these bool events. Existing bridge legacy change
 queues and Python/Node/Go/Rust wrappers remain unchanged. Native typed APIs do not
 imply typed binding selection payloads or new accessibility support.
+
+## Implementation checkpoints
+
+Single List now exposes the existing per-transition private hook through Base and
+Styled facades. Its narrow Styled common seam retains direct legacy reduction and
+paint; existing Select/Combo/Menu forwarding is unchanged. New typed callbacks
+retain the existing selection-forwarding ability to consume later input events,
+without permitting active owner/resource mutation. Multi List and ToggleGroup
+remain pending independently reviewed/tested slices.

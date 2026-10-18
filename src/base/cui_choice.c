@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "cui/cui_list_events.h"
 #include "cui/cui_base.h"
 #include "cui/cui_scroll.h"
 #include <math.h>
@@ -843,6 +844,18 @@ bool cui_choice_private_list_events(cui_context *ui, const cui_choice_item *item
     cui_selection_handler handler, cui_selection_event_result *observed) {
     return cui_choice_list_reduce(ui, items, count, selected, state, options, control,
         handler, observed, (cui_menu_command_handler){0}, NULL);
+}
+cui_list_event_result cui_base_list_events(cui_context *ui, cui_id control,
+    const cui_choice_item *items, size_t count, cui_id *selected,
+    cui_list_state *state, cui_list_options options, cui_selection_handler handler) {
+    cui_list_event_result result = {0};
+    if (!ui || !control || (!items && count) || !selected || !state)
+        return result;
+    result.events.valid = true;
+    result.events.submitted = cui_frame_sequence(ui) != 0;
+    result.legacy_activated = cui_choice_private_list_events(ui, items, count, selected,
+        state, options, control, handler, &result.events);
+    return result;
 }
 bool cui_choice_private_list_commands(cui_context *ui, const cui_choice_item *items, size_t count,
     cui_id *selected, cui_list_state *state, cui_list_options options, cui_id control,

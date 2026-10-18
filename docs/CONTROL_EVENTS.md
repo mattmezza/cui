@@ -1,6 +1,6 @@
 # Button and Check event facades
 
-`cui_control_events.h` and the Styled declarations in `cui_components.h` add typed synchronous event facades for Button and Checkbox/Check. Existing entry points keep their behavior. Switch/Toggle facades, group controls and language request bindings remain deferred; this is not uniform coverage of all 78 families. See the [design checkpoint](design/COMPONENT_EVENTS_CONTRACT.md), [coverage inventory](design/COMPONENT_EVENTS_COVERAGE.md) and [binding limitations](design/COMPONENT_EVENTS_BINDINGS.md).
+`cui_control_events.h` and the Styled declarations in `cui_components.h` add typed synchronous event facades for Button and Checkbox/Check. Existing entry points keep their behavior. [Switch/Toggle facades](BOOLEAN_EVENTS.md) are also implemented; group controls and language request bindings remain deferred; this is not uniform coverage of all 78 families. See the [design checkpoint](design/COMPONENT_EVENTS_CONTRACT.md), [coverage inventory](design/COMPONENT_EVENTS_COVERAGE.md) and [binding limitations](design/COMPONENT_EVENTS_BINDINGS.md).
 
 ## Controlled Checkbox requests
 
@@ -64,3 +64,7 @@ The focused `tests/unit/test_control_events.c` covers per-event legacy/new order
 ```sh
 python scripts/test_local.py --build-dir build -- -R 'control_events|button_click|button_callback|checkbox_source'
 ```
+
+## Run a complete native example
+
+The [settings example](../examples/control_events/README.md) builds a real SDL window with an owner-controlled Checkbox, an Apply button and deferred panel removal. It demonstrates acceptance and rejection, passive result inspection without duplicate side effects, and the next-submission snapshot boundary. Its README includes exact dependency, compiler, font, build and invisible-test commands. The separate [async fetch example](../examples/async_fetch/README.md) demonstrates returning promptly from a synchronous handler and applying worker completions on the UI thread.

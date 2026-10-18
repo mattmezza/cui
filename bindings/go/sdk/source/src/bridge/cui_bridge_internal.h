@@ -121,6 +121,8 @@ typedef struct {
     uint32_t own_slot;
 } cui_bridge_node_record;
 typedef struct {
+    uint32_t node_kind, payload_kind;
+    cui_bridge_notification_value_v1 notification;
     uint32_t checked;
     double value;
     char *text;

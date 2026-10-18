@@ -38,7 +38,7 @@ def generate(name,sources):
     if name in {"cui_components", "cui_theme_registry"}:
         lines += ['#ifndef CUI_THEME_IMPLEMENTATION','#define CUI_THEME_IMPLEMENTATION','#endif','#include "cui_theme.h"']
     if name=="cui_components":
-        for module in ["cui_text_overflow", "cui_overlay", "cui_virtual", "cui_plot_motion", "cui_content", "cui_disclosure", "cui_choice", "cui_numeric", "cui_picker", "cui_tree", "cui_table", "cui_scroll", "cui_surface", "cui_form", "cui_otp", "cui_status", "cui_message", "cui_media", "cui_description", "cui_chrome", "cui_resizable", "cui_icon", "cui_toolbar", "cui_sidebar", "cui_textarea", "cui_settings", "cui_carousel", "cui_command", "cui_root", "cui_text_view", "cui_chart", "cui_speech", "cui_questionnaire", "cui_editor", "cui_virtual_scroll", "cui_plot_view", "cui_radio_group", "cui_button_group"]:
+        for module in ["cui_boolean_events", "cui_text_overflow", "cui_overlay", "cui_virtual", "cui_plot_motion", "cui_content", "cui_disclosure", "cui_choice", "cui_numeric", "cui_picker", "cui_tree", "cui_table", "cui_scroll", "cui_surface", "cui_form", "cui_otp", "cui_status", "cui_message", "cui_media", "cui_description", "cui_chrome", "cui_resizable", "cui_icon", "cui_toolbar", "cui_sidebar", "cui_textarea", "cui_settings", "cui_carousel", "cui_command", "cui_root", "cui_text_view", "cui_chart", "cui_speech", "cui_questionnaire", "cui_editor", "cui_virtual_scroll", "cui_plot_view", "cui_radio_group", "cui_button_group"]:
             macro_dependency = module.upper()+"_IMPLEMENTATION"
             lines += [f'#ifndef {macro_dependency}',f'#define {macro_dependency}', '#endif',f'#include "{module}.h"']
     for source in sources:

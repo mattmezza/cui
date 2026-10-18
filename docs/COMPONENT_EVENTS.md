@@ -1,6 +1,6 @@
 # Shared component event metadata
 
-The additive `cui_component_events.h` utility supplies common metadata and a bounded text-copy helper. It does **not** change any existing component callback, result, state owner or dispatch timing. The [78-family coverage](design/COMPONENT_EVENTS_COVERAGE.md), [binding audit](design/COMPONENT_EVENTS_BINDINGS.md) and [design contract](design/COMPONENT_EVENTS_CONTRACT.md) describe the wider work. The first [Button and Check facades](CONTROL_EVENTS.md) are implemented; other family facades remain future slices. This utility is not full component parity.
+The additive `cui_component_events.h` utility supplies common metadata and a bounded text-copy helper. It does **not** change any existing component callback, result, state owner or dispatch timing. The [78-family coverage](design/COMPONENT_EVENTS_COVERAGE.md), [binding audit](design/COMPONENT_EVENTS_BINDINGS.md) and [design contract](design/COMPONENT_EVENTS_CONTRACT.md) describe the wider work. The first [Button and Check facades](CONTROL_EVENTS.md) are implemented; [Switch/Toggle facades](BOOLEAN_EVENTS.md) are also implemented; other family facades remain future slices. This utility is not full component parity.
 
 ## Names and meanings
 
@@ -74,3 +74,5 @@ The helper is registered in native and WASI tests and included in generated dist
 ## Nonblocking application work
 
 The separate [async HTTPS fetch example](../examples/async_fetch/README.md) builds an actual native UI using the existing synchronous Button callback. It copies requests to a worker, shows loading, prevents duplicate requests, delivers completions through a bounded mailbox and wakes the idle UI. Its guide covers failure, retry, stale responses, cancellation and joined shutdown, with deterministic offline tests. Networking and worker code belong to the optional Linux host example; they are not Core APIs or a replacement event-dispatch architecture.
+
+The bridge separately supports [versioned typed manual notification polling](BRIDGE_NOTIFICATIONS.md). These queued post-mutation views preserve legacy dispatch timing and do not provide synchronous value rejection through language bindings.

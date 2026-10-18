@@ -4,6 +4,7 @@
 #define CUI_COMPONENTS_H
 #include "cui_base.h"
 #include "cui_control_events.h"
+#include "cui_boolean_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
@@ -291,6 +292,14 @@ cui_id cui_switch_thumb_id(cui_id);
 bool cui_switch_ex(cui_context *, cui_id, const cui_theme *, cui_str label, bool *value,
                    cui_switch_state *, cui_switch_options);
 bool cui_switch(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
+/* Immutable controlled snapshot. Legacy on_change/change_user must both be NULL;
+ * conflicts fail before semantics/state/paint. Handler may accept externally;
+ * requests, semantics and painting retain entry value for this call. Optional
+ * state retains spring/tooltip presentation only. Same teardown preconditions
+ * as cui_base_switch_events; no handler means read-only. */
+cui_component_action_result cui_switch_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                               bool, cui_switch_state *, cui_switch_options,
+                                               cui_component_boolean_handler);
 typedef enum { CUI_TOGGLE_GHOST, CUI_TOGGLE_OUTLINE } cui_toggle_variant;
 typedef struct {
     cui_toggle_variant variant;
@@ -314,6 +323,11 @@ cui_toggle_options cui_toggle_options_default(void);
 void cui_toggle_paint(cui_context *, cui_id, const cui_theme *, cui_str, bool, cui_toggle_options);
 bool cui_toggle_ex(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
                    cui_hover_state *tooltip_state, cui_toggle_options);
+/* Same immutable/request/conflict rules as cui_switch_events. Tooltip state is
+ * optional presentation storage; passive ancestors do not mutate it. */
+cui_component_action_result cui_toggle_events(cui_context *, cui_id, const cui_theme *, cui_str,
+                                               bool, cui_hover_state *, cui_toggle_options,
+                                               cui_component_boolean_handler);
 typedef struct {
     cui_id id;
     cui_str label;
@@ -524,6 +538,10 @@ bool cui_separator_ex(cui_context *, cui_id, const cui_theme *, cui_separator_op
 #define CUI_THEME_IMPLEMENTATION
 #endif
 #include "cui_theme.h"
+#ifndef CUI_BOOLEAN_EVENTS_IMPLEMENTATION
+#define CUI_BOOLEAN_EVENTS_IMPLEMENTATION
+#endif
+#include "cui_boolean_events.h"
 #ifndef CUI_TEXT_OVERFLOW_IMPLEMENTATION
 #define CUI_TEXT_OVERFLOW_IMPLEMENTATION
 #endif
@@ -2054,10 +2072,10 @@ static void cui_components_switch_label(cui_context *ui, const cui_theme *t, cui
     cui_end_box(ui);
 }
 
-bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
-                   cui_switch_state *state, cui_switch_options o) {
-    cui_design_metrics design;
-    if (!ui || !id || !t || !value || !cui_components_design(t, o.design_size, &design) ||
+static bool cui_components_switch_valid(cui_context *ui, cui_id id, const cui_theme *t,
+                                         cui_str label, cui_switch_options o,
+                                         cui_design_metrics *design) {
+    if (!ui || !id || !t || !cui_components_design(t, o.design_size, design) ||
         o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL || !isfinite(o.width) ||
         !isfinite(o.now_seconds) || o.now_seconds < 0 || !isfinite(t->font_size) ||
         t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0 ||
@@ -2068,17 +2086,12 @@ bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label
         (o.accessibility_label.length && !o.accessibility_label.data) ||
         (o.tooltip.length && !o.tooltip.data))
         return false;
-    cui_str name = o.accessibility_label.length ? o.accessibility_label : label;
-    bool requested = *value;
-    bool changed = cui_base_switch(ui, id, name, &requested, o.disabled);
-    if (changed) {
-        if (o.on_change)
-            o.on_change(o.change_user, requested);
-        else
-            *value = requested;
-    }
-    cui_update_semantic(ui, id, *value, *value ? 1 : 0);
-    cui_set_tab_stop(ui, id, !o.skip_tab);
+    return true;
+}
+static void cui_components_switch_paint(cui_context *ui, cui_id id, const cui_theme *t,
+                                         cui_str label, const bool *value,
+                                         cui_switch_state *state, cui_switch_options o,
+                                         cui_design_metrics design, bool lifecycle) {
     bool small = o.size == CUI_CONTROL_SMALL || o.size == CUI_CONTROL_XSMALL;
     float width = small ? 28 : o.size == CUI_CONTROL_LARGE ? 44 : 36;
     float height = small ? 16 : o.size == CUI_CONTROL_LARGE ? 24 : 20;
@@ -2141,14 +2154,41 @@ bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label
             cui_end_box(ui);
         }
     }
-    if (state && o.tooltip.length) {
+    if (lifecycle && state && o.tooltip.length) {
         cui_hover_options tooltip = o.tooltip_options;
         tooltip.trigger = id;
         tooltip.disabled |= o.disabled;
         cui_tooltip(ui, cui_components_child_id(id, 5004), t, &state->tooltip, o.tooltip, tooltip);
     }
-    if (state && state->next_wake_seconds)
+    if (lifecycle && state && state->next_wake_seconds)
         cui_invalidate(ui);
+}
+bool cui_switch_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label, bool *value,
+                   cui_switch_state *state, cui_switch_options o) {
+    cui_design_metrics design;
+    if (!ui || !id || !t || !value || !cui_components_design(t, o.design_size, &design) ||
+        o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL || !isfinite(o.width) ||
+        !isfinite(o.now_seconds) || o.now_seconds < 0 || !isfinite(t->font_size) ||
+        t->font_size <= 0 || !isfinite(t->radius) || t->radius < 0 ||
+        !isfinite(t->spring_move.response) || t->spring_move.response < 0 ||
+        !isfinite(t->spring_move.damping) || t->spring_move.damping < 0 ||
+        !isfinite(t->spring_move.epsilon) || t->spring_move.epsilon <= 0 ||
+        (label.length && !label.data) ||
+        (o.accessibility_label.length && !o.accessibility_label.data) ||
+        (o.tooltip.length && !o.tooltip.data))
+        return false;
+    cui_str name = o.accessibility_label.length ? o.accessibility_label : label;
+    bool requested = *value;
+    bool changed = cui_base_switch(ui, id, name, &requested, o.disabled);
+    if (changed) {
+        if (o.on_change)
+            o.on_change(o.change_user, requested);
+        else
+            *value = requested;
+    }
+    cui_update_semantic(ui, id, *value, *value ? 1 : 0);
+    cui_set_tab_stop(ui, id, !o.skip_tab);
+    cui_components_switch_paint(ui, id, t, label, value, state, o, design, true);
     return changed;
 }
 bool cui_switch(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, bool *value,
@@ -3560,6 +3600,64 @@ cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, cons
     options.on_change = cui_control_events_private_check_request;
     options.change_user = &forward;
     (void)cui_checkbox_source(ui, id, theme, name, &value, options);
+    return result;
+}
+
+cui_component_action_result cui_switch_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                               cui_str label, bool value,
+                                               cui_switch_state *state, cui_switch_options options,
+                                               cui_component_boolean_handler handler) {
+    cui_component_action_result result = {0};
+    cui_design_metrics design;
+    if (options.on_change || options.change_user ||
+        !cui_components_switch_valid(ui, id, theme, label, options, &design))
+        return result;
+    result.valid = true;
+    if (!cui_frame_is_submitting(ui))
+        return result;
+    cui_str name = options.accessibility_label.length ? options.accessibility_label : label;
+    result = cui_base_switch_events(ui, id, name, value,
+                                    (cui_boolean_event_options){.disabled = options.disabled,
+                                                               .skip_tab = options.skip_tab}, handler);
+    cui_update_semantic(ui, id, value, value ? 1 : 0);
+    cui_switch_state passive;
+    if (!result.submitted && state) {
+        passive = *state;
+        state = &passive;
+    }
+    cui_components_switch_paint(ui, id, theme, label, &value, state, options, design,
+                                result.submitted);
+    return result;
+}
+cui_component_action_result cui_toggle_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                               cui_str label, bool value,
+                                               cui_hover_state *tooltip_state,
+                                               cui_toggle_options options,
+                                               cui_component_boolean_handler handler) {
+    cui_component_action_result result = {0};
+    cui_design_metrics design;
+    if (options.on_change || options.change_user || !ui || !id || !theme ||
+        !cui_components_design(theme, options.design_size, &design) ||
+        !cui_components_toggle_valid(label, options) || !isfinite(theme->font_size) ||
+        theme->font_size <= 0 || !isfinite(theme->radius) || theme->radius < 0)
+        return result;
+    result.valid = true;
+    if (!cui_frame_is_submitting(ui))
+        return result;
+    cui_str name = options.accessibility_label.length ? options.accessibility_label
+                   : options.tooltip.length ? options.tooltip : label;
+    result = cui_base_toggle_events(ui, id, name, value,
+                                    (cui_boolean_event_options){.disabled = options.disabled,
+                                                               .skip_tab = options.skip_tab}, handler);
+    cui_update_semantic(ui, id, value, value ? 1 : 0);
+    cui_toggle_paint(ui, id, theme, label, value, options);
+    if (result.submitted && tooltip_state && options.tooltip.length) {
+        cui_hover_options tooltip = options.tooltip_options;
+        tooltip.trigger = id;
+        tooltip.disabled |= options.disabled;
+        cui_tooltip(ui, cui_components_child_id(id, 5100), theme, tooltip_state,
+                     options.tooltip, tooltip);
+    }
     return result;
 }
 

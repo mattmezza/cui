@@ -2688,7 +2688,8 @@ static void bridge_click(void *user, const cui_button_click_event *event) {
     }
     cui_bridge_node_record *node = &app->nodes[binding->slot];
     uint32_t tail = (app->event_head + app->event_count) % app->max_events;
-    app->event_payloads[tail] = (cui_bridge_event_payload){0};
+    app->event_payloads[tail] = (cui_bridge_event_payload){
+        .node_kind = app->nodes[binding->slot].kind, .payload_kind = CUI_BRIDGE_PAYLOAD_NONE};
     app->events[tail] = (cui_bridge_event){.type = CUI_BRIDGE_EVENT_CLICK,
                                            .node = {binding->slot, node->generation},
                                            .frame_sequence = event->frame_sequence};
@@ -2701,7 +2702,14 @@ static void bridge_change(cui_bridge_app *app, uint32_t slot) {
     }
     uint32_t tail = (app->event_head + app->event_count) % app->max_events;
     cui_bridge_node_record *node = &app->nodes[slot];
-    cui_bridge_event_payload payload = {.checked = node->checked, .value = node->value};
+    cui_bridge_event_payload payload = {.checked = node->checked, .value = node->value,
+                                       .node_kind = node->kind,
+                                       .payload_kind = CUI_BRIDGE_PAYLOAD_LEGACY};
+    if (node->kind == CUI_BRIDGE_CHECKBOX || node->kind == CUI_BRIDGE_SWITCH ||
+        node->kind == CUI_BRIDGE_TOGGLE) {
+        payload.payload_kind = CUI_BRIDGE_PAYLOAD_BOOLEAN;
+        payload.notification.boolean_value = node->checked ? 1u : 0u;
+    }
     if ((node->kind == CUI_BRIDGE_RADIO_GROUP || node->kind == CUI_BRIDGE_TABS ||
          node->kind == CUI_BRIDGE_SELECT || node->kind == CUI_BRIDGE_COMBOBOX ||
          node->kind == CUI_BRIDGE_DROPDOWN_BUTTON || node->kind == CUI_BRIDGE_LIST ||
@@ -2847,7 +2855,14 @@ static void bridge_data_table_change(cui_bridge_app *app, uint32_t slot, const c
     }
     memcpy(copy, snapshot, (size_t)length + 1);
     uint32_t tail = (app->event_head + app->event_count) % app->max_events;
-    app->event_payloads[tail] = (cui_bridge_event_payload){.checked = (uint32_t)state->column,
+    app->event_payloads[tail] = (cui_bridge_event_payload){
+        .node_kind = node->kind, .payload_kind = CUI_BRIDGE_PAYLOAD_TABLE,
+        .notification.table = {.reason = strcmp(reason, "sort") == 0 ? CUI_BRIDGE_TABLE_SORT
+                                                                       : CUI_BRIDGE_TABLE_SELECTION,
+                               .row = (uint32_t)state->row, .column = (uint32_t)state->column,
+                               .sort_column = (uint32_t)state->sort_column,
+                               .sort_direction = (uint32_t)state->sort},
+        .checked = (uint32_t)state->column,
                                                            .value = (double)state->row,
                                                            .text = copy,
                                                            .text_length = (uint32_t)length};
@@ -2862,7 +2877,8 @@ static void bridge_click_simple(cui_bridge_app *app, uint32_t slot) {
         return;
     }
     uint32_t tail = (app->event_head + app->event_count) % app->max_events;
-    app->event_payloads[tail] = (cui_bridge_event_payload){0};
+    app->event_payloads[tail] = (cui_bridge_event_payload){
+        .node_kind = app->nodes[slot].kind, .payload_kind = CUI_BRIDGE_PAYLOAD_NONE};
     app->events[tail] = (cui_bridge_event){.type = CUI_BRIDGE_EVENT_CLICK,
                                            .node = {slot, app->nodes[slot].generation},
                                            .frame_sequence = cui_frame_sequence(app->ui)};
@@ -2874,7 +2890,9 @@ static void bridge_surface_close(cui_bridge_app *app, uint32_t slot, cui_surface
         return;
     }
     uint32_t tail = (app->event_head + app->event_count) % app->max_events;
-    app->event_payloads[tail] = (cui_bridge_event_payload){.value = result};
+    app->event_payloads[tail] = (cui_bridge_event_payload){
+        .node_kind = app->nodes[slot].kind, .payload_kind = CUI_BRIDGE_PAYLOAD_SURFACE,
+        .notification.surface_result = (uint32_t)result, .value = result};
     app->events[tail] = (cui_bridge_event){.type = CUI_BRIDGE_EVENT_CLOSE,
                                            .node = {slot, app->nodes[slot].generation},
                                            .frame_sequence = cui_frame_sequence(app->ui)};
@@ -4810,4 +4828,66 @@ cui_bridge_status cui_bridge_request_close(cui_bridge_app *app) {
         return status;
     app->closed = true;
     return CUI_BRIDGE_OK;
+}
+
+uint32_t cui_bridge_notification_v1_size(void) {
+    return (uint32_t)sizeof(cui_bridge_notification_v1);
+}
+uint32_t cui_bridge_notification_versions(void) {
+    return 1u;
+}
+cui_bridge_status cui_bridge_poll_notification_v1(cui_bridge_app *app, uint32_t struct_size,
+                                                  cui_bridge_notification_v1 *out,
+                                                  char *text, uint32_t capacity,
+                                                  uint32_t *required_capacity) {
+    cui_bridge_status status = bridge_ready(app);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!out || !required_capacity || struct_size != sizeof(*out))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    while (app->event_count) {
+        uint32_t index = app->event_head;
+        cui_bridge_event event = app->events[index];
+        cui_bridge_event_payload payload = app->event_payloads[index];
+        if (!bridge_node(app, event.node)) {
+            free(payload.text);
+            app->event_payloads[index] = (cui_bridge_event_payload){0};
+            app->event_head = (index + 1) % app->max_events;
+            --app->event_count;
+            continue;
+        }
+        uint32_t required = payload.text_length + 1;
+        if (!text || capacity < required) {
+            *required_capacity = required;
+            return CUI_BRIDGE_CAPACITY;
+        }
+        cui_bridge_notification_v1 value;
+        memset(&value, 0, sizeof(value));
+        value.struct_size = (uint32_t)sizeof(value);
+        value.schema_version = CUI_BRIDGE_NOTIFICATION_V1;
+        value.kind = event.type == CUI_BRIDGE_EVENT_CLICK ? CUI_BRIDGE_NOTIFY_ACTIVATE
+                     : event.type == CUI_BRIDGE_EVENT_CLOSE ? CUI_BRIDGE_NOTIFY_LIFECYCLE
+                                                           : CUI_BRIDGE_NOTIFY_CHANGE;
+        value.payload_kind = payload.payload_kind;
+        value.node_kind = payload.node_kind;
+        value.node = event.node;
+        value.frame_sequence = event.frame_sequence;
+        value.flags = event.frame_sequence ? CUI_BRIDGE_NOTIFY_HAS_FRAME : 0;
+        value.text_length = payload.text_length;
+        value.payload = payload.notification;
+        value.legacy = (cui_bridge_event_ex){.type = event.type, .node = event.node,
+            .frame_sequence = event.frame_sequence, .checked = payload.checked,
+            .value = payload.value, .text_length = payload.text_length, .selected = payload.selected};
+        if (payload.text_length)
+            memcpy(text, payload.text, payload.text_length);
+        text[payload.text_length] = 0;
+        *required_capacity = required;
+        *out = value;
+        free(payload.text);
+        app->event_payloads[index] = (cui_bridge_event_payload){0};
+        app->event_head = (index + 1) % app->max_events;
+        --app->event_count;
+        return CUI_BRIDGE_OK;
+    }
+    return CUI_BRIDGE_EMPTY;
 }

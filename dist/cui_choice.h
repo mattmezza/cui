@@ -10,6 +10,7 @@
 #include "cui_theme.h"
 #include "cui_selection_events.h"
 #include "cui_menu_events.h"
+#include "cui_control_events.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -478,6 +479,26 @@ typedef struct {
 typedef struct {
     bool action_activated, menu_activated;
 } cui_dropdown_button_result;
+/* Callback counts are actual invocations; missing handlers count zero. */
+typedef struct {
+    cui_component_activation_handler action;
+    cui_menu_command_handler menu;
+} cui_dropdown_event_handlers;
+typedef struct {
+    bool valid, submitted, count_overflow;
+    size_t action_count, command_count;
+    cui_dropdown_button_result legacy;
+} cui_dropdown_event_result;
+cui_dropdown_event_result cui_base_dropdown_button_events(
+    cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,
+    bool action_disabled, bool action_loading, float dt, bool keep_open_checks,
+    cui_dropdown_event_handlers);
+cui_dropdown_event_result cui_dropdown_button_events(
+    cui_context *, cui_id container, cui_id action_id, cui_id trigger_id, const cui_theme *,
+    cui_str action_name, cui_str menu_name, const cui_menu_entry *, size_t count,
+    cui_id *menu_action, cui_menu_tree_state *, cui_dropdown_button_options,
+    cui_dropdown_event_handlers);
 cui_dropdown_button_result cui_base_dropdown_button(
     cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
     const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,
@@ -2319,14 +2340,19 @@ cui_menu_command_result cui_base_context_menu_events(cui_context *ui, cui_id tar
     return result;
 }
 
-cui_dropdown_button_result cui_base_dropdown_button(
+static cui_dropdown_button_result cui_choice_reduce_dropdown(
     cui_context *ui, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
     const cui_menu_entry *items, size_t count, cui_id *menu_action, cui_menu_tree_state *state,
-    bool disabled, bool action_disabled, bool action_loading, float dt, bool keep_open_checks) {
+    bool disabled, bool action_disabled, bool action_loading, float dt, bool keep_open_checks,
+    cui_dropdown_event_handlers handlers, cui_dropdown_event_result *observed) {
     cui_dropdown_button_result result = {0};
     if (!ui || (!action_id && !trigger_id) || action_id == trigger_id || !menu_action || !state ||
         (!items && count))
         return result;
+    if (observed) {
+        observed->valid = true;
+        observed->submitted = cui_frame_is_submitting(ui) && cui_frame_sequence(ui) != 0;
+    }
     if (action_id)
         result.action_activated = cui_base_button(ui, action_id, action_name,
                                                   disabled || action_disabled || action_loading)
@@ -2335,16 +2361,61 @@ cui_dropdown_button_result cui_base_dropdown_button(
         cui_set_semantic_details(
             ui, action_id,
             (cui_semantic_details){.description = cui_string("Loading"), .busy = true});
-    if (trigger_id)
-        result.menu_activated =
-            cui_base_menu_tree(ui, trigger_id, menu_name, items, count, menu_action, state,
-                               disabled, dt, keep_open_checks);
+    /* Passive accepted-evidence enumeration after the original registration.
+     * No second Button reducer, semantic update, or aggregate reconstruction. */
+    if (observed && action_id && handlers.action.callback) {
+        size_t event_count = 0;
+        (void)cui_frame_events(ui, &event_count);
+        for (size_t e = 0; e < event_count; e++) {
+            cui_activation_snapshot snapshot;
+            cui_component_event_metadata metadata;
+            if (cui_event_accepted_activation(ui, e) != action_id ||
+                !cui_event_activation_snapshot(ui, e, &snapshot) ||
+                !cui_component_event_from_activation(&metadata, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                      &snapshot))
+                continue;
+            cui_control_events_private_increment(&observed->action_count, &observed->count_overflow);
+            handlers.action.callback(handlers.action.user, &metadata);
+        }
+    }
+    if (trigger_id) {
+        if (observed) {
+            cui_menu_command_result menu = cui_base_menu_tree_events(ui, trigger_id, menu_name,
+                items, count, menu_action, state, disabled, dt, keep_open_checks, handlers.menu);
+            result.menu_activated = menu.legacy_activated;
+            observed->command_count = menu.command_count;
+            observed->count_overflow |= menu.count_overflow;
+        } else
+            result.menu_activated = cui_base_menu_tree(ui, trigger_id, menu_name, items, count,
+                menu_action, state, disabled, dt, keep_open_checks);
+    }
     else if (state->overlay.open) {
         cui_overlay_close(ui, &state->overlay);
         state->depth = 0;
     }
     if (trigger_id)
         cui_update_semantic(ui, trigger_id, false, 0);
+    return result;
+}
+
+cui_dropdown_button_result cui_base_dropdown_button(
+    cui_context *ui, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *items, size_t count, cui_id *menu_action, cui_menu_tree_state *state,
+    bool disabled, bool action_disabled, bool action_loading, float dt, bool keep_open_checks) {
+    return cui_choice_reduce_dropdown(ui, action_id, trigger_id, action_name, menu_name,
+        items, count, menu_action, state, disabled, action_disabled, action_loading, dt,
+        keep_open_checks, (cui_dropdown_event_handlers){0}, NULL);
+}
+cui_dropdown_event_result cui_base_dropdown_button_events(
+    cui_context *ui, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *items, size_t count, cui_id *menu_action, cui_menu_tree_state *state,
+    bool disabled, bool action_disabled, bool action_loading, float dt, bool keep_open_checks,
+    cui_dropdown_event_handlers handlers) {
+    cui_dropdown_event_result result;
+    memset(&result, 0, sizeof(result));
+    result.legacy = cui_choice_reduce_dropdown(ui, action_id, trigger_id, action_name, menu_name,
+        items, count, menu_action, state, disabled, action_disabled, action_loading, dt,
+        keep_open_checks, handlers, &result);
     return result;
 }
 
@@ -4629,12 +4700,14 @@ static void cui_dropdown_label(cui_context *ui, cui_id id, cui_str text, float s
     }
     cui_end_box(ui);
 }
-cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container, cui_id action_id,
+static cui_dropdown_button_result cui_choice_render_dropdown(cui_context *ui, cui_id container, cui_id action_id,
                                                cui_id trigger_id, const cui_theme *theme,
                                                cui_str action_name, cui_str menu_name,
                                                const cui_menu_entry *items, size_t count,
                                                cui_id *menu_action, cui_menu_tree_state *state,
-                                               cui_dropdown_button_options options) {
+                                               cui_dropdown_button_options options,
+                                               cui_dropdown_event_handlers handlers,
+                                               cui_dropdown_event_result *observed) {
     cui_dropdown_button_result result = {0};
     if (!ui || !theme || !state || !cui_design_valid(options.design_size) || !state->overlay.id ||
         !menu_action || (!items && count) || !container ||
@@ -4661,11 +4734,19 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                                 d.indicator_size};
     }
     state->drag_scroll = options.menu.drag_scroll;
-    result = cui_base_dropdown_button(
-        ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
-        menu_name, items, count, menu_action, state,
-        options.disabled || options.menu.popup.disabled, options.action_disabled,
-        options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks);
+    if (observed) {
+        *observed = cui_base_dropdown_button_events(
+            ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
+            menu_name, items, count, menu_action, state,
+            options.disabled || options.menu.popup.disabled, options.action_disabled,
+            options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks, handlers);
+        result = observed->legacy;
+    } else
+        result = cui_base_dropdown_button(
+            ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id, action_name,
+            menu_name, items, count, menu_action, state,
+            options.disabled || options.menu.popup.disabled, options.action_disabled,
+            options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks);
     if (options.variant == CUI_DROPDOWN_BUTTON_LINK) {
         if (!options.hide_action)
             cui_set_semantic_role(ui, action_id, CUI_ROLE_LINK);
@@ -4770,6 +4851,24 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
     if (state->overlay.open)
         cui_choice_menu_level(ui, theme, items, count, state, 0, cui_bounds(ui, trigger_id),
                               options.menu, menu_name);
+    return result;
+}
+
+cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container, cui_id action_id,
+    cui_id trigger_id, const cui_theme *theme, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *items, size_t count, cui_id *menu_action, cui_menu_tree_state *state,
+    cui_dropdown_button_options options) {
+    return cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme, action_name,
+        menu_name, items, count, menu_action, state, options, (cui_dropdown_event_handlers){0}, NULL);
+}
+cui_dropdown_event_result cui_dropdown_button_events(cui_context *ui, cui_id container,
+    cui_id action_id, cui_id trigger_id, const cui_theme *theme, cui_str action_name,
+    cui_str menu_name, const cui_menu_entry *items, size_t count, cui_id *menu_action,
+    cui_menu_tree_state *state, cui_dropdown_button_options options, cui_dropdown_event_handlers handlers) {
+    cui_dropdown_event_result result;
+    memset(&result, 0, sizeof(result));
+    result.legacy = cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme,
+        action_name, menu_name, items, count, menu_action, state, options, handlers, &result);
     return result;
 }
 

@@ -1311,3 +1311,13 @@ add_executable(test_simple_menu_events tests/unit/test_simple_menu_events.c)
 target_link_libraries(test_simple_menu_events PRIVATE cui)
 cui_warnings(test_simple_menu_events)
 add_test(NAME simple_menu_events COMMAND test_simple_menu_events)
+
+add_executable(test_otp_events tests/unit/test_otp_events.c)
+target_link_libraries(test_otp_events PRIVATE cui)
+cui_warnings(test_otp_events)
+add_test(NAME otp_events COMMAND test_otp_events)
+
+add_executable(test_dropdown_events tests/unit/test_dropdown_events.c)
+target_link_libraries(test_dropdown_events PRIVATE cui)
+cui_warnings(test_dropdown_events)
+add_test(NAME dropdown_events COMMAND test_dropdown_events)

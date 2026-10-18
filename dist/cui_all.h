@@ -58,6 +58,7 @@
 #include "cui_tabs_events.h"
 #include "cui_numeric_selection_events.h"
 #include "cui_picker_events.h"
+#include "cui_otp_events.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -289,4 +290,8 @@
 #define CUI_PICKER_EVENTS_IMPLEMENTATION
 #endif
 #include "cui_picker_events.h"
+#ifndef CUI_OTP_EVENTS_IMPLEMENTATION
+#define CUI_OTP_EVENTS_IMPLEMENTATION
+#endif
+#include "cui_otp_events.h"
 #endif

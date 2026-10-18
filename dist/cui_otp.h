@@ -61,6 +61,10 @@ cui_otp_result cui_otp(cui_context *, cui_id, const cui_theme *, cui_otp_state *
 
 #if defined(CUI_OTP_IMPLEMENTATION) && defined(CUI_OTP_DECLARATIONS_READY) && !defined(CUI_OTP_IMPLEMENTATION_ONCE)
 #define CUI_OTP_IMPLEMENTATION_ONCE
+#ifndef CUI_OTP_EVENTS_IMPLEMENTATION
+#define CUI_OTP_EVENTS_IMPLEMENTATION
+#endif
+#include "cui_otp_events.h"
 /* src/base/cui_otp.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -354,9 +358,10 @@ cui_otp_result cui_base_otp(cui_context *ui, cui_id id, cui_otp_state *s, cui_ot
 /* src/components/cui_otp.c */
 /* SPDX-License-Identifier: MIT */
 
+
 #include <math.h>
-cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_state *s,
-                       cui_otp_options o) {
+static cui_otp_result cui_otp_common(cui_context *ui, cui_id id, const cui_theme *t,
+    cui_otp_state *s, cui_otp_options o, const cui_otp_event_handler *handler, size_t *change_count) {
     if (!t || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_otp_result){.error = CUI_EDIT_INVALID_ARGUMENT};
     cui_design_metrics design = {0};
@@ -372,7 +377,13 @@ cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_s
         if (o.group_gap == 0)
             o.group_gap = design.gap * 3;
     }
-    cui_otp_result out = cui_base_otp(ui, id, s, o);
+    cui_otp_result out;
+    if (handler) {
+        cui_otp_event_result result = cui_base_otp_events(ui, id, s, o, *handler);
+        out = result.control;
+        *change_count = result.change_count;
+    } else
+        out = cui_base_otp(ui, id, s, o);
     if (out.error == CUI_EDIT_INVALID_ARGUMENT)
         return out;
     float size = o.cell_size > 0                                       ? o.cell_size
@@ -469,6 +480,16 @@ cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *t, cui_otp_s
                                            cell_bounds.h * .5f});
     }
     return out;
+}
+cui_otp_result cui_otp(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_otp_state *state, cui_otp_options options) {
+    return cui_otp_common(ui, id, theme, state, options, NULL, NULL);
+}
+cui_otp_event_result cui_otp_events(cui_context *ui, cui_id id, const cui_theme *theme,
+    cui_otp_state *state, cui_otp_options options, cui_otp_event_handler handler) {
+    cui_otp_event_result result = {0};
+    result.control = cui_otp_common(ui, id, theme, state, options, &handler, &result.change_count);
+    return result;
 }
 
 #endif

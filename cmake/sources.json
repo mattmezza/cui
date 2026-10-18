@@ -219,6 +219,9 @@
     "cui_picker_events": [
       "src/base/cui_picker_events.c",
       "src/components/cui_picker_events.c"
+    ],
+    "cui_otp_events": [
+      "src/base/cui_otp_events.c"
     ]
   },
   "native": {

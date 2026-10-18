@@ -9,6 +9,7 @@
 #include "cui_theme.h"
 #include "cui_selection_events.h"
 #include "cui_menu_events.h"
+#include "cui_control_events.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -477,6 +478,26 @@ typedef struct {
 typedef struct {
     bool action_activated, menu_activated;
 } cui_dropdown_button_result;
+/* Callback counts are actual invocations; missing handlers count zero. */
+typedef struct {
+    cui_component_activation_handler action;
+    cui_menu_command_handler menu;
+} cui_dropdown_event_handlers;
+typedef struct {
+    bool valid, submitted, count_overflow;
+    size_t action_count, command_count;
+    cui_dropdown_button_result legacy;
+} cui_dropdown_event_result;
+cui_dropdown_event_result cui_base_dropdown_button_events(
+    cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
+    const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,
+    bool action_disabled, bool action_loading, float dt, bool keep_open_checks,
+    cui_dropdown_event_handlers);
+cui_dropdown_event_result cui_dropdown_button_events(
+    cui_context *, cui_id container, cui_id action_id, cui_id trigger_id, const cui_theme *,
+    cui_str action_name, cui_str menu_name, const cui_menu_entry *, size_t count,
+    cui_id *menu_action, cui_menu_tree_state *, cui_dropdown_button_options,
+    cui_dropdown_event_handlers);
 cui_dropdown_button_result cui_base_dropdown_button(
     cui_context *, cui_id action_id, cui_id trigger_id, cui_str action_name, cui_str menu_name,
     const cui_menu_entry *, size_t count, cui_id *menu_action, cui_menu_tree_state *, bool disabled,

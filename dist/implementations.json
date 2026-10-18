@@ -437,6 +437,13 @@
         "src/base/cui_picker_events.c",
         "src/components/cui_picker_events.c"
       ]
+    },
+    {
+      "header": "cui_otp_events.h",
+      "macro": "CUI_OTP_EVENTS_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_otp_events.c"
+      ]
     }
   ]
 }

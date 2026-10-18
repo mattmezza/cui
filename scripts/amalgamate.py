@@ -30,6 +30,10 @@ def generate(name,sources):
         lines += ['#ifndef CUI_CHOICE_IMPLEMENTATION', '#define CUI_CHOICE_IMPLEMENTATION', '#endif', '#include "cui_choice.h"']
     if name == "cui_picker_events":
         lines += ['#include "cui_components.h"', '#ifndef CUI_PICKER_IMPLEMENTATION', '#define CUI_PICKER_IMPLEMENTATION', '#endif', '#include "cui_picker.h"']
+    if name == "cui_otp":
+        lines += ['#ifndef CUI_OTP_EVENTS_IMPLEMENTATION', '#define CUI_OTP_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_otp_events.h"']
+    if name == "cui_otp_events":
+        lines += ['#include "cui_components.h"', '#ifndef CUI_OTP_IMPLEMENTATION', '#define CUI_OTP_IMPLEMENTATION', '#endif', '#include "cui_otp.h"']
     if name == "cui_numeric":
         lines += ['#ifndef CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION', '#define CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_numeric_selection_events.h"']
         lines += ['#ifndef CUI_NUMBER_EVENTS_IMPLEMENTATION', '#define CUI_NUMBER_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_number_events.h"']

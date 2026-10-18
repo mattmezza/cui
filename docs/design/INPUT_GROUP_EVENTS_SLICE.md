@@ -142,3 +142,14 @@ must preserve this old paint path for paired equivalence, while secure event
 payloads inherit the existing observed Base Input redaction. Do not claim secure
 paint parity. A separate review/fix must audit actual secure paint fields and
 prove no secret text leaks through draw commands, semantics or selection paths.
+
+## Event compatibility implementation checkpoint
+
+Implemented the private Base/Styled common paths and new public event facade,
+without changing legacy layouts or secure paint forwarding. Tests compare old/new
+state/results/focus/redraw/semantics/paint, addon traversal versus input order,
+per-event text/submit counts, rejection/partial failure, IME/undo, masked/password
+payload redaction, disabled/loading/readonly distinctions, actual inert/layout
+scopes, custom child isolation, missing handlers, invalid input and deferred
+omission. Secure Styled paint remains the separate reviewed follow-up; event
+redaction does not imply visual masking. No binding or full parity promotion.

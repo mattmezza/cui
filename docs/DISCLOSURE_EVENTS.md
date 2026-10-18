@@ -36,3 +36,24 @@ context, recursively submit UI, or destroy resources. Unrelated flags may change
 Defer omission, removal and teardown until the outer call returns and the frame's
 renderer has consumed retained resources. Existing header/panel callback contracts
 remain unchanged. This C facade adds no bridge or language-binding support.
+
+## Accordion
+
+`cui_base_accordion_events` takes an explicit nonzero compound target;
+`cui_accordion_events` uses its container ID. Item IDs and required pointers must
+be valid before admission; invalid required arguments return a zero result without
+calling the legacy operation. Existing unique/stable ID preconditions apply.
+
+`item` and `item_index` identify the affected model slot. Opening in single mode
+closes each true sibling in ascending index order, including a disabled-open
+sibling, then opens the chosen item. Already-false writes stay silent. Each callback
+sees this intermediate array; there can temporarily be no open item or several
+remaining old items. No normalization occurs just because input starts multi-open.
+Multiple mode only changes the chosen slot. Noncollapsible open activation is silent.
+
+The copied activation still identifies the originating trigger, even when keyboard
+navigation redirects the reducer cursor or single-open policy closes another item.
+`event.target` remains the compound. Notifications precede the existing final
+semantic pass: Button checked values reflect initial registration and expanded
+details have not yet been finalized. Do not infer finalized semantics, panel paint
+or motion from a callback. No observers run for spring updates or passive cleanup.

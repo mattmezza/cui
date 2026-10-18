@@ -313,3 +313,13 @@ were added or run, and no foreign binding/lifecycle/parity claim follows.
 Base and Styled Collapsible now use the approved immediate-write seam. Accepted
 activation snapshots are copied before writes; legacy entry points remain available.
 Accordion production remains pending its independent implementation/test commit.
+
+### Accordion implementation checkpoint
+
+The preferred per-transition seam now covers Base and Styled Accordion. Each
+single-open sibling write is observed immediately in its original model order,
+then the chosen write; already-equal assignments remain silent. Genuine activation
+snapshots preserve their originating target even across keyboard cursor redirection.
+No caller workspace, allocation, event cap or legacy state-layout change was added.
+Tests distinguish initial Button checked values from not-yet-finalized expanded
+details, rather than promising previous-frame expanded details inside callbacks.

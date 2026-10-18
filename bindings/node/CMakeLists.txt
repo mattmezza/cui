@@ -63,3 +63,20 @@ endif()
 add_test(NAME node_sidebar_workspace COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/examples/sidebar-workspace.cjs --headless)
+
+add_test(NAME node_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/notifications-v1.test.cjs)
+
+# Synthetic protocol boundaries stay in a Linux test-only preload library.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_notification_v1_fixture SHARED ../tests/notification_v1_fixture.c)
+ target_link_libraries(cui_notification_v1_fixture PRIVATE cui_bridge)
+ target_compile_options(cui_notification_v1_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ foreach(mode edges capacity limit zero repeat size unavailable)
+  add_test(NAME node_notifications_v1_protocol_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings>
+   LD_PRELOAD=$<TARGET_FILE:cui_notification_v1_fixture> CUI_NOTIFICATION_FIXTURE=${mode}
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/notifications-v1-protocol.test.cjs)
+ endforeach()
+endif()

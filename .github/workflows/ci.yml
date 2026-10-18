@@ -131,11 +131,12 @@ jobs:
         with:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
-      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components
+      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components cui_notification_v1_fixture
       - run: ctest --test-dir build-node -R '^(bridge_|node_)' --output-on-failure
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless
       - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 bindings/typescript/components.typecheck.ts
+      - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext bindings/node/test/notifications-v1.types.ts
       - run: node bindings/typescript/examples/save.ts --headless
 
   installed-binding-packages:

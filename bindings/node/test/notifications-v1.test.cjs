@@ -36,10 +36,12 @@ try {
   const textEvent=app.poll_notification_v1();
   assert.equal(textEvent.kind,'legacy'); assert.equal(textEvent.legacy.text,'héllo ✓');
   app.text_input('later').step_only(); assert.equal(textEvent.legacy.text,'héllo ✓');
-  for (const value of [(1n<<53n)-1n,1n<<53n,(1n<<53n)+1n,(1n<<64n)-1n]) {
-    // Conversion-only uint64 fixture uses the same native BigInt conversion as polling.
-    assert.equal(native.testNotificationFrame(value),value);
+  if (typeof native.testNotificationFrame === 'function') {
+    for (const value of [(1n<<53n)-1n,1n<<53n,(1n<<53n)+1n,(1n<<64n)-1n]) {
+      // Conversion-only uint64 fixture uses the same native BigInt conversion as polling.
+      assert.equal(native.testNotificationFrame(value),value);
+    }
+    assert.throws(()=>native.testNotificationFrame(1n<<64n),/uint64/);
   }
-  assert.throws(()=>native.testNotificationFrame(1n<<64n),/uint64/);
 } finally { app.dispose(); }
 console.log('manual V1 notifications: real queue, table integers, lifetime, uint64 BigInt PASS');

@@ -151,3 +151,12 @@ slice needs full date fields/RGBA tags, stable IDs, owning bounds, handler reten
 and exception containment. Existing notification queues cannot reject applied
 changes. See [the binding audit](COMPONENT_EVENTS_BINDINGS.md). No new source/test
 or feature-ledger status is promoted by this checkpoint.
+
+## First slice implementation status
+
+Calendar selected-date observers only are implemented by `cui_picker_events.h`
+and the new Base/Styled wrapper sources. See [Calendar observer guide](../PICKER_EVENTS.md).
+Each whole legacy operation is called once; date comparison, callback count,
+passive silence and outer completion timing follow the first slice above.
+DatePicker and ColorPicker remain proposals awaiting separate review. No TimeField,
+navigation/popup lifecycle, foreign binding or parity-ledger promotion is included.

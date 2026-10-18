@@ -195,5 +195,8 @@ retain the existing selection-forwarding ability to consume later input events,
 without permitting active owner/resource mutation. Multi List now captures bool
 facts at the real private activation path, after which legacy activate/confirm
 retain their original timing and the final item bool is observed. New facades
-preflight the required compound ID before paint. ToggleGroup remains pending its
-independently reviewed/tested slice.
+preflight the required compound ID before paint. ToggleGroup now has a private
+common reducer and immediate per-write events, with sibling clears before the
+chosen value and no workspace. New tests compare real legacy/new reducers,
+callback traces, copied payloads, intermediate arrays and semantics/paint; existing
+Choice/Select/Combo/Simple Menu/Dropdown/Tabs regressions remain unchanged.

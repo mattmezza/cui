@@ -41,5 +41,19 @@ when the final array matches entry. Item/selected-array ordering and storage sta
 borrowed throughout submission/paint. The result's `legacy_result` preserves the
 old activation bool; `change_count` counts actual typed callbacks with saturation.
 
-New facades require a nonzero compound ID. ToggleGroup is the next independent
-slice. Bridge and Python/Node/Go/Rust behavior is unchanged.
+ToggleGroup adds matching Base/Styled `_events` functions with the same bool
+payload and result. Unlike List multi, it notifies immediately after each actual
+write. Single-mode selection clears previously true entries in array order, then
+sets the chosen entry; callbacks deliberately see intermediate arrays. Sibling
+clears use the affected `item` and causal activated `trigger_item`, sharing input
+metadata. False-to-false stores produce no event. Disabled siblings can be cleared
+by an enabled item's single-mode selection, preserving the legacy array policy.
+`allow_empty` rejection emits nothing. Multiple mode emits only the chosen flip.
+No workspace or array snapshot is allocated. `legacy_result` here is the old
+accepted-change bool, which can remain true after returning to the initial array.
+BUTTON activation support differs from ordinary List OPTION; no role remap occurs.
+
+New facades require a nonzero compound ID. Descriptors, strings and bool arrays
+must keep identity/order/storage throughout the call and rendering. Initial
+multi-true arrays retain their old behavior; no normalization policy was added.
+Bridge and Python/Node/Go/Rust behavior is unchanged.

@@ -43,6 +43,15 @@ cui_choice_items_event_result cui_base_list_multi_events(cui_context *, cui_id c
 cui_choice_items_event_result cui_list_multi_events(cui_context *, cui_id container,
     const cui_theme *, const cui_choice_item *, size_t count, bool *selected,
     cui_list_state *, cui_list_options, cui_choice_item_handler);
+/* ToggleGroup emits each actual bool write: sibling clears in array order,
+ * then the activated item's new value. Callbacks see intermediate arrays.
+ * trigger_item stays the causal activated item for all clears. No workspace. */
+cui_choice_items_event_result cui_base_toggle_group_events(cui_context *, cui_id control,
+    const cui_choice_item *, size_t count, bool *selected,
+    cui_toggle_group_options, cui_choice_item_handler);
+cui_choice_items_event_result cui_toggle_group_events(cui_context *, cui_id container,
+    const cui_theme *, const cui_choice_item *, size_t count, bool *selected,
+    cui_toggle_group_options, cui_choice_item_handler);
 #ifdef __cplusplus
 }
 #endif

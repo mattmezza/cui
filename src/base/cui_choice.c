@@ -488,10 +488,41 @@ bool cui_base_tabs(cui_context *ui, const cui_choice_item *items, size_t count, 
     }
     return old != *selected;
 }
-bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t count,
-                           bool *selected, cui_toggle_group_options options) {
+static cui_component_event_metadata cui_choice_toggle_metadata(cui_context *ui, cui_id control,
+    size_t index, cui_event event) {
+    cui_component_event_metadata metadata = {0};
+    cui_activation_snapshot snapshot;
+    if (!cui_event_activation_snapshot(ui, index, &snapshot) ||
+        !cui_component_event_from_activation(&metadata, CUI_COMPONENT_EVENT_CHANGE, &snapshot)) {
+        cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+        if (event.type == CUI_EVENT_POINTER_UP) source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+        else if (event.type == CUI_EVENT_KEY_DOWN || event.type == CUI_EVENT_KEY_UP)
+            source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+        else if (event.type == CUI_EVENT_ACCESSIBILITY_ACTION)
+            source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+        (void)cui_component_event_init(&metadata, CUI_COMPONENT_EVENT_CHANGE, control, source);
+        (void)cui_component_event_set_frame_index(&metadata, cui_frame_sequence(ui), index);
+    }
+    metadata.target = control;
+    return metadata;
+}
+static void cui_choice_toggle_notify(cui_choice_items_event_result *result,
+    cui_choice_item_handler handler, cui_component_event_metadata metadata,
+    cui_id item, cui_id trigger, bool previous, bool value) {
+    cui_choice_item_change change = {metadata, item, trigger, previous, value};
+    if (result->change_count == SIZE_MAX) result->count_overflow = true;
+    else result->change_count++;
+    handler.on_change(handler.user, &change);
+}
+static bool cui_base_toggle_group_common(cui_context *ui, const cui_choice_item *items, size_t count,
+    bool *selected, cui_toggle_group_options options, cui_id control,
+    const cui_choice_item_handler *handler, cui_choice_items_event_result *result) {
     if (!items || !selected || !count)
         return false;
+    if (result) {
+        result->valid = true;
+        result->submitted = cui_frame_sequence(ui) != 0;
+    }
     bool changed = false;
     for (size_t i = 0; i < count; ++i) {
         cui_interact(ui, items[i].id, CUI_ROLE_BUTTON, items[i].label,
@@ -521,10 +552,21 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
             for (size_t j = 0; j < count; j++)
                 active_count += selected[j];
             if (next_selected || options.allow_empty || active_count > 1) {
+                bool notify = handler && handler->on_change && cui_frame_sequence(ui) != 0;
+                cui_component_event_metadata metadata = {0};
+                cui_id trigger = items[cursor].id;
+                bool previous = selected[cursor];
+                if (notify) metadata = cui_choice_toggle_metadata(ui, control, e, events[e]);
                 if (next_selected && !options.multiple)
-                    for (size_t j = 0; j < count; j++)
+                    for (size_t j = 0; j < count; j++) {
+                        bool was_selected = selected[j];
                         selected[j] = false;
+                        if (notify && was_selected)
+                            cui_choice_toggle_notify(result, *handler, metadata, items[j].id, trigger, true, false);
+                    }
                 selected[cursor] = next_selected;
+                if (notify && previous != next_selected)
+                    cui_choice_toggle_notify(result, *handler, metadata, trigger, trigger, previous, next_selected);
                 changed = true;
             }
         }
@@ -542,6 +584,20 @@ bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t
     for (size_t i = 0; i < count; ++i)
         cui_update_semantic(ui, items[i].id, selected[i], selected[i]);
     return changed;
+}
+
+bool cui_base_toggle_group(cui_context *ui, const cui_choice_item *items, size_t count,
+    bool *selected, cui_toggle_group_options options) {
+    return cui_base_toggle_group_common(ui, items, count, selected, options, 0, NULL, NULL);
+}
+cui_choice_items_event_result cui_base_toggle_group_events(cui_context *ui, cui_id control,
+    const cui_choice_item *items, size_t count, bool *selected,
+    cui_toggle_group_options options, cui_choice_item_handler handler) {
+    cui_choice_items_event_result result = {0};
+    if (!ui || !control) return result;
+    result.legacy_result = cui_base_toggle_group_common(ui, items, count, selected, options,
+        control, &handler, &result);
+    return result;
 }
 
 static unsigned char cui_choice_lower(unsigned char c) {

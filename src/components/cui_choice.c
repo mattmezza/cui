@@ -896,12 +896,19 @@ cui_tabs_event_result cui_tabs_events(
     return result;
 }
 
-bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
-                      const cui_choice_item *items, size_t count, bool *selected,
-                      cui_toggle_group_options options) {
+static bool cui_toggle_group_common(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, bool *selected,
+    cui_toggle_group_options options, const cui_choice_item_handler *handler,
+    cui_choice_items_event_result *result) {
+    if (handler && (!ui || !container)) return false;
     if (!theme || !items || !selected)
         return false;
-    bool changed = cui_base_toggle_group(ui, items, count, selected, options);
+    bool changed;
+    if (handler) {
+        *result = cui_base_toggle_group_events(ui, container, items, count, selected, options, *handler);
+        changed = result->legacy_result;
+    } else
+        changed = cui_base_toggle_group(ui, items, count, selected, options);
     cui_interact(ui, container, CUI_ROLE_GROUP, cui_string(""), options.disabled, false, 0);
     cui_set_semantic_details(
         ui, container,
@@ -914,6 +921,18 @@ bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
     cui_end_box(ui);
     return changed;
 }
+bool cui_toggle_group(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, bool *selected, cui_toggle_group_options options) {
+    return cui_toggle_group_common(ui, container, theme, items, count, selected, options, NULL, NULL);
+}
+cui_choice_items_event_result cui_toggle_group_events(cui_context *ui, cui_id container,
+    const cui_theme *theme, const cui_choice_item *items, size_t count, bool *selected,
+    cui_toggle_group_options options, cui_choice_item_handler handler) {
+    cui_choice_items_event_result result = {0};
+    (void)cui_toggle_group_common(ui, container, theme, items, count, selected, options, &handler, &result);
+    return result;
+}
+
 
 cui_list_metrics cui_list_default_metrics(float density) {
     if (!isfinite(density) || density <= 0)

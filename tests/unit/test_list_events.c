@@ -11,6 +11,7 @@ typedef struct {
     cui_selection_change copies[32];
     cui_choice_item_change item_copies[32];
     bool multi, values[3], activation_value;
+    unsigned masks[32];
     size_t calls, trace_length;
     char trace[128];
     bool redirect, consume, cancel_seen, deferred_remove;
@@ -188,7 +189,72 @@ static void invalid_control(void) {
     fixture f;init(&f);cui_theme t=cui_theme_light();assert(cui_begin_frame(f.ui,600,300,.016f));
     assert(!cui_list_events(f.ui,0,&t,items,3,&f.selected,&f.state,(cui_list_options){0},(cui_selection_handler){0}).events.valid);
     assert(!cui_list_multi_events(f.ui,0,&t,items,3,f.values,&f.state,(cui_list_options){0},(cui_choice_item_handler){0}).valid);
+    assert(!cui_toggle_group_events(f.ui,0,&t,items,3,f.values,(cui_toggle_group_options){0},(cui_choice_item_handler){0}).valid);
+    cui_list_event_result empty=cui_base_list_events(f.ui,90,NULL,0,&f.selected,&f.state,(cui_list_options){0},(cui_selection_handler){0});
+    assert(empty.events.valid&&empty.events.submitted&&!empty.legacy_activated&&!empty.events.change_count);
+    assert(!cui_base_list_multi_events(f.ui,90,items,0,f.values,&f.state,(cui_list_options){0},(cui_choice_item_handler){0}).valid);
+    assert(!cui_base_toggle_group_events(f.ui,90,items,0,f.values,(cui_toggle_group_options){0},(cui_choice_item_handler){0}).valid);
     assert(cui_end_frame(f.ui).count==0 && cui_last_error(f.ui)==CUI_OK);
     cui_destroy(f.ui);
 }
-int main(void){single(false);single(true);multi(false);multi(true);invalid_control();return 0;}
+static void toggle_changed(void *user,const cui_choice_item_change *event) {
+    fixture *f=user;assert(f->calls<32);
+    assert(event->event.target==90 && event->event.kind==CUI_COMPONENT_EVENT_CHANGE);
+    assert(event->event.flags&CUI_COMPONENT_EVENT_HAS_INDEX);
+    assert(event->event.frame_sequence==cui_frame_sequence(f->ui));
+    size_t index=event->item==10?0:event->item==20?1:2;
+    assert(f->values[index]==event->value && event->previous!=event->value);
+    f->masks[f->calls]=(f->values[0]?1u:0u)|(f->values[1]?2u:0u)|(f->values[2]?4u:0u);
+    f->item_copies[f->calls++]=*event;trace(f,'T');f->deferred_remove=true;
+    if(f->consume) {
+        size_t count;cui_frame_events(f->ui,&count);
+        for(size_t i=event->event.event_index+1;i<count;++i)cui_consume_event(f->ui,i);
+    }
+}
+static cui_choice_items_event_result toggle_frame(fixture *f,bool styled,bool legacy,bool handler,unsigned passive,cui_toggle_group_options o) {
+    assert(cui_begin_frame(f->ui,600,300,.016f));
+    cui_begin_box(f->ui,900,(cui_box){.width=500,.height=250,.inert=passive==1,.layout_only=passive==2});
+    cui_theme t=cui_theme_light();cui_choice_items_event_result r={0};
+    if(legacy)r.legacy_result=styled?cui_toggle_group(f->ui,90,&t,items,3,f->values,o)
+        :cui_base_toggle_group(f->ui,items,3,f->values,o);
+    else {cui_choice_item_handler h={handler?toggle_changed:NULL,f};
+        r=styled?cui_toggle_group_events(f->ui,90,&t,items,3,f->values,o,h)
+            :cui_base_toggle_group_events(f->ui,90,items,3,f->values,o,h);}
+    cui_end_box(f->ui);f->draw=cui_end_frame(f->ui);assert(cui_last_error(f->ui)==CUI_OK);return r;
+}
+static void toggles(bool styled) {
+    fixture f;init(&f);f.values[0]=f.values[1]=true;
+    cui_toggle_group_options o={0};toggle_frame(&f,styled,false,true,0,o);cui_focus(f.ui,30);
+    key(&f,CUI_KEY_ENTER);cui_choice_items_event_result r=toggle_frame(&f,styled,false,true,0,o);
+    assert(r.valid&&r.submitted&&r.legacy_result&&r.change_count==3);
+    assert(f.item_copies[0].item==10&&f.item_copies[1].item==20&&f.item_copies[2].item==30);
+    assert(f.masks[0]==2&&f.masks[1]==0&&f.masks[2]==4); /* Real intermediate arrays. */
+    for(size_t i=0;i<3;++i)assert(f.item_copies[i].trigger_item==30 &&
+        f.item_copies[i].event.event_index==f.item_copies[0].event.event_index);
+    key(&f,CUI_KEY_ENTER);r=toggle_frame(&f,styled,false,true,0,o);
+    assert(!r.legacy_result&&!r.change_count&&f.values[2]); /* allow_empty=false. */
+    o.multiple=true;o.allow_empty=true;key(&f,CUI_KEY_ENTER);key(&f,CUI_KEY_ENTER);
+    r=toggle_frame(&f,styled,false,true,0,o);assert(r.legacy_result&&r.change_count==2&&f.values[2]);
+    assert(f.item_copies[3].previous&&!f.item_copies[3].value&&!f.item_copies[4].previous&&f.item_copies[4].value);
+    key(&f,CUI_KEY_ENTER);r=toggle_frame(&f,styled,false,false,0,o);assert(r.legacy_result&&!r.change_count&&!f.values[2]);
+    assert(cui_queue_event(f.ui,(cui_event){.type=CUI_EVENT_ACCESSIBILITY_ACTION,.accessibility_target=30,.accessibility_action=CUI_ACCESSIBILITY_ACTIVATE}));
+    assert(toggle_frame(&f,styled,false,true,0,o).change_count==1);
+    assert(f.item_copies[f.calls-1].event.source==CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
+    assert(f.deferred_remove);cui_destroy(f.ui);
+    if(styled) {
+        init(&f);f.values[0]=f.values[1]=true;o=(cui_toggle_group_options){0};
+        toggle_frame(&f,true,false,true,0,o);click(&f,30);click(&f,10);f.consume=true;
+        assert(toggle_frame(&f,true,false,true,0,o).change_count==3&&f.values[2]);cui_destroy(f.ui);
+    }
+    for(unsigned passive=0;passive<3;++passive)for(unsigned disabled=0;disabled<2;++disabled)
+        for(unsigned vertical=0;vertical<2;++vertical) {
+            fixture a,b;init(&a);init(&b);a.values[0]=b.values[0]=a.values[1]=b.values[1]=true;
+            o=(cui_toggle_group_options){.vertical=vertical!=0};
+            toggle_frame(&a,styled,true,false,0,o);toggle_frame(&b,styled,false,true,0,o);
+            cui_focus(a.ui,30);cui_focus(b.ui,30);key(&a,CUI_KEY_ENTER);key(&b,CUI_KEY_ENTER);o.disabled=disabled!=0;
+            cui_choice_items_event_result ar=toggle_frame(&a,styled,true,false,passive,o),br=toggle_frame(&b,styled,false,true,passive,o);
+            compare(&a,&b);assert(ar.legacy_result==br.legacy_result);
+            assert(br.change_count==((!passive&&!disabled)?3u:0u));cui_destroy(a.ui);cui_destroy(b.ui);
+        }
+}
+int main(void){single(false);single(true);multi(false);multi(true);toggles(false);toggles(true);invalid_control();return 0;}

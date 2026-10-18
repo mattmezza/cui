@@ -24,7 +24,10 @@ def generate(name,sources):
         lines += ['#include "cui_multiline_events.h"']
     if name == "cui_editor":
         lines += ['#include "cui_editor_events.h"']
+    if name == "cui_disclosure":
+        lines += ['#include "cui_disclosure_events.h"']
     if name == "cui_choice":
+        lines += ['#include "cui_list_events.h"']
         lines += ['#ifndef CUI_TABS_EVENTS_IMPLEMENTATION', '#define CUI_TABS_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_tabs_events.h"']
     if name == "cui_tabs_events":
         lines += ['#ifndef CUI_CHOICE_IMPLEMENTATION', '#define CUI_CHOICE_IMPLEMENTATION', '#endif', '#include "cui_choice.h"']

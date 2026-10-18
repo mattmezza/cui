@@ -106,3 +106,8 @@ Their guides specify aggregation and timing. These additions do not automaticall
 while preserving their phase order. [OTP](OTP_EVENTS.md) provides aggregate
 accepted-operation and completion counts on CHANGE; completion is not submission.
 These C additions do not extend the foreign notification allowlist automatically.
+
+[Collapsible transitions](DISCLOSURE_EVENTS.md) report every applied expanded
+bool write before final semantics and paint. [Single List selection](LIST_EVENTS.md)
+reuses the ordered selection seam after legacy activation/confirmation callbacks.
+Accordion, multi-list and ToggleGroup additions remain separate slices.

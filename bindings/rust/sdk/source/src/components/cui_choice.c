@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_choice.h"
+#include "cui/cui_list_events.h"
 #include "cui/cui_tabs_events.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_base.h"
@@ -1134,9 +1135,9 @@ static void cui_choice_paint_list(cui_context *ui, cui_id container, const cui_t
                                     bar_viewport, bar_content, bars);
     cui_end_box(ui);
 }
-bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
-              const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
-              cui_list_options options) {
+static bool cui_list_common(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
+    cui_list_options options, const cui_selection_handler *handler, cui_list_event_result *result) {
     if (!theme || (!items && count) || !selected || !state)
         return false;
     cui_theme validation_theme;
@@ -1145,11 +1146,29 @@ bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
     cui_list_metrics metrics = cui_choice_list_metrics(theme, options);
     options.scroll_bounds = cui_bounds(ui, container);
     options.scroll_target = container;
-    bool activated = cui_base_list(ui, items, count, selected, state, options);
+    bool activated;
+    if (handler) {
+        *result = cui_base_list_events(ui, container, items, count, selected, state, options, *handler);
+        activated = result->legacy_activated;
+    } else
+        activated = cui_base_list(ui, items, count, selected, state, options);
     cui_choice_paint_list(ui, container, theme, items, count, selected, state, options, NULL, false,
                           &metrics);
     return activated;
 }
+bool cui_list(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
+    cui_list_options options) {
+    return cui_list_common(ui, container, theme, items, count, selected, state, options, NULL, NULL);
+}
+cui_list_event_result cui_list_events(cui_context *ui, cui_id container, const cui_theme *theme,
+    const cui_choice_item *items, size_t count, cui_id *selected, cui_list_state *state,
+    cui_list_options options, cui_selection_handler handler) {
+    cui_list_event_result result = {0};
+    (void)cui_list_common(ui, container, theme, items, count, selected, state, options, &handler, &result);
+    return result;
+}
+
 
 static bool cui_choice_popup_render(cui_context *ui, cui_id trigger, const cui_theme *theme,
                                     cui_str name, cui_str placeholder, const cui_choice_item *items,

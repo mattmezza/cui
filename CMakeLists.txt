@@ -1321,3 +1321,13 @@ add_executable(test_dropdown_events tests/unit/test_dropdown_events.c)
 target_link_libraries(test_dropdown_events PRIVATE cui)
 cui_warnings(test_dropdown_events)
 add_test(NAME dropdown_events COMMAND test_dropdown_events)
+
+add_executable(test_disclosure_events tests/unit/test_disclosure_events.c)
+target_link_libraries(test_disclosure_events PRIVATE cui)
+cui_warnings(test_disclosure_events)
+add_test(NAME disclosure_events COMMAND test_disclosure_events)
+
+add_executable(test_list_events tests/unit/test_list_events.c)
+target_link_libraries(test_list_events PRIVATE cui)
+cui_warnings(test_list_events)
+add_test(NAME list_events COMMAND test_list_events)

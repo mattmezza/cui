@@ -53,6 +53,7 @@ typedef struct {
     bool reduced_motion;
 } cui_collapsible_options;
 typedef void (*cui_disclosure_panel_fn)(cui_context *, size_t index, void *user);
+/* Applied transition observers: see cui_disclosure_events.h. */
 /* Base submits semantic triggers without layout or painting. */
 bool cui_base_collapsible(cui_context *, cui_id, cui_str, bool *open, bool disabled);
 bool cui_base_accordion(cui_context *, const cui_disclosure_item *, size_t count, bool *open,
@@ -74,6 +75,7 @@ bool cui_accordion(cui_context *, cui_id container, const cui_theme *, const cui
 
 #if defined(CUI_DISCLOSURE_IMPLEMENTATION) && defined(CUI_DISCLOSURE_DECLARATIONS_READY) && !defined(CUI_DISCLOSURE_IMPLEMENTATION_ONCE)
 #define CUI_DISCLOSURE_IMPLEMENTATION_ONCE
+#include "cui_disclosure_events.h"
 /* src/base/cui_disclosure.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -137,9 +139,48 @@ void cui_disclosure_motion_step(cui_disclosure_motion *motion, bool open, float 
                                   reduced_motion);
 }
 
-bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled) {
-    if (!open)
+static bool cui_disclosure_evidence(cui_context *ui, cui_id target, size_t index,
+                                     cui_component_event_metadata *out) {
+    if (!target || !cui_frame_paint_enabled(ui) || !cui_frame_sequence(ui))
         return false;
+    cui_activation_snapshot snapshot;
+    if (cui_event_activation_snapshot(ui, index, &snapshot) &&
+        cui_component_event_from_activation(out, CUI_COMPONENT_EVENT_CHANGE, &snapshot)) {
+        out->target = target;
+        return true;
+    }
+    size_t count = 0;
+    const cui_event *events = cui_frame_events(ui, &count);
+    if (index >= count)
+        return false;
+    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+    switch (events[index].type) {
+    case CUI_EVENT_POINTER_UP: source = CUI_COMPONENT_EVENT_SOURCE_POINTER; break;
+    case CUI_EVENT_KEY_DOWN:
+    case CUI_EVENT_KEY_UP: source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD; break;
+    case CUI_EVENT_ACCESSIBILITY_ACTION: source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY; break;
+    default: break;
+    }
+    return cui_component_event_init(out, CUI_COMPONENT_EVENT_CHANGE, target, source) &&
+           cui_component_event_set_frame_index(out, cui_frame_sequence(ui), index);
+}
+static void cui_disclosure_notify(cui_disclosure_event_result *result,
+                                  cui_disclosure_handler handler,
+                                  cui_component_event_metadata evidence, cui_id item,
+                                  size_t index, bool previous, bool expanded) {
+    cui_disclosure_change change = {evidence, item, index, previous, expanded};
+    handler.on_change(handler.user, &change);
+    if (result->change_count == SIZE_MAX)
+        result->count_overflow = true;
+    else
+        ++result->change_count;
+}
+static cui_disclosure_event_result cui_collapsible_common(
+    cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled,
+    cui_disclosure_handler handler) {
+    cui_disclosure_event_result result = {0};
+    if (!open)
+        return result;
     cui_interaction interaction =
         cui_interact(ui, id, CUI_ROLE_BUTTON, label, disabled, *open, *open);
     cui_set_semantic_details(
@@ -147,22 +188,37 @@ bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open,
         (cui_semantic_details){.expanded = *open, .controls = id ^ UINT64_C(0x1d8f322539deca61)});
     (void)interaction;
     if (disabled)
-        return false;
-    bool changed = false;
+        return result;
     size_t event_count = 0;
     cui_frame_events(ui, &event_count);
     for (size_t e = 0; e < event_count; e++)
         if (cui_event_activation(ui, e) == id) {
+            cui_component_event_metadata evidence;
+            bool notify = handler.on_change && cui_disclosure_evidence(ui, id, e, &evidence);
+            bool previous = *open;
             *open = !*open;
-            changed = true;
+            result.changed = true;
+            if (notify)
+                cui_disclosure_notify(&result, handler, evidence, id, 0, previous, *open);
         }
-    if (!changed)
-        return false;
+    if (!result.changed)
+        return result;
     cui_update_semantic(ui, id, *open, *open);
     cui_set_semantic_details(
         ui, id,
         (cui_semantic_details){.expanded = *open, .controls = id ^ UINT64_C(0x1d8f322539deca61)});
-    return true;
+    return result;
+}
+bool cui_base_collapsible(cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled) {
+    return cui_collapsible_common(ui, id, label, open, disabled,
+                                  (cui_disclosure_handler){0}).changed;
+}
+cui_disclosure_event_result cui_base_collapsible_events(
+    cui_context *ui, cui_id id, cui_str label, bool *open, bool disabled,
+    cui_disclosure_handler handler) {
+    if (!ui || !id || !open)
+        return (cui_disclosure_event_result){0};
+    return cui_collapsible_common(ui, id, label, open, disabled, handler);
 }
 bool cui_base_accordion(cui_context *ui, const cui_disclosure_item *items, size_t count, bool *open,
                         cui_accordion_options options) {
@@ -309,12 +365,16 @@ static void cui_disclosure_panel(cui_context *ui, cui_id trigger, cui_id parent,
     if (motion)
         cui_end_box(ui);
 }
-bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+static cui_disclosure_event_result cui_collapsible_styled_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
                         bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
-                        void *user) {
+                        void *user, cui_disclosure_handler handler) {
     if (!theme || !open)
-        return false;
-    bool changed = cui_base_collapsible(ui, id, label, open, options.disabled);
+        return (cui_disclosure_event_result){0};
+    cui_disclosure_event_result result = {0};
+    if (handler.on_change)
+        result = cui_base_collapsible_events(ui, id, label, open, options.disabled, handler);
+    else
+        result.changed = cui_base_collapsible(ui, id, label, open, options.disabled);
     cui_begin_box(ui, id ^ UINT64_C(0xb7c1c9d453922783), (cui_box){.gap = theme->gap});
     cui_disclosure_item item = {.id = id, .label = label, .disabled = options.disabled};
     cui_disclosure_trigger(ui, id, theme, label, *open, options.disabled, !options.borderless,
@@ -326,7 +386,21 @@ bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_
                          options.response, theme->spring_control, options.reduced_motion, 0, panel,
                          user);
     cui_end_box(ui);
-    return changed;
+    return result;
+}
+bool cui_collapsible_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
+                        bool *open, cui_collapsible_options options, cui_disclosure_panel_fn panel,
+                        void *user) {
+    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user,
+                                         (cui_disclosure_handler){0}).changed;
+}
+cui_disclosure_event_result cui_collapsible_events(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
+    cui_collapsible_options options, cui_disclosure_panel_fn panel, void *user,
+    cui_disclosure_handler handler) {
+    if (!ui || !id || !theme || !open)
+        return (cui_disclosure_event_result){0};
+    return cui_collapsible_styled_common(ui, id, theme, label, open, options, panel, user, handler);
 }
 bool cui_collapsible(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label, bool *open,
                      bool disabled, cui_disclosure_panel_fn panel, void *user) {

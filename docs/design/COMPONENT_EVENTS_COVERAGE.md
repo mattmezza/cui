@@ -192,6 +192,9 @@ reviewable. None of these additions promotes a parity level.
 | [DropdownButton](../DROPDOWN_EVENTS.md) | Per-action accepted evidence followed by per-command menu notifications. | Phase indices can decrease; Styled modal and Link accessibility restrictions remain. |
 | [OTP](../OTP_EVENTS.md) | One aggregate CHANGE carrying accepted-operation/completion counts and final borrowed text. | Masked text is redacted; completion is not SUBMIT and final state may be incomplete. |
 
+| [Collapsible](../DISCLOSURE_EVENTS.md) | Every applied expanded bool transition, preserving repeated/net-zero toggles and genuine activation evidence. | Notification precedes final semantics/paint; callback model/input mutation is unsupported. |
+| [Single List](../LIST_EVENTS.md) | Ordered ID transitions after legacy activation/confirmation callbacks. | Same-item confirmation is separate; multi-list and ToggleGroup remain separate slices. |
+
 Counts summarize actual observer invocations except where a guide explicitly
 preserves another established result convention. Reading results is passive.
 Synchronous callbacks must not destroy their active context or storage. New

@@ -79,4 +79,4 @@ The bridge separately supports [versioned typed manual notification polling](BRI
 
 The controlled [Slider phase facade](SLIDER_EVENTS.md) preserves double values and distinguishes BEGIN/UPDATE/COMMIT/CANCEL, including cancellation without fabricated input evidence. It does not add a Styled or foreign-language request facade.
 
-The [Base Input observer](TEXT_INPUT_EVENTS.md) reports committed text changes and eligible submissions synchronously. It does not add rejectable edit requests or multiline observers. [Go and Rust manual notification views](BRIDGE_NOTIFICATIONS_GO_RUST.md) preserve typed queue values with owning payloads; their callbacks retain existing timing.
+The [Base Input observer](TEXT_INPUT_EVENTS.md) and [Styled Input facade](TEXT_INPUT_STYLED_EVENTS.md) report committed text changes and eligible submissions synchronously. It does not add rejectable edit requests or multiline observers. [Go and Rust manual notification views](BRIDGE_NOTIFICATIONS_GO_RUST.md) preserve typed queue values with owning payloads; their callbacks retain existing timing.

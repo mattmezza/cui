@@ -5,8 +5,9 @@ Include `cui/cui_text_input_events.h` for two additive Base-only APIs:
 `cui_base_input_reduce_event_events` observes one event for composite controls that
 already register their textbox and reduce events in queue order. Existing Input
 signatures, options/results, validation, presentation and mutation policy remain
-unchanged. Styled Input, Textarea, Editor and foreign bindings have no corresponding
-new facade in this slice.
+unchanged. A [Styled Input facade](TEXT_INPUT_STYLED_EVENTS.md) adds the same
+observer at its existing reduction seam. Textarea, Editor and foreign bindings
+have no corresponding new facade.
 
 ```c
 static void input_event(void *user, const cui_component_text_event *event) {

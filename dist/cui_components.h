@@ -5,6 +5,7 @@
 #include "cui_base.h"
 #include "cui_control_events.h"
 #include "cui_boolean_events.h"
+#include "cui_text_input_events.h"
 #include "cui_carousel.h"
 #include "cui_chart.h"
 #include "cui_choice.h"
@@ -419,6 +420,11 @@ void cui_input_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_edit
                      cui_input_state *, cui_input_options);
 cui_input_result cui_input_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                               cui_input_state *, cui_input_options);
+/* CHANGE/SUBMIT observers follow Base Input timing and lifetime rules. Secure text
+ * is redacted. Defer model/context destruction until frame/render consumption. */
+cui_input_event_result cui_input_events(cui_context *, cui_id, const cui_theme *, cui_str name,
+                                         cui_edit *, cui_input_state *, cui_input_options,
+                                         cui_component_text_handler);
 cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);
@@ -3342,8 +3348,9 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_end_box(ui);
     cui_end_box(ui);
 }
-cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                              cui_edit *edit, cui_input_state *state, cui_input_options options) {
+static cui_input_result cui_input_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              cui_edit *edit, cui_input_state *state, cui_input_options options,
+                              cui_component_text_handler handler, cui_input_event_result *events) {
     cui_input_metrics metrics;
     if (!ui || !t || !edit || !state || !cui_input_measure(options, t->font_size, &metrics) ||
         !isfinite(options.width) || options.text_align < CUI_ALIGN_START ||
@@ -3419,9 +3426,7 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
     if (state->behavior.composition && state->behavior.composition_owned)
         state->behavior.composition->grow_view = true;
     cui_input_mask_hit masked_hit = {cached_hit, mask};
-    cui_input_result result = cui_base_input_ex(
-        ui, id, name, edit, &state->behavior,
-        (cui_base_input_options){
+    cui_base_input_options base_options = {
             .disabled = options.disabled,
             .readonly = options.readonly,
             .required = options.required,
@@ -3442,7 +3447,14 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
             .hit_test = multiline        ? NULL
                         : options.masked ? cui_input_mask_hit_test
                                          : cui_input_cached_hit_test,
-            .hit_test_user = options.masked ? (void *)&masked_hit : (void *)&cached_hit});
+            .hit_test_user = options.masked ? (void *)&masked_hit : (void *)&cached_hit};
+    cui_input_result result;
+    if (events) {
+        *events = cui_base_input_events(ui, id, name, edit, &state->behavior, base_options, handler);
+        result = events->control;
+    } else {
+        result = cui_base_input_ex(ui, id, name, edit, &state->behavior, base_options);
+    }
     if (mask) {
         mask->revision = cui_edit_get_state(edit).revision;
         if (!state->behavior.composition || !state->behavior.composition->active)
@@ -3456,6 +3468,21 @@ cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cu
     }
     options.invalid = options.invalid || result.error != CUI_EDIT_OK;
     cui_input_paint(ui, id, t, name, edit, state, options);
+    return result;
+}
+
+cui_input_result cui_input_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              cui_edit *edit, cui_input_state *state, cui_input_options options) {
+    return cui_input_common(ui, id, t, name, edit, state, options,
+                            (cui_component_text_handler){0}, NULL);
+}
+
+cui_input_event_result cui_input_events(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                         cui_edit *edit, cui_input_state *state,
+                                         cui_input_options options,
+                                         cui_component_text_handler handler) {
+    cui_input_event_result result = {0};
+    result.control = cui_input_common(ui, id, t, name, edit, state, options, handler, &result);
     return result;
 }
 

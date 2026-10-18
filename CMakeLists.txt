@@ -1242,3 +1242,8 @@ add_executable(test_text_input_events tests/unit/test_text_input_events.c)
 target_link_libraries(test_text_input_events PRIVATE cui)
 cui_warnings(test_text_input_events)
 add_test(NAME text_input_events COMMAND test_text_input_events)
+
+add_executable(test_text_input_styled_events tests/unit/test_text_input_styled_events.c)
+target_link_libraries(test_text_input_styled_events PRIVATE cui)
+cui_warnings(test_text_input_styled_events)
+add_test(NAME text_input_events_styled COMMAND test_text_input_styled_events)

@@ -81,7 +81,7 @@ typedef struct {
 typedef void (*cui_choice_item_change_fn)(void *user, const cui_choice_item_change *event);
 typedef struct { cui_choice_item_change_fn on_change; void *user; } cui_choice_item_handler;
 typedef struct {
-    bool valid, submitted, legacy_activated, count_overflow;
+    bool valid, submitted, legacy_result, count_overflow;
     size_t change_count; /* Actual typed calls; can exceed activation count. */
 } cui_choice_items_event_result;
 cui_choice_items_event_result cui_base_list_multi_events(cui_context *, cui_id control,
@@ -98,10 +98,10 @@ cui_choice_items_event_result cui_toggle_group_events(cui_context *, cui_id cont
     cui_toggle_group_options, cui_choice_item_handler);
 ```
 
-`legacy_activated` preserves the original bool for each family; for ToggleGroup
-it specifically means its old accepted-change bool, not proof of a rejected
-activation. Consider naming this common field `legacy_result` before production
-if the mixed naming would mislead consumers. No invented acceptance counter.
+Single List's `legacy_activated` preserves its activation bool. The bool-array
+result uses `legacy_result` because List multi returns activation while ToggleGroup
+returns accepted change; neither proves rejected activation. Preserve each original
+meaning without an invented acceptance counter.
 Missing callback accepts/ignores user and still writes owners. Actual callback
 counts saturate with `count_overflow`, following shared conventions.
 

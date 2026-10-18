@@ -15,7 +15,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIRS = ("src", "include", "backends", "third_party", "cmake", "tests", "examples", "bindings", "scripts")
 
-def copy_source(destination):
+def copy_source(destination, *, omit_npm_ignored=False):
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "SOURCE_REVISION").write_text(subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True))
     diff = subprocess.check_output(["git", "diff", "HEAD", "--", *SOURCE_DIRS, "CMakeLists.txt", "LICENSE"], cwd=ROOT)
@@ -28,6 +28,9 @@ def copy_source(destination):
     tracked = subprocess.check_output(["git", "ls-files", "--cached", "-z"], cwd=ROOT).decode().split("\0")
     for name in tracked:
         if not name or not (name in ("CMakeLists.txt", "LICENSE") or name.split("/")[0] in SOURCE_DIRS):
+            continue
+        # npm pack omits .gitignore even inside the bundled source snapshot.
+        if omit_npm_ignored and Path(name).name == ".gitignore":
             continue
         source = ROOT / name
         if not source.is_file():
@@ -58,7 +61,7 @@ def stage(language, destination):
         subprocess.run(["python", str(ROOT / "scripts/generate_go_sdk.py"), "--check"], check=True)
     else:
         source = package / ("cui_bridge/_source" if language == "python" else "_source")
-        copy_source(source)
+        copy_source(source, omit_npm_ignored=(language == "node"))
     shutil.copy2(ROOT / "LICENSE", package / "LICENSE")
     if language == "node":
         for name in tracked:

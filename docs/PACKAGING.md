@@ -244,7 +244,18 @@ not enable network fetching or silently replace system development dependencies.
 ## Source receipts and release work
 
 Artifacts include tracked source only, file hashes, pinned dependency manifests
-and license texts. Revision receipts include dirty-source information so a
+and license texts. The npm source snapshot intentionally omits `.gitignore` files
+before hashing because `npm pack` excludes them; these files do not participate
+in consumer builds. Python retains these canonical tracked files. The installed
+package validator verifies every source manifest hash against actual archive
+contents and rejects missing, changed, unlisted or unsafe source entries before
+installation. The source file inventory excludes its own `SOURCE_FILES.sha256`
+and `bindings/go/sdk/source/SOURCE_FILES.sha256` and
+`bindings/rust/sdk/source/SOURCE_FILES.sha256` from recursive hashing, matching
+the producer; all other archived source files must be listed. Use
+`python scripts/test_binding_packages.py --artifacts DIR --verify-only` to run
+only these offline archive checks, without installing packages, building code or
+opening a display. Revision receipts include dirty-source information so a
 revision is not mistaken for an exact clean snapshot. Go and Rust use minimal
 SDK snapshots: after canonical changes run `python scripts/generate_go_sdk.py`,
 then `python scripts/generate_go_sdk.py --check` to validate freshness/provenance.

@@ -1,14 +1,99 @@
 #!/usr/bin/env python3
 """Install actual wheel/npm artifacts and smoke-test from clean temporary directories."""
 import argparse
+import hashlib
+import re
+import tarfile
+import zipfile
 import os
 import secrets
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[1]
+
+def archive_path(name):
+    """Require a canonical relative POSIX file name, without traversal."""
+    if (not name or "\\" in name or "\0" in name or name.startswith("/") or
+            re.match(r"^[A-Za-z]:", name) or
+            any(part in ("", ".", "..") for part in name.split("/")) or
+            str(PurePosixPath(name)) != name):
+        raise ValueError("Unsafe archive/source manifest path: " + repr(name))
+    return name
+
+
+def verify_source_manifest(artifact):
+    """Hash the actual archived source files before trusting package installation."""
+    artifact = Path(artifact)
+    if artifact.suffix == ".whl":
+        archive = zipfile.ZipFile(artifact)
+        prefix = "cui_bridge/_source/"
+        members = {}
+        for member in archive.infolist():
+            name = archive_path(member.filename.removesuffix("/") if member.is_dir() else member.filename)
+            if name in members:
+                archive.close()
+                raise ValueError("Duplicate archive entry: " + name)
+            # Unix symlinks and special files must never be treated as source bytes.
+            kind = (member.external_attr >> 16) & 0o170000
+            if kind not in (0, 0o100000, 0o040000):
+                archive.close()
+                raise ValueError("Nonregular archive entry: " + name)
+            members[name] = member
+        read = archive.read
+        regular = lambda member: not member.is_dir()
+    else:
+        archive = tarfile.open(artifact, "r:gz")
+        prefix = "package/_source/"
+        members = {}
+        for member in archive.getmembers():
+            name = archive_path(member.name.removesuffix("/") if member.isdir() else member.name)
+            if name in members:
+                archive.close()
+                raise ValueError("Duplicate archive entry: " + name)
+            if not (member.isfile() or member.isdir()):
+                archive.close()
+                raise ValueError("Nonregular archive entry: " + name)
+            members[name] = member
+        read = lambda member: archive.extractfile(member).read()
+        regular = lambda member: member.isfile()
+    try:
+        manifest = members.get(prefix + "SOURCE_FILES.sha256")
+        if manifest is None or not regular(manifest):
+            raise ValueError("Missing source manifest in " + artifact.name)
+        seen = set()
+        for line in read(manifest).decode("utf-8").splitlines():
+            match = re.fullmatch(r"([0-9a-f]{64})  (.+)", line)
+            if match is None:
+                raise ValueError("Malformed source manifest entry: " + repr(line))
+            digest, relative = match.groups()
+            archive_path(relative)
+            if relative in seen:
+                raise ValueError("Duplicate source manifest entry: " + relative)
+            seen.add(relative)
+            member = members.get(prefix + relative)
+            if member is None or not regular(member):
+                raise ValueError("Missing archived source file: " + relative)
+            if hashlib.sha256(read(member)).hexdigest() != digest:
+                raise ValueError("Archived source hash mismatch: " + relative)
+        # Existing producer excludes nested SDK hash receipts from recursive hashing.
+        receipt_exclusions = {"SOURCE_FILES.sha256",
+                              "bindings/go/sdk/source/SOURCE_FILES.sha256",
+                              "bindings/rust/sdk/source/SOURCE_FILES.sha256"}
+        actual = {name[len(prefix):] for name, member in members.items()
+                  if name.startswith(prefix) and regular(member)
+                  and name[len(prefix):] not in receipt_exclusions}
+        if actual != seen:
+            raise ValueError("Unlisted archived source files: " + ", ".join(sorted(actual - seen)))
+        if not seen:
+            raise ValueError("Empty source manifest in " + artifact.name)
+        print(f"{artifact.name}: verified {len(seen)} archived source files", flush=True)
+        return len(seen)
+    finally:
+        archive.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -16,9 +101,14 @@ def main():
     parser.add_argument("--native", action="store_true")
     parser.add_argument("--font", type=Path)
     parser.add_argument("--require-prebuilt", action="store_true", help="Fail if installation tries a native compiler/build tool")
+    parser.add_argument("--verify-only", action="store_true", help="Verify actual wheel/npm source archives without installing or running consumers")
     parser.add_argument("--virtual-token", help=argparse.SUPPRESS)
     args = parser.parse_args()
     artifacts = args.artifacts.resolve()
+    if args.verify_only:
+        verify_source_manifest(next(artifacts.glob("*.whl")))
+        verify_source_manifest(next(artifacts.glob("*.tgz")))
+        return
     env = dict(os.environ)
     for key in ("PYTHONPATH", "CUI_BRIDGE_LIBRARY", "CUI_NODE_ADDON", "CUI_BRIDGE_LIB_DIR", "LD_LIBRARY_PATH"):
         env.pop(key, None)
@@ -48,6 +138,8 @@ def main():
             raise SystemExit("Native validation requires a dedicated invisible Xvfb display")
         env["CUI_PACKAGE_SMOKE_BACKEND"] = "sdl"
         env["CUI_PACKAGE_NATIVE"] = "1"
+    verify_source_manifest(next(artifacts.glob("*.whl")))
+    verify_source_manifest(next(artifacts.glob("*.tgz")))
     with tempfile.TemporaryDirectory(prefix="cui-package-install-") as temporary:
         clean = Path(temporary)
         if args.require_prebuilt:

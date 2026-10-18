@@ -975,19 +975,23 @@
     },
     {
       "api_symbols": [
-        "cui_input_group"
+        "cui_input_group",
+        "cui_base_input_group_events",
+        "cui_input_group_events"
       ],
       "state_types": [
         "cui_input_group_state"
       ],
       "state_ownership": "Caller retains cui_edit, cui_input_group_state, and addon descriptors.",
-      "interaction": "cui_input_group_result reports edit behavior; cui_input_group_content_fn composes addons.",
+      "interaction": "cui_input_group_result reports edit behavior; cui_input_group_content_fn composes addons. Opt-in observers report accepted addon activations and per-event nested text changes/submissions; results never replay callbacks.",
       "usage": "Keep the editor and state across frames and compose prefix/suffix addon controls.",
       "docs": [
-        "docs/FORMS.md"
+        "docs/FORMS.md",
+        "docs/INPUT_GROUP_EVENTS.md"
       ],
       "callback_symbols": [
-        "cui_input_group_content_fn"
+        "cui_input_group_content_fn",
+        "cui_input_group_handler"
       ],
       "scope": "styled frame component",
       "name": "Input Group",

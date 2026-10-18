@@ -51,6 +51,17 @@ typedef struct {
     cui_id row, column;
 } cui_table_context_request;
 typedef void (*cui_table_context_request_fn)(void *user, const cui_table_context_request *event);
+typedef enum {
+    CUI_TABLE_MODE_FROM_ACTIVATION,
+    CUI_TABLE_MODE_FROM_NAVIGATION
+} cui_table_mode_request_reason;
+typedef struct {
+    cui_component_event_metadata event;
+    cui_table_selection_mode current, requested;
+    cui_id row;
+    cui_table_mode_request_reason reason;
+} cui_table_mode_request;
+typedef void (*cui_table_mode_request_fn)(void *user, const cui_table_mode_request *event);
 typedef struct {
     cui_table_selection_change_fn on_selection;
     cui_table_sort_change_fn on_sort;
@@ -58,6 +69,7 @@ typedef struct {
     cui_table_column_move_change_fn on_column_move;
     cui_table_activation_fn on_activate;
     cui_table_context_request_fn on_context_request;
+    cui_table_mode_request_fn on_mode_request;
     void *user;
 } cui_table_event_handler;
 typedef struct {
@@ -65,13 +77,16 @@ typedef struct {
     bool valid, submitted, count_overflow;
     size_t selection_count, sort_count; /* Actual synchronous calls, not the legacy result flag. */
     size_t column_width_count, column_move_count;
-    size_t activation_count, context_request_count;
+    size_t activation_count, context_request_count, mode_request_count;
 } cui_table_event_result;
 /* Cell/row-header ACTIVATE observes accepted attempts, even unchanged or failed
  * selection; context REQUEST observes secondary press without selecting/opening.
  * Effective IDs/evidence freeze before selection observers. These pointer-free
  * payloads do not reinterpret the legacy last-value fields or add header invoke,
- * mode, viewport/load hooks. Missing callback ignores user; no request rejection.
+ * viewport/load hooks. Missing callback ignores user; no request rejection.
+ * Mode REQUEST reports each legacy row-mode intent after its flags are written,
+ * before navigation focus/reveal. current is the options snapshot; requested is
+ * ROW even when already ROW or selection fails. It cannot veto or mutate options.
  * Width/move observers report successful reducer operations only; programmatic
  * cui_table_resize/cui_table_move_column remain silent. Indices are operation-time
  * positions; the copied column key stays authoritative. Cancel does not roll back.
@@ -123,6 +138,7 @@ typedef struct {
     cui_table_column_move_change_fn on_column_move;
     cui_table_activation_fn on_activate;
     cui_table_context_request_fn on_context_request;
+    cui_table_mode_request_fn on_mode_request;
     void *user;
 } cui_table_set_event_handler;
 typedef enum {

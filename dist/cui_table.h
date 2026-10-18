@@ -881,6 +881,30 @@ static void cui_table_notify_activation(const cui_table_input_observer *observer
         observer->events->activation_count++;
     observer->handler->on_activate(observer->handler->user, change);
 }
+static bool cui_table_prepare_mode(const cui_table_input_observer *observer,
+                                   cui_table_selection_mode current, cui_id row,
+                                   cui_table_mode_request_reason reason,
+                                   cui_table_mode_request *request) {
+    if (!observer->handler || !observer->handler->on_mode_request ||
+        cui_frame_sequence(observer->ui) == 0)
+        return false;
+    request->event =
+        cui_table_event_metadata(observer->ui, observer->table, observer->index, observer->input);
+    request->event.kind = CUI_COMPONENT_EVENT_REQUEST;
+    request->current = current;
+    request->requested = CUI_TABLE_SELECT_ROW;
+    request->row = row;
+    request->reason = reason;
+    return true;
+}
+static void cui_table_notify_mode(const cui_table_input_observer *observer,
+                                  const cui_table_mode_request *request) {
+    if (observer->events->mode_request_count == SIZE_MAX)
+        observer->events->count_overflow = true;
+    else
+        observer->events->mode_request_count++;
+    observer->handler->on_mode_request(observer->handler->user, request);
+}
 static void cui_table_notify_context(const cui_table_input_observer *observer,
                                      cui_table_context_area area, cui_id row, cui_id column_key) {
     if (!observer->handler || !observer->handler->on_context_request ||
@@ -1011,12 +1035,18 @@ static bool row_header_event(cui_context *ui, cui_id id, cui_table_model *m, cui
         cui_table_activation change = {0};
         bool notify = cui_table_prepare_activation(input_observer, CUI_TABLE_ACTION_ROW_HEADER,
                                                    s->cursor_row, 0, &change);
+        cui_table_mode_request request = {0};
+        bool notify_mode = !o.row_selection_disabled &&
+                           cui_table_prepare_mode(input_observer, o.selection_mode, s->cursor_row,
+                                                  CUI_TABLE_MODE_FROM_ACTIVATION, &request);
         apply_selection(m, s, row_options, s->cursor_row, s->cursor_column, mods, out, observer);
         out->activated_row = s->cursor_row;
         if (notify)
             cui_table_notify_activation(input_observer, &change);
         out->selection_mode_requested = !o.row_selection_disabled;
         out->requested_selection_mode = CUI_TABLE_SELECT_ROW;
+        if (notify_mode)
+            cui_table_notify_mode(input_observer, &request);
         *reveal = true;
     }
     if (event->type == CUI_EVENT_KEY_DOWN) {
@@ -1038,9 +1068,15 @@ static bool row_header_event(cui_context *ui, cui_id id, cui_table_model *m, cui
         if (next != SIZE_MAX) {
             s->cursor_row = m->rows[next].key;
             if (!o.manual_selection && !o.row_selection_disabled) {
+                cui_table_mode_request request = {0};
+                bool notify_mode =
+                    cui_table_prepare_mode(input_observer, o.selection_mode, s->cursor_row,
+                                           CUI_TABLE_MODE_FROM_NAVIGATION, &request);
                 apply_selection(m, s, row_options, s->cursor_row, s->cursor_column, mods, out, observer);
                 out->selection_mode_requested = true;
                 out->requested_selection_mode = CUI_TABLE_SELECT_ROW;
+                if (notify_mode)
+                    cui_table_notify_mode(input_observer, &request);
             }
             cui_focus(ui, cui_table_row_header_id(id, s->cursor_row));
             *reveal = true;
@@ -1587,6 +1623,7 @@ cui_table_set_event_result cui_table_reduce_set_events(cui_context *ui, cui_id i
                                       .on_column_move = handler.on_column_move,
                                       .on_activate = handler.on_activate,
                                       .on_context_request = handler.on_context_request,
+                                      .on_mode_request = handler.on_mode_request,
                                       .user = handler.user};
     result.events.control =
         cui_table_reduce_common(ui, id, model, state, options, &scalar, &result.events,

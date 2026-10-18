@@ -116,6 +116,7 @@ cui_input_group_result cui_input_group(cui_context *, cui_id group, cui_id input
 #if defined(CUI_FORM_IMPLEMENTATION) && defined(CUI_FORM_DECLARATIONS_READY) && !defined(CUI_FORM_IMPLEMENTATION_ONCE)
 #define CUI_FORM_IMPLEMENTATION_ONCE
 #include "cui_components.h"
+#include "cui_form_events.h"
 /* src/base/cui_form.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -281,10 +282,12 @@ static bool cui_form_private_group_valid(cui_id group, cui_id input, const cui_i
     }
     return true;
 }
-cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_id input,
+static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id group, cui_id input,
                                             cui_edit *edit, cui_input_group_state *state,
                                             const cui_input_group_addon *a, size_t count,
-                                            cui_input_group_options o) {
+                                            cui_input_group_options o,
+                                            cui_input_group_handler handler,
+                                            cui_input_group_event_result *notifications) {
     cui_input_group_result result = {.input.error = CUI_EDIT_OK};
     if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
         result.error = CUI_FORM_INVALID;
@@ -311,6 +314,34 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
                                    .busy = a[i].loading,
                                    .focus_target =
                                        a[i].kind == CUI_INPUT_GROUP_BUTTON ? 0 : input});
+        if (notifications && handler.on_addon && !disabled &&
+            a[i].kind == CUI_INPUT_GROUP_BUTTON && cui_frame_paint_enabled(ui) && cui_frame_sequence(ui)) {
+            size_t event_count;
+            const cui_event *events = cui_frame_events(ui, &event_count);
+            for (size_t e = 0; e < event_count; ++e) {
+                if (cui_event_accepted_activation(ui, e) != a[i].id)
+                    continue;
+                cui_component_event_metadata event;
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, e, &snapshot) ||
+                    !cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE, &snapshot)) {
+                    cui_component_event_source source = CUI_COMPONENT_EVENT_SOURCE_UNKNOWN;
+                    if (events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_KEYBOARD;
+                    else if (events[e].type == CUI_EVENT_POINTER_UP)
+                        source = CUI_COMPONENT_EVENT_SOURCE_POINTER;
+                    else if (events[e].type == CUI_EVENT_ACCESSIBILITY_ACTION)
+                        source = CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY;
+                    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_ACTIVATE, a[i].id, source);
+                    (void)cui_component_event_set_frame_index(&event, cui_frame_sequence(ui), e);
+                }
+                if (notifications->addon_count == SIZE_MAX)
+                    notifications->count_overflow = true;
+                else
+                    ++notifications->addon_count;
+                handler.on_addon(handler.user, &event);
+            }
+        }
     }
     cui_base_input_options behavior = o.input;
     cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
@@ -319,7 +350,15 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
         behavior.hit_test = cui_base_input_hit_test;
         behavior.hit_test_user = &hit;
     }
-    result.input = cui_base_input_ex(ui, input, o.name, edit, &state->behavior, behavior);
+    if (notifications && handler.on_text) {
+        cui_input_event_result observed = cui_base_input_events(ui, input, o.name, edit,
+            &state->behavior, behavior, (cui_component_text_handler){handler.on_text, handler.user});
+        result.input = observed.control;
+        notifications->change_count = observed.change_count;
+        notifications->submit_count = observed.submit_count;
+        notifications->count_overflow |= observed.count_overflow;
+    } else
+        result.input = cui_base_input_ex(ui, input, o.name, edit, &state->behavior, behavior);
     size_t sc;
     const cui_semantic *sem = cui_semantics(ui, &sc);
     for (size_t i = 0; i < sc; i++)
@@ -329,6 +368,21 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
             cui_set_semantic_details(ui, input, d);
             break;
         }
+    return result;
+}
+
+cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_id input,
+    cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
+    size_t count, cui_input_group_options options) {
+    return cui_form_private_group(ui, group, input, edit, state, addons, count, options,
+                                  (cui_input_group_handler){0}, NULL);
+}
+cui_input_group_event_result cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input,
+    cui_edit *edit, cui_input_group_state *state, const cui_input_group_addon *addons,
+    size_t count, cui_input_group_options options, cui_input_group_handler handler) {
+    cui_input_group_event_result result = {0};
+    result.control = cui_form_private_group(ui, group, input, edit, state, addons, count, options,
+                                            handler, &result);
     return result;
 }
 
@@ -519,10 +573,12 @@ static void cui_form_private_addons(cui_context *ui, const cui_theme *t,
         if (a[i].alignment == alignment)
             cui_form_private_addon(ui, t, &a[i], o, height, rem_size);
 }
-cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id input,
+static cui_input_group_result cui_form_private_group(cui_context *ui, cui_id group, cui_id input,
                                        const cui_theme *theme, cui_edit *edit,
                                        cui_input_group_state *state, const cui_input_group_addon *a,
-                                       size_t count, cui_input_group_options o) {
+                                       size_t count, cui_input_group_options o,
+                                       cui_input_group_handler handler,
+                                       cui_input_group_event_result *notifications) {
     if (!theme || o.design_size < CUI_DESIGN_INHERIT || o.design_size > CUI_DESIGN_9XL)
         return (cui_input_group_result){.error = CUI_FORM_INVALID,
                                         .input.error = CUI_EDIT_INVALID_ARGUMENT};
@@ -632,8 +688,17 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
         }
         a = bounded;
     }
-    cui_input_group_result result =
-        cui_base_input_group(ui, group, input, edit, state, a, count, o);
+    cui_input_group_result result;
+    if (notifications) {
+        cui_input_group_event_result observed = cui_base_input_group_events(
+            ui, group, input, edit, state, a, count, o, handler);
+        result = observed.control;
+        notifications->addon_count = observed.addon_count;
+        notifications->change_count = observed.change_count;
+        notifications->submit_count = observed.submit_count;
+        notifications->count_overflow = observed.count_overflow;
+    } else
+        result = cui_base_input_group(ui, group, input, edit, state, a, count, o);
     if (result.error != CUI_FORM_OK)
         return result;
     bool focused = cui_focused(ui) == input;
@@ -683,6 +748,22 @@ cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id inp
         }
     }
     cui_end_box(ui);
+    return result;
+}
+
+cui_input_group_result cui_input_group(cui_context *ui, cui_id group, cui_id input,
+    const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
+    const cui_input_group_addon *addons, size_t count, cui_input_group_options options) {
+    return cui_form_private_group(ui, group, input, theme, edit, state, addons, count, options,
+                                  (cui_input_group_handler){0}, NULL);
+}
+cui_input_group_event_result cui_input_group_events(cui_context *ui, cui_id group, cui_id input,
+    const cui_theme *theme, cui_edit *edit, cui_input_group_state *state,
+    const cui_input_group_addon *addons, size_t count, cui_input_group_options options,
+    cui_input_group_handler handler) {
+    cui_input_group_event_result result = {0};
+    result.control = cui_form_private_group(ui, group, input, theme, edit, state, addons, count,
+                                            options, handler, &result);
     return result;
 }
 

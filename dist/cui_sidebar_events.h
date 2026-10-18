@@ -37,7 +37,7 @@ typedef struct {
     size_t activation_count;
     size_t request_count, change_count;
 } cui_sidebar_menu_event_result;
-/* No retained handler; collapse/header/footer events remain separate.
+/* No retained handler; header/footer events remain separate.
  * Only a controlled REQUEST observer may assign its explicit expanded bool.
  * Other active item/input mutation, recursive composition and ui destruction are unsupported.
  * Expansion fields extend an unreleased branch API: rebuild all consumers. */
@@ -48,6 +48,28 @@ cui_sidebar_item_event_result cui_base_sidebar_item_events(cui_context *,
 cui_sidebar_menu_event_result cui_sidebar_menu_events(cui_context *, cui_id, const cui_theme *,
                                                       const cui_sidebar_menu_item *, size_t,
                                                       bool collapsed, cui_sidebar_item_handler);
+/* Collapse requests follow the existing local flip sequence from entry options.
+ * Assigning an external owner bool does not redirect that local sequence. */
+typedef struct {
+    cui_component_event_metadata event;
+    bool previous, value;
+} cui_sidebar_collapse_request;
+typedef void (*cui_sidebar_collapse_fn)(void *, const cui_sidebar_collapse_request *);
+typedef struct {
+    cui_sidebar_collapse_fn on_request;
+    void *user;
+} cui_sidebar_collapse_handler;
+typedef struct {
+    bool activated, valid, count_overflow;
+    size_t request_count; /* Actual observer calls, not aggregate activations. */
+} cui_sidebar_toggle_event_result;
+cui_sidebar_toggle_event_result cui_base_sidebar_toggle_events(cui_context *, cui_id,
+                                                               cui_sidebar_toggle_options,
+                                                               cui_sidebar_collapse_handler);
+cui_sidebar_toggle_event_result cui_sidebar_toggle_button_events(cui_context *, cui_id,
+                                                                 const cui_theme *,
+                                                                 cui_sidebar_toggle_options,
+                                                                 cui_sidebar_collapse_handler);
 #ifdef __cplusplus
 }
 #endif

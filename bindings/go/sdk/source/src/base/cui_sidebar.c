@@ -304,24 +304,51 @@ cui_sidebar_item_event_result cui_base_sidebar_item_events(
     result.control = cui_sidebar_item_common(ui, item, collapsed, level, handler, &result);
     return result;
 }
-bool cui_base_sidebar_toggle(cui_context *ui, cui_id id, cui_sidebar_toggle_options o) {
+static bool cui_sidebar_toggle_common(cui_context *ui, cui_id id, cui_sidebar_toggle_options o,
+                                       cui_sidebar_collapse_handler handler,
+                                       cui_sidebar_toggle_event_result *observed) {
     if (!ui || !id || o.side < CUI_SIDEBAR_LEFT || o.side > CUI_SIDEBAR_RIGHT ||
         !cui_sidebar_string_valid(o.accessibility_label))
         return false;
+    if (observed) observed->valid = true;
     cui_interaction state =
         cui_interact(ui, id, CUI_ROLE_BUTTON, o.accessibility_label, o.disabled, false, 0);
     cui_set_semantic_details(ui, id, (cui_semantic_details){.expanded = !o.collapsed});
     if (state.activated) {
         size_t count = 0;
-        cui_frame_events(ui, &count);
+        const cui_event *events = cui_frame_events(ui, &count);
         bool collapsed = o.collapsed;
         for (size_t i = 0; i < count; i++)
             if (cui_event_activation(ui, i) == id) {
+                cui_sidebar_collapse_request request;
+                bool notify = observed && handler.on_request;
+                if (notify) {
+                    cui_sidebar_activation cause = cui_sidebar_event_cause(ui, id, 0, i, events[i].type);
+                    request.event = cause.event;
+                    request.event.kind = CUI_COMPONENT_EVENT_REQUEST;
+                    request.previous = collapsed;
+                    request.value = !collapsed;
+                }
                 collapsed = !collapsed;
                 if (o.on_change)
                     o.on_change(collapsed, o.user);
+                if (notify) {
+                    handler.on_request(handler.user, &request);
+                    if (observed->request_count == SIZE_MAX) observed->count_overflow = true;
+                    else observed->request_count++;
+                }
             }
         cui_invalidate(ui);
     }
     return state.activated;
+}
+bool cui_base_sidebar_toggle(cui_context *ui, cui_id id, cui_sidebar_toggle_options o) {
+    return cui_sidebar_toggle_common(ui, id, o, (cui_sidebar_collapse_handler){0}, NULL);
+}
+cui_sidebar_toggle_event_result cui_base_sidebar_toggle_events(
+    cui_context *ui, cui_id id, cui_sidebar_toggle_options o, cui_sidebar_collapse_handler handler) {
+    cui_sidebar_toggle_event_result result;
+    memset(&result, 0, sizeof(result));
+    result.activated = cui_sidebar_toggle_common(ui, id, o, handler, &result);
+    return result;
 }

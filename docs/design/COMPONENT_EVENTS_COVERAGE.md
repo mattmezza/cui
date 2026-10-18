@@ -1,6 +1,6 @@
 # Component event coverage checkpoint
 
-Read-only inventory at `e9d2c1a561ced3254e606b0206f412af8b156317` on `integration/next39-components`. This covers the exact 78 names in [the frozen manifest](../gpui-parity.json), not a parity promotion. The design request was read from the integrator's working-tree `docs/design/COMPONENT_EVENTS_REQUEST.md`; it was not yet tracked at this baseline. This document describes existing C APIs and implementation seams. It approves no new API.
+Read-only inventory at `e9d2c1a561ced3254e606b0206f412af8b156317` on `integration/next39-components`. This covers the exact 78 names in [the frozen manifest](../gpui-parity.json), not a parity promotion. The design request is tracked in `docs/design/COMPONENT_EVENTS_REQUEST.md` at this baseline. This document describes existing C APIs and implementation seams. It approves no new API.
 
 ## Reading the evidence
 
@@ -115,7 +115,17 @@ The manifest order is preserved so omissions are mechanically detectable. Shared
 
 This matrix inventories public portable C, not 78 verified language event surfaces. The [C bridge](../../include/cui/cui_bridge.h) explicitly copies clicks into a bounded queue and language callbacks run after `step`; its native `run` callback has a separate deferred-destroy contract. That differs from direct C Button synchronous dispatch. The [Rust wrapper](../../bindings/rust/src/lib.rs) is a separate adapter; matching node names or constructors does not establish matching typed callback payloads, multiplicity, lifetime or controlled rejection. Every row's direct callback availability in Rust/Go/other generated bindings is **unknown in this checkpoint** until an explicit export/signature and callback-retention matrix is added. No proposed new event API is exported by this document.
 
-Clipboard, TitleBar, Speech, image loaders and Root plugins are host/service boundaries. Their callbacks cannot be made portable network/OS implementations by renaming them as component events. Video/VideoControls are additive modules outside these 78 frozen families and require their own later inventory; they must not silently become a 79th baseline entry.
+Clipboard, TitleBar, Speech, image loaders and Root plugins are host/service boundaries. Their callbacks cannot be made portable network/OS implementations by renaming them as component events. Video/VideoControls are additive modules outside these 78 frozen families. Their supplementary inventory below does not add a 79th baseline entry.
+
+## Supplementary modules outside the frozen manifest
+
+These already implemented modules are part of the interaction audit without
+changing the 78-entry manifest:
+
+| Module | Ownership/results | Callbacks/timing/lifetimes | Evidence |
+| --- | --- | --- | --- |
+| Video timeline/surface | Caller-owned timeline; mutators return operation validity. Surface borrows decoded pixel storage through all renderer consumption. | No family event callback; playback/seek success is a model operation, not asynchronous decoder acknowledgement. | [API](../../include/cui/cui_video.h), [source](../../src/base/cui_video.c), [test](../../tests/unit/test_video.c) |
+| VideoControls/Player | Caller-owned confirmed view and local presentation/scrub state; bool is submission validity. | Synchronous typed requests with source/generation/sequence and typed union. Requests never mutate/acknowledge confirmed host state; absent handler is read-only. Options/view copied before dispatch; UI/state must survive callbacks. Hidden parts submit no targets. | [API](../../include/cui/cui_video_controls.h), [source](../../src/components/cui_video_controls.c), [test](../../tests/unit/test_video_controls.c) |
 
 ## Design obligations and missing proof (proposals, not current guarantees)
 
@@ -139,7 +149,7 @@ Reviewed `docs/design/COMPONENT_EVENTS_CONTRACT.md` at integrator commit `84376c
 - The proposed omission rule must distinguish new immediate callbacks from retained lifecycle/pump work: omitted drawing does not by itself cancel an already-registered notification, provider report or surface exit. Removal/cancellation policy is still per-family work.
 - Slider's current controlled bool is submission validity, not changed/requested. Textarea reports last Enter modifiers rather than a universal submit event; OTP already exposes per-frame counts. Proposed richer result fields need additive types and exact adapters, not reinterpretation.
 
-No source contract was altered to fit the proposal. The separate binding audit remains a required part of the checkpoint.
+No source contract was altered to fit the proposal. The separately committed [binding audit](COMPONENT_EVENTS_BINDINGS.md) supplies the bridge and language-specific timing/ownership evidence.
 
 ## Audit validation
 

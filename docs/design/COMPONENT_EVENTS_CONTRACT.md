@@ -1,9 +1,11 @@
 # Component events: proposed contract and implementation slices
 
-Status: design proposal only. No API in this document is shipped. The design
-checkpoint is incomplete until the family coverage and binding audits are
-committed and reviewed together with this proposal. Existing headers remain the
-authority for implemented behavior.
+Status: design proposal only. No API in this document is shipped. The committed
+[78-family inventory](COMPONENT_EVENTS_COVERAGE.md) and
+[binding audit](COMPONENT_EVENTS_BINDINGS.md) accompany this checkpoint. Their
+source evidence establishes existing contracts and identifies missing proof;
+it is not a claim that proposed behavior is implemented. Existing headers remain
+the authority for implemented behavior.
 
 ## Architectural decision
 
@@ -13,6 +15,20 @@ pool, or networking to Core. New optional facades should preserve existing
 ownership models rather than replacing them. A family that cannot adopt this
 contract without changing public timing, mutation, or ownership must be split
 out for a reported architectural decision before production implementation.
+
+Preserve explicit exceptions established by the audits: Speech's pump and
+foreign-language notification queues retain their current delivery timing.
+Surface, Notification, Carousel, Resizable, Root, Questionnaire and Dock keep
+their retained registration/descriptor lifetimes. Plot/Chart callbacks deferred
+to layout/prepaint/paint remain valid through their existing current-frame
+boundary. Omitting a drawing call does not cancel retained lifecycle work.
+No broad synchronous-dispatch or submission-borrowing claim covers these APIs.
+
+The bridge currently reports post-mutation notifications, not synchronous typed
+value requests. Preserve that path. A future opt-in foreign request hook needs
+its own reviewed retention, cross-language exception, reentrancy and value-owner
+design; adding fields to a queued notification cannot implement rejection. No
+new request hook or retiming is authorized by calling this checkpoint complete.
 
 Current source examples establish why a blanket replacement is unsafe:
 

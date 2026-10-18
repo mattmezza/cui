@@ -166,6 +166,23 @@ pub enum NotificationV1 {
     SurfaceClose(MetadataV1, SurfaceResultV1),
     Legacy(MetadataV1),
 }
+/// Separate opt-in value view; the original NotificationV1 enum stays exhaustive.
+#[derive(Clone, Debug)]
+pub enum ValueNotificationV1 {
+    Activation(MetadataV1),
+    BooleanChange(MetadataV1, bool),
+    TableChange(MetadataV1, TableChangeV1),
+    SurfaceClose(MetadataV1, SurfaceResultV1),
+    Legacy(MetadataV1),
+    ScalarChange(MetadataV1, f64),
+    TextChange(MetadataV1, String),
+    SelectionChange(MetadataV1, SelectionChangeV1),
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SelectionChangeV1 {
+    pub handle: RawHandle,
+    pub node: Option<Node>,
+}
 /// Text capacity policy is 1 MiB including NUL; this error leaves the live event queued.
 pub const NOTIFICATION_PAYLOAD_LIMIT: Error = Error(0x10001);
 pub const NOTIFICATION_PROTOCOL_ERROR: Error = Error(0x10002);
@@ -205,6 +222,15 @@ type NotificationPollV1 = unsafe extern "C" fn(
     u32,
     *mut u32,
 ) -> u32;
+type ValueNotificationPollV1 = unsafe extern "C" fn(
+    *mut c_void,
+    u32,
+    u32,
+    *mut NotificationRawV1,
+    *mut c_char,
+    u32,
+    *mut u32,
+) -> u32;
 #[cfg(cui_bridge_static)]
 fn notification_functions_v1(
 ) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
@@ -224,6 +250,34 @@ fn notification_functions_v1(
         cui_bridge_notification_v1_size,
         cui_bridge_notification_versions,
         cui_bridge_poll_notification_v1,
+    ))
+}
+#[cfg(cui_bridge_static)]
+fn value_notification_functions_v1() -> Option<(
+    NotificationQueryV1,
+    NotificationQueryV1,
+    NotificationQueryV1,
+    ValueNotificationPollV1,
+)> {
+    extern "C" {
+        fn cui_bridge_notification_v1_size() -> u32;
+        fn cui_bridge_notification_versions() -> u32;
+        fn cui_bridge_notification_value_payloads_v1() -> u32;
+        fn cui_bridge_poll_value_notification_v1(
+            app: *mut c_void,
+            size: u32,
+            enabled: u32,
+            out: *mut NotificationRawV1,
+            text: *mut c_char,
+            capacity: u32,
+            required: *mut u32,
+        ) -> u32;
+    }
+    Some((
+        cui_bridge_notification_v1_size,
+        cui_bridge_notification_versions,
+        cui_bridge_notification_value_payloads_v1,
+        cui_bridge_poll_value_notification_v1,
     ))
 }
 #[cfg(all(not(cui_bridge_static), unix))]
@@ -277,6 +331,44 @@ fn notification_functions_v1(
 #[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
 fn notification_functions_v1(
 ) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
+    None
+}
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn value_notification_functions_v1() -> Option<(
+    NotificationQueryV1,
+    NotificationQueryV1,
+    NotificationQueryV1,
+    ValueNotificationPollV1,
+)> {
+    unsafe {
+        let size = notification_symbol_v1(b"cui_bridge_notification_v1_size\0".as_ptr().cast());
+        let versions =
+            notification_symbol_v1(b"cui_bridge_notification_versions\0".as_ptr().cast());
+        let poll =
+            notification_symbol_v1(b"cui_bridge_poll_value_notification_v1\0".as_ptr().cast());
+        let categories = notification_symbol_v1(
+            b"cui_bridge_notification_value_payloads_v1\0"
+                .as_ptr()
+                .cast(),
+        );
+        if categories.is_null() || size.is_null() || versions.is_null() || poll.is_null() {
+            return None;
+        }
+        Some((
+            std::mem::transmute::<*mut c_void, NotificationQueryV1>(size),
+            std::mem::transmute::<*mut c_void, NotificationQueryV1>(versions),
+            std::mem::transmute::<*mut c_void, NotificationQueryV1>(categories),
+            std::mem::transmute::<*mut c_void, ValueNotificationPollV1>(poll),
+        ))
+    }
+}
+#[cfg(all(not(cui_bridge_static), not(any(unix, windows))))]
+fn value_notification_functions_v1() -> Option<(
+    NotificationQueryV1,
+    NotificationQueryV1,
+    NotificationQueryV1,
+    ValueNotificationPollV1,
+)> {
     None
 }
 #[derive(Clone, Debug)]
@@ -1711,6 +1803,162 @@ impl App {
             7 => Ok(NotificationV1::Legacy(meta)),
             _ => Err(NOTIFICATION_PROTOCOL_ERROR),
         }
+    }
+    /// Opt-in manual owning values on the same queue; no fallback drain or callbacks.
+    /// Static builds pair with their bundled bridge; dynamic exports are optional.
+    pub fn poll_value_notification_v1(&mut self) -> Result<Option<ValueNotificationV1>> {
+        let (size, versions, categories, poll) =
+            value_notification_functions_v1().ok_or(Error(9))?;
+        if unsafe { versions() } & 1 == 0 {
+            return Err(Error(9));
+        }
+        if unsafe { size() } as usize != std::mem::size_of::<NotificationRawV1>() {
+            return Err(NOTIFICATION_PROTOCOL_ERROR);
+        }
+        let enabled = unsafe { categories() } & 28;
+        if enabled == 0 {
+            return Err(Error(9));
+        }
+        let mut required_copy = 0;
+        let mut raw: NotificationRawV1 = unsafe { std::mem::zeroed() };
+        let text = read_notification_text_v1(|text| {
+            let mut required = 0;
+            let status = unsafe {
+                poll(
+                    self.raw,
+                    std::mem::size_of::<NotificationRawV1>() as u32,
+                    enabled,
+                    &mut raw,
+                    text.as_mut_ptr().cast(),
+                    text.len() as u32,
+                    &mut required,
+                )
+            };
+            required_copy = required;
+            (status, required)
+        })?;
+        let Some(text) = text else {
+            return Ok(None);
+        };
+        if raw.struct_size as usize != std::mem::size_of::<NotificationRawV1>()
+            || raw.schema_version != 1
+            || raw.flags & !1 != 0
+            || raw.text_length as usize >= text.len()
+            || text[raw.text_length as usize] != 0
+        {
+            return Err(NOTIFICATION_PROTOCOL_ERROR);
+        }
+        if required_copy != raw.text_length + 1
+            || raw.legacy.text_length != raw.text_length
+            || raw.legacy.frame != raw.frame
+            || raw.legacy.node != raw.node
+            || raw.legacy.kind != raw.kind
+            || !(1..=3).contains(&raw.kind)
+            || ((raw.flags & 1 != 0) != (raw.frame != 0))
+            || ((2..=4).contains(&raw.payload_kind) && enabled & (1 << raw.payload_kind) == 0)
+        {
+            return Err(NOTIFICATION_PROTOCOL_ERROR);
+        }
+        let text =
+            String::from_utf8(text[..raw.text_length as usize].to_vec()).map_err(|_| Error(7))?;
+        self.decode_value_notification_v1(raw, text).map(Some)
+    }
+    fn decode_value_notification_v1(
+        &self,
+        raw: NotificationRawV1,
+        text: String,
+    ) -> Result<ValueNotificationV1> {
+        let old = raw.legacy;
+        let meta = MetadataV1 {
+            handle: raw.node.into(),
+            node: self.value_notification_node_v1(raw.node),
+            node_kind: raw.node_kind,
+            frame: raw.frame,
+            has_frame: raw.flags & 1 != 0,
+            legacy: LegacySnapshotV1 {
+                kind: old.kind,
+                handle: old.node.into(),
+                frame: old.frame,
+                checked_raw: old.checked,
+                value: old.value,
+                text,
+                selected_handle: old.selected.into(),
+            },
+        };
+        match raw.payload_kind {
+            0 if raw.kind == 1 => Ok(ValueNotificationV1::Activation(meta)),
+            1 if raw.kind == 2 => {
+                let value = unsafe { raw.payload.boolean };
+                if value > 1 {
+                    return Err(NOTIFICATION_PROTOCOL_ERROR);
+                }
+                Ok(ValueNotificationV1::BooleanChange(meta, value != 0))
+            }
+            2 if raw.kind == 2 => {
+                let value = unsafe { raw.payload.scalar };
+                if !value.is_finite() || value != old.value {
+                    return Err(NOTIFICATION_PROTOCOL_ERROR);
+                }
+                Ok(ValueNotificationV1::ScalarChange(meta, value))
+            }
+            3 if raw.kind == 2 => {
+                let value = meta.legacy.text.clone();
+                Ok(ValueNotificationV1::TextChange(meta, value))
+            }
+            4 if raw.kind == 2 => {
+                let selected = unsafe { raw.payload.selected };
+                if selected != old.selected || ((selected.slot == 0) != (selected.generation == 0))
+                {
+                    return Err(NOTIFICATION_PROTOCOL_ERROR);
+                }
+                let value = SelectionChangeV1 {
+                    handle: selected.into(),
+                    node: self.value_notification_node_v1(selected),
+                };
+                Ok(ValueNotificationV1::SelectionChange(meta, value))
+            }
+            5 if raw.kind == 2 => {
+                let t = unsafe { raw.payload.table };
+                if t.reason != 1 && t.reason != 2 {
+                    return Err(NOTIFICATION_PROTOCOL_ERROR);
+                }
+                Ok(ValueNotificationV1::TableChange(
+                    meta,
+                    TableChangeV1 {
+                        reason: t.reason,
+                        row: t.row,
+                        column: t.column,
+                        sort_column: t.sort_column,
+                        sort_direction: t.sort_direction,
+                    },
+                ))
+            }
+            6 if raw.kind == 3 => {
+                let result = match unsafe { raw.payload.surface } {
+                    1 => SurfaceResultV1::Accepted,
+                    2 => SurfaceResultV1::Cancelled,
+                    3 => SurfaceResultV1::Closed,
+                    _ => return Err(NOTIFICATION_PROTOCOL_ERROR),
+                };
+                Ok(ValueNotificationV1::SurfaceClose(meta, result))
+            }
+            7 => Ok(ValueNotificationV1::Legacy(meta)),
+            _ => Err(NOTIFICATION_PROTOCOL_ERROR),
+        }
+    }
+    // The existing text getter validates full identity without consuming input or allocating.
+    // Every allowlisted origin/selection has a text-bearing bridge kind.
+    fn value_notification_node_v1(&self, raw: RawNode) -> Option<Node> {
+        if raw.slot == 0 || raw.generation == 0 {
+            return None;
+        }
+        let mut required = 0;
+        let status =
+            unsafe { cui_bridge_get_text(self.raw, raw, std::ptr::null_mut(), 0, &mut required) };
+        (status == 0 || status == 5).then_some(Node {
+            raw,
+            app_id: self.id,
+        })
     }
     pub fn dispatch(&mut self) -> Result<usize> {
         let mut count = 0;

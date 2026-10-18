@@ -1742,9 +1742,10 @@ void cui_context_menu_open(cui_context *ui, cui_menu_tree_state *state, cui_id r
     state->overlay.has_bounds = false;
     cui_invalidate(ui);
 }
-bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry *items,
+static bool cui_choice_reduce_context_menu(cui_context *ui, cui_id target, const cui_menu_entry *items,
                            size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
-                           float dt, bool keep_open_checks) {
+                           float dt, bool keep_open_checks, cui_menu_command_handler handler,
+                           cui_menu_command_result *observed) {
     if (!state || !state->overlay.id || !target)
         return false;
     state->contextual = true;
@@ -1763,8 +1764,31 @@ bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry 
                     ui, state, state->overlay.open ? state->overlay.trigger : cui_focused(ui),
                     (cui_rect){event.x, event.y, 0, 0});
         }
+    if (observed) {
+        *observed = cui_base_menu_tree_events(ui, target, cui_string(""), items, count, action,
+                                               state, disabled, dt, keep_open_checks, handler);
+        return observed->legacy_activated;
+    }
     return cui_base_menu_tree(ui, target, cui_string(""), items, count, action, state, disabled, dt,
                               keep_open_checks);
+}
+
+bool cui_base_context_menu(cui_context *ui, cui_id target, const cui_menu_entry *items,
+    size_t count, cui_id *action, cui_menu_tree_state *state, bool disabled,
+    float dt, bool keep_open_checks) {
+    return cui_choice_reduce_context_menu(ui, target, items, count, action, state, disabled,
+        dt, keep_open_checks, (cui_menu_command_handler){0}, NULL);
+}
+cui_menu_command_result cui_base_context_menu_events(cui_context *ui, cui_id target,
+    const cui_menu_entry *items, size_t count, cui_id *action, cui_menu_tree_state *state,
+    bool disabled, float dt, bool keep_open_checks, cui_menu_command_handler handler) {
+    cui_menu_command_result result;
+    memset(&result, 0, sizeof(result));
+    if (!ui || !target)
+        return result;
+    result.legacy_activated = cui_choice_reduce_context_menu(ui, target, items, count, action,
+        state, disabled, dt, keep_open_checks, handler, &result);
+    return result;
 }
 
 cui_dropdown_button_result cui_base_dropdown_button(

@@ -24,9 +24,17 @@ def generate(name,sources):
         lines += ['#include "cui_multiline_events.h"']
     if name == "cui_editor":
         lines += ['#include "cui_editor_events.h"']
+    if name == "cui_choice":
+        lines += ['#ifndef CUI_TABS_EVENTS_IMPLEMENTATION', '#define CUI_TABS_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_tabs_events.h"']
+    if name == "cui_tabs_events":
+        lines += ['#ifndef CUI_CHOICE_IMPLEMENTATION', '#define CUI_CHOICE_IMPLEMENTATION', '#endif', '#include "cui_choice.h"']
+    if name == "cui_picker_events":
+        lines += ['#include "cui_components.h"', '#ifndef CUI_PICKER_IMPLEMENTATION', '#define CUI_PICKER_IMPLEMENTATION', '#endif', '#include "cui_picker.h"']
     if name == "cui_numeric":
+        lines += ['#ifndef CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION', '#define CUI_NUMERIC_SELECTION_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_numeric_selection_events.h"']
         lines += ['#ifndef CUI_NUMBER_EVENTS_IMPLEMENTATION', '#define CUI_NUMBER_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_number_events.h"']
-    if name == "cui_number_events":
+    if name in {"cui_number_events", "cui_numeric_selection_events"}:
+        lines += ['#include "cui_components.h"']
         lines += ['#ifndef CUI_NUMERIC_IMPLEMENTATION', '#define CUI_NUMERIC_IMPLEMENTATION', '#endif', '#include "cui_numeric.h"']
     if name == "cui_styled_slider_events":
         lines += ['#ifndef CUI_BASE_IMPLEMENTATION', '#define CUI_BASE_IMPLEMENTATION', '#endif', '#include "cui_base.h"']

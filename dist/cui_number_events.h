@@ -40,6 +40,7 @@ cui_number_event_result cui_number_input_events(cui_context *, cui_id, const cui
 
 #if defined(CUI_NUMBER_EVENTS_IMPLEMENTATION) && defined(CUI_NUMBER_EVENTS_DECLARATIONS_READY) && !defined(CUI_NUMBER_EVENTS_IMPLEMENTATION_ONCE)
 #define CUI_NUMBER_EVENTS_IMPLEMENTATION_ONCE
+#include "cui_components.h"
 #ifndef CUI_NUMERIC_IMPLEMENTATION
 #define CUI_NUMERIC_IMPLEMENTATION
 #endif

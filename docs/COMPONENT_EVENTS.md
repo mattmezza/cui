@@ -96,3 +96,9 @@ remain separate work; this is not complete menu-family coverage.
 [NumberInput observers](NUMBER_EVENTS.md) report an aggregate committed double
 change after the legacy reducer, independently of draft revisions or submission.
 They preserve step-policy callbacks and do not provide rejectable numeric requests.
+
+Additional implemented observers cover [Tabs selection](TABS_EVENTS.md),
+[ContextMenu commands](CONTEXT_MENU_EVENTS.md), [Pagination, Stepper and Rating](NUMERIC_SELECTION_EVENTS.md),
+and [Calendar selected dates](PICKER_EVENTS.md). Their guides specify aggregation
+and timing; DatePicker/ColorPicker and Simple Menu/Dropdown forwarding remain
+separate slices. These additions do not automatically extend binding allowlists.

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_numeric.h"
 #include "cui/cui_number_events.h"
+#include "cui/cui_numeric_selection_events.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
 #include <math.h>
@@ -171,11 +172,17 @@ cui_number_event_result cui_number_input_events(cui_context *ui, cui_id id, cons
                                              &handler, &result.change_count);
     return result;
 }
-bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page, size_t total,
-                    bool compact, bool disabled) {
+static bool cui_pagination_common(cui_context *ui, cui_id id, const cui_theme *t, size_t *page, size_t total,
+    bool compact, bool disabled, const cui_pagination_event_handler *handler, size_t *change_count) {
     if (!t || !page)
         return false;
-    bool changed = cui_base_pagination(ui, id, page, total, compact, disabled);
+    bool changed;
+    if (handler) {
+        cui_numeric_selection_event_result result = cui_base_pagination_events(ui, id, page, total, compact, disabled, *handler);
+        changed = result.control;
+        *change_count = result.change_count;
+    } else
+        changed = cui_base_pagination(ui, id, page, total, compact, disabled);
     cui_begin_box(ui, id, (cui_box){.row = true, .gap = t->gap, .align_y = CUI_ALIGN_CENTER});
     cui_numeric_paint_button(ui, cui_numeric_part_id(id, 1), t, cui_string("First"),
                              disabled || *page <= 1);
@@ -205,6 +212,18 @@ bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *t, size_t *page
                              disabled || !total || *page >= total);
     cui_end_box(ui);
     return changed;
+}
+bool cui_pagination(cui_context *ui, cui_id id, const cui_theme *theme, size_t *page,
+    size_t total, bool compact, bool disabled) {
+    return cui_pagination_common(ui, id, theme, page, total, compact, disabled, NULL, NULL);
+}
+cui_numeric_selection_event_result cui_pagination_events(cui_context *ui, cui_id id,
+    const cui_theme *theme, size_t *page, size_t total, bool compact, bool disabled,
+    cui_pagination_event_handler handler) {
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_pagination_common(ui, id, theme, page, total, compact, disabled,
+                                           &handler, &result.change_count);
+    return result;
 }
 typedef struct {
     cui_icon_state outline, fill;
@@ -246,11 +265,17 @@ static cui_rating_icons *cui_rating_icons_get(cui_context *ui, cui_id id, float 
         return NULL;
     return icons;
 }
-bool cui_rating(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
-                cui_rating_options o) {
+static bool cui_rating_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
+    cui_rating_options o, const cui_rating_event_handler *handler, size_t *change_count) {
     if (!t || !value)
         return false;
-    bool changed = cui_base_rating(ui, id, name, value, o);
+    bool changed;
+    if (handler) {
+        cui_numeric_selection_event_result result = cui_base_rating_events(ui, id, name, value, o, *handler);
+        changed = result.control;
+        *change_count = result.change_count;
+    } else
+        changed = cui_base_rating(ui, id, name, value, o);
     unsigned maximum = o.maximum ? o.maximum : 5;
     if (maximum > 100)
         maximum = 100;
@@ -307,11 +332,29 @@ bool cui_rating(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
     cui_end_box(ui);
     return changed;
 }
-bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *t, const cui_step *steps,
-                 size_t count, size_t *current, bool vertical, bool disabled) {
+bool cui_rating(cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, float *value,
+    cui_rating_options options) {
+    return cui_rating_common(ui, id, theme, name, value, options, NULL, NULL);
+}
+cui_numeric_selection_event_result cui_rating_events(cui_context *ui, cui_id id,
+    const cui_theme *theme, cui_str name, float *value, cui_rating_options options,
+    cui_rating_event_handler handler) {
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_rating_common(ui, id, theme, name, value, options, &handler, &result.change_count);
+    return result;
+}
+static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t, const cui_step *steps,
+    size_t count, size_t *current, bool vertical, bool disabled,
+    const cui_stepper_event_handler *handler, size_t *change_count) {
     if (!t || !current || (!steps && count) || count > 100)
         return false;
-    bool changed = cui_base_stepper(ui, id, steps, count, current, disabled);
+    bool changed;
+    if (handler) {
+        cui_numeric_selection_event_result result = cui_base_stepper_events(ui, id, steps, count, current, disabled, *handler);
+        changed = result.control;
+        *change_count = result.change_count;
+    } else
+        changed = cui_base_stepper(ui, id, steps, count, current, disabled);
     cui_begin_box(ui, id, (cui_box){.row = !vertical, .gap = t->gap});
     for (size_t i = 0; i < count; ++i) {
         bool selected = i == *current;
@@ -333,4 +376,16 @@ bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *t, const cui_step 
     }
     cui_end_box(ui);
     return changed;
+}
+bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_step *steps,
+    size_t count, size_t *current, bool vertical, bool disabled) {
+    return cui_stepper_common(ui, id, theme, steps, count, current, vertical, disabled, NULL, NULL);
+}
+cui_numeric_selection_event_result cui_stepper_events(cui_context *ui, cui_id id,
+    const cui_theme *theme, const cui_step *steps, size_t count, size_t *current,
+    bool vertical, bool disabled, cui_stepper_event_handler handler) {
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_stepper_common(ui, id, theme, steps, count, current, vertical, disabled,
+                                       &handler, &result.change_count);
+    return result;
 }

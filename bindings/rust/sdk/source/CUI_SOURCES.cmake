@@ -90,4 +90,8 @@ set(CUI_SOURCES
  src/components/cui_surface_events.c
  src/components/cui_styled_slider_events.c
  src/base/cui_number_events.c
+ src/base/cui_tabs_events.c
+ src/base/cui_numeric_selection_events.c
+ src/base/cui_picker_events.c
+ src/components/cui_picker_events.c
 )

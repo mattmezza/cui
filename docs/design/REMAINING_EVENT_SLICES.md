@@ -23,14 +23,17 @@ claim and no basis for renaming requests into committed changes.
 
 Additional implemented slices: [Styled controlled Slider](../STYLED_SLIDER_EVENTS.md),
 [Combobox](../COMBOBOX_EVENTS.md), [Surface](../SURFACE_EVENTS.md),
-[MenuTree](../MENU_EVENTS.md), and [NumberInput](../NUMBER_EVENTS.md).
-Tabs, remaining numeric selections and menu forwarding have separate design
-checkpoints; proposals must not be read as implemented APIs.
+[MenuTree](../MENU_EVENTS.md), [ContextMenu](../CONTEXT_MENU_EVENTS.md),
+[NumberInput](../NUMBER_EVENTS.md), [Tabs](../TABS_EVENTS.md),
+[Pagination/Stepper/Rating](../NUMERIC_SELECTION_EVENTS.md), and
+[Calendar](../PICKER_EVENTS.md). Remaining menu forwarding and picker additions
+have separate checkpoints; proposals must not be read as implemented APIs.
 
 ## Highest-value independent slices
 
 The original proposals below are an audit baseline; the additions above supersede
-its Styled Slider and NumberInput recommendations. Remaining entries are unimplemented. Prefer one family per review and preserve all
+its Styled Slider, NumberInput, Rating, Stepper/Pagination and Tabs recommendations.
+List/ToggleGroup remains unimplemented. Prefer one family per review and preserve all
 old signatures/options/results. An aggregate observer needs UNKNOWN source and no
 index; per-event evidence must be captured at the actual reducer seam. Neither
 approach supplies rejection for an already-mutated pointer value.

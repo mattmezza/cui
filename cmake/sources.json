@@ -209,6 +209,16 @@
     "cui_menu_events": [],
     "cui_number_events": [
       "src/base/cui_number_events.c"
+    ],
+    "cui_tabs_events": [
+      "src/base/cui_tabs_events.c"
+    ],
+    "cui_numeric_selection_events": [
+      "src/base/cui_numeric_selection_events.c"
+    ],
+    "cui_picker_events": [
+      "src/base/cui_picker_events.c",
+      "src/components/cui_picker_events.c"
     ]
   },
   "native": {

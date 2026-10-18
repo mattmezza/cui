@@ -1286,3 +1286,23 @@ add_executable(test_number_events tests/unit/test_number_events.c)
 target_link_libraries(test_number_events PRIVATE cui)
 cui_warnings(test_number_events)
 add_test(NAME number_events COMMAND test_number_events)
+
+add_executable(test_tabs_events tests/unit/test_tabs_events.c)
+target_link_libraries(test_tabs_events PRIVATE cui)
+cui_warnings(test_tabs_events)
+add_test(NAME tabs_events COMMAND test_tabs_events)
+
+add_executable(test_context_menu_events tests/unit/test_context_menu_events.c)
+target_link_libraries(test_context_menu_events PRIVATE cui)
+cui_warnings(test_context_menu_events)
+add_test(NAME context_menu_events COMMAND test_context_menu_events)
+
+add_executable(test_numeric_selection_events tests/unit/test_numeric_selection_events.c)
+target_link_libraries(test_numeric_selection_events PRIVATE cui)
+cui_warnings(test_numeric_selection_events)
+add_test(NAME numeric_selection_events COMMAND test_numeric_selection_events)
+
+add_executable(test_picker_events tests/unit/test_picker_events.c)
+target_link_libraries(test_picker_events PRIVATE cui)
+cui_warnings(test_picker_events)
+add_test(NAME picker_events COMMAND test_picker_events)

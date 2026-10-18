@@ -508,17 +508,21 @@
       "api_symbols": [
         "cui_message_scroller_create",
         "cui_message_scroller_destroy",
-        "cui_message_scroller"
+        "cui_message_scroller",
+        "cui_base_message_scroller_events",
+        "cui_message_scroller_events"
       ],
       "state_types": [
-        "cui_message_scroller_state"
+        "cui_message_scroller_state",
+        "cui_message_scroller_event_result"
       ],
       "state_ownership": "Caller retains allocated cui_message_scroller_state and message data; destroy model after use.",
-      "interaction": "cui_message_scroller_result reports scrolling/jump behavior; cui_message_row_render_fn composes visible rows.",
-      "usage": "Append/prepend through model operations, then submit visible messages through the row callback each frame.",
+      "interaction": "Row render callbacks compose visible messages; optional cui_message_scroller_handler observes final double offsets and following-tail policy, offset before tail, after legacy composition.",
+      "usage": "Retain state and records through frame completion. Use cui_message_scroller_events for aggregate applied notifications; explicit mutators stay result-only and returned change flags do not replay callbacks.",
       "docs": [
         "docs/MESSAGE.md",
-        "docs/AVATAR_MESSAGE_EXAMPLES.md"
+        "docs/AVATAR_MESSAGE_EXAMPLES.md",
+        "docs/MESSAGE_EVENTS.md"
       ],
       "callback_symbols": [
         "cui_message_row_render_fn"
@@ -526,7 +530,13 @@
       "scope": "styled frame component",
       "name": "MessageScroller",
       "public_header": "include/cui/cui_message.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_message_events.h"
+      ],
+      "handler_types": [
+        "cui_message_scroller_handler"
+      ]
     },
     {
       "api_symbols": [
@@ -1124,11 +1134,13 @@
       ],
       "state_types": [
         "cui_questionnaire_state",
-        "cui_questionnaire_workspace"
+        "cui_questionnaire_workspace",
+        "cui_questionnaire_slot_style",
+        "cui_questionnaire_labels"
       ],
       "state_ownership": "Caller retains question definitions, state and all workspace buffers.",
       "interaction": "cui_questionnaire_event_fn emits model events; cui_questionnaire_validate_fn validates answers.",
-      "usage": "Initialize definitions/workspace once; compose current question controls each frame and handle answer/submit events.",
+      "usage": "Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI.",
       "docs": [
         "docs/QUESTIONNAIRE.md"
       ],
@@ -1782,18 +1794,22 @@
     {
       "api_symbols": [
         "cui_virtual_list_draw",
-        "cui_base_virtual_list"
+        "cui_base_virtual_list",
+        "cui_virtual_list_draw_events",
+        "cui_base_virtual_list_events"
       ],
       "state_types": [
         "cui_virtual_list",
-        "cui_virtual_widget_state"
+        "cui_virtual_widget_state",
+        "cui_virtual_event_result"
       ],
       "state_ownership": "Application retains cui_virtual_list and cui_virtual_widget_state; keyed extents live in the model and row controls remain application-owned.",
-      "interaction": "cui_virtual_render_item_fn composes only the visible window; cui_virtual_measure_item_fn supplies optional intrinsic measurement; scrollbars and owner keys update state.",
-      "usage": "Rebuild keyed item extents between frames, then call cui_virtual_list_draw with a viewport and row callback; keep model keys stable while callbacks run.",
+      "interaction": "cui_virtual_render_item_fn composes the visible window; cui_virtual_measure_item_fn supplies intrinsic measurement; optional cui_scroll_handler observes aggregate final offsets after composition, with UNKNOWN source.",
+      "usage": "Rebuild keyed extents between frames and keep keys stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result.",
       "docs": [
         "docs/VIRTUAL_LIST.md",
-        "docs/VIRTUALIZATION.md"
+        "docs/VIRTUALIZATION.md",
+        "docs/VIRTUAL_EVENTS.md"
       ],
       "callback_symbols": [
         "cui_virtual_render_item_fn",
@@ -1802,7 +1818,13 @@
       "scope": "styled frame adapter + retained base model",
       "name": "VirtualList",
       "public_header": "include/cui/cui_virtual_scroll.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_virtual_events.h"
+      ],
+      "handler_types": [
+        "cui_scroll_handler"
+      ]
     },
     {
       "api_symbols": [

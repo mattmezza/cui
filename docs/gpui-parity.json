@@ -4074,7 +4074,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Retained answers, validation, delayed confirmation and initial composable graphical parts have targeted tests. Explicit scoped letter/number shortcuts, composition guards, filled-answer focus restoration, card palette/size styling and custom indicator/content/shortcut renderers are tested. Automatic root keyboard capture, cross-item focus transfer, slot style refinements, remaining styling, localization and full accessibility remain unfinished. The real browser story covers validation, delayed navigation, freeform submission, reset, disabled state, four sizes, letter/number shortcuts and composition commits; see docs/QUESTIONNAIRE.md."
+        "Retained models, automatic root keyboard capture, cross-item focus transfer, ordered input routing, palette/size cards and custom slot renderers have scoped tests. Bounded box-only indicator/content/shortcut refinements and six localized action/error labels are covered by headless tests; see docs/QUESTIONNAIRE.md for precedence and ABI rebuild requirements. General Styled typography/inheritance, complete nested-root and callback choreography, comprehensive localization and physical accessibility acceptance remain unfinished. Existing browser story evidence predates the new slot/localization API; no browser proof of those additions is claimed."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

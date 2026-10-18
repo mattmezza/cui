@@ -7,6 +7,10 @@
 - Fixes secure Styled InputGroup masking and owned IME composition lifetime, and
   same-frame IME caret ownership during Find-to-Editor focus transfer.
 - Adds focused callback-contract and distribution compiler regressions.
+- Adds call-local VirtualList final-offset and MessageScroller double-offset/tail
+  observers, preserving legacy reduction and deferred-window semantics.
+- Adds bounded Questionnaire box-slot styles and six translated labels; rebuild
+  consumers for the extended by-value options structure.
 - Makes human skill discovery concise, preserves full/JSON output and adds explicit
   partial Markdown section reads without clipping canonical limitations.
 - Final source freeze, integrated checks and release artifact validation remain

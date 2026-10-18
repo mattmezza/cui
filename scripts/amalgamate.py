@@ -30,6 +30,10 @@ def generate(name,sources):
         lines += ['#include "cui_hover_events.h"']
     if name == "cui_scroll":
         lines += ['#include "cui_scroll_events.h"']
+    if name == "cui_virtual_scroll":
+        lines += ['#include "cui_virtual_events.h"']
+    if name == "cui_message":
+        lines += ['#include "cui_message_events.h"']
     if name == "cui_command":
         lines += ['#include "cui_command_events.h"']
     if name == "cui_toolbar":

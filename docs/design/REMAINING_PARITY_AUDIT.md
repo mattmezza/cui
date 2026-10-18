@@ -28,7 +28,7 @@ by later additions; follow the actual current API and implementation.
 
 | Stale shorthand | What is already present | What remains distinct |
 | --- | --- | --- |
-| Questionnaire lacks automatic root capture/cross-item focus | [Styled implementation](../../src/components/cui_questionnaire.c) routes through prior-frame bindings and ordered input reduction; [styled tests](../../tests/unit/test_questionnaire_styled.c) cover automatic routing, omission and focus. [Guide](../QUESTIONNAIRE.md) ends with the newer contracts. | Nested roots, comprehensive callback choreography, slot refinements and localization still need completion. Earlier paragraphs and manifest prose are not the final source truth. |
+| Questionnaire lacks automatic root capture/cross-item focus | [Styled implementation](../../src/components/cui_questionnaire.c) routes through prior-frame bindings and ordered input reduction; [styled tests](../../tests/unit/test_questionnaire_styled.c) cover automatic routing, omission and focus. [Guide](../QUESTIONNAIRE.md) ends with the newer contracts. | Bounded box-slot refinements and six localized labels landed in the follow-up below; nested roots, comprehensive callback choreography, broader styling and localization still need completion. Earlier paragraphs and manifest prose are not the final source truth. |
 | Icon padding/nonzero style is unsupported; no accessible API | [Icon options](../../include/cui/cui_icon.h), [resolver](../../src/base/cui_icon_layout.h), [source-style tests](../../tests/unit/test_icon_style_source.c), [accessibility tests](../../tests/unit/test_icon_accessibility_source.c) implement numeric bounds/padding/border floors, full-box paint, explicit image labels and decorative suppression. | Ambient inheritance, generic Styled layout and SVG renderer fidelity remain limited. Do not redo numeric constraints or add guessed asset-name labels. |
 | Slider has no controlled value/semantics | [Base API](../../include/cui/cui_base.h) and [controlled tests](../../tests/unit/test_slider_controlled.c) already define typed BEGIN/UPDATE/COMMIT/CANCEL requests and read-only behavior without a handler. | Typed Base/Styled facades and aggregate bridge scalar notifications now exist; foreign controlled phases remain distinct. Do not replace phased semantics with one bool change callback. |
 | Text gradients/tokens/tracking are wholly absent | [Tokens](../TYPOGRAPHY_TOKENS.md), [gradient implementation](../TEXT_GRADIENT.md), [native tracking](../LETTER_SPACING.md), [real gallery gradient proof](../../tests/web/test_gradient_gallery.py). | Canvas tracking, foreign authoring and GPU support are unfinished. Reimplementing solid/gradient paint or native tracking would duplicate completed work. |
@@ -166,31 +166,27 @@ native `letter_spacing`, and bridge Spinner remains legacy. New fields need
 observable unsupported-provider failure and actual installed consumer tests;
 manual notification success cannot prove typography support.
 
-### 6. Finish Questionnaire's actual remaining Styled/localization contract
+### 6. Complete Questionnaire beyond bounded box slots and labels
 
-The retained model, root routing, ordered TEXT/Enter batches, four-size/palette
-cards, slots, focus band, semantic positions and delayed validation/navigation
-already exist. Do not restart the component because its family row is only
-`implemented`. [Public options](../../include/cui/cui_questionnaire.h) expose render
-callbacks, not source `indicator_style`, `content_style`, `shortcut_style`
-refinements. Frozen `crates/component/src/questionnaire/components.rs` exposes
-those methods and uses localized action labels; current custom rendering is not
-equivalent to independently refining each default slot.
+Follow-up `5744beb8` implements three independent masked box-slot descriptors
+and six localized action/error labels. [The guide](../QUESTIONNAIRE.md) defines
+default/custom-renderer precedence, submission snapshots, borrowed text lifetime,
+invalid preflight and the by-value options ABI rebuild requirement. Focused native
+and sanitizer evidence covers all four legacy sizes, zero/transparent overrides,
+translated text and default compatibility. This is not browser or full-family proof.
 
-First slice: bounded explicit slot-style descriptors/precedence and action/error
-label localization hooks that retain default semantics, layout and lifetime
-rules. Audit all remaining frozen part methods and callback choreography before
-choosing the final verification boundary. A second slice verifies nested roots,
-subscriber-driven item enabling/navigation and callback mutation ordering against
-frozen Base state/keyboard/control tests; no generic arbitrary callback reentrancy
-or context destruction guarantee is implied.
+Next slices: expose and verify the remaining typography/general style refinements,
+audit frozen part methods, then test nested roots, subscriber-driven enabling/
+navigation and callback mutation ordering against frozen Base tests. No arbitrary
+callback reentrancy or context destruction contract is implied. Six caller-supplied
+labels are not a general locale/formatting engine or automatic root inheritance.
 
-Acceptance: extend [model](../../tests/unit/test_questionnaire.c) and
-[Styled](../../tests/unit/test_questionnaire_styled.c) regressions, plus actual gallery
-WASM interactions, covering slot-only overrides/precedence, translated long labels,
-all four sizes, callback sequences, disabled/omitted/reintroduced parts and nested
-focus ownership. Reconcile the guide's older unfinished paragraphs after proof;
-do not promote from palette screenshots or only reducer tests.
+Extend [model](../../tests/unit/test_questionnaire.c) and
+[Styled](../../tests/unit/test_questionnaire_styled.c) coverage plus actual gallery
+WASM interactions for the new styles/translations, callback sequences,
+disabled/omitted/reintroduced parts and nested focus ownership. Do not schedule
+the already delivered box masks or label bundle again, or promote parity from
+palette screenshots or reducer tests alone.
 
 ### 7. Close the remaining Icon/Spinner inherited-style boundary deliberately
 

@@ -381,11 +381,13 @@ API: `cui_message`. [Public header](../include/cui/cui_message.h); [guide](MESSA
 
 **State:** Caller retains allocated cui_message_scroller_state and message data; destroy model after use.
 
-**Interaction:** cui_message_scroller_result reports scrolling/jump behavior; cui_message_row_render_fn composes visible rows.
+**Interaction:** Row render callbacks compose visible messages; optional cui_message_scroller_handler observes final double offsets and following-tail policy, offset before tail, after legacy composition.
 
-**Usage:** Append/prepend through model operations, then submit visible messages through the row callback each frame.
+**Usage:** Retain state and records through frame completion. Use cui_message_scroller_events for aggregate applied notifications; explicit mutators stay result-only and returned change flags do not replay callbacks.
 
-API: `cui_message_scroller_create`, `cui_message_scroller_destroy`, `cui_message_scroller`. [Public header](../include/cui/cui_message.h); [guide](MESSAGE.md).
+API: `cui_message_scroller_create`, `cui_message_scroller_destroy`, `cui_message_scroller`, `cui_base_message_scroller_events`, `cui_message_scroller_events`. [Public header](../include/cui/cui_message.h); [guide](MESSAGE.md).
+
+Additional event includes: `cui/cui_message_events.h`; [observer guide](MESSAGE_EVENTS.md).
 
 ## Notification
 
@@ -697,7 +699,7 @@ Additional event includes: `cui/cui_otp_events.h`.
 
 **Interaction:** cui_questionnaire_event_fn emits model events; cui_questionnaire_validate_fn validates answers.
 
-**Usage:** Initialize definitions/workspace once; compose current question controls each frame and handle answer/submit events.
+**Usage:** Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI.
 
 API: `cui_questionnaire_init`, `cui_questionnaire_begin`, `cui_questionnaire_end`. [Public header](../include/cui/cui_questionnaire.h); [guide](QUESTIONNAIRE.md).
 
@@ -1017,11 +1019,13 @@ Event API includes: `cui/cui_tree_events.h`.
 
 **State:** Application retains cui_virtual_list and cui_virtual_widget_state; keyed extents live in the model and row controls remain application-owned.
 
-**Interaction:** cui_virtual_render_item_fn composes only the visible window; cui_virtual_measure_item_fn supplies optional intrinsic measurement; scrollbars and owner keys update state.
+**Interaction:** cui_virtual_render_item_fn composes the visible window; cui_virtual_measure_item_fn supplies intrinsic measurement; optional cui_scroll_handler observes aggregate final offsets after composition, with UNKNOWN source.
 
-**Usage:** Rebuild keyed item extents between frames, then call cui_virtual_list_draw with a viewport and row callback; keep model keys stable while callbacks run.
+**Usage:** Rebuild keyed extents between frames and keep keys stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result.
 
-API: `cui_virtual_list_draw`, `cui_base_virtual_list`. [Public header](../include/cui/cui_virtual_scroll.h); [guide](VIRTUAL_LIST.md), [guide](VIRTUALIZATION.md).
+API: `cui_virtual_list_draw`, `cui_base_virtual_list`, `cui_virtual_list_draw_events`, `cui_base_virtual_list_events`. [Public header](../include/cui/cui_virtual_scroll.h); [guide](VIRTUAL_LIST.md), [guide](VIRTUALIZATION.md), [guide](VIRTUAL_EVENTS.md).
+
+Additional event includes: `cui/cui_virtual_events.h`.
 
 ## Chart
 

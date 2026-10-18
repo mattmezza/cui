@@ -38,7 +38,40 @@ by `cui_virtual_scroll.h`. Measurements remain allowed to reject the frame.
 This observes float widget offsets, not double model mutation, selection, rendered
 visibility, data delivery or GPU completion. No retained registration, capture/
 bubble, veto, context-destruction support or foreign-language facade is added.
-MessageScroller remains separate and result-only.
+MessageScroller has a separate [double-offset and tail observer](MESSAGE_EVENTS.md); its explicit mutators remain result-only.
+
+## Observe scrolling in an existing frame
+
+Retain the model, widget state and application data across frames. This helper
+assumes the caller already began a frame and supplies its existing row renderer.
+The callback records the applied offset; reading the result does not replay it.
+
+```c
+#include "cui/cui_virtual_events.h"
+
+static void remember_scroll(void *user, const cui_scroll_change *change) {
+    cui_scroll_offset *saved = user;
+    *saved = change->value;
+}
+
+static cui_virtual_event_result draw_list(
+    cui_context *ui, const cui_theme *theme, const cui_virtual_list *model,
+    cui_virtual_widget_state *state, cui_virtual_render_item_fn render_row,
+    void *row_data, cui_scroll_offset *saved_offset)
+{
+    cui_virtual_widget_options options = {0};
+    options.scroll.width = 320;
+    options.scroll.height = 240;
+    return cui_virtual_list_draw_events(
+        ui, cui_id_from(ui, "records"), theme, model, state, options,
+        render_row, row_data, (cui_scroll_handler){remember_scroll, saved_offset});
+}
+```
+
+Check `result.valid` before using the result. Use either the callback or
+`result.changed` for each application side effect. `result.change_count` counts
+delivered callbacks, so it stays zero with a missing handler even when offsets
+change. Keep the saved-offset storage alive through the call.
 
 `tests/unit/test_virtual_events.c` compares legacy and observed Base/Styled results,
 state, consumed input, semantics and composition counts, exercises real deferred child routing, exact wheel,

@@ -233,7 +233,8 @@
     "cui_form_events": [],
     "cui_toolbar_events": [],
     "cui_command_events": [],
-    "cui_scroll_events": []
+    "cui_scroll_events": [],
+    "cui_hover_events": []
   },
   "native": {
     "text": [

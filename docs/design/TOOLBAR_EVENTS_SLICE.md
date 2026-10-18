@@ -83,3 +83,14 @@ submission; copied payload and deferred removal. Keep legacy Toolbar regressions
 strict C11/C++ headers and private native wrapper checks, then portable WASI.
 Existing foreign Toolbar child/command callbacks and generic bridge queues remain
 separate; including this header in a source SDK does not expose a foreign facade.
+
+## Implementation checkpoint
+
+Implemented in the independent Toolbar command slice: one private renderer seam,
+unchanged legacy entrypoint, additive aggregate observer/result. Capture occurs
+immediately after the existing interaction; paint and legacy callback still
+precede the typed observer. Unique accepted evidence is copied, ambiguous/missing
+evidence reports only the proven frame. No Base/Core/container or foreign API
+changes. Focused tests compare legacy/facade paint geometry, metrics, semantics,
+focus and callbacks, and exercise pointer/touch/key/accessibility, coalescing,
+mutable legacy hooks, passive/disabled policy and copied payload lifetime.

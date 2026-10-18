@@ -181,3 +181,9 @@ CTest through the private headless wrapper before a production slice is proposed
 Bridge NumberInput currently queues legacy CHANGE from its aggregate result; its
 V1 payload remains LEGACY, not the reserved SCALAR tag. No new typed bridge schema,
 per-event delivery or cross-binding parity follows from this C-only proposal.
+
+Implementation checkpoint: the additive C facade is described in
+[NUMBER_EVENTS.md](../NUMBER_EVENTS.md) and `cui_number_events.h`. The whole Base
+wrapper preserves canonical Base Numeric unchanged; the Styled private common
+seam retains the legacy no-observer path. This does not promote binding coverage
+or any deferred per-event/commit/submission API.

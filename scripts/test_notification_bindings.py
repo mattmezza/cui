@@ -2,7 +2,9 @@
 """Offline Linux Go/Rust notification contracts through private Xvfb CTest.
 
 Requires existing CMake/C11, Go, Cargo and xvfb-run. No downloads, SDK generation,
-production changes or publication. The supplied shared bridge must implement V1.
+production changes or publication. The supplied shared bridge must implement V1
+and value payloads. Static Rust tests use their paired SDK; older-library and
+injected-provider tests are dynamic only.
 """
 import argparse
 import hashlib
@@ -94,11 +96,11 @@ def main():
     # tests are explicitly disabled, since these contracts need no visible UI.
     add('go_static_legacy_and_v1', go + ['./cui', '-count=1'], {'CUI_VALUE_REAL': '1'})
     add('rust_static_legacy_and_v1', rust + ['--', '--test-threads=1'],
-        {'CARGO_TARGET_DIR': build / 'rust-static' / stage.name})
+        {'CARGO_TARGET_DIR': build / 'rust-static' / stage.name, 'CUI_VALUE_REAL': '1'})
     dynamic = {'CUI_BRIDGE_LIB_DIR': library.parent, 'CARGO_TARGET_DIR': build / 'rust-dynamic'}
     add('go_dynamic_legacy_and_v1', go + ['-tags', 'cui_dynamic', './cui', '-count=1'],
         {'CUI_BRIDGE_LIBRARY': library, 'CUI_VALUE_REAL': '1'})
-    add('rust_dynamic_legacy_and_v1', rust + ['--', '--test-threads=1'], dynamic)
+    add('rust_dynamic_legacy_and_v1', rust + ['--', '--test-threads=1'], {**dynamic, 'CUI_VALUE_REAL': '1'})
     for mode in MODES:
         add('go_protocol_' + mode,
             go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestNotificationV1ProtocolFixture$', '-count=1'],
@@ -122,6 +124,23 @@ def main():
              '-fPIC', '-shared', '-I' + str(source / 'include'), *definitions,
              value_source, '-Wl,--no-as-needed', value_dependency,
              '-Wl,-rpath,' + str(value_dependency.parent), '-o', output], source, env)
+    # Rust owns a distinct provider: compiling the Go fixture would silently
+    # validate the wrong protocol implementation. All interposition stays dynamic.
+    rust_value_fixture = build / 'libcui_rust_value_fixture.so'
+    rust_value_missing_fixture = build / 'libcui_rust_value_missing_fixture.so'
+    rust_value_source = source / 'bindings/rust/tests/fixtures/value_notifications_provider.c'
+    for output, definitions in ((rust_value_fixture, []),
+                                (rust_value_missing_fixture, ['-DCUI_VALUE_FIXTURE_MISSING'])):
+        if definitions and not value_older:
+            continue
+        run([env.get('CC', 'cc'), '-std=c11', '-Wall', '-Wextra', '-Werror', '-pedantic',
+             '-fPIC', '-shared', '-I' + str(source / 'include'), *definitions,
+             rust_value_source, '-Wl,--no-as-needed', value_dependency,
+             '-Wl,-rpath,' + str(value_dependency.parent), '-o', output], source, env)
+    # With an initial-V1 dependency, Rust must link that same bridge too: a
+    # current bridge could otherwise satisfy the intentionally missing export.
+    rust_value_dynamic = {**dynamic, 'CUI_BRIDGE_LIB_DIR': value_dependency.parent,
+                          'CARGO_TARGET_DIR': build / 'rust-value-protocol'}
     for mode in VALUE_MODES:
         if mode == 'missing' and not value_older:
             continue
@@ -129,6 +148,10 @@ def main():
         add('go_value_protocol_' + mode,
             go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestValueNotificationV1Protocol$', '-count=1'],
             {'CUI_BRIDGE_LIBRARY': provider, 'CUI_VALUE_FIXTURE': mode})
+        rust_provider = rust_value_missing_fixture if mode == 'missing' else rust_value_fixture
+        add('rust_value_protocol_' + mode,
+            rust + ['--test', 'value_notifications_v1', 'synthetic_protocol', '--', '--exact'],
+            {**rust_value_dynamic, 'LD_PRELOAD': rust_provider, 'CUI_VALUE_FIXTURE': mode})
     if value_older:
         add('go_value_older_library',
             go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestValueNotificationV1TextFIFO$', '-count=1'],
@@ -137,8 +160,16 @@ def main():
             add('go_value_no_drain_' + mode,
                 go + ['-tags', 'cui_dynamic', './cui', '-run', '^TestValueNotificationV1TextFIFO$', '-count=1'],
                 {'CUI_BRIDGE_LIBRARY': provider, 'CUI_VALUE_FIXTURE': mode, 'CUI_VALUE_OLD': '1'})
+        rust_value_old = {'CUI_BRIDGE_LIB_DIR': value_older.parent,
+                          'CARGO_TARGET_DIR': build / 'rust-value-old', 'CUI_VALUE_OLD': '1'}
+        rust_no_drain = rust + ['--test', 'value_notifications_v1',
+                               'real_text_fifo_or_older_library_no_drain', '--', '--exact']
+        add('rust_value_older_library', rust_no_drain, rust_value_old)
+        for mode, provider in (('unavailable', rust_value_fixture), ('missing', rust_value_missing_fixture)):
+            add('rust_value_no_drain_' + mode, rust_no_drain,
+                {**rust_value_old, 'LD_PRELOAD': provider, 'CUI_VALUE_FIXTURE': mode})
     else:
-        print('Value older-library, missing-export and no-drain compatibility cases deferred: supply --value-older-library', flush=True)
+        print('Go/Rust value older-library, missing-export and no-drain compatibility cases deferred: supply --value-older-library', flush=True)
     harness = build / 'harness'
     harness.mkdir(exist_ok=True)
     (harness / 'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.20)\n'

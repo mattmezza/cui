@@ -93,15 +93,46 @@ Do not call the public Base observer from Styled end and then notify again.
 Handler/user borrowing lasts through end only. This explicit final-after-paint
 seam keeps child/paint timing intact; it is not a generic frame-end dispatch.
 
-Token checks: initialized/admitted once in an active frame, correct context,
-owner, state address, layer and frame, paired once; wrong/mismatched/double finish
-must reject before reducer/box/observer effects. Failed begin never requires end.
-Legacy successful-begin layout pairing still applies even if later layout errors
-occur: `valid` is adapter admission, not transactional rendering success.
-The caller must use the same effective dimensions/style/options across its pair;
-no silent option snapshot or retained stack-style pointer. Do not hide a second
-finish in a passive getter. Optional whole-call convenience composition can be a
-later slice; it would introduce a content callback lifetime contract unnecessarily.
+Token checks require zero initialization before first use, correct context,
+owner, state address and Base/Styled layer, and single-use pairing. These identity
+mismatches and an already-consumed token reject before reducer/box/observer effects.
+An admitted token records `cui_frame_sequence(ui)`, which is zero in inert or
+layout-only scopes. **The current public API cannot prove same-frame identity for
+frame-zero work.** Do not add a Core counter or claim a runtime guarantee there.
+When both recorded and current frame sequences are nonzero, require equality;
+a zero/nonzero transition is also rejected as a changed submission scope. If both
+are zero, same-frame/same-scope pairing remains a caller obligation: carrying such
+a token across frames is unsupported misuse that cannot be detected reliably.
+No diagnostic promise covers that case. The same passive ancestry must surround
+the pair; the facade must not temporarily escape it to obtain evidence.
+
+Base begin returns the exact legacy reducer bool: false may mean valid no-change.
+Admission is separately recorded in the token, so callers must not use that bool
+to decide whether Base finish is allowed. Base null arguments/zero ID reject and
+leave no admitted pair; a later finish returns a zero invalid result. For Styled
+begin, preserve the legacy argument preflight and boolean composition contract:
+false means no pair was opened and end must not be called; true admits the token
+and requires end even when offsets did not change. An already-active token is
+rejected before calling legacy begin. A matching finish result is `valid=true`
+even when `changed=false`; invalid/mismatched finish is `valid=false` and has
+zero callback count. Layout/capacity errors after admitted Styled begin still
+require balanced box closure; `valid` is adapter admission, not transactional
+rendering success. Existing Core diagnostics are not erased.
+
+Passive Styled begin/end still execute the existing normalization, layout and
+paint policy exactly once; frame-zero is not an argument failure or permission
+to omit end. Base also preserves its existing maintenance behavior. A final
+result can report `changed=true` with `change_count=0` in these scopes, because
+no observer is dispatched without nonzero frame evidence. Admission and change
+are therefore independent of callback eligibility.
+
+The caller must use the same effective dimensions/style/options across its pair,
+including disabled state, enabled axes, geometry, auto-measure and style lifetime.
+Identity checks do not prove descriptor equality: mismatched options are unsupported
+caller misuse, not silently reconciled. Preserve Styled's existing remeasurement
+at end; the same options do not promise identical measured geometry. No hidden
+option snapshot or retained stack-style pointer. Do not hide a second finish in a
+passive getter.
 
 `changed` means the finite final offset differs from a finite entry, or a
 nonfinite entry was repaired to a finite result. `has_previous=false` leaves
@@ -114,16 +145,19 @@ drag operations, including a return to entry that is intentionally silent.
 **Normalization decision for review:** recommend including observed entry-to-final
 clamping/axis-disable/range-shrink repair in this aggregate, because it is an
 actual applied offset change and matches Base's old bool comparison. It is
-explicitly not a user-input notification. Therefore disabled or inert work may
-normalize caller state and yield a final-offset CHANGE, while never implying a
-user activation/request. Preserve legacy reducer behavior; do not gate away its
+explicitly not a user-input notification. Disabled ordinary submission may
+normalize caller state and yield a final-offset CHANGE with genuine nonzero frame
+and UNKNOWN source. Inert/layout-only frame-zero work may normalize state and
+report maintenance `changed`, but dispatches no observer. Neither implies a user
+activation/request. Preserve legacy reducer behavior; do not gate away its
 normalization to satisfy a blanket disabled-event slogan. If user-only events
 are required, that is a separate instrumented reducer design, not an inference
 from this aggregate. External assignment before begin is the baseline and silent;
 arbitrary external scroll-state mutation between begin/end is unsupported.
 
-Metadata target is the public scroll owner, kind CHANGE, source UNKNOWN. Retain
-genuine frame sequence when admitted, omit event index/HAS_ACTIVATION; several
+Metadata target is the public scroll owner, kind CHANGE, source UNKNOWN. Dispatch
+only when the pair has matching genuine nonzero frame evidence; retain that frame,
+omit event index/HAS_ACTIVATION. Frame-zero pairs emit no callback; several
 inputs, range reconciliation or children can contribute. Do not select a last
 wheel event and pretend it caused the final offset. Payload is pointer-free and
 copyable; callback cannot mutate active scroll state/options/input, recursively
@@ -207,12 +241,30 @@ Required headless assertions:
   axis locking, scrollbar pointer drag/page/key and hidden/auto-hidden bars.
 - Range shrink, disabled-axis/disabled-owner, nonfinite entry repair, prior-frame
   auto-measure normalization; distinguish these from user input explicitly.
-- Inert/layout-only legacy behavior preserved rather than assumed; omitted owner
-  has no callback, token mismatch/reuse/wrong frame/layer rejects atomically.
+- Inert/layout-only normalization/layout preserved with frame-zero maintenance
+  results and no callbacks; omitted owner has no callback. Token identity/layer/
+  reuse errors and differing nonzero frames reject atomically. A frame-zero
+  cross-frame test cannot assert a diagnostic that the API cannot establish;
+  document that misuse and test suppression instead.
+- Base false/no-change still admits finish; Base invalid begin does not. Styled
+  false begin requires no end; successful no-change/passive begin requires end.
+  Check `valid`, `changed` and callback count independently, including normalized
+  disabled ordinary work versus frame-zero maintenance.
 - Nested tokens, frozen copied payload after context destruction, callback timing
   and unsupported mutation documented; strict C11/C++ header construction.
 - Preserve virtual deferred-window/result tests and MessageScroller double/tail/
   measurement regressions without adding their production facades in this slice.
+
+An alternative first API could take a whole-call content callback instead of a
+public begin/end token. It would execute begin, invoke borrowed content, then
+mutable end and notify in one stack frame, avoiding unprovable cross-frame token
+identity. Costs: a new callback composition convention, user lifetime through the
+whole call, inability to interleave arbitrary caller begin/end control flow, and
+an additional failure/early-return contract for content. It still needs passive
+callback suppression and normalization rules; it does not create input evidence.
+Recommend the compatible paired form with the explicitly limited checks above,
+not a hidden Core architecture change. A whole-call convenience wrapper can be
+reviewed independently if applications prefer that tradeoff.
 
 Callbacks at begin miss deferred work; callbacks at both phases double-deliver;
 per-input notifications need internal mutation instrumentation and different

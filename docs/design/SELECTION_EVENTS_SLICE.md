@@ -1,6 +1,6 @@
 # Single-selection event facade checkpoint
 
-Status: proposal only; no new API below ships. Audited at `b61a14d0` against the [contract](COMPONENT_EVENTS_CONTRACT.md), [coverage](COMPONENT_EVENTS_COVERAGE.md), [bindings](COMPONENT_EVENTS_BINDINGS.md), and implemented [metadata](../COMPONENT_EVENTS.md). Scope is RadioGroup, Select and single-selection Combobox, without changing their reducers, ownership, popup timing or legacy results. No family parity promotion follows from this proposal.
+Status: reviewed checkpoint. The RadioGroup-only subset is implemented in [SELECTION_EVENTS.md](../SELECTION_EVENTS.md); Select/Combobox and the broader declarations below remain proposals. Audited at `b61a14d0` against the [contract](COMPONENT_EVENTS_CONTRACT.md), [coverage](COMPONENT_EVENTS_COVERAGE.md), [bindings](COMPONENT_EVENTS_BINDINGS.md), and implemented [metadata](../COMPONENT_EVENTS.md). Scope is RadioGroup, Select and single-selection Combobox, without changing their reducers, ownership, popup timing or legacy results. No family parity promotion follows from this proposal.
 
 ## Source findings
 
@@ -111,3 +111,7 @@ Tests must exercise actual reducers, not fabricated snapshots:
 Deferred explicitly: controlled Select/Combo request/rejection, RadioGroup typed request replacement, query-edit events, same-item ACTIVATE/COMMIT, open/close lifecycle, menu/list/multi-select/tabs/toggle-group facades, async/deferred listeners, foreign-language synchronous requests, bridge typed selection allowlist, label/text copying and uniform 78-family coverage. Existing bridge queued notifications keep their timing and current allowlist.
 
 Approved implementation sequence: first RadioGroup Base/Styled only, with minimal shared selection types. Select/Combobox signatures above remain proposals for a separate later slice. No choice reducer edits are authorized by the RadioGroup implementation.
+
+RadioGroup implementation exception approved during source proof: its legacy reducer registers current semantics after reduction/callbacks, while `cui_event_activation_snapshot` requires current submitted semantics. Preserve that timing rather than registering early. RadioGroup therefore omits HAS_ACTIVATION on every notification and freezes only actual input frame/index/source facts before callback consumption. Explicit event type proves pointer/keyboard/accessibility source; it does not provide an accepted snapshot or authorize fabricating its coordinates/device fields. The compound/child target convention remains approved for later families where genuine accepted snapshots are available. Early registration is a separate architecture change outside this slice.
+
+The implemented minimal shared reason enum includes ACTIVATION and NAVIGATION only; CONFIRM remains deferred with Select/Combobox. Shared results count observer invocations only. The RadioGroup guide/header are authoritative for the shipped subset; no broader signature in this proposal implies implementation.

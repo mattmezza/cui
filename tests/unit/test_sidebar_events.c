@@ -688,6 +688,113 @@ static void test_collapse(void) {
                saved.event.kind == CUI_COMPONENT_EVENT_REQUEST);
     }
 }
+
+static size_t section_old, section_new, section_content_calls;
+static cui_component_event_metadata section_copy;
+static bool section_consume, section_no_legacy;
+static void section_content(cui_context *ctx, const cui_theme *theme, bool collapsed, void *user) {
+    (void)theme;
+    assert(user == &section_content_calls && collapsed);
+    section_content_calls++;
+    cui_begin_box(ctx, 0, (cui_box){.width = 80, .height = 24});
+    cui_end_box(ctx);
+}
+static void section_legacy(void *user) {
+    assert(user == &section_old);
+    section_old++;
+    trace[trace_count++] = 8;
+    if (section_consume) {
+        size_t count;
+        cui_frame_events(ui, &count);
+        for (size_t i = 0; i < count; i++)
+            if (cui_event_activation(ui, i) == 70)
+                cui_consume_event(ui, i);
+    }
+}
+static void section_observe(void *user, const cui_component_event_metadata *event) {
+    assert(user == &section_new);
+    section_new++;
+    trace[trace_count++] = 9;
+    section_copy = *event;
+    assert(event->target == 70 && event->kind == CUI_COMPONENT_EVENT_ACTIVATE);
+}
+static cui_component_action_result section_frame(bool footer, bool legacy, bool observe,
+                                                 unsigned passive) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    cui_begin_box(ui, 1,
+                  (cui_box){.width = 250, .inert = passive == 1, .layout_only = passive == 2});
+    cui_sidebar_section_options options = {.collapsed = true,
+                                           .content = section_content,
+                                           .user = &section_content_calls,
+                                           .on_activate = section_legacy,
+                                           .activate_user = &section_old};
+    if (section_no_legacy)
+        options.on_activate = NULL;
+    cui_component_action_result result;
+    memset(&result, 0, sizeof(result));
+    if (legacy)
+        result.submitted = footer ? cui_sidebar_footer(ui, 70, &theme, options)
+                                  : cui_sidebar_header(ui, 70, &theme, options);
+    else {
+        cui_component_activation_handler handler = {observe ? section_observe : NULL, &section_new};
+        result = footer ? cui_sidebar_footer_events(ui, 70, &theme, options, handler)
+                        : cui_sidebar_header_events(ui, 70, &theme, options, handler);
+    }
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return result;
+}
+static void test_sections(void) {
+    for (unsigned footer = 0; footer < 2; footer++) {
+        ui = cui_create((cui_config){.max_elements = 128});
+        assert(ui);
+        section_old = section_new = section_content_calls = trace_count = 0;
+        section_consume = section_no_legacy = false;
+        assert(section_frame(footer, false, true, 0).submitted);
+        click(70, false);
+        click(70, false);
+        cui_component_action_result result = section_frame(footer, false, true, 0);
+        assert(result.valid && result.activation_count == 2 && section_old == 2 &&
+               section_new == 2);
+        assert(trace[0] == 8 && trace[1] == 9 && trace[2] == 8 && trace[3] == 9);
+        assert(section_copy.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION);
+        assert(section_copy.activation.target == 70);
+        click(70, true);
+        assert(section_frame(footer, false, true, 0).activation_count == 1);
+        assert(cui_queue_accessibility_action(ui, 70, CUI_ACCESSIBILITY_ACTIVATE));
+        assert(cui_queue_accessibility_action(ui, 70, CUI_ACCESSIBILITY_ACTIVATE));
+        section_consume = true;
+        assert(section_frame(footer, false, true, 0).activation_count == 1);
+        assert(section_copy.flags & CUI_COMPONENT_EVENT_HAS_ACTIVATION);
+        assert(section_copy.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
+        section_consume = false;
+        section_no_legacy = true;
+        size_t old_before = section_old;
+        click(70, false);
+        assert(section_frame(footer, false, true, 0).activation_count == 1);
+        assert(section_old == old_before);
+        section_no_legacy = false;
+        size_t before = section_new;
+        click(70, false);
+        assert(section_frame(footer, false, false, 0).activation_count == 0);
+        assert(section_new == before);
+        click(70, false);
+        assert(section_frame(footer, true, false, 0).submitted);
+        assert(section_new == before);
+        section_frame(footer, false, true, 1);
+        click(70, false);
+        assert(section_frame(footer, false, true, 1).activation_count == 0);
+        assert(section_frame(footer, false, true, 2).activation_count == 0);
+        cui_component_event_metadata saved = section_copy;
+        assert(!cui_sidebar_header_events(ui, 0, NULL, (cui_sidebar_section_options){0},
+                                          (cui_component_activation_handler){0})
+                    .valid);
+        cui_destroy(ui);
+        assert(saved.target == 70 && saved.activation.target == 70);
+    }
+}
 int main(void) {
     test_base();
     test_legacy_equivalence();
@@ -695,5 +802,6 @@ int main(void) {
     test_nested();
     test_expansion();
     test_collapse();
+    test_sections();
     return 0;
 }

@@ -142,8 +142,7 @@ geometry/colors; prove legacy-then-typed ordering despite divergent owner writes
 entry-snapshot semantics, repeated requests, pointer/touch/keyboard/genuine Button
 accessibility, missing handlers, disabled/inert/layout-only work, invalid arguments,
 frozen current evidence after legacy consumption of accessibility activations, and
-copied metadata after context destruction. Header/footer observers remain a
-separate review slice.
+copied metadata after context destruction. Header/footer observers are documented below.
 
 Handler, user and payload pointers are borrowed only during submission. Copying the
 pointer-free payload preserves it through later frames, omission and context teardown;
@@ -166,3 +165,36 @@ only through `python scripts/test_local.py --build-dir <external-build>` (privat
 Bridge Sidebar has separate retained state and queued generic notifications. No
 Python/JS/TS/Go/Rust API automatically gains these immediate per-item notifications
 or synchronous expansion requests. SDK/module/export wiring is integrator work.
+
+## Header and footer actions
+
+`cui_sidebar_header_events` and `cui_sidebar_footer_events` take the existing
+section options plus `cui_component_activation_handler` and return
+`cui_component_action_result`. There is no Base section counterpart.
+
+```c
+cui_component_action_result result = cui_sidebar_header_events(
+    ui, header_id, theme, header_options,
+    (cui_component_activation_handler){on_header_action, app});
+```
+
+Each actual activation freezes ACTIVATE metadata before the existing
+`options.on_activate`, then calls the typed observer. Repeated invocations notify
+separately. `activation_count` counts observer calls; a missing observer reports
+zero while legacy callbacks and content still run. A typed-only handler works
+without a legacy callback. `submitted` reports successful section composition,
+including inert/layout-only submissions; it does not imply an action.
+
+These GROUP surfaces set `pointer_activatable`: existing Core routing supports
+pointer/touch and accessibility ACTIVATE. The earlier pointer-only checkpoint
+wording was incomplete. No keyboard routing or new focusability is introduced.
+Legacy accessibility consumption can suppress later actions; already frozen
+current evidence remains intact. Handler/user/payload borrowing and unsupported
+active-context destruction follow the same lifetime rules above. No retained
+handler, queued foreign callback, or binding export is added.
+
+Focused tests cover both surfaces, repeated mouse activation, touch, genuine
+accessibility activation and consumption, old-before-new ordering, typed-only
+and legacy-only paths, omitted handlers, inert/layout-only work, invalid arguments,
+and copied payload lifetime. Existing Sidebar and Settings regressions remain
+part of the bounded verification.

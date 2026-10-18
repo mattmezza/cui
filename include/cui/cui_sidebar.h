@@ -104,7 +104,7 @@ typedef struct {
     bool collapsed, selected, custom_box;
     cui_sidebar_content_fn content;
     void *user;
-    void (*on_activate)(void *); /* Optional pointer-only Header/Footer host action. */
+    void (*on_activate)(void *); /* Optional Header/Footer host action (pointer or accepted accessibility activation). */
     void *activate_user;
     cui_box box;
 } cui_sidebar_section_options;

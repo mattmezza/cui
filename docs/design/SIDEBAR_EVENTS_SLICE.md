@@ -1,6 +1,6 @@
 # Sidebar event checkpoint
 
-Activation, item expansion and collapse Base/Styled slices implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Header/footer remain proposals. Original audit: `2d7e16d1`. Activation, expansion and collapse payload/handler/result types are exposed now.
+Activation, item expansion and collapse Base/Styled slices implemented in this branch; see [Sidebar events](../SIDEBAR_EVENTS.md). Header/footer action forwarding is implemented in the final independent slice. Original audit: `2d7e16d1`. Activation, expansion and collapse payload/handler/result types are exposed now.
 Preserve the shared component event contract, existing public layouts and all old
 callbacks/results. This is an additive seam proposal, not new input routing.
 
@@ -183,4 +183,14 @@ No collapse CHANGE, callback reconstruction from aggregate bool or hidden resync
 Bounded tests compare actual old/new callback values and Styled geometry, repeated
 requests, divergent owner writes, entry semantics, genuine pointer/touch/key/Button
 accessibility, inert/layout-only/disabled/missing handlers and copied lifetime.
-Header/footer remain unimplemented and require separate approval.
+Header/footer were subsequently approved and implemented; see the routing correction below.
+
+## Header/footer routing correction and implementation
+
+The earlier pointer-only description was incomplete: existing GROUP sections set
+`pointer_activatable`, which Core's accessibility eligibility explicitly accepts.
+The additive Styled-only `cui_sidebar_header_events` / `cui_sidebar_footer_events`
+therefore preserve pointer, touch and accepted accessibility ACTIVATE. No keyboard
+activation routing or Base section API is introduced. Shared activation handlers
+and action results report actual observer calls, after each legacy callback;
+metadata is frozen beforehand. Legacy entrypoints retain their original path.

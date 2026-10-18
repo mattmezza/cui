@@ -1,11 +1,12 @@
-# Base hover model-open observers
+# Hover model-open observers
 
 Include `cui/cui_hover_events.h` for `cui_hover_update_events`. This additive pure
 Base adapter preserves `cui_hover_update` and all its parameters, state and timing.
 It observes actual model-open transitions for shared HoverCard/Tooltip policy.
 It does not report painted visibility, rendered geometry, animation completion,
-input acceptance or controlled requests. Styled panel observers are not implemented
-in this slice; see the [checkpoint](design/LIFECYCLE_RESULT_EVENTS_SLICE.md).
+input acceptance or controlled requests. Styled `cui_tooltip_events` and
+`cui_begin_hover_card_events` add final-model observation around existing
+composition; see below and the [checkpoint](design/LIFECYCLE_RESULT_EVENTS_SLICE.md).
 
 ```c
 #include <cui/cui_hover_events.h>
@@ -38,7 +39,7 @@ policy: finite positive dt advances elapsed, invalid/nonpositive dt does not;
 nonfinite or negative delay becomes zero. `control_result` is the exact legacy
 bool (entry open differs from final open), not successful submission. The explicit
 `changed` flag independently records the same entry/final comparison even without
-a handler; it will remain distinct from Styled composition admission. Pending,
+a handler; it is distinct from Styled composition admission. Pending,
 target, elapsed or suppression-only changes are not open transitions.
 
 One actual open transition invokes the optional handler once, after reduction,
@@ -51,7 +52,7 @@ Disabled pure policy closes an open state and may notify. Escape closes and
 suppresses reopening until trigger/focus/content facts are absent. This function
 has no UI ancestry or routing: disabled closing is a model transition, not accepted
 user input; it cannot identify inert/layout-only frames or promise UI callback
-suppression. A later Styled adapter must handle those boundaries separately.
+suppression. The Styled adapters handle those boundaries separately, below.
 
 Payload metadata is LIFECYCLE with the supplied target and UNKNOWN source. All
 presence flags are clear: no context/frame/index/activation/reason is inferred
@@ -74,10 +75,74 @@ and ASan/UBSan checks run alongside existing content regressions through the pri
 test wrapper. Sanitizer validation uses prebuilt instrumented Core/software archives,
 not a new full-project sanitizer build.
 
-No Styled Tooltip/HoverCard composition, Focus Trap, virtual-window completion,
+No Focus Trap, virtual-window completion,
 MessageScroller, bridge producer or language callback is added. Existing binding
 notification allowlists remain unchanged. This is a bounded model observation
 slice, not full-family or uniform coverage of all 78 manifest families.
 
 The explicit `changed` field extends the unreleased event-result layout. Rebuild
 consumers rather than mixing earlier objects; no legacy result/layout changed.
+
+## Styled Tooltip and HoverCard
+
+```c
+cui_hover_event_result tooltip = cui_tooltip_events(
+    ui, tooltip_id, theme, &tooltip_state, cui_string("Help"), options,
+    (cui_hover_handler){open_changed, app});
+(void)tooltip;
+
+cui_hover_event_result card = cui_begin_hover_card_events(
+    ui, card_id, theme, &card_state, cui_string("Details"), card_options,
+    (cui_hover_handler){open_changed, app});
+if (card.control_result) {
+    /* Arbitrary child controls/content keep their own event contracts. */
+    cui_end_hover_card(ui); /* Existing end, exactly once on true admission. */
+}
+```
+
+Both functions call their legacy counterpart once, then compare the final model.
+`control_result` is the exact old Tooltip bool or HoverCard begin admission;
+`changed` independently compares entry/final open state, even without a handler.
+`valid` requires nonnull context/theme/state and nonzero ID, not successful
+geometry, resources, paint or full-frame completion. Invalid arguments reject
+before model work. Missing observers preserve state/composition with count zero.
+Callback count remains zero/one and overflow false.
+
+Placement can force the model closed after delayed policy opens it. Closed→open→
+forced-closed within one call is net-zero and silent. Conversely intrinsic card
+measurement resource failure can return false with the model open: `changed=true`,
+`control_result=false` and one OPEN model notification are valid. The callback does
+not claim that a portal was composed or displayed. Never condition HoverCard end
+on `changed` or callback count; pair only on `control_result`.
+
+Notification follows the complete legacy Tooltip call or the legacy HoverCard
+begin decision, **before arbitrary HoverCard children**. It is not a deferred end
+callback. Do not call the new Base observer internally/on the same state first;
+that would advance delay twice. Original content, placement, measurement redraw,
+trigger description, child semantics and end balancing remain unchanged.
+
+Styled metadata has only HAS_FRAME with the genuine nonzero local frame sequence;
+UNKNOWN source, no source-presence/index/activation/reason. Delays, focus, geometry
+fallback and several inputs may contribute. Frame-zero inert/layout-only/protected
+work keeps legacy maintenance and `changed` results but suppresses observers.
+Calling UI composition from protected measurement is still unsupported: the
+adapter does not hide the old lifecycle diagnostic or grant permission to do it.
+
+Legacy Escape policy scans globally without filtering consumed/repeated/modified
+keys. This adapter preserves it rather than changing routing. Trigger focus opens;
+HoverCard can hold open for panel hover/contained child focus, Tooltip cannot.
+Omission does not close model state or retain handlers for a later close.
+The original hover-state/options/text and arbitrary child storage obligations
+remain; users/payloads are callback-borrowed, not retained during pending delay or
+measurement redraw. Do not mutate active hover/trigger/input/options, recursively
+compose, free active resources or destroy the context during callbacks.
+
+Styled tests compare old/new paint command geometry/colors/text size, panel bounds,
+state and semantics; prove pointer delay, contained child focus, global consumed
+repeat Escape, disable close, missing handlers, omission, viewport/anchor fallback,
+resource-capacity failure, inert/layout-only maintenance, protected-measurement
+suppression with unchanged legacy diagnostic, and copied payload lifetime.
+Strict Release and ASan/UBSan private-wrapper runs include Base and legacy content
+regressions; sanitizer checks reuse instrumented Core/software archives. No actual
+visibility/presentation, retained listener, bridge producer or foreign callback is
+claimed.

@@ -32,12 +32,25 @@ typedef struct {
  * Pending/elapsed-only changes do not notify; omission does not advance policy.
  * Do not mutate active state, recursively invoke its reducer, free active storage
  * or unwind a foreign exception through callbacks. Unrelated app state may change.
- * No Styled Tooltip/HoverCard observer or retained lifecycle is supplied yet. */
+ * Styled observers below use UI admission; this Base function has no UI context. */
 cui_hover_event_result cui_hover_update_events(cui_id target, cui_hover_state *,
                                                bool trigger_hovered, bool content_hovered,
                                                bool focused, bool escape, bool disabled, float dt,
                                                float open_delay, float close_delay,
                                                cui_hover_handler);
+/* Styled final-model observation: control_result is the exact legacy Tooltip
+ * bool / HoverCard begin admission. changed is independent, including fallback
+ * closes; neither means completed visibility. End HoverCard only on admission.
+ * Callback runs after legacy call, before arbitrary admitted HoverCard children.
+ * Frame-zero/protected work preserves maintenance but suppresses callbacks.
+ * Metadata has genuine frame only, UNKNOWN source and no index/activation.
+ * No handlers retained across omission, delay or end. Same callback rules apply. */
+cui_hover_event_result cui_tooltip_events(cui_context *, cui_id, const cui_theme *,
+                                          cui_hover_state *, cui_str text, cui_hover_options,
+                                          cui_hover_handler);
+cui_hover_event_result cui_begin_hover_card_events(cui_context *, cui_id, const cui_theme *,
+                                                   cui_hover_state *, cui_str name,
+                                                   cui_hover_options, cui_hover_handler);
 #ifdef __cplusplus
 }
 #endif

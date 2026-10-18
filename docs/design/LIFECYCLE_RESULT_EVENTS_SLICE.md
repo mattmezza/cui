@@ -1,6 +1,6 @@
 # Lifecycle and result observer checkpoint
 
-Original design audit at `ea5a3e40`; the Base hover observer is now implemented,
+Original design audit at `ea5a3e40`; the Base and Styled hover observers are now implemented,
 as recorded at the end. Other proposals remain unimplemented; no metadata promotion
 or new manifest family. Read with the [remaining audit](COMPONENT_EVENTS_REMAINING.md),
 [contract](COMPONENT_EVENTS_CONTRACT.md) and [scroll checkpoint](SCROLL_EVENTS_SLICE.md).
@@ -303,3 +303,15 @@ independent of handler/count. Base `control_result` is the same legacy transitio
 bool; future Styled `control_result` remains composition admission. Tests assert
 that absence of a handler does not erase the applied transition. Consumers rebuild
 for this additive unreleased layout change.
+
+## Implemented Styled hover slice
+
+`cui_tooltip_events` and `cui_begin_hover_card_events` now wrap each legacy call
+once and observe final open model after placement/resource decisions, before
+arbitrary HoverCard children. `changed` is independent of `control_result`
+admission and handler/count. Metadata is UNKNOWN with genuine nonzero frame only;
+frame-zero/protected maintenance remains observable in results with no callback.
+No Base observer is invoked internally. The guide and focused old/new geometry,
+semantics, failure, omission, input-policy and protected-phase tests document the
+implemented limits. Original Focus Trap and virtual/message dispositions remain
+unchanged; no visibility, allocation rollback or completion promise was added.

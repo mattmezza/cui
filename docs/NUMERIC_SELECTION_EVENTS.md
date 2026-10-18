@@ -35,6 +35,14 @@ the callback. Request teardown or owner updates in separate application state
 and perform them after the outer call returns. Styled paint rereads the owner;
 owner mutation during observation has no supported rendering contract.
 
-Legacy entrypoints remain unchanged. Stepper and Rating are subsequent family
-slices; this checkpoint exposes Pagination only. This native facade does not add
-bridge notification tags or binding wrappers.
+Stepper adds the same Base/Styled `_events` pattern with a distinct
+`cui_stepper_change_event`: exact `size_t before`, `after`, `count`. Indices are
+zero-based; an empty list normalizes to zero. Descriptors, titles and descriptions
+remain borrowed through the call. Selection does not rewrite explicit statuses;
+Styled paint still shows Current only on the selected item, retains Complete and
+Error, and shows an unselected ACTIVE descriptor as Pending. Counts above 100 or
+missing nonempty descriptor arrays retain legacy rejection. Disabled items cannot
+activate, while list-wide normalization still occurs when disabled or passive.
+
+Legacy entrypoints remain unchanged. Rating is the next family slice. This native
+facade does not add bridge notification tags or binding wrappers.

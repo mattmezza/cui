@@ -24,6 +24,19 @@ cui_numeric_selection_event_result cui_base_pagination_events(cui_context *, cui
 cui_numeric_selection_event_result cui_pagination_events(cui_context *, cui_id,
     const cui_theme *, size_t *, size_t total, bool compact, bool disabled,
     cui_pagination_event_handler);
+typedef struct {
+    cui_component_event_metadata event;
+    size_t before, after, count;
+} cui_stepper_change_event;
+typedef void (*cui_stepper_change_fn)(void *user, const cui_stepper_change_event *event);
+typedef struct { cui_stepper_change_fn change; void *user; } cui_stepper_event_handler;
+/* Same aggregate observation/lifetime rules as Pagination; zero-based indices.
+ * Step descriptors and their strings remain borrowed throughout the outer call. */
+cui_numeric_selection_event_result cui_base_stepper_events(cui_context *, cui_id,
+    const cui_step *, size_t count, size_t *current, bool disabled, cui_stepper_event_handler);
+cui_numeric_selection_event_result cui_stepper_events(cui_context *, cui_id,
+    const cui_theme *, const cui_step *, size_t count, size_t *current,
+    bool vertical, bool disabled, cui_stepper_event_handler);
 #ifdef __cplusplus
 }
 #endif

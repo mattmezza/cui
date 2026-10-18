@@ -19,3 +19,24 @@ cui_numeric_selection_event_result cui_base_pagination_events(cui_context *ui, c
     }
     return result;
 }
+cui_numeric_selection_event_result cui_base_stepper_events(cui_context *ui, cui_id id,
+    const cui_step *steps, size_t count, size_t *current, bool disabled,
+    cui_stepper_event_handler handler) {
+    uint64_t frame = cui_frame_sequence(ui);
+    bool observe = handler.change && frame && id && current && !disabled &&
+                   (steps || !count) && count <= 100;
+    size_t before = observe ? *current : 0;
+    cui_numeric_selection_event_result result = {0};
+    result.control = cui_base_stepper(ui, id, steps, count, current, disabled);
+    if (observe && cui_frame_sequence(ui) == frame && before != *current) {
+        cui_stepper_change_event event = {0};
+        (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_CHANGE, id,
+                                      CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+        event.event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
+        event.event.frame_sequence = frame;
+        event.before = before; event.after = *current; event.count = count;
+        result.change_count = 1;
+        handler.change(handler.user, &event);
+    }
+    return result;
+}

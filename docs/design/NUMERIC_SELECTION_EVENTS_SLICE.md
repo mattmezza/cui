@@ -200,5 +200,7 @@ multiplicity and Tabs remain excluded.
 ## Implementation checkpoints
 
 Pagination now has an additive Base wrapper and a narrow Styled common seam.
-Legacy paint and reduction remain on their original unobserved path. Stepper and
-Rating remain pending independent implementation and validation checkpoints.
+Legacy paint and reduction remain on their original unobserved path. Stepper
+has a separate aggregate wrapper/common seam with zero-based exact index payloads;
+its legacy descriptor statuses and rejection rules remain unchanged. Rating
+remains pending its independent implementation and validation checkpoint.

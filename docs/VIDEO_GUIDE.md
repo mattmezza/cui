@@ -8,11 +8,21 @@ casting service or editor. The architecture roadmap remains [VIDEO_PLAN.md](VIDE
 The optional [offline audio host foundation](../examples/video_audio_host/README.md)
 demonstrates bounded PCM buffering, worker cancellation, generation-safe seeks and
 ordered output-consumption accounting with injected services. It is an
-example-local C11 controller, not a CUI component API or a real decoder/device
-adapter. Native playback still has no sound output through this example. Its
-six deterministic tests require no network, microphone, speaker or window;
+example-local C11 controller, not a CUI component API or device adapter. Its
+deterministic tests require no network, microphone, speaker or window;
 the guide includes build and invisible-display test commands. Browser video uses
 the browser's existing audio decoder/output independently.
+
+The separate [FFmpeg PCM decoder proof](../examples/video_audio_ffmpeg/README.md)
+feeds that controller from real local media and converts audio to 48 kHz stereo
+float. Offline tests check sample content, resampler draining, exact replay-based
+seeks, a shared video/audio origin, cancellation and pending-worker shutdown.
+This optional example currently admits only bounded PCM media and replays from
+the beginning for seeks; it is not general compressed-media playback. Its pinned
+FFmpeg package has GPLv3-or-later licensing, documented in the example. Neither
+example connects to a speaker or the native video UI yet. Native sound output
+therefore remains unimplemented; passing these tests does not prove audibility
+or audio/video synchronization.
 
 ## Initialize and advance
 

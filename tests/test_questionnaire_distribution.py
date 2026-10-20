@@ -13,6 +13,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class QuestionnaireDistributionTests(unittest.TestCase):
+    def test_staged_binding_configures_without_optional_guides(self):
+        if not shutil.which('cmake'):
+            self.skipTest('CMake unavailable')
+        spec = importlib.util.spec_from_file_location(
+            'questionnaire_package_stage', ROOT / 'scripts/package_bindings.py')
+        package = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(package)
+        with tempfile.TemporaryDirectory(prefix='cui-questionnaire-package-') as directory:
+            root = Path(directory)
+            package.copy_source(root / 'source')
+            self.assertFalse((root / 'source/docs').exists())
+            result = subprocess.run(
+                ['cmake', '-S', str(root / 'source/bindings/bridge'),
+                 '-B', str(root / 'build'), '-DCUI_BUILD_NATIVE=OFF',
+                 '-DCMAKE_BUILD_TYPE=Release'],
+                text=True, capture_output=True, timeout=90)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_direct_implementation_and_cpp_declarations(self):
         compiler = shlex.split(os.environ.get('CC', 'cc'))
         if not compiler or not shutil.which(compiler[0]):

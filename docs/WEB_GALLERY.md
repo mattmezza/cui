@@ -157,3 +157,11 @@ Hosted runner capacity and queue time also affect latency.
 Portable matrix builds use two concurrent compilation jobs; tests keep their
 existing execution order. Core and native-binding workflows cancel superseded
 runs on the same ref. No test coverage or deployment acceptance gate was removed.
+
+DatePicker retains its default extended-API example and locale selector. Enable
+**Date-only actions** for two application-owned preset dates, then optionally
+enable its clear button and scoped Delete key. The copy button follows the active
+mode and includes retained state/value initialization for the actions example.
+Dismiss an open modal popup before using its outside clear button. Desktop and
+touch tests exercise these actions and compile both copied C snippets. This
+coverage excludes date-time editing, arbitrary styling, observers and bindings.

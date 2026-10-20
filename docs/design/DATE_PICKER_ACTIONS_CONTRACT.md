@@ -1,7 +1,8 @@
 # DatePicker date-only actions: proposed contract
 
-Review checkpoint only, based on `b0405a3c`. No declarations below are installed,
-no production implementation is included, and no tests are claimed executed.
+Reviewed contract, based on `b0405a3c`; implementation is isolated in the new
+actions files and private fixture. Canonical registration remains integrator-owned.
+Final validation evidence is recorded in the consumer guide.
 Scope: presets and clear actions, legacy-preserving Base/Styled composition;
 no date-time, new visual variants, lifecycle observers or Core dispatch changes.
 
@@ -13,11 +14,9 @@ New `include/cui/cui_date_picker_actions.h` includes
 ```c
 #define CUI_DATE_PICKER_PRESET_LIMIT 8u
 #define CUI_DATE_PICKER_LABEL_LIMIT 96u
+#define CUI_DATE_PICKER_TARGET_LIMIT 144u
 
-typedef enum {
-    CUI_DATE_PICKER_SINGLE = 0,
-    CUI_DATE_PICKER_RANGE
-} cui_date_picker_shape;
+typedef enum { CUI_DATE_PICKER_SINGLE = 0, CUI_DATE_PICKER_RANGE } cui_date_picker_shape;
 
 typedef struct {
     cui_date_selection dates;
@@ -60,10 +59,20 @@ typedef struct {
     cui_date_picker_value calendar_value;
     cui_date_picker_value observed_value;
     bool synchronized;
+    /* Previous submission identities, copied values only; do not edit directly. */
+    cui_calendar_state submitted_calendar;
+    cui_id submitted_root, submitted_presets[CUI_DATE_PICKER_PRESET_LIMIT];
+    size_t submitted_count;
+    bool submitted_open, submitted_clear;
+    uint64_t prepared_frame, submitted_frame, clear_frame;
+    cui_id prepared_root, prepared_trigger, submitted_clear_id;
+    unsigned submitted_months, submitted_first_weekday;
+    cui_id submitted_targets[CUI_DATE_PICKER_TARGET_LIMIT];
+    size_t submitted_target_count;
 } cui_date_picker_actions_state;
 
-void cui_date_picker_actions_init(cui_date_picker_actions_state *,
-    cui_id popup, cui_date initial_month);
+void cui_date_picker_actions_init(cui_date_picker_actions_state *, cui_id popup,
+                                  cui_date initial_month);
 
 typedef struct {
     cui_calendar_result calendar;
@@ -72,15 +81,23 @@ typedef struct {
     bool action_activated;
 } cui_date_picker_actions_result;
 
-cui_date_picker_actions_result cui_base_date_picker_actions(
-    cui_context *, cui_id trigger, cui_id calendar, cui_str name,
-    cui_date_picker_actions_state *, cui_date_picker_value *,
-    cui_date_picker_actions_options);
+/* Inside caller-owned open popup scope, after a valid Base reduction.
+ * Publishes bounded prior-submission identity only after full successful submission.
+ * Semantics only: no reduction, callbacks or scope begin/end. */
+void cui_date_picker_actions_submit_presets(cui_context *, cui_date_picker_actions_state *,
+                                            cui_date_picker_actions_options);
 
-cui_date_picker_actions_result cui_date_picker_actions(
-    cui_context *, cui_id trigger, const cui_theme *, cui_str name,
-    cui_date_picker_actions_state *, cui_date_picker_value *,
-    cui_date_picker_actions_options);
+cui_date_picker_actions_result cui_base_date_picker_actions(cui_context *, cui_id trigger,
+                                                            cui_id calendar, cui_str name,
+                                                            cui_date_picker_actions_state *,
+                                                            cui_date_picker_value *,
+                                                            cui_date_picker_actions_options);
+
+cui_date_picker_actions_result cui_date_picker_actions(cui_context *, cui_id trigger,
+                                                       const cui_theme *, cui_str name,
+                                                       cui_date_picker_actions_state *,
+                                                       cui_date_picker_value *,
+                                                       cui_date_picker_actions_options);
 ```
 
 The new state is necessary: frozen source owns independent picker and child
@@ -96,9 +113,12 @@ The caller owns this state; no allocation or hidden retained pointer is introduc
 `value.shape` is authoritative for the picker title and clear action. Child
 Calendar reduction/submission uses `state.calendar_value.shape` and dates;
 `options.picker.calendar.range` is ignored by this facade. All other picker and
-Calendar options are forwarded. A genuine child day edit publishes the resulting
-child value to outer value; navigation and rejected/no-op activation do not copy
-the stale child value over the accepted outer value. Legacy records/functions
+Calendar options are forwarded. An accepted complete child activation publishes its child value to the outer
+value even if the child date did not change (frozen Calendar emits Selected).
+Actual child edits additionally publish incomplete ranges, preserving CUI's
+partial-range behavior; upstream subscription delivery is completion-only.
+Navigation and rejected activation do not copy stale child values over the outer
+value. Legacy records/functions
 remain unchanged. Zero-action equivalence to legacy holds only when outer and
 child selections are synchronized; exact source divergence is new explicit state,
 not a claimed shared-selection legacy behavior.
@@ -263,3 +283,45 @@ and current month/year only; rejected matcher updates change none of those.
 child dates on each render. Clear emptiness bypasses matcher evaluation and
 preserves month/year because there is no start. These claims are source evidence,
 not executed upstream behavior or live focus/AT proof.
+
+
+## Implemented split submission and identity expiry
+
+`cui_date_picker_actions_submit_presets(ui, state, options)` requires the same
+preflight-valid options and the caller's one open popup scope, after its Base
+reduction and Calendar submission. It submits semantics only, never replays
+input, predicates or callbacks. The mutable state receives bounded copied
+previous-submission identity only after all submissions succeed; failure clears
+its publication stamp. Duplicate helper calls are invalid Core submission.
+Base itself submits trigger/clear semantics, not popup semantics.
+
+The state stores the prior root/grid/month-count/week-start and at most 8 preset IDs,
+plus at most 144 actual enabled semantic target IDs,
+plus context-local prepared/submitted frame stamps. Omission, failed/missing
+helper, reinitialization and close/reopen invalidate eligibility. Trigger toggles
+and Escape invalidate the old popup action targets in the current action pass.
+A genuine previous Core event target/activation is required alongside those
+records and current policy/list membership. Scope Delete covers actual Calendar
+navigation, month/year headers and selector/day grids, not only preset buttons.
+No Core scope introspection or Surface dispatch changes are introduced. Caller
+must reinitialize before moving state to another context or manually reopening
+its overlay; a context pointer is not retained.
+
+
+Final identity review: reserved year/month conflicts use decoded part intervals
+and authoritative ID rechecks, not a 9999-year scan. Successful popup submission
+copies at most 144 actual enabled semantic targets;
+Scope Delete requires both that previous set and current view/grid/list eligibility.
+An absent/off-view generated ID alone is insufficient (Core focus fallback is
+described below). The
+private overlay reducer reports open state after its trigger/dismiss pass, before
+Calendar reduction, so outside-dismiss expiration is distinguished from the
+explicitly retained Calendar auto-close/action phase behavior. There is no shared
+Core routing change.
+
+Scope Delete excludes the nonfocusable popup root and requires an actually submitted
+enabled Calendar/preset semantic target plus current view/list eligibility. Tests
+cover previously submitted year/day targets made off-view before reduction and
+absence of unsubmitted IDs from the bounded record. Core redirects unknown
+programmatic focus to an eligible modal target before key dispatch; that resolved
+target, rather than the invalid requested ID, is authoritative.

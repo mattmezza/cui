@@ -379,7 +379,8 @@ static void image_avatars(void) {
         saved = image;
         assert(cui_begin_frame(ui, 100, 100, .016f));
         cui_avatar_ex(ui, 3000, &t, failure == 2 ? cui_string("") : cui_string("Ada Lovelace"),
-                      (cui_avatar_options){.size = 48, .interactive = failure == 1,
+                      (cui_avatar_options){.size = 48,
+                                           .interactive = failure == 1,
                                            .image = failures[failure],
                                            .image_state = &image});
         draw = cui_end_frame(ui);
@@ -400,8 +401,7 @@ static void image_avatars(void) {
                 const char *expected = failure == 2 ? "Anonymous" : "Ada Lovelace";
                 size_t length = strlen(expected);
                 named = sem[i].role == (failure == 1 ? CUI_ROLE_BUTTON : CUI_ROLE_IMAGE) &&
-                        sem[i].name.length == length &&
-                        !memcmp(sem[i].name.data, expected, length);
+                        sem[i].name.length == length && !memcmp(sem[i].name.data, expected, length);
             }
         assert(named);
         /* Text commands were checked above; paint the fill without a host font. */

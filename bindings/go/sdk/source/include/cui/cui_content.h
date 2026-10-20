@@ -46,6 +46,8 @@ typedef struct {
 } cui_avatar_image;
 bool cui_avatar_image_init(cui_avatar_image *, unsigned char *storage, size_t capacity,
                            unsigned diameter);
+/* Failure leaves the cache unchanged. Use the return value for this source,
+ * not ready: a retained successful cache does not make a failed source valid. */
 bool cui_avatar_image_prepare(cui_avatar_image *, cui_bitmap source);
 typedef struct {
     float size, ring_width;

@@ -1594,10 +1594,8 @@ static void large_document_editor(void) {
 }
 static void gutter_logical_line_index(void) {
     char buffer[512] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\nb\rc\n";
-    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
-                                                       .capacity = sizeof buffer,
-                                                       .multiline = true,
-                                                       .history_bytes = 4096});
+    cui_edit *edit = cui_edit_create((cui_edit_config){
+        .buffer = buffer, .capacity = sizeof buffer, .multiline = true, .history_bytes = 4096});
     cui_textarea_line lines[128];
     cui_editor_state state;
     assert(edit && cui_editor_state_init(&state, edit, lines, 128));
@@ -1635,7 +1633,8 @@ static void gutter_logical_line_index(void) {
     /* External revisions must scan before the stale row index is refreshed.
      * U+2028 produces visual rows but does not increment logical line numbers. */
     assert(cui_edit_replace_range(edit, 0, cui_edit_get_state(edit).length,
-                                  cui_string("a\xe2\x80\xa8" "b\r\nc\r")) == CUI_EDIT_OK);
+                                  cui_string("a\xe2\x80\xa8"
+                                             "b\r\nc\r")) == CUI_EDIT_OK);
     assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
     assert(state.gutter_line_count == 3 && state.view.count == 4);
     state.gutter_valid = false;

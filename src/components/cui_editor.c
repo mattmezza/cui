@@ -41,8 +41,8 @@ static float cui_editor_gutter(cui_context *ui, cui_editor_state *editor, cui_st
         bool indexed = view->initialized && view->error == CUI_TEXTAREA_OK &&
                        view->layout_model == editor->edit && view->revision == revision &&
                        !view->layout_composing && !view->fold_count && !view->layout_fold_count &&
-                       !view->layout_token_count &&
-                       view->lines && view->lines == view->layout_lines && view->count &&
+                       !view->layout_token_count && view->lines &&
+                       view->lines == view->layout_lines && view->count &&
                        view->count <= view->capacity && view->capacity == view->layout_capacity &&
                        view->lines[view->count - 1].next == document.length;
         /* Event handling has already refreshed these rows. Logical line numbers

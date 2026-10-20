@@ -381,8 +381,14 @@
         },
         {
           "name": "image failures and accessible name",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c",
+            "docs/AVATAR_FAILURE_AUDIT.md"
+          ],
+          "limitations": [
+            "Host-decoded RGBA validation, missing/invalid source fallback, retained-cache gating, passive/interactive names and recovery are tested. Frozen upstream exposes no Avatar loading/error lifecycle; host acquisition, decoder/network retries and native assistive-technology acceptance are outside this evidence."
+          ]
         },
         {
           "name": "validated UTF-8 initials and named fallback",
@@ -3483,8 +3489,16 @@
         },
         {
           "name": "200K-line benchmark",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/bench_editor_operations.c",
+            "docs/benchmarks/EDITOR_OPERATIONS.md",
+            "docs/benchmarks/editor-operations-gutter-before-2026-10-20.csv",
+            "docs/benchmarks/editor-operations-gutter-after-2026-10-20.csv"
+          ],
+          "limitations": [
+            "Actual Editor synthetic ASCII 2K/20K/200K operation samples exist. Concurrent load was uncontrolled; results do not establish general latency targets, Unicode performance, viewport-only layout or complete Editor parity. Middle edits still relayout the suffix."
+          ]
         },
         {
           "name": "styled editor: text metrics, token callbacks, literal find panel and caller-owned folding",

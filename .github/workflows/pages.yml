@@ -123,6 +123,9 @@ jobs:
       - name: Verify Calendar month menu and neighboring dates
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_calendar_presentation_gallery.py --directory build/web
+      - name: Verify DatePicker month menu and adjacent-day popup selection
+        if: ${{ matrix.shard == 1 }}
+        run: uv run tests/web/test_date_picker_presentation_gallery.py --directory build/web
       - name: Verify Avatar sizes identity palettes and SVG placeholders
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_avatar_variants.py --directory build/web

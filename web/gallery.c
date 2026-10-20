@@ -16,6 +16,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_regex.h"
 #endif
 #include "cui/cui_content.h"
+#include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_description.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
@@ -5583,7 +5584,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 40:
-        cui_date_picker(
+        cui_date_picker_ex(
             ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
             &date_selection,
             (cui_date_picker_options){
@@ -5592,7 +5593,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                              .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale)},
                 .viewport = {0, 0, width, height},
                 .disabled = disabled,
-                .width = width > 360 ? 280 : width - 48});
+                .width = width > 360 ? 280 : width - 48},
+            (cui_date_picker_calendar_options){.presentation = {.month_toggle = true,
+                                                                .neighboring_days = true,
+                                                                .today = calendar_today}});
         break;
     case 41: {
         cui_time_field(ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_state,

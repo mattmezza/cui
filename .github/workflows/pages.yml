@@ -199,7 +199,7 @@ jobs:
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_example_polish.py
       - name: Verify Plot mouse and touch viewport interactions
-        if: ${{ matrix.shard == 3 }}
+        if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_plot_interactions.py
       - name: Verify portrait stacks and compact conversation touch behavior
         if: ${{ matrix.shard == 3 }}

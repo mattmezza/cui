@@ -172,3 +172,8 @@ and invalid-option rejection before automatic root routing and callbacks. These
 are portable headless contracts, not browser/native screen-reader acceptance or
 complete Questionnaire source parity. Nested roots, comprehensive callback
 choreography, broader part/style methods and platform integration remain open.
+
+Optional [progress presentation](QUESTIONNAIRE_PROGRESS.md) now supports localized
+accessible/visible text, decorative children and explicit bounded progress text
+metrics via an independent C header. The legacy helper keeps its English sentence
+and previous paint. This does not change other-part typography or add a Form role.

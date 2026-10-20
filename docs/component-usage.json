@@ -1249,7 +1249,8 @@
         "cui_questionnaire_query_copy",
         "cui_questionnaire_observer_attach",
         "cui_questionnaire_observer_detach",
-        "cui_questionnaire_observer_get_statistics"
+        "cui_questionnaire_observer_get_statistics",
+        "cui_questionnaire_progress_ex"
       ],
       "state_types": [
         "cui_questionnaire_state",
@@ -1259,21 +1260,25 @@
         "cui_questionnaire_keyboard_options",
         "cui_questionnaire_snapshot_workspace",
         "cui_questionnaire_observer",
-        "cui_questionnaire_observer_frame"
+        "cui_questionnaire_observer_frame",
+        "cui_questionnaire_progress_options",
+        "cui_questionnaire_text_refinement"
       ],
       "state_ownership": "Caller retains question definitions, state and all workspace buffers. An attached observer, handler/userdata and disjoint frame arenas remain alive through detach and all in-flight callbacks; rebuild matching headers/library after the state pointer ABI extension.",
       "interaction": "cui_questionnaire_event_fn emits live legacy model events; cui_questionnaire_validate_fn validates answers. The optional persistent typed observer runs synchronously before each legacy callback with frozen bounded copied payloads; handlers are observational and input metadata is UNKNOWN.",
-      "usage": "Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies. Pure answer/submission snapshots copy effective values into caller-owned bounded storage without callbacks or model mutation; query_copy reports scalar state. Language builders omit snapshot APIs. Optional typed observation freezes Completed/Submit as one pair, preserves legacy callback replacement and nested mutations, and reports capacity/depth failures without suppressing legacy events. Detach can return BUSY while an outer callback pins resources. Language builders omit observer attachment, typed payloads and arenas.",
+      "usage": "Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies. Pure answer/submission snapshots copy effective values into caller-owned bounded storage without callbacks or model mutation; query_copy reports scalar state. Language builders omit snapshot APIs. Optional typed observation freezes Completed/Submit as one pair, preserves legacy callback replacement and nested mutations, and reports capacity/depth failures without suppressing legacy events. Detach can return BUSY while an outer callback pins resources. Language builders omit observer attachment, typed payloads and arenas. Additive progress presentation supports masked localized accessible/visible labels, borrowed decorative child composition and explicit bounded text size/linebox/style/color; zero preserves legacy paint and enabled-position numeric semantics. No implicit typography cascade or language-builder progress facade is provided.",
       "docs": [
         "docs/QUESTIONNAIRE.md",
         "docs/QUESTIONNAIRE_KEYBOARD.md",
         "docs/QUESTIONNAIRE_SNAPSHOTS.md",
-        "docs/QUESTIONNAIRE_OBSERVER.md"
+        "docs/QUESTIONNAIRE_OBSERVER.md",
+        "docs/QUESTIONNAIRE_PROGRESS.md"
       ],
       "callback_symbols": [
         "cui_questionnaire_event_fn",
         "cui_questionnaire_validate_fn",
-        "cui_questionnaire_observation_fn"
+        "cui_questionnaire_observation_fn",
+        "cui_questionnaire_progress_render_fn"
       ],
       "scope": "styled frame component",
       "name": "Questionnaire",
@@ -1282,7 +1287,8 @@
       "additional_public_headers": [
         "include/cui/cui_questionnaire_keyboard.h",
         "include/cui/cui_questionnaire_snapshots.h",
-        "include/cui/cui_questionnaire_observer.h"
+        "include/cui/cui_questionnaire_observer.h",
+        "include/cui/cui_questionnaire_progress.h"
       ]
     },
     {

@@ -186,3 +186,9 @@ explicit hex commit reparses/truncates and can quantize an unchanged display.
 SELECT reports a close request and owns no popup.
 
 Questionnaire typed observation is an optional persistent C attachment, separate from pure snapshot copy-out. Consult `docs/QUESTIONNAIRE_OBSERVER.md` for matching-header/library rebuild, caller-owned observer/handler/frame arenas, BUSY detach pinning, frozen Completed/Submit payloads and capacity/depth failures. Typed handlers are observational; input metadata is UNKNOWN. Language builders do not expose this observer facade.
+
+For localized/custom Questionnaire progress, read `docs/QUESTIONNAIRE_PROGRESS.md`
+and `include/cui/cui_questionnaire_progress.h`. Masks preserve explicit empty/zero
+values; strings survive frame consumption and child callbacks are borrowed/pure.
+Numeric progress stays model-derived. This is C-only bounded presentation, not a
+family typography cascade or language-builder facade.

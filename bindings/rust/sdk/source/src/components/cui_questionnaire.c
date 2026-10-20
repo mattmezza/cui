@@ -2,6 +2,7 @@
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_components.h"
 #include "cui/cui_questionnaire_keyboard.h"
+#include "cui/cui_questionnaire_progress.h"
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -572,28 +573,63 @@ void cui_questionnaire_part_end(cui_context *ui) {
 }
 void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
                                 const cui_questionnaire_state *s, cui_questionnaire_options o) {
+    (void)cui_questionnaire_progress_ex(ui, id, t, s, o, (cui_questionnaire_progress_options){0});
+}
+bool cui_questionnaire_progress_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                                   const cui_questionnaire_state *s, cui_questionnaire_options o,
+                                   cui_questionnaire_progress_options p) {
     cui_questionnaire_options_snapshot snapshot;
-    if (!cui_questionnaire_snapshot(&o, &snapshot))
-        return;
-    if (!ui || !id || !t || !s || !s->initialized)
-        return;
+    if (!cui_questionnaire_snapshot(&o, &snapshot) || !ui || !id || !t || !s || !s->initialized)
+        return false;
+    cui_questionnaire_text_refinement r = p.text;
+    if ((p.fields & ~UINT32_C(3)) || (r.fields & ~UINT32_C(15)) ||
+        ((p.fields & CUI_QUESTIONNAIRE_PROGRESS_LABEL) && !cui_edit_valid_utf8(p.label)) ||
+        ((p.fields & CUI_QUESTIONNAIRE_PROGRESS_VISIBLE) && !cui_edit_valid_utf8(p.visible)) ||
+        ((r.fields & CUI_QUESTIONNAIRE_TEXT_SIZE) &&
+         (!isfinite(r.font_size) || r.font_size <= 0 || r.font_size > 512)) ||
+        ((r.fields & CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT) &&
+         (!isfinite(r.line_height) || r.line_height < 0 || r.line_height > 4096)) ||
+        ((r.fields & CUI_QUESTIONNAIRE_TEXT_STYLE) &&
+         ((unsigned)r.style.weight > CUI_TEXT_WEIGHT_BOLD || !isfinite(r.style.letter_spacing))))
+        return false;
     o = cui_questionnaire_resolve_size(ui, s, o);
     size_t position = cui_questionnaire_position(s), total = cui_questionnaire_total(s);
     size_t current = position == SIZE_MAX ? 0 : position + 1;
     char label[80];
-    int n = snprintf(label, sizeof label, "Question %zu of %zu", current, total);
-    if (n < 0 || (size_t)n >= sizeof label)
-        return;
-    cui_str text = {label, (size_t)n};
+    cui_str text = p.label;
+    if (!(p.fields & CUI_QUESTIONNAIRE_PROGRESS_LABEL)) {
+        int n = snprintf(label, sizeof label, "Question %zu of %zu", current, total);
+        if (n < 0 || (size_t)n >= sizeof label)
+            return false;
+        text = (cui_str){label, (size_t)n};
+    }
+    cui_questionnaire_progress_view view = {
+        .current = current,
+        .total = total,
+        .font_size = o.design_size                       ? cui_questionnaire_measure(o).font * .75f
+                     : o.size == CUI_QUESTIONNAIRE_LARGE ? 14
+                                                         : 12,
+        .color = t->muted,
+        .style = {.weight = CUI_TEXT_WEIGHT_MEDIUM}};
+    if (r.fields & CUI_QUESTIONNAIRE_TEXT_SIZE)
+        view.font_size = r.font_size;
+    if (r.fields & CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT)
+        view.line_height = r.line_height;
+    if (r.fields & CUI_QUESTIONNAIRE_TEXT_COLOR)
+        view.color = r.color;
+    if (r.fields & CUI_QUESTIONNAIRE_TEXT_STYLE)
+        view.style = r.style;
     cui_interact(ui, id, CUI_ROLE_PROGRESSBAR, text, false, false, (float)current);
     cui_set_semantic_details(ui, id, (cui_semantic_details){.minimum = 0, .maximum = (float)total});
     cui_begin_box(ui, id, (cui_box){.width = -1});
-    cui_text_ex(ui, text,
-                o.design_size                       ? cui_questionnaire_measure(o).font * .75f
-                : o.size == CUI_QUESTIONNAIRE_LARGE ? 14
-                                                    : 12,
-                t->muted, 0, (cui_text_style){.weight = CUI_TEXT_WEIGHT_MEDIUM});
+    if (p.render_child) {
+        cui_id child = id ^ UINT64_C(0x619ed493fe2853b4);
+        p.render_child(ui, child ? child : 1, &view, p.render_user);
+    } else
+        cui_text_ex(ui, (p.fields & CUI_QUESTIONNAIRE_PROGRESS_VISIBLE) ? p.visible : text,
+                    view.font_size, view.color, view.line_height, view.style);
     cui_end_box(ui);
+    return true;
 }
 bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_theme *t,
                                       cui_questionnaire_state *s, size_t item, size_t choice,

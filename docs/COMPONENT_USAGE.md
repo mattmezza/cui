@@ -159,13 +159,13 @@ Additional event includes: `cui/cui_media_events.h`.
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller retains name, borrowed RGBA pixels, bounded circular cache and destination storage through rendering.
+**State:** Caller retains name, borrowed RGBA pixels, bounded circular cache and destination storage through rendering. Optional typed placeholder state and mask versions also survive draw completion; named SVG uses the context cache. Metrics and palettes are copied values.
 
 **Interaction:** Interactive avatars return activation; interactive stacks return the selected index or SIZE_MAX. Application opens the selected profile.
 
-**Usage:** Initialize a circular image cache once; submit borrowed image pixels with a revision. Missing images fall back to initials; stacks use stable application keys.
+**Usage:** Initialize a circular image cache once; submit borrowed image pixels with a revision. Missing/invalid images fall back to initials; stacks use stable application keys. Opt into shared design sizes, deterministic identity palettes or anonymous SVG placeholders without changing legacy defaults.
 
-API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`. [Public header](../include/cui/cui_content.h); [content guide](CONTENT.md); [profile images and conversations](AVATAR_MESSAGE_EXAMPLES.md).
+API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`, `cui_avatar_image_prepare`, `cui_avatar_measure`, `cui_avatar_identity`. [Public header](../include/cui/cui_content.h); [content guide](CONTENT.md); [profile images and conversations](AVATAR_MESSAGE_EXAMPLES.md).
 
 ## Badge
 

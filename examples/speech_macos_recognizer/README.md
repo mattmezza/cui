@@ -107,3 +107,37 @@ ObjC service fixture need actual macOS CI; Linux fixtures do not prove them.
 Real microphone consent/capture, Speech authorization, locale/model availability,
 on-device recognition and real stop/no-speech behavior remain explicit manual
 validation. None is executed automatically or inferred from portable tests.
+
+## Private Objective-C slice: source ready, macOS validation pending
+
+`host_macos.h` adds only opaque C factory/service types. `host_macos.m` keeps
+Foundation/Speech/AVFoundation objects and ARC callback blocks private. The
+native factory does not request authorization or open a microphone. Explicit
+Speech preparation validates the application's nonempty
+`NSSpeechRecognitionUsageDescription`; recognition rechecks authorization,
+locale/on-device availability and always configures on-device-only requests,
+partial results and punctuation. No microphone authorization API is called.
+
+`host_macos_private.h` is an ObjC-only test seam. The native service fixture
+injects Objective-C fake request/task/backend objects into the **actual transport**.
+It is intended to observe real transport property setters, copied
+AVAudioPCMBuffer samples, bounded UTF-8 conversion, oversized results,
+result-plus-error precedence, cancel/end-audio counts and blocks retained beyond
+host/service shutdown. It does not instantiate SFSpeechRecognizer, request OS
+permission, create a real recognition task or touch a microphone. The real
+Apple backend is compiled and linked in the same target but not executed.
+
+On macOS the same standalone CMake commands add a `speech_recognizer_macos`
+library and `test_macos` target with ARC/blocks, deployment target 13.0 and
+strict warnings. `speech_recognizer_macos_injected` is the seventh CTest case.
+CI needs the installed Xcode macOS SDK and system frameworks; no new downloaded
+dependency. Run through `scripts/test_local.py` using the portable-only cache
+already set by this project. The independent example currently supplies a
+POSIX mutex and explicitly rejects Windows configuration.
+
+These Objective-C sources have only been formatted/reviewed on Linux so far;
+**macOS compilation and all native fixture results are pending actual macOS CI**.
+Linux's six portable cases still pass after adding the conditional native build.
+Do not infer native build/test success, live permission behavior, microphone
+operation or recognition quality from those results. Integrator owns the CI
+change and resulting evidence update.

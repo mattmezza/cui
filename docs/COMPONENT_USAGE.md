@@ -141,6 +141,8 @@ Additional event includes: `cui/cui_surface_events.h`.
 
 API: `cui_alert`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
 
+Direct C `cui_alert_events` and `cui_alert_dismiss_fn` observe the completed built-in dismissal after the legacy visibility write. See [dismissal timing and ownership](ALERT_EVENTS.md).
+
 ## Attachment
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.

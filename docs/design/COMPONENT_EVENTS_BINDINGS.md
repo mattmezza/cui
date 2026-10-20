@@ -484,3 +484,11 @@ Direct C single-Avatar and visible-stack activation observers are implemented in
 Rust do not yet expose these synchronous observer handlers or stack payloads.
 Avatar style setters are a separate retained binding feature, not event parity.
 See [the observer guide](../AVATAR_EVENTS.md) for timing and borrowed lifetimes.
+
+## Alert completed-dismiss observer
+
+Direct C `cui_alert_events` is a synchronous coalesced observer after the existing
+optional visibility assignment. Python, JS/TS, Go and Rust do not expose this
+handler/result facade or per-input Dismiss events. The retained bridge Alert is
+presentational; its arbitrary child actions remain separate. See
+[the guide](../ALERT_EVENTS.md); no foreign close/veto support is implied.

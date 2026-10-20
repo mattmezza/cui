@@ -36,7 +36,7 @@ full-family verification. Each family links its authoritative public header.
 | --- | --- | --- |
 | [Accordion](../../include/cui/cui_disclosure.h) | A | [DISCLOSURE_EVENTS](../DISCLOSURE_EVENTS.md): Every applied expansion transition; no controlled veto added. |
 | [AlertDialog](../../include/cui/cui_surface.h) | A | [SURFACE_EVENTS](../SURFACE_EVENTS.md): Retained completed-close only; existing decision policy separate; open/request/veto not notifications. |
-| [Alert](../../include/cui/cui_content.h) | G | Built-in Dismiss activation and optional visibility mutation lack a shared observer; arbitrary child actions remain separate. See [audit](AVATAR_EVENTS_SLICE.md). |
+| [Alert](../../include/cui/cui_content.h) | A | [ALERT_EVENTS](../ALERT_EVENTS.md): coalesced completed Dismiss action after legacy visibility assignment; frame-only metadata, no per-input observer or close/veto promise. Child actions remain separate. |
 | [Attachment](../../include/cui/cui_media.h) | A | [ATTACHMENT_EVENTS](../ATTACHMENT_EVENTS.md): Coalesced OPEN/REMOVE/RETRY after old callbacks in category order, not raw-input multiplicity. |
 | [Avatar](../../include/cui/cui_content.h) | A | [AVATAR_EVENTS](../AVATAR_EVENTS.md): single and visible-stack per-event activation observers preserve genuine child evidence and legacy aggregate order. Legacy void Avatar remains presentational; foreign callback facades are omitted. |
 | [Badge](../../include/cui/cui_components.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
@@ -124,7 +124,7 @@ HoverCard and Tooltip now have final open-model observers. Focus Trap bracketing
 The earlier follow-up plan has landed for Command forwarding, Scrollable,
 HoverCard/Tooltip, VirtualList and MessageScroller. TitleBar, Focus Trap and
 TextView retain the documented typed/host/composition exceptions. Current
-classification is A44, N18, H8, T7, G1 across exactly 78 families. This is a
+classification is A45, N18, H8, T7, G0 across exactly 78 families. This is a
 **disposition count**, not uniform event semantics or complete family parity.
 
 Further work must target demonstrated application needs rather than repeat those

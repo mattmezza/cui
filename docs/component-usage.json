@@ -60,22 +60,34 @@
     },
     {
       "api_symbols": [
-        "cui_alert"
+        "cui_alert",
+        "cui_alert_events"
       ],
       "state_types": [
-        "cui_alert_options"
+        "cui_alert_options",
+        "cui_alert_dismissal",
+        "cui_alert_dismiss_result"
       ],
       "state_ownership": "Caller optionally retains a bool visible flag referenced by cui_alert_options.visible.",
       "interaction": "Returns dismissal; writes supplied visibility.",
       "usage": "Submit the current title/message and visibility; handle dismissal in the returned event branch.",
       "docs": [
-        "docs/CONTENT.md"
+        "docs/CONTENT.md",
+        "docs/ALERT_EVENTS.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_alert_dismiss_fn"
+      ],
       "scope": "styled frame component",
       "name": "Alert",
       "public_header": "include/cui/cui_content.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_alert_events.h"
+      ],
+      "handler_types": [
+        "cui_alert_dismiss_handler"
+      ]
     },
     {
       "api_symbols": [

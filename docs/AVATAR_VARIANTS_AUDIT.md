@@ -31,8 +31,10 @@ complete Avatar or AvatarGroup parity.
 Implemented opt-in mapping: `cui_avatar_options.design_size` reuses the shared
 CUI scale. INHERIT retains existing `.size` behavior. Explicit XS/SM/BASE=MD/LG
 use the frozen preset dimensions above. XL..9XL use twice shared control height,
-clamped to 512 after rem scaling; typography uses shared font size times 30/18,
-with semibold weight. These higher steps are CUI extensions. A positive rem
+with the overall scale capped at 512 divided by raw variant diameter; typography
+uses shared font size times 30/18,
+with semibold weight. The cap scales diameter and text together to preserve
+their ratio, including 9XL at rem=16. These higher steps are CUI extensions. A positive rem
 parameter scales presets; zero in options selects 16. Metrics helper rejects
 invalid inputs without modifying output, while Avatar falls back to legacy
 metrics for invalid options.
@@ -57,3 +59,8 @@ legacy metrics/colors, typed/named/default icons, initials precedence, image
 precedence, absence of duplicate semantics, and software pixels. The targeted
 content CTest uses the isolated-display wrapper; no GPU or screen-reader claim
 is implied. Generated SDK/skill metadata remains an integrator refresh step.
+
+The scale-cap regression exercises every variant at rem 1, 16, 64 and 512,
+checks the font-size/diameter ratio against uncapped small-rem metrics, and
+verifies actual Avatar bounds and emitted text sizes. Large rem values cannot
+leave oversized initials after the diameter reaches 512.

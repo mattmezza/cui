@@ -82,7 +82,9 @@ Use `cui_avatar_measure` to inspect the resulting diameter, text size and weight
 The first four sizes reproduce frozen Avatar preset geometry and text sizes.
 BASE aliases MD. XL through 9XL extend CUI's shared design scale; they are not
 upstream presets. Their diameters are 96, 112, 128, 160, 208, 256, 304, 400 and
-512 at rem=16. All variant diameters stay bounded to 512 after rem scaling.
+512 at rem=16. The overall scale is capped when the raw diameter would exceed 512, reducing
+both diameter and font size together to preserve their ratio. This also applies
+to 9XL at rem=16, whose raw diameter is 528.
 Custom GPUI `Size` sets initials-child dimensions; CUI does not claim identical
 custom text layout. Invalid variants or rem values fall back to legacy metrics.
 These opt-ins do not change `cui_avatar` or `cui_avatar_stack` defaults.

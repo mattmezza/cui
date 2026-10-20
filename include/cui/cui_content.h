@@ -56,7 +56,8 @@ typedef struct {
 } cui_avatar_metrics;
 /* Explicit variants only. rem: finite (0,512]; false leaves output unchanged.
  * XS/SM/BASE=MD/LG preserve frozen 16/24/48/80px metrics at rem=16.
- * XL..9XL extend the shared scale; diameter is bounded to 512. */
+ * XL..9XL extend the shared scale. A shared scale cap bounds diameter to 512
+ * while preserving the variant font-size/diameter ratio. */
 bool cui_avatar_measure(cui_design_size, float rem, cui_avatar_metrics *);
 typedef struct {
     cui_color background, foreground, border;

@@ -186,6 +186,7 @@ bool cui_avatar_measure(cui_design_size size, float rem, cui_avatar_metrics *out
                  : size == CUI_DESIGN_BASE || size == CUI_DESIGN_MD ? 14
                  : size == CUI_DESIGN_LG ? 30
                                          : shared.font_size * (30.f / 18.f);
+    scale = fminf(scale, 512 / diameter);
     *out = (cui_avatar_metrics){.diameter = fminf(diameter * scale, 512),
                                 .font_size = text * scale,
                                 .text_style = {.weight = size >= CUI_DESIGN_LG

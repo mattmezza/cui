@@ -362,6 +362,33 @@ static void avatar_variants(void) {
                 assert(!memcmp(&draw.commands[i].color, &palette.foreground, sizeof(cui_color)));
             }
         assert(text);
+        /* Scaling hits one shared limit, preserving the initials/diameter ratio
+         * even for high variants whose unscaled diameter already exceeds 512. */
+        cui_avatar_metrics unit;
+        assert(cui_avatar_measure(size, 1, &unit));
+        const float rems[] = {1, 16, 64, 512};
+        for (size_t r = 0; r < sizeof rems / sizeof rems[0]; r++) {
+            cui_avatar_metrics scaled;
+            assert(cui_avatar_measure(size, rems[r], &scaled));
+            assert(scaled.diameter > 0 && scaled.diameter <= 512);
+            assert(fabsf(scaled.font_size / scaled.diameter -
+                         unit.font_size / unit.diameter) < .00001f);
+            assert(scaled.font_size <= scaled.diameter);
+            if (rems[r] == 512)
+                assert(fabsf(scaled.diameter - 512) < .001f);
+            assert(cui_begin_frame(ui, 600, 600, .016f));
+            cui_avatar_ex(ui, 9000, &t, cui_string("Ada Lovelace"),
+                          (cui_avatar_options){.design_size = size, .rem_size = rems[r]});
+            draw = cui_end_frame(ui);
+            assert(fabsf(cui_bounds(ui, 9000).w - scaled.diameter) < .001f);
+            text = false;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                    text = true;
+                    assert(fabsf(draw.commands[i].font_size - scaled.font_size) < .001f);
+                }
+            assert(text);
+        }
     }
     cui_avatar_metrics metrics = {.diameter = 123};
     assert(!cui_avatar_measure(CUI_DESIGN_INHERIT, 16, &metrics) && metrics.diameter == 123);

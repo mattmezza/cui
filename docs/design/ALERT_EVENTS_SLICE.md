@@ -131,19 +131,30 @@ merely to normalize result bookkeeping.
 
 ## Preserve the existing owner-write boundary
 
-Use one private common Alert implementation, with the old public entry passing
-no observer. The new facade borrows copied handler/options for one call. Keep
-the original zero-option `cui_button` invocation, its child ID, text, drawing,
-semantics, focus and input policy unchanged. No Button forwarding hook is needed
-for this first slice, and no second reducer pass is allowed.
+Implement the facade as a `static inline` function in the new dedicated
+`cui_alert_events.h`. Freeze the by-value options and handler, narrow preflight,
+ordinary active submission eligibility and actual frame identity at entry. Then
+call the existing `cui_alert` **exactly once**, including in passive contexts
+where its existing visual/slot behavior must remain untouched. The legacy call
+already returns after the optional owner assignment and `cui_end_box`.
 
-At the existing aggregate true branch, perform the same optional false write.
-Freeze `legacy_dismissed`, `visibility_assigned` and truthful frame-only payload
-facts. Run the existing `cui_end_box`, then set `dismissal_count=1` for an eligible
-completed dismissal regardless of handler presence, and invoke the optional
-observer before return. Passive/ineligible observation leaves the count zero;
-it must not suppress or rewrite any legacy operation. This is synchronous submission-time observation, not end-frame or a
-queued close event. Slot `user` and observer `user` remain independent.
+Store its unchanged bool in `legacy_dismissed`. The frozen operation fact
+`visibility_assigned = legacy_dismissed && options.visible != NULL` is sufficient:
+the legacy true return proves that its optional false assignment ran. Set
+`dismissal_count=1` only when the frozen entry eligibility and legacy bool are
+both true, regardless of handler presence. Freeze the frame-only payload, then
+invoke the optional observer before returning the result. No Button hook,
+second reduction, `content.c` hook, public options layout change or `content.h`
+declaration is needed. Passive/ineligible observation leaves the count zero;
+it must not suppress or rewrite any legacy operation.
+
+A private common implementation would also preserve the existing boundary, but
+is unnecessary for this coalesced slice. The header-only wrapper is preferred:
+it observes the actual legacy return directly, has no source ownership conflict,
+and leaves the zero-option Button invocation, child ID, text, paint, semantics,
+focus and input policy entirely in the existing function. This remains
+synchronous submission-time observation, not end-frame or a queued close event.
+Slot `user` and observer `user` remain independent.
 
 The observer sees the false assignment already applied if storage exists. It
 may deliberately set that owner value true again; the frozen payload, original
@@ -209,11 +220,11 @@ Before production, add meaningful real-input headless tests for:
   On Linux run only through `python scripts/test_local.py --build-dir <build>`;
   no desktop display or GPU parity claim.
 
-Proposed later implementation ownership: new `include/cui/cui_alert_events.h`
-containing all new types and facade declarations, private common implementation
-in `src/components/cui_content.c`, new focused tests and native consumer guide.
-The dedicated header can include the existing content header; no declarations
-or layout changes in `include/cui/cui_content.h` are required.
+Approved implementation ownership: new `include/cui/cui_alert_events.h`
+containing all new types and the header-only facade, new focused tests and native
+consumer guide/example. The dedicated header includes the existing content
+header. Do not modify `src/components/cui_content.c` or
+`include/cui/cui_content.h`; neither is needed for this slice.
 Integrator owns registration, source metadata, generated SDK/distribution/skill
 refresh and ledger decisions. This checkpoint changes none of them.
 

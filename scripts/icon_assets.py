@@ -10,7 +10,7 @@ def embedded_names(archive):
     """Single source for the default C bundle and website availability labels."""
     return set(archive["default_names"]) | {"pencil", "pen-line", "funnel", "archive", "trash", "mail",
         "mail-open", "paperclip", "send", "reply", "reply-all", "forward", "download", "upload",
-        "link", "log-out", "check-check"}
+        "link", "log-out", "check-check", "skip-back", "skip-forward", "gauge"}
 
 
 def generate():

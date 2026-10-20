@@ -1,4 +1,86 @@
-# Controlled video controls
+# Reusable VideoPlayer
+
+Start with `cui_video_player_defaults()`: a 320×180 contained video surface,
+compact playback/skip/timeline controls, short `m:ss / m:ss` time and fullscreen.
+The seek row and icon buttons have 44-unit touch targets; artwork is 20 units.
+The seek line is four units high. Narrow bars wrap buttons/time within the
+configured width (minimum 160). Controls are below the surface, not overlays;
+there is no auto-hide policy. Rate is available explicitly, not shown by default.
+Set both `surface.geometry` and `controls_options.width` when resizing. The host
+must supply capabilities and a request callback to enable actions. Fullscreen is
+visible by default but disabled without `CUI_VIDEO_CAP_FULLSCREEN`; it never
+silently changes a window or DOM element. No volume/audio state is invented.
+
+This complete portable C11 owner seam draws inside an existing CUI frame. The
+host fills `confirmed`, optionally supplies an already-decoded RGBA frame, and
+drains copied requests **after** submission/rendering. It must handle overflow
+rather than assuming an unbounded queue. No codec/network API is required by CUI.
+
+```c
+#include "cui/cui_video_controls.h"
+
+typedef struct {
+    cui_video_controls_state controls;
+    cui_video_view confirmed;
+    cui_video_request pending[32];
+    unsigned pending_count;
+    bool overflow;
+} player_owner;
+
+static void player_request(void *user, const cui_video_request *request) {
+    player_owner *owner = user;
+    if (owner->pending_count < 32)
+        owner->pending[owner->pending_count++] = *request;
+    else
+        owner->overflow = true;
+}
+
+bool player_owner_init(player_owner *owner, uint64_t source_id) {
+    if (!owner || !source_id)
+        return false;
+    *owner = (player_owner){0};
+    owner->confirmed.source_id = source_id;
+    owner->confirmed.capabilities = CUI_VIDEO_CAP_PLAY | CUI_VIDEO_CAP_SEEK;
+    return cui_video_init(&owner->confirmed.timeline,
+        (cui_video_config){.duration = 120, .duration_known = true, .seekable = true});
+}
+
+bool player_owner_draw(cui_context *ui, const cui_theme *theme,
+                       player_owner *owner, const cui_video_player_frame *decoded) {
+    cui_video_player_options options = cui_video_player_defaults();
+    options.controls_options.on_request = player_request;
+    options.controls_options.user = owner;
+    options.surface.description = cui_string("Video preview");
+    return cui_video_player(ui, 700, theme, &owner->controls,
+                            owner->confirmed, decoded, options);
+}
+```
+
+The 120-second timeline is example host metadata, not media opened by CUI.
+The host acquires sources, demuxes/decodes, schedules frames and audio, implements
+seek/rate/fullscreen, and publishes confirmed state after success. Check request
+source/generation before applying it; queueing is not acknowledgement. The null
+frame draws an empty reserved surface. For actual decoding, the existing
+[FFmpeg host example](../examples/video_player/README.md) is a separate adapter.
+`cui_video_surface` remains the reusable Base surface for a controls-free view.
+Keep captions, sample descriptions and diagnostic/debug text in host content
+outside the player; the standard bar displays only media position and controls.
+
+Legacy `cui_video_controls_defaults()` keeps its original layout and visible
+parts. The additive `controls_options.compact=true` opts into the standard bar;
+`cui_video_player_defaults()` selects it automatically. Existing manually built
+player options are not forced into the new layout.
+
+The pinned catalog already contained `skip-back`, `skip-forward` and `gauge`,
+but they were excluded from the default embedded bundle. They now embed their
+existing SVGs alongside play/pause/maximize/minimize, so standard controls need
+no custom loader or all-assets build. All seven names are prepared and checked
+for actual mask pixels by `test_video_player_defaults.c`; player seek icons are
+also checked in actual software-rendered pixels. Catalog names/paths and
+`theme.icon_loader` overrides are retained. The named Button icon cache accepts
+catalog names/paths; arbitrary unknown names are not introduced by this API.
+
+## Controlled video controls
 
 `cui_video_controls.h` adds optional Styled controls above the portable video
 surface. This extension is independent of the frozen 78-component baseline.

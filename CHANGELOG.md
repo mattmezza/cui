@@ -1,6 +1,22 @@
 # Changelog
 
-## 0.1.0-alpha.2 — preparation (not published)
+## 0.1.0-alpha.3 — unreleased
+
+- Adds opt-in date-only DatePicker presets, clear/Delete actions and an interactive
+  desktop/touch gallery mode. Legacy date-only APIs remain available.
+- Adds bounded Questionnaire copy-out snapshots, keyboard shortcut policies and
+  persistent typed observation with explicit payload, nesting and lifetime rules.
+- Adds an optional native FFmpeg/SDL video-audio example with a local bounded
+  fixture; this does not imply general codec, device or platform acceptance.
+- Fixes source-package configuration when documentation examples are absent, and
+  checks DatePicker semantic values independently of C struct padding.
+- Rebuild C consumers and bindings with matching headers and libraries:
+  `cui_questionnaire_state` gained an observer pointer. Language builders do not
+  expose the new C observer/payload arenas or DatePicker action options.
+- Release artifacts and registry publication are not yet available for alpha.3.
+  All 78 catalog families remain present; full feature parity is unfinished.
+
+## 0.1.0-alpha.2 — 2026-10-20
 
 - Adds implemented component event facades while retaining explicit typed and
   host-service exceptions; this does not imply uniform APIs or full binding parity.
@@ -15,8 +31,8 @@
   partial Markdown section reads without clipping canonical limitations.
 - Adds a real browser-decoded Video gallery extension with bounded WebM/MP4
   assets, CUI controls and explicit decoder/audio limitations; baseline remains 78.
-- Final source freeze, integrated checks and release artifact validation remain
-  pending. No registry publication is implied.
+- Published as GitHub release artifacts with validation receipts. PyPI, npm,
+  crates.io publication and a public Go module tag remain separate work.
 - Alpha.1 versions, tags and published assets remain immutable.
 
 ## 0.1.0-dev

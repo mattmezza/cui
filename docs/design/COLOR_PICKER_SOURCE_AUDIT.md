@@ -213,3 +213,59 @@ reported manual/hardware boundary. Run existing picker and picker-event regressi
 alongside focused tests. Root registers tests and updates metadata, consumer skill
 and generated distributions after approved implementation; this checkpoint claims
 no additional completed parity.
+
+## Approved first-slice API decisions
+
+The first implementation uses new `cui_color_entry.h` only; existing picker
+headers, HSV state, parser, formatter and events remain untouched. A public
+caller-owned `cui_color_entry_state` owns a ten-byte NUL-terminated draft buffer
+(`#` plus eight digits), an allocated `cui_edit`, and retained input view state.
+Zero-initialize before init; init returns failure transactionally; destroy is
+idempotent after successful initialization. The initialized state is address-stable
+and noncopyable because its editor borrows its buffer. Destroy only after frame
+render consumption. No state storage may be rebound during submission.
+
+Committed and preview values use an explicit `{present, color}` optional byte-RGBA
+value. Pure source-format parsing reports COMPLETE, INCOMPLETE (hex-only prefixes
+of unsupported short lengths), or INVALID; it accepts optional hash and writes
+the output only on COMPLETE. The real field additionally requires a leading hash
+(or empty draft), ASCII hex only, and at most eight digits. Disallowed edits are
+rejected transactionally by existing Input acceptance. Incomplete drafts remain
+editable and retain the last valid preview; they cannot commit. Empty draft is
+incomplete, not an implicit clear command. Explicit owner sync can clear selection.
+
+Owner sync takes an explicit replace-draft flag. A dirty draft conflicts unless
+replacement is requested; conflict or invalid arguments leave all model/editor
+state unchanged. Successful sync replaces draft with canonical uppercase bytes,
+updates committed/preview presence, and clears editor history through existing
+set-content behavior; it emits no UI callback. Canonical alpha is omitted only
+when opaque. Draft updates preview but never commit. A valid explicit commit
+copies preview into committed and clears dirty, including same-value commits;
+it does not rewrite editor text while Input is reducing events.
+
+Base and styled field facades use existing Input event reduction and its accepted,
+focused nonrepeated Enter submit notifications, not a second raw key scan. Internal
+change/submit observers update entry state in queue order, so text after Enter
+cannot retroactively change that commit. Multiple valid Enters produce a commit
+count independent of handler presence; incomplete submit attempts have a separate
+rejected-commit count. This count represents observed field submits, not every
+possible upstream activation. Disabled/readonly/passive submissions cannot commit.
+Pure model operations have typed outcomes; they do not fabricate UI events.
+
+The external handler is snapshotted by value and runs once only if at least one
+commit completed, after final semantics (Base) or paint (styled). Its pointer-free
+summary copies previous/final committed values and accepted/rejected commit counts;
+metadata is UNKNOWN with actual active frame only. It does not attribute the
+coalesced summary to one input index. The result reports counts even without a
+handler. Callback payloads may be copied; handler/user remain borrowed. Callbacks
+may update a separate owner model for next submission but may not mutate entry,
+input, context or borrowed label/options until return. Draft-change/preview status
+is available in the result, without inventing a separate source Change contract.
+
+The facade is an inline hex field with standard Input focus, selection, pointer,
+keyboard and semantic textbox behavior. It does not close anything and has no
+popup/open state, palette tab, HSLA sliders, or screen sampler. Before the next
+slice, review a float-HSLA optional selection representation (including conversion
+precision and source truncating formatter), popup action ownership/focus restoration,
+and palette/HSLA tab presentation. Byte RGBA is an explicit first-slice boundary,
+not the permanent replacement for those remaining frozen-source requirements.

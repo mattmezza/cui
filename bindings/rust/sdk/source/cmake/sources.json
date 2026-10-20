@@ -264,7 +264,8 @@
       "src/base/cui_color_hsla_entry.c",
       "src/components/cui_color_hsla_entry.c"
     ],
-    "cui_date_picker_calendar": []
+    "cui_date_picker_calendar": [],
+    "cui_questionnaire_keyboard": []
   },
   "native": {
     "text": [

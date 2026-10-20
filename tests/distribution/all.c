@@ -4,6 +4,10 @@
 #include "cui_component_events.h"
 
 int main(void) {
+    if (cui_questionnaire_begin_with_keyboard(
+            NULL, 0, NULL, NULL, (cui_questionnaire_options){0},
+            &(cui_questionnaire_keyboard_options){.shortcuts = CUI_QUESTIONNAIRE_SHORTCUT_OFF}))
+        return 1;
     cui_calendar_result calendar = cui_base_calendar_with_behavior(
         NULL, 0, NULL, NULL, (cui_calendar_options){0}, (cui_calendar_presentation_options){0},
         (cui_calendar_behavior_options){.year_destination = CUI_CALENDAR_YEAR_OPEN_DAYS});

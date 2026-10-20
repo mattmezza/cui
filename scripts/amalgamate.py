@@ -20,6 +20,10 @@ def generate(name,sources):
         lines += ['#include "cui_components.h"']
     if name == "cui_components":
         lines += ['#include "cui_button_styles.h"']
+    if name == "cui_questionnaire":
+        lines += ['#include "cui_questionnaire_keyboard.h"']
+    if name == "cui_questionnaire_keyboard":
+        lines += ['#ifndef CUI_QUESTIONNAIRE_IMPLEMENTATION', '#define CUI_QUESTIONNAIRE_IMPLEMENTATION', '#endif', '#include "cui_questionnaire.h"']
     if name == "cui_picker":
         lines += ['#include "cui_components.h"', '#include "cui_calendar_presentation.h"', '#include "cui_calendar_behavior.h"', '#include "cui_date_picker_calendar.h"']
     if name in {"cui_calendar_presentation", "cui_calendar_behavior", "cui_date_picker_calendar"}:

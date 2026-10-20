@@ -4249,14 +4249,16 @@
       "sample": null,
       "tests": [
         "tests/unit/test_questionnaire.c",
-        "tests/unit/test_questionnaire_styled.c"
+        "tests/unit/test_questionnaire_styled.c",
+        "tests/unit/test_questionnaire_keyboard.c"
       ],
       "status": "implemented",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Retained models, automatic root keyboard capture, cross-item focus transfer, ordered input routing, palette/size cards and custom slot renderers have scoped tests. Bounded box-only indicator/content/shortcut refinements and six localized action/error labels are covered by headless tests; see docs/QUESTIONNAIRE.md for precedence and ABI rebuild requirements. General Styled typography/inheritance, complete nested-root and callback choreography, comprehensive localization and physical accessibility acceptance remain unfinished. Existing browser story evidence predates the new slot/localization API; no browser proof of those additions is claimed."
+        "Retained models, automatic root keyboard capture, cross-item focus transfer, ordered input routing, palette/size cards and custom slot renderers have scoped tests. Bounded box-only indicator/content/shortcut refinements and six localized action/error labels are covered by headless tests; see docs/QUESTIONNAIRE.md for precedence and ABI rebuild requirements. General Styled typography/inheritance, complete nested-root and callback choreography, comprehensive localization and physical accessibility acceptance remain unfinished. Existing browser story evidence predates the new slot/localization API; no browser proof of those additions is claimed.",
+        "Additive C keyboard policies cover shortcut OFF/letters/numbers, item-only answer-entry restoration and explicit host submit modifiers; source-differential native/WASI tests preserve legacy root shortcut inheritance. Nested roots retain outer-first capture, not nearest-root dispatch. Language builders omit these policies. Copied answer/submission snapshots, complete typed events, separate compound parts, progress localization, Form semantics and general styling remain unfinished."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

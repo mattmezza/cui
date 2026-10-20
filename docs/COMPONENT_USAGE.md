@@ -707,9 +707,9 @@ Additional event includes: `cui/cui_otp_events.h`.
 
 **Interaction:** cui_questionnaire_event_fn emits model events; cui_questionnaire_validate_fn validates answers.
 
-**Usage:** Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI.
+**Usage:** Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies.
 
-API: `cui_questionnaire_init`, `cui_questionnaire_begin`, `cui_questionnaire_end`. [Public header](../include/cui/cui_questionnaire.h); [guide](QUESTIONNAIRE.md).
+API: `cui_questionnaire_init`, `cui_questionnaire_begin`, `cui_questionnaire_end`, `cui_questionnaire_begin_with_keyboard`. [Public header](../include/cui/cui_questionnaire.h); [guide](QUESTIONNAIRE.md); [keyboard policies](QUESTIONNAIRE_KEYBOARD.md).
 
 ## Select
 

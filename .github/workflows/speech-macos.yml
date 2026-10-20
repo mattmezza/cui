@@ -1,0 +1,51 @@
+name: Optional macOS Speech host fixtures
+on:
+  push:
+    paths:
+      - '.github/workflows/speech-macos.yml'
+      - 'examples/speech_macos_recognizer/**'
+      - 'include/cui/cui_speech.h'
+      - 'src/base/cui_speech.c'
+      - 'scripts/test_local.py'
+  pull_request:
+    paths:
+      - '.github/workflows/speech-macos.yml'
+      - 'examples/speech_macos_recognizer/**'
+      - 'include/cui/cui_speech.h'
+      - 'src/base/cui_speech.c'
+      - 'scripts/test_local.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  injected-native-service:
+    name: Apple compile and injected fixtures (${{ matrix.build_type }})
+    runs-on: macos-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Record actual Apple compiler and SDK
+        run: |
+          xcodebuild -version
+          xcrun --show-sdk-version
+          clang --version
+      - name: Configure only the optional recognizer host
+        run: >-
+          cmake -S examples/speech_macos_recognizer -B build/speech-recognizer
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+          -DCUI_BUILD_NATIVE=OFF
+      - name: Compile portable C11 and private Objective-C with strict warnings
+        run: cmake --build build/speech-recognizer --parallel 2
+      # test_macos injects ObjC request/task/backend objects into the actual
+      # transport. No Apple recognizer, OS consent, microphone, live task,
+      # window, or network/model download is used by any fixture.
+      - name: Run six portable cases and the injected Objective-C service case
+        run: python scripts/test_local.py --build-dir build/speech-recognizer

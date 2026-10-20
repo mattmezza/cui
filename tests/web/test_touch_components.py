@@ -41,7 +41,11 @@ class Audit:
 
     def route(self, name):
         self.page.evaluate('(name)=>location.hash=name', name)
-        self.page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
+        try:
+            self.page.wait_for_function('(name)=>cuiGallery.renderedComponent===name', arg=name)
+        except Exception as error:
+            current = self.page.evaluate('window.cuiGallery?.renderedComponent')
+            raise AssertionError(f'Route {name} did not render (current={current}, errors={self.errors})') from error
         self.page.locator('canvas').scroll_into_view_if_needed()
         self.page.wait_for_timeout(70)
 
@@ -281,7 +285,15 @@ def run_cases(a):
     a.case('DataTable', 'touch selects actual visible grid cell', table_selection)
     a.case('Sidebar', 'touch selects Files', lambda: a.selected('Files', 23))
     a.case('List', 'touch selects Priority option', lambda: a.selected('Priority', 14))
-    a.case('Stepper', 'touch selects Review step', lambda: a.selected('Review', 1))
+    def stepper():
+        review = a.target('Review', 1)
+        a.tap(review)
+        assert a.value(review, 11) == 0, 'Unconfirmed navigation bypassed owner validation'
+        confirmation = a.target('Details confirmed')
+        a.tap(confirmation)
+        assert a.value(confirmation, 6) == 1, 'Touch did not confirm details'
+        a.selected('Review', 1)
+    a.case('Stepper', 'touch rejects unconfirmed navigation, then selects Review', stepper)
     def rating():
         a.tap(a.target('5 of 5', 1))
         assert a.target(role=5)['f'][8] == 5, 'Touch did not change rating'

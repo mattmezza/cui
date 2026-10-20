@@ -2474,6 +2474,12 @@ def main():
             page.evaluate('location.hash="Stepper"')
             page.wait_for_function('cuiGallery.renderedComponent==="Stepper"')
             page.wait_for_timeout(80)
+            # This demo now asks the owner to validate navigation. Confirm through
+            # the real checkbox before exercising accepted navigation geometry.
+            details_index = semantic_index('Details confirmed')
+            if not page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,6)', details_index):
+                click_semantic('Details confirmed')
+            page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,6)===1', arg=details_index)
             for step_name, selected in [('Finish', 2), ('Details', 0)]:
                 bounds = page.evaluate('''(name)=>{const e=cuiGallery.exports;
                     const i=Array.from({length:e.gallery_semantic_count()},(_,i)=>i).find(i=>
@@ -2482,7 +2488,8 @@ def main():
                     return [1,2,3,4].map(f=>e.gallery_semantic(i,f));}''', step_name)
                 box = canvas.bounding_box()
                 page.mouse.click(box['x']+bounds[0]+bounds[2]/2, box['y']+bounds[1]+bounds[3]/2)
-                page.wait_for_function('(index)=>cuiGallery.exports.gallery_semantic(0,8)===index', arg=selected)
+                page.wait_for_function('({i,value})=>cuiGallery.exports.gallery_semantic(i,8)===value',
+                                       arg={'i': semantic_index('Steps'), 'value': selected})
                 current = page.evaluate('''()=>{const e=cuiGallery.exports;
                     return Array.from({length:e.gallery_count()},(_,i)=>i).filter(i=>
                         e.gallery_command(i,0)===2 && new TextDecoder().decode(new Uint8Array(

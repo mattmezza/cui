@@ -79,7 +79,7 @@ def main():
                 const bytes=c.getContext('2d').getImageData(24*d,24*d,160*d,90*d).data;
                 let hash=2166136261;for(let i=0;i<bytes.length;i+=97)hash=Math.imul(hash^bytes[i],16777619);return hash>>>0;}""")
             first=snap();first_surface=surface_hash()
-            assert first['muted'] and first['loop'] and first['paused']
+            assert not first['muted'] and first['volume']>0 and first['loop'] and first['paused']
             assert first['duration']>=11
             assert first['source'].startswith('blob:')
             def action(label):
@@ -91,6 +91,13 @@ def main():
             bounds=page.locator('#preview').bounding_box()
             page.mouse.click(bounds['x']+play['x'],bounds['y']+play['y'])
             page.wait_for_function('!cuiGallery.video.snapshot().paused && cuiGallery.video.snapshot().time>.5')
+            # Real Chromium audio decoding after genuine user Play. Headless output is
+            # muted by the browser harness; this proves a decoded, enabled audio path,
+            # not physical speaker output or a native/cross-browser audio claim.
+            page.wait_for_function('(initial)=>{const s=cuiGallery.video.snapshot();return !s.muted&&s.volume>0&&s.audioDecodedBytes>0&&s.audioDecodedBytes>initial;}',arg=first['audioDecodedBytes'])
+            playing=snap()
+            assert not playing['muted'] and playing['volume']>0
+            assert playing['audioDecodedBytes']>first['audioDecodedBytes']
             page.wait_for_function('(hash)=>cuiGallery.video.snapshot().checksum!==hash',arg=first['checksum'])
             assert surface_hash()!=first_surface, 'actual CUI surface pixels must change'
             action('Pause')
@@ -237,7 +244,7 @@ def main():
             oversized.close()
             assert not errors,errors
             browser.close()
-            print('PASS: VideoPlayer decode, painted default skip glyphs, +/-2s seek, stage fullscreen/Escape, mobile DPR2 and cleanup')
+            print('PASS: VideoPlayer real video/audio decode, painted default skip glyphs, +/-2s seek, stage fullscreen/Escape, mobile DPR2 and cleanup')
     finally:
         server.shutdown();server.server_close()
 

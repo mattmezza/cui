@@ -97,11 +97,11 @@ class SourceManifest(unittest.TestCase):
             self.assertNotIn('.gitignore', (node_source / 'SOURCE_FILES.sha256').read_text())
             env = dict(os.environ, npm_config_cache=str(directory / 'npm-cache'), npm_config_offline='true')
             subprocess.run([shutil.which('npm'), 'pack', '--ignore-scripts', '--pack-destination', str(directory)],
-                           cwd=node, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                           cwd=node, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
             self.assertGreater(validator.verify_source_manifest(next(directory.glob('*.tgz'))), 1000)
             python = producer.stage('python', directory)
             source = python / 'cui_bridge/_source'
-            tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
+            tracked = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT, timeout=30).decode().split('\0')
             expected = [name for name in tracked if Path(name).name == '.gitignore'
                         and name.split('/')[0] in producer.SOURCE_DIRS]
             self.assertTrue(expected)

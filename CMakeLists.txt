@@ -944,6 +944,9 @@ add_test(NAME speech_base_only COMMAND test_speech_base)
 # Bound failed assertions/driver initialization, including late Base-only targets.
 get_property(CUI_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)
 set_tests_properties(${CUI_REGISTERED_TESTS} PROPERTIES TIMEOUT 60)
+# This offline integration check stages/hashes the full source twice and packs
+# an actual npm archive. Windows filesystem work can exceed the unit-test bound.
+set_tests_properties(binding_package_source_manifest PROPERTIES TIMEOUT 300)
 
 # Radio collection behavior uses only portable Core.
 add_executable(test_radio_group_base tests/unit/test_radio_group_base.c src/core/cui.c src/base/cui_radio_group.c)

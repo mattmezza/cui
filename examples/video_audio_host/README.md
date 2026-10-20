@@ -121,8 +121,9 @@ video demux scheduling, physical output, physical presentation clock/latency,
 owner-thread CUI integration, audible pause/seek behavior, device loss, sample
 rate changes and platform CI remain deferred. Fixed rate 1 is the only intended
 initial playback mode; there is no rate API here. Tests do not establish sound
-output or full native VideoPlayer parity. Consumer metadata and canonical CI
-registration belong to the integrator after this independent slice is reviewed.
+output or full native VideoPlayer parity. The Linux GCC and Clang native CI jobs
+build this optional example separately with ASan/UBSan and run all six offline
+cases through the invisible-display wrapper.
 
 Validation of this checkpoint: all six focused CTest cases passed through
 `scripts/test_local.py` in normal and ASan/UBSan builds on Linux (GCC 16.2.1).

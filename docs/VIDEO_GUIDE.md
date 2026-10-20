@@ -5,6 +5,15 @@ surface using the existing bitmap draw path. There is **no built-in codec**,
 container reader, network transport, audio output, subtitle engine, recorder,
 casting service or editor. The architecture roadmap remains [VIDEO_PLAN.md](VIDEO_PLAN.md).
 
+The optional [offline audio host foundation](../examples/video_audio_host/README.md)
+demonstrates bounded PCM buffering, worker cancellation, generation-safe seeks and
+ordered output-consumption accounting with injected services. It is an
+example-local C11 controller, not a CUI component API or a real decoder/device
+adapter. Native playback still has no sound output through this example. Its
+six deterministic tests require no network, microphone, speaker or window;
+the guide includes build and invisible-display test commands. Browser video uses
+the browser's existing audio decoder/output independently.
+
 ## Initialize and advance
 
 ```c

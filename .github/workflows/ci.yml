@@ -57,6 +57,11 @@ jobs:
           cmake -S examples/speech_sdl_input -B build/speech-input -G Ninja
           cmake --build build/speech-input
           python scripts/test_local.py --build-dir build/speech-input
+      - name: Offline video audio accounting and callback lifetime
+        run: |
+          cmake -S examples/video_audio_host -B build/video-audio -G Ninja -DCMAKE_BUILD_TYPE=Release -DVIDEO_AUDIO_SANITIZE=ON
+          cmake --build build/video-audio --parallel 2
+          python scripts/test_local.py --build-dir build/video-audio
       - name: X11 compatibility smoke (software forced; GPU unverified)
         run: xvfb-run -a env SDL_RENDER_DRIVER=software ./build/cui_gallery --smoke 3
       - name: Independent Sokol OpenGL pixel readback (actual driver reported)

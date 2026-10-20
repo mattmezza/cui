@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: MIT */
+#ifndef SPEECH_RECOGNIZER_MACOS_PRIVATE_H
+#define SPEECH_RECOGNIZER_MACOS_PRIVATE_H
 /* Private Objective-C service seam: never include from a consumer C header. */
 #import "host_macos.h"
 #import <AVFoundation/AVFoundation.h>

@@ -28,13 +28,14 @@ conflicting contracts simultaneously.
 
 Proposed new `include/cui/cui_button_styles.h`, including existing component
 types. No platform or Clay types, heap allocation, ownership transfer or
-additional input dispatch. Names remain subject to review.
+additional input dispatch. Names remain subject to review. The production record is named
+`cui_button_style_paint` because `cui_button_paint` is already a legacy C function.
 
 ```c
 typedef struct {
     cui_box root;          /* Resolved box; geometry is inspection-only. */
     cui_color foreground;  /* Label and inherited icon/content ink. */
-} cui_button_paint;
+} cui_button_style_paint;
 
 enum {
     CUI_BUTTON_PAINT_BACKGROUND = 1u << 0,
@@ -46,7 +47,7 @@ enum {
 };
 typedef struct {
     unsigned fields;
-    cui_button_paint paint;
+    cui_button_style_paint paint;
 } cui_button_paint_patch;
 
 typedef enum {
@@ -65,7 +66,7 @@ typedef struct {
 } cui_button_style_info;
 typedef void (*cui_button_style_fn)(void *user,
     const cui_button_style_info *info,
-    const cui_button_paint *current,
+    const cui_button_style_paint *current,
     cui_button_paint_patch *out);
 typedef struct {
     cui_button_style_fn instance, hovered, active, selected, disabled, focused;
@@ -182,7 +183,7 @@ an example of an API available in the current SDK.
 
 typedef struct { cui_color hover, selected, disabled; } save_style;
 static void save_hover(void *user, const cui_button_style_info *info,
-                       const cui_button_paint *current,
+                       const cui_button_style_paint *current,
                        cui_button_paint_patch *out) {
     const save_style *s = user;
     (void)info;
@@ -191,7 +192,7 @@ static void save_hover(void *user, const cui_button_style_info *info,
     out->paint.root.background = s->hover;
 }
 static void save_selected(void *user, const cui_button_style_info *info,
-                          const cui_button_paint *current,
+                          const cui_button_style_paint *current,
                           cui_button_paint_patch *out) {
     const save_style *s = user;
     (void)info;
@@ -200,7 +201,7 @@ static void save_selected(void *user, const cui_button_style_info *info,
     out->paint.root.background = s->selected;
 }
 static void save_disabled(void *user, const cui_button_style_info *info,
-                          const cui_button_paint *current,
+                          const cui_button_style_paint *current,
                           cui_button_paint_patch *out) {
     const save_style *s = user;
     (void)info;

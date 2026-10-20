@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
+#include "cui/cui_button_styles.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_icon.h"
 #include "cui_input_private.h"
@@ -263,8 +264,219 @@ static void cui_button_artwork_paint(cui_context *ui, cui_id id, const cui_theme
         *a.result = result;
 }
 static bool cui_button_shape_valid(cui_button_options);
+static cui_button_style_paint cui_button_default_paint(cui_box b, const cui_theme *t,
+                                                       cui_button_options o, cui_interaction state,
+                                                       cui_color *caret) {
+    bool disabled = o.disabled;
+    bool text = o.variant == CUI_BUTTON_TEXT;
+    cui_theme_button_kind kind =
+        o.variant == CUI_BUTTON_SECONDARY ? CUI_THEME_BUTTON_SECONDARY
+        : o.variant == CUI_BUTTON_DANGER  ? CUI_THEME_BUTTON_DANGER
+        : o.variant == CUI_BUTTON_WARNING ? CUI_THEME_BUTTON_WARNING
+        : o.variant == CUI_BUTTON_SUCCESS ? CUI_THEME_BUTTON_SUCCESS
+        : o.variant == CUI_BUTTON_INFO    ? CUI_THEME_BUTTON_INFO
+        : o.variant == CUI_BUTTON_OUTLINE || o.variant == CUI_BUTTON_DEFAULT
+            ? CUI_THEME_BUTTON_DEFAULT
+            : CUI_THEME_BUTTON_PRIMARY;
+    cui_theme_button_colors palette = o.custom_colors ? o.colors : t->buttons[kind];
+    if (o.variant == CUI_BUTTON_CUSTOM && !o.custom_colors)
+        palette = (cui_theme_button_colors){.foreground = t->text, .outline_foreground = t->text};
+    bool outlined = o.outline || o.variant == CUI_BUTTON_OUTLINE;
+    /* Selected/open use their semantic style, independently of pointer state. */
+    bool selected = o.selected || o.open;
+    bool pressed = state.pressed && !selected;
+    bool hovered = state.hovered && !pressed && !selected;
+    bool active = pressed || selected;
+    cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
+    cui_color caret_color = foreground;
+    if (!o.custom_colors) {
+        if (o.variant == CUI_BUTTON_GHOST)
+            caret_color = t->secondary_foreground;
+        else if (o.variant == CUI_BUTTON_LINK)
+            caret_color = t->link;
+        else if (o.variant == CUI_BUTTON_TEXT) {
+            caret_color = t->text;
+            caret_color.a = (uint8_t)(caret_color.a * .9f);
+        }
+    }
+    caret_color.a = (uint8_t)(caret_color.a * .75f);
+    b.background = outlined ? (active          ? palette.outline_active
+                               : state.hovered ? palette.outline_hover
+                                               : palette.outline_normal)
+                            : (active          ? palette.active
+                               : state.hovered ? palette.hover
+                                               : palette.normal);
+    b.border = outlined ? palette.outline_border : palette.border;
+    if (o.variant == CUI_BUTTON_GHOST && !o.custom_colors) {
+        b.background = selected && !outlined ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
+                       : active              ? t->buttons[CUI_THEME_BUTTON_DEFAULT].active
+                       : hovered             ? t->accent
+                                             : (cui_color){0};
+        if (hovered && t->dark)
+            b.background.a = (uint8_t)(b.background.a * .5f);
+        foreground = hovered ? t->accent_foreground : t->secondary_foreground;
+    } else if (o.variant == CUI_BUTTON_LINK && !o.custom_colors) {
+        b.background = (cui_color){0};
+        foreground = selected && outlined ? t->link
+                     : active             ? t->link_active
+                     : hovered            ? t->link_hover
+                                          : t->link;
+    } else if (text && !o.custom_colors) {
+        b.background = (cui_color){0};
+        foreground = t->text;
+        foreground.a = (uint8_t)(foreground.a * (selected && outlined ? .9f
+                                                 : active             ? .7f
+                                                 : hovered            ? 1
+                                                                      : .9f));
+    }
+    if (!outlined && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
+        b.border_width = 0;
+    if (!o.custom_colors && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
+        b.border = (cui_color){0};
+    if (disabled) {
+        b.background = outlined ? palette.outline_normal : palette.normal;
+        float opacity = outlined ? .5f : kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
+        b.background.a = (uint8_t)fminf(255, b.background.a * opacity);
+        b.border.a = (uint8_t)fminf(255, b.border.a * (outlined ? .5f : opacity));
+        if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
+            b.background.a = 0;
+        if (o.variant == CUI_BUTTON_DEFAULT && !o.custom_colors && !outlined) {
+            b.background = t->input_background;
+            b.background.a /= 2;
+            b.border = t->input;
+            b.border.a /= 2;
+        }
+        foreground = t->muted;
+        foreground.a /= 2;
+    } else if (o.loading) {
+        b.custom_opacity = true;
+        b.opacity = .8f;
+    }
+    if (!o.hide_focus_ring && state.focus_visible) {
+        b.border = t->focus;
+        b.border_width = 2;
+    }
+    b.custom_corners = o.custom_corners;
+    b.corner_radii = o.corner_radii;
+    b.custom_border_edges = o.custom_border_edges;
+    b.border_edges = o.border_edges;
+    if (caret)
+        *caret = caret_color;
+    return (cui_button_style_paint){.root = b, .foreground = foreground};
+}
+static bool cui_button_patch_valid(cui_button_paint_patch p) {
+    if (p.fields & ~63u)
+        return false;
+    if ((p.fields & CUI_BUTTON_PAINT_RADIUS) &&
+        (!isfinite(p.paint.root.radius) || p.paint.root.radius < 0))
+        return false;
+    if ((p.fields & CUI_BUTTON_PAINT_OPACITY) &&
+        (!isfinite(p.paint.root.opacity) || p.paint.root.opacity < 0 || p.paint.root.opacity > 1))
+        return false;
+    if (p.fields & CUI_BUTTON_PAINT_CORNERS) {
+        float radii[] = {p.paint.root.corner_radii.top_left, p.paint.root.corner_radii.top_right,
+                         p.paint.root.corner_radii.bottom_left,
+                         p.paint.root.corner_radii.bottom_right};
+        for (size_t i = 0; i < 4; i++)
+            if (!isfinite(radii[i]) || radii[i] < 0)
+                return false;
+    }
+    return true;
+}
+static void cui_button_apply_patch(cui_button_style_paint *p, cui_button_paint_patch patch) {
+    if (patch.fields & CUI_BUTTON_PAINT_BACKGROUND)
+        p->root.background = patch.paint.root.background;
+    if (patch.fields & CUI_BUTTON_PAINT_BORDER)
+        p->root.border = patch.paint.root.border;
+    if (patch.fields & CUI_BUTTON_PAINT_FOREGROUND)
+        p->foreground = patch.paint.foreground;
+    if (patch.fields & CUI_BUTTON_PAINT_RADIUS)
+        p->root.radius = patch.paint.root.radius;
+    if (patch.fields & CUI_BUTTON_PAINT_CORNERS) {
+        p->root.custom_corners = patch.paint.root.custom_corners;
+        p->root.corner_radii = patch.paint.root.corner_radii;
+    }
+    if (patch.fields & CUI_BUTTON_PAINT_OPACITY) {
+        p->root.custom_opacity = true;
+        p->root.opacity = patch.paint.root.opacity;
+    }
+}
+static cui_button_paint_patch cui_button_style_layer(cui_button_style_paint *p,
+                                                     cui_button_style_info *info,
+                                                     cui_button_style_phase phase,
+                                                     cui_button_style_fn callback, void *user) {
+    cui_button_paint_patch patch = {0};
+    if (callback) {
+        info->phase = phase;
+        callback(user, info, p, &patch);
+        if (!cui_button_patch_valid(patch))
+            patch = (cui_button_paint_patch){0};
+        cui_button_apply_patch(p, patch);
+    }
+    return patch;
+}
+static void cui_button_builtin_layer(cui_button_style_paint *p, cui_box geometry,
+                                     const cui_theme *t, cui_button_options o,
+                                     cui_interaction state) {
+    cui_button_style_paint built = cui_button_default_paint(geometry, t, o, state, NULL);
+    p->root.background = built.root.background;
+    p->root.border = built.root.border;
+    p->foreground = built.foreground;
+}
+static cui_button_style_paint cui_button_resolve_styles(cui_box geometry, cui_id id,
+                                                        const cui_theme *t, cui_button_options o,
+                                                        cui_interaction state,
+                                                        cui_button_styles styles) {
+    cui_button_style_info info = {.id = id,
+                                  .hovered = state.hovered,
+                                  .pressed = state.pressed,
+                                  .focus_visible = state.focus_visible,
+                                  .selected = o.selected,
+                                  .open = o.open,
+                                  .disabled = o.disabled,
+                                  .loading = o.loading};
+    cui_button_options normal = o;
+    normal.selected = normal.open = normal.disabled = normal.loading = false;
+    cui_interaction idle = {0};
+    cui_button_style_paint p = cui_button_default_paint(geometry, t, normal, idle, NULL);
+    cui_button_paint_patch instance =
+        cui_button_style_layer(&p, &info, CUI_BUTTON_STYLE_INSTANCE, styles.instance, styles.user);
+    if (!o.disabled && !o.loading && !o.selected && !o.open) {
+        if (state.pressed || state.hovered) {
+            cui_interaction pointer = {.pressed = state.pressed, .hovered = state.hovered};
+            cui_button_builtin_layer(&p, geometry, t, normal, pointer);
+            cui_button_style_layer(&p, &info,
+                                   state.pressed ? CUI_BUTTON_STYLE_ACTIVE : CUI_BUTTON_STYLE_HOVER,
+                                   state.pressed ? styles.active : styles.hovered, styles.user);
+        }
+    }
+    if (o.selected || o.open) {
+        cui_button_options selected = normal;
+        selected.selected = true;
+        cui_button_builtin_layer(&p, geometry, t, selected, idle);
+        cui_button_style_layer(&p, &info, CUI_BUTTON_STYLE_SELECTED, styles.selected, styles.user);
+        cui_button_apply_patch(&p, instance);
+    }
+    if (o.disabled) {
+        cui_button_options disabled = normal;
+        disabled.disabled = true;
+        cui_button_builtin_layer(&p, geometry, t, disabled, idle);
+        cui_button_style_layer(&p, &info, CUI_BUTTON_STYLE_DISABLED, styles.disabled, styles.user);
+        cui_button_apply_patch(&p, instance);
+    } else if (o.loading) {
+        p.root.opacity = (p.root.custom_opacity ? p.root.opacity : 1) * .8f;
+        p.root.custom_opacity = true;
+    }
+    if (state.focus_visible && !o.hide_focus_ring) {
+        p.root.border = t->focus;
+        p.root.border_width = 2;
+        cui_button_style_layer(&p, &info, CUI_BUTTON_STYLE_FOCUS, styles.focused, styles.user);
+    }
+    return p;
+}
 static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                                   cui_button_options o, cui_interaction state) {
+                                   cui_button_options o, cui_interaction state,
+                                   const cui_button_styles *styles) {
     cui_design_metrics design;
     if (!ui || !t || !cui_frame_is_submitting(ui) ||
         !cui_components_design(t, o.design_size, &design) || !cui_button_shape_valid(o))
@@ -387,97 +599,13 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
         b.radius = t->radius * 2;
     else if (o.rounding == CUI_BUTTON_ROUNDED_CUSTOM && isfinite(o.radius) && o.radius >= 0)
         b.radius = o.radius;
-    cui_theme_button_kind kind =
-        o.variant == CUI_BUTTON_SECONDARY ? CUI_THEME_BUTTON_SECONDARY
-        : o.variant == CUI_BUTTON_DANGER  ? CUI_THEME_BUTTON_DANGER
-        : o.variant == CUI_BUTTON_WARNING ? CUI_THEME_BUTTON_WARNING
-        : o.variant == CUI_BUTTON_SUCCESS ? CUI_THEME_BUTTON_SUCCESS
-        : o.variant == CUI_BUTTON_INFO    ? CUI_THEME_BUTTON_INFO
-        : o.variant == CUI_BUTTON_OUTLINE || o.variant == CUI_BUTTON_DEFAULT
-            ? CUI_THEME_BUTTON_DEFAULT
-            : CUI_THEME_BUTTON_PRIMARY;
-    cui_theme_button_colors palette = o.custom_colors ? o.colors : t->buttons[kind];
-    if (o.variant == CUI_BUTTON_CUSTOM && !o.custom_colors)
-        palette = (cui_theme_button_colors){.foreground = t->text, .outline_foreground = t->text};
-    bool outlined = o.outline || o.variant == CUI_BUTTON_OUTLINE;
-    /* Selected/open use their semantic style, independently of pointer state. */
-    bool selected = o.selected || o.open;
-    bool pressed = state.pressed && !selected;
-    bool hovered = state.hovered && !pressed && !selected;
-    bool active = pressed || selected;
-    cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
-    cui_color caret_color = foreground;
-    if (!o.custom_colors) {
-        if (o.variant == CUI_BUTTON_GHOST)
-            caret_color = t->secondary_foreground;
-        else if (o.variant == CUI_BUTTON_LINK)
-            caret_color = t->link;
-        else if (o.variant == CUI_BUTTON_TEXT) {
-            caret_color = t->text;
-            caret_color.a = (uint8_t)(caret_color.a * .9f);
-        }
-    }
-    caret_color.a = (uint8_t)(caret_color.a * .75f);
-    b.background = outlined ? (active          ? palette.outline_active
-                               : state.hovered ? palette.outline_hover
-                                               : palette.outline_normal)
-                            : (active          ? palette.active
-                               : state.hovered ? palette.hover
-                                               : palette.normal);
-    b.border = outlined ? palette.outline_border : palette.border;
-    if (o.variant == CUI_BUTTON_GHOST && !o.custom_colors) {
-        b.background = selected && !outlined ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
-                       : active              ? t->buttons[CUI_THEME_BUTTON_DEFAULT].active
-                       : hovered             ? t->accent
-                                             : (cui_color){0};
-        if (hovered && t->dark)
-            b.background.a = (uint8_t)(b.background.a * .5f);
-        foreground = hovered ? t->accent_foreground : t->secondary_foreground;
-    } else if (o.variant == CUI_BUTTON_LINK && !o.custom_colors) {
-        b.background = (cui_color){0};
-        foreground = selected && outlined ? t->link
-                     : active             ? t->link_active
-                     : hovered            ? t->link_hover
-                                          : t->link;
-    } else if (text && !o.custom_colors) {
-        b.background = (cui_color){0};
-        foreground = t->text;
-        foreground.a = (uint8_t)(foreground.a * (selected && outlined ? .9f
-                                                 : active             ? .7f
-                                                 : hovered            ? 1
-                                                                      : .9f));
-    }
-    if (!outlined && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
-        b.border_width = 0;
-    if (!o.custom_colors && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
-        b.border = (cui_color){0};
-    if (disabled) {
-        b.background = outlined ? palette.outline_normal : palette.normal;
-        float opacity = outlined ? .5f : kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
-        b.background.a = (uint8_t)fminf(255, b.background.a * opacity);
-        b.border.a = (uint8_t)fminf(255, b.border.a * (outlined ? .5f : opacity));
-        if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
-            b.background.a = 0;
-        if (o.variant == CUI_BUTTON_DEFAULT && !o.custom_colors && !outlined) {
-            b.background = t->input_background;
-            b.background.a /= 2;
-            b.border = t->input;
-            b.border.a /= 2;
-        }
-        foreground = t->muted;
-        foreground.a /= 2;
-    } else if (o.loading) {
-        b.custom_opacity = true;
-        b.opacity = .8f;
-    }
-    if (!o.hide_focus_ring && state.focus_visible) {
-        b.border = t->focus;
-        b.border_width = 2;
-    }
-    b.custom_corners = o.custom_corners;
-    b.corner_radii = o.corner_radii;
-    b.custom_border_edges = o.custom_border_edges;
-    b.border_edges = o.border_edges;
+    cui_color caret_color;
+    cui_button_style_paint paint = cui_button_default_paint(b, t, o, state, &caret_color);
+    if (styles && (styles->instance || styles->hovered || styles->active || styles->selected ||
+                   styles->disabled || styles->focused))
+        paint = cui_button_resolve_styles(b, id, t, o, state, *styles);
+    b = paint.root;
+    cui_color foreground = paint.foreground;
     cui_begin_box(ui, id, b);
     /* Clipping boxes retain natural child widths for scrolling. A percentage
      * child establishes the resolved viewport width without compression by the
@@ -642,7 +770,7 @@ void cui_button_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str na
     cui_interaction state = cui_interaction_state(ui, id);
     if (o.disabled || o.loading)
         state.hovered = state.pressed = false;
-    cui_button_paint_state(ui, id, t, name, o, state);
+    cui_button_paint_state(ui, id, t, name, o, state, NULL);
 }
 static bool cui_button_shape_valid(cui_button_options o) {
     if (!cui_button_artwork_valid(o.leading_artwork, false) ||
@@ -747,8 +875,8 @@ static cui_button_click_event cui_button_click_snapshot(cui_context *ui, cui_id 
         result.has_evidence = cui_event_activation_snapshot(ui, index, &result.evidence);
     return result;
 }
-bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_button_options o) {
+static bool cui_button_submit(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                              cui_button_options o, const cui_button_styles *styles) {
     if (!ui || !t || !cui_button_shape_valid(o))
         return false;
     /* Freeze descriptor values before accepted callbacks; resource handles remain borrowed. */
@@ -771,7 +899,7 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         /* Suppressed ancestry composes visuals without touching caller lifecycle state.
          * The borrowed state survives through deferred label paint, whose inert guard
          * preserves the diagnostic prefix cap without writing it. */
-        cui_button_paint_state(ui, id, t, name, o, (cui_interaction){0});
+        cui_button_paint_state(ui, id, t, name, o, (cui_interaction){0}, styles);
         return false;
     }
     bool inert = o.disabled || o.loading;
@@ -792,9 +920,24 @@ bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
             if (o.on_click_event)
                 o.on_click_event(o.action_user, &event);
         }
-    cui_button_paint_state(ui, id, t, name, o, interaction);
+    cui_button_paint_state(ui, id, t, name, o, interaction, styles);
     cui_button_tooltip(ui, id, t, o);
     return activated;
+}
+bool cui_button_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_button_options o) {
+    return cui_button_submit(ui, id, t, name, o, NULL);
+}
+bool cui_button_styled_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                          cui_button_options o, cui_button_styles styles) {
+    return cui_button_submit(ui, id, t, name, o, &styles);
+}
+void cui_button_styled_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                             cui_button_options o, cui_button_styles styles) {
+    cui_interaction state = cui_interaction_state(ui, id);
+    if (o.disabled || o.loading)
+        state.hovered = state.pressed = false;
+    cui_button_paint_state(ui, id, t, name, o, state, &styles);
 }
 typedef struct {
     const cui_button_group_styled_item *child;
@@ -963,7 +1106,7 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
                                                     .right = width,
                                                     .bottom = width};
             }
-            cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i]);
+            cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i], NULL);
             if (!passive)
                 cui_button_tooltip(ui, child.id, t, o);
         }

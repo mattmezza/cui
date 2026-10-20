@@ -130,9 +130,13 @@ pinned. No cross-revision binary cache is used.
 
 The baseline Pages run [39397271176](https://github.com/mattmezza/cui/actions/runs/39397271176)
 spent 25.6 minutes in its sequential build/check job. The three groups were balanced
-using that run's recorded step durations (about 7.4 minutes of checks per group,
-excluding setup/build/transfer). This is a scheduling estimate, not a measured new
-end-to-end result. Hosted runner capacity and queue time also affect latency.
+using that run's recorded step durations. The first parallel run
+[39401871665](https://github.com/mattmezza/cui/actions/runs/39401871665) passed
+all 67 checks: build plus browser validation took 11 minutes 42 seconds
+(09:36:33–09:48:15 UTC), about 54% less elapsed time than the baseline.
+This is one hosted-runner observation, not a guarantee or a reduction in total
+runner minutes. Deployment was intentionally skipped on the experiment branch.
+Hosted runner capacity and queue time also affect latency.
 Portable matrix builds use two concurrent compilation jobs; tests keep their
 existing execution order. Core and native-binding workflows cancel superseded
 runs on the same ref. No test coverage or deployment acceptance gate was removed.

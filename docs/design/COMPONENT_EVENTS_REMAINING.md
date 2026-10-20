@@ -36,9 +36,9 @@ full-family verification. Each family links its authoritative public header.
 | --- | --- | --- |
 | [Accordion](../../include/cui/cui_disclosure.h) | A | [DISCLOSURE_EVENTS](../DISCLOSURE_EVENTS.md): Every applied expansion transition; no controlled veto added. |
 | [AlertDialog](../../include/cui/cui_surface.h) | A | [SURFACE_EVENTS](../SURFACE_EVENTS.md): Retained completed-close only; existing decision policy separate; open/request/veto not notifications. |
-| [Alert](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
+| [Alert](../../include/cui/cui_content.h) | G | Built-in Dismiss activation and optional visibility mutation lack a shared observer; arbitrary child actions remain separate. See [audit](AVATAR_EVENTS_SLICE.md). |
 | [Attachment](../../include/cui/cui_media.h) | A | [ATTACHMENT_EVENTS](../ATTACHMENT_EVENTS.md): Coalesced OPEN/REMOVE/RETRY after old callbacks in category order, not raw-input multiplicity. |
-| [Avatar](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
+| [Avatar](../../include/cui/cui_content.h) | G | Interactive Avatar and stack return activation bool/index but lack shared per-event observers. Legacy void Avatar is presentational. See [checkpoint](AVATAR_EVENTS_SLICE.md), currently a proposal. |
 | [Badge](../../include/cui/cui_components.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [Bubble](../../include/cui/cui_content.h) | N | Rendering/container or child composition; successful submission is not activation. Child controls retain their own event contracts. |
 | [Button](../../include/cui/cui_components.h) | A | [CONTROL_EVENTS](../CONTROL_EVENTS.md): Per-activation Button; immutable controlled Check requests, not confirmed owner changes. |
@@ -124,7 +124,7 @@ HoverCard and Tooltip now have final open-model observers. Focus Trap bracketing
 The earlier follow-up plan has landed for Command forwarding, Scrollable,
 HoverCard/Tooltip, VirtualList and MessageScroller. TitleBar, Focus Trap and
 TextView retain the documented typed/host/composition exceptions. Current
-classification is A43, N20, H8, T7, G0 across exactly 78 families. This is a
+classification is A43, N18, H8, T7, G2 across exactly 78 families. This is a
 **disposition count**, not uniform event semantics or complete family parity.
 
 Further work must target demonstrated application needs rather than repeat those

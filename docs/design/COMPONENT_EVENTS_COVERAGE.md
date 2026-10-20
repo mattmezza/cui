@@ -2,6 +2,8 @@
 
 Read-only inventory at `e9d2c1a561ced3254e606b0206f412af8b156317` on `integration/next39-components`. This covers the exact 78 names in [the frozen manifest](../gpui-parity.json), not a parity promotion. The design request is tracked in `docs/design/COMPONENT_EVENTS_REQUEST.md` at this baseline. This document describes existing C APIs and implementation seams. It approves no new API.
 
+Correction to this historical inventory: the Avatar and Alert rows below omitted intrinsic activation/dismissal paths. The [current audit](AVATAR_EVENTS_SLICE.md) records those paths and their observer gaps; use the [remaining coverage matrix](COMPONENT_EVENTS_REMAINING.md) for current dispositions.
+
 
 ## Implemented additions since the checkpoint
 

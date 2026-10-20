@@ -1,15 +1,17 @@
-# Prerelease preparation: v0.1.0-alpha.2
+# Prerelease preparation: v0.1.0-alpha.3
 
-This document prepares **v0.1.0-alpha.2**; it is not evidence that publication
-has occurred or that the release source is frozen. The next batch includes the
-implemented component event slices, documented typed/host-service exceptions,
-secure InputGroup rendering and IME lifetime/focus fixes, precise virtual/message
-scroll observers, bounded Questionnaire styles/labels and the decoded Video gallery
-extension. These additions preserve the original 78 baseline; no full parity or
-foreign-event uniformity is claimed. Concise skill discovery
-and explicit partial Markdown reads are implemented. Final integrated validation,
-source freeze and artifact checks remain pending; implementation is not publication.
-Final release notes must describe the actual frozen commit.
+This document prepares **v0.1.0-alpha.3**; it is not evidence that publication
+has occurred or that the release source is frozen. The current development batch
+adds opt-in Avatar metrics, identity palettes, SVG placeholders and language
+bindings, further large-document Editor improvements, and an optional bounded
+SDL audio-input host example. Native speech recognition remains separate work;
+no physical microphone or platform recognizer acceptance is implied. These
+additions preserve the original 78 baseline. Full feature parity and uniform
+foreign event coverage are not claimed. Final integrated validation, source
+freeze and artifact checks remain pending. Final release notes must describe the
+actual frozen commit and distinguish completed APIs from proposals.
+
+Published alpha.2 (`v0.1.0-alpha.2`, Python `0.1.0a2`) remains immutable. This document prepares the next development version, not another publication claim.
 
 Keep alpha.1 (`v0.1.0-alpha.1`, Python `0.1.0a1`) and any associated published
 assets immutable. This version update does not retag or replace alpha.1. No
@@ -22,13 +24,13 @@ commits together. Do not turn each implementation commit into a release.
 
 | Surface | Prepared version |
 | --- | --- |
-| Repository/GitHub release | `v0.1.0-alpha.2` |
+| Repository/GitHub release | `v0.1.0-alpha.3` |
 | CMake ABI/base project version | `0.1.0` |
-| Public C `CUI_VERSION` | `0.1.0-alpha.2` |
-| Python / wheel metadata | `0.1.0a2` |
-| npm / Cargo | `0.1.0-alpha.2` |
-| Go proxy version | `v0.1.0-alpha.2` |
-| Public nested Go module tag | `bindings/go/v0.1.0-alpha.2` |
+| Public C `CUI_VERSION` | `0.1.0-alpha.3` |
+| Python / wheel metadata | `0.1.0a3` |
+| npm / Cargo | `0.1.0-alpha.3` |
+| Go proxy version | `v0.1.0-alpha.3` |
+| Public nested Go module tag | `bindings/go/v0.1.0-alpha.3` |
 
 The Go module is `github.com/mattmezza/cui/bindings/go`; its public Git tag needs
 the subdirectory prefix. A repository release tag alone does not publish this
@@ -50,7 +52,7 @@ The checker below requires Python 3.11 or newer and deliberately checks the
 existing format rather than rewriting binding manifests:
 
 ```sh
-python scripts/test_release_metadata.py --tag v0.1.0-alpha.2
+python scripts/test_release_metadata.py --tag v0.1.0-alpha.3
 python scripts/test_release_metadata.py --self-test
 ```
 
@@ -116,7 +118,7 @@ basenames. Prepare release notes describing the tested subset, explicit platform
 and runtime requirements, known limitations, and source revision.
 
 ```sh
-tag=v0.1.0-alpha.2
+tag=v0.1.0-alpha.3
 git tag -a "$tag" "$release_sha" -m "CUI $tag"
 git push origin "refs/tags/$tag"
 gh release create "$tag" --repo mattmezza/cui --verify-tag --draft --prerelease \
@@ -166,7 +168,7 @@ consumer builds. The current packaging helper uses `--allow-dirty --no-verify
 See [Cargo manifest publication controls](https://doc.rust-lang.org/cargo/reference/manifest.html#the-publish-field).
 
 **Go:** validate a clean external consumer without local `replace` paths, then
-push the separate `bindings/go/v0.1.0-alpha.2` tag at the same release SHA if
+push the separate `bindings/go/v0.1.0-alpha.3` tag at the same release SHA if
 publishing that module is intended. Check public source retrieval and module
 checksums. A local proxy archive is not proof that public proxy ingestion works.
 

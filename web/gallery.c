@@ -1276,6 +1276,10 @@ static unsigned char avatar_mask_pixels[3][96 * 96 * 4];
 static cui_avatar_image avatar_images[3];
 static bool avatar_images_ready;
 static int avatar_selected;
+static int avatar_source = 1, avatar_palette = 1, avatar_hue = -1, avatar_placeholder;
+static float avatar_rem = 16;
+static cui_icon_state avatar_custom_placeholder;
+static bool avatar_custom_placeholder_ready;
 static bool message_demo_disabled;
 static const char *avatar_names[3] = {"Alex Morgan", "Jamie Chen", "Robin Hayes"};
 static cui_bitmap gallery_avatar_source(unsigned index) {
@@ -2761,6 +2765,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     next_wake = 0;
     /* The host has synchronously painted the preceding draw list by this call. */
     cui_icon_state_collect(&icon_state);
+    if (avatar_custom_placeholder_ready)
+        cui_icon_state_collect(&avatar_custom_placeholder);
     t.scrollbar = (cui_scrollbar_style){.visibility = (cui_scrollbar_visibility)scrollbar_policy,
                                         .thickness = scrollbar_policy ? (float)scrollbar_width : 0,
                                         .thumb_radius = (float)scrollbar_radius,
@@ -4348,7 +4354,33 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                     .name = cui_string("Compact team avatars")});
         cui_avatar(ui, cui_id_from(ui, "avatar-fallback"), &t, cui_string("Sam Patel"), 40);
         cui_end_box(ui);
-        cui_label(ui, &t, cui_string("No image? Initials remain available."));
+        cui_label(ui, &t, cui_string("Palette, size and anonymous SVG fallback"));
+        if (!avatar_custom_placeholder_ready) {
+            cui_icon_state_init(&avatar_custom_placeholder);
+            cui_icon_set_data(
+                &avatar_custom_placeholder,
+                cui_string("<svg viewBox='0 0 24 24'><path d='M12 2L22 12L12 22L2 12Z'/></svg>"));
+            avatar_custom_placeholder_ready = true;
+        }
+        cui_avatar_ex(ui, cui_id_from(ui, "avatar-variant"), &t,
+                      avatar_source == 2 ? cui_string("") : cui_string("Taylor Reed"),
+                      (cui_avatar_options){.size = 48,
+                                           .design_size = design_size,
+                                           .rem_size = avatar_rem,
+                                           .identity_colors = avatar_palette != 0,
+                                           .custom_identity_hue = avatar_hue >= 0,
+                                           .identity_hue = avatar_hue >= 0 ? (unsigned)avatar_hue : 0,
+                                           .anonymous_icon = true,
+                                           .placeholder_name = avatar_placeholder == 1
+                                                                   ? cui_string("circle-check")
+                                                                   : cui_string(""),
+                                           .placeholder = avatar_placeholder == 2
+                                                              ? &avatar_custom_placeholder : NULL,
+                                           .image = avatar_source == 0 ? gallery_avatar_source(0)
+                                                                       : (cui_bitmap){0},
+                                           .image_state = &avatar_images[0]});
+        cui_label(ui, &t,
+                   cui_string("Photos win; names select initials; anonymous icons are decorative."));
         cui_end_box(ui);
         break;
     }
@@ -6236,6 +6268,19 @@ void gallery_dropdown_options(int variant, int size, int halves, int action, int
     dropdown_selected = selected != 0;
 }
 
+void gallery_avatar_options(int source, int palette, int hue, int placeholder, float rem) {
+    avatar_source = source >= 0 && source <= 2 ? source : 1;
+    avatar_palette = palette != 0;
+    avatar_hue = hue >= 0 && hue < 12 ? hue : -1;
+    avatar_placeholder = placeholder >= 0 && placeholder <= 2 ? placeholder : 0;
+    avatar_rem = isfinite(rem) && rem > 0 && rem <= 512 ? rem : 16;
+}
+float gallery_avatar_metric(int size, float rem, int field) {
+    cui_avatar_metrics metrics;
+    if (!cui_avatar_measure((cui_design_size)size, rem, &metrics))
+        return field ? 48 * .38f : 48;
+    return field ? metrics.font_size : metrics.diameter;
+}
 void gallery_message_options(int alignment, int variant, int inset, int avatar, int scrollbar) {
     message_alignment = alignment;
     message_variant = variant;

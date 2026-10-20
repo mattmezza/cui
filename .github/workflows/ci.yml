@@ -46,6 +46,14 @@ jobs:
         env:
           PKG_CONFIG_PATH: ${{ runner.temp }}/native-deps/lib/pkgconfig
           LD_LIBRARY_PATH: ${{ runner.temp }}/native-deps/lib
+      - name: Offline bounded Speech input host and SDL conversion
+        env:
+          PKG_CONFIG_PATH: ${{ runner.temp }}/native-deps/lib/pkgconfig
+          LD_LIBRARY_PATH: ${{ runner.temp }}/native-deps/lib
+        run: |
+          cmake -S examples/speech_sdl_input -B build/speech-input -G Ninja
+          cmake --build build/speech-input
+          python scripts/test_local.py --build-dir build/speech-input
       - name: X11 compatibility smoke (software forced; GPU unverified)
         run: xvfb-run -a env SDL_RENDER_DRIVER=software ./build/cui_gallery --smoke 3
       - name: Independent Sokol OpenGL pixel readback (actual driver reported)

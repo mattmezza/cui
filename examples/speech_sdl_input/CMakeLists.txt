@@ -46,3 +46,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   add_test(NAME speech_input_threaded_offline COMMAND test_thread)
   set_tests_properties(speech_input_threaded_offline PROPERTIES TIMEOUT 10)
 endif()
+
+# Bound callback-lock regressions without permitting desktop/device fallbacks.
+get_property(SPEECH_INPUT_TESTS DIRECTORY PROPERTY TESTS)
+set_tests_properties(${SPEECH_INPUT_TESTS} PROPERTIES TIMEOUT 20)
+if(TARGET test_thread)
+  set_tests_properties(speech_input_threaded_offline PROPERTIES TIMEOUT 10)
+endif()

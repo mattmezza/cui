@@ -325,7 +325,7 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
                                              (cui_bridge_button_variant)(int)number);
     if (which == 14)
         code = cui_bridge_set_design_size(app->bridge, node->node,
-                                           (cui_bridge_design_size)(int)number);
+                                          (cui_bridge_design_size)(int)number);
     if (which == 3)
         code = cui_bridge_set_button_size(app->bridge, node->node,
                                           (cui_bridge_button_size)(int)number);
@@ -504,9 +504,9 @@ static napi_value set_avatar_identity(napi_env env, napi_callback_info info) {
     js_app *app;
     js_node *node;
     uint32_t enabled, custom_hue, hue;
-    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) ||
-        !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &enabled) ||
-        !uint_arg(env, v[3], &custom_hue) || !uint_arg(env, v[4], &hue))
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &enabled) || !uint_arg(env, v[3], &custom_hue) ||
+        !uint_arg(env, v[4], &hue))
         return NULL;
     cui_bridge_status code =
         cui_bridge_set_avatar_identity(app->bridge, node->node, enabled, custom_hue, hue);
@@ -518,9 +518,8 @@ static napi_value set_avatar_placeholder(napi_env env, napi_callback_info info) 
     js_node *node;
     uint32_t enabled;
     char *name = NULL;
-    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) ||
-        !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &enabled) ||
-        !string_arg(env, v[3], &name))
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &enabled) || !string_arg(env, v[3], &name))
         return NULL;
     cui_bridge_status code =
         cui_bridge_set_avatar_placeholder(app->bridge, node->node, enabled, name);

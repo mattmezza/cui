@@ -27,14 +27,18 @@ static void diameter(cui_bridge_app *app, cui_bridge_node node, float expected) 
 int main(void) {
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
-                                  .width = 800, .height = 800};
+                                  .width = 800,
+                                  .height = 800};
     cui_bridge_status status;
     cui_bridge_app *app = cui_bridge_create(&options, &status);
     assert(app && status == CUI_BRIDGE_OK);
     cui_bridge_node root, avatar, button;
-    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_ROW, "root", &root) == CUI_BRIDGE_OK);
-    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_AVATAR, "avatar", &avatar) == CUI_BRIDGE_OK);
-    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_BUTTON, "button", &button) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, (cui_bridge_node){0}, CUI_BRIDGE_ROW, "root", &root) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_AVATAR, "avatar", &avatar) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_BUTTON, "button", &button) ==
+           CUI_BRIDGE_OK);
     assert(cui_bridge_set_text(app, avatar, "Ada Lovelace") == CUI_BRIDGE_OK);
     (void)frame(app);
     diameter(app, avatar, 40);
@@ -66,12 +70,16 @@ int main(void) {
     bool fill = false, initials = false;
     for (size_t i = 0; i < list.count; ++i) {
         const cui_draw_command *command = &list.commands[i];
-        fill |= command->type == CUI_DRAW_RECT && command->bounds.w == 48 && color_equal(command->color, palette.background);
-        initials |= command->type == CUI_DRAW_TEXT && command->text.length == 2 && !memcmp(command->text.data, "AL", 2) && color_equal(command->color, palette.foreground);
+        fill |= command->type == CUI_DRAW_RECT && command->bounds.w == 48 &&
+                color_equal(command->color, palette.background);
+        initials |= command->type == CUI_DRAW_TEXT && command->text.length == 2 &&
+                    !memcmp(command->text.data, "AL", 2) &&
+                    color_equal(command->color, palette.foreground);
     }
     assert(fill && initials);
     assert(cui_bridge_set_design_size(app, root, CUI_BRIDGE_SIZE_MD) == CUI_BRIDGE_INVALID_STATE);
-    assert(cui_bridge_set_design_size(app, avatar, (cui_bridge_design_size)99) == CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_set_design_size(app, avatar, (cui_bridge_design_size)99) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
     assert(cui_bridge_set_button_size(app, avatar, CUI_BRIDGE_SIZE_MD) == CUI_BRIDGE_INVALID_STATE);
     assert(cui_bridge_set_avatar_identity(app, button, 1, 0, 0) == CUI_BRIDGE_INVALID_STATE);
     assert(cui_bridge_set_avatar_identity(app, avatar, 2, 0, 0) == CUI_BRIDGE_INVALID_ARGUMENT);
@@ -82,39 +90,47 @@ int main(void) {
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 1, name) == CUI_BRIDGE_OK);
     name[0] = 'X'; /* The bridge owns the resource name. */
     assert(!strcmp(app->nodes[avatar.slot].avatar_placeholder, "user"));
-    char too_long[4098]; memset(too_long, 'x', sizeof too_long - 1); too_long[sizeof too_long - 1] = 0;
+    char too_long[4098];
+    memset(too_long, 'x', sizeof too_long - 1);
+    too_long[sizeof too_long - 1] = 0;
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 0, too_long) == CUI_BRIDGE_CAPACITY);
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 0, "\x80") == CUI_BRIDGE_INVALID_UTF8);
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 0, NULL) == CUI_BRIDGE_INVALID_UTF8);
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 2, "") == CUI_BRIDGE_INVALID_ARGUMENT);
-    assert(!strcmp(app->nodes[avatar.slot].avatar_placeholder, "user") && app->nodes[avatar.slot].avatar_anonymous);
+    assert(!strcmp(app->nodes[avatar.slot].avatar_placeholder, "user") &&
+           app->nodes[avatar.slot].avatar_anonymous);
     /* Named people keep initials even when a placeholder is configured. */
     list = frame(app);
-    for (size_t i = 0; i < list.count; ++i) assert(list.commands[i].type != CUI_DRAW_IMAGE);
+    for (size_t i = 0; i < list.count; ++i)
+        assert(list.commands[i].type != CUI_DRAW_IMAGE);
     assert(cui_bridge_set_text(app, avatar, "") == CUI_BRIDGE_OK);
     list = frame(app);
     size_t images = 0;
-    for (size_t i = 0; i < list.count; ++i) images += list.commands[i].type == CUI_DRAW_IMAGE;
+    for (size_t i = 0; i < list.count; ++i)
+        images += list.commands[i].type == CUI_DRAW_IMAGE;
     assert(images == 1); /* Runtime SVG rasterization through the named icon cache. */
     size_t count, avatar_semantics = 0;
     const cui_semantic *semantics = cui_semantics(app->ui, &count);
     for (size_t i = 0; i < count; ++i)
         if (semantics[i].id == app->nodes[avatar.slot].id) {
             assert(semantics[i].role == CUI_ROLE_IMAGE && !semantics[i].details.focusable);
-            assert(semantics[i].name.length == 9 && !memcmp(semantics[i].name.data, "Anonymous", 9));
+            assert(semantics[i].name.length == 9 &&
+                   !memcmp(semantics[i].name.data, "Anonymous", 9));
             ++avatar_semantics;
         }
     assert(avatar_semantics == 1);
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 1, "") == CUI_BRIDGE_OK);
     list = frame(app);
     images = 0;
-    for (size_t i = 0; i < list.count; ++i) images += list.commands[i].type == CUI_DRAW_IMAGE;
+    for (size_t i = 0; i < list.count; ++i)
+        images += list.commands[i].type == CUI_DRAW_IMAGE;
     assert(images == 1); /* Empty resource name selects the default user mask. */
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 0, "") == CUI_BRIDGE_OK);
     assert(cui_bridge_set_design_size(app, avatar, CUI_BRIDGE_SIZE_INHERIT) == CUI_BRIDGE_OK);
     list = frame(app);
     diameter(app, avatar, 60);
-    for (size_t i = 0; i < list.count; ++i) assert(list.commands[i].type != CUI_DRAW_IMAGE);
+    for (size_t i = 0; i < list.count; ++i)
+        assert(list.commands[i].type != CUI_DRAW_IMAGE);
     assert(cui_bridge_node_remove(app, avatar) == CUI_BRIDGE_OK);
     assert(cui_bridge_set_avatar_placeholder(app, avatar, 1, "user") == CUI_BRIDGE_STALE_HANDLE);
     assert(cui_bridge_set_avatar_identity(app, avatar, 1, 0, 0) == CUI_BRIDGE_STALE_HANDLE);

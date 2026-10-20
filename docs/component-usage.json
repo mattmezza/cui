@@ -128,7 +128,8 @@
         "docs/CONTENT.md",
         "docs/AVATAR_MESSAGE_EXAMPLES.md",
         "docs/AVATAR_FAILURE_AUDIT.md",
-        "docs/AVATAR_VARIANTS_AUDIT.md"
+        "docs/AVATAR_VARIANTS_AUDIT.md",
+        "docs/AVATAR_STYLE_BINDINGS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",

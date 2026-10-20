@@ -139,7 +139,7 @@ jobs:
         with:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
-      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components cui_notification_v1_fixture cui_value_notification_fixture
+      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components test_bridge_avatar_style cui_notification_v1_fixture cui_value_notification_fixture
       - run: python scripts/test_local.py --build-dir build-node -R '^(bridge_|node_)'
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless
@@ -212,7 +212,7 @@ jobs:
           cache: false
       - run: rustup toolchain install 1.85.1 --profile minimal
       - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
-      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components test_bridge_portable_run test_bridge_notifications test_bridge_value_notifications test_bridge_text_notifications test_bridge_selection_notifications
+      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components test_bridge_avatar_style test_bridge_portable_run test_bridge_notifications test_bridge_value_notifications test_bridge_text_notifications test_bridge_selection_notifications
       - run: python scripts/test_local.py --build-dir build -R '^bridge_'
       - name: Real Go component state and callback tests
         working-directory: bindings/go

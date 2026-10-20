@@ -4401,15 +4401,15 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             cui_avatar(app->ui, node->id, &app->theme, cui_string(node->text),
                        node->visual_width > 0 ? node->visual_width : 40);
         else
-            (void)cui_avatar_ex(app->ui, node->id, &app->theme, cui_string(node->text),
-                                (cui_avatar_options){
-                                    .size = node->visual_width > 0 ? node->visual_width : 40,
-                                    .design_size = (cui_design_size)node->size,
-                                    .identity_colors = node->avatar_identity,
-                                    .custom_identity_hue = node->avatar_custom_hue,
-                                    .identity_hue = node->avatar_hue,
-                                    .anonymous_icon = node->avatar_anonymous,
-                                    .placeholder_name = cui_string(node->avatar_placeholder)});
+            (void)cui_avatar_ex(
+                app->ui, node->id, &app->theme, cui_string(node->text),
+                (cui_avatar_options){.size = node->visual_width > 0 ? node->visual_width : 40,
+                                     .design_size = (cui_design_size)node->size,
+                                     .identity_colors = node->avatar_identity,
+                                     .custom_identity_hue = node->avatar_custom_hue,
+                                     .identity_hue = node->avatar_hue,
+                                     .anonymous_icon = node->avatar_anonymous,
+                                     .placeholder_name = cui_string(node->avatar_placeholder)});
     } else if (node->kind == CUI_BRIDGE_BUBBLE) {
         cui_bubble(app->ui, node->id, &app->theme,
                    (cui_bubble_options){.message = cui_string(node->text)});

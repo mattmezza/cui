@@ -4362,25 +4362,24 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 cui_string("<svg viewBox='0 0 24 24'><path d='M12 2L22 12L12 22L2 12Z'/></svg>"));
             avatar_custom_placeholder_ready = true;
         }
-        cui_avatar_ex(ui, cui_id_from(ui, "avatar-variant"), &t,
-                      avatar_source == 2 ? cui_string("") : cui_string("Taylor Reed"),
-                      (cui_avatar_options){.size = 48,
-                                           .design_size = design_size,
-                                           .rem_size = avatar_rem,
-                                           .identity_colors = avatar_palette != 0,
-                                           .custom_identity_hue = avatar_hue >= 0,
-                                           .identity_hue = avatar_hue >= 0 ? (unsigned)avatar_hue : 0,
-                                           .anonymous_icon = true,
-                                           .placeholder_name = avatar_placeholder == 1
-                                                                   ? cui_string("circle-check")
-                                                                   : cui_string(""),
-                                           .placeholder = avatar_placeholder == 2
-                                                              ? &avatar_custom_placeholder : NULL,
-                                           .image = avatar_source == 0 ? gallery_avatar_source(0)
-                                                                       : (cui_bitmap){0},
-                                           .image_state = &avatar_images[0]});
+        cui_avatar_ex(
+            ui, cui_id_from(ui, "avatar-variant"), &t,
+            avatar_source == 2 ? cui_string("") : cui_string("Taylor Reed"),
+            (cui_avatar_options){
+                .size = 48,
+                .design_size = design_size,
+                .rem_size = avatar_rem,
+                .identity_colors = avatar_palette != 0,
+                .custom_identity_hue = avatar_hue >= 0,
+                .identity_hue = avatar_hue >= 0 ? (unsigned)avatar_hue : 0,
+                .anonymous_icon = true,
+                .placeholder_name =
+                    avatar_placeholder == 1 ? cui_string("circle-check") : cui_string(""),
+                .placeholder = avatar_placeholder == 2 ? &avatar_custom_placeholder : NULL,
+                .image = avatar_source == 0 ? gallery_avatar_source(0) : (cui_bitmap){0},
+                .image_state = &avatar_images[0]});
         cui_label(ui, &t,
-                   cui_string("Photos win; names select initials; anonymous icons are decorative."));
+                  cui_string("Photos win; names select initials; anonymous icons are decorative."));
         cui_end_box(ui);
         break;
     }

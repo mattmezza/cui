@@ -371,8 +371,8 @@ static void avatar_variants(void) {
             cui_avatar_metrics scaled;
             assert(cui_avatar_measure(size, rems[r], &scaled));
             assert(scaled.diameter > 0 && scaled.diameter <= 512);
-            assert(fabsf(scaled.font_size / scaled.diameter -
-                         unit.font_size / unit.diameter) < .00001f);
+            assert(fabsf(scaled.font_size / scaled.diameter - unit.font_size / unit.diameter) <
+                   .00001f);
             assert(scaled.font_size <= scaled.diameter);
             if (rems[r] == 512)
                 assert(fabsf(scaled.diameter - 512) < .001f);
@@ -487,8 +487,11 @@ static void avatar_variants(void) {
     size_t raster_count = icon.raster_count;
     assert(cui_begin_frame(ui, 100, 100, .016f));
     cui_avatar_ex(ui, 9000, &t, cui_string(""),
-                  (cui_avatar_options){.size = 48, .anonymous_icon = true, .placeholder = &icon,
-                                       .image = {photo_source, 1, 1, 4, 1}, .image_state = &photo});
+                  (cui_avatar_options){.size = 48,
+                                       .anonymous_icon = true,
+                                       .placeholder = &icon,
+                                       .image = {photo_source, 1, 1, 4, 1},
+                                       .image_state = &photo});
     cui_draw_list draw = cui_end_frame(ui);
     size_t photos = 0;
     for (size_t i = 0; i < draw.count; i++)
@@ -556,11 +559,14 @@ static void image_avatars(void) {
     /* Use a separate render frame to inspect the genuine masked bitmap output. */
     assert(cui_begin_frame(ui, 100, 100, .016f));
     cui_theme t = cui_theme_light();
-    cui_avatar_ex(
-        ui, 3000, &t, cui_string("Photo"),
-        (cui_avatar_options){.size = 48, .ring_width = 2, .image = bitmap, .image_state = &image,
-                             .identity_colors = true, .anonymous_icon = true,
-                             .placeholder_name = cui_string("user")});
+    cui_avatar_ex(ui, 3000, &t, cui_string("Photo"),
+                  (cui_avatar_options){.size = 48,
+                                       .ring_width = 2,
+                                       .image = bitmap,
+                                       .image_state = &image,
+                                       .identity_colors = true,
+                                       .anonymous_icon = true,
+                                       .placeholder_name = cui_string("user")});
     draw = cui_end_frame(ui);
     size_t photos = 0;
     for (size_t i = 0; i < draw.count; i++)

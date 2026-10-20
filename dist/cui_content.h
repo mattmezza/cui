@@ -3,8 +3,8 @@
 #ifndef CUI_CONTENT_H
 #define CUI_CONTENT_H
 #include "cui_base.h"
-#include "cui_theme.h"
 #include "cui_icon.h"
+#include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -1,7 +1,8 @@
 # Questionnaire localized progress and bounded text presentation
 
-Design checkpoint only. No API or behavior described as proposed below is
-implemented by this document. Baseline CUI is `9e5ec407`; frozen upstream is
+Approved checkpoint with a worker implementation. The additive header and
+progress-only common submission seam now implement the contract below; canonical
+registration and gallery integration remain separately owned. Baseline CUI is `9e5ec407`; frozen upstream is
 `87d10ae5e1299d1be18670a37570c5402f952e34` (v0.7.1), verified in the local
 `/tmp/cui-gpui-reference` checkout. This is one bounded family slice, not complete
 Questionnaire parity. Core Form-role support is explicitly outside this slice.
@@ -25,14 +26,14 @@ string bytes are borrowed through completed-frame consumption. Existing masked
 invalid values reject the submission before interaction. Root publishes size,
 not translations or slot styles. Those contracts must not silently expand.
 
-## Recommended additive surface
+## Chosen additive surface
 
-Add `include/cui/cui_questionnaire_progress.h`, leaving the existing public options
+The worker adds `include/cui/cui_questionnaire_progress.h`, leaving the existing public options
 record and state layout unchanged. It includes the legacy Questionnaire header.
 One new Styled entry point takes the independent record by value:
 
 ```c
-/* PROPOSED declarations, not currently callable API. */
+/* Implemented additive declarations, shown here as the contract. */
 enum {
     CUI_QUESTIONNAIRE_TEXT_SIZE = 1u << 0,
     CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT = 1u << 1,
@@ -208,3 +209,18 @@ This closes only progress content/localization and explicit progress typography.
 Full family token mappings, root Form semantics, broad localization, arbitrary
 Styled behavior and language presentation/event facades remain separate work.
 All 78 manifest entries and honest partial-platform statements must remain.
+
+Implementation clarification: the derived nonzero child namespace is distinct
+from the progress ID but is not globally collision-free. Callers avoid their
+other application IDs as with existing choice child composition. The focused
+software test uses deterministic rectangular glyph coverage, proving transport
+and actual software compositing rather than production font shaping.
+
+Worker verification: strict Release native progress/Styled/keyboard/observer
+suites 4/4; pinned WASI equivalents 4/4; ASan/UBSan progress 1/1; real guide
+and C++ header consumer compiled; pinned clang-format 23.1.2 check passed.
+Zero comparison uses an independent pre-change rendering body, not two calls
+through the new forwarding seam. Tests compare semantic/draw members and pixel
+bytes without comparing ABI padding. Completed progress is checked before reset
+and reset separately. No browser, production font shaping or physical AT proof
+is claimed; canonical generators and gallery are still pending integration.

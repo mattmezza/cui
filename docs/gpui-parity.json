@@ -3108,7 +3108,10 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_picker.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_calendar_presentation.c",
+        "tests/unit/test_calendar_presentation_header.cpp",
+        "tests/test_calendar_distribution.py"
       ],
       "status": "tested",
       "platforms": {
@@ -3117,7 +3120,9 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual one-to-three month Gregorian grid, ordered keyboard navigation, controlled date/range selection, disabled/min/max predicates and roving semantic days tested. Locale labels, week numbers, today markers, hover range previews and neighboring-day interaction remain pending."
+        "One-to-three-month, six-row Gregorian grid; custom cell size, seven locale tables/custom labels, ordered keyboard navigation and bounded controlled selection. Opt-in independent month access, host-supplied today and selectable neighboring occurrences are headless-tested; new presentation options have not been verified in actual WASM/browser or exposed through language builders.",
+        "CUI preserves earlier range endpoint swapping and year-to-month picker transition, while frozen source restarts an earlier second range endpoint and year selection returns to days. Neighbor activation recenters on the chosen date only outside the visible window; frozen source recenters on range start. Localized full-date day names differ from frozen ISO-only names.",
+        "Arbitrary item/style refinements, unrestricted month counts, ambient locale lookup/non-Gregorian/RTL formatting and complete frozen family parity remain unsupported. DatePicker and typed CHANGE wrappers do not accept presentation extensions. Frozen Calendar itself does not implement week-number columns, hover range previews or a dedicated arrow-key map."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3138,8 +3143,12 @@
         },
         {
           "name": "keyboard/localized semantics",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_picker.c",
+            "tests/unit/test_calendar_presentation.c",
+            "docs/design/CALENDAR_KEYBOARD_LOCALIZATION_AUDIT.md"
+          ]
         },
         {
           "name": "Gregorian grid geometry over forty years",
@@ -3160,6 +3169,22 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "opt-in independent month header and host-supplied today paint (headless)",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_calendar_presentation.c",
+            "docs/CALENDAR_PRESENTATION.md"
+          ]
+        },
+        {
+          "name": "opt-in neighboring-date occurrences and ordered input (headless)",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_calendar_presentation.c",
+            "docs/CALENDAR_PRESENTATION.md"
           ]
         }
       ],
@@ -3197,7 +3222,7 @@
           "Availability Calendar"
         ]
       },
-      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309",
+      "last_tested_commit": "91764e77",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]

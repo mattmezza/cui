@@ -254,7 +254,8 @@
     "cui_color_entry": [
       "src/base/cui_color_entry.c",
       "src/components/cui_color_entry.c"
-    ]
+    ],
+    "cui_calendar_presentation": []
   },
   "native": {
     "text": [

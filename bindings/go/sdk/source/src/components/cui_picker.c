@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_picker.h"
+#include "cui/cui_calendar_presentation.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_picker.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -22,20 +23,25 @@ static bool cui_picker_style_selected(cui_date d, cui_date_selection s, bool ran
     return cui_date_compare(d, s.start) >= 0 && cui_date_compare(d, s.end) <= 0;
 }
 static void cui_picker_paint_cell(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
-                                  float size, bool disabled, bool selected) {
+                                  float size, bool disabled, bool selected, bool today,
+                                  bool neighboring) {
     cui_begin_box(ui, id,
                   (cui_box){.width = size,
                             .height = size,
                             .align_x = CUI_ALIGN_CENTER,
                             .align_y = CUI_ALIGN_CENTER,
                             .radius = t->radius,
-                            .background = selected ? t->primary : t->surface,
+                            .background = selected ? t->primary
+                                          : today  ? t->accent
+                                                   : t->surface,
                             .border = cui_focused(ui) == id ? t->focus : t->border,
                             .border_width = cui_focused(ui) == id ? 2 : 0});
     cui_text(ui, label, fminf(t->font_size, size * .625f),
-             disabled   ? t->muted
-             : selected ? t->on_primary
-                        : t->text);
+             disabled      ? t->muted
+             : selected    ? t->on_primary
+             : today       ? t->accent_foreground
+             : neighboring ? t->muted
+                           : t->text);
     cui_end_box(ui);
 }
 static void cui_picker_paint_navigation(cui_context *ui, cui_id id, const cui_theme *t, float size,
@@ -67,13 +73,43 @@ static bool cui_picker_style_year_page(int page, cui_calendar_options o) {
             return true;
     return false;
 }
+static void cui_picker_paint_calendar_headers(cui_context *ui, cui_id id, const cui_theme *t,
+                                              const cui_calendar_state *s, cui_calendar_options o,
+                                              float cell) {
+    const cui_date_locale *locale = o.locale;
+    const char *month = locale ? locale->months[s->month.month - 1] : NULL;
+    if (!month)
+        month = cui_date_locale_builtin(CUI_DATE_LOCALE_EN_US)->months[s->month.month - 1];
+    char year[16];
+    snprintf(year, sizeof year, "%04d", s->month.year);
+    for (unsigned part = 0; part < 2; part++) {
+        cui_id header = part ? cui_calendar_navigation_id(id, 5) : cui_calendar_month_toggle_id(id);
+        bool active = s->view == (part ? CUI_CALENDAR_YEARS : CUI_CALENDAR_MONTHS);
+        cui_begin_box(ui, header,
+                      (cui_box){.width = -1,
+                                .height = cell,
+                                .align_x = CUI_ALIGN_CENTER,
+                                .align_y = CUI_ALIGN_CENTER,
+                                .radius = t->radius,
+                                .background = active ? t->accent : t->surface,
+                                .border = t->focus,
+                                .border_width = cui_focused(ui) == header ? 2 : 0});
+        cui_text(ui, cui_string(part ? year : month), fminf(t->font_size, cell * .4f),
+                 o.disabled ? t->muted
+                 : active   ? t->accent_foreground
+                            : t->text);
+        cui_end_box(ui);
+    }
+}
 static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_theme *t,
                                       cui_calendar_state *s, cui_date_selection *selection,
-                                      cui_calendar_options o) {
+                                      cui_calendar_options o,
+                                      cui_calendar_presentation_options presentation) {
     if (!t || !s || !selection)
         return;
     float cell = cui_picker_cell(o), gap = 2, width = cell * 7 + gap * 6;
     unsigned months = cui_picker_style_months(o);
+    bool month_toggle = presentation.month_toggle && months == 1;
     const char *weekday[] = {"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"};
     cui_begin_box(ui, id,
                   (cui_box){.row = true,
@@ -91,21 +127,25 @@ static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_them
             cui_picker_paint_navigation(
                 ui, cui_calendar_navigation_id(id, 1), t, cell,
                 o.disabled || !cui_picker_style_year_page((int)s->year_page - 20, o), true, true);
-        char heading[40];
-        unsigned last = s->year_page + 19;
-        if (last > 9999)
-            last = 9999;
-        if (years)
-            snprintf(heading, sizeof heading, "%u–%u", s->year_page, last);
-        else
-            snprintf(heading, sizeof heading, "%04d", s->month.year);
-        cui_begin_box(ui, cui_calendar_navigation_id(id, 5),
-                      (cui_box){.width = -1,
-                                .height = cell,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER});
-        cui_text(ui, cui_string(heading), t->font_size, t->text);
-        cui_end_box(ui);
+        if (month_toggle)
+            cui_picker_paint_calendar_headers(ui, id, t, s, o, cell);
+        else {
+            char heading[40];
+            unsigned last = s->year_page + 19;
+            if (last > 9999)
+                last = 9999;
+            if (years)
+                snprintf(heading, sizeof heading, "%u–%u", s->year_page, last);
+            else
+                snprintf(heading, sizeof heading, "%04d", s->month.year);
+            cui_begin_box(ui, cui_calendar_navigation_id(id, 5),
+                          (cui_box){.width = -1,
+                                    .height = cell,
+                                    .align_x = CUI_ALIGN_CENTER,
+                                    .align_y = CUI_ALIGN_CENTER});
+            cui_text(ui, cui_string(heading), t->font_size, t->text);
+            cui_end_box(ui);
+        }
         if (years)
             cui_picker_paint_navigation(
                 ui, cui_calendar_navigation_id(id, 4), t, cell,
@@ -163,25 +203,29 @@ static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_them
             cui_picker_paint_navigation(ui, cui_calendar_navigation_id(id, 2), t, cell, o.disabled,
                                         true, false);
         }
-        char title[24];
-        snprintf(title, sizeof(title), "%04d-%02d", month.year, month.month);
-        cui_begin_box(ui,
-                      m == 0 ? cui_calendar_navigation_id(id, 5) : cui_picker_style_id(id, 40 + m),
-                      (cui_box){.width = -1,
-                                .height = cell,
-                                .align_x = CUI_ALIGN_CENTER,
-                                .align_y = CUI_ALIGN_CENTER});
-        if (o.locale) {
-            const char *month_label = o.locale->months[month.month - 1];
-            if (!month_label)
-                month_label =
-                    cui_date_locale_builtin(CUI_DATE_LOCALE_EN_US)->months[month.month - 1];
-            cui_text(ui, cui_string(month_label), fminf(t->font_size, cell * .4f), t->text);
-            snprintf(title, sizeof title, "%04d", month.year);
-            cui_text(ui, cui_string(title), fminf(t->font_size, cell * .4f), t->text);
-        } else
-            cui_text(ui, cui_string(title), fminf(t->font_size, cell * .625f), t->text);
-        cui_end_box(ui);
+        if (month_toggle)
+            cui_picker_paint_calendar_headers(ui, id, t, s, o, cell);
+        else {
+            char title[24];
+            snprintf(title, sizeof(title), "%04d-%02d", month.year, month.month);
+            cui_begin_box(
+                ui, m == 0 ? cui_calendar_navigation_id(id, 5) : cui_picker_style_id(id, 40 + m),
+                (cui_box){.width = -1,
+                          .height = cell,
+                          .align_x = CUI_ALIGN_CENTER,
+                          .align_y = CUI_ALIGN_CENTER});
+            if (o.locale) {
+                const char *month_label = o.locale->months[month.month - 1];
+                if (!month_label)
+                    month_label =
+                        cui_date_locale_builtin(CUI_DATE_LOCALE_EN_US)->months[month.month - 1];
+                cui_text(ui, cui_string(month_label), fminf(t->font_size, cell * .4f), t->text);
+                snprintf(title, sizeof title, "%04d", month.year);
+                cui_text(ui, cui_string(title), fminf(t->font_size, cell * .4f), t->text);
+            } else
+                cui_text(ui, cui_string(title), fminf(t->font_size, cell * .625f), t->text);
+            cui_end_box(ui);
+        }
         if (m == 0) {
             cui_picker_paint_navigation(ui, cui_calendar_navigation_id(id, 3), t, cell, o.disabled,
                                         false, false);
@@ -210,14 +254,25 @@ static void cui_picker_paint_calendar(cui_context *ui, cui_id id, const cui_them
                           (cui_box){.row = true, .gap = gap});
             for (unsigned col = 0; col < 7; ++col) {
                 unsigned index = row * 7 + col;
-                if (cui_date_valid(grid[index]) && grid[index].month == month.month &&
-                    grid[index].year == month.year) {
+                cui_calendar_cell_info info = {0};
+                bool visible =
+                    presentation.neighboring_days
+                        ? cui_calendar_cell_resolve(id, s->month, cui_calendar_first_weekday(o), m,
+                                                    index, &info)
+                        : cui_date_valid(grid[index]) && grid[index].month == month.month &&
+                              grid[index].year == month.year;
+                if (visible) {
                     char label[16];
                     snprintf(label, sizeof(label), "%d", grid[index].day);
                     cui_picker_paint_cell(
-                        ui, cui_calendar_day_id(id, grid[index]), t, cui_string(label), cell,
-                        !cui_calendar_date_enabled(grid[index], o),
-                        cui_picker_style_selected(grid[index], *selection, o.range));
+                        ui,
+                        presentation.neighboring_days ? info.id
+                                                      : cui_calendar_day_id(id, grid[index]),
+                        t, cui_string(label), cell, !cui_calendar_date_enabled(grid[index], o),
+                        cui_picker_style_selected(grid[index], *selection, o.range),
+                        cui_date_valid(presentation.today) &&
+                            !cui_date_compare(grid[index], presentation.today),
+                        presentation.neighboring_days && info.neighboring);
                 } else {
                     cui_begin_box(ui, cui_picker_style_id(id, 400 + m * 42 + index),
                                   (cui_box){.width = cell, .height = cell});
@@ -236,7 +291,17 @@ cui_calendar_result cui_calendar(cui_context *ui, cui_id id, const cui_theme *t,
     if (!t)
         return (cui_calendar_result){0};
     cui_calendar_result result = cui_base_calendar(ui, id, s, selection, o);
-    cui_picker_paint_calendar(ui, id, t, s, selection, o);
+    cui_picker_paint_calendar(ui, id, t, s, selection, o, (cui_calendar_presentation_options){0});
+    return result;
+}
+cui_calendar_result cui_calendar_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                                    cui_calendar_state *s, cui_date_selection *selection,
+                                    cui_calendar_options o,
+                                    cui_calendar_presentation_options presentation) {
+    if (!t)
+        return (cui_calendar_result){0};
+    cui_calendar_result result = cui_base_calendar_ex(ui, id, s, selection, o, presentation);
+    cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
     return result;
 }
 bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
@@ -293,7 +358,7 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     calendar.disabled = calendar.disabled || o.disabled;
     cui_calendar_submit(ui, cui_picker_style_id(id, 900), &s->calendar, *selection, calendar);
     cui_picker_paint_calendar(ui, cui_picker_style_id(id, 900), t, &s->calendar, selection,
-                              calendar);
+                              calendar, (cui_calendar_presentation_options){0});
     if (!was_open) {
         cui_id calendar_id = cui_picker_style_id(id, 900);
         cui_id focus = s->calendar.view == CUI_CALENDAR_YEARS

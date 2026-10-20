@@ -563,13 +563,15 @@ Event API: `cui_hover_update_events`, `cui_tooltip_events`.
 
 **State:** Caller retains cui_calendar_state and cui_date_selection.
 
-**Interaction:** cui_calendar_result reports selection/navigation; cui_date_disabled_fn excludes dates.
+**Interaction:** cui_calendar_result reports aggregate selection/navigation; live cui_date_disabled_fn excludes dates. Extended presentation has no typed observer bridge or binding options; legacy CHANGE remains selection-only.
 
-**Usage:** Initialize a month, submit calendar each frame, and consume selection changes in the result.
+**Usage:** Initialize caller state and submit each frame. Optional cui_calendar_ex enables independent month access, host-supplied today and checked neighboring-cell occurrences; zero presentation options preserve legacy behavior. Rebuild with matching headers/library.
 
 API: `cui_calendar_init`, `cui_calendar`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
 
 Additional event includes: `cui/cui_picker_events.h`.
+
+Presentation extension: `cui/cui_calendar_presentation.h`; [opt-in month, today and neighboring dates](CALENDAR_PRESENTATION.md).
 
 ## ColorPicker
 

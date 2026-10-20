@@ -44,6 +44,8 @@ SOURCES = ["src/base/cui_otp_events.c", "src/base/cui_number_events.c", "src/bas
            'src/components/cui_kbd.c',
            'src/base/cui_stepper_navigation.c',
            'src/components/cui_stepper_navigation.c',
+           'src/base/cui_color_entry.c',
+           'src/components/cui_color_entry.c',
            'src/base/cui_disclosure.c', 'src/components/cui_disclosure.c',
            'src/base/cui_choice.c', 'src/components/cui_choice.c',
            'src/base/cui_radio_group.c', 'src/components/cui_radio_group.c',

@@ -904,18 +904,27 @@
       "api_symbols": [
         "cui_calendar_init",
         "cui_calendar",
-        "cui_calendar_events"
+        "cui_calendar_events",
+        "cui_calendar_ex",
+        "cui_base_calendar_ex",
+        "cui_calendar_reduce_ex",
+        "cui_calendar_submit_ex",
+        "cui_calendar_cell_resolve",
+        "cui_calendar_month_toggle_id"
       ],
       "state_types": [
         "cui_calendar_state",
-        "cui_date_selection"
+        "cui_date_selection",
+        "cui_calendar_presentation_options",
+        "cui_calendar_cell_info"
       ],
       "state_ownership": "Caller retains cui_calendar_state and cui_date_selection.",
-      "interaction": "cui_calendar_result reports selection/navigation; cui_date_disabled_fn excludes dates.",
-      "usage": "Initialize a month, submit calendar each frame, and consume selection changes in the result.",
+      "interaction": "cui_calendar_result reports aggregate selection/navigation; live cui_date_disabled_fn excludes dates. Extended presentation has no typed observer bridge or binding options; legacy CHANGE remains selection-only.",
+      "usage": "Initialize caller state and submit each frame. Optional cui_calendar_ex enables independent month access, host-supplied today and checked neighboring-cell occurrences; zero presentation options preserve legacy behavior. Rebuild with matching headers/library.",
       "docs": [
         "docs/PICKERS.md",
-        "docs/PICKER_EVENTS.md"
+        "docs/PICKER_EVENTS.md",
+        "docs/CALENDAR_PRESENTATION.md"
       ],
       "callback_symbols": [
         "cui_date_disabled_fn"
@@ -925,7 +934,8 @@
       "public_header": "include/cui/cui_picker.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_picker_events.h"
+        "include/cui/cui_picker_events.h",
+        "include/cui/cui_calendar_presentation.h"
       ]
     },
     {

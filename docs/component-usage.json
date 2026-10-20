@@ -1244,21 +1244,25 @@
         "cui_questionnaire_init",
         "cui_questionnaire_begin",
         "cui_questionnaire_end",
-        "cui_questionnaire_begin_with_keyboard"
+        "cui_questionnaire_begin_with_keyboard",
+        "cui_questionnaire_submission_copy",
+        "cui_questionnaire_query_copy"
       ],
       "state_types": [
         "cui_questionnaire_state",
         "cui_questionnaire_workspace",
         "cui_questionnaire_slot_style",
         "cui_questionnaire_labels",
-        "cui_questionnaire_keyboard_options"
+        "cui_questionnaire_keyboard_options",
+        "cui_questionnaire_snapshot_workspace"
       ],
       "state_ownership": "Caller retains question definitions, state and all workspace buffers.",
       "interaction": "cui_questionnaire_event_fn emits model events; cui_questionnaire_validate_fn validates answers.",
-      "usage": "Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies.",
+      "usage": "Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies. Pure answer/submission snapshots copy effective values into caller-owned bounded storage without callbacks or model mutation; query_copy reports scalar state. Language builders omit snapshot APIs.",
       "docs": [
         "docs/QUESTIONNAIRE.md",
-        "docs/QUESTIONNAIRE_KEYBOARD.md"
+        "docs/QUESTIONNAIRE_KEYBOARD.md",
+        "docs/QUESTIONNAIRE_SNAPSHOTS.md"
       ],
       "callback_symbols": [
         "cui_questionnaire_event_fn",
@@ -1269,7 +1273,8 @@
       "public_header": "include/cui/cui_questionnaire.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_questionnaire_keyboard.h"
+        "include/cui/cui_questionnaire_keyboard.h",
+        "include/cui/cui_questionnaire_snapshots.h"
       ]
     },
     {

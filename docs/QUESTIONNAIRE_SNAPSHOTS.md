@@ -25,7 +25,8 @@ memcpy-relocated arena does not automatically rebase them.
 This example retains a submission independently of subsequent model edits and
 source definitions. The bounded application workspace may be too small; the result
 and measured requirements tell the caller that explicitly. The saved object must
-stay at the same address while its snapshot is in use.
+stay at the same address while its snapshot is in use. Publishing only after a
+successful copy preserves the previous saved record and its storage on failure.
 
 ```c
 #include "cui/cui_questionnaire_snapshots.h"
@@ -46,7 +47,12 @@ cui_questionnaire_snapshot_result save_questionnaire(
         .choices = saved->choices, .choice_capacity = 64,
         .text = saved->text, .text_capacity = sizeof saved->text
     };
-    return cui_questionnaire_submission_copy(state, workspace, required, &saved->snapshot);
+    cui_questionnaire_submission_snapshot next = {0};
+    cui_questionnaire_snapshot_result result =
+        cui_questionnaire_submission_copy(state, workspace, required, &next);
+    if (result == CUI_QUESTIONNAIRE_SNAPSHOT_OK)
+        saved->snapshot = next;
+    return result;
 }
 ```
 

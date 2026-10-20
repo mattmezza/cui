@@ -105,4 +105,5 @@ set(CUI_SOURCES
  src/base/cui_color_hsla.c
  src/base/cui_color_hsla_entry.c
  src/components/cui_color_hsla_entry.c
+ src/base/cui_questionnaire_snapshots.c
 )

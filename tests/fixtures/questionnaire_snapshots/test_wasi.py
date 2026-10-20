@@ -8,8 +8,8 @@ root = Path(__file__).resolve().parents[3]
 spec = importlib.util.spec_from_file_location("snapshots_worker_wasi", root / "scripts/test_wasi.py")
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
-runner.SOURCES = (*runner.SOURCES, "src/base/cui_questionnaire_snapshots.c")
-runner.SUITES = (*runner.SUITES, "questionnaire_snapshots")
+runner.SOURCES = tuple(dict.fromkeys((*runner.SOURCES, "src/base/cui_questionnaire_snapshots.c")))
+runner.SUITES = tuple(dict.fromkeys((*runner.SUITES, "questionnaire_snapshots")))
 original_fingerprint = runner.source_fingerprint
 
 def source_fingerprint(source_root):

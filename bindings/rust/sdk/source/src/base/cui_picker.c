@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_date_picker_calendar.h"
+#include "cui/cui_picker.h"
 #include "cui/cui_calendar_behavior.h"
 #include "cui/cui_calendar_presentation.h"
-#include "cui/cui_picker.h"
+#include "cui/cui_date_picker_calendar.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -924,10 +924,11 @@ void cui_base_date_picker_trigger(cui_context *ui, cui_id id, cui_str name,
         ui, id, (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
 }
 
-static cui_calendar_result cui_picker_date_picker(
-    cui_context *ui, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *s,
-    cui_date_selection *selection, cui_date_picker_options o,
-    cui_date_picker_calendar_options extension) {
+static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
+                                                  cui_str name, cui_date_picker_state *s,
+                                                  cui_date_selection *selection,
+                                                  cui_date_picker_options o,
+                                                  cui_date_picker_calendar_options extension) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
@@ -976,7 +977,8 @@ cui_id cui_date_picker_calendar_id(cui_id trigger) {
 }
 cui_calendar_result cui_base_date_picker_ex(cui_context *ui, cui_id trigger, cui_id calendar,
                                             cui_str name, cui_date_picker_state *s,
-                                            cui_date_selection *selection, cui_date_picker_options o,
+                                            cui_date_selection *selection,
+                                            cui_date_picker_options o,
                                             cui_date_picker_calendar_options extension) {
     return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o, extension);
 }

@@ -1086,10 +1086,11 @@ void cui_base_date_picker_trigger(cui_context *ui, cui_id id, cui_str name,
         ui, id, (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
 }
 
-static cui_calendar_result cui_picker_date_picker(
-    cui_context *ui, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *s,
-    cui_date_selection *selection, cui_date_picker_options o,
-    cui_date_picker_calendar_options extension) {
+static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
+                                                  cui_str name, cui_date_picker_state *s,
+                                                  cui_date_selection *selection,
+                                                  cui_date_picker_options o,
+                                                  cui_date_picker_calendar_options extension) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
@@ -1138,7 +1139,8 @@ cui_id cui_date_picker_calendar_id(cui_id trigger) {
 }
 cui_calendar_result cui_base_date_picker_ex(cui_context *ui, cui_id trigger, cui_id calendar,
                                             cui_str name, cui_date_picker_state *s,
-                                            cui_date_selection *selection, cui_date_picker_options o,
+                                            cui_date_selection *selection,
+                                            cui_date_picker_options o,
                                             cui_date_picker_calendar_options extension) {
     return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o, extension);
 }
@@ -1897,15 +1899,15 @@ cui_calendar_result cui_calendar_with_behavior(cui_context *ui, cui_id id, const
     cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
     return result;
 }
-static bool cui_picker_date_picker_styled(
-    cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_date_picker_state *s,
-    cui_date_selection *selection, cui_date_picker_options o,
-    cui_date_picker_calendar_options extension) {
+static bool cui_picker_date_picker_styled(cui_context *ui, cui_id id, const cui_theme *t,
+                                          cui_str name, cui_date_picker_state *s,
+                                          cui_date_selection *selection, cui_date_picker_options o,
+                                          cui_date_picker_calendar_options extension) {
     if (!ui || !t || !s || !selection)
         return false;
     bool was_open = s->overlay.open;
-    cui_calendar_result result =
-        cui_base_date_picker_ex(ui, id, cui_picker_style_id(id, 900), name, s, selection, o, extension);
+    cui_calendar_result result = cui_base_date_picker_ex(ui, id, cui_picker_style_id(id, 900), name,
+                                                         s, selection, o, extension);
     char value[200], end_value[96];
     cui_str label;
     if (cui_date_valid(selection->start)) {
@@ -1951,7 +1953,7 @@ static bool cui_picker_date_picker_styled(
     cui_calendar_options calendar = o.calendar;
     calendar.disabled = calendar.disabled || o.disabled;
     cui_calendar_submit_ex(ui, cui_picker_style_id(id, 900), &s->calendar, *selection, calendar,
-                            extension.presentation);
+                           extension.presentation);
     cui_picker_paint_calendar(ui, cui_picker_style_id(id, 900), t, &s->calendar, selection,
                               calendar, extension.presentation);
     if (!was_open) {

@@ -1,10 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_date_picker_calendar.h"
 #include <type_traits>
-static_assert(std::is_trivially_copyable<cui_calendar_presentation_options>::value, "value options");
+static_assert(std::is_trivially_copyable<cui_calendar_presentation_options>::value,
+              "value options");
 static_assert(std::is_trivially_copyable<cui_calendar_cell_info>::value, "copied occurrence");
 static_assert(std::is_trivially_copyable<cui_calendar_behavior_options>::value, "value policies");
-static_assert(std::is_trivially_copyable<cui_date_picker_calendar_options>::value, "value forwarding");
+static_assert(std::is_trivially_copyable<cui_date_picker_calendar_options>::value,
+              "value forwarding");
 int main() {
     if (cui_date_picker_calendar_id(0) || !cui_date_picker_calendar_id(31))
         return 1;

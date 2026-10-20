@@ -6,7 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define CHECK(x) do { if (!(x)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #x); abort(); } } while (0)
+#define CHECK(x)                                                                                   \
+    do {                                                                                           \
+        if (!(x)) {                                                                                \
+            fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #x);                                \
+            abort();                                                                               \
+        }                                                                                          \
+    } while (0)
 enum { W = 1000, H = 650 };
 typedef struct {
     cui_context *ui;
@@ -26,11 +32,12 @@ static bool disabled(void *user, cui_date d) {
            (f->blocked_month && d.month == f->blocked_month);
 }
 static fixture create(bool base, bool dark) {
-    fixture f = {.ui = cui_create((cui_config){.width = W, .height = H,
-                                               .max_elements = 1024, .max_commands = 2048}),
-        .theme = dark ? cui_theme_dark() : cui_theme_light(), .base = base,
-        .selection = {.start = {2024, 2, 15}},
-        .options = {.viewport = {0, 0, W, H}}};
+    fixture f = {.ui = cui_create((cui_config){
+                     .width = W, .height = H, .max_elements = 1024, .max_commands = 2048}),
+                 .theme = dark ? cui_theme_dark() : cui_theme_light(),
+                 .base = base,
+                 .selection = {.start = {2024, 2, 15}},
+                 .options = {.viewport = {0, 0, W, H}}};
     CHECK(f.ui);
     cui_set_reduced_motion(f.ui, true);
     cui_date_picker_init(&f.state, 32, f.selection.start);
@@ -42,7 +49,9 @@ static cui_id root(const fixture *f) {
 static const cui_semantic *semantic(fixture *f, cui_id id) {
     size_t n;
     const cui_semantic *s = cui_semantics(f->ui, &n);
-    for (size_t i = 0; i < n; i++) if (s[i].id == id) return s + i;
+    for (size_t i = 0; i < n; i++)
+        if (s[i].id == id)
+            return s + i;
     return NULL;
 }
 static void frame(fixture *f, bool legacy) {
@@ -52,17 +61,17 @@ static void frame(fixture *f, bool legacy) {
     f->changed = false;
     if (!f->omit) {
         if (!f->base) {
-            f->changed = legacy
-                ? cui_date_picker(f->ui, 31, &f->theme, cui_string("Date"), &f->state,
-                                  &f->selection, f->options)
-                : cui_date_picker_ex(f->ui, 31, &f->theme, cui_string("Date"), &f->state,
-                                     &f->selection, f->options, f->extension);
+            f->changed =
+                legacy ? cui_date_picker(f->ui, 31, &f->theme, cui_string("Date"), &f->state,
+                                         &f->selection, f->options)
+                       : cui_date_picker_ex(f->ui, 31, &f->theme, cui_string("Date"), &f->state,
+                                            &f->selection, f->options, f->extension);
         } else {
             f->result = legacy
-                ? cui_base_date_picker(f->ui, 31, 10, cui_string("Date"), &f->state,
-                                       &f->selection, f->options)
-                : cui_base_date_picker_ex(f->ui, 31, 10, cui_string("Date"), &f->state,
-                                          &f->selection, f->options, f->extension);
+                            ? cui_base_date_picker(f->ui, 31, 10, cui_string("Date"), &f->state,
+                                                   &f->selection, f->options)
+                            : cui_base_date_picker_ex(f->ui, 31, 10, cui_string("Date"), &f->state,
+                                                      &f->selection, f->options, f->extension);
             f->changed = f->result.changed;
             cui_begin_box(f->ui, 31, (cui_box){.width = 180, .height = 32});
             cui_end_box(f->ui);
@@ -74,13 +83,15 @@ static void frame(fixture *f, bool legacy) {
                     cui_calendar_options o = f->options.calendar;
                     o.disabled = o.disabled || f->options.disabled;
                     cui_calendar_submit_ex(f->ui, 10, &f->state.calendar, f->selection, o,
-                        legacy ? (cui_calendar_presentation_options){0} : f->extension.presentation);
+                                           legacy ? (cui_calendar_presentation_options){0}
+                                                  : f->extension.presentation);
                     size_t n;
                     const cui_semantic *s = cui_semantics(f->ui, &n);
-                    for (size_t i = 0; i < n; i++) if (s[i].id != 31) {
-                        cui_begin_box(f->ui, s[i].id, (cui_box){.width = 100, .height = 3});
-                        cui_end_box(f->ui);
-                    }
+                    for (size_t i = 0; i < n; i++)
+                        if (s[i].id != 31) {
+                            cui_begin_box(f->ui, s[i].id, (cui_box){.width = 100, .height = 3});
+                            cui_end_box(f->ui);
+                        }
                     cui_end_box(f->ui);
                     cui_overlay_end(f->ui);
                 }
@@ -98,17 +109,20 @@ static void activate(fixture *f, cui_id id, unsigned kind) {
     if (!kind) {
         cui_rect b = cui_bounds(f->ui, id);
         CHECK(b.w > 0 && b.h > 0);
-        CHECK(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
-            .x = b.x + b.w / 2, .y = b.y + b.h / 2}));
-        CHECK(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
-            .x = b.x + b.w / 2, .y = b.y + b.h / 2}));
+        CHECK(cui_queue_event(
+            f->ui,
+            (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = b.x + b.w / 2, .y = b.y + b.h / 2}));
+        CHECK(cui_queue_event(
+            f->ui,
+            (cui_event){.type = CUI_EVENT_POINTER_UP, .x = b.x + b.w / 2, .y = b.y + b.h / 2}));
     } else if (kind == 2) {
         CHECK(cui_queue_accessibility_action(f->ui, id, CUI_ACCESSIBILITY_ACTIVATE));
     } else {
         cui_focus(f->ui, id);
         key(f, kind == 1 ? CUI_KEY_ENTER : CUI_KEY_SPACE);
         if (kind == 3)
-            CHECK(cui_queue_event(f->ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+            CHECK(cui_queue_event(f->ui,
+                                  (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
     }
 }
 static void open_picker(fixture *f, unsigned kind) {
@@ -142,7 +156,8 @@ static void ranges(void) {
                     activate(&f, day(&f, 15), kind);
                     frame(&f, false);
                     CHECK(f.changed && f.selection.end.day == 15 && !f.state.overlay.open);
-                } else CHECK(f.selection.end.day == 20);
+                } else
+                    CHECK(f.selection.end.day == 20);
                 CHECK(cui_focused(f.ui) == 31 && !semantic(&f, 31)->details.expanded);
                 cui_destroy(f.ui);
             }
@@ -196,7 +211,8 @@ static void validation_and_queues(void) {
         for (unsigned i = 0; i < 42; i++) {
             cui_calendar_cell_info info;
             if (cui_calendar_cell_resolve(root(&f), f.state.calendar.month, 0, 0, i, &info) &&
-                !cui_date_compare(info.date, (cui_date){2024, 3, 1})) neighbor = info;
+                !cui_date_compare(info.date, (cui_date){2024, 3, 1}))
+                neighbor = info;
         }
         CHECK(neighbor.id && neighbor.neighboring);
         activate(&f, neighbor.id, 2); /* Completes, then same original-grid date starts again. */
@@ -222,8 +238,8 @@ static void headers_and_neighbors(void) {
             cui_date_locale locale = *cui_date_locale_builtin(CUI_DATE_LOCALE_IT);
             locale.choose_month = "Mese locale";
             f.options.calendar.locale = &locale;
-            f.extension.presentation = (cui_calendar_presentation_options){.month_toggle = true,
-                .today = {2024, 2, 16}, .neighboring_days = true};
+            f.extension.presentation = (cui_calendar_presentation_options){
+                .month_toggle = true, .today = {2024, 2, 16}, .neighboring_days = true};
             f.extension.behavior.year_destination = CUI_CALENDAR_YEAR_OPEN_DAYS;
             open_picker(&f, kind);
             CHECK(semantic(&f, cui_calendar_month_toggle_id(root(&f))));
@@ -233,7 +249,8 @@ static void headers_and_neighbors(void) {
             CHECK(semantic(&f, 31)->name.length > 0);
             activate(&f, cui_calendar_month_toggle_id(root(&f)), kind);
             frame(&f, false);
-            CHECK(f.state.overlay.open && !f.changed && f.state.calendar.view == CUI_CALENDAR_MONTHS);
+            CHECK(f.state.overlay.open && !f.changed &&
+                  f.state.calendar.view == CUI_CALENDAR_MONTHS);
             CHECK(semantic(&f, cui_calendar_month_toggle_id(root(&f)))->details.expanded);
             activate(&f, cui_calendar_month_id(root(&f), 2), kind);
             frame(&f, false);
@@ -242,7 +259,8 @@ static void headers_and_neighbors(void) {
             frame(&f, false);
             activate(&f, cui_calendar_year_id(root(&f), 2025), kind);
             frame(&f, false);
-            CHECK(f.state.calendar.view == CUI_CALENDAR_DAYS && f.state.calendar.month.year == 2025);
+            CHECK(f.state.calendar.view == CUI_CALENDAR_DAYS &&
+                  f.state.calendar.month.year == 2025);
             CHECK(!f.changed && f.selection.start.year == 2024 && f.state.overlay.open);
             cui_destroy(f.ui);
             f = create(base != 0, false);
@@ -253,7 +271,8 @@ static void headers_and_neighbors(void) {
             for (unsigned i = 0; i < 42; i++) {
                 cui_calendar_cell_info info;
                 if (cui_calendar_cell_resolve(root(&f), f.state.calendar.month, 0, 0, i, &info) &&
-                    !cui_date_compare(info.date, (cui_date){2024, 3, 1})) neighbor = info;
+                    !cui_date_compare(info.date, (cui_date){2024, 3, 1}))
+                    neighbor = info;
             }
             CHECK(neighbor.id && semantic(&f, neighbor.id));
             activate(&f, neighbor.id, kind);
@@ -269,7 +288,8 @@ static void pixels(cui_draw_list draw, unsigned char *out) {
     CHECK(draw.count <= 2048);
     cui_draw_list copy = {.commands = commands, .width = draw.width, .height = draw.height};
     for (size_t i = 0; i < draw.count; i++)
-        if (draw.commands[i].type != CUI_DRAW_TEXT) commands[copy.count++] = draw.commands[i];
+        if (draw.commands[i].type != CUI_DRAW_TEXT)
+            commands[copy.count++] = draw.commands[i];
     cui_software *sw = cui_software_create(W, H, NULL);
     CHECK(sw && cui_software_render(sw, &copy, (cui_color){0, 0, 0, 255}));
     unsigned w, h;
@@ -303,7 +323,8 @@ static void equal(fixture *a, fixture *b, unsigned char *pa, unsigned char *pb) 
               !memcmp(&x->color, &y->color, sizeof x->color) && x->text.length == y->text.length);
         CHECK(!x->text.length || !memcmp(x->text.data, y->text.data, x->text.length));
     }
-    pixels(a->draw, pa); pixels(b->draw, pb);
+    pixels(a->draw, pa);
+    pixels(b->draw, pb);
     CHECK(!memcmp(pa, pb, W * H * 4));
 }
 static void zero_and_invalid(void) {
@@ -316,17 +337,26 @@ static void zero_and_invalid(void) {
                     fixture a = create(base != 0, dark != 0), b = create(base != 0, dark != 0);
                     a.options.calendar.months = b.options.calendar.months = months;
                     a.state.calendar.view = b.state.calendar.view = (cui_calendar_view)view;
-                    frame(&a, true); frame(&b, false); equal(&a, &b, pa, pb);
-                    activate(&a, 31, 2); activate(&b, 31, 2);
-                    frame(&a, true); frame(&b, false); equal(&a, &b, pa, pb);
+                    frame(&a, true);
+                    frame(&b, false);
+                    equal(&a, &b, pa, pb);
+                    activate(&a, 31, 2);
+                    activate(&b, 31, 2);
+                    frame(&a, true);
+                    frame(&b, false);
+                    equal(&a, &b, pa, pb);
                     b.extension.behavior = (cui_calendar_behavior_options){
                         (cui_calendar_range_transition)-1, (cui_calendar_year_destination)INT_MAX,
                         (cui_calendar_recenter_policy)99, (cui_calendar_range_validation)-5};
                     b.extension.presentation.today = (cui_date){2024, 2, 31};
-                    frame(&a, true); frame(&b, false); equal(&a, &b, pa, pb);
-                    cui_destroy(a.ui); cui_destroy(b.ui);
+                    frame(&a, true);
+                    frame(&b, false);
+                    equal(&a, &b, pa, pb);
+                    cui_destroy(a.ui);
+                    cui_destroy(b.ui);
                 }
-    free(pa); free(pb);
+    free(pa);
+    free(pb);
 }
 static void paint_and_boundaries(void) {
     unsigned char *a = malloc(W * H * 4), *b = malloc(W * H * 4);
@@ -337,7 +367,8 @@ static void paint_and_boundaries(void) {
         open_picker(&f, 2);
         pixels(f.draw, a);
         f.extension.presentation.today = (cui_date){2024, 2, 16};
-        frame(&f, false); pixels(f.draw, b);
+        frame(&f, false);
+        pixels(f.draw, b);
         CHECK(memcmp(a, b, W * H * 4)); /* Actual today background. */
         f.options.calendar.is_disabled = disabled;
         f.options.calendar.disabled_user = &f;
@@ -346,8 +377,7 @@ static void paint_and_boundaries(void) {
         bool label = false;
         for (size_t i = 0; i < f.draw.count; i++) {
             const cui_draw_command *c = f.draw.commands + i;
-            if (c->type == CUI_DRAW_TEXT && c->text.length == 2 &&
-                !memcmp(c->text.data, "16", 2)) {
+            if (c->type == CUI_DRAW_TEXT && c->text.length == 2 && !memcmp(c->text.data, "16", 2)) {
                 CHECK(!memcmp(&c->color, &f.theme.muted, sizeof c->color));
                 label = true;
             }
@@ -355,16 +385,19 @@ static void paint_and_boundaries(void) {
         CHECK(label && semantic(&f, day(&f, 16))->disabled);
         f.blocked_day = 0;
         f.extension.presentation.today = f.selection.start;
-        frame(&f, false); pixels(f.draw, a);
+        frame(&f, false);
+        pixels(f.draw, a);
         f.extension.presentation.today = (cui_date){0};
-        frame(&f, false); pixels(f.draw, b);
+        frame(&f, false);
+        pixels(f.draw, b);
         CHECK(!memcmp(a, b, W * H * 4)); /* Selected overrides today. */
         cui_rect bounds = f.state.overlay.bounds;
         CHECK(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.w <= W &&
               bounds.y + bounds.h <= H);
         cui_destroy(f.ui);
     }
-    free(a); free(b);
+    free(a);
+    free(b);
     for (unsigned base = 0; base < 2; base++) {
         for (unsigned months = 2; months <= 3; months++) {
             fixture f = create(base != 0, false);
@@ -381,10 +414,13 @@ static void paint_and_boundaries(void) {
             f.extension.behavior.range_transition = (cui_calendar_range_transition)99;
             f.extension.presentation.neighboring_days = true;
             open_picker(&f, 2);
-            activate(&f, cui_calendar_navigation_id(root(&f), 5), 2); frame(&f, false);
-            activate(&f, cui_calendar_year_id(root(&f), edge ? 9999 : 1), 2); frame(&f, false);
+            activate(&f, cui_calendar_navigation_id(root(&f), 5), 2);
+            frame(&f, false);
+            activate(&f, cui_calendar_year_id(root(&f), edge ? 9999 : 1), 2);
+            frame(&f, false);
             CHECK(f.state.calendar.month.year == (edge ? 9999 : 1) &&
-                  f.state.calendar.view == CUI_CALENDAR_DAYS && cui_date_valid(f.state.calendar.cursor));
+                  f.state.calendar.view == CUI_CALENDAR_DAYS &&
+                  cui_date_valid(f.state.calendar.cursor));
             CHECK(f.state.overlay.open && !f.changed);
             cui_destroy(f.ui);
         }
@@ -395,7 +431,8 @@ static void paint_and_boundaries(void) {
         f.options.calendar.disabled_user = &f;
         f.extension.behavior.year_destination = CUI_CALENDAR_YEAR_OPEN_DAYS;
         open_picker(&f, 2);
-        activate(&f, cui_calendar_navigation_id(root(&f), 5), 2); frame(&f, false);
+        activate(&f, cui_calendar_navigation_id(root(&f), 5), 2);
+        frame(&f, false);
         activate(&f, cui_calendar_year_id(root(&f), 2025), 2);
         f.blocked_month = 2;
         frame(&f, false);
@@ -436,27 +473,36 @@ static void combinations(void) {
                             (cui_calendar_recenter_policy)recenter,
                             (cui_calendar_range_validation)validate};
                         open_picker(&f, 2);
-                        activate(&f, cui_calendar_navigation_id(root(&f), 5), 2); frame(&f, false);
-                        activate(&f, cui_calendar_year_id(root(&f), 2025), 2); frame(&f, false);
-                        CHECK(f.state.calendar.view == (years ? CUI_CALENDAR_DAYS : CUI_CALENDAR_MONTHS));
+                        activate(&f, cui_calendar_navigation_id(root(&f), 5), 2);
+                        frame(&f, false);
+                        activate(&f, cui_calendar_year_id(root(&f), 2025), 2);
+                        frame(&f, false);
+                        CHECK(f.state.calendar.view ==
+                              (years ? CUI_CALENDAR_DAYS : CUI_CALENDAR_MONTHS));
                         CHECK(!f.changed && f.selection.start.day == 20 && f.state.overlay.open);
                         if (!years) {
-                            activate(&f, cui_calendar_month_id(root(&f), 2), 2); frame(&f, false);
+                            activate(&f, cui_calendar_month_id(root(&f), 2), 2);
+                            frame(&f, false);
                         }
                         activate(&f, cui_calendar_day_id(root(&f), (cui_date){2025, 2, 10}), 2);
                         frame(&f, false);
-                        CHECK(f.changed && f.selection.start.year == 2025 && f.selection.start.day == 10);
+                        CHECK(f.changed && f.selection.start.year == 2025 &&
+                              f.selection.start.day == 10);
                         CHECK(f.state.overlay.open == (restart != 0) &&
                               f.state.calendar.selecting_end == (restart != 0));
-                        CHECK(restart ? !cui_date_valid(f.selection.end) : f.selection.end.day == 20);
+                        CHECK(restart ? !cui_date_valid(f.selection.end)
+                                      : f.selection.end.day == 20);
                         cui_destroy(f.ui);
                     }
     fixture f = create(false, false);
     f.extension.presentation.neighboring_days = true;
     open_picker(&f, 1);
-    cui_focus(f.ui, day(&f, 15)); key(&f, CUI_KEY_RIGHT); key(&f, CUI_KEY_ENTER);
+    cui_focus(f.ui, day(&f, 15));
+    key(&f, CUI_KEY_RIGHT);
+    key(&f, CUI_KEY_ENTER);
     frame(&f, false);
-    CHECK(f.changed && f.selection.start.day == 16 && !f.state.overlay.open && cui_focused(f.ui) == 31);
+    CHECK(f.changed && f.selection.start.day == 16 && !f.state.overlay.open &&
+          cui_focused(f.ui) == 31);
     cui_destroy(f.ui);
 }
 static void lifecycle_and_errors(void) {
@@ -467,35 +513,53 @@ static void lifecycle_and_errors(void) {
         activate(&f, cui_calendar_navigation_id(root(&f), 5), 2);
         frame(&f, false);
         CHECK(f.state.calendar.view == CUI_CALENDAR_YEARS);
-        key(&f, CUI_KEY_ESCAPE); key(&f, CUI_KEY_ESCAPE); frame(&f, false);
+        key(&f, CUI_KEY_ESCAPE);
+        key(&f, CUI_KEY_ESCAPE);
+        frame(&f, false);
         CHECK(f.state.overlay.open && f.state.calendar.view == CUI_CALENDAR_DAYS);
-        key(&f, CUI_KEY_ESCAPE); frame(&f, false);
+        key(&f, CUI_KEY_ESCAPE);
+        frame(&f, false);
         CHECK(!f.state.overlay.open && cui_focused(f.ui) == 31);
-        activate(&f, 31, 2); activate(&f, 31, 2); frame(&f, false);
+        activate(&f, 31, 2);
+        activate(&f, 31, 2);
+        frame(&f, false);
         CHECK(!f.state.overlay.open && !f.changed);
-        activate(&f, 31, 2); frame(&f, false);
+        activate(&f, 31, 2);
+        frame(&f, false);
         CHECK(f.state.overlay.open);
-        CHECK(cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 990, .y = 640}));
+        CHECK(
+            cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 990, .y = 640}));
         CHECK(cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 990, .y = 640}));
         frame(&f, false);
         CHECK(!f.state.overlay.open && cui_focused(f.ui) == 31);
-        activate(&f, 31, 2); frame(&f, false);
+        activate(&f, 31, 2);
+        frame(&f, false);
         CHECK(f.state.overlay.open);
         f.options.calendar.disabled = true;
-        activate(&f, day(&f, 20), 2); frame(&f, false);
+        activate(&f, day(&f, 20), 2);
+        frame(&f, false);
         CHECK(f.state.overlay.open && !f.changed && f.selection.start.day == 15);
-        f.options.disabled = true; frame(&f, false);
+        f.options.disabled = true;
+        frame(&f, false);
         CHECK(!f.state.overlay.open);
         f.options.disabled = f.options.calendar.disabled = false;
         frame(&f, false); /* Publish enabled trigger before requesting an AT action. */
-        activate(&f, 31, 2); frame(&f, false);
+        activate(&f, 31, 2);
+        frame(&f, false);
         CHECK(f.state.overlay.open);
-        f.omit = true; activate(&f, day(&f, 20), 2); frame(&f, false);
+        f.omit = true;
+        activate(&f, day(&f, 20), 2);
+        frame(&f, false);
         CHECK(!f.changed && f.state.overlay.open && !semantic(&f, 31));
-        f.omit = false; frame(&f, false);
-        f.inert = true; activate(&f, day(&f, 20), 2); frame(&f, false);
+        f.omit = false;
+        frame(&f, false);
+        f.inert = true;
+        activate(&f, day(&f, 20), 2);
+        frame(&f, false);
         CHECK(!f.changed && f.selection.start.day == 15);
-        f.inert = false; f.layout = true; frame(&f, false);
+        f.inert = false;
+        f.layout = true;
+        frame(&f, false);
         CHECK(!f.changed);
         cui_destroy(f.ui);
     }
@@ -510,17 +574,21 @@ static void lifecycle_and_errors(void) {
     /* A subsequent ordinary control is outside the removed modal scope. */
     f.options.viewport = (cui_rect){0, 0, W, H};
     frame(&f, false);
-    activate(&f, 31, 2); frame(&f, false); CHECK(f.state.overlay.open);
+    activate(&f, 31, 2);
+    frame(&f, false);
+    CHECK(f.state.overlay.open);
     cui_destroy(f.ui);
     f = create(false, false);
     CHECK(cui_begin_frame(f.ui, W, H, .016f));
     cui_date_selection saved = f.selection;
-    CHECK(!cui_base_date_picker_ex(f.ui, 31, 10, cui_string("Date"), NULL, &f.selection,
-        f.options, f.extension).activated);
-    CHECK(!cui_date_picker_ex(f.ui, 31, NULL, cui_string("Date"), &f.state, &f.selection,
-        f.options, f.extension));
-    CHECK(!cui_base_date_picker_ex(f.ui, 31, 10, cui_string("Date"), &f.state, NULL,
-        f.options, f.extension).changed);
+    CHECK(!cui_base_date_picker_ex(f.ui, 31, 10, cui_string("Date"), NULL, &f.selection, f.options,
+                                   f.extension)
+               .activated);
+    CHECK(!cui_date_picker_ex(f.ui, 31, NULL, cui_string("Date"), &f.state, &f.selection, f.options,
+                              f.extension));
+    CHECK(!cui_base_date_picker_ex(f.ui, 31, 10, cui_string("Date"), &f.state, NULL, f.options,
+                                   f.extension)
+               .changed);
     CHECK(!cui_date_compare(saved.start, f.selection.start) && !f.state.overlay.open);
     cui_end_frame(f.ui);
     cui_destroy(f.ui);
@@ -528,18 +596,27 @@ static void lifecycle_and_errors(void) {
     cui_id zero_root = UINT64_C(0x713d9902fd4b5a97) + UINT64_C(0x9e3779b97f4a7c15) * 900;
     CHECK(!cui_date_picker_calendar_id(zero_root));
     CHECK(!cui_base_date_picker_ex(NULL, 31, 10, cui_string("Date"), NULL, NULL,
-        (cui_date_picker_options){0}, (cui_date_picker_calendar_options){0}).changed);
+                                   (cui_date_picker_options){0},
+                                   (cui_date_picker_calendar_options){0})
+               .changed);
     CHECK(!cui_date_picker_ex(NULL, 31, NULL, cui_string("Date"), NULL, NULL,
-        (cui_date_picker_options){0}, (cui_date_picker_calendar_options){0}));
+                              (cui_date_picker_options){0}, (cui_date_picker_calendar_options){0}));
 }
 int main(void) {
-    fputs("ranges\n", stderr); ranges();
-    fputs("validation/queues\n", stderr); validation_and_queues();
-    fputs("headers/neighbors\n", stderr); headers_and_neighbors();
-    fputs("zero/invalid\n", stderr); zero_and_invalid();
-    fputs("paint/boundaries\n", stderr); paint_and_boundaries();
-    fputs("combinations\n", stderr); combinations();
-    fputs("lifecycle/errors\n", stderr); lifecycle_and_errors();
+    fputs("ranges\n", stderr);
+    ranges();
+    fputs("validation/queues\n", stderr);
+    validation_and_queues();
+    fputs("headers/neighbors\n", stderr);
+    headers_and_neighbors();
+    fputs("zero/invalid\n", stderr);
+    zero_and_invalid();
+    fputs("paint/boundaries\n", stderr);
+    paint_and_boundaries();
+    fputs("combinations\n", stderr);
+    combinations();
+    fputs("lifecycle/errors\n", stderr);
+    lifecycle_and_errors();
     puts("DatePicker Calendar extension checks passed");
     return 0;
 }

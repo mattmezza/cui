@@ -372,6 +372,64 @@ static void image_avatars(void) {
     const unsigned char *rendered = cui_software_pixels(renderer, NULL, NULL);
     assert(rendered[0] == 255 && rendered[1] == 255 && rendered[2] == 255);
     assert(rendered[(24 * 100 + 24) * 4] > 230 && rendered[(24 * 100 + 24) * 4 + 1] < 20);
+    /* A previously prepared photo must not leak into a failed/missing frame.
+     * Recovering with the same source reuses the untouched cache. */
+    const cui_bitmap failures[] = {{0}, {source, 8, 4, 1, 9}, {0}};
+    for (size_t failure = 0; failure < sizeof failures / sizeof failures[0]; failure++) {
+        saved = image;
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        cui_avatar_ex(ui, 3000, &t, failure == 2 ? cui_string("") : cui_string("Ada Lovelace"),
+                      (cui_avatar_options){.size = 48, .interactive = failure == 1,
+                                           .image = failures[failure],
+                                           .image_state = &image});
+        draw = cui_end_frame(ui);
+        bool initials = false;
+        for (size_t i = 0; i < draw.count; i++) {
+            assert(draw.commands[i].type != CUI_DRAW_IMAGE);
+            if (draw.commands[i].type == CUI_DRAW_TEXT &&
+                draw.commands[i].text.length == (failure == 2 ? 1 : 2) &&
+                !memcmp(draw.commands[i].text.data, failure == 2 ? "?" : "AL",
+                        failure == 2 ? 1 : 2))
+                initials = true;
+        }
+        assert(initials && memcmp(&image, &saved, sizeof image) == 0);
+        sem = cui_semantics(ui, &count);
+        bool named = false;
+        for (size_t i = 0; i < count; i++)
+            if (sem[i].id == 3000) {
+                const char *expected = failure == 2 ? "Anonymous" : "Ada Lovelace";
+                size_t length = strlen(expected);
+                named = sem[i].role == (failure == 1 ? CUI_ROLE_BUTTON : CUI_ROLE_IMAGE) &&
+                        sem[i].name.length == length &&
+                        !memcmp(sem[i].name.data, expected, length);
+            }
+        assert(named);
+        /* Text commands were checked above; paint the fill without a host font. */
+        cui_draw_command shapes[64];
+        cui_draw_list fill = draw;
+        fill.commands = shapes;
+        fill.count = 0;
+        assert(draw.count <= sizeof shapes / sizeof shapes[0]);
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type != CUI_DRAW_TEXT)
+                shapes[fill.count++] = draw.commands[i];
+        assert(cui_software_render(renderer, &fill, (cui_color){255, 255, 255, 255}));
+        rendered = cui_software_pixels(renderer, NULL, NULL);
+        /* Away from the initials, the failed frame paints the fallback fill. */
+        size_t sample = (24 * 100 + 12) * 4;
+        assert(rendered[sample] == t.primary.r && rendered[sample + 1] == t.primary.g);
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        cui_avatar_ex(ui, 3000, &t, cui_string("Ada Lovelace"),
+                      (cui_avatar_options){.size = 48, .image = bitmap, .image_state = &image});
+        draw = cui_end_frame(ui);
+        photos = 0;
+        for (size_t i = 0; i < draw.count; i++)
+            photos += draw.commands[i].type == CUI_DRAW_IMAGE;
+        assert(photos == 1 && image.bitmap.revision == saved.bitmap.revision);
+        assert(cui_software_render(renderer, &draw, (cui_color){255, 255, 255, 255}));
+        rendered = cui_software_pixels(renderer, NULL, NULL);
+        assert(rendered[(24 * 100 + 24) * 4] > 230);
+    }
     cui_software_destroy(renderer);
     avatar_stack_frame(ui, &image, bitmap, 200, false);
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 40, .y = 24}));

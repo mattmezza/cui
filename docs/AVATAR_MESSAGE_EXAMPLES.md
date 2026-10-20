@@ -11,7 +11,21 @@ Changing the source pointer, dimensions, stride or revision rebuilds the cache.
 Increment the source revision when its pixels change. There is no per-frame heap
 allocation and no cleanup function: the application owns all storage. A diameter
 of 1–512 is supported; storage requires diameter × diameter × 4 bytes. Source and
-cache storage must not overlap. Missing or invalid images fall back to initials.
+cache storage must not overlap. Missing or invalid images fall back to initials. A
+failed preparation leaves the last successful cache intact, but `cui_avatar_ex`
+uses the current preparation result and never displays that stale photo for an
+invalid source. To represent acquisition/decode failure or a pending download,
+pass a zero bitmap; retry with valid borrowed RGBA pixels when available. Recovery
+can reuse the same cache. Acquisition, decoding and retry policy belong to the
+host; there is no network or asynchronous source-status API.
+
+The supplied full name labels both photo and initials frames; it is not shortened
+for assistive technology. An empty name becomes “Anonymous” in `cui_avatar_ex`.
+Passive avatars expose image semantics and interactive avatars expose button
+semantics. Read semantic records within the current frame lifetime; copy names
+before retaining them across frames. These names are a CUI accessibility policy:
+the frozen upstream Avatar does not define an equivalent automatic name policy.
+See `docs/AVATAR_FAILURE_AUDIT.md` for the precise frozen upstream distinction.
 
 ```c
 #include <cui/cui_content.h>

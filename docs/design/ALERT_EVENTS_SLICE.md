@@ -86,11 +86,15 @@ cui_alert_dismiss_result cui_alert_events(
 ```
 
 This is a **coalesced completed-dismiss-action observation**, zero or one
-notification per invocation. `dismissal_count` counts actual observer calls,
-never accepted input multiplicity. It is zero with no callback, even when
-`legacy_dismissed` is true. No overflow flag is necessary for a bounded 0/1
-count. `legacy_dismissed` is exactly the bool the old function would return.
-Reading the result does not dispatch again.
+notification per invocation. `dismissal_count` summarizes the eligible observed
+completed dismissal, never accepted input multiplicity or callback invocations.
+It is one when an ordinary active, non-omitted submission completes the built-in
+Dismiss action, independently of whether a callback is installed. Missing
+callbacks do not change interaction results. No overflow flag is necessary for
+this bounded 0/1 count. `legacy_dismissed` is exactly the bool the old function
+would return; passive/ineligible contexts retain that legacy bool independently
+of the observation count and cannot emit a notification. Reading the result does
+not dispatch or replay an observation.
 
 `visibility_assigned` records only whether the existing false assignment ran.
 It is true even when the value was already false; it is false when no storage
@@ -121,8 +125,8 @@ This does not guarantee all later rendering succeeded. `submitted` means an
 ordinary active frame and a non-omitted Alert at entry. An initially false
 visibility value is a valid omission with `submitted=false`; a nondismissible
 Alert can submit normally with no dismissal. Inert/layout-only submission
-retains its legacy visual/slot behavior and emits no user dismissal callback.
-Do not introduce new legacy-entry rejection rules or suppress existing slots
+retains its legacy visual/slot behavior with `dismissal_count=0` and no user
+dismissal callback, independently of the legacy return. Do not introduce new legacy-entry rejection rules or suppress existing slots
 merely to normalize result bookkeeping.
 
 ## Preserve the existing owner-write boundary
@@ -135,13 +139,15 @@ for this first slice, and no second reducer pass is allowed.
 
 At the existing aggregate true branch, perform the same optional false write.
 Freeze `legacy_dismissed`, `visibility_assigned` and truthful frame-only payload
-facts. Run the existing `cui_end_box`, then invoke the optional observer before
-return. This is synchronous submission-time observation, not end-frame or a
+facts. Run the existing `cui_end_box`, then set `dismissal_count=1` for an eligible
+completed dismissal regardless of handler presence, and invoke the optional
+observer before return. Passive/ineligible observation leaves the count zero;
+it must not suppress or rewrite any legacy operation. This is synchronous submission-time observation, not end-frame or a
 queued close event. Slot `user` and observer `user` remain independent.
 
 The observer sees the false assignment already applied if storage exists. It
 may deliberately set that owner value true again; the frozen payload, original
-aggregate bool and 0/1 callback count do not change. Such an owner write is not
+aggregate bool and 0/1 dismissal count do not change. Such an owner write is not
 a second generated event and must not be overwritten after observation. Likewise,
 visibility changed by earlier title/body/action slots follows the existing single
 entry guard; do not recheck it to skip the Button or classify a fake transition.
@@ -192,17 +198,22 @@ Before production, add meaningful real-input headless tests for:
 - Null visibility storage still yields true plus one observation on accepted
   dismissal, with `visibility_assigned=false`. Already-false storage at the
   write boundary still yields assignment fact, not a fabricated transition.
-- Copied payload survives frame/context lifetime; callback-less result count
-  stays zero; initial omission versus submitted state is explicit. Verify exact
+- Copied payload survives frame/context lifetime. An eligible completed dismissal
+  has count one both with and without a handler; the callback-less case executes
+  no callback and reading its result never replays one. Passive/ineligible
+  contexts have count zero while preserving the independent legacy bool and
+  mutations. Initial omission versus submitted state is explicit. Verify exact
   legacy drawing/semantic results alongside the new facade.
 - Strict portable C11 and C++ header checks; targeted `content`,
   `alert_bubble_slots`, Button event regressions and a new Alert observer CTest.
   On Linux run only through `python scripts/test_local.py --build-dir <build>`;
   no desktop display or GPU parity claim.
 
-Proposed later implementation ownership: new `include/cui/cui_alert_events.h`,
-narrow declarations in `include/cui/cui_content.h`, private common implementation
+Proposed later implementation ownership: new `include/cui/cui_alert_events.h`
+containing all new types and facade declarations, private common implementation
 in `src/components/cui_content.c`, new focused tests and native consumer guide.
+The dedicated header can include the existing content header; no declarations
+or layout changes in `include/cui/cui_content.h` are required.
 Integrator owns registration, source metadata, generated SDK/distribution/skill
 refresh and ledger decisions. This checkpoint changes none of them.
 

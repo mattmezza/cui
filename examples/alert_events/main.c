@@ -23,19 +23,20 @@ int main(void) {
         cui_destroy(ui);
         return EXIT_FAILURE;
     }
-    cui_alert_dismiss_result result = cui_alert_events(
-        ui, 100, &theme,
-        (cui_alert_options){.kind = CUI_ALERT_INFO,
-                            .message = {"Your changes were saved.", 24},
-                            .width = 400, .visible = &state.visible, .dismissible = true},
-        (cui_alert_dismiss_handler){dismissed, &state});
+    cui_alert_dismiss_result result =
+        cui_alert_events(ui, 100, &theme,
+                         (cui_alert_options){.kind = CUI_ALERT_INFO,
+                                             .message = {"Your changes were saved.", 24},
+                                             .width = 400,
+                                             .visible = &state.visible,
+                                             .dismissible = true},
+                         (cui_alert_dismiss_handler){dismissed, &state});
     (void)cui_end_frame(ui);
     /* Choose the callback or dismissal_count for each side effect; do not
      * perform the same effect through both. Neither reading result nor copying
      * it dispatches a second callback. This frame has no queued dismissal. */
     bool ok = result.valid && result.submitted && !result.legacy_dismissed &&
-              result.dismissal_count == 0 && state.dismissed == 0 &&
-              cui_last_error(ui) == CUI_OK;
+              result.dismissal_count == 0 && state.dismissed == 0 && cui_last_error(ui) == CUI_OK;
     cui_destroy(ui);
     return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

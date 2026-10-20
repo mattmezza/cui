@@ -7,8 +7,8 @@
 #include <string.h>
 
 enum { ALERT = 10, CUSTOM = 90 };
-static const cui_id dismiss_id = ALERT ^
-    (UINT64_C(0x874e65fa19c80721) + UINT64_C(0x9e3779b97f4a7c15));
+static const cui_id dismiss_id =
+    ALERT ^ (UINT64_C(0x874e65fa19c80721) + UINT64_C(0x9e3779b97f4a7c15));
 typedef struct {
     bool visible, hide_in_body, consume_in_body;
     unsigned order, custom_actions;
@@ -70,19 +70,25 @@ static cui_context *context(void) {
     return ui;
 }
 static cui_alert_options options(slots *s) {
-    return (cui_alert_options){.kind = CUI_ALERT_INFO, .width = 400,
-                               .visible = &s->visible, .dismissible = true,
-                               .title_content = title, .content = body, .action = action,
-                               .user = s, .accessible_name = {"Test alert", 10}};
+    return (cui_alert_options){.kind = CUI_ALERT_INFO,
+                               .width = 400,
+                               .visible = &s->visible,
+                               .dismissible = true,
+                               .title_content = title,
+                               .content = body,
+                               .action = action,
+                               .user = s,
+                               .accessible_name = {"Test alert", 10}};
 }
-static cui_alert_dismiss_result frame(cui_context *ui, cui_alert_options opt,
-                                      observer *o, unsigned passive, bool legacy,
-                                      cui_draw_list *draw, size_t *accepted) {
+static cui_alert_dismiss_result frame(cui_context *ui, cui_alert_options opt, observer *o,
+                                      unsigned passive, bool legacy, cui_draw_list *draw,
+                                      size_t *accepted) {
     if (opt.user)
         ((slots *)opt.user)->order = 0;
     assert(cui_begin_frame(ui, 600, 400, .016f));
-    cui_begin_box(ui, 1, (cui_box){.width = 600, .height = 400,
-                                  .inert = passive == 1, .layout_only = passive == 2});
+    cui_begin_box(
+        ui, 1,
+        (cui_box){.width = 600, .height = 400, .inert = passive == 1, .layout_only = passive == 2});
     if (o)
         o->frame = cui_frame_sequence(ui);
     cui_theme theme = cui_theme_light();
@@ -91,7 +97,7 @@ static cui_alert_dismiss_result frame(cui_context *ui, cui_alert_options opt,
         result.legacy_dismissed = cui_alert(ui, ALERT, &theme, opt);
     else
         result = cui_alert_events(ui, ALERT, &theme, opt,
-                                   (cui_alert_dismiss_handler){o ? completed : NULL, o});
+                                  (cui_alert_dismiss_handler){o ? completed : NULL, o});
     if (accepted) {
         *accepted = 0;
         size_t count;
@@ -107,8 +113,10 @@ static cui_alert_dismiss_result frame(cui_context *ui, cui_alert_options opt,
 static void pointer(cui_context *ui, cui_id target, cui_pointer_type type) {
     cui_rect b = cui_bounds(ui, target);
     assert(b.w > 0 && b.h > 0);
-    cui_event event = {.type = CUI_EVENT_POINTER_DOWN, .x = b.x + b.w / 2,
-                       .y = b.y + b.h / 2, .pointer_type = type,
+    cui_event event = {.type = CUI_EVENT_POINTER_DOWN,
+                       .x = b.x + b.w / 2,
+                       .y = b.y + b.h / 2,
+                       .pointer_type = type,
                        .pointer_id = type == CUI_POINTER_TOUCH ? 7 : 0};
     assert(cui_queue_event(ui, event));
     event.type = CUI_EVENT_POINTER_UP;
@@ -135,7 +143,8 @@ static void interaction(unsigned input, bool callback, bool storage) {
             assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = key}));
     }
     size_t accepted;
-    cui_alert_dismiss_result result = frame(ui, opt, callback ? &o : NULL, 0, false, &draw, &accepted);
+    cui_alert_dismiss_result result =
+        frame(ui, opt, callback ? &o : NULL, 0, false, &draw, &accepted);
     assert(result.valid && result.submitted && result.legacy_dismissed);
     assert(result.dismissal_count == 1 && accepted == 1 && o.calls == (unsigned)callback);
     assert(s.visible == !storage);
@@ -159,20 +168,23 @@ static void multiple_and_slot_mutation(void) {
             if (mode == 3)
                 assert(cui_queue_accessibility_action(ui, dismiss_id, CUI_ACCESSIBILITY_ACTIVATE));
             else
-                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
+                assert(cui_queue_event(
+                    ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ENTER}));
         }
         s.hide_in_body = mode == 1;
         /* Core consumption cancels accessibility activation but does not revoke
          * an ordinary already-accepted Enter-down action. Preserve both paths. */
         s.consume_in_body = mode == 3 || mode == 4;
         size_t accepted;
-        cui_alert_dismiss_result result = frame(ui, opt, mode == 5 ? NULL : &o, 0, false, &draw, &accepted);
+        cui_alert_dismiss_result result =
+            frame(ui, opt, mode == 5 ? NULL : &o, 0, false, &draw, &accepted);
         assert(result.valid && result.submitted && s.order == 123);
         if (mode == 3) {
             assert(!result.legacy_dismissed && !result.dismissal_count && !o.calls && !accepted);
             assert(s.visible);
         } else {
-            assert(result.legacy_dismissed && result.dismissal_count == 1 && o.calls == (mode == 5 ? 0u : 1u));
+            assert(result.legacy_dismissed && result.dismissal_count == 1 &&
+                   o.calls == (mode == 5 ? 0u : 1u));
             assert(accepted == 2 && s.visible == (mode == 2));
         }
         cui_destroy(ui);
@@ -185,7 +197,8 @@ static void omission_and_custom_actions(void) {
     cui_alert_options opt = options(&s);
     cui_draw_list draw;
     cui_alert_dismiss_result result = frame(ui, opt, &o, 0, false, &draw, NULL);
-    assert(result.valid && !result.submitted && !result.legacy_dismissed && !result.dismissal_count);
+    assert(result.valid && !result.submitted && !result.legacy_dismissed &&
+           !result.dismissal_count);
     assert(!s.order && !o.calls);
     s.visible = true;
     opt.dismissible = false;
@@ -210,9 +223,12 @@ static void parity_and_passive(void) {
         (void)frame(new_ui, new_opt, NULL, 0, false, &new_draw, NULL);
         pointer(old_ui, dismiss_id, CUI_POINTER_MOUSE);
         pointer(new_ui, dismiss_id, CUI_POINTER_MOUSE);
-        cui_alert_dismiss_result old_result = frame(old_ui, old_opt, NULL, passive, true, &old_draw, NULL);
-        cui_alert_dismiss_result new_result = frame(new_ui, new_opt, NULL, passive, false, &new_draw, NULL);
-        assert(old_result.legacy_dismissed == new_result.legacy_dismissed && a.visible == b.visible);
+        cui_alert_dismiss_result old_result =
+            frame(old_ui, old_opt, NULL, passive, true, &old_draw, NULL);
+        cui_alert_dismiss_result new_result =
+            frame(new_ui, new_opt, NULL, passive, false, &new_draw, NULL);
+        assert(old_result.legacy_dismissed == new_result.legacy_dismissed &&
+               a.visible == b.visible);
         assert(new_result.dismissal_count == (passive ? 0u : 1u));
         assert(new_result.submitted == (passive == 0));
         size_t old_count, new_count;
@@ -252,8 +268,8 @@ static void parity_and_passive(void) {
         cui_software *old_pixels = cui_software_create(600, 400, NULL);
         cui_software *new_pixels = cui_software_create(600, 400, NULL);
         assert(old_pixels && new_pixels);
-        assert(cui_software_render(old_pixels, &old_fill, (cui_color){255,255,255,255}));
-        assert(cui_software_render(new_pixels, &new_fill, (cui_color){255,255,255,255}));
+        assert(cui_software_render(old_pixels, &old_fill, (cui_color){255, 255, 255, 255}));
+        assert(cui_software_render(new_pixels, &new_fill, (cui_color){255, 255, 255, 255}));
         assert(!memcmp(cui_software_pixels(old_pixels, NULL, NULL),
                        cui_software_pixels(new_pixels, NULL, NULL), 600 * 400 * 4));
         cui_software_destroy(old_pixels);

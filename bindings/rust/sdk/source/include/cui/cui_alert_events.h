@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_ALERT_EVENTS_H
 #define CUI_ALERT_EVENTS_H
-#include "cui_content.h"
 #include "cui_component_events.h"
+#include "cui_content.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,13 +31,14 @@ typedef struct {
  * views/users/resources are borrowed. Do not recurse, destroy context, unwind
  * across C or free/rebind active resources; defer teardown until after frame.
  * Handler may update visibility again: no veto, replay or second write follows. */
-static inline cui_alert_dismiss_result
-cui_alert_events(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_options options,
-                  cui_alert_dismiss_handler handler) {
+static inline cui_alert_dismiss_result cui_alert_events(cui_context *ui, cui_id id,
+                                                        const cui_theme *theme,
+                                                        cui_alert_options options,
+                                                        cui_alert_dismiss_handler handler) {
     cui_alert_dismiss_result result;
     memset(&result, 0, sizeof result);
-    if (!ui || !id || !theme || options.kind < CUI_ALERT_INFO ||
-        options.kind > CUI_ALERT_DEFAULT || (options.title.length && !options.title.data) ||
+    if (!ui || !id || !theme || options.kind < CUI_ALERT_INFO || options.kind > CUI_ALERT_DEFAULT ||
+        (options.title.length && !options.title.data) ||
         (options.message.length && !options.message.data) ||
         (options.icon.length && !options.icon.data) ||
         (options.icon_name.length && !options.icon_name.data) ||
@@ -47,8 +48,8 @@ cui_alert_events(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_o
     const cui_alert_dismiss_handler observer = handler;
     const uint64_t frame = cui_frame_sequence(ui);
     result.valid = true;
-    result.submitted = cui_frame_is_submitting(ui) && frame != 0 &&
-                       (!snapshot.visible || *snapshot.visible);
+    result.submitted =
+        cui_frame_is_submitting(ui) && frame != 0 && (!snapshot.visible || *snapshot.visible);
     result.legacy_dismissed = cui_alert(ui, id, theme, snapshot);
     if (result.submitted && result.legacy_dismissed) {
         result.dismissal_count = 1;
@@ -56,7 +57,7 @@ cui_alert_events(cui_context *ui, cui_id id, const cui_theme *theme, cui_alert_o
             cui_alert_dismissal dismissal;
             memset(&dismissal, 0, sizeof dismissal);
             (void)cui_component_event_init(&dismissal.event, CUI_COMPONENT_EVENT_ACTIVATE, id,
-                                            CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                                           CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
             dismissal.event.frame_sequence = frame;
             dismissal.event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
             dismissal.visibility_assigned = snapshot.visible != NULL;

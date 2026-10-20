@@ -117,3 +117,22 @@ The homepage's light and dark workspace images show the actual CUI WebAssembly r
 Dock's gallery opts into `cui_dock_create_nary`: repeated horizontal splits become siblings under a stable split node. The browser suite splits three panes and drags the second divider, checking that only its two neighbors resize; reset, zoom and cross-region tab transfer remain covered. Existing applications retain binary/v1 behavior with `cui_dock_create`.
 
 Editor's gallery attaches eight live selection slots, bounded history snapshots and measured-column anchors. Ctrl/Alt+Up/Down or Alt-click adds cursors; text is inserted at each cursor as one undoable edit, and Escape collapses extras. The browser checks three-cursor typing and collection restoration through Undo/Redo. Further multi-range clipboard, indentation, rectangular dragging and IME behavior remain separate source work.
+
+## CI execution
+
+Pages builds the default and regex-enabled gallery once, then shares those exact
+artifacts with three independent browser-check groups. All existing checks remain
+required; deployment waits for the build and every group. Each group has a private
+runner and headless Chromium, so probes and temporary servers remain isolated.
+The transfer contains only generated gallery/fixture files, including `.nojekyll`;
+its artifact expires after one day. Dependency versions and Action revisions remain
+pinned. No cross-revision binary cache is used.
+
+The baseline Pages run [39397271176](https://github.com/mattmezza/cui/actions/runs/39397271176)
+spent 25.6 minutes in its sequential build/check job. The three groups were balanced
+using that run's recorded step durations (about 7.4 minutes of checks per group,
+excluding setup/build/transfer). This is a scheduling estimate, not a measured new
+end-to-end result. Hosted runner capacity and queue time also affect latency.
+Portable matrix builds use two concurrent compilation jobs; tests keep their
+existing execution order. Core and native-binding workflows cancel superseded
+runs on the same ref. No test coverage or deployment acceptance gate was removed.

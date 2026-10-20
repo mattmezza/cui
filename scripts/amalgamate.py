@@ -21,8 +21,8 @@ def generate(name,sources):
     if name == "cui_components":
         lines += ['#include "cui_button_styles.h"']
     if name == "cui_picker":
-        lines += ['#include "cui_components.h"', '#include "cui_calendar_presentation.h"']
-    if name == "cui_calendar_presentation":
+        lines += ['#include "cui_components.h"', '#include "cui_calendar_presentation.h"', '#include "cui_calendar_behavior.h"']
+    if name in {"cui_calendar_presentation", "cui_calendar_behavior"}:
         lines += ['#ifndef CUI_PICKER_IMPLEMENTATION', '#define CUI_PICKER_IMPLEMENTATION', '#endif', '#include "cui_picker.h"']
     if name == "cui_button_styles":
         lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']

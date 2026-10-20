@@ -910,21 +910,26 @@
         "cui_calendar_reduce_ex",
         "cui_calendar_submit_ex",
         "cui_calendar_cell_resolve",
-        "cui_calendar_month_toggle_id"
+        "cui_calendar_month_toggle_id",
+        "cui_calendar_with_behavior",
+        "cui_base_calendar_with_behavior",
+        "cui_calendar_reduce_with_behavior"
       ],
       "state_types": [
         "cui_calendar_state",
         "cui_date_selection",
         "cui_calendar_presentation_options",
-        "cui_calendar_cell_info"
+        "cui_calendar_cell_info",
+        "cui_calendar_behavior_options"
       ],
       "state_ownership": "Caller retains cui_calendar_state and cui_date_selection.",
-      "interaction": "cui_calendar_result reports aggregate selection/navigation; live cui_date_disabled_fn excludes dates. Extended presentation has no typed observer bridge or binding options; legacy CHANGE remains selection-only.",
-      "usage": "Initialize caller state and submit each frame. Optional cui_calendar_ex enables independent month access, host-supplied today and checked neighboring-cell occurrences; zero presentation options preserve legacy behavior. Rebuild with matching headers/library.",
+      "interaction": "cui_calendar_result reports aggregate selection/navigation; live cui_date_disabled_fn excludes dates. Presentation and behavior extensions have no typed observer bridge or binding options; legacy CHANGE remains selection-only.",
+      "usage": "Initialize caller state and submit each frame. Optional cui_calendar_ex enables month access, host-supplied today and neighboring cells; cui_calendar_with_behavior adds independent range transition, endpoint validation, year destination and recenter policies. Zero options preserve exact legacy behavior. Rebuild with matching headers/library.",
       "docs": [
         "docs/PICKERS.md",
         "docs/PICKER_EVENTS.md",
-        "docs/CALENDAR_PRESENTATION.md"
+        "docs/CALENDAR_PRESENTATION.md",
+        "docs/CALENDAR_BEHAVIOR.md"
       ],
       "callback_symbols": [
         "cui_date_disabled_fn"
@@ -935,7 +940,8 @@
       "composition": "application model + frame composition",
       "additional_public_headers": [
         "include/cui/cui_picker_events.h",
-        "include/cui/cui_calendar_presentation.h"
+        "include/cui/cui_calendar_presentation.h",
+        "include/cui/cui_calendar_behavior.h"
       ]
     },
     {

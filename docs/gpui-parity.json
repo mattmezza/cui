@@ -3111,7 +3111,8 @@
         "tests/web/test_browser.py",
         "tests/unit/test_calendar_presentation.c",
         "tests/unit/test_calendar_presentation_header.cpp",
-        "tests/test_calendar_distribution.py"
+        "tests/test_calendar_distribution.py",
+        "tests/unit/test_calendar_behavior.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3121,8 +3122,8 @@
       },
       "limitations": [
         "One-to-three-month, six-row Gregorian grid; custom cell size, seven locale tables/custom labels, ordered keyboard navigation and bounded controlled selection. Opt-in independent month access, host-supplied today and selectable neighboring occurrences are headless-tested; new presentation options have not been verified in actual WASM/browser or exposed through language builders.",
-        "CUI preserves earlier range endpoint swapping and year-to-month picker transition, while frozen source restarts an earlier second range endpoint and year selection returns to days. Neighbor activation recenters on the chosen date only outside the visible window; frozen source recenters on range start. Localized full-date day names differ from frozen ISO-only names.",
-        "Arbitrary item/style refinements, unrestricted month counts, ambient locale lookup/non-Gregorian/RTL formatting and complete frozen family parity remain unsupported. DatePicker and typed CHANGE wrappers do not accept presentation extensions. Frozen Calendar itself does not implement week-number columns, hover range previews or a dedicated arrow-key map."
+        "Zero behavior options preserve legacy endpoint swapping, year-to-month transition and conditional activated-date recentering. Explicit independent policies support earlier-endpoint restart, completed-endpoint validation, year-to-days and selection-start recentering matching frozen source behavior. Localized full-date day names still differ from frozen ISO-only names; new policies are native/WASI-tested, without browser or language-builder coverage.",
+        "Arbitrary item/style refinements, unrestricted month counts, ambient locale lookup/non-Gregorian/RTL formatting and complete frozen family parity remain unsupported. DatePicker and typed CHANGE wrappers do not accept presentation or behavior extensions. Frozen Calendar itself does not implement week-number columns, hover range previews or a dedicated arrow-key map."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3186,6 +3187,14 @@
             "tests/unit/test_calendar_presentation.c",
             "docs/CALENDAR_PRESENTATION.md"
           ]
+        },
+        {
+          "name": "opt-in range validation, endpoint restart and year/recenter policies (native/WASI)",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_calendar_behavior.c",
+            "docs/CALENDAR_BEHAVIOR.md"
+          ]
         }
       ],
       "upstream_doc": {
@@ -3222,7 +3231,7 @@
           "Availability Calendar"
         ]
       },
-      "last_tested_commit": "91764e77",
+      "last_tested_commit": "b60f5c19",
       "evidence": [
         "Partial coverage only; see limitations and named tests. Full family definition of done not met."
       ]

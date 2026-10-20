@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_calendar_behavior.h"
 #include "cui/cui_calendar_presentation.h"
 #include "cui/cui_components.h"
 #include "cui/cui_icon.h"
@@ -301,6 +302,18 @@ cui_calendar_result cui_calendar_ex(cui_context *ui, cui_id id, const cui_theme 
     if (!t)
         return (cui_calendar_result){0};
     cui_calendar_result result = cui_base_calendar_ex(ui, id, s, selection, o, presentation);
+    cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
+    return result;
+}
+cui_calendar_result cui_calendar_with_behavior(cui_context *ui, cui_id id, const cui_theme *t,
+                                               cui_calendar_state *s, cui_date_selection *selection,
+                                               cui_calendar_options o,
+                                               cui_calendar_presentation_options presentation,
+                                               cui_calendar_behavior_options behavior) {
+    if (!t)
+        return (cui_calendar_result){0};
+    cui_calendar_result result =
+        cui_base_calendar_with_behavior(ui, id, s, selection, o, presentation, behavior);
     cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
     return result;
 }

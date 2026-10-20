@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_calendar_behavior.h"
 #include "cui/cui_calendar_presentation.h"
 #include "cui/cui_picker.h"
 #include <math.h>
@@ -278,15 +279,82 @@ static void cui_picker_select(cui_calendar_state *state, cui_date_selection *sel
     }
     state->cursor = date;
 }
+static cui_calendar_behavior_options cui_picker_behavior(cui_calendar_behavior_options b) {
+    if (b.range_transition != CUI_CALENDAR_RANGE_RESTART_EARLIER)
+        b.range_transition = CUI_CALENDAR_RANGE_LEGACY;
+    if (b.year_destination != CUI_CALENDAR_YEAR_OPEN_DAYS)
+        b.year_destination = CUI_CALENDAR_YEAR_OPEN_MONTHS;
+    if (b.recenter != CUI_CALENDAR_RECENTER_ACTIVATED_DATE &&
+        b.recenter != CUI_CALENDAR_RECENTER_SELECTION_START)
+        b.recenter = CUI_CALENDAR_RECENTER_LEGACY;
+    if (b.range_validation != CUI_CALENDAR_VALIDATE_RANGE_ENDPOINTS)
+        b.range_validation = CUI_CALENDAR_VALIDATE_ACTIVATED_DATE;
+    return b;
+}
+static bool cui_picker_select_candidate(cui_calendar_state *s, cui_date_selection *selection,
+                                        cui_date date, cui_calendar_options o,
+                                        cui_calendar_behavior_options b) {
+    cui_calendar_state next = *s;
+    cui_date_selection candidate = *selection;
+    if (o.range && b.range_transition == CUI_CALENDAR_RANGE_RESTART_EARLIER) {
+        if (cui_date_valid(candidate.start) && !cui_date_valid(candidate.end) &&
+            cui_date_compare(date, candidate.start) >= 0) {
+            candidate.end = date;
+            next.selecting_end = false;
+        } else {
+            candidate = (cui_date_selection){.start = date};
+            next.selecting_end = true;
+        }
+        next.cursor = date;
+    } else
+        cui_picker_select(&next, &candidate, date, o.range);
+    if (o.range && b.range_validation == CUI_CALENDAR_VALIDATE_RANGE_ENDPOINTS &&
+        cui_date_valid(candidate.start) && cui_date_valid(candidate.end) &&
+        (!cui_calendar_date_enabled(candidate.start, o) ||
+         !cui_calendar_date_enabled(candidate.end, o)))
+        return false;
+    *selection = candidate;
+    s->selecting_end = next.selecting_end;
+    s->cursor = next.cursor;
+    return true;
+}
+static bool cui_picker_focus_visible(cui_context *ui, cui_id id, cui_calendar_state *s,
+                                     cui_calendar_options o, cui_date preferred, unsigned months) {
+    cui_date last = cui_picker_last_displayed(s->month, months);
+    cui_date candidate = preferred;
+    if (!cui_calendar_date_enabled(candidate, o) || cui_date_compare(candidate, s->month) < 0 ||
+        cui_date_compare(candidate, last) > 0) {
+        candidate = s->month;
+        for (unsigned i = 0;
+             i < 93 && cui_date_valid(candidate) && cui_date_compare(candidate, last) <= 0; i++) {
+            if (cui_calendar_date_enabled(candidate, o))
+                break;
+            candidate = cui_date_add_days(candidate, 1);
+        }
+    }
+    if (cui_date_valid(candidate) && cui_date_compare(candidate, last) <= 0 &&
+        cui_calendar_date_enabled(candidate, o) && cui_calendar_day_id(id, candidate)) {
+        s->cursor = candidate;
+        cui_focus(ui, cui_calendar_day_id(id, candidate));
+        return true;
+    }
+    s->cursor = preferred;
+    cui_focus(ui, cui_calendar_navigation_id(id, 5));
+    return false;
+}
 cui_id cui_calendar_month_toggle_id(cui_id root) {
     return cui_calendar_navigation_id(root, 6);
 }
-cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calendar_state *s,
-                                           cui_date_selection *selection, cui_calendar_options o,
-                                           cui_calendar_presentation_options presentation) {
+cui_calendar_result
+cui_calendar_reduce_with_behavior(cui_context *ui, cui_id id, cui_calendar_state *s,
+                                  cui_date_selection *selection, cui_calendar_options o,
+                                  cui_calendar_presentation_options presentation,
+                                  cui_calendar_behavior_options behavior) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
+    behavior = cui_picker_behavior(behavior);
+    bool preserve_cursor = false;
     if (!cui_date_valid(s->month))
         cui_calendar_init(s, selection->start);
     s->month.day = 1;
@@ -394,15 +462,24 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
                 if (years) {
                     s->month.year = (int)current;
                     s->year_cursor = current;
-                    s->view = CUI_CALENDAR_MONTHS;
-                    s->month_cursor = (unsigned)s->month.month;
-                    if (!cui_calendar_month_enabled(current, s->month_cursor, o))
-                        for (unsigned month = 1; month <= 12; month++)
-                            if (cui_calendar_month_enabled(current, month, o)) {
-                                s->month_cursor = month;
-                                break;
-                            }
-                    cui_focus(ui, cui_calendar_month_id(id, s->month_cursor));
+                    if (behavior.year_destination == CUI_CALENDAR_YEAR_OPEN_DAYS) {
+                        cui_date preferred = {s->month.year, s->month.month, s->cursor.day};
+                        int days = cui_date_days_in_month(preferred.year, preferred.month);
+                        if (preferred.day > days)
+                            preferred.day = days;
+                        s->view = CUI_CALENDAR_DAYS;
+                        preserve_cursor = !cui_picker_focus_visible(ui, id, s, o, preferred, 1);
+                    } else {
+                        s->view = CUI_CALENDAR_MONTHS;
+                        s->month_cursor = (unsigned)s->month.month;
+                        if (!cui_calendar_month_enabled(current, s->month_cursor, o))
+                            for (unsigned month = 1; month <= 12; month++)
+                                if (cui_calendar_month_enabled(current, month, o)) {
+                                    s->month_cursor = month;
+                                    break;
+                                }
+                        cui_focus(ui, cui_calendar_month_id(id, s->month_cursor));
+                    }
                 } else {
                     s->month.month = (int)current;
                     s->month.day = 1;
@@ -547,6 +624,7 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
             if (cui_date_valid(next)) {
                 s->month = next;
                 s->cursor = next;
+                preserve_cursor = false;
                 result.navigated = true;
             }
             continue;
@@ -565,9 +643,21 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
             keyboard_source = cui_event_target(ui, e);
         if (activation) {
             cui_date chosen = keyboard ? s->cursor : target;
-            if (cui_calendar_date_enabled(chosen, o)) {
-                cui_picker_select(s, selection, chosen, o.range);
-                if (presentation.neighboring_days) {
+            if (cui_calendar_date_enabled(chosen, o) &&
+                cui_picker_select_candidate(s, selection, chosen, o, behavior)) {
+                preserve_cursor = false;
+                if (behavior.recenter != CUI_CALENDAR_RECENTER_LEGACY) {
+                    cui_date anchor = behavior.recenter == CUI_CALENDAR_RECENTER_SELECTION_START
+                                          ? selection->start
+                                          : chosen;
+                    cui_date previous_month = s->month, previous_cursor = s->cursor;
+                    cui_id previous_focus = cui_focused(ui);
+                    s->month = (cui_date){anchor.year, anchor.month, 1};
+                    preserve_cursor = !cui_picker_focus_visible(ui, id, s, o, anchor, months);
+                    result.navigated |= cui_date_compare(previous_month, s->month) != 0 ||
+                                        cui_date_compare(previous_cursor, s->cursor) != 0 ||
+                                        previous_focus != cui_focused(ui);
+                } else if (presentation.neighboring_days) {
                     cui_date last = cui_picker_last_displayed(s->month, months);
                     if (cui_date_compare(chosen, s->month) < 0 ||
                         cui_date_compare(chosen, last) > 0) {
@@ -616,6 +706,7 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
             next = cui_date_add_days(next, step);
         if (cui_calendar_date_enabled(next, o)) {
             s->cursor = next;
+            preserve_cursor = false;
             cui_date end = cui_date_add_months(s->month, (int)months - 1);
             end.day = cui_date_days_in_month(end.year, end.month);
             if (presentation.neighboring_days)
@@ -630,8 +721,9 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
     final_month.day = cui_date_days_in_month(final_month.year, final_month.month);
     if (presentation.neighboring_days)
         final_month = cui_picker_last_displayed(s->month, months);
-    if (!cui_calendar_date_enabled(s->cursor, o) || cui_date_compare(s->cursor, s->month) < 0 ||
-        cui_date_compare(s->cursor, final_month) > 0) {
+    if (!preserve_cursor &&
+        (!cui_calendar_date_enabled(s->cursor, o) || cui_date_compare(s->cursor, s->month) < 0 ||
+         cui_date_compare(s->cursor, final_month) > 0)) {
         cui_date candidate = s->month;
         for (unsigned i = 0;
              i < 93 && cui_date_valid(candidate) && cui_date_compare(candidate, final_month) <= 0;
@@ -648,6 +740,12 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
     if (result.changed || result.navigated)
         cui_invalidate(ui);
     return result;
+}
+cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calendar_state *s,
+                                           cui_date_selection *selection, cui_calendar_options o,
+                                           cui_calendar_presentation_options presentation) {
+    return cui_calendar_reduce_with_behavior(ui, id, s, selection, o, presentation,
+                                             (cui_calendar_behavior_options){0});
 }
 cui_calendar_result cui_calendar_reduce(cui_context *ui, cui_id id, cui_calendar_state *s,
                                         cui_date_selection *selection, cui_calendar_options o) {
@@ -761,6 +859,18 @@ void cui_calendar_submit_ex(cui_context *ui, cui_id id, cui_calendar_state *s,
 void cui_calendar_submit(cui_context *ui, cui_id id, cui_calendar_state *s,
                          cui_date_selection selection, cui_calendar_options o) {
     cui_calendar_submit_ex(ui, id, s, selection, o, (cui_calendar_presentation_options){0});
+}
+cui_calendar_result cui_base_calendar_with_behavior(cui_context *ui, cui_id id,
+                                                    cui_calendar_state *s,
+                                                    cui_date_selection *selection,
+                                                    cui_calendar_options o,
+                                                    cui_calendar_presentation_options presentation,
+                                                    cui_calendar_behavior_options behavior) {
+    cui_calendar_result result =
+        cui_calendar_reduce_with_behavior(ui, id, s, selection, o, presentation, behavior);
+    if (selection)
+        cui_calendar_submit_ex(ui, id, s, *selection, o, presentation);
+    return result;
 }
 cui_calendar_result cui_base_calendar_ex(cui_context *ui, cui_id id, cui_calendar_state *s,
                                          cui_date_selection *selection, cui_calendar_options o,

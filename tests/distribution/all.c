@@ -4,6 +4,11 @@
 #include "cui_component_events.h"
 
 int main(void) {
+    cui_calendar_result calendar = cui_base_calendar_with_behavior(NULL, 0, NULL, NULL,
+        (cui_calendar_options){0}, (cui_calendar_presentation_options){0},
+        (cui_calendar_behavior_options){.year_destination = CUI_CALENDAR_YEAR_OPEN_DAYS});
+    if (calendar.changed || calendar.activated || calendar.navigated)
+        return 1;
     char storage[8];
     cui_str copied;
     cui_component_event_metadata metadata;

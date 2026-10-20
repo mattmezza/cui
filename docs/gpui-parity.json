@@ -4341,7 +4341,7 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Injected-provider lifecycle, bounded copied report queue, transcript handling, level meter and graphical controls are tested. Real microphone capture, format conversion, platform recognizers, fallback, event-loop integration and live-device verification remain unfinished; see docs/SPEECH.md."
+        "Injected-provider lifecycle, bounded copied report queue, transcript handling, level meter and graphical controls are tested. An optional SDL input host has offline lifecycle, conversion, callback and concurrency coverage; real microphone operation, platform recognizers, fallback policy, application event-loop/device-removal integration and live-device acceptance remain unfinished; see docs/SPEECH.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4378,6 +4378,20 @@
           "name": "platform capture, system recognizers and complete source integration",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "optional bounded SDL input host and owner-thread PCM delivery",
+          "status": "tested",
+          "evidence": [
+            "examples/speech_sdl_input/test_host.c",
+            "examples/speech_sdl_input/test_sdl.c",
+            "examples/speech_sdl_input/test_thread.c",
+            "docs/design/speech_sdl_conversion_probe.c",
+            "docs/SPEECH.md"
+          ],
+          "limitations": [
+            "Offline injected-device and unbound-stream proof only. No microphone hardware or native OS recognizer acceptance; application owns polling, wake integration, permissions and device-removal events."
+          ]
         }
       ],
       "upstream_doc": {

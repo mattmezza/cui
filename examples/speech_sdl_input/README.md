@@ -1,4 +1,4 @@
-# Optional SDL Speech input host (design checkpoint)
+# Optional SDL Speech input host
 
 This independent application-host example feeds existing `cui_speech_input`.
 It is not a recognizer or a Core/Base API change. Linux still needs an
@@ -56,11 +56,11 @@ stop polling and let pump surface its existing capacity terminal error. Never
 claim that a dropped batch was recognized. Poll is forbidden during provider
 callbacks and must not run from event/wake/audio callbacks.
 
-## Planned proof and limits
+## Validation boundary
 
 Standalone external CMake builds only existing CUI speech base code plus this
 host fixture and optional SDL source, with strict warnings. Injected devices
-will check startup failure, synchronous delivery, PCM ordering, ring overflow,
+check startup failure, synchronous delivery, PCM ordering, ring overflow,
 error forwarding, wake failure, stop/cancel cleanup, restart rejection of stale
 reports and shutdown rejection. Tests use deterministic synthetic PCM and no
 SDL initialization/device open. A separate unbound SDL stream proves conversion.

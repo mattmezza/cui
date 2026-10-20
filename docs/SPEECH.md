@@ -1,6 +1,6 @@
 # Speech
 
-The portable provider lifecycle, PCM level meter, SVG SpeechButton and waveform are implemented and tested. Platform microphone capture and system recognizers are not implemented yet. The following audit records the frozen source contract and the remaining target. Reference: commit `87d10ae5e1299d1be18670a37570c5402f952e34`, `crates/component/src/speech/{state,recognizer,level,button,waveform,microphone}.rs`.
+The portable provider lifecycle, PCM level meter, SVG SpeechButton and waveform are implemented and tested. An optional SDL input-host example now implements the capture boundary with bounded PCM delivery; real-device operation and system recognizers remain unverified or unimplemented. The following audit records the frozen source contract and the remaining target. Reference: commit `87d10ae5e1299d1be18670a37570c5402f952e34`, `crates/component/src/speech/{state,recognizer,level,button,waveform,microphone}.rs`.
 
 The portable layer must model Idle, Connecting, Recording and Stopping. A session owns capture and recognition separately: start recognition first, then capture; stop capture before requesting recognition finish; tear down capture before recognition. Failed starts report an error and preserve the previous transcript. Every asynchronous delivery carries a session generation, and stale deliveries must be ignored. Synchronous provider callbacks must defer their changes until start/push/finish returns. Started precedes provider results. Partial replaces the current hypothesis; Phrase appends literally to committed text and clears the hypothesis. Final keeps the transcript, Cancel clears it, and session teardown clears waveform history. Stop defaults to a three-second timeout and returns the current transcript when it expires. Repeated start/stop/cancel calls must preserve their source no-op semantics.
 
@@ -23,4 +23,19 @@ Provider sinks copy UTF-8 text and PCM into the bounded queue, including reports
 
 Tests cover lifecycle event order, PCM copying, synchronous callbacks, failed input cleanup, transcript preservation, stale delivery across both sessions and dispose/reinit, stop timeout, cancellation, reentrant completion/restart, bounded storage, UTF-8 rejection, meter batching/history/smoothing, waveform geometry/capacity, real SVG draw commands, four sizes, pointer activation, keyboard stopping despite provider unavailability, loading and unsupported semantics. Both standalone base and styled tests pass strict C11 and ASan/UBSan; the isolated worktree CTest run includes both new tests.
 
-Remaining parity work: native capture and rate/channel conversion, platform recognizers and fallback policy, host thread/event-loop wake integration, automatic stop-deadline scheduling, button tooltip composition, inherited layout/style refinements, and live-device/browser verification. No fake transcript or deterministic provider test establishes any of these capabilities.
+Remaining parity work: real-device capture acceptance, platform recognizers and fallback policy, application event-loop/device-removal integration and automatic stop-deadline scheduling, button tooltip composition, inherited layout/style refinements, and live-device/browser verification. No fake transcript or deterministic provider test establishes any of these capabilities.
+
+
+## Optional SDL input host
+
+The independently buildable [SDL input-host example](../examples/speech_sdl_input/README.md) supplies the existing input-provider interface. Its private SDL callback converts to requested signed interleaved PCM16 and writes a fixed-capacity C11 SPSC ring. The UI thread polls copied samples into CUI and pumps the existing Speech state. Audio callbacks never call CUI. Ring overflow and wake failure terminate the session explicitly; the bound covers host PCM storage, not SDL or operating-system buffers.
+
+```sh
+cmake -S examples/speech_sdl_input -B /tmp/cui-speech-input-build -G Ninja
+cmake --build /tmp/cui-speech-input-build
+python scripts/test_local.py --build-dir /tmp/cui-speech-input-build
+```
+
+This requires CMake 3.20+, a C11 compiler, pkg-config and SDL3 development files (SDL >= 3.2). These commands run four offline Linux fixtures and never open a microphone. They test injected lifecycle/error handling, real unbound SDL conversion, intercepted SDL device operations and concurrent producer delivery. The example's CMake file records exact compiler and linker settings. It is an optional application-host example, not a new Core API or a built-in recognizer.
+
+For actual capture, the application supplies a recognizer and explicitly initializes SDL audio. See the example's integration section for start/poll/pump/shutdown ordering, timer and wake obligations, device-removal handling and OS permission limits. The host must outlive all provider callbacks; generation checks do not make reports safe after state storage is freed. macOS/Windows compilation, microphone hardware and recognition accuracy still require separate evidence.

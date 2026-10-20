@@ -199,3 +199,35 @@ remain explicit gaps.
 - FFmpeg's installed pinned `libswresample/swresample.h` documents conversion
   bounds, `swr_get_delay`, timestamp conversion and draining; implementations must
   validate against these pinned headers rather than assume newer API behavior.
+
+## Implemented independent foundation; transports still proposed
+
+`examples/video_audio_host` now implements the first injected-only controller
+slice without modifying existing decoder/UI/Core code. It owns a bounded PCM
+ring and a separately bounded per-output-frame media/silence ledger, one decoder
+worker, generation-aware sticky cancellation and synchronous output-quiescence
+requirements. Render/submission does not advance the clock. Ordered actual
+consumption acknowledgements advance source-frame position only for media;
+silence, duplicates, reordering and stale generations cannot advance it.
+
+The example README/header specify the consumption and lifetime contract for
+review. In particular output stop must prove no active/future callbacks and
+release host references on discard; failed stop leaves storage allocated. Seek
+is paused, asynchronous worker work with an explicit generation change, not a
+claim of sample-accurate container seek. Input is already normalized contiguous
+48 kHz stereo float PCM; timestamps, priming and sample conversion remain future
+transport work. Ordinary bounded mutex sections are used, not a hard realtime
+or lock-free callback guarantee. Host-owned allocations and both queue bounds
+are explicit; external service/device allocations are excluded.
+
+The standalone strict-C11 fixture uses injected decoder/output operations only.
+No SDL/FFmpeg transport, physical device, UI integration or audible native audio
+support has been added. Those slices remain gated on review of actual
+consumption accounting and platform-specific quiescence/latency evidence.
+
+Foundation validation: six focused offline cases passed through the private
+native-test wrapper in normal and ASan/UBSan Linux builds. They include exact
+known PCM and consumption counts, independent queue exhaustion, stale returned
+DATA after seek cancellation, blocked read/seek shutdown, output callback join
+before host free and concurrent stream accounting. This validates the injected
+contract only; it supplies no evidence of a physical output consumption clock.

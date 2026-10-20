@@ -148,8 +148,11 @@ def main():
             page.wait_for_timeout(100)
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             assert not errors,errors
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)'))==78
-            print('PASS:78 usage guides, real gradient/blur/opacity pixels, font families/scales/styles, configurable/reduced motion, composed app CTA/account/edit/save/themes/mobile')
+            baseline = set(page.evaluate('cuiGallery.catalog.components.map(c => c.name)'))
+            extensions = set(page.evaluate('(cuiGallery.catalog.extensions || []).map(c => c.name)'))
+            assert len(baseline) == 78 and extensions == {'Video'} and not baseline & extensions
+            assert set(page.evaluate('Object.keys(cuiGallery.stories)')) == baseline | extensions
+            print('PASS:78 baseline usage guides plus Video extension, real gradient/blur/opacity pixels, font families/scales/styles, configurable/reduced motion, composed app CTA/account/edit/save/themes/mobile')
             browser.close()
     finally:
         server.shutdown()

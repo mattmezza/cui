@@ -13,7 +13,7 @@ const fs=require('fs'),vm=require('vm');
 const source=fs.readFileSync(process.argv[1],'utf8');
 const pick=(name)=>{const start=source.indexOf('const '+name+' = {');
  if(start<0)throw Error(name+' missing');
- return source.slice(start,name==='stories'?source.indexOf('};',start)+2:source.indexOf('\n};',start)+3);};
+ return source.slice(start,name==='stories'?source.indexOf('};',start)+2:source.indexOf('\n};\nlet wasm',start)+3);};
 const context={};vm.runInNewContext(pick('stories')+'\n'+pick('snippets')+'\nglobalThis.data={stories,snippets};',context);
 process.stdout.write(JSON.stringify(context.data));
 '''
@@ -40,7 +40,10 @@ def main():
     stories, snippets = data['stories'], data['snippets']
     missing = sorted(set(stories) - set(snippets))
     assert not missing, f'Usage excerpts missing for {missing}'
-    assert len(stories) == 78, len(stories)
+    baseline = {entry['name'] for entry in json.loads((ROOT / 'docs/gpui-parity.json').read_text())['components']}
+    extensions = {'Video'}
+    assert len(baseline) == 78 and not baseline & extensions
+    assert set(stories) == baseline | extensions
     headers = '\n'.join(path.read_text() for path in (ROOT / 'include/cui').glob('*.h'))
     declarations = re.sub(r'/\*.*?\*/|//[^\n]*', '', headers, flags=re.S)
     for story, snippet in snippets.items():
@@ -58,6 +61,7 @@ def main():
             assert token in headers, (story, token)
     compiled = tuple(stories)
     extra = {
+        'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
         'Avatar': 'cui_bitmap photo = {0};',
         'Button': 'cui_str label = {0};',
         'Checkbox': 'cui_str label = {0}; cui_check_state state = CUI_CHECK_UNCHECKED;',

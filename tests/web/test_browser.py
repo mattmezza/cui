@@ -43,7 +43,10 @@ def main():
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/')
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
-            assert len(page.evaluate('Object.keys(cuiGallery.stories)')) == 78
+            baseline = set(page.evaluate('cuiGallery.catalog.components.map(c => c.name)'))
+            extensions = set(page.evaluate('(cuiGallery.catalog.extensions || []).map(c => c.name)'))
+            assert len(baseline) == 78 and extensions == {'Video'} and not baseline & extensions
+            assert set(page.evaluate('Object.keys(cuiGallery.stories)')) == baseline | extensions
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()
             assert 'Portable C11 UI' in page.title()
@@ -223,7 +226,7 @@ def main():
             page.emulate_media(color_scheme='light')
             page.wait_for_function('getComputedStyle(document.body).colorScheme==="light"')
             assert page.request.get(f'http://127.0.0.1:{server.server_port}/cui/LICENSE.txt').ok
-            assert page.locator('#catalog a').count() == 78
+            assert page.locator('#catalog a').count() == len(baseline | extensions)
             assert page.locator('#name').inner_text() == 'Button'
             assert page.locator('#accessible [role=link][aria-label="Link"]').count() == 1
             assert page.get_by_role('link', name='View source').count() == 1
@@ -2898,7 +2901,7 @@ def main():
             control_change('disabled', False)
             page.screenshot(path='/tmp/cui-web-questionnaire.png')
             page.locator('#search').fill('button')
-            assert 0 < page.locator('#catalog a').count() < 78
+            assert 0 < page.locator('#catalog a').count() < len(baseline | extensions)
             page.locator('#search').fill('')
             page.set_viewport_size({'width': 390, 'height': 844})
             page.locator('#menu').click()
@@ -2976,7 +2979,7 @@ def main():
             assert static.locator('noscript pre code').count() > 0
             static_context.close()
             browser.close()
-            print('PASS: 78 catalog entries, 78 real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting')
+            print('PASS: 78 baseline catalog entries plus Video extension, complete real WASM stories, Speech/Chart/TextView/Root/Command/Settings/Carousel interactions, Sidebar/Textarea interactions, controlled form validation, surface focus/dismissal, split-button actions, table interactions, themes, search, 390px layout, /cui/ hosting')
     finally:
         server.shutdown()
         server.server_close()

@@ -218,6 +218,26 @@ if (cui_questionnaire_begin(ui, root_id, &theme, &state, options)) {
  Speech:'cui_speech_init(&state, workspace, recognizer, input, on_event, user);\ncui_speech_button(ui, id, &theme, &state, options, now);\ncui_speech_waveform(ui, waveform_id, &theme, &state, waveform, now);',
  Chart:'cui_chart_options options = cui_chart_theme(config, &theme);\ncui_chart_render_animated(ui, &state, &options);\ncui_chart(ui, id, &state, &options, cui_string("Activity"));',
  TextView:'cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN);\ncui_text_view_set_text(&state, markdown);\ncui_text_view(ui, id, &theme, &state, options);',
+ Video:`/* Called inside the host's begin_frame/end_frame composition.
+   Retain controls across frames. confirmed_view is acknowledged host state;
+   decoded_frame is NULL while loading, otherwise matching source_id/generation.
+   The host supplies a queue_video_request callback and video_host queue. */
+static cui_video_controls_state controls = {0};
+cui_video_player_options options = {
+    .surface = {.geometry = {.width = 320, .height = 180},
+                .opacity = 1, .description = cui_string("Video")},
+    .controls = true
+};
+options.controls_options = cui_video_controls_defaults();
+options.controls_options.on_request = queue_video_request;
+options.controls_options.user = video_host;
+cui_video_player(ui, id, &theme, &controls, confirmed_view,
+                 decoded_frame, options);
+/* Queue copied typed requests without mutating controls/view during callbacks.
+   After ALL draw-list rendering completes, apply supported host requests and
+   acknowledge success in the next confirmed_view. Keep decoded RGBA8 pixels
+   unchanged until rendering completes; increment bitmap.revision on edits.
+   The host decodes/schedules frames and rejects stale source/generation requests. */`,
  'Root View':'cui_root_init(&root, plugins, 1, &registry, window);\ncui_root_bind_facilities(&root, dialogs, 2, &notifications);\ncui_root_render(ui, id, &root, &theme, viewport, NULL, content, user, now);'
 };
 let wasm, catalog, documents, themes, selected, framePending=false, wakeTimer, lastTime=performance.now();
@@ -813,11 +833,7 @@ async function pickScreenColor(){
 function cancelScreenColor(){if(screenColorRequest){const request=screenColorRequest;screenColorRequest=null;request.abort();}screenColorControls();}
 $('screen-color').addEventListener('click',pickScreenColor);
 const exampleDescriptor={name:'Northstar workspace',example:true,status:'tested',public_header:'examples/composed_apps/app.h',reference_url:'https://github.com/mattmezza/cui/tree/main/examples/composed_apps',features:[],limitations:['Session-local demo state; sign-in and pricing actions are examples without a server.','Native Linux/X11 and portable headless interactions are validated; other native platforms remain unverified.'],usage:{composition:'Application model + immediate frame composition',state_ownership:'Retain composed_app until its draw lists finish rendering.',interaction:'Pass app_callback to composed_app_create for navigation, session, plan and save events.',usage:'Open Overview, try a plan CTA, use the account menu, then edit and save workspace settings.',docs:['docs/COMPOSED_APPS.md']}};
-snippets.Video = `/* Browser host decodes actual RGBA; CUI renders the controls. */
-cui_video_player(ui, id, &theme, &controls, confirmed_view,
-                 decoded_frame, player_options);
-/* Queue typed on_request values; apply after rendering.
-   Borrow pixels unchanged through renderer completion. */`;
+
 function selectComponent(){
  let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=name==='examples/northstar'?exampleDescriptor:[...catalog.components,...(catalog.extensions||[])].find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
  if(selected.name==='Video')videoHost.start();else videoHost.stop();

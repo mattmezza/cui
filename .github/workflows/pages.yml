@@ -60,6 +60,10 @@ jobs:
         run: python tests/test_sharing.py
       - name: Compile selected gallery usage across modes and sizes
         run: python tests/test_selected_usage.py
+      - name: Verify Video asset receipts and actual Chromium decoding and controls
+        run: |
+          uv run tests/web/test_video_gallery.py --offline
+          uv run tests/web/test_video_gallery.py --directory build/web
       - name: Exercise component behavior in Chromium
         run: uv run tests/web/test_browser.py
       - name: Verify real touch contacts scrolling and opt-in pinch

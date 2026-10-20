@@ -531,6 +531,55 @@ static void submission_failure(void) {
     CHECK(!f.result.action_activated);
     cui_destroy(f.ui);
 }
+/* Compare semantic values, never C struct padding or borrowed string pointers.
+ * Independent equivalent submissions need not initialize padding identically. */
+/* Keep the field table flat: adjacent X-macro calls are not nested expressions. */
+// clang-format off
+#define DATE_DETAILS_SCALARS(X) \
+    X(expanded) X(selected) X(readonly) X(multiline) X(required) X(invalid) \
+    X(multiselectable) X(busy) X(scrollable) X(orientation) X(controls) X(labelled_by) \
+    X(parent) X(focus_target) X(minimum) X(maximum) X(level) X(pos_in_set) X(set_size) \
+    X(row_index) X(column_index) X(row_count) X(column_count) X(scroll_x) X(scroll_y) \
+    X(scroll_max_x) X(scroll_max_y) X(scroll_axis_lock) X(scroll_trap_horizontal) \
+    X(scroll_gesture_lock) X(focusable) X(pointer_activatable) X(handles_tab) X(cursor) \
+    X(no_focus) X(gesture_pan) X(gesture_zoom) X(touch_drag_priority) X(touch_scroll_disabled) \
+    X(no_pointer_focus) X(blocks_pointer_activation) X(secret) X(password) \
+    X(text_input_configured) X(text_input_config.type) X(text_input_config.purpose) \
+    X(release_key_activation)
+// clang-format on
+static bool details_equal(const cui_semantic_details *a, const cui_semantic_details *b) {
+#define SAME(field)                                                                                \
+    if (a->field != b->field)                                                                      \
+        return false;
+    DATE_DETAILS_SCALARS(SAME)
+#undef SAME
+    return a->description.length == b->description.length &&
+           (!a->description.length ||
+            !memcmp(a->description.data, b->description.data, a->description.length));
+}
+static void details_values(void) {
+    cui_semantic_details a, b;
+    memset(&a, 0xa5, sizeof a);
+    memset(&b, 0x5a, sizeof b);
+#define ZERO(field) a.field = b.field = 0;
+    DATE_DETAILS_SCALARS(ZERO)
+#undef ZERO
+    char left[] = "Same description", right[] = "Same description";
+    a.description = cui_string(left);
+    b.description = cui_string(right);
+    CHECK(details_equal(&a, &b));
+#define DIFFERENT(field)                                                                           \
+    b.field = 1;                                                                                   \
+    CHECK(!details_equal(&a, &b));                                                                 \
+    b.field = 0;
+    DATE_DETAILS_SCALARS(DIFFERENT)
+#undef DIFFERENT
+    right[0] = 'X';
+    CHECK(!details_equal(&a, &b));
+    b.description.length--;
+    CHECK(!details_equal(&a, &b));
+}
+#undef DATE_DETAILS_SCALARS
 static void zero_pixels(void) {
     fixture a, b;
     create(&a, true);
@@ -558,7 +607,7 @@ static void zero_pixels(void) {
             CHECK(sa[i].name.length == sb[i].name.length &&
                   (!sa[i].name.length ||
                    !memcmp(sa[i].name.data, sb[i].name.data, sa[i].name.length)));
-            CHECK(!memcmp(&sa[i].details, &sb[i].details, sizeof sa[i].details));
+            CHECK(details_equal(&sa[i].details, &sb[i].details));
         }
         unsigned char *pixels[2] = {malloc(1000 * 800 * 4), malloc(1000 * 800 * 4)};
         CHECK(pixels[0] && pixels[1]);
@@ -628,6 +677,7 @@ int main(void) {
         identity(styled);
     }
     guide_example();
+    details_values();
     zero_pixels();
     submission_failure();
     printf("PASS: %u DatePicker action assertions\n", checks);

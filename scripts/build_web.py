@@ -37,6 +37,7 @@ SOURCES = ["src/base/cui_otp_events.c", "src/base/cui_number_events.c", "src/bas
            'src/base/cui_table.c', 'src/components/cui_table.c',
            'src/base/cui_tree.c', 'src/components/cui_tree.c',
            'src/base/cui_picker.c', 'src/components/cui_picker.c',
+           'src/base/cui_date_picker_actions.c', 'src/components/cui_date_picker_actions.c',
            'src/base/cui_numeric.c', 'src/components/cui_numeric.c',
            'src/base/cui_content.c', 'src/components/cui_content.c',
            'src/components/cui_hover_card_extended.c',

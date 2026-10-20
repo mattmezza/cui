@@ -106,7 +106,7 @@ jobs:
       - run: pip install clang-format==23.1.2
       - run: python scripts/format.py --check
       - run: python scripts/check_manifest.py
-      - run: python scripts/test_release_metadata.py --tag v0.1.0-alpha.2
+      - run: python scripts/test_release_metadata.py --tag v0.1.0-alpha.3
       - run: python scripts/test_release_metadata.py --self-test
       - run: python scripts/check_licenses.py
       - run: python scripts/amalgamate.py --check
@@ -171,7 +171,7 @@ jobs:
       - name: Install outside the checkout with native build tools blocked
         run: python scripts/test_binding_packages.py --artifacts build/packages/dynamic --require-prebuilt
       - name: Exercise installed addon on pinned Node 18 and 22 runtimes
-        run: python scripts/test_node_package_runtimes.py --tarball build/packages/dynamic/cui-native-0.1.0-alpha.2.tgz --cache-dir ${{ runner.temp }}/cui-node-runtime-validation
+        run: python scripts/test_node_package_runtimes.py --tarball build/packages/dynamic/cui-native-0.1.0-alpha.3.tgz --cache-dir ${{ runner.temp }}/cui-node-runtime-validation
       - name: Build embedded Go, public source Go and static Rust artifacts
         run: |
           python scripts/package_bindings.py go --prebuilt --output build/packages/go-embedded

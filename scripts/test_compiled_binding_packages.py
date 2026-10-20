@@ -59,7 +59,7 @@ def main():
         env.update(GOMODCACHE=str(clean / "go-modules"), GOCACHE=str(clean / "go-cache"),
                    GOPROXY=args.go_artifacts.resolve().as_uri(), GOSUMDB="off", CGO_ENABLED="1",
                    XDG_CACHE_HOME=str(clean / "runtime-cache"))
-        (consumer / "go.mod").write_text("module cui-package-smoke\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.2\n")
+        (consumer / "go.mod").write_text("module cui-package-smoke\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.3\n")
         shutil.copy2(ROOT / "tests/packaging/go_smoke.go", consumer / "main.go")
         subprocess.run(["go", "mod", "download", "all"], cwd=consumer, env=env, check=True)
         binary = clean / "go-smoke"

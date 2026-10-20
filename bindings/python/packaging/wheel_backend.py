@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-NAME = "cui_bridge-0.1.0a2"
+NAME = "cui_bridge-0.1.0a3"
 
 def get_requires_for_build_wheel(config_settings=None):
     return []
@@ -51,7 +51,7 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
             "system_runtime_dependencies": [line.split()[0] for line in dependencies.splitlines() if line.split()],
             "source_revision": (source / "SOURCE_REVISION").read_text().strip()
         }, indent=2).encode()
-        entries[f"{info}/METADATA"] = ("Metadata-Version: 2.4\nName: cui-bridge\nVersion: 0.1.0a2\n"
+        entries[f"{info}/METADATA"] = ("Metadata-Version: 2.4\nName: cui-bridge\nVersion: 0.1.0a3\n"
             "Summary: Alpha CUI bridge builders; tested subset, not full binding parity\n"
             "Requires-Python: >=3.10\nLicense-Expression: MIT\n").encode()
         entries[f"{info}/WHEEL"] = f"Wheel-Version: 1.0\nGenerator: cui-alpha\nRoot-Is-Purelib: false\nTag: {tag}\n".encode()

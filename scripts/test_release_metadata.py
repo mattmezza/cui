@@ -106,7 +106,7 @@ class ParserTests(unittest.TestCase):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--tag", default="v0.1.0-alpha.2")
+    parser.add_argument("--tag", default="v0.1.0-alpha.3")
     parser.add_argument("--registries", action="store_true", help="also reject explicit npm/Cargo publication gates; does not prove registry ownership or OIDC readiness")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()

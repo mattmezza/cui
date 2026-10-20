@@ -22,13 +22,13 @@ def main():
             env.pop(key, None)
         env.update(GOPROXY=args.artifacts.resolve().as_uri(), GOSUMDB='off', CGO_ENABLED='1',
                    GOMODCACHE=str(clean/'modules'), GOCACHE=str(clean/'build-cache'), XDG_CACHE_HOME=str(clean/'cache'))
-        (clean/'go.mod').write_text('module example.local/cui-counter\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.2\n')
+        (clean/'go.mod').write_text('module example.local/cui-counter\n\ngo 1.23\n\nrequire github.com/mattmezza/cui/bindings/go v0.1.0-alpha.3\n')
         shutil.copy2(ROOT/'tests/packaging/go_smoke.go', clean/'main.go')
         subprocess.run(['go','mod','tidy'],cwd=clean,env=env,check=True)
         tags = 'cui_native' if args.native else ''
         subprocess.run(['go','build','-tags',tags,'-o','app','.'],cwd=clean,env=env,check=True)
         # Compile an incompatible ABI fixture exporting the complete loader table.
-        module = clean/'modules/github.com/mattmezza/cui/bindings/go@v0.1.0-alpha.2'
+        module = clean/'modules/github.com/mattmezza/cui/bindings/go@v0.1.0-alpha.3'
         table = (module/'cui/native.go').read_text().split('#define API(X, V)',1)[1].split('#define DECL',1)[0]
         functions = re.findall(r'[XV]\((\w+), ([^,]+), (\([^\n]*?\)), \([^\n]*?\)\)',table)
         source = '#include "cui/cui_bridge.h"\n'

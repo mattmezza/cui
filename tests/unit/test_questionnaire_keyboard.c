@@ -213,6 +213,66 @@ static void equivalence_and_badge(void) {
     cui_destroy(u);
     cui_destroy(v);
 }
+static cui_draw_list mismatch_frame(cui_context *ui, model *m, bool extension, bool root_numbers,
+                                    bool choice_numbers, bool custom) {
+    assert(cui_begin_frame(ui, 320, 240, .001f));
+    cui_theme t = cui_theme_light();
+    cui_questionnaire_options root = {.width = 300, .numeric_shortcuts = root_numbers};
+    const cui_questionnaire_keyboard_options zero = {0};
+    if (extension)
+        assert(cui_questionnaire_begin_with_keyboard(ui, 10, &t, &m->state, root, &zero));
+    else
+        assert(cui_questionnaire_begin(ui, 10, &t, &m->state, root));
+    cui_questionnaire_options choice = {.numeric_shortcuts = choice_numbers};
+    if (custom) {
+        choice.render_shortcut = shortcut;
+        choice.render_user = m;
+    }
+    for (size_t c = 0; c < 2; ++c)
+        (void)cui_questionnaire_choice_control(ui, 12 + c, &t, &m->state, 0, c, choice);
+    cui_questionnaire_end(ui);
+    cui_draw_list draw = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return draw;
+}
+static void legacy_mismatched_shortcut_inheritance(void) {
+    static unsigned char baseline[320 * 240 * 4], extended[320 * 240 * 4], matching[320 * 240 * 4];
+    for (unsigned numbers = 0; numbers < 2; ++numbers) {
+        model a, b, c;
+        init(&a);
+        init(&b);
+        init(&c);
+        cui_context *u = cui_create((cui_config){0});
+        cui_context *v = cui_create((cui_config){0});
+        cui_context *w = cui_create((cui_config){0});
+        assert(u && v && w);
+        /* Frozen pre-extension resolve_size -> resolve_shortcuts already copied
+         * the active root's numeric flag before choice paint. Both mismatches
+         * must therefore match a choice explicitly agreeing with the root. */
+        pixels(mismatch_frame(u, &a, false, numbers != 0, numbers == 0, false), baseline);
+        pixels(mismatch_frame(v, &b, true, numbers != 0, numbers == 0, false), extended);
+        pixels(mismatch_frame(w, &c, false, numbers != 0, numbers != 0, false), matching);
+        assert(!memcmp(baseline, extended, sizeof baseline));
+        assert(!memcmp(baseline, matching, sizeof baseline));
+        mismatch_frame(u, &a, false, numbers != 0, numbers == 0, true);
+        mismatch_frame(v, &b, true, numbers != 0, numbers == 0, true);
+        assert(a.shortcuts == 2 && b.shortcuts == 2);
+        assert(a.badge == (numbers ? '2' : 'B') && b.badge == a.badge);
+        /* Root-wide activation follows that same inherited mode. */
+        cui_focus(u, 12);
+        cui_focus(v, 12);
+        key(u, numbers ? CUI_KEY_2 : CUI_KEY_B, 0);
+        key(v, numbers ? CUI_KEY_2 : CUI_KEY_B, 0);
+        mismatch_frame(u, &a, false, numbers != 0, numbers == 0, false);
+        mismatch_frame(v, &b, true, numbers != 0, numbers == 0, false);
+        assert(cui_questionnaire_choice_selected(&a.state, 0, 1));
+        assert(cui_questionnaire_choice_selected(&b.state, 0, 1));
+        assert(!memcmp(a.events, b.events, sizeof a.events));
+        cui_destroy(u);
+        cui_destroy(v);
+        cui_destroy(w);
+    }
+}
 static void standalone(void) {
     for (unsigned numbers = 0; numbers < 2; ++numbers) {
         model m;
@@ -363,6 +423,7 @@ static void nested_characterization(void) {
 int main(void) {
     policies();
     equivalence_and_badge();
+    legacy_mismatched_shortcut_inheritance();
     standalone();
     standalone_entry_and_confirm();
     normalization_and_guards();

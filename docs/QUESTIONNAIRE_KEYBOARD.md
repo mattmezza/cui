@@ -11,6 +11,11 @@ Root policy is copied before capture and applies to ordered input routing, inclu
 confirmation routed through an editor. Existing choice parts inherit the matching
 active root's shortcut mode; explicit standalone overrides are documented in the
 header. The host must keep per-part and root activation policies consistent.
+Legacy matching-root inheritance predates this API: the active root's
+`numeric_shortcuts` supplies ordinary choice badges even when the choice's own
+boolean differs. A zero-valued extension root preserves that behavior in both
+directions. Standalone choices retain their own boolean; a non-NULL explicit
+choice keyboard record follows the override rules in the header.
 
 Frozen source `87d10ae5e1299d1be18670a37570c5402f952e34` defaults shortcuts to
 absent (`base/questionnaire/state.rs:121,343–348`). OFF must suppress both key

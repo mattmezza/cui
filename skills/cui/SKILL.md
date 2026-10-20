@@ -178,5 +178,9 @@ For validated color text, read `docs/COLOR_ENTRY.md` and
 `include/cui/cui_color_entry.h`. ColorEntry is an additive inline byte-RGBA field
 with an address-stable owned draft/editor and explicit preview/commit state.
 Its coalesced commit observer runs after submission; update a separate owner
-model and synchronize on the next submission. It does not add float-HSLA, popup
-focus/actions, tabs, native screen sampling or handwritten foreign builders.
+model and synchronize on the next submission. It does not add popup focus/actions, tabs, native screen sampling or handwritten
+foreign builders. For a separate precision-preserving float-HSLA owner/entry, read
+`docs/COLOR_HSLA_ENTRY.md`, `include/cui/cui_color_hsla.h` and
+`include/cui/cui_color_hsla_entry.h`. Derived hex display never updates float state;
+explicit hex commit reparses/truncates and can quantize an unchanged display.
+SELECT reports a close request and owns no popup.

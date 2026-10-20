@@ -475,6 +475,21 @@
         "src/base/cui_color_entry.c",
         "src/components/cui_color_entry.c"
       ]
+    },
+    {
+      "header": "cui_color_hsla.h",
+      "macro": "CUI_COLOR_HSLA_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_color_hsla.c"
+      ]
+    },
+    {
+      "header": "cui_color_hsla_entry.h",
+      "macro": "CUI_COLOR_HSLA_ENTRY_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_color_hsla_entry.c",
+        "src/components/cui_color_hsla_entry.c"
+      ]
     }
   ]
 }

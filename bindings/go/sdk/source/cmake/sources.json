@@ -256,7 +256,14 @@
       "src/components/cui_color_entry.c"
     ],
     "cui_calendar_presentation": [],
-    "cui_calendar_behavior": []
+    "cui_calendar_behavior": [],
+    "cui_color_hsla": [
+      "src/base/cui_color_hsla.c"
+    ],
+    "cui_color_hsla_entry": [
+      "src/base/cui_color_hsla_entry.c",
+      "src/components/cui_color_hsla_entry.c"
+    ]
   },
   "native": {
     "text": [

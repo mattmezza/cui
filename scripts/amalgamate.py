@@ -28,6 +28,9 @@ def generate(name,sources):
         lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']
     if name == "cui_hover_card_extended":
         lines += ['#ifndef CUI_CONTENT_IMPLEMENTATION', '#define CUI_CONTENT_IMPLEMENTATION', '#endif', '#include "cui_content.h"']
+    if name == "cui_color_hsla_entry":
+        for dependency in ["cui_color_hsla", "cui_components"]:
+            lines += [f'#ifndef {dependency.upper()}_IMPLEMENTATION', f'#define {dependency.upper()}_IMPLEMENTATION', '#endif', f'#include "{dependency}.h"']
     if name == "cui_color_entry":
         lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']
     if name == "cui_stepper_navigation":
@@ -118,7 +121,7 @@ def generate(name,sources):
             code=code.replace(private_include, (ROOT/'src/base/cui_icon_layout.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_textarea_geometry.h').read_text(encoding='utf-8'))
-        for private_path in ['src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h']:
+        for private_path in ['src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h']:
             private_name = private_path.rsplit("/", 1)[-1]
             for private_include in [f'#include "{private_name}"', f'#include "../base/{private_name}"', f'#include "../components/{private_name}"']:
                 code = code.replace(private_include, (ROOT/private_path).read_text(encoding='utf-8'))

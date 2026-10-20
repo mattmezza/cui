@@ -579,15 +579,15 @@ Behavior extension: `cui/cui_calendar_behavior.h`; [independent selection and na
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_color_state and cui_color value. ColorEntry owns an address-stable, noncopyable bounded draft/editor; destroy after render consumption.
+**State:** Caller retains cui_color_state and cui_color value. ColorEntry owns an address-stable, noncopyable bounded draft/editor; destroy after render consumption. Float-HSLA entry separately retains normalized full-precision selection/preview and an address-stable owned editor.
 
-**Interaction:** Returns true when color changes. Additive ColorEntry separates draft/preview/commit and summarizes accepted Enter commits after submission; owner sync is silent and conflict-aware.
+**Interaction:** Returns true when color changes. Additive ColorEntry separates draft/preview/commit and summarizes accepted Enter commits after submission; owner sync is silent and conflict-aware. Float-HSLA entry preserves owner floats until explicit hex parsing; SELECT requests close without owning a popup.
 
 **Usage:** Submit persistent channel/editor state; use the accepted color in the next frame theme or preview.
 
 API: `cui_color_picker`, `cui_color_picker_events`; additive `cui_color_entry`, `cui_base_color_entry` and the ColorEntry model operations. [Picker public header](../include/cui/cui_picker.h); [ColorEntry public header](../include/cui/cui_color_entry.h); [picker guide](PICKERS.md); [entry guide](COLOR_ENTRY.md).
 
-Additional includes: `cui/cui_picker_events.h`, `cui/cui_color_entry.h`. ColorEntry keeps optional committed and preview values separate from its bounded draft. Float-HSLA precision, popup focus/actions, tabs and handwritten foreign builders remain outside this slice.
+Additional includes: `cui/cui_picker_events.h`, `cui/cui_color_entry.h`. ColorEntry keeps optional committed and preview values separate from its bounded draft. Float-HSLA primitives and entry: `cui_color_hsla_entry`, `cui_base_color_hsla_entry` and model/conversion operations. [Primitive header](../include/cui/cui_color_hsla.h); [entry header](../include/cui/cui_color_hsla_entry.h); [float entry guide](COLOR_HSLA_ENTRY.md). Float owner precision is preserved across display; explicit hex commit quantizes by source truncation/parsing. Popup focus/actions, tabs and handwritten foreign builders remain outside this slice.
 
 ## Combobox
 

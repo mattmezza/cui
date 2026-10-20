@@ -63,6 +63,8 @@
 #include "cui_kbd.h"
 #include "cui_stepper_navigation.h"
 #include "cui_color_entry.h"
+#include "cui_color_hsla.h"
+#include "cui_color_hsla_entry.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -314,4 +316,12 @@
 #define CUI_COLOR_ENTRY_IMPLEMENTATION
 #endif
 #include "cui_color_entry.h"
+#ifndef CUI_COLOR_HSLA_IMPLEMENTATION
+#define CUI_COLOR_HSLA_IMPLEMENTATION
+#endif
+#include "cui_color_hsla.h"
+#ifndef CUI_COLOR_HSLA_ENTRY_IMPLEMENTATION
+#define CUI_COLOR_HSLA_ENTRY_IMPLEMENTATION
+#endif
+#include "cui_color_hsla_entry.h"
 #endif

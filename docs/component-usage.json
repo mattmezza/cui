@@ -956,24 +956,47 @@
         "cui_color_entry_commit",
         "cui_color_entry_restore",
         "cui_color_entry_destroy",
-        "cui_color_entry_parse"
+        "cui_color_entry_parse",
+        "cui_color_hsla_entry",
+        "cui_base_color_hsla_entry",
+        "cui_color_hsla_entry_init",
+        "cui_color_hsla_entry_sync",
+        "cui_color_hsla_entry_preview",
+        "cui_color_hsla_entry_restore",
+        "cui_color_hsla_entry_set_draft",
+        "cui_color_hsla_entry_commit_hex",
+        "cui_color_hsla_entry_commit_value",
+        "cui_color_hsla_entry_destroy",
+        "cui_color_hsla_parse_hex",
+        "cui_color_hsla_format_hex",
+        "cui_color_hsla_valid",
+        "cui_color_hsla_from_rgba",
+        "cui_color_hsla_to_rgba",
+        "cui_color_hsla_from_color",
+        "cui_color_hsla_to_color"
       ],
       "state_types": [
         "cui_color_state",
         "cui_color_entry_state",
         "cui_color_entry_value",
-        "cui_color_entry_result"
+        "cui_color_entry_result",
+        "cui_color_hsla",
+        "cui_color_hsla_entry_state",
+        "cui_color_hsla_value",
+        "cui_color_hsla_entry_result"
       ],
-      "state_ownership": "Caller retains cui_color_state and cui_color value. ColorEntry owns an address-stable, noncopyable bounded draft/editor; destroy after render consumption.",
-      "interaction": "Returns true when color changes. Additive ColorEntry separates draft/preview/commit and summarizes accepted Enter commits after submission; owner sync is silent and conflict-aware.",
+      "state_ownership": "Caller retains cui_color_state and cui_color value. ColorEntry owns an address-stable, noncopyable bounded draft/editor; destroy after render consumption. Float-HSLA entry separately retains normalized full-precision selection/preview and an address-stable owned editor.",
+      "interaction": "Returns true when color changes. Additive ColorEntry separates draft/preview/commit and summarizes accepted Enter commits after submission; owner sync is silent and conflict-aware. Float-HSLA entry preserves owner floats until explicit hex parsing; SELECT requests close without owning a popup.",
       "usage": "Submit persistent channel/editor state; use the accepted color in the next frame theme or preview.",
       "docs": [
         "docs/PICKERS.md",
         "docs/PICKER_EVENTS.md",
-        "docs/COLOR_ENTRY.md"
+        "docs/COLOR_ENTRY.md",
+        "docs/COLOR_HSLA_ENTRY.md"
       ],
       "callback_symbols": [
-        "cui_color_entry_commit_fn"
+        "cui_color_entry_commit_fn",
+        "cui_color_hsla_entry_commit_fn"
       ],
       "scope": "styled frame component",
       "name": "ColorPicker",
@@ -981,7 +1004,9 @@
       "composition": "application model + frame composition",
       "additional_public_headers": [
         "include/cui/cui_picker_events.h",
-        "include/cui/cui_color_entry.h"
+        "include/cui/cui_color_entry.h",
+        "include/cui/cui_color_hsla.h",
+        "include/cui/cui_color_hsla_entry.h"
       ]
     },
     {

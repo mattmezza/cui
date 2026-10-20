@@ -102,4 +102,7 @@ set(CUI_SOURCES
  src/components/cui_stepper_navigation.c
  src/base/cui_color_entry.c
  src/components/cui_color_entry.c
+ src/base/cui_color_hsla.c
+ src/base/cui_color_hsla_entry.c
+ src/components/cui_color_hsla_entry.c
 )

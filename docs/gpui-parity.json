@@ -3249,7 +3249,13 @@
         "tests/unit/test_color_entry.c",
         "tests/unit/test_color_entry_owner.c",
         "tests/unit/test_color_entry_header.cpp",
-        "tests/distribution/color_entry.c"
+        "tests/distribution/color_entry.c",
+        "tests/unit/test_color_hsla.c",
+        "tests/unit/test_color_hsla_model.c",
+        "tests/unit/test_color_hsla_entry.c",
+        "tests/unit/test_color_hsla_entry_owner.c",
+        "tests/unit/test_color_hsla_entry_header.cpp",
+        "tests/distribution/color_hsla_entry.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3258,7 +3264,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Inline HSV/RGBA picker plus additive bounded byte-RGBA hex draft/preview/commit field. Float-HSLA precision, popup focus/actions, palette/HSLA tabs and continuous gradients remain pending. Browser screen picking is a host-owned async gallery integration, not a native picker API. Handwritten language bindings do not expose ColorEntry."
+        "Inline HSV/RGBA picker plus separate byte-RGBA and float-HSLA hex entries. Float owner precision is retained until explicit hex parsing; source-style formatting truncates. Popup focus/actions, palette/HSLA tabs and continuous gradients remain pending. Browser screen picking is a host-owned async gallery integration, not a native picker API. Handwritten language builders do not expose either entry model."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3303,6 +3309,17 @@
             "tests/unit/test_color_entry.c",
             "tests/unit/test_color_entry_owner.c",
             "tests/distribution/color_entry.c"
+          ]
+        },
+        {
+          "name": "float-HSLA owned selection, preview and explicit hex commit",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_color_hsla.c",
+            "tests/unit/test_color_hsla_model.c",
+            "tests/unit/test_color_hsla_entry.c",
+            "tests/unit/test_color_hsla_entry_owner.c",
+            "tests/distribution/color_hsla_entry.c"
           ]
         }
       ],

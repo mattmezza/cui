@@ -250,7 +250,8 @@
     "cui_stepper_navigation": [
       "src/base/cui_stepper_navigation.c",
       "src/components/cui_stepper_navigation.c"
-    ]
+    ],
+    "cui_calendar_presentation": []
   },
   "native": {
     "text": [

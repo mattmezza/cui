@@ -476,3 +476,11 @@ No suite was executed and no manifest status was promoted by this documentation
 refresh. Future foreign typed/controlled/lifecycle work needs its own reviewed
 protocol, exception/reentrancy/storage and real-input tests; native source-header
 availability alone is insufficient.
+
+## Avatar observer addition
+
+Direct C single-Avatar and visible-stack activation observers are implemented in
+[cui_avatar_events.h](../../include/cui/cui_avatar_events.h). Python, JS/TS, Go and
+Rust do not yet expose these synchronous observer handlers or stack payloads.
+Avatar style setters are a separate retained binding feature, not event parity.
+See [the observer guide](../AVATAR_EVENTS.md) for timing and borrowed lifetimes.

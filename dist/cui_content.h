@@ -330,6 +330,7 @@ void cui_end_hover_card(cui_context *ui);
 #define CUI_CONTENT_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 #include "cui_hover_events.h"
+#include "cui_avatar_events.h"
 /* src/base/cui_content.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -511,6 +512,7 @@ cui_hover_event_result cui_hover_update_events(cui_id target, cui_hover_state *s
 
 /* src/components/cui_content.c */
 /* SPDX-License-Identifier: MIT */
+
 
 
 
@@ -744,8 +746,10 @@ bool cui_avatar_identity(cui_str name, bool dark, bool custom_hue, unsigned hue,
                                        cui_avatar_oklch(.89, .05, hue)};
     return true;
 }
-bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_avatar_options o) {
+static bool cui_avatar_private_submit(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                      cui_avatar_options o,
+                                      cui_component_activation_handler handler,
+                                      cui_component_action_result *result) {
     if (!ui || !t)
         return false;
     if (!id) {
@@ -838,13 +842,65 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     for (size_t i = 0; i < n; i++)
         if (o.interactive && !o.disabled && !cui_event_consumed(ui, i) &&
             cui_event_activation(ui, i) == id) {
+            cui_component_event_metadata event;
+            bool observe = result && result->submitted;
+            if (observe) {
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, i, &snapshot) || snapshot.target != id ||
+                    !cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                         &snapshot)) {
+                    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_ACTIVATE, id,
+                                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                    event.frame_sequence = cui_frame_sequence(ui);
+                    event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
+                }
+            }
             cui_consume_event(ui, i);
             activated = true;
+            if (observe) {
+                cui_control_events_private_increment(&result->activation_count,
+                                                     &result->count_overflow);
+                if (handler.callback)
+                    handler.callback(handler.user, &event);
+            }
         }
     return activated;
 }
-size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *t,
-                        const cui_avatar_item *items, size_t count, cui_avatar_stack_options o) {
+bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_avatar_options options) {
+    return cui_avatar_private_submit(ui, id, t, name, options,
+                                     (cui_component_activation_handler){0}, NULL);
+}
+cui_component_action_result cui_avatar_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                              cui_str name, cui_avatar_options options,
+                                              cui_component_activation_handler handler) {
+    cui_component_action_result result = {0};
+    if (!ui || !id || !theme || (name.length && !name.data))
+        return result;
+    result.valid = true;
+    result.submitted = cui_frame_paint_enabled(ui) && cui_frame_sequence(ui) != 0;
+    (void)cui_avatar_private_submit(ui, id, theme, name, options, handler, &result);
+    return result;
+}
+typedef struct {
+    cui_id id;
+    size_t index;
+    uint64_t key;
+    cui_avatar_stack_handler handler;
+} cui_avatar_private_stack_forward;
+static void cui_avatar_private_stack_activate(void *user,
+                                              const cui_component_event_metadata *event) {
+    cui_avatar_private_stack_forward *forward = user;
+    cui_avatar_stack_activation activation = {
+        .event = *event, .index = forward->index, .key = forward->key};
+    activation.event.target = forward->id;
+    forward->handler.callback(forward->handler.user, &activation);
+}
+static size_t cui_avatar_private_stack_submit(cui_context *ui, cui_id id, const cui_theme *t,
+                                              const cui_avatar_item *items, size_t count,
+                                              cui_avatar_stack_options o,
+                                              cui_avatar_stack_handler handler,
+                                              cui_component_action_result *result) {
     if (!ui || !id || !t || !count || count > 64 || !items)
         return SIZE_MAX;
     if (isfinite(o.width) && o.width > 0 && o.width < 1)
@@ -877,15 +933,20 @@ size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *t,
                              (items[i].key ? items[i].key : i + 1) * UINT64_C(0x9e3779b97f4a7c15));
         cui_begin_absolute_box(ui, cui_content_child(child, 32), (cui_box){0},
                                (cui_rect){step * (float)i, 0, size, size});
-        if (cui_avatar_ex(ui, child, t, items[i].name,
-                          (cui_avatar_options){.size = size,
-                                               .ring_width = o.ring_width,
-                                               .image = items[i].image,
-                                               .image_state = items[i].image_state,
-                                               .custom_ring = true,
-                                               .ring = t->background,
-                                               .interactive = o.interactive,
-                                               .disabled = o.disabled}))
+        cui_avatar_private_stack_forward forward = {id, i, items[i].key, handler};
+        if (cui_avatar_private_submit(
+                ui, child, t, items[i].name,
+                (cui_avatar_options){.size = size,
+                                     .ring_width = o.ring_width,
+                                     .image = items[i].image,
+                                     .image_state = items[i].image_state,
+                                     .custom_ring = true,
+                                     .ring = t->background,
+                                     .interactive = o.interactive,
+                                     .disabled = o.disabled},
+                (cui_component_activation_handler){
+                    handler.callback ? cui_avatar_private_stack_activate : NULL, &forward},
+                result))
             activated = i;
         cui_end_box(ui);
     }
@@ -908,6 +969,31 @@ size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *t,
     }
     cui_end_box(ui);
     return activated;
+}
+size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *theme,
+                        const cui_avatar_item *items, size_t count,
+                        cui_avatar_stack_options options) {
+    return cui_avatar_private_stack_submit(ui, id, theme, items, count, options,
+                                           (cui_avatar_stack_handler){0}, NULL);
+}
+cui_avatar_stack_event_result cui_avatar_stack_events(cui_context *ui, cui_id id,
+                                                      const cui_theme *theme,
+                                                      const cui_avatar_item *items, size_t count,
+                                                      cui_avatar_stack_options options,
+                                                      cui_avatar_stack_handler handler) {
+    cui_avatar_stack_event_result result = {.control = SIZE_MAX};
+    if (!ui || !id || !theme || !items || !count || count > 64 ||
+        (isfinite(options.width) && options.width > 0 && options.width < 1) ||
+        (options.name.length && !options.name.data))
+        return result;
+    for (size_t i = 0; i < count; i++)
+        if (items[i].name.length && !items[i].name.data)
+            return result;
+    result.action.valid = true;
+    result.action.submitted = cui_frame_paint_enabled(ui) && cui_frame_sequence(ui) != 0;
+    result.control = cui_avatar_private_stack_submit(ui, id, theme, items, count, options, handler,
+                                                     &result.action);
+    return result;
 }
 void cui_begin_bubble(cui_context *ui, cui_id id, const cui_theme *t, cui_bubble_variant v,
                       float width) {

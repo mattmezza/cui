@@ -113,13 +113,17 @@
         "cui_avatar_image_init",
         "cui_avatar_image_prepare",
         "cui_avatar_measure",
-        "cui_avatar_identity"
+        "cui_avatar_identity",
+        "cui_avatar_events",
+        "cui_avatar_stack_events"
       ],
       "state_types": [
         "cui_avatar_image",
         "cui_avatar_options",
         "cui_avatar_metrics",
-        "cui_avatar_palette"
+        "cui_avatar_palette",
+        "cui_avatar_stack_activation",
+        "cui_avatar_stack_event_result"
       ],
       "state_ownership": "Caller retains name, borrowed RGBA pixels, bounded circular cache and destination storage through rendering. Optional typed placeholder state and mask versions also survive draw completion; named SVG uses the context cache. Metrics and palettes are copied values.",
       "interaction": "Interactive avatars return activation; interactive stacks return the selected index or SIZE_MAX. Application opens the selected profile.",
@@ -129,13 +133,24 @@
         "docs/AVATAR_MESSAGE_EXAMPLES.md",
         "docs/AVATAR_FAILURE_AUDIT.md",
         "docs/AVATAR_VARIANTS_AUDIT.md",
-        "docs/AVATAR_STYLE_BINDINGS.md"
+        "docs/AVATAR_STYLE_BINDINGS.md",
+        "docs/AVATAR_EVENTS.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_component_activation_fn",
+        "cui_avatar_stack_activation_fn"
+      ],
       "scope": "styled frame component",
       "name": "Avatar",
       "public_header": "include/cui/cui_content.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_avatar_events.h"
+      ],
+      "handler_types": [
+        "cui_component_activation_handler",
+        "cui_avatar_stack_handler"
+      ]
     },
     {
       "api_symbols": [

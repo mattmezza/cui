@@ -236,7 +236,8 @@
     "cui_scroll_events": [],
     "cui_hover_events": [],
     "cui_virtual_events": [],
-    "cui_message_events": []
+    "cui_message_events": [],
+    "cui_avatar_events": []
   },
   "native": {
     "text": [

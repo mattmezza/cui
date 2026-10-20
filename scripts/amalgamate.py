@@ -27,7 +27,7 @@ def generate(name,sources):
     if name == "cui_table":
         lines += ['#include "cui_table_events.h"']
     if name == "cui_content":
-        lines += ['#include "cui_hover_events.h"']
+        lines += ['#include "cui_hover_events.h"', '#include "cui_avatar_events.h"']
     if name == "cui_scroll":
         lines += ['#include "cui_scroll_events.h"']
     if name == "cui_virtual_scroll":

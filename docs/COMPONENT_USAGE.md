@@ -165,7 +165,7 @@ Additional event includes: `cui/cui_media_events.h`.
 
 **Usage:** Initialize a circular image cache once; submit borrowed image pixels with a revision. Missing/invalid images fall back to initials; stacks use stable application keys. Opt into shared design sizes, deterministic identity palettes or anonymous SVG placeholders without changing legacy defaults.
 
-API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`, `cui_avatar_image_prepare`, `cui_avatar_measure`, `cui_avatar_identity`. [Public header](../include/cui/cui_content.h); [content guide](CONTENT.md); [profile images and conversations](AVATAR_MESSAGE_EXAMPLES.md); [Avatar styling from Python, JS/TS, Go and Rust](AVATAR_STYLE_BINDINGS.md).
+API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`, `cui_avatar_image_prepare`, `cui_avatar_measure`, `cui_avatar_identity`. [Public header](../include/cui/cui_content.h); [content guide](CONTENT.md); [profile images and conversations](AVATAR_MESSAGE_EXAMPLES.md); [Avatar styling from Python, JS/TS, Go and Rust](AVATAR_STYLE_BINDINGS.md). Direct C observers: `cui_avatar_events`, `cui_avatar_stack_events`; callbacks `cui_component_activation_fn`, `cui_avatar_stack_activation_fn`. See [activation guide](AVATAR_EVENTS.md).
 
 ## Badge
 

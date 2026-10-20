@@ -29,3 +29,15 @@ foreach(case accounting backpressure generations failures cancellation concurren
  add_test(NAME video_audio_${case} COMMAND test_video_audio_host ${case})
  set_tests_properties(video_audio_${case} PROPERTIES TIMEOUT 20)
 endforeach()
+
+# Measurement only: never a hardware-latency or hard realtime CTest assertion.
+if(UNIX)
+ add_executable(bench_video_audio_mutex bench_mutex.c)
+ add_test(NAME video_audio_mutex_observation COMMAND bench_video_audio_mutex)
+ set_tests_properties(video_audio_mutex_observation PROPERTIES TIMEOUT 20 LABELS benchmark)
+ target_link_libraries(bench_video_audio_mutex PRIVATE video_audio_host)
+ target_compile_options(bench_video_audio_mutex PRIVATE -Wall -Wextra -Wpedantic -Werror -UNDEBUG)
+ if(VIDEO_AUDIO_SANITIZE)
+  target_compile_options(bench_video_audio_mutex PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+ endif()
+endif()

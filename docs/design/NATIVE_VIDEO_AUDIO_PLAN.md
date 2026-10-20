@@ -231,3 +231,252 @@ known PCM and consumption counts, independent queue exhaustion, stale returned
 DATA after seek cancellation, blocked read/seek shutdown, output callback join
 before host free and concurrent stream accounting. This validates the injected
 contract only; it supplies no evidence of a physical output consumption clock.
+
+## Real-adapter feasibility checkpoint (no adapter implementation)
+
+Audit after foundation `c63af6de`: installed SDL 3.4.18, FFmpeg n9.0.2,
+libavformat/libavcodec 63.1.102, libavutil 61.1.102, libswscale 10.1.102 and
+libswresample 7.1.102. Inspected existing headers and the SDL fallback source at
+`7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`. No device was opened. The only added
+executable is an offline mutex observation fixture; controller production code
+is unchanged. The following real transport design still requires review.
+
+### Three different boundaries
+
+| Boundary | Evidence available | Meaning and limit |
+| --- | --- | --- |
+| Host/SDL submission | Successful host render ticket and `SDL_PutAudioStreamData` | Bytes accepted into a software queue; not playback progress. |
+| SDL stream input consumed by mixing | Successful-put byte ledger minus remaining input queue, under the restricted invariant below | Actual asynchronous removal of this stream's PCM for SDL mixing; useful software clock, not device acceptance. |
+| Backend accepted / physically presented / acoustically audible | No equivalent portable SDL timestamp/count API established in this audit | Backend buffering, OS routing, DAC, speakers and propagation are outside the proven clock. These stages are themselves different. |
+
+The recommended first SDL clock is explicitly **SDL software-mixer input
+consumption**. Native audio playback need not wait for a universal hardware
+presentation timestamp, provided this boundary, queue bounds and latency limits
+are visible. Do not silently equate the controller's generic consumption wording
+with acoustic truth. The adapter's example-local documentation and UI host status
+must name its chosen clock boundary before integration.
+
+Source evidence: the pinned stream implementation invokes its get callback
+before removing input; it returns the bytes actually retrieved to its caller.
+`SDL_GetAudioStreamQueued` reads remaining input bytes. Equal-rate operation with
+unity frequency ratio and zero resample offset bypasses its resampler. These
+facts permit a restricted drain calculation, not a general resampling clock.
+See [pinned SDL stream implementation](https://github.com/libsdl-org/SDL/blob/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/src/audio/SDL_audiocvt.c).
+The pinned device loop drains bound streams, invokes postmix, then calls the
+backend `PlayDevice`; postmix is consequently before backend acceptance.
+See [pinned SDL device loop](https://github.com/libsdl-org/SDL/blob/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/src/audio/SDL_audio.c).
+
+Neither callback request sizes nor postmix buffer length prove that this
+particular stream supplied all those frames. SDL can mix automatic silence.
+[Postmix documentation](https://wiki.libsdl.org/SDL3/SDL_SetAudioPostmixCallback)
+also permits changing channel counts/rates and describes synchronous callback
+replacement. [Get-callback documentation](https://wiki.libsdl.org/SDL3/SDL_SetAudioStreamGetCallback)
+provides a refill opportunity, not a post-play acknowledgement.
+
+### Restricted same-format software-drain adapter
+
+Use one private logical playback device and one privately owned bound stream.
+Normalize decoder output to native float32 stereo 48 kHz on the worker. Require
+stream source and destination to remain float32 stereo 48 kHz, unity frequency
+ratio, default channel maps and no format changes for the whole generation.
+Check the bound destination and postmix spec, not just the requested open spec.
+An unsupported obtained format or hot device change stops playback with an
+explicit error; do not continue with an unproved sample mapping. SDL can still
+convert final float values to a physical integer format without changing the
+selected software frame-count boundary; no physical-clock claim follows.
+
+For a generation, maintain checked successful-put bytes P, remaining queued
+input bytes Q, and previously acknowledged frames A. All values are private to
+this stream and measured coherently with its stream lock:
+
+```
+frame_bytes = 2 * sizeof(float) = 8
+software_drained_frames = (P - Q) / frame_bytes
+new_consumption = software_drained_frames - A
+```
+
+Only acknowledge this ordered prefix, never all submitted frames or callback
+request sizes. Require nonnegative/aligned Q, Q <= P, monotonic drain, and a
+prefix within outstanding controller tickets. Cap both software queues well
+below SDL's int-count clamp; C=12,000 means at most 96,000 input bytes. Prove the
+identity on each admitted SDL build using unbound-stream actual reads, then a
+private dummy-output postmix fixture. No resampling, format-track changes,
+foreign puts/gets/clear calls or silent queue reset may occur inside this identity.
+A copied frame value of zero can be valid decoded media; only controller-added
+underrun padding is tagged nonmedia and excluded from media-time advancement.
+
+A refill callback may submit a bounded aligned chunk when requested. Count P
+only after a successful put. Postmix observes actual remaining queue after the
+mixer's read and acknowledges newly drained entries. Do not synthesize
+consumption from postmix silence. Input drain can include frames in SDL's current
+mix buffer that are never accepted if the backend fails afterward; status must
+say software consumption rather than successful hardware playback.
+
+There is a transaction limitation in the existing foundation: render reserves a
+ticket before SDL put can fail, and no unsubmit API exists. On put failure,
+immediately stop feeding and surface an adapter failure on owner poll. Quiesce,
+discard and require seek/reset from the last acknowledged source position or
+destroy/recreate before retry. Never acknowledge the failed put or send later
+chunks across its unsubmitted sequence gap. No Core schema change is necessary;
+minimal example integration can keep this failure in host-owned state.
+
+### Pause, seek, flush, close and locking
+
+Open/configure while paused, validate format, then install callbacks and resume
+only after the host is ready. A failed start must leave no callbacks running;
+resume/setup failure branches need injected coverage before claiming the
+foundation start contract is met. All SDL operations run outside the controller
+mutex. Callback paths take stream lock then controller lock, never call CUI,
+never wait for owner/UI, and never change device/callback lifecycle themselves.
+The owner must never acquire those locks in the reverse order.
+
+The proposed stop sequence is: pause the logical device, detach postmix with
+`SDL_SetAudioPostmixCallback(..., NULL, NULL)`, detach get callback using its
+stream-serialized setter, then observe a final coherent input-drain prefix.
+The first setter waits out the current device iteration; the stream setter
+serializes with an active get callback. Report final consumed frames while the
+host is still logically playing, then return success to freeze owner-visible
+state. Failure to prove either detach keeps the host allocated, as the existing
+foundation requires. Verify exact order against both supported builds and
+injected failures; pause alone is not the quiescence proof.
+
+For pause, retain stream queue and outstanding tickets for ordered resume. For
+seek/close, after detachment acknowledge only the final drain, then clear the
+stream and discard mappings. Queue reduction caused by clear is **discard**, not
+consumption. `SDL_ClearAudioStream` does not retract already submitted hardware
+buffers: see [clear contract](https://wiki.libsdl.org/SDL3/SDL_ClearAudioStream).
+Only then may the host increment generation/reset queues or free storage. Remove
+all retained raw host/wake pointers and queued notifications before success.
+No old postmix/get event may acknowledge a new generation. A small adapter
+mailbox can report errors; owner polling can initially provide all UI scheduling.
+
+The foundation ended flag means all media reached the chosen software boundary.
+It does not prove the speakers finished. Likewise pause/seek can leave a hardware
+or OS tail from the previous position. Application queue latency has a known
+capacity bound; total audible latency does not. Device buffer size/frequency is
+only a latency component, not a promise about OS/backend queues. Start with no
+acoustic compensation promise; a later optional calibrated video delay can use
+an explicitly estimated latency. There is no hard A/V error bound under UI/OS
+stalls. Report synchronization against the software clock and defer measured
+speaker/display alignment to explicit manual platform checks.
+
+### FFmpeg service: bounded asynchronous conversion and seek
+
+Keep one worker as sole owner of the format, both codec contexts, frames,
+packets, scaler and resampler. Its injected audio read can demux/decode video
+encountered on the way to audio and publish into a bounded video lease queue.
+Video publication drops superseded unleased frames rather than blocking audio.
+Never add a second reader to the same `AVFormatContext`. Deep interleave and
+per-packet/decoded-frame limits remain explicit rejection/buffering cases.
+
+Use `avcodec_send_packet`/`avcodec_receive_frame` with EAGAIN drain discipline,
+then null-packet EOF drain. The
+[FFmpeg 9 decoding contract](https://ffmpeg.org/doxygen/9.0/group__lavc__decoding.html)
+defines those operations; it does not make concurrent seek/flush safe. An owner
+seek publishes a serial/generation and atomic cancellation ceiling only. AVIO
+interrupt checks those atomics; it never calls CUI or touches a context being
+mutated by another thread. Old results, including successful DATA, remain
+quarantined by generation. The first implementation can reopen the local file
+on the worker for each seek to avoid relying on demuxer-specific recovery from
+an interrupted AVIO operation. This adds I/O and has no universal seek-latency
+bound. Preserve file-only protocol restrictions and bounded copied paths.
+
+Maintain one rational container origin for both streams. Decode preroll, warm
+the resampler, map output frames to that origin, then trim converted output to
+the requested 48 kHz target before returning contiguous DATA. Do not independently
+zero each stream or reset source time at each converted chunk. Gaps, negative
+preroll and fractional-rate rounding need actual muxed impulse/video-marker
+fixtures. Never subtract a guessed fixed resampler delay from every timestamp.
+
+Proposed initial limits: mono/stereo input, fixed rate per stream (8-192 kHz),
+no midstream layout/rate changes, decoded frames <=8,192 input samples, one
+bounded converted spill buffer <=65,536 stereo output frames. Query
+`swr_get_out_samples` immediately before conversion, reject a bound beyond that
+buffer, use returned sample counts, and hand back chunks no larger than the
+controller's D. Do not repeatedly feed input into insufficient output space;
+that can grow internal buffered conversion data. `swr_get_delay`, checked
+`av_rescale_rnd`/`av_rescale_delta` and optional `swr_next_pts` provide accounting
+primitives, not a complete timestamp policy. In particular `swr_next_pts` uses
+1/(input_rate*output_rate) units; automatic timestamp compensation must stay off
+for rate 1. Any timestamp operation that changes SWR state requires recomputing
+its output-space bound. Drain codec and converter at EOF; recreate/reset both
+for seek. The pinned installed `libswresample/swresample.h` is authoritative;
+see also the [FFmpeg 9 resampler API](https://ffmpeg.org/doxygen/9.0/group__lswr.html).
+
+Start the actual decoder proof with lossless PCM audio muxed with the existing
+lossless video markers, then 44.1-to-48 kHz conversion/seek impulse fixtures.
+Do not claim AAC/Opus priming parity yet. The pinned codec header's
+`AV_CODEC_FLAG2_SKIP_MANUAL` exports skip metadata instead of automatic skipping;
+manual plus automatic trimming would double-skip. A first PCM-only subset can
+reject nonzero codec padding/preroll and defer compressed-audio trimming until
+fixtures establish the selected mode. Missing/unsupported timestamp or edit-list
+cases must fail explicitly instead of returning invented contiguous timestamps.
+`avformat_seek_file` uses the selected stream timebase (or AV_TIME_BASE for -1)
+and ignores AVSEEK_FLAG_BACKWARD; choose min/target/max deliberately and decode
+forward rather than assume that flag establishes an exact landing sample.
+
+### Smallest real integration sequence and pins
+
+1. Implement the FFmpeg service behind the injected interface and prove actual
+   decoded/resampled PCM offline against the controller. No output device yet.
+2. Prove same-format SDL queue-drain arithmetic with actual unbound streams,
+   then a dummy logical output's postmix callback. Cover zero-fill versus media
+   zeros, partial reads, pause retention, clear-as-discard, failed put/setup,
+   generation-stale callbacks, stop failure, format mismatch and teardown.
+3. Only after those proofs, add an optional example combining the shared demux
+   service and SDL output. Owner polls source-frame position, converts to seconds
+   at 48 kHz, advances the existing video model by coherent deltas and acquires
+   due video leases. Seek must coordinate video/model/audio generations; any
+   partial failure leaves the whole example paused/failed. Preserve leased
+   pixels until renderer release. While playing/buffering, owner schedules
+   frames independently of UI input; callbacks do not call CUI. Rate stays 1 and
+   RATE capability is omitted. No-audio tracks retain the explicit silent mode;
+   audio output failure cannot silently become successful sound playback.
+
+Reuse existing exact FFmpeg pins and add explicit optional libswresample
+`=7.1.102` with version/buildconf/license audit. The observed n9.0.2 package has
+`--enable-gpl --enable-version3`; its recorded GPLv3-or-later linked obligations
+remain unchanged. Record the entire linked configuration rather than infer LGPL
+from the library name. SDL remains zlib-licensed, with existing fallback commit
+pin above. Installed SDL 3.4.18 is an audited system version, not proof that every
+`>=3.2` build behaves identically. Admit only tested builds for the drain adapter;
+retain a runtime version/configuration record and require the same queue probes
+when changing that set. No new dependencies enter Core, and no dependency is
+installed by fixtures. macOS/Windows native compile/dummy proof and physical
+playback checks remain separate prerequisites for platform claims.
+
+### Mutex observation, not a realtime guarantee
+
+The new Unix-only `bench_mutex.c` uses injected services and CLOCK_MONOTONIC to
+measure 4,000 render-plus-consume pairs of 256 frames, with a contending decoder
+worker, C=12,000 and D=256/4,096. It validates PCM classes and actual counter
+identity while recording p50/p95/p99/max and observations exceeding the 5.33 ms
+block duration. There is no deadline pass threshold. It measures controller
+calls, not SDL callback duration, device latency or a worst-case scheduler bound.
+Worker critical sections include finite validation/copy loops; the callback uses
+an ordinary C11 mutex, so priority inversion and scheduling delays remain risks.
+
+Run it through the private test wrapper using the standalone Release build:
+`python scripts/test_local.py --build-dir BUILD -R video_audio_mutex_observation -V`.
+The example README records the observed run. Future SDL dummy tests must also
+measure the complete get/postmix path under decoder contention, queue pressure
+and UI stalls; move validation/copies or redesign synchronization if measured
+budget risk is unacceptable. Neither successful sanitizer tests nor a fast
+microbenchmark establishes hard realtime behavior.
+
+Alternatives retained for review: immediate acknowledgement after put is a
+submission clock and is rejected; using only postmix buffer length incorrectly
+counts SDL-generated silence and other streams; an unbound conversion stream's
+manual read is valuable conversion proof but is not real device progression;
+platform-specific hardware presentation timing could improve latency estimates
+but would add another optional backend and platform validation scope. The
+restricted bound-stream software-drain clock is the minimum useful native
+playback route, with honest latency limits, rather than a reason to block native
+sound until universal DAC timestamps exist.
+
+Checkpoint validation: Release and ASan/UBSan standalone wrapper runs passed
+7/7 (six controller cases plus the new observation fixture). The Release probe
+recorded p99 render/consume pair durations about 31 microseconds and observed
+maxima 427/106 microseconds for D=256/4,096 on this Linux GCC host. The unpaced
+loop also produced underrun padding, which was separately counted and did not
+advance media time. Full SDL callback timing and hardware playback are untested.

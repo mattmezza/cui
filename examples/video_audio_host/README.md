@@ -129,3 +129,35 @@ Validation of this checkpoint: all six focused CTest cases passed through
 `scripts/test_local.py` in normal and ASan/UBSan builds on Linux (GCC 16.2.1).
 clang-format 23.1.2 and diff checks passed. No other platform compile, hardware
 latency or physical output result is implied.
+
+## Offline mutex observation fixture
+
+`bench_mutex.c` is a separate Unix-only fixture; controller code is unchanged.
+It measures render-plus-consume pairs using CLOCK_MONOTONIC while the decoder
+worker contends for the same mutex. Configure a Release build, build normally,
+then run `scripts/test_local.py --build-dir BUILD -R video_audio_mutex_observation -V`.
+The fixture checks PCM classes and consumption counters but sets no deadline
+pass threshold. It is registered with the `benchmark` CTest label. It neither
+opens output nor simulates a physical-device scheduler.
+
+One Linux x86_64 / GCC 16.2.1 Release observation (4,000 pairs, C=12,000,
+256-frame output blocks; durations in microseconds):
+
+| Decoder chunk | p50 | p95 | p99 | Observed max | Pairs above 5.33 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 256 | 6.211 | 19.160 | 31.041 | 427.163 | 0 |
+| 4,096 | 4.655 | 19.302 | 31.030 | 105.800 | 0 |
+
+The tight loop is deliberately not paced at 48 kHz: it consumed 1,017,536 / 998,592
+media frames respectively, with 6,464 / 25,408 underrun-padding frames. Counter
+checks ensure that padding did not advance media time. These are observations,
+not an absence-of-dropouts claim. All seven CTest cases (six foundation fixtures
+plus observation) passed in this Release build and a separate ASan/UBSan build.
+The instrumented probe's observed maxima were 2.134 / 1.913 ms; instrumentation
+and scheduling differ, so those values are not directly a performance comparison.
+No hard realtime, hardware-latency or worst-case bound follows from any run.
+
+The next real-adapter proposal, including the explicitly named SDL software-mixer
+clock and its remaining acoustic A/V limits, is in
+[the design checkpoint](../../docs/design/NATIVE_VIDEO_AUDIO_PLAN.md). Actual SDL
+queue-drain/format/quiescence fixtures must pass before that adapter is added.

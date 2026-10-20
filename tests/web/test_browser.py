@@ -2345,7 +2345,11 @@ def main():
             click_semantic('2026-10-20')
             page.wait_for_function('cuiGallery.exports.gallery_modal()===0')
             page.wait_for_function(texts + '.some(s=>s.includes("2026-10-20"))')
-            assert page.evaluate('cuiGallery.exports.gallery_semantic(0,7)') == 1
+            # DatePicker now has action-option controls before its trigger. Verify
+            # restored trigger focus by semantic identity, not submission position.
+            date_trigger = semantic_index('Date')
+            assert date_trigger is not None
+            assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', date_trigger) == 1
             page.evaluate('location.hash="TimeField"')
             page.wait_for_function('document.querySelector("#name").textContent==="TimeField" && cuiGallery.renderedComponent==="TimeField"')
             page.wait_for_timeout(80)

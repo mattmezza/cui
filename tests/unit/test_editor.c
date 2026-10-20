@@ -257,6 +257,9 @@ static void folding(void) {
     assert(draw(ui, &state, o, &commands).error == CUI_TEXTAREA_OK);
     assert(state.view.count == 3 && lines[0].start == 0 && lines[1].start == 23 &&
            lines[2].start == 29 && state.view.maximum_y == 20);
+    state.gutter_valid = false;
+    assert(draw(ui, &state, o, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 7);
     assert(!strcmp(buffer, "open\none\ninner\ntwo\nend\nclose\ntail"));
     assert(cui_textarea_hit_test(ui, edit, &state.view, state.view.viewport.x + 1,
                                  state.view.viewport.y + 21) == 23);
@@ -1589,7 +1592,60 @@ static void large_document_editor(void) {
     free(lines);
     free(buffer);
 }
+static void gutter_logical_line_index(void) {
+    char buffer[512] = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\nb\rc\n";
+    cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer,
+                                                       .capacity = sizeof buffer,
+                                                       .multiline = true,
+                                                       .history_bytes = 4096});
+    cui_textarea_line lines[128];
+    cui_editor_state state;
+    assert(edit && cui_editor_state_init(&state, edit, lines, 128));
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_editor_options options = cui_editor_default();
+    options.textarea.width = 100;
+    options.textarea.height = 240;
+    options.textarea.no_wrap = false;
+    cui_draw_list commands;
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 4 && state.view.count > 4);
+    /* Force a recount from already current wrapped rows, then edit via events. */
+    state.gutter_valid = false;
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 4);
+    cui_focus(ui, 10);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_TEXT, .text = "d\ne\n"}));
+    assert(draw(ui, &state, options, &commands).changed);
+    assert(state.gutter_line_count == 6);
+    bool sixth = false;
+    for (size_t i = 0; i < commands.count; ++i) {
+        const cui_draw_command *command = &commands.commands[i];
+        if (command->type == CUI_DRAW_TEXT && command->text.length == 1 &&
+            command->text.data[0] == '6')
+            sixth = true;
+    }
+    assert(sixth);
+    assert(cui_edit_undo(edit) == CUI_EDIT_OK);
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 4);
+    assert(cui_edit_redo(edit) == CUI_EDIT_OK);
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 6);
+    /* External revisions must scan before the stale row index is refreshed.
+     * U+2028 produces visual rows but does not increment logical line numbers. */
+    assert(cui_edit_replace_range(edit, 0, cui_edit_get_state(edit).length,
+                                  cui_string("a\xe2\x80\xa8" "b\r\nc\r")) == CUI_EDIT_OK);
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 3 && state.view.count == 4);
+    state.gutter_valid = false;
+    assert(draw(ui, &state, options, &commands).error == CUI_TEXTAREA_OK);
+    assert(state.gutter_line_count == 3);
+    cui_destroy(ui);
+    cui_edit_destroy(edit);
+}
 int main(void) {
+    gutter_logical_line_index();
     large_document_editor();
     rectangle_selection();
     multicursor_clipboard_and_indent();

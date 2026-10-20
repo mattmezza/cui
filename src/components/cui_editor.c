@@ -37,8 +37,18 @@ static float cui_editor_gutter(cui_context *ui, cui_editor_state *editor, cui_st
     uint64_t revision = cui_edit_get_state(editor->edit).revision;
     if (!editor->gutter_valid || editor->gutter_model != editor->edit ||
         editor->gutter_revision != revision) {
-        size_t count = 1;
-        for (size_t i = 0; i < document.length; ++i) {
+        const cui_textarea_state *view = &editor->view;
+        bool indexed = view->initialized && view->error == CUI_TEXTAREA_OK &&
+                       view->layout_model == editor->edit && view->revision == revision &&
+                       !view->layout_composing && !view->fold_count && !view->layout_fold_count &&
+                       !view->layout_token_count &&
+                       view->lines && view->lines == view->layout_lines && view->count &&
+                       view->count <= view->capacity && view->capacity == view->layout_capacity &&
+                       view->lines[view->count - 1].next == document.length;
+        /* Event handling has already refreshed these rows. Logical line numbers
+         * count hard breaks, independently of wrapping and soft separators. */
+        size_t count = indexed ? view->lines[view->count - 1].logical_line + 1 : 1;
+        for (size_t i = 0; !indexed && i < document.length; ++i) {
             if (document.data[i] == '\r') {
                 ++count;
                 if (i + 1 < document.length && document.data[i + 1] == '\n')

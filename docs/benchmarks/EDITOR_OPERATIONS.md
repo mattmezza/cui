@@ -88,3 +88,38 @@ public segmenter at every scalar offset of every pinned Unicode grapheme test
 case, surrounded by ASCII context. It includes offsets within clusters,
 extended selections, and CR/LF selection collapse. Existing malformed-input
 and byte-interior public API tests remain in force.
+
+## Validated Editor gutter index reuse
+
+The styled Editor previously counted every document byte again whenever the
+model revision changed, even after event handling had refreshed the Textarea
+row index. Its gutter now uses the final row's logical line number when that
+index matches the model, revision, storage and complete document extent. This
+counts logical lines rather than wrapped rows. Stale or missing layouts,
+folds and composition retain the document scan. No model storage, undo history,
+grapheme segmentation or change notification behavior changes.
+
+The unchanged benchmark above ran before and after this change on 2026-10-20,
+Linux x86_64, Intel Core Ultra 5 235U, GCC 16.2.1, source base `63a62d6f`.
+Raw samples: [before](editor-operations-gutter-before-2026-10-20.csv) and
+[after](editor-operations-gutter-after-2026-10-20.csv). Median CPU milliseconds:
+
+| Operation | 2K before / after | 20K before / after | 200K before / after |
+| --- | ---: | ---: | ---: |
+| Tail insertion | 0.396 / 0.165 | 1.353 / 0.174 | 12.546 / 0.098 |
+| Tail removal | 0.406 / 0.170 | 1.428 / 0.281 | 13.715 / 0.867 |
+| Middle insertion | 0.620 / 0.391 | 2.973 / 2.349 | 29.242 / 16.574 |
+| Middle removal | 0.617 / 0.381 | 2.982 / 2.374 | 29.729 / 16.873 |
+
+These sequential runs had uncontrolled concurrent engineering load; timing
+differences from the earlier reference run are not attributable solely to this
+patch. The removed full-document gutter pass is evident in the code path.
+Middle edits still lay out the changed suffix, and external programmatic edits
+still require a gutter scan before layout. This fixture has no undo storage.
+It does not establish Unicode, wrapped/folded, IME, history-enabled or renderer
+performance, full editor parity, or a general 60 Hz guarantee.
+
+The headless `gutter_logical_line_index` regression covers wrapped logical
+counts, CR/LF/CRLF, trailing newlines, multiline event insertion and rendered
+gutter labels, undo/redo, external edits, and U+2028 soft separators. Folded
+gutter fallback is also checked in the existing folding regression.

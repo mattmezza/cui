@@ -3123,7 +3123,7 @@
       "limitations": [
         "One-to-three-month, six-row Gregorian grid; custom cell size, seven locale tables/custom labels, ordered keyboard navigation and bounded controlled selection. Opt-in independent month access, host-supplied today and selectable neighboring occurrences are headless-tested; new presentation options have not been verified in actual WASM/browser or exposed through language builders.",
         "Zero behavior options preserve legacy endpoint swapping, year-to-month transition and conditional activated-date recentering. Explicit independent policies support earlier-endpoint restart, completed-endpoint validation, year-to-days and selection-start recentering matching frozen source behavior. Localized full-date day names still differ from frozen ISO-only names; new policies are native/WASI-tested, without browser or language-builder coverage.",
-        "Arbitrary item/style refinements, unrestricted month counts, ambient locale lookup/non-Gregorian/RTL formatting and complete frozen family parity remain unsupported. DatePicker and typed CHANGE wrappers do not accept presentation or behavior extensions. Frozen Calendar itself does not implement week-number columns, hover range previews or a dedicated arrow-key map."
+        "Arbitrary item/style refinements, unrestricted month counts, ambient locale lookup/non-Gregorian/RTL formatting and complete frozen family parity remain unsupported. DatePicker has a separate additive forwarding API; typed CHANGE wrappers do not accept presentation or behavior extensions. Frozen Calendar itself does not implement week-number columns, hover range previews or a dedicated arrow-key map."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3463,7 +3463,11 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_picker.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_date_picker_calendar.c",
+        "tests/unit/test_picker_events.c",
+        "tests/unit/test_calendar_presentation_header.cpp",
+        "tests/test_calendar_distribution.py"
       ],
       "status": "tested",
       "platforms": {
@@ -3472,7 +3476,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Real collision-placed calendar portal, date/range selection, trapped Tab and same-frame focus restoration tested. Editable date masks, custom formats/locales, clear controls, presets and responsive scrolling remain pending."
+        "Bounded Gregorian popup, locale/custom-label formatting, live bounds/disabled policy, keyboard/AT semantics and legacy close/focus are tested. Additive Calendar presentation/behavior forwarding is native/WASI-tested; zero extension preserves legacy defaults, pass ordering and late-error bool. New options lack actual browser or language-builder coverage.",
+        "Editable date masks, arbitrary format parsing, clear controls, presets, date-time editing, responsive scrolling and arbitrary styling remain pending. Existing typed CHANGE observes final actual endpoint changes on legacy paths; extension observers, open/close lifecycle causes and full source event semantics remain unsupported."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3506,6 +3511,23 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "opt-in Calendar presentation/behavior popup forwarding (native/WASI)",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_date_picker_calendar.c",
+            "docs/DATE_PICKER_CALENDAR.md"
+          ]
+        },
+        {
+          "name": "bounded locale/custom labels, routed popup input and final-queue close/focus",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_date_picker_calendar.c",
+            "tests/unit/test_picker.c",
+            "tests/unit/test_picker_events.c"
           ]
         }
       ],
@@ -3546,7 +3568,7 @@
           "Financial Period Selector"
         ]
       },
-      "last_tested_commit": "b582fde631fa7440ad2ed7d0660fdbb49f75f309"
+      "last_tested_commit": "6757fd6f"
     },
     {
       "name": "Editor",

@@ -38,7 +38,8 @@ typedef enum {
  * enabled visible date/year header). Selection-start uses the resulting start.
  * No clock, allocation, retained handler or new dispatch is introduced. Borrowed
  * locale/policy/user resources retain existing submission/frame lifetimes.
- * There is no extended typed CHANGE wrapper, binding or DatePicker bridge. */
+ * No extended typed CHANGE wrapper or binding builder is supplied.
+ * DatePicker forwarding is declared separately in cui_date_picker_calendar.h. */
 typedef struct {
     cui_calendar_range_transition range_transition;
     cui_calendar_year_destination year_destination;

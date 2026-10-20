@@ -1037,18 +1037,24 @@
       "api_symbols": [
         "cui_date_picker_init",
         "cui_date_picker",
-        "cui_date_picker_events"
+        "cui_date_picker_events",
+        "cui_base_date_picker",
+        "cui_date_picker_ex",
+        "cui_base_date_picker_ex",
+        "cui_date_picker_calendar_id"
       ],
       "state_types": [
         "cui_date_picker_state",
-        "cui_date_selection"
+        "cui_date_selection",
+        "cui_date_picker_calendar_options"
       ],
       "state_ownership": "Caller retains cui_date_picker_state and cui_date_selection.",
-      "interaction": "Returns selection changes; optional cui_date_disabled_fn restricts dates.",
-      "usage": "Initialize stable popup identity once; resubmit state and accepted selection each frame.",
+      "interaction": "Returns final selection changes; live cui_date_disabled_fn restricts dates. The extended API forwards Calendar presentation/behavior and preserves final-queue completion close/focus; legacy CHANGE wrappers do not accept the extension or observe lifecycle.",
+      "usage": "Initialize stable popup identity once; submit caller state and selection each frame. Optional cui_date_picker_ex forwards month/today/neighbor presentation and independent range/year/recenter policies. Zero extension preserves legacy behavior, including late-error bool; rebuild matching headers/library.",
       "docs": [
         "docs/PICKERS.md",
-        "docs/PICKER_EVENTS.md"
+        "docs/PICKER_EVENTS.md",
+        "docs/DATE_PICKER_CALENDAR.md"
       ],
       "callback_symbols": [
         "cui_date_disabled_fn"
@@ -1058,7 +1064,8 @@
       "public_header": "include/cui/cui_picker.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_picker_events.h"
+        "include/cui/cui_picker_events.h",
+        "include/cui/cui_date_picker_calendar.h"
       ]
     },
     {

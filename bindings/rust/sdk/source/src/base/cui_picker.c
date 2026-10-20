@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_calendar_behavior.h"
 #include "cui/cui_calendar_presentation.h"
 #include "cui/cui_picker.h"
@@ -923,9 +924,10 @@ void cui_base_date_picker_trigger(cui_context *ui, cui_id id, cui_str name,
         ui, id, (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
 }
 
-cui_calendar_result cui_base_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
-                                         cui_str name, cui_date_picker_state *s,
-                                         cui_date_selection *selection, cui_date_picker_options o) {
+static cui_calendar_result cui_picker_date_picker(
+    cui_context *ui, cui_id trigger, cui_id calendar, cui_str name, cui_date_picker_state *s,
+    cui_date_selection *selection, cui_date_picker_options o,
+    cui_date_picker_calendar_options extension) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
@@ -946,7 +948,8 @@ cui_calendar_result cui_base_date_picker(cui_context *ui, cui_id trigger, cui_id
     if (s->overlay.open) {
         cui_calendar_options options = o.calendar;
         options.disabled = options.disabled || o.disabled;
-        result = cui_calendar_reduce(ui, calendar, &s->calendar, selection, options);
+        result = cui_calendar_reduce_with_behavior(ui, calendar, &s->calendar, selection, options,
+                                                   extension.presentation, extension.behavior);
         if (result.activated && (!options.range || !s->calendar.selecting_end))
             cui_overlay_close(ui, &s->overlay);
     }
@@ -965,6 +968,23 @@ cui_calendar_result cui_base_date_picker(cui_context *ui, cui_id trigger, cui_id
         ui, trigger,
         (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
     return result;
+}
+cui_id cui_date_picker_calendar_id(cui_id trigger) {
+    if (!trigger)
+        return 0;
+    return trigger ^ (UINT64_C(0x713d9902fd4b5a97) + UINT64_C(0x9e3779b97f4a7c15) * 900);
+}
+cui_calendar_result cui_base_date_picker_ex(cui_context *ui, cui_id trigger, cui_id calendar,
+                                            cui_str name, cui_date_picker_state *s,
+                                            cui_date_selection *selection, cui_date_picker_options o,
+                                            cui_date_picker_calendar_options extension) {
+    return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o, extension);
+}
+cui_calendar_result cui_base_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
+                                         cui_str name, cui_date_picker_state *s,
+                                         cui_date_selection *selection, cui_date_picker_options o) {
+    return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o,
+                                  (cui_date_picker_calendar_options){0});
 }
 bool cui_time_valid(cui_time time) {
     return time.hour < 24 && time.minute < 60 && time.second < 60;

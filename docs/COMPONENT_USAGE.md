@@ -607,13 +607,15 @@ API: `cui_combobox`. [Public header](../include/cui/cui_choice.h); [guide](CHOIC
 
 **State:** Caller retains cui_date_picker_state and cui_date_selection.
 
-**Interaction:** Returns selection changes; optional cui_date_disabled_fn restricts dates.
+**Interaction:** Returns final selection changes; live cui_date_disabled_fn restricts dates. The extended API forwards Calendar presentation/behavior and preserves final-queue completion close/focus; legacy CHANGE wrappers do not accept the extension or observe lifecycle.
 
-**Usage:** Initialize stable popup identity once; resubmit state and accepted selection each frame.
+**Usage:** Initialize stable popup identity once; submit caller state and selection each frame. Optional cui_date_picker_ex forwards month/today/neighbor presentation and independent range/year/recenter policies. Zero extension preserves legacy behavior, including late-error bool; rebuild matching headers/library.
 
-API: `cui_date_picker_init`, `cui_date_picker`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
+API: `cui_date_picker_init`, `cui_date_picker`, `cui_date_picker_events`, `cui_base_date_picker`, `cui_date_picker_ex`, `cui_base_date_picker_ex`, `cui_date_picker_calendar_id`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
 
 Additional event includes: `cui/cui_picker_events.h`.
+
+Calendar forwarding: `cui/cui_date_picker_calendar.h`; [presentation and behavior guide](DATE_PICKER_CALENDAR.md).
 
 ## Editor
 

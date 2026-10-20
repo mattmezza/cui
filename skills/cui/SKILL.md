@@ -124,7 +124,7 @@ Read these with `read PATH --source CUI_SOURCE`:
 | Go or Rust authoring | `docs/GO_BUILDERS.md` or `docs/RUST_BUILDERS.md`, then bridge coverage |
 | Hosting C-authored UI from another language | `docs/LANGUAGE_BINDINGS.md` (different from language component builders) |
 | Embedding/custom host or renderer | `docs/INTERFACES.md`, `docs/PLATFORM_MATRIX.md`, relevant `backends/*/README.md` |
-| Calendar presentation and localized dates | `docs/PICKERS.md`, `docs/CALENDAR_PRESENTATION.md`, `docs/CALENDAR_BEHAVIOR.md`; read `include/cui/cui_calendar_presentation.h` and `include/cui/cui_calendar_behavior.h` for opt-in month/today/neighbor and independent range/year/recenter policies, matching-header/library rebuild and DatePicker/binding limits. |
+| Calendar presentation and localized dates | `docs/PICKERS.md`, `docs/CALENDAR_PRESENTATION.md`, `docs/CALENDAR_BEHAVIOR.md`; read `include/cui/cui_calendar_presentation.h` and `include/cui/cui_calendar_behavior.h` for opt-in month/today/neighbor and independent range/year/recenter policies, matching-header/library rebuild and binding limits. DatePicker forwarding uses `docs/DATE_PICKER_CALENDAR.md` and `include/cui/cui_date_picker_calendar.h`; legacy typed CHANGE does not observe extensions or lifecycle. |
 | Layout and responsive composition | `docs/LAYOUT_GUIDE.md`, `docs/APP_RECIPES.md`, `docs/FORMS.md`, `docs/COMPOSED_APPS.md` |
 | Fonts, metrics, fallback and shaping | `docs/TYPOGRAPHY.md`, `docs/TEXT.md`, `docs/BIDI_SHAPING.md`, `docs/IME.md` |
 | Theme, density, colors and icons | `docs/DESIGN_SYSTEM.md`, `docs/THEME_GUIDE.md`, `docs/THEME_REGISTRY_GUIDE.md`, `docs/ICON.md` |

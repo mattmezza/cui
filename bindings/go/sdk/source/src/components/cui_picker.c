@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_calendar_behavior.h"
 #include "cui/cui_calendar_presentation.h"
 #include "cui/cui_components.h"
@@ -317,14 +318,15 @@ cui_calendar_result cui_calendar_with_behavior(cui_context *ui, cui_id id, const
     cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
     return result;
 }
-bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                     cui_date_picker_state *s, cui_date_selection *selection,
-                     cui_date_picker_options o) {
+static bool cui_picker_date_picker_styled(
+    cui_context *ui, cui_id id, const cui_theme *t, cui_str name, cui_date_picker_state *s,
+    cui_date_selection *selection, cui_date_picker_options o,
+    cui_date_picker_calendar_options extension) {
     if (!ui || !t || !s || !selection)
         return false;
     bool was_open = s->overlay.open;
     cui_calendar_result result =
-        cui_base_date_picker(ui, id, cui_picker_style_id(id, 900), name, s, selection, o);
+        cui_base_date_picker_ex(ui, id, cui_picker_style_id(id, 900), name, s, selection, o, extension);
     char value[200], end_value[96];
     cui_str label;
     if (cui_date_valid(selection->start)) {
@@ -369,9 +371,10 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                      placement.bounds, 100);
     cui_calendar_options calendar = o.calendar;
     calendar.disabled = calendar.disabled || o.disabled;
-    cui_calendar_submit(ui, cui_picker_style_id(id, 900), &s->calendar, *selection, calendar);
+    cui_calendar_submit_ex(ui, cui_picker_style_id(id, 900), &s->calendar, *selection, calendar,
+                            extension.presentation);
     cui_picker_paint_calendar(ui, cui_picker_style_id(id, 900), t, &s->calendar, selection,
-                              calendar, (cui_calendar_presentation_options){0});
+                              calendar, extension.presentation);
     if (!was_open) {
         cui_id calendar_id = cui_picker_style_id(id, 900);
         cui_id focus = s->calendar.view == CUI_CALENDAR_YEARS
@@ -388,6 +391,17 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_set_semantic_details(
         ui, id, (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
     return result.changed;
+}
+bool cui_date_picker_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                        cui_date_picker_state *s, cui_date_selection *selection,
+                        cui_date_picker_options o, cui_date_picker_calendar_options extension) {
+    return cui_picker_date_picker_styled(ui, id, t, name, s, selection, o, extension);
+}
+bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                     cui_date_picker_state *s, cui_date_selection *selection,
+                     cui_date_picker_options o) {
+    return cui_picker_date_picker_styled(ui, id, t, name, s, selection, o,
+                                         (cui_date_picker_calendar_options){0});
 }
 bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                     cui_time_state *state, cui_time *time, cui_time_options options) {

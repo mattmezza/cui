@@ -9,6 +9,10 @@ int main(void) {
         (cui_calendar_behavior_options){.year_destination = CUI_CALENDAR_YEAR_OPEN_DAYS});
     if (calendar.changed || calendar.activated || calendar.navigated)
         return 1;
+    if (cui_date_picker_calendar_id(0) || !cui_date_picker_calendar_id(31) ||
+        cui_date_picker_ex(NULL, 31, NULL, cui_string("Date"), NULL, NULL,
+                           (cui_date_picker_options){0}, (cui_date_picker_calendar_options){0}))
+        return 1;
     char storage[8];
     cui_str copied;
     cui_component_event_metadata metadata;

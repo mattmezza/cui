@@ -355,7 +355,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Caller-owned bounded RGBA circle/cover cache, source revision updates, named initials and interactive overlapping stacks with overflow, keyboard and touch cancellation are tested. Explicit initials fallback foreground/background overrides are tested. Image acquisition/loading remains host-owned; explicit failure-state transitions, custom icon slots and complete typography/theme variants remain unverified."
+        "Caller-owned bounded RGBA cover cache, image failure/recovery, full/anonymous naming and interactive overlapping photo stacks are tested. Opt-in shared design sizes, SVG placeholders and twelve light/dark identity palettes have focused headless coverage. CUI initials/hash assignment and higher size extensions differ from the frozen source; arbitrary upstream Div styling, acquisition/decoding and physical accessibility acceptance remain outside this proof. See docs/AVATAR_VARIANTS_AUDIT.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -376,7 +376,11 @@
           "name": "size variants",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_content.c",
+            "docs/AVATAR_VARIANTS_AUDIT.md"
+          ],
+          "limitations": [
+            "Opt-in XS/SM/BASE/MD/LG metrics plus CUI XL..9XL extensions are tested, including proportional diameter/text capping. Custom source Div styling is not reproduced by a fixed metrics helper."
           ]
         },
         {
@@ -395,6 +399,18 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_content.c"
+          ]
+        },
+        {
+          "name": "opt-in identity palettes and decorative SVG placeholders",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_content.c",
+            "docs/AVATAR_VARIANTS_AUDIT.md",
+            "docs/AVATAR_MESSAGE_EXAMPLES.md"
+          ],
+          "limitations": [
+            "Twelve light/dark OkLCH hues, explicit hue override, deterministic CUI initials hash, typed/named anonymous SVG and image/name precedence are tested. Hash/initials differ from upstream; image acquisition is host-owned."
           ]
         }
       ],

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_content.h"
+#include "cui/cui_avatar_events.h"
 #include "cui/cui_components.h"
 #include "cui/cui_hover_events.h"
 #include "cui/cui_icon.h"
@@ -232,8 +233,10 @@ bool cui_avatar_identity(cui_str name, bool dark, bool custom_hue, unsigned hue,
                                        cui_avatar_oklch(.89, .05, hue)};
     return true;
 }
-bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                   cui_avatar_options o) {
+static bool cui_avatar_private_submit(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                                      cui_avatar_options o,
+                                      cui_component_activation_handler handler,
+                                      cui_component_action_result *result) {
     if (!ui || !t)
         return false;
     if (!id) {
@@ -326,10 +329,45 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
     for (size_t i = 0; i < n; i++)
         if (o.interactive && !o.disabled && !cui_event_consumed(ui, i) &&
             cui_event_activation(ui, i) == id) {
+            cui_component_event_metadata event;
+            bool observe = result && result->submitted;
+            if (observe) {
+                cui_activation_snapshot snapshot;
+                if (!cui_event_activation_snapshot(ui, i, &snapshot) || snapshot.target != id ||
+                    !cui_component_event_from_activation(&event, CUI_COMPONENT_EVENT_ACTIVATE,
+                                                         &snapshot)) {
+                    (void)cui_component_event_init(&event, CUI_COMPONENT_EVENT_ACTIVATE, id,
+                                                   CUI_COMPONENT_EVENT_SOURCE_UNKNOWN);
+                    event.frame_sequence = cui_frame_sequence(ui);
+                    event.flags = CUI_COMPONENT_EVENT_HAS_FRAME;
+                }
+            }
             cui_consume_event(ui, i);
             activated = true;
+            if (observe) {
+                cui_control_events_private_increment(&result->activation_count,
+                                                     &result->count_overflow);
+                if (handler.callback)
+                    handler.callback(handler.user, &event);
+            }
         }
     return activated;
+}
+bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                   cui_avatar_options options) {
+    return cui_avatar_private_submit(ui, id, t, name, options,
+                                     (cui_component_activation_handler){0}, NULL);
+}
+cui_component_action_result cui_avatar_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                              cui_str name, cui_avatar_options options,
+                                              cui_component_activation_handler handler) {
+    cui_component_action_result result = {0};
+    if (!ui || !id || !theme || (name.length && !name.data))
+        return result;
+    result.valid = true;
+    result.submitted = cui_frame_paint_enabled(ui) && cui_frame_sequence(ui) != 0;
+    (void)cui_avatar_private_submit(ui, id, theme, name, options, handler, &result);
+    return result;
 }
 size_t cui_avatar_stack(cui_context *ui, cui_id id, const cui_theme *t,
                         const cui_avatar_item *items, size_t count, cui_avatar_stack_options o) {

@@ -575,15 +575,15 @@ Additional event includes: `cui/cui_picker_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_color_state and cui_color value.
+**State:** Caller retains cui_color_state and cui_color value. ColorEntry owns an address-stable, noncopyable bounded draft/editor; destroy after render consumption.
 
-**Interaction:** Returns true when color changes.
+**Interaction:** Returns true when color changes. Additive ColorEntry separates draft/preview/commit and summarizes accepted Enter commits after submission; owner sync is silent and conflict-aware.
 
 **Usage:** Submit persistent channel/editor state; use the accepted color in the next frame theme or preview.
 
-API: `cui_color_picker`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
+API: `cui_color_picker`, `cui_color_picker_events`; additive `cui_color_entry`, `cui_base_color_entry` and the ColorEntry model operations. [Picker public header](../include/cui/cui_picker.h); [ColorEntry public header](../include/cui/cui_color_entry.h); [picker guide](PICKERS.md); [entry guide](COLOR_ENTRY.md).
 
-Additional event includes: `cui/cui_picker_events.h`.
+Additional includes: `cui/cui_picker_events.h`, `cui/cui_color_entry.h`. ColorEntry keeps optional committed and preview values separate from its bounded draft. Float-HSLA precision, popup focus/actions, tabs and handwritten foreign builders remain outside this slice.
 
 ## Combobox
 

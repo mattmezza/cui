@@ -931,25 +931,41 @@
     {
       "api_symbols": [
         "cui_color_picker",
-        "cui_color_picker_events"
+        "cui_color_picker_events",
+        "cui_color_entry",
+        "cui_base_color_entry",
+        "cui_color_entry_init",
+        "cui_color_entry_sync",
+        "cui_color_entry_set_draft",
+        "cui_color_entry_commit",
+        "cui_color_entry_restore",
+        "cui_color_entry_destroy",
+        "cui_color_entry_parse"
       ],
       "state_types": [
-        "cui_color_state"
+        "cui_color_state",
+        "cui_color_entry_state",
+        "cui_color_entry_value",
+        "cui_color_entry_result"
       ],
-      "state_ownership": "Caller retains cui_color_state and cui_color value.",
-      "interaction": "Returns true when color changes.",
+      "state_ownership": "Caller retains cui_color_state and cui_color value. ColorEntry owns an address-stable, noncopyable bounded draft/editor; destroy after render consumption.",
+      "interaction": "Returns true when color changes. Additive ColorEntry separates draft/preview/commit and summarizes accepted Enter commits after submission; owner sync is silent and conflict-aware.",
       "usage": "Submit persistent channel/editor state; use the accepted color in the next frame theme or preview.",
       "docs": [
         "docs/PICKERS.md",
-        "docs/PICKER_EVENTS.md"
+        "docs/PICKER_EVENTS.md",
+        "docs/COLOR_ENTRY.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_color_entry_commit_fn"
+      ],
       "scope": "styled frame component",
       "name": "ColorPicker",
       "public_header": "include/cui/cui_picker.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_picker_events.h"
+        "include/cui/cui_picker_events.h",
+        "include/cui/cui_color_entry.h"
       ]
     },
     {

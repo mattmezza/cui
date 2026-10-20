@@ -467,6 +467,14 @@
         "src/base/cui_stepper_navigation.c",
         "src/components/cui_stepper_navigation.c"
       ]
+    },
+    {
+      "header": "cui_color_entry.h",
+      "macro": "CUI_COLOR_ENTRY_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_color_entry.c",
+        "src/components/cui_color_entry.c"
+      ]
     }
   ]
 }

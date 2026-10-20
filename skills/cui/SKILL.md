@@ -172,3 +172,10 @@ invisible Xvfb through the wrapper, never DISPLAY=:0 or a user's Wayland session
 Browser tests run headless. GPU observations unsupported by the virtual display
 remain explicitly deferred. Never auto-launch a native example on the desktop
 as an automated check. Report what actually ran and which host/backend it used.
+
+For validated color text, read `docs/COLOR_ENTRY.md` and
+`include/cui/cui_color_entry.h`. ColorEntry is an additive inline byte-RGBA field
+with an address-stable owned draft/editor and explicit preview/commit state.
+Its coalesced commit observer runs after submission; update a separate owner
+model and synchronize on the next submission. It does not add float-HSLA, popup
+focus/actions, tabs, native screen sampling or handwritten foreign builders.

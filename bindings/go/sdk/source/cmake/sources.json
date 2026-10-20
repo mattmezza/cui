@@ -250,6 +250,10 @@
     "cui_stepper_navigation": [
       "src/base/cui_stepper_navigation.c",
       "src/components/cui_stepper_navigation.c"
+    ],
+    "cui_color_entry": [
+      "src/base/cui_color_entry.c",
+      "src/components/cui_color_entry.c"
     ]
   },
   "native": {

@@ -3211,7 +3211,11 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_picker.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_color_entry.c",
+        "tests/unit/test_color_entry_owner.c",
+        "tests/unit/test_color_entry_header.cpp",
+        "tests/distribution/color_entry.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3220,7 +3224,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Actual HSV plane, hue/alpha/RGBA sliders and palettes; pointer capture, keyboard edits, disabled/readonly and 20,000 conversion/hex round trips tested. Editable text channels, continuous gradients, eyedropper and popup presentation remain pending."
+        "Inline HSV/RGBA picker plus additive bounded byte-RGBA hex draft/preview/commit field. Float-HSLA precision, popup focus/actions, palette/HSLA tabs and continuous gradients remain pending. Browser screen picking is a host-owned async gallery integration, not a native picker API. Handwritten language bindings do not expose ColorEntry."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3256,6 +3260,15 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "validated inline hex draft/preview/commit entry",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_color_entry.c",
+            "tests/unit/test_color_entry_owner.c",
+            "tests/distribution/color_entry.c"
           ]
         }
       ],

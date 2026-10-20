@@ -1,6 +1,7 @@
 # Optional macOS Speech recognizer: design checkpoint
 
-Status: proposed, pending integrator approval before production implementation.
+Status: design approved; portable slices 1/2 implemented and injected offline
+fixtures validated. Private Objective-C transport and macOS CI remain pending.
 Base: CUI `3df1ad51`. This design changes no Core, Speech state/input dispatch,
 release, manifest, or public framework API. Native recognition and real macOS
 permissions remain unimplemented/unvalidated by this checkpoint.
@@ -45,8 +46,8 @@ A proposed application-host `prepare_authorization` operation may request
 provider factory, `available`, status refresh, poll, tests, and CI never prompt.
 Before requesting, validate a nonempty usage description. Missing/invalid key
 returns UNSUPPORTED locally and must not call Apple's request method. At most
-one permission request per host can be pending; another returns BUSY at the
-host API level. A request is not made again merely because the UI polls.
+one permission request per host can be pending; another returns INVALID at the
+example host API level. A request is not made again merely because the UI polls.
 
 Microphone consent is independent. Speech authorization never proves microphone
 permission. The application/SDL capture host separately owns
@@ -154,8 +155,10 @@ The endpoint's parent pool has independent reference-counted lifetime.
    is not required for CUI state or host destruction to be safe.
 5. An endpoint can be reused only after every callback lease is released.
    The service owns/releases its callback lease even if the callback never
-   fires, through block/lease-object destruction. Slot generation rejects old
-   records; generation wrap is a visible capacity failure, not an ABA reset.
+   fires, through block/lease-object destruction. Slot reuse is withheld until every lease releases, so a valid old callback
+   cannot observe a reused slot. No endpoint generation is needed under that
+   lease contract; using a pointer after releasing its last lease is invalid.
+   CUI still rejects queued reports from previous CUI session generations.
 6. If Apple never releases a block, its endpoint remains retired. After the
    fixed pool is exhausted, new starts and permission actions fail CAPACITY;
    there is no timeout-based unsafe reuse or unlimited replacement allocation.
@@ -213,7 +216,13 @@ not a false successful finish after a dropped phrase.
 
 ## Coverage and implementation slices
 
-Production work begins only after integrator approval of this checkpoint.
+Integrator approved the checkpoint before production work. Portable slices 1/2
+now have strict C11 and ASan/UBSan proof through the private test wrapper; the
+remaining native slices still require actual macOS validation. Constants are
+fixed at four endpoints/eight events/4096-byte storage rather than configurable
+budgets in this first implementation. No additional allocation occurs on result
+publication. The implementation covers selected Unicode/utterance fixtures; it
+does not claim all OS transcript behavior or the private no-speech exception.
 
 | Slice | Deliverable | Meaningful evidence and stop condition |
 | --- | --- | --- |

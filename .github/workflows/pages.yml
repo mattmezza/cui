@@ -120,6 +120,9 @@ jobs:
       - name: Verify owned hex drafts and focused text input routing
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_color_entry_gallery.py --directory build/web
+      - name: Verify Calendar month menu and neighboring dates
+        if: ${{ matrix.shard == 3 }}
+        run: uv run tests/web/test_calendar_presentation_gallery.py --directory build/web
       - name: Verify Avatar sizes identity palettes and SVG placeholders
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_avatar_variants.py --directory build/web

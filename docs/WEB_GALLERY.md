@@ -118,7 +118,14 @@ Dock's gallery opts into `cui_dock_create_nary`: repeated horizontal splits beco
 
 Editor's gallery attaches eight live selection slots, bounded history snapshots and measured-column anchors. Ctrl/Alt+Up/Down or Alt-click adds cursors; text is inserted at each cursor as one undoable edit, and Escape collapses extras. The browser checks three-cursor typing and collection restoration through Undo/Redo. Further multi-range clipboard, indentation, rectangular dragging and IME behavior remain separate source work.
 
-## Hex-entry example
+## Calendar and hex-entry examples
+
+Calendar exposes independent **Month menu**, **Adjacent days** and **Mark today**
+options through the real Calendar presentation API. The host supplies today's
+local civil date; the component reads no clock. Selecting an adjacent date updates
+selection and recenters when required. Month navigation preserves selection.
+The control row stacks at narrow widths. See
+[CALENDAR_PRESENTATION.md](CALENDAR_PRESENTATION.md) for the API and lifetimes.
 
 ColorPicker also demonstrates the owned byte-RGBA hex entry from
 [COLOR_ENTRY.md](COLOR_ENTRY.md). Editing changes its draft and preview; Enter

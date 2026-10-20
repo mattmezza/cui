@@ -4,6 +4,7 @@
 #include "touch_page_host.h"
 static cui_touch_page_host page_touch_host;
 static unsigned page_touch_cancels;
+#include "cui/cui_calendar_presentation.h"
 #include "cui/cui_carousel.h"
 #include "cui/cui_chart.h"
 #include "cui/cui_choice.h"
@@ -1446,6 +1447,8 @@ static bool dock_disabled;
 static unsigned dock_refreshes[12];
 static cui_date date = {2026, 10, 12};
 static cui_calendar_state calendar;
+static cui_date calendar_today;
+static bool calendar_month_menu, calendar_neighbors, calendar_mark_today;
 static int date_locale = -1;
 static cui_date_selection date_selection = {{2026, 10, 12}, {0}};
 static cui_date_picker_state date_picker;
@@ -4990,12 +4993,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 29: {
-        cui_calendar(ui, cui_id_from(ui, "calendar"), &t, &calendar, &date_selection,
-                     (cui_calendar_options){
-                         .disabled = disabled,
-                         .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale),
-                         .first_weekday = 1,
-                         .cell_size = width > 360 ? 32 : 28});
+        cui_begin_box(ui, cui_id_from(ui, "calendar-presentation-controls"),
+                      (cui_box){.row = width > 540, .gap = 8});
+        cui_checkbox(ui, cui_id_from(ui, "calendar-month-menu"), &t, cui_string("Month menu"),
+                     &calendar_month_menu, disabled);
+        cui_checkbox(ui, cui_id_from(ui, "calendar-neighbors"), &t, cui_string("Adjacent days"),
+                     &calendar_neighbors, disabled);
+        cui_checkbox(ui, cui_id_from(ui, "calendar-today"), &t, cui_string("Mark today"),
+                     &calendar_mark_today, disabled);
+        cui_end_box(ui);
+        cui_calendar_ex(ui, cui_id_from(ui, "calendar"), &t, &calendar, &date_selection,
+                        (cui_calendar_options){
+                            .disabled = disabled,
+                            .locale = cui_date_locale_builtin((cui_date_locale_kind)date_locale),
+                            .first_weekday = 1,
+                            .cell_size = width > 360 ? 32 : 28},
+                        (cui_calendar_presentation_options){
+                            .month_toggle = calendar_month_menu,
+                            .neighboring_days = calendar_neighbors,
+                            .today = calendar_mark_today ? calendar_today : (cui_date){0}});
         char text[64];
         snprintf(text, sizeof(text), "Selected: %04d-%02d-%02d", date_selection.start.year,
                  date_selection.start.month, date_selection.start.day);
@@ -5728,6 +5744,10 @@ void gallery_status_options(int right, int custom) {
 }
 void gallery_date_locale(int locale) {
     date_locale = locale >= -1 && locale <= CUI_DATE_LOCALE_JA ? locale : -1;
+}
+void gallery_calendar_today(int year, unsigned month, unsigned day) {
+    cui_date supplied = {year, month, day};
+    calendar_today = cui_date_valid(supplied) ? supplied : (cui_date){0};
 }
 unsigned gallery_date_value(void) {
     return (unsigned)(date_selection.start.year * 10000 + date_selection.start.month * 100 +

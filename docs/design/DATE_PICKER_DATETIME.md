@@ -209,11 +209,19 @@ as well as Calendar/preset targets. Popup root and unsubmitted namespace IDs do
 not suffice. Core may resolve invalid programmatic focus to a real modal target;
 that resolved event target remains authoritative.
 
-Base reduces input once but does not call styled TimeField or open a second scope.
-It submits TimeField semantics via its Base reducer only while open. Caller paints
-those segment IDs, Calendar and helper rows within the one popup scope. Styled
-uses paint-only seams; calling the public TimeField again would reduce twice and
-is prohibited. Define/verify derived root and segment IDs against clear/presets and
+Approved Base correction: Base reduces input once but submits no TimeField
+bindings before the caller opens its popup scope. The private TimeField seam
+splits reduce and submit, while the legacy public TimeField still does both.
+After Base reduction, inside the one actual popup scope: submit Calendar, call
+`cui_date_time_picker_submit_time(ui, time_id, state, value, options)`, THEN call
+`cui_date_time_picker_submit_presets`. The latter snapshots actual eligible
+Calendar/preset/time targets. Both helpers are semantics-only; neither reduces,
+starts a scope, invokes predicates through input reduction, or replays callbacks.
+Call the preset helper even for zero presets to publish the bounded admission set.
+Failure or omission of either helper prevents stale time admission next frame.
+Caller paints those segment IDs, Calendar and helper rows. A later Styled facade
+must use paint-only seams; calling the public TimeField again would reduce twice
+and is prohibited. Slice1 has no unimplemented Styled declaration. Define/verify derived root and segment IDs against clear/presets and
 Calendar before reduction. The previous frame must provide genuine bindings;
 retaining numeric IDs cannot synthesize activation.
 
@@ -267,3 +275,114 @@ parity: existing date-time range/source formatting/style/event boundaries remain
 
 No tests were executed for this documentation-only checkpoint. Source inspection
 is evidence for the proposed contract, not proof that it is implemented.
+
+
+Production slice1 clarification: `time_id` and `time_submitted_frame` are copied
+bookkeeping in the new state. A successful time submission precedes publication
+of the aggregate target set. Final value changes and coalesced source Change are
+separate; regression vectors include time edit followed by timed preset restoring
+the entry value. No production Core/Styled/canonical registration change belongs
+to the Base-only slice.
+
+## Review checkpoint: ordered accepted-day decisions (implementation paused)
+
+The phase-final Calendar result is insufficient for date-time confirmation. With
+outer date A, accepted B followed by accepted A must adopt B, then A, emit two
+source Change conditions, and remain open. Comparing the final Calendar value
+with the entry value would instead close incorrectly. Production slice1 is not
+ready to ship until this is corrected; its existing single-acceptance tests do
+not establish this multi-event behavior.
+
+Authority is frozen `87d10ae5e1299d1be18670a37570c5402f952e34`:
+`crates/base/src/calendar.rs:260-269` commits the Calendar selection before
+emitting Selected; `crates/component/src/time/date_picker.rs:403-420` compares
+that selected value against the picker's *current* date, closes and returns on
+equality, or stores the new date and calls emit_change on difference.
+`emit_change:395-401` emits only for a complete date. This establishes the order
+of individual source handlers; it does not establish equivalence between GPUI's
+queued event scheduler and CUI's frame input queue.
+
+### Smallest proposed private seam (not yet approved or implemented)
+
+Add these private types to `src/base/cui_picker_composition_internal.h`; no public
+Calendar state, result, event schema or Core dispatch changes:
+
+```c
+typedef enum {
+    CUI_PICKER_ACCEPT_CONTINUE,
+    CUI_PICKER_ACCEPT_STOP
+} cui_picker_accept_flow;
+typedef cui_picker_accept_flow (*cui_picker_accept_visitor)(
+    void *context, size_t event_index, cui_date_selection accepted);
+```
+
+Extend only the private Calendar reducer implementation with visitor/context
+arguments. All existing public Calendar and legacy picker entry points pass
+NULL/NULL. The private datetime reducer supplies one stack-owned accumulator.
+No visitor, context pointer or event index survives the synchronous reduction.
+This is a private internal function pointer, never an application callback.
+
+Invoke the visitor exactly once at the single successful activation site in
+`src/base/cui_picker.c` (currently immediately after `result.activated = true`),
+after candidate validation/selection commit and existing recenter/focus updates.
+Pass a copied selection and the current Core event index. Navigation alone and
+rejected candidates do not invoke it. Existing range reducers use NULL; datetime
+preflight prohibits range. This preserves existing CUI matcher/bounds admission;
+it does not newly claim exact source notification behavior for rejected dates.
+
+The datetime visitor compares each accepted single date with its accumulator's
+current outer date, initialized after external assignment/configuration sync:
+
+1. Different: adopt that date immediately in the accumulator, retain current
+   time, set coalesced source_change, and return CONTINUE.
+2. Equal: set confirmed and return STOP without setting source_change for this
+   acceptance. Retain any earlier source_change already observed.
+
+STOP breaks only this Calendar reduction's remaining event loop. Existing final
+cursor normalization, net Calendar changed calculation and invalidation still
+run. After the reducer returns, datetime copies the accumulator's final date to
+its controlled value and performs overlay close/focus handling once. The visitor
+must not call CUI, invoke predicates, dispatch input, mutate Calendar state,
+allocate, or call any user callback. Time reduction is skipped after confirmation,
+as it already is for a closed popup. This avoids reentrant overlay mutation
+inside Calendar reduction.
+
+Stopping at the first confirmation is an explicit CUI popup-generation routing
+policy: later queued Calendar events cannot mutate a popup that has confirmed.
+It is not a claim about GPUI scheduling after an emitted close. Thus A→B→A
+remains open; A→B→B confirms B and ignores subsequent Calendar events; A→A→B
+confirms A and ignores B. Public source_change remains a coalesced fact and
+value_changed remains final-versus-entry; neither is used to decide confirmation.
+Source callbacks/event-stream parity remains excluded.
+
+### Capacity, failure and compatibility
+
+The seam uses constant stack storage and no trace array, so there is no trace
+capacity, allocation failure or truncation policy. At most one visit occurs per
+input event that the existing bounded Core frame admitted, and processing stops
+on confirmation. The seam adds no independent queue or event retention. An
+invalid enum returned by this internal visitor is treated as STOP defensively;
+no partially published trace or callback state exists. Preflight failures still
+happen before the reducer and do not invoke the visitor. Core frame/layout
+failure remains the existing nontransactional failure boundary, not rollback.
+
+NULL visitor preserves the exact existing loop and legacy result semantics,
+including processing later events and computing changed from final versus entry.
+No public state layout changes; the new date-time state needs no additional
+retained fields. There must be no second Calendar reduction or event replay.
+This seam addresses accepted Calendar ordering only. TimeField currently reports
+net phase change; its Up→Down cancellation/event-notification fidelity must be
+reported separately rather than inferred from this Calendar correction.
+
+### Required focused proof before production handoff
+
+Use actual prior-frame semantic day targets and queued events, not direct
+visitor calls alone. Cover A→B→A (open, source_change true, value_changed false),
+A→B→C (open, final C), A→B→B (closed B, changed and confirmed), A→A→B
+(closed A, no source_change), and divergent outer/retained child followed by
+multiple accepted days. Include rejected/disabled candidates between accepted
+ones, navigation preceding acceptance, matcher rejection with no visitor, and
+subsequent TimeField input suppressed after confirmation. Record legacy
+Calendar/date-only picker results for equivalent queues with NULL visitor.
+Run native wrapper, strict C11/C++ header checks, sanitizer and deterministic
+WASI vectors. No claim of corrected behavior until those tests pass.

@@ -139,3 +139,27 @@ explicit lifetime/overflow/coalescing rules and platform support evidence before
 adding any public API. Those requirements are not proved by the frozen component
 sources and are outside this next slice. Metadata/skill updates and any row
 classification remain integrator-owned after the chosen evidence is reviewed.
+
+## Bounded proof implementation (after this audit)
+
+`examples/loading_region` now provides compiling application composition, Core
+snapshot output and a focused external CMake harness; corresponding new Core and
+headless DOM fixtures exercise transitions without changing public APIs.
+`test_native.c` uses the existing verified optional cache and private DBus/Xvfb
+runner to receive real AT-SPI announcement events, not synthetic callback events.
+Core/native focused tests passed 2/2 in normal and ASan/UBSan builds; the
+production-gallery-translator DOM fixture
+passed in headless Chromium. No native window or screen reader was launched.
+
+Inspection of the lockfile-selected `accesskit_atspi_common` 0.20.0 found named
+live-node insertion announcements in `adapter.rs:add_node`, changed-name
+announcements in `node.rs:notify_property_changes`, and live politeness mapping
+in `node.rs:live`. `accesskit_unix` 0.23.0 `atspi/bus.rs` serializes message and
+politeness in `object:announcement`. The real fixture verifies Alert insertion,
+changed name, hide/reinsert and idle deduplication, completion STATUS politeness,
+and busy true/false. The pinned Unix role mapping exposes AccessKit Alert as
+AT-SPI Notification (AlertDialog maps to AT-SPI Alert); this mapping is asserted
+without changing production code. Existing client cache-signature warnings do
+not prevent the direct queries or event assertions, but remain a compatibility
+observation. See the example README for commands and remaining live-AT/platform
+limits. No manifest status promotion follows automatically from these results.

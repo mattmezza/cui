@@ -62,6 +62,7 @@
 #include "cui_hover_card_extended.h"
 #include "cui_kbd.h"
 #include "cui_stepper_navigation.h"
+#include "cui_color_entry.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -309,4 +310,8 @@
 #define CUI_STEPPER_NAVIGATION_IMPLEMENTATION
 #endif
 #include "cui_stepper_navigation.h"
+#ifndef CUI_COLOR_ENTRY_IMPLEMENTATION
+#define CUI_COLOR_ENTRY_IMPLEMENTATION
+#endif
+#include "cui_color_entry.h"
 #endif

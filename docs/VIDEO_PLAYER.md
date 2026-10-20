@@ -11,6 +11,11 @@ must supply capabilities and a request callback to enable actions. Fullscreen is
 visible by default but disabled without `CUI_VIDEO_CAP_FULLSCREEN`; it never
 silently changes a window or DOM element. No volume/audio state is invented.
 
+`compact` is an appended field of `cui_video_controls_options`. Rebuild C
+applications against matching headers and library; this prerelease does not
+promise binary compatibility with an older struct layout. Legacy zero-initialized
+options retain their existing full-size controls.
+
 This complete portable C11 owner seam draws inside an existing CUI frame. The
 host fills `confirmed`, optionally supplies an already-decoded RGBA frame, and
 drains copied requests **after** submission/rendering. It must handle overflow
@@ -163,8 +168,8 @@ recording before using it as a host-adapter starting point.
 
 ## Browser gallery extension
 
-The gallery's **Video** entry is an extension outside the frozen 78-family GPUI
-baseline. Build and exercise it locally (Chromium runs headless):
+The gallery provides **Video** (bare surface) and **VideoPlayer** (ready-made
+controls) as extensions outside the frozen 78-family baseline. Build and exercise it locally (Chromium runs headless):
 
 ```sh
 python scripts/build_web.py --output /tmp/cui-video-web
@@ -174,13 +179,18 @@ python -m http.server --directory /tmp/cui-video-web
 # Open http://localhost:8000/#Video
 ```
 
-The browser decodes a checked-in original, silent 12-second 320×180 sample using
+The browser decodes a checked-in original 12-second 320×180 sample using
 `HTMLVideoElement`. The visible surface, buttons and timeline are CUI draw lists;
 there are no HTML media controls. Play/pause, two-second skips, keyboard timeline
 seeks and 1× / 1.5× rate requests are acknowledged from actual media state. The
-sample is muted and loops. Fullscreen is a browser capability and may reject a
-request; host errors are displayed explicitly. This is not audio playback or
-universal codec/browser support, and Safari has not been validated.
+sample includes a quiet generated tone and loops. VideoPlayer starts paused and
+plays unmuted after the user presses Play; the bare Video surface autoplays muted
+to respect browser autoplay policies. The browser routes decoded audio to its
+normal output device and keeps audio/video synchronized. Fullscreen is a browser
+capability and may reject a request; host errors are displayed explicitly.
+Volume controls, audio-device selection and subtitles are not exposed by the CUI
+controls yet. Native hosts must supply their own audio output; the FFmpeg example
+remains silent. Universal codec/browser support and Safari are not validated.
 
 The host chooses VP8 WebM or H.264 MP4 using `canPlayType`, with the alternate
 encoding available if decoding fails. It fetches at most 512 KiB into a Blob so

@@ -35,7 +35,7 @@ filesystem or network access. Raw data uses `cui_icon_set_data`.
 
 The complete 1,830-name/path catalog remains available through
 `cui_icon_catalog_*`. The default build embeds the 106 frozen upstream defaults plus 17 application essentials
-from the same pinned archive (123 SVGs total). These include `pencil`, `pen-line`,
+from the same pinned archive (126 SVGs total). These include media controls `skip-back`, `skip-forward`, `gauge`, plus `pencil`, `pen-line`,
 `funnel`, `archive`, `trash`, `mail`, `mail-open`, `paperclip`, `send`, `reply`,
 `reply-all`, `forward`, `download`, `upload`, `link`, `log-out`, and `check-check`.
 `filter`, `trash-2`, and `more-vertical` are accepted aliases for `funnel`, `trash`,

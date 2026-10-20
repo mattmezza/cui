@@ -78,6 +78,8 @@ typedef struct {
     cui_str fullscreen_label, leave_fullscreen_label, rate_label;
     cui_video_request_fn on_request;
     void *user;
+    bool compact; /* Opt-in standard bar: thin timeline, short time, 20px icons.
+                   * Buttons/timeline retain >=44 logical unit hit targets. */
 } cui_video_controls_options;
 cui_video_controls_options cui_video_controls_defaults(void);
 /* No callback => read-only. Requests never acknowledge host success. Sequence
@@ -96,6 +98,11 @@ typedef struct {
     bool controls;
     cui_video_controls_options controls_options;
 } cui_video_player_options;
+/* Standard reusable 320x180 contained surface + compact controls. Includes
+ * playback, +/-10s skip, timeline and capability-gated fullscreen; no rate or
+ * volume by default. Set both surface geometry and controls width to resize.
+ * No callback means read-only; host owns media acquisition/decoding/fullscreen. */
+cui_video_player_options cui_video_player_defaults(void);
 /* Null frame displays an empty surface-sized box (loading/error UI remains host
  * content). Mismatched source/generation fails before any UI submission. Frame
  * pixels stay borrowed through ALL renderer consumption; no lease is acquired. */
@@ -154,6 +161,23 @@ cui_video_controls_options cui_video_controls_defaults(void) {
                                         .fullscreen_label = cui_string("Enter fullscreen"),
                                         .leave_fullscreen_label = cui_string("Leave fullscreen"),
                                         .rate_label = cui_string("Playback rate")};
+}
+cui_video_player_options cui_video_player_defaults(void) {
+    cui_video_player_options o = {
+        .surface = {.geometry = {.width = 320, .height = 180, .fit = CUI_IMAGE_CONTAIN},
+                    .opacity = 1},
+        .controls = true,
+        .controls_options = cui_video_controls_defaults()};
+    o.controls_options.compact = true;
+    o.controls_options.visible |= CUI_VIDEO_CONTROL_FULLSCREEN;
+    return o;
+}
+static void short_time(char *text, size_t size, double seconds) {
+    double minutes = floor(seconds / 60);
+    unsigned remainder = (unsigned)fmod(floor(seconds), 60);
+    int n = snprintf(text, size, "%.0f:%02u", minutes, remainder);
+    if (n < 0 || (size_t)n >= size)
+        snprintf(text, size, "--:--");
 }
 static bool str_valid(cui_str s) {
     return !s.length || s.data;
@@ -222,9 +246,85 @@ static void button(cui_context *ui, cui_id id, const cui_theme *theme, request_c
                                        .icon_only = true,
                                        .disabled = disabled,
                                        .pixel_size = 44,
+                                       .icon_size = c->options.compact ? 20 : 0,
                                        .variant = CUI_BUTTON_GHOST,
                                        .on_click_event = button_clicked,
                                        .action_user = &b});
+}
+static void timeline(cui_context *ui, cui_id id, const cui_theme *theme, request_context *c) {
+    cui_video_view view = c->view;
+    cui_video_controls_options o = c->options;
+    cui_video_controls_state *state = c->state;
+    bool ready = view.status == CUI_VIDEO_READY;
+    if (o.visible & CUI_VIDEO_CONTROL_TIMELINE) {
+        char time[96];
+        int length = view.timeline.duration_known
+                         ? snprintf(time, sizeof time, "%.3f / %.3f seconds",
+                                    view.timeline.position, view.timeline.duration)
+                         : snprintf(time, sizeof time, "%.3f seconds (duration unknown)",
+                                    view.timeline.position);
+        cui_str description =
+            length > 0 && (size_t)length < sizeof time ? cui_string(time) : o.timeline_label;
+        cui_id track = cui_video_part_id(id, CUI_VIDEO_PART_TIMELINE);
+        cui_begin_box(ui, track,
+                      (cui_box){.width = o.width,
+                                .height = o.compact ? 44 : 32,
+                                .fixed_width = true,
+                                .fixed_height = true,
+                                .background = o.compact ? (cui_color){0} : theme->surface,
+                                .radius = theme->radius,
+                                .border = theme->border,
+                                .border_width = o.compact ? 0 : 1});
+        bool seek = ready && (view.capabilities & CUI_VIDEO_CAP_SEEK) && view.timeline.seekable &&
+                    view.timeline.duration_known && view.timeline.duration > 0;
+        cui_base_slider_controlled(
+            ui, track, o.timeline_label, view.timeline.position, &state->scrub,
+            (cui_slider_options){.maximum = view.timeline.duration_known ? view.timeline.duration
+                                                                         : view.timeline.position,
+                                 .step = o.seek_step,
+                                 .disabled = o.disabled || !seek,
+                                 .readonly = !o.on_request || state->sequence == UINT64_MAX,
+                                 .value_description = description,
+                                 .on_request = o.on_request ? seek_request : NULL,
+                                 .user = c});
+        double shown = state->scrub.dragging ? state->scrub.preview : view.timeline.position;
+        float width = view.timeline.duration > 0
+                          ? (float)fmax(0, fmin(1, shown / view.timeline.duration)) * o.width
+                          : 0;
+        if (o.compact) {
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = o.width,
+                                    .height = 44,
+                                    .fixed_width = true,
+                                    .fixed_height = true,
+                                    .align_y = CUI_ALIGN_CENTER});
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = o.width,
+                                    .height = 4,
+                                    .fixed_width = true,
+                                    .fixed_height = true,
+                                    .background = theme->border,
+                                    .radius = 2});
+        }
+        if (width > 0) {
+            cui_begin_box(ui, 0,
+                          (cui_box){.width = width,
+                                    .height = o.compact ? 4 : 30,
+                                    .fixed_width = true,
+                                    .fixed_height = true,
+                                    .background = theme->primary,
+                                    .radius = o.compact ? 2 : theme->radius});
+            cui_end_box(ui);
+        }
+        if (o.compact) {
+            cui_end_box(ui);
+            cui_end_box(ui);
+        }
+        cui_end_box(ui);
+        if (!o.compact)
+            cui_text(ui, description, theme->font_size, theme->text);
+    } else
+        state->scrub = (cui_slider_state){0};
 }
 bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
                         cui_video_controls_state *state, cui_video_view view,
@@ -243,7 +343,12 @@ bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
     }
     bool ready = view.status == CUI_VIDEO_READY;
     cui_begin_box(ui, id, (cui_box){.width = o.width, .fixed_width = true, .gap = 6});
-    cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 4});
+    if (o.compact)
+        timeline(ui, id, theme, &c);
+    cui_begin_box(
+        ui, 0,
+        (cui_box){
+            .row = true, .gap = 4, .width = o.compact ? o.width : 0, .fixed_width = o.compact});
     if (o.visible & CUI_VIDEO_CONTROL_PLAY)
         button(ui, cui_video_part_id(id, CUI_VIDEO_PART_PLAY), theme, &c,
                view.timeline.playing ? o.pause_label : o.play_label,
@@ -270,56 +375,32 @@ bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
         button(ui, cui_video_part_id(id, CUI_VIDEO_PART_RATE), theme, &c, o.rate_label, o.rate_icon,
                ready && (view.capabilities & CUI_VIDEO_CAP_RATE),
                (cui_video_request){.kind = CUI_VIDEO_RATE, .value.rate = o.requested_rate});
-    cui_end_box(ui);
-    if (o.visible & CUI_VIDEO_CONTROL_TIMELINE) {
-        char time[96];
-        int length = view.timeline.duration_known
-                         ? snprintf(time, sizeof time, "%.3f / %.3f seconds",
-                                    view.timeline.position, view.timeline.duration)
-                         : snprintf(time, sizeof time, "%.3f seconds (duration unknown)",
-                                    view.timeline.position);
-        cui_str description =
-            length > 0 && (size_t)length < sizeof time ? cui_string(time) : o.timeline_label;
-        cui_id track = cui_video_part_id(id, CUI_VIDEO_PART_TIMELINE);
-        cui_begin_box(ui, track,
-                      (cui_box){.width = o.width,
-                                .height = 32,
-                                .fixed_width = true,
-                                .fixed_height = true,
-                                .background = theme->surface,
-                                .radius = theme->radius,
-                                .border = theme->border,
-                                .border_width = 1});
-        bool seek = ready && (view.capabilities & CUI_VIDEO_CAP_SEEK) && view.timeline.seekable &&
-                    view.timeline.duration_known && view.timeline.duration > 0;
-        cui_base_slider_controlled(
-            ui, track, o.timeline_label, view.timeline.position, &state->scrub,
-            (cui_slider_options){.maximum = view.timeline.duration_known ? view.timeline.duration
-                                                                         : view.timeline.position,
-                                 .step = o.seek_step,
-                                 .disabled = o.disabled || !seek,
-                                 .readonly = !o.on_request || state->sequence == UINT64_MAX,
-                                 .value_description = description,
-                                 .on_request = o.on_request ? seek_request : NULL,
-                                 .user = &c});
-        double shown = state->scrub.dragging ? state->scrub.preview : view.timeline.position;
-        float width = view.timeline.duration > 0
-                          ? (float)fmax(0, fmin(1, shown / view.timeline.duration)) * o.width
-                          : 0;
-        if (width > 0) {
-            cui_begin_box(ui, 0,
-                          (cui_box){.width = width,
-                                    .height = 30,
-                                    .fixed_width = true,
-                                    .fixed_height = true,
-                                    .background = theme->primary,
-                                    .radius = theme->radius});
+    if (o.compact && (o.visible & CUI_VIDEO_CONTROL_TIMELINE)) {
+        char position[32], duration[32], text[72];
+        short_time(position, sizeof position,
+                   state->scrub.dragging ? state->scrub.preview : view.timeline.position);
+        short_time(duration, sizeof duration, view.timeline.duration);
+        snprintf(text, sizeof text, "%s / %s", position,
+                 view.timeline.duration_known ? duration : "--:--");
+        float available = o.width - c.row_items * 48;
+        float text_width = cui_measure_text(ui, cui_string(text), 12).width;
+        if (c.row_items > c.row_capacity || available < text_width) {
             cui_end_box(ui);
+            cui_begin_box(ui, 0, (cui_box){.width = o.width, .fixed_width = true});
+            available = o.width;
         }
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = available,
+                                .fixed_width = true,
+                                .height = 44,
+                                .align_y = CUI_ALIGN_CENTER,
+                                .clip = true});
+        cui_text(ui, cui_string(text), 12, theme->text);
         cui_end_box(ui);
-        cui_text(ui, description, theme->font_size, theme->text);
-    } else
-        state->scrub = (cui_slider_state){0};
+    }
+    cui_end_box(ui);
+    if (!o.compact)
+        timeline(ui, id, theme, &c);
     if (view.status_description.length) {
         cui_id status = id ^ UINT64_C(0x27cb57021ee10201);
         cui_interact(ui, status, CUI_ROLE_LABEL, view.status_description, false, false, 0);

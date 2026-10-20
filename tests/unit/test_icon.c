@@ -80,11 +80,11 @@ static void test_assets(void) {
         cui_icon_state_collect(&state);
         assert(state.cache_versions == 1);
     }
-    assert(defaults == 123);
+    assert(defaults == 126);
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
     assert(embedded == 1830);
 #else
-    assert(embedded == 123);
+    assert(embedded == 126);
 #endif
     assert(!cui_icon_catalog_name(1830).length && !cui_icon_catalog_path(1830).length);
     assert(!cui_icon_asset(cui_string("missing"), &(cui_str){0}));

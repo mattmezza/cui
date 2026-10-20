@@ -4,7 +4,10 @@ This document prepares **v0.1.0-alpha.3**; it is not evidence that publication
 has occurred or that the release source is frozen. The current development batch
 adds opt-in Avatar metrics, identity palettes, SVG placeholders and language
 bindings, further large-document Editor improvements, and an optional bounded
-SDL audio-input host example. Native speech recognition remains separate work;
+SDL audio-input host example. It also adds reusable compact VideoPlayer defaults,
+embedded seek icons, player-only browser fullscreen and an audible browser sample.
+The appended controls-options field requires rebuilding C consumers against
+matching headers and library. Native speech recognition remains separate work;
 no physical microphone or platform recognizer acceptance is implied. These
 additions preserve the original 78 baseline. Full feature parity and uniform
 foreign event coverage are not claimed. Final integrated validation, source

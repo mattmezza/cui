@@ -45,7 +45,7 @@ def main():
             page.wait_for_function('window.cuiGallery && window.cuiGallery.catalog.components.length === 78')
             baseline = set(page.evaluate('cuiGallery.catalog.components.map(c => c.name)'))
             extensions = set(page.evaluate('(cuiGallery.catalog.extensions || []).map(c => c.name)'))
-            assert len(baseline) == 78 and extensions == {'Video'} and not baseline & extensions
+            assert len(baseline) == 78 and extensions == {'Video', 'VideoPlayer'} and not baseline & extensions
             assert set(page.evaluate('Object.keys(cuiGallery.stories)')) == baseline | extensions
             assert page.locator('#home-page').is_visible()
             assert page.locator('#gallery-page').is_hidden()

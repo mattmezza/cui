@@ -2672,9 +2672,8 @@ void gallery_video_sync(unsigned session, unsigned epoch, double position, doubl
     video_view.status_description =
         status == CUI_VIDEO_LOADING     ? cui_string("Loading browser-decoded sample")
         : status == CUI_VIDEO_BUFFERING ? cui_string("Seeking / buffering")
-        : status == CUI_VIDEO_FAILED
-            ? cui_string("Browser media operation failed; see host status")
-            : cui_string("Silent local sample · browser decoding · CUI controls");
+        : status == CUI_VIDEO_FAILED ? cui_string("Browser media operation failed; see host status")
+                                     : (cui_str){0};
 }
 unsigned char *gallery_video_buffer(unsigned session, unsigned epoch) {
     return session && session == video_session && epoch == video_epoch ? video_pixels : NULL;
@@ -2775,6 +2774,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                         .idle_seconds = .8f,
                                         .fade_seconds = .2f,
                                         .reduced_motion = reduced_motion};
+    if ((story == 81 || story == 82) && video_view.fullscreen)
+        t = cui_theme_dark();
     current_theme = t;
     if (story == 80)
         composed_app_set_theme(gallery_app, &t);
@@ -2785,19 +2786,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                       (cui_box){.width = width,
                                 .height = height,
                                 .padding = 24,
+                                .align_x = ((story == 81 || story == 82) && video_view.fullscreen)
+                                               ? CUI_ALIGN_CENTER
+                                               : CUI_ALIGN_START,
+                                .align_y = ((story == 81 || story == 82) && video_view.fullscreen)
+                                               ? CUI_ALIGN_CENTER
+                                               : CUI_ALIGN_START,
                                 .gap = design_spacing >= 0 ? t.gap : 16,
                                 .background = t.background});
     switch (story) {
-    case 81: {
-        float player_width = fmaxf(160, fminf(width - 48, 640));
-        cui_video_player_options o = {
-            .controls = true,
-            .surface = {.geometry = {.width = player_width,
-                                     .height = player_width * 180 / 320,
-                                     .fit = CUI_IMAGE_CONTAIN},
-                        .opacity = 1,
-                        .description = cui_string("Decoded moving color test sample")},
-            .controls_options = cui_video_controls_defaults()};
+    case 81:
+    case 82: {
+        float player_width =
+            video_view.fullscreen
+                ? fmaxf(1, fminf(width - 48, (height - (width - 48 < 350 ? 200 : 160)) * 320 / 180))
+                : fmaxf(160, fminf(width - 48, 640));
+        cui_video_player_options o = cui_video_player_defaults();
+        o.controls = story == 82;
+        o.surface.geometry = (cui_image_geometry){
+            .width = player_width, .height = player_width * 180 / 320, .fit = CUI_IMAGE_CONTAIN};
+        o.surface.description = cui_string("Decoded moving color test sample");
         o.controls_options.width = player_width;
         o.controls_options.visible |= CUI_VIDEO_CONTROL_FULLSCREEN | CUI_VIDEO_CONTROL_RATE;
         o.controls_options.skip_seconds = 2;
@@ -2812,8 +2820,18 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                              .revision = video_revision},
                                                   .generation = video_epoch,
                                                   .timestamp = video_timestamp}};
-        (void)cui_video_player(ui, cui_id_from(ui, "browser-video"), &t, &video_controls,
-                               video_view, video_frame_valid ? &frame : NULL, o);
+        if (story == 81) {
+            if (video_frame_valid)
+                (void)cui_video_surface(ui, cui_id_from(ui, "browser-video-surface"),
+                                        &video_view.timeline, &frame.frame, o.surface);
+            else {
+                cui_begin_box(ui, cui_id_from(ui, "browser-video-loading"),
+                              (cui_box){.width = player_width, .height = player_width * 180 / 320});
+                cui_end_box(ui);
+            }
+        } else
+            (void)cui_video_player(ui, cui_id_from(ui, "browser-video"), &t, &video_controls,
+                                   video_view, video_frame_valid ? &frame : NULL, o);
         break;
     }
     case 80:

@@ -53,7 +53,7 @@ bool cui_icon_set_path(cui_icon_state *, cui_str path, cui_icon_loader_fn, void 
 bool cui_icon_set_name(cui_icon_state *, cui_str name, cui_icon_loader_fn, void *user);
 bool cui_icon_set_empty(cui_icon_state *);
 void cui_icon_reload(cui_icon_state *);
-/* Complete catalog is always present; only 123 defaults embed SVG unless
+/* Complete catalog is always present; only 126 defaults embed SVG unless
  * CUI_ICON_ALL_ASSETS=1. Unknown catalog index returns an empty string. */
 size_t cui_icon_catalog_count(void);
 cui_str cui_icon_catalog_name(size_t);
@@ -8845,11 +8845,7 @@ static const char cui_icon_svg_762[] = "<svg\n  xmlns=\"http://www.w3.org/2000/s
 #else
 #define cui_icon_svg_762 NULL
 #endif
-#if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_763[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"m12 14 4-4\" />\n  <path d=\"M3.34 19a10 10 0 1 1 17.32 0\" />\n</svg>\n";
-#else
-#define cui_icon_svg_763 NULL
-#endif
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_764[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"m14 13-8.381 8.38a1 1 0 0 1-3.001-3l8.384-8.381\" />\n  <path d=\"m16 16 6-6\" />\n  <path d=\"m21.5 10.5-8-8\" />\n  <path d=\"m8 8 6-6\" />\n  <path d=\"m8.5 7.5 8 8\" />\n</svg>\n";
 #else
@@ -12011,16 +12007,8 @@ static const char cui_icon_svg_1436[] = "<svg\n  xmlns=\"http://www.w3.org/2000/
 #else
 #define cui_icon_svg_1436 NULL
 #endif
-#if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1437[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"M17.971 4.285A2 2 0 0 1 21 6v12a2 2 0 0 1-3.029 1.715l-9.997-5.998a2 2 0 0 1-.003-3.432z\" />\n  <path d=\"M3 20V4\" />\n</svg>\n";
-#else
-#define cui_icon_svg_1437 NULL
-#endif
-#if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1438[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"M21 4v16\" />\n  <path d=\"M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z\" />\n</svg>\n";
-#else
-#define cui_icon_svg_1438 NULL
-#endif
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1439[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"m12.5 17-.5-1-.5 1h1z\" />\n  <path d=\"M15 22a1 1 0 0 0 1-1v-1a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20v1a1 1 0 0 0 1 1z\" />\n  <circle cx=\"15\" cy=\"12\" r=\"1\" />\n  <circle cx=\"9\" cy=\"12\" r=\"1\" />\n</svg>\n";
 #else
@@ -14660,7 +14648,7 @@ static const cui_icon_asset_record cui_icon_assets[] = {
     {"gamepad-directional", "icons/gamepad-directional.svg", cui_icon_svg_760, false},
     {"gap-horizontal", "icons/gap-horizontal.svg", cui_icon_svg_761, false},
     {"gap-vertical", "icons/gap-vertical.svg", cui_icon_svg_762, false},
-    {"gauge", "icons/gauge.svg", cui_icon_svg_763, false},
+    {"gauge", "icons/gauge.svg", cui_icon_svg_763, true},
     {"gavel", "icons/gavel.svg", cui_icon_svg_764, false},
     {"gem", "icons/gem.svg", cui_icon_svg_765, false},
     {"georgian-lari", "icons/georgian-lari.svg", cui_icon_svg_766, false},
@@ -15334,8 +15322,8 @@ static const cui_icon_asset_record cui_icon_assets[] = {
     {"signpost", "icons/signpost.svg", cui_icon_svg_1434, false},
     {"signpost-big", "icons/signpost-big.svg", cui_icon_svg_1435, false},
     {"siren", "icons/siren.svg", cui_icon_svg_1436, false},
-    {"skip-back", "icons/skip-back.svg", cui_icon_svg_1437, false},
-    {"skip-forward", "icons/skip-forward.svg", cui_icon_svg_1438, false},
+    {"skip-back", "icons/skip-back.svg", cui_icon_svg_1437, true},
+    {"skip-forward", "icons/skip-forward.svg", cui_icon_svg_1438, true},
     {"skull", "icons/skull.svg", cui_icon_svg_1439, false},
     {"slash", "icons/slash.svg", cui_icon_svg_1440, false},
     {"slice", "icons/slice.svg", cui_icon_svg_1441, false},

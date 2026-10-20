@@ -25,7 +25,7 @@ def compile_usage():
     data = json.loads(subprocess.check_output(
         ['node', '-e', EXTRACT, str(ROOT / 'web/gallery.js')], text=True))
     baseline = {c['name'] for c in json.loads((ROOT / 'docs/gpui-parity.json').read_text())['components']}
-    assert len(baseline) == 78 and set(data['stories']) == baseline | {'Video'}
+    assert len(baseline) == 78 and set(data['stories']) == baseline | {'Video', 'VideoPlayer'}
     source = ('#include "cui/cui_components.h"\n#include "cui/cui_content.h"\n'
               'void usage(cui_context *ui, cui_id id, cui_theme theme) {\n'
               'cui_bitmap photo = {0};\n' + data['snippets']['Avatar'] + '\n}\n')

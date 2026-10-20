@@ -1145,7 +1145,11 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
     if (o.variant == CUI_BUTTON_CUSTOM && !o.custom_colors)
         palette = (cui_theme_button_colors){.foreground = t->text, .outline_foreground = t->text};
     bool outlined = o.outline || o.variant == CUI_BUTTON_OUTLINE;
-    bool active = state.pressed || o.selected || o.open;
+    /* Selected/open use their semantic style, independently of pointer state. */
+    bool selected = o.selected || o.open;
+    bool pressed = state.pressed && !selected;
+    bool hovered = state.hovered && !pressed && !selected;
+    bool active = pressed || selected;
     cui_color foreground = outlined ? palette.outline_foreground : palette.foreground;
     cui_color caret_color = foreground;
     if (!o.custom_colors) {
@@ -1167,27 +1171,36 @@ static void cui_button_paint_state(cui_context *ui, cui_id id, const cui_theme *
                                                : palette.normal);
     b.border = outlined ? palette.outline_border : palette.border;
     if (o.variant == CUI_BUTTON_GHOST && !o.custom_colors) {
-        b.background = active          ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
-                       : state.hovered ? t->accent
-                                       : (cui_color){0};
-        foreground = state.hovered ? t->accent_foreground : t->secondary_foreground;
-        if (state.pressed)
-            b.background = t->buttons[CUI_THEME_BUTTON_DEFAULT].active;
+        b.background = selected && !outlined ? t->buttons[CUI_THEME_BUTTON_SECONDARY].active
+                       : active              ? t->buttons[CUI_THEME_BUTTON_DEFAULT].active
+                       : hovered             ? t->accent
+                                             : (cui_color){0};
+        if (hovered && t->dark)
+            b.background.a = (uint8_t)(b.background.a * .5f);
+        foreground = hovered ? t->accent_foreground : t->secondary_foreground;
     } else if (o.variant == CUI_BUTTON_LINK && !o.custom_colors) {
         b.background = (cui_color){0};
-        foreground = active ? t->link_active : state.hovered ? t->link_hover : t->link;
+        foreground = selected && outlined ? t->link
+                     : active             ? t->link_active
+                     : hovered            ? t->link_hover
+                                          : t->link;
     } else if (text && !o.custom_colors) {
         b.background = (cui_color){0};
         foreground = t->text;
-        foreground.a = (uint8_t)(foreground.a * (active ? .7f : state.hovered ? 1 : .9f));
+        foreground.a = (uint8_t)(foreground.a * (selected && outlined ? .9f
+                                                 : active             ? .7f
+                                                 : hovered            ? 1
+                                                                      : .9f));
     }
-    if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
+    if (!outlined && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
         b.border_width = 0;
+    if (!o.custom_colors && (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text))
+        b.border = (cui_color){0};
     if (disabled) {
         b.background = outlined ? palette.outline_normal : palette.normal;
         float opacity = outlined ? .5f : kind == CUI_THEME_BUTTON_SECONDARY ? 1.5f : .15f;
         b.background.a = (uint8_t)fminf(255, b.background.a * opacity);
-        b.border.a = (uint8_t)(b.border.a * .5f);
+        b.border.a = (uint8_t)fminf(255, b.border.a * (outlined ? .5f : opacity));
         if (o.variant == CUI_BUTTON_GHOST || o.variant == CUI_BUTTON_LINK || text)
             b.background.a = 0;
         if (o.variant == CUI_BUTTON_DEFAULT && !o.custom_colors && !outlined) {

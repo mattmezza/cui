@@ -41,7 +41,7 @@ def main():
     missing = sorted(set(stories) - set(snippets))
     assert not missing, f'Usage excerpts missing for {missing}'
     baseline = {entry['name'] for entry in json.loads((ROOT / 'docs/gpui-parity.json').read_text())['components']}
-    extensions = {'Video'}
+    extensions = {'Video', 'VideoPlayer'}
     assert len(baseline) == 78 and not baseline & extensions
     assert set(stories) == baseline | extensions
     headers = '\n'.join(path.read_text() for path in (ROOT / 'include/cui').glob('*.h'))
@@ -61,7 +61,8 @@ def main():
             assert token in headers, (story, token)
     compiled = tuple(stories)
     extra = {
-        'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
+        'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0;',
+        'VideoPlayer': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
         'Avatar': 'cui_bitmap photo = {0};',
         'Button': 'cui_str label = {0};',
         'Checkbox': 'cui_str label = {0}; cui_check_state state = CUI_CHECK_UNCHECKED;',

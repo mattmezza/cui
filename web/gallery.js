@@ -120,7 +120,7 @@ function paintBitmap(i,x,y,w,h,radii){
  ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,h,radii);ctx.clip();ctx.globalAlpha=field(7);
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(bitmap,sx,sy,sw,sh,x,y,w,h);ctx.restore();
 }
-const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79,Video:81};
+const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79,Video:81,VideoPlayer:82};
 const modelStories = new Set(['Focus Trap']);
 const snippets = {
  Button:'cui_button_ex(ui, id, &theme, label,\n    (cui_button_options){\n        .variant = CUI_BUTTON_OUTLINE,\n        .size = CUI_CONTROL_SMALL\n    });',
@@ -218,17 +218,20 @@ if (cui_questionnaire_begin(ui, root_id, &theme, &state, options)) {
  Speech:'cui_speech_init(&state, workspace, recognizer, input, on_event, user);\ncui_speech_button(ui, id, &theme, &state, options, now);\ncui_speech_waveform(ui, waveform_id, &theme, &state, waveform, now);',
  Chart:'cui_chart_options options = cui_chart_theme(config, &theme);\ncui_chart_render_animated(ui, &state, &options);\ncui_chart(ui, id, &state, &options, cui_string("Activity"));',
  TextView:'cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN);\ncui_text_view_set_text(&state, markdown);\ncui_text_view(ui, id, &theme, &state, options);',
- Video:`/* Called inside the host's begin_frame/end_frame composition.
+ Video:`/* The host owns decoding, playback and frame lifetime. */
+cui_video_surface_options surface = {
+    .geometry = {.width = 320, .height = 180, .fit = CUI_IMAGE_CONTAIN},
+    .opacity = 1, .description = cui_string("Video surface")
+};
+if (decoded_frame)
+    cui_video_surface(ui, id, &confirmed_view.timeline, &decoded_frame->frame, surface);
+/* Decoded RGBA pixels stay live and immutable until draw-list consumption. */`,
+ VideoPlayer:`/* Called inside the host's begin_frame/end_frame composition.
    Retain controls across frames. confirmed_view is acknowledged host state;
    decoded_frame is NULL while loading, otherwise matching source_id/generation.
    The host supplies a queue_video_request callback and video_host queue. */
 static cui_video_controls_state controls = {0};
-cui_video_player_options options = {
-    .surface = {.geometry = {.width = 320, .height = 180},
-                .opacity = 1, .description = cui_string("Video")},
-    .controls = true
-};
-options.controls_options = cui_video_controls_defaults();
+cui_video_player_options options = cui_video_player_defaults();
 options.controls_options.on_request = queue_video_request;
 options.controls_options.user = video_host;
 cui_video_player(ui, id, &theme, &controls, confirmed_view,
@@ -394,12 +397,12 @@ const videoHost=(()=>{
   time:active.media.currentTime,duration:active.media.duration,paused:active.media.paused,
   rate:active.media.playbackRate,frames:active.frames,checksum:active.checksum,
   requests:active.requests.slice(),error:active.error,source:active.media.currentSrc,asset:active.asset,
-  seeking:active.media.seeking,muted:active.media.muted,loop:active.media.loop}: {active:false,decodedFrames};
+  seeking:active.media.seeking,muted:active.media.muted,volume:active.media.volume,audioDecodedBytes:active.media.webkitAudioDecodedByteCount??null,loop:active.media.loop}: {active:false,decodedFrames};
  const valid=s=>active===s;
  function status(s,message='',failed=false){
   if(!valid(s))return;
   if(message){s.error=message;s.failed=failed;}
-  $('video-host-status').textContent=s.error||'Silent browser-decoded sample. CUI controls below the video; skip ±2 seconds, rate 1× / 1.5×.';
+  $('video-host-status').textContent=s.error||(s.mode==='Video'?'Bare video surface; the browser host automatically plays this muted sample.':'VideoPlayer with sound; play to hear the quiet sample tone. Skip ±2 seconds, rate 1× / 1.5×.');
  }
  function sync(){
   const s=active;if(!s)return;
@@ -409,7 +412,7 @@ const videoHost=(()=>{
   const ready=m.readyState>=2;
   const state=s.failed?3:!duration?1:m.seeking&&!s.scrubbing?2:ready?0:2;
   wasm.gallery_video_sync(s.session,s.generation,Math.max(0,m.currentTime),duration,m.playbackRate,
-   Number(!m.paused&&!m.ended),state,1|8|(m.seekable.length&&m.seekable.end(m.seekable.length-1)>0?2:0)|(document.fullscreenEnabled?4:0),Number(!!document.fullscreenElement));
+   Number(!m.paused&&!m.ended),state,1|8|(m.seekable.length&&m.seekable.end(m.seekable.length-1)>0?2:0)|(document.fullscreenEnabled?4:0),Number(document.fullscreenElement===$('video-player-stage')));
  }
  function cancelFrame(s){
   if(s.frameCallback!==null){if(s.media.cancelVideoFrameCallback)s.media.cancelVideoFrameCallback(s.frameCallback);else cancelAnimationFrame(s.frameCallback);s.frameCallback=null;}
@@ -442,22 +445,23 @@ const videoHost=(()=>{
  function stop(){
   const s=active;if(!s)return;active=null;cancelFrame(s);
   for(const [event,fn] of s.listeners)s.media.removeEventListener(event,fn);
-  if(document.fullscreenElement===$('preview-card'))void document.exitFullscreen().catch(()=>{});
+  if(document.fullscreenElement===$('video-player-stage'))void document.exitFullscreen().catch(()=>{});
   s.abort.abort();s.media.pause();s.media.removeAttribute('src');s.media.load();
   if(s.url)URL.revokeObjectURL(s.url);
   wasm.gallery_video_session(0);$('video-host-status').hidden=true;
  }
- function start(){
-  if(active)return;
+ function start(mode){
+  if(active?.mode===mode)return;
+  if(active)stop();
   const media=document.createElement('video'),decoder=document.createElement('canvas');
-  decoder.width=320;decoder.height=180;media.muted=true;media.loop=true;media.playsInline=true;media.preload='auto';
-  const s={media,decoder,context:decoder.getContext('2d',{willReadFrequently:true}),session:++serial,
+  decoder.width=320;decoder.height=180;media.muted=mode==='Video';media.volume=1;media.loop=true;media.playsInline=true;media.preload='auto';
+  const s={mode,media,decoder,context:decoder.getContext('2d',{willReadFrequently:true}),session:++serial,
    generation:1,ticket:1,frames:0,checksum:0,frameCallback:null,listeners:[],requests:[],error:'',failed:false,scrubbing:false,seekOrigin:0,lastTime:0,operation:0,abort:new AbortController(),url:null,asset:''};
   active=s;wasm.gallery_video_session(s.session);$('video-host-status').hidden=false;status(s);
   const on=(event,fn)=>{s.listeners.push([event,fn]);media.addEventListener(event,fn);};
   for(const event of ['loadedmetadata','loadeddata','canplay','timeupdate','ratechange','waiting','playing','pause','ended'])on(event,()=>{
    if(!valid(s))return;if(event==='pause'||event==='ended')cancelFrame(s);
-   sync();if(event==='loadeddata')capture(s);schedule(s);requestFrame();
+   sync();if(event==='loadeddata'){capture(s);if(mode==='Video')void media.play().catch(error=>{if(valid(s))status(s,`Autoplay rejected: ${error.message}`);});}schedule(s);requestFrame();
   });
   on('seeked',()=>{if(valid(s)){capture(s);schedule(s);requestFrame();}});
   const sources=[['video/webm; codecs="vp8"','./assets/video/sample.webm'],['video/mp4','./assets/video/sample.mp4']];
@@ -507,13 +511,19 @@ const videoHost=(()=>{
     if(kind===0){if(value){s.media.play().catch(error=>{if(current()){status(s,`Play rejected: ${error.message}`);sync();requestFrame();}});}else s.media.pause();}
     else if(kind===1){if(phase===0){s.seekOrigin=s.media.currentTime;s.scrubbing=true;}else seek(s,phase===3?s.seekOrigin:value,phase===2||phase===3);}
     else if(kind===2)seek(s,s.media.currentTime+value,true);
-    else if(kind===3){const operation=value?$('preview-card').requestFullscreen?.():document.exitFullscreen?.();if(!operation)status(s,'Fullscreen is unavailable.');else operation.catch(error=>{if(current()){status(s,`Fullscreen rejected: ${error.message}`);requestFrame();}});}
+    else if(kind===3){const operation=value?$('video-player-stage').requestFullscreen?.():document.exitFullscreen?.();if(!operation)status(s,'Fullscreen is unavailable.');else operation.catch(error=>{if(current()){status(s,`Fullscreen rejected: ${error.message}`);requestFrame();}});}
     else if(kind===4)s.media.playbackRate=value;
    }catch(error){status(s,`Media request rejected: ${error.message}`);}
   }
   sync();if(requests.length)requestFrame();
  }
  document.addEventListener('fullscreenchange',()=>{if(active){sync();requestFrame();}});
+ window.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&document.fullscreenElement===$('video-player-stage')){
+   event.preventDefault();event.stopPropagation();
+   void document.exitFullscreen().catch(error=>{if(active)status(active,`Fullscreen exit rejected: ${error.message}`);});
+  }
+ },true);
  return {start,stop,sync,drain,snapshot};
 })();
 
@@ -525,7 +535,7 @@ function render(){
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Avatar'?avatarDiameter+390:selected.name==='Video'?Math.min(640,Math.max(160,width-48))*180/320+290:selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Calendar'?420:selected.name==='DatePicker'?380:selected.name==='ColorPicker'?620:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -583,7 +593,7 @@ function render(){
  const frameReducedMotion=reducedMotion.matches;
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(frameReducedMotion));lastTime=now;
  wasm.gallery_theme_preset(themeChoice==='high-contrast'?-1:selectedPreset());
- if(selected.name==='Video')videoHost.sync();
+ if(['Video','VideoPlayer'].includes(selected.name))videoHost.sync();
  if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
  applyTouchPageFallback();
  const commands=Array.from({length:wasm.gallery_count()},(_,i)=>{
@@ -633,7 +643,7 @@ function render(){
  syncImeTarget();
  canvas.style.cursor=['default','pointer','text','ew-resize','ns-resize','move','not-allowed','crosshair','grab','grabbing','zoom-in','zoom-out','wait','help'][wasm.gallery_cursor()]||'default';
  syncSemantics();
- if(selected.name==='Video')videoHost.drain();
+ if(['Video','VideoPlayer'].includes(selected.name))videoHost.drain();
  if(selected.name==='Button'||selected.name==='Input'){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
@@ -781,7 +791,7 @@ $('icon-catalog-search').addEventListener('input',renderIconCatalog);
 $('icon-catalog-embedded').addEventListener('change',renderIconCatalog);
 
 function route(){
- if((location.hash.slice(1)||document.body.dataset.route)!=='Video')videoHost.stop();
+ if(!['Video','VideoPlayer'].includes(location.hash.slice(1)||document.body.dataset.route))videoHost.stop();
  const raw=location.hash.slice(1)||document.body.dataset.route||'home';
  if(!raw||raw==='home'){
   selected=null;$('home-page').hidden=false;$('docs-page').hidden=true;$('gallery-page').hidden=true;$('catalog').hidden=false;$('docs-nav').hidden=true;
@@ -839,7 +849,7 @@ const exampleDescriptor={name:'Northstar workspace',example:true,status:'tested'
 
 function selectComponent(){
  let name='Button';try{name=decodeURIComponent(location.hash.slice(1)||document.body.dataset.route)||'Button';}catch{/* Malformed percent escapes select the default component. */}selected=name==='examples/northstar'?exampleDescriptor:[...catalog.components,...(catalog.extensions||[])].find(c=>c.name===name)||catalog.components.find(c=>c.name==='Button');
- if(selected.name==='Video')videoHost.start();else videoHost.stop();
+ if(['Video','VideoPlayer'].includes(selected.name))videoHost.start(selected.name);else videoHost.stop();
  document.title=`${selected.name} · CUI`;shareRoute(selected.example?'examples/northstar/':`components/${componentSlug(selected.name)}/`,selected.example?'examples/northstar':encodeURIComponent(selected.name),document.title,`Explore CUI ${selected.name}: its C11 API, interactive WebAssembly example, application-owned state and implementation scope. Complete component coverage remains in progress.`); $('name').textContent=selected.name; $('status').textContent=selected.status.replaceAll('_',' ');
  const live=selected.example||selected.name in stories;
  window.cuiGallery.renderedComponent=live?'':selected.name;

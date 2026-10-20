@@ -77,6 +77,8 @@ typedef struct {
     cui_str fullscreen_label, leave_fullscreen_label, rate_label;
     cui_video_request_fn on_request;
     void *user;
+    bool compact; /* Opt-in standard bar: thin timeline, short time, 20px icons.
+                   * Buttons/timeline retain >=44 logical unit hit targets. */
 } cui_video_controls_options;
 cui_video_controls_options cui_video_controls_defaults(void);
 /* No callback => read-only. Requests never acknowledge host success. Sequence
@@ -95,6 +97,11 @@ typedef struct {
     bool controls;
     cui_video_controls_options controls_options;
 } cui_video_player_options;
+/* Standard reusable 320x180 contained surface + compact controls. Includes
+ * playback, +/-10s skip, timeline and capability-gated fullscreen; no rate or
+ * volume by default. Set both surface geometry and controls width to resize.
+ * No callback means read-only; host owns media acquisition/decoding/fullscreen. */
+cui_video_player_options cui_video_player_defaults(void);
 /* Null frame displays an empty surface-sized box (loading/error UI remains host
  * content). Mismatched source/generation fails before any UI submission. Frame
  * pixels stay borrowed through ALL renderer consumption; no lease is acquired. */

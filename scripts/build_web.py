@@ -107,18 +107,29 @@ def main():
         raise ValueError('Component usage must match all 78 manifest families')
     for component, explanation in zip(manifest['components'], usage):
         component['usage'] = explanation
-    manifest['extensions'] = [{
-        'name': 'Video', 'category': 'extensions', 'status': 'extension', 'public_header': 'include/cui/cui_video_controls.h',
-        'source_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
-        'features': [{'name': 'Browser-decoded local sample with CUI player controls', 'status': 'tested'}],
-        'limitations': ['Extension outside the frozen 78-family GPUI baseline.',
-            'Silent sample; browser codec and fullscreen support vary. Safari is not validated.',
-            'Seek cancel restores the requested position; decoder completion is asynchronous.'],
-        'usage': {'composition': 'cui_video_player surface plus optional CUI controls',
-            'state_ownership': 'Browser host owns media, timeline confirmation and bounded RGBA staging storage.',
-            'interaction': 'Typed requests are drained after rendering; confirmed HTMLVideoElement state is synchronized back.',
-            'usage': 'Play, pause, scrub, skip two seconds and switch 1x / 1.5x. The sample is muted and loops.',
-            'docs': ['docs/VIDEO_PLAYER.md', 'docs/VIDEO_GUIDE.md']}}]
+    extension_revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    manifest['extensions'] = [
+        {'name': 'Video', 'category': 'extensions', 'status': 'extension',
+         'public_header': 'include/cui/cui_video.h', 'source_commit': extension_revision,
+         'features': [{'name': 'Browser-decoded base video surface', 'status': 'tested'}],
+         'limitations': ['Extension outside the frozen baseline.', 'Decoding, playback, audio and source ownership are host services.'],
+         'usage': {'composition': 'cui_video_surface with host-controlled playback',
+             'state_ownership': 'Host retains timeline and decoded RGBA pixels through rendering.',
+             'interaction': 'This surface has no built-in playback controls; the sample host autoplays muted video.',
+             'usage': 'Use VideoPlayer for ready-to-use playback controls.',
+             'docs': ['docs/VIDEO_GUIDE.md', 'docs/VIDEO_PLAYER.md']}},
+        {'name': 'VideoPlayer', 'category': 'extensions', 'status': 'extension',
+         'public_header': 'include/cui/cui_video_controls.h', 'source_commit': extension_revision,
+         'features': [{'name': 'Reusable player with standard CUI controls and player-only fullscreen', 'status': 'tested'}],
+         'limitations': ['Extension outside the frozen baseline.',
+             'Browser sample includes sound; codec and fullscreen support vary. Safari is not validated.',
+             'Browser host plays audio; native audio output, volume controls and subtitles require separate host capabilities.'],
+         'usage': {'composition': 'cui_video_player_defaults plus cui_video_player',
+             'state_ownership': 'Browser host owns media, timeline confirmation and bounded RGBA staging storage.',
+             'interaction': 'Typed requests are drained after rendering; confirmed decoder state is synchronized back.',
+             'usage': 'Play, pause, scrub, skip two seconds, change rate and fullscreen only the player.',
+             'docs': ['docs/VIDEO_PLAYER.md', 'docs/VIDEO_GUIDE.md']}}
+    ]
     (out / 'catalog.json').write_text(json.dumps(manifest, indent=2)+'\n')
     notices = (ROOT / 'LICENSE').read_text(encoding='utf-8') + '\n\nClay layout engine\n==================\n' + (ROOT / 'third_party/clay/LICENSE').read_text(encoding='utf-8') + '\n\nNanoSVG\n=======\n' + (ROOT / 'third_party/nanosvg/LICENSE').read_text(encoding='utf-8') + '\n\nGPUI Kit icons\n==============\n' + (ROOT / 'third_party/gpui_icons/LICENSE').read_text(encoding='utf-8') + '\n\n' + (ROOT / 'web/TOOLCHAIN_NOTICES.txt').read_text(encoding='utf-8')
     notices += '\n\nGPUI Kit theme presets\n======================\n' + (ROOT / 'third_party/gpui_themes/LICENSE').read_text(encoding='utf-8')

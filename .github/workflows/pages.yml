@@ -64,6 +64,7 @@ jobs:
         run: |
           uv run tests/web/test_video_gallery.py --offline
           uv run tests/web/test_video_gallery.py --directory build/web
+          uv run tests/web/test_video_player_gallery.py --directory build/web
       - name: Verify Avatar sizes identity palettes and SVG placeholders
         run: uv run tests/web/test_avatar_variants.py --directory build/web
       - name: Exercise component behavior in Chromium

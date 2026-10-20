@@ -150,7 +150,7 @@ def main():
             assert not errors,errors
             baseline = set(page.evaluate('cuiGallery.catalog.components.map(c => c.name)'))
             extensions = set(page.evaluate('(cuiGallery.catalog.extensions || []).map(c => c.name)'))
-            assert len(baseline) == 78 and extensions == {'Video'} and not baseline & extensions
+            assert len(baseline) == 78 and extensions == {'Video', 'VideoPlayer'} and not baseline & extensions
             assert set(page.evaluate('Object.keys(cuiGallery.stories)')) == baseline | extensions
             print('PASS:78 baseline usage guides plus Video extension, real gradient/blur/opacity pixels, font families/scales/styles, configurable/reduced motion, composed app CTA/account/edit/save/themes/mobile')
             browser.close()

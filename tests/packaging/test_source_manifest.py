@@ -3,12 +3,13 @@ import hashlib
 import importlib.util
 import io
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import shutil
 import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import MagicMock
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -72,6 +73,17 @@ class SourceManifest(unittest.TestCase):
                         validator.verify_source_manifest(self.make_archive(directory, kind, mode))
 
     def test_unsafe_paths(self):
+        # Exercise the producer with a Windows relative path on every host.
+        destination = MagicMock()
+        source = MagicMock()
+        source.name = 'source.c'
+        source.is_file.return_value = True
+        source.read_bytes.return_value = b'source'
+        source.relative_to.return_value = PureWindowsPath('nested/source.c')
+        destination.rglob.return_value = [source]
+        producer.write_source_manifest(destination)
+        destination.__truediv__.return_value.write_text.assert_called_once_with(
+            hashlib.sha256(b'source').hexdigest() + '  nested/source.c\n')
         for path in ('', '/absolute', '../a', 'a/../b', './a', 'a//b', 'a\\b', 'C:/a', 'a\0b'):
             with self.subTest(path=path), self.assertRaises(ValueError): validator.archive_path(path)
 
@@ -84,7 +96,7 @@ class SourceManifest(unittest.TestCase):
             self.assertFalse(list(node_source.rglob('.gitignore')))
             self.assertNotIn('.gitignore', (node_source / 'SOURCE_FILES.sha256').read_text())
             env = dict(os.environ, npm_config_cache=str(directory / 'npm-cache'), npm_config_offline='true')
-            subprocess.run(['npm', 'pack', '--ignore-scripts', '--pack-destination', str(directory)],
+            subprocess.run([shutil.which('npm'), 'pack', '--ignore-scripts', '--pack-destination', str(directory)],
                            cwd=node, env=env, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             self.assertGreater(validator.verify_source_manifest(next(directory.glob('*.tgz'))), 1000)
             python = producer.stage('python', directory)

@@ -44,7 +44,7 @@ def write_source_manifest(destination):
     manifest = []
     for file in sorted(destination.rglob("*")):
         if file.is_file() and file.name != "SOURCE_FILES.sha256":
-            manifest.append(hashlib.sha256(file.read_bytes()).hexdigest() + "  " + str(file.relative_to(destination)))
+            manifest.append(hashlib.sha256(file.read_bytes()).hexdigest() + "  " + file.relative_to(destination).as_posix())
     (destination / "SOURCE_FILES.sha256").write_text("\n".join(manifest) + "\n")
 
 def stage(language, destination):

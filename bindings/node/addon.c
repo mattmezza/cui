@@ -315,7 +315,7 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
     if (which != 1 && which != 7 && (number < 0 || number > UINT32_MAX || floor(number) != number))
         return fail(env, "expected unsigned integer");
     if ((which == 2 && number > 3) || (which == 3 && number > 14) || (which == 4 && number > 4) ||
-        (which == 11 && number > 4))
+        (which == 11 && number > 4) || (which == 14 && number > 14))
         return fail(env, "enum value is outside its supported range");
     cui_bridge_status code = CUI_BRIDGE_INVALID_ARGUMENT;
     if (which == 1)
@@ -323,6 +323,9 @@ static napi_value set_num(napi_env env, napi_callback_info info) {
     if (which == 2)
         code = cui_bridge_set_button_variant(app->bridge, node->node,
                                              (cui_bridge_button_variant)(int)number);
+    if (which == 14)
+        code = cui_bridge_set_design_size(app->bridge, node->node,
+                                           (cui_bridge_design_size)(int)number);
     if (which == 3)
         code = cui_bridge_set_button_size(app->bridge, node->node,
                                           (cui_bridge_button_size)(int)number);
@@ -494,6 +497,34 @@ static napi_value set_anchor(napi_env env, napi_callback_info info) {
         !node_arg(env, v[2], app, &anchor))
         return NULL;
     cui_bridge_status code = cui_bridge_set_anchor(app->bridge, node->node, anchor->node);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_avatar_identity(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    js_node *node;
+    uint32_t enabled, custom_hue, hue;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) ||
+        !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &enabled) ||
+        !uint_arg(env, v[3], &custom_hue) || !uint_arg(env, v[4], &hue))
+        return NULL;
+    cui_bridge_status code =
+        cui_bridge_set_avatar_identity(app->bridge, node->node, enabled, custom_hue, hue);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value set_avatar_placeholder(napi_env env, napi_callback_info info) {
+    napi_value v[4];
+    js_app *app;
+    js_node *node;
+    uint32_t enabled;
+    char *name = NULL;
+    if (!args(env, info, 4, v) || !app_arg(env, v[0], &app) ||
+        !node_arg(env, v[1], app, &node) || !uint_arg(env, v[2], &enabled) ||
+        !string_arg(env, v[3], &name))
+        return NULL;
+    cui_bridge_status code =
+        cui_bridge_set_avatar_placeholder(app->bridge, node->node, enabled, name);
+    free(name);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 static napi_value set_visual(napi_env env, napi_callback_info info) {
@@ -1802,6 +1833,9 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setGap", set_num, 1);
     EXPORT("setVariant", set_num, 2);
     EXPORT("setSize", set_num, 3);
+    EXPORT("setDesignSize", set_num, 14);
+    EXPORT("setAvatarIdentity", set_avatar_identity, 0);
+    EXPORT("setAvatarPlaceholder", set_avatar_placeholder, 0);
     EXPORT("setRounding", set_num, 4);
     EXPORT("setDisabled", set_num, 5);
     EXPORT("setDetail", set_detail, 0);

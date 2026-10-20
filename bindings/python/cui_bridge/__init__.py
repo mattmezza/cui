@@ -162,6 +162,9 @@ class _API:
         self.set_text = bind("set_text", C.c_int, C.c_void_p, _Handle, C.c_char_p)
         self.set_gap = bind("set_gap", C.c_int, C.c_void_p, _Handle, C.c_float)
         self.set_variant = bind("set_button_variant", C.c_int, C.c_void_p, _Handle, C.c_int)
+        self.set_design_size = bind("set_design_size", C.c_int, C.c_void_p, _Handle, C.c_int)
+        self.set_avatar_identity = bind("set_avatar_identity", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
+        self.set_avatar_placeholder = bind("set_avatar_placeholder", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_char_p)
         self.set_size = bind("set_button_size", C.c_int, C.c_void_p, _Handle, C.c_int)
         self.set_rounding = bind("set_button_rounding", C.c_int, C.c_void_p,
                                  _Handle, C.c_int, C.c_float)
@@ -229,6 +232,7 @@ class _API:
             raise BridgeError(status, message.decode("utf-8") if message else "unknown")
 
 
+DesignSize = Literal["inherit", "xs", "sm", "base", "md", "lg", "xl", "2xl", "3xl", "4xl", "5xl", "6xl", "7xl", "8xl", "9xl"]
 _SIZE = {name: i for i, name in enumerate(("inherit", "xs", "sm", "base", "md", "lg",
                                            "xl", "2xl", "3xl", "4xl", "5xl", "6xl",
                                            "7xl", "8xl", "9xl"))}
@@ -358,6 +362,9 @@ class Widget:
         self._question_flags = None
         self._variant = "primary"
         self._size = "base"
+        self._design_size = None
+        self._avatar_identity = None
+        self._avatar_placeholder = None
         self._rounding = "theme"
         self._radius = 0.0
         self._disabled = False
@@ -466,6 +473,33 @@ class Widget:
             raise ValueError("unsupported design size")
         self._change("set_size", _SIZE[value])
         self._size = value
+        return self
+
+    def design_size(self, value: DesignSize) -> "Widget":
+        """Shared scale: currently Button and Avatar only."""
+        if self.kind == "button":
+            return self.size(value)
+        if self.kind != "avatar" or value not in _SIZE:
+            raise ValueError("design_size requires Button or Avatar and a supported size")
+        self._change("set_design_size", _SIZE[value])
+        self._design_size = value
+        return self
+
+    def identity_colors(self, enabled: bool = True, hue: int | None = None) -> "Widget":
+        if self.kind != "avatar" or type(enabled) is not bool:
+            raise ValueError("identity_colors requires Avatar and a bool")
+        if hue is not None and (type(hue) is not int or not 0 <= hue <= 11):
+            raise ValueError("identity hue must be an integer 0..11 or None")
+        self._change("set_avatar_identity", int(enabled), int(hue is not None), hue or 0)
+        self._avatar_identity = (enabled, hue)
+        return self
+
+    def anonymous_icon(self, enabled: bool = True, name: str = "") -> "Widget":
+        if self.kind != "avatar" or type(enabled) is not bool:
+            raise ValueError("anonymous_icon requires Avatar and a bool")
+        encoded = _utf8(name)
+        self._change("set_avatar_placeholder", int(enabled), encoded)
+        self._avatar_placeholder = (enabled, name)
         return self
 
     def rounded_md(self) -> "Widget":
@@ -1406,6 +1440,14 @@ class App:
                     node._change("set_open", int(node._open))
                 if node.kind in _DETAIL:
                     node._change("set_detail", _utf8(node._detail))
+                if node._design_size is not None:
+                    node._change("set_design_size", _SIZE[node._design_size])
+                if node._avatar_identity is not None:
+                    enabled, hue = node._avatar_identity
+                    node._change("set_avatar_identity", int(enabled), int(hue is not None), hue or 0)
+                if node._avatar_placeholder is not None:
+                    enabled, name = node._avatar_placeholder
+                    node._change("set_avatar_placeholder", int(enabled), _utf8(name))
                 if node.kind == "button":
                     node._change("set_variant", _VARIANT[node._variant])
                     node._change("set_size", _SIZE[node._size])
@@ -1828,3 +1870,5 @@ __all__ += ["settings"]
 
 __all__ += ["ValueNotificationV1", "ScalarChangeNotificationV1", "TextChangeNotificationV1",
             "SelectionChangeNotificationV1"]
+
+__all__ += ["DesignSize"]

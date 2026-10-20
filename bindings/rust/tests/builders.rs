@@ -1770,3 +1770,33 @@ fn settings_pages_fields_filter_and_reset() {
     app.remove(settings).unwrap();
     assert_eq!(app.settings_page(settings).err(), Some(Error(4)));
 }
+#[test]
+fn avatar_style() {
+    let _guard = NATIVE.lock().unwrap();
+    let mut app = App::headless(600., 400.).unwrap();
+    let root = app.root(Kind::Column, "root").unwrap();
+    let person = app.build_child(root, Kind::Avatar, "person").unwrap()
+        .text("Ada Lovelace").unwrap().design_size(DesignSize::Md).unwrap()
+        .identity_colors(true, Some(4)).unwrap().anonymous_icon(true, "user").unwrap().finish();
+    let legacy = app.child(root, Kind::Avatar, "legacy").unwrap();
+    app.visual_size(legacy, 60., 60.).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.bounds(person).unwrap().width, 48.);
+    assert_eq!(app.bounds(legacy).unwrap().width, 60.);
+    app.design_size(person, DesignSize::Lg).unwrap().identity_colors(person, false, None).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.bounds(person).unwrap().width, 80.);
+    app.anonymous_icon(person, false, "").unwrap().design_size(person, DesignSize::Inherit).unwrap();
+    app.step(0.016).unwrap();
+    assert_eq!(app.bounds(person).unwrap().width, 40.);
+    assert_eq!(app.identity_colors(person, true, Some(12)).err(), Some(Error(3)));
+    assert_eq!(app.anonymous_icon(person, true, "bad\0").err(), Some(Error(3)));
+    assert_eq!(app.anonymous_icon(person, true, &"x".repeat(4097)).err(), Some(Error(3)));
+    assert!(app.design_size(root, DesignSize::Md).is_err());
+    let button = app.child(root, Kind::Button, "button").unwrap();
+    assert!(app.identity_colors(button, true, None).is_err());
+    assert!(app.size(person, Size::Md).is_err());
+    app.design_size(button, DesignSize::Lg).unwrap().size(button, Size::Sm).unwrap();
+    app.remove(person).unwrap();
+    assert!(app.design_size(person, DesignSize::Md).is_err());
+}

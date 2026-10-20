@@ -66,3 +66,17 @@ settings.settings_field_bounds(c.checkbox('updates','Updates'));
 settings.disabled();
 // @ts-expect-error Settings field bounds require a supported field control.
 settings.settings_field_bounds(c.button('save'));
+
+const styledAvatar: c.Avatar = c.avatar('person','Ada').design_size('md').identity_colors(true,4).anonymous_icon(true,'user');
+const sharedSize: c.DesignSize = '9xl';
+c.button('styled').design_size(sharedSize).size('base');
+// @ts-expect-error Shared scale currently excludes Badge.
+c.badge('bad').design_size('md');
+// @ts-expect-error Identity colors are Avatar-only.
+c.button('bad').identity_colors();
+// @ts-expect-error Existing size() remains Button-only.
+styledAvatar.size('md');
+// @ts-expect-error Unsupported named design variant.
+styledAvatar.design_size('huge');
+// @ts-expect-error Foreign bindings do not accept borrowed icon-state objects.
+styledAvatar.anonymous_icon(true, {});

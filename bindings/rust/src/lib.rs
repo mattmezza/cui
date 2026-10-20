@@ -541,6 +541,9 @@ extern "C" {
     fn cui_bridge_set_text(a: *mut c_void, n: RawNode, t: *const c_char) -> u32;
     fn cui_bridge_set_gap(a: *mut c_void, n: RawNode, g: f32) -> u32;
     fn cui_bridge_set_button_variant(a: *mut c_void, n: RawNode, v: u32) -> u32;
+    fn cui_bridge_set_design_size(a: *mut c_void, n: RawNode, v: u32) -> u32;
+    fn cui_bridge_set_avatar_identity(a: *mut c_void, n: RawNode, enabled: u32, custom_hue: u32, hue: u32) -> u32;
+    fn cui_bridge_set_avatar_placeholder(a: *mut c_void, n: RawNode, enabled: u32, name: *const c_char) -> u32;
     fn cui_bridge_set_button_size(a: *mut c_void, n: RawNode, v: u32) -> u32;
     fn cui_bridge_set_button_rounding(a: *mut c_void, n: RawNode, v: u32, r: f32) -> u32;
     fn cui_bridge_set_button_disabled(a: *mut c_void, n: RawNode, v: u32) -> u32;
@@ -839,6 +842,8 @@ pub enum Size {
     X8l = 13,
     X9l = 14,
 }
+/// Shared scale, currently supported only by Button and Avatar.
+pub type DesignSize = Size;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rounding {
     Theme,
@@ -1085,6 +1090,25 @@ impl App {
     pub fn size(&mut self, n: Node, v: Size) -> Result<&mut Self> {
         let n = self.valid(n)?;
         check(unsafe { cui_bridge_set_button_size(self.raw, n, v as u32) })?;
+        Ok(self)
+    }
+    /// Shared scale for Button and Avatar only; other kinds return an error.
+    pub fn design_size(&mut self, n: Node, v: DesignSize) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_design_size(self.raw, n, v as u32) })?;
+        Ok(self)
+    }
+    pub fn identity_colors(&mut self, n: Node, enabled: bool, hue: Option<u8>) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        if hue.is_some_and(|h| h > 11) { return Err(Error(3)); }
+        check(unsafe { cui_bridge_set_avatar_identity(self.raw, n, enabled as u32,
+            hue.is_some() as u32, hue.unwrap_or(0) as u32) })?;
+        Ok(self)
+    }
+    pub fn anonymous_icon(&mut self, n: Node, enabled: bool, name: &str) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        let name = string(name)?;
+        check(unsafe { cui_bridge_set_avatar_placeholder(self.raw, n, enabled as u32, name.as_ptr()) })?;
         Ok(self)
     }
     pub fn rounding(&mut self, n: Node, v: Rounding) -> Result<&mut Self> {
@@ -2125,6 +2149,18 @@ impl<'a> Builder<'a> {
     }
     pub fn size(self, v: Size) -> Result<Self> {
         self.app.size(self.node, v)?;
+        Ok(self)
+    }
+    pub fn design_size(self, v: DesignSize) -> Result<Self> {
+        self.app.design_size(self.node, v)?;
+        Ok(self)
+    }
+    pub fn identity_colors(self, enabled: bool, hue: Option<u8>) -> Result<Self> {
+        self.app.identity_colors(self.node, enabled, hue)?;
+        Ok(self)
+    }
+    pub fn anonymous_icon(self, enabled: bool, name: &str) -> Result<Self> {
+        self.app.anonymous_icon(self.node, enabled, name)?;
         Ok(self)
     }
     pub fn rounding(self, v: Rounding) -> Result<Self> {

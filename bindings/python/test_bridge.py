@@ -1,6 +1,6 @@
 """Headless real-component bridge behavior and Python callback isolation."""
 import unittest
-from cui_bridge import App, BridgeError, button, column, label, row
+from cui_bridge import App, BridgeError, avatar, button, column, label, row
 
 
 def click(app, widget):
@@ -11,6 +11,33 @@ def click(app, widget):
 
 
 class BridgeTests(unittest.TestCase):
+    def test_avatar_style_owned_options_and_live_updates(self):
+        person = avatar("person", "Ada Lovelace").design_size("md").identity_colors(True, 4)
+        anonymous = avatar("anonymous").anonymous_icon(True, "user")
+        legacy = avatar("legacy", "L").visual_size(60, 60)
+        with App(width=600, height=400) as app:
+            app.mount(column().children(person, anonymous, legacy))
+            app.step()
+            self.assertEqual(app.bounds(person)[2:], (48, 48))
+            self.assertEqual(app.bounds(anonymous)[2:], (40, 40))
+            self.assertEqual(app.bounds(legacy)[2:], (60, 60))
+            person.design_size("lg").identity_colors(False).anonymous_icon(False)
+            app.step()
+            self.assertEqual(app.bounds(person)[2:], (80, 80))
+            person.design_size("inherit")
+            app.step()
+            self.assertEqual(app.bounds(person)[2:], (40, 40))
+            for bad in (12, -1, 1.5, True):
+                with self.assertRaises(ValueError): person.identity_colors(True, bad)
+            for bad in ("\0bad", "x" * 4097, "\ud800"):
+                with self.assertRaises((ValueError, UnicodeError)): anonymous.anonymous_icon(True, bad)
+        with self.assertRaises(RuntimeError): person.design_size("md")
+        for node in (label("bad"), row()):
+            with self.assertRaises(ValueError): node.design_size("md")
+        with self.assertRaises(ValueError): button("bad").identity_colors()
+        with self.assertRaises(ValueError): avatar("bad").size("md")
+        self.assertEqual(button("ordered").design_size("lg").size("sm")._size, "sm")
+
     def test_callback_can_close_or_request_close(self):
         for dispose in (False, True):
             with App() as app:

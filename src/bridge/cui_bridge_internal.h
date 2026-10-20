@@ -41,6 +41,9 @@ typedef struct {
     float gap, custom_radius;
     cui_bridge_button_variant variant;
     cui_bridge_button_size size;
+    char *avatar_placeholder;
+    bool avatar_identity, avatar_custom_hue, avatar_anonymous;
+    unsigned avatar_hue;
     cui_bridge_button_rounding rounding;
     bool disabled, custom_hover;
     cui_color hover;

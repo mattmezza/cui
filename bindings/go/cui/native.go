@@ -65,6 +65,9 @@ static char bridge_error_buf[80];
  X(set_visual_size, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, float w, float h), (a,n,w,h)) \
  X(set_gap, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, float v), (a,n,v)) \
  X(set_button_variant, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_button_variant v), (a,n,v)) \
+ X(set_design_size, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_button_size v), (a,n,v)) \
+ X(set_avatar_identity, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t enabled, uint32_t custom, uint32_t hue), (a,n,enabled,custom,hue)) \
+ X(set_avatar_placeholder, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t enabled, const char *name), (a,n,enabled,name)) \
  X(set_button_size, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_button_size v), (a,n,v)) \
  X(set_button_rounding, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_button_rounding v, float radius), (a,n,v,radius)) \
  X(set_button_disabled, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t v), (a,n,v)) \
@@ -373,6 +376,13 @@ type Node struct {
 	onClose                              func(Event)
 	err                                  error
 	removed                              bool
+
+	designSize                                        int
+	hasDesignSize                                     bool
+	avatarIdentity, avatarCustomHue, hasAvatarIdentity bool
+	avatarHue                                         uint8
+	avatarAnonymous, hasAvatarPlaceholder              bool
+	avatarPlaceholder                                 string
 }
 type Rect struct{ X, Y, Width, Height float32 }
 type Handle struct{ Slot, Generation uint32 }
@@ -389,6 +399,10 @@ type Event struct {
 	SelectedHandle Handle
 	CloseResult    int
 }
+
+// DesignSize uses the shared scale currently supported by Button and Avatar.
+type DesignSize = Size
+
 type Size int
 
 const (
@@ -1106,6 +1120,95 @@ func (n *Node) Size(v Size) *Node {
 	}
 	return n
 }
+
+// DesignSize applies the shared scale to Button and Avatar only.
+func (n *Node) DesignSize(v DesignSize) *Node {
+	if n.kind == 4 {
+		return n.Size(v)
+	}
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 30 || v < Inherit || v > Size9XL {
+		n.err = errors.New("design size requires Button or Avatar and a supported size")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := result(C.go_set_design_size(n.app.ptr, n.handle, C.cui_bridge_button_size(v))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.designSize = int(v)
+	n.hasDesignSize = true
+	return n
+}
+
+// IdentityColors enables Avatar identity colors with zero or one hue (0..11).
+func (n *Node) IdentityColors(enabled bool, hue ...uint8) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 30 || len(hue) > 1 || (len(hue) == 1 && hue[0] > 11) {
+		n.err = errors.New("identity colors requires Avatar and optional hue 0..11")
+		return n
+	}
+	var h uint8
+	if len(hue) == 1 {
+		h = hue[0]
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := result(C.go_set_avatar_identity(n.app.ptr, n.handle, C.uint32_t(btoi(enabled)), C.uint32_t(btoi(len(hue) == 1)), C.uint32_t(h))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.avatarIdentity = enabled
+	n.avatarCustomHue = len(hue) == 1
+	n.avatarHue = h
+	n.hasAvatarIdentity = true
+	return n
+}
+
+// AnonymousIcon supplies an owned named SVG fallback for an empty Avatar name.
+func (n *Node) AnonymousIcon(enabled bool, name string) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 30 {
+		n.err = errors.New("anonymous icon requires Avatar")
+		return n
+	}
+	if e := valid(name); e != nil {
+		n.err = e
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		p := cs(name)
+		e := result(C.go_set_avatar_placeholder(n.app.ptr, n.handle, C.uint32_t(btoi(enabled)), p))
+		C.free(unsafe.Pointer(p))
+		if e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.avatarAnonymous = enabled
+	n.avatarPlaceholder = name
+	n.hasAvatarPlaceholder = true
+	return n
+}
 func (n *Node) Rounding(v Rounding, r float32) *Node {
 	if n.err != nil {
 		return n
@@ -1396,6 +1499,24 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasStepStatus {
 			if e := result(C.go_set_step_status(a.ptr, h, C.uint32_t(n.stepStatus))); e != nil {
+				return e
+			}
+		}
+		if n.hasDesignSize {
+			if e := result(C.go_set_design_size(a.ptr, h, C.cui_bridge_button_size(n.designSize))); e != nil {
+				return e
+			}
+		}
+		if n.hasAvatarIdentity {
+			if e := result(C.go_set_avatar_identity(a.ptr, h, C.uint32_t(btoi(n.avatarIdentity)), C.uint32_t(btoi(n.avatarCustomHue)), C.uint32_t(n.avatarHue))); e != nil {
+				return e
+			}
+		}
+		if n.hasAvatarPlaceholder {
+			p := cs(n.avatarPlaceholder)
+			e := result(C.go_set_avatar_placeholder(a.ptr, h, C.uint32_t(btoi(n.avatarAnonymous)), p))
+			C.free(unsafe.Pointer(p))
+			if e != nil {
 				return e
 			}
 		}

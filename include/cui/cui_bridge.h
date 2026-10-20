@@ -275,6 +275,9 @@ typedef enum {
     CUI_BRIDGE_SIZE_8XL,
     CUI_BRIDGE_SIZE_9XL
 } cui_bridge_button_size;
+/* Shared scale, currently supported by Button and Avatar only. Existing Button
+ * size functions retain their Button-only contract and enum values. */
+typedef cui_bridge_button_size cui_bridge_design_size;
 typedef enum {
     CUI_BRIDGE_ROUND_THEME = 0,
     CUI_BRIDGE_ROUND_NONE,
@@ -511,6 +514,21 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *a
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_size(cui_bridge_app *app,
                                                             cui_bridge_node node,
                                                             cui_bridge_button_size size);
+/* INHERIT restores the component's legacy sizing; explicit variants win over
+ * Avatar visual_size. Other component kinds return INVALID_STATE. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_design_size(cui_bridge_app *, cui_bridge_node,
+                                                            cui_bridge_design_size);
+/* Avatar only. Flags are 0/1; custom hue is 0..11. No other palette/ring API. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_avatar_identity(cui_bridge_app *, cui_bridge_node,
+                                                                uint32_t enabled,
+                                                                uint32_t custom_hue, uint32_t hue);
+/* Avatar only. Copies valid UTF-8, at most 4096 bytes, transactionally. Empty
+ * name selects the default user SVG. Used only for an empty accessible name;
+ * named initials take precedence. No borrowed icon-state pointer is accepted. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_avatar_placeholder(cui_bridge_app *,
+                                                                   cui_bridge_node,
+                                                                   uint32_t enabled,
+                                                                   const char *name_utf8);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_rounding(cui_bridge_app *app,
                                                                 cui_bridge_node node,
                                                                 cui_bridge_button_rounding rounding,

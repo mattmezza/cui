@@ -1,9 +1,24 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 const assert = require('node:assert/strict');
-const {App, row, column, label, button} = require('..');
+const {App, row, column, label, button, avatar} = require('..');
 
 async function main() {
+  const avatarApp = new App({width:600,height:400});
+  const person = avatar('person','Ada Lovelace').design_size('md').identity_colors(true,4);
+  const anonymous = avatar('anonymous').anonymous_icon(true,'user');
+  const legacy = avatar('legacy','L').visual_size(60,60);
+  avatarApp.mount(column().children(person,anonymous,legacy)); avatarApp.step();
+  assert.equal(person.bounds().width,48); assert.equal(anonymous.bounds().width,40); assert.equal(legacy.bounds().width,60);
+  person.design_size('lg').identity_colors(false).anonymous_icon(false); avatarApp.step();
+  assert.equal(person.bounds().width,80);
+  person.design_size('inherit'); avatarApp.step(); assert.equal(person.bounds().width,40);
+  for(const bad of [12,-1,1.5,true])assert.throws(()=>person.identity_colors(true,bad));
+  for(const bad of ['\0bad','x'.repeat(4097),'\uD800'])assert.throws(()=>anonymous.anonymous_icon(true,bad));
+  assert.throws(()=>label().design_size('md')); assert.throws(()=>button().identity_colors());
+  assert.throws(()=>avatar().size('md'));
+  assert.equal(button().design_size('lg').size('sm').sizeValue,2);
+  avatarApp.dispose(); assert.throws(()=>person.design_size('md'));
   for (const dispose of [false, true]) {
     const closingApp = new App();
     const closer = button('close').label('Close').on_click(() =>

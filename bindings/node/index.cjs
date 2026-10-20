@@ -85,6 +85,24 @@ class Node {
   secondary() { return this._variant(1); }
   outline() { return this._variant(2); }
   ghost() { return this._variant(3); }
+  design_size(value) {
+    if (this.kind === 4) return this.size(value);
+    const names = {inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14};
+    if (this.kind !== 30 || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button or Avatar and a supported size');
+    if (this.owner) native.setDesignSize(this.owner.handle,this[NODE],names[value]);
+    this.designSizeValue=names[value]; return this;
+  }
+  identity_colors(enabled=true,hue=null) {
+    if (this.kind!==30 || typeof enabled!=='boolean' || (hue!==null && (!Number.isInteger(hue)||hue<0||hue>11))) throw new TypeError('identity_colors requires Avatar, bool, and optional hue 0..11');
+    const value=[enabled?1:0,hue===null?0:1,hue??0];
+    if(this.owner) native.setAvatarIdentity(this.owner.handle,this[NODE],...value);
+    this.avatarIdentityValue=value; return this;
+  }
+  anonymous_icon(enabled=true,name='') {
+    if(this.kind!==30 || typeof enabled!=='boolean' || typeof name!=='string' || name.includes('\0') || Buffer.byteLength(name,'utf8')>4096 || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(name)) throw new TypeError('anonymous_icon requires Avatar, bool, and valid UTF-8 name up to 4096 bytes');
+    if(this.owner) native.setAvatarPlaceholder(this.owner.handle,this[NODE],enabled?1:0,name);
+    this.avatarPlaceholderValue=[enabled?1:0,name]; return this;
+  }
   _size(value) { this._button(); this.sizeValue = value; if (this.owner) native.setSize(this.owner.handle, this[NODE], value); return this; }
   inherit() { return this._size(0); }
   xs() { return this._size(1); }
@@ -365,6 +383,9 @@ class App {
       if(node.extentValue)native.setScrollExtent(this.handle,node[NODE],...node.extentValue);
       if(node.visualValue)native.setVisualSize(this.handle,node[NODE],...node.visualValue);
       if(node.statusValue!==null)native.setStepStatus(this.handle,node[NODE],node.statusValue);
+      if(node.designSizeValue!==undefined)native.setDesignSize(this.handle,node[NODE],node.designSizeValue);
+      if(node.avatarIdentityValue)native.setAvatarIdentity(this.handle,node[NODE],...node.avatarIdentityValue);
+      if(node.avatarPlaceholderValue)native.setAvatarPlaceholder(this.handle,node[NODE],...node.avatarPlaceholderValue);
       if (node.kind === 4) {
         native.setVariant(this.handle, node[NODE], node.variantValue);
         native.setSize(this.handle, node[NODE], node.sizeValue);

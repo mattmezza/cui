@@ -11,7 +11,10 @@ export interface Container extends Node { children(...items: (Node | Node[])[]):
 export interface Row extends Container {}
 export interface Column extends Container {}
 export interface Label extends Node { label(value: string): this }
-export interface Button extends Node {
+export type DesignSize = 'inherit' | 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | '8xl' | '9xl';
+/** Shared scale is currently supported only by Button and Avatar. */
+export interface DesignSized {design_size(value: DesignSize): this}
+export interface Button extends Node, DesignSized {
   label(value: string): this; primary(): this; secondary(): this; outline(): this; ghost(): this;
   inherit(): this; xs(): this; sm(): this; small(): this; base(): this; md(): this; medium(): this; lg(): this; large(): this; xl(): this; size(value: "inherit" | "xs" | "sm" | "base" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "8xl" | "9xl"): this;
   rounded_theme(): this; rounded_none(): this; rounded_sm(): this; rounded_md(): this; rounded_px(radius: number): this;
@@ -97,10 +100,11 @@ export function tooltip(key?: string, text?: string): HoverSurface;
 export function hover_card(key?: string, text?: string): HoverCard;
 
 export interface Visual extends Label {visual_size(width: number, height: number): this}
+export interface Avatar extends Visual, DesignSized {identity_colors(enabled?: boolean, hue?: number | null): this; anonymous_icon(enabled?: boolean, name?: string): this}
 export interface EmptyView extends Visual {detail(text: string): this}
 export interface GroupBox extends Visual, Composite {}
 export interface Message extends Visual {detail(text: string): this}
-export function avatar(key?: string, text?: string): Visual;
+export function avatar(key?: string, text?: string): Avatar;
 export function bubble(key?: string, text?: string): Label;
 export function empty_view(key?: string, text?: string): EmptyView;
 export function group_box(key?: string, text?: string): GroupBox;

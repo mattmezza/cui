@@ -212,3 +212,184 @@ with explicit precision boundaries. Handwritten Python, Node/TypeScript, Go and
 Rust support needs separate typed owned-string/float APIs and language tests;
 copied SDK headers alone do not establish builder support. No eye-dropper service,
 full popup, tabs, theme parity or native AT parity is completed by this design.
+
+## Exact first implementation contract (review gate)
+
+The following declaration-shaped API supersedes provisional naming above. Shared
+primitives live in `cui_color_hsla.h`, depending only on `cui.h`; the owned field
+API lives in `cui_color_hsla_entry.h`, including those primitives and existing
+Input declarations. Neither header depends on byte ColorEntry or Plot.
+
+```c
+typedef struct { float h, s, l, a; } cui_color_hsla;
+/* Encoded, unpremultiplied channels; explicitly not Plot linear RGBA. */
+typedef struct { float r, g, b, a; } cui_color_encoded_rgba;
+typedef enum {
+    CUI_COLOR_HSLA_OK,
+    CUI_COLOR_HSLA_INVALID_ARGUMENT,
+    CUI_COLOR_HSLA_CAPACITY
+} cui_color_hsla_status;
+typedef enum {
+    CUI_COLOR_HSLA_HEX_INVALID,
+    CUI_COLOR_HSLA_HEX_INCOMPLETE,
+    CUI_COLOR_HSLA_HEX_COMPLETE
+} cui_color_hsla_hex_status;
+typedef struct {
+    cui_color_hsla_status status;
+    size_t required; /* Payload bytes, excluding NUL; 7 or 9 for valid color. */
+} cui_color_hsla_format_result;
+bool cui_color_hsla_valid(cui_color_hsla);
+cui_color_hsla_status cui_color_hsla_from_rgba(cui_color_encoded_rgba,
+                                             cui_color_hsla *out);
+cui_color_hsla_status cui_color_hsla_to_rgba(cui_color_hsla,
+                                           cui_color_encoded_rgba *out);
+cui_color_hsla_status cui_color_hsla_from_color(cui_color, cui_color_hsla *out);
+/* Explicit source-style truncating export, never updates a retained model. */
+cui_color_hsla_status cui_color_hsla_to_color(cui_color_hsla, cui_color *out);
+cui_color_hsla_hex_status cui_color_hsla_parse_hex(cui_str, cui_color_hsla *out);
+cui_color_hsla_format_result cui_color_hsla_format_hex(cui_color_hsla,
+                                                      char *out, size_t capacity);
+
+typedef struct {
+    bool present;
+    cui_color_hsla color;
+} cui_color_hsla_value;
+typedef enum {
+    CUI_COLOR_HSLA_ENTRY_OK,
+    CUI_COLOR_HSLA_ENTRY_INVALID_ARGUMENT,
+    CUI_COLOR_HSLA_ENTRY_CONFLICT,
+    CUI_COLOR_HSLA_ENTRY_INCOMPLETE,
+    CUI_COLOR_HSLA_ENTRY_ALLOCATION_FAILED,
+    CUI_COLOR_HSLA_ENTRY_EDIT_ERROR
+} cui_color_hsla_entry_outcome;
+typedef enum {
+    CUI_COLOR_HSLA_COMMIT_SELECT, /* Successful commit requests close. */
+    CUI_COLOR_HSLA_COMMIT_UPDATE  /* Successful commit leaves open policy alone. */
+} cui_color_hsla_commit_kind;
+typedef struct {
+    cui_color_hsla_entry_outcome outcome;
+    bool committed, close_requested;
+    cui_color_hsla_value previous, value;
+} cui_color_hsla_commit_result;
+typedef struct {
+    char draft[10];
+    cui_edit *edit;
+    cui_input_state input;
+    cui_color_hsla_value committed, preview;
+    cui_color_hsla_hex_status status;
+    bool dirty;
+} cui_color_hsla_entry_state;
+cui_color_hsla_entry_outcome cui_color_hsla_entry_init(
+    cui_color_hsla_entry_state *, cui_color_hsla_value);
+void cui_color_hsla_entry_destroy(cui_color_hsla_entry_state *);
+cui_color_hsla_entry_outcome cui_color_hsla_entry_sync(
+    cui_color_hsla_entry_state *, cui_color_hsla_value, bool replace_draft);
+cui_color_hsla_entry_outcome cui_color_hsla_entry_set_draft(
+    cui_color_hsla_entry_state *, cui_str);
+cui_color_hsla_entry_outcome cui_color_hsla_entry_preview(
+    cui_color_hsla_entry_state *, cui_color_hsla, bool replace_draft);
+cui_color_hsla_entry_outcome cui_color_hsla_entry_restore(
+    cui_color_hsla_entry_state *, bool replace_draft);
+cui_color_hsla_commit_result cui_color_hsla_entry_commit_hex(
+    cui_color_hsla_entry_state *, cui_color_hsla_commit_kind);
+cui_color_hsla_commit_result cui_color_hsla_entry_commit_value(
+    cui_color_hsla_entry_state *, cui_color_hsla,
+    cui_color_hsla_commit_kind, bool replace_draft);
+
+typedef struct {
+    bool disabled, readonly;
+    float width; /* Styled Input width; Base caller supplies layout. */
+} cui_color_hsla_entry_options;
+typedef struct {
+    cui_input_result input;
+    bool submitted; /* Eligible active field submission, not an Enter count. */
+    bool draft_changed;
+    size_t commit_count, rejected_commit_count, close_request_count;
+    cui_color_hsla_hex_status status;
+    cui_color_hsla_value previous, committed, preview;
+    cui_component_event_metadata event;
+} cui_color_hsla_entry_result;
+typedef void (*cui_color_hsla_entry_commit_fn)(void *,
+                                              const cui_color_hsla_entry_result *);
+typedef struct {
+    cui_color_hsla_entry_commit_fn on_commit;
+    void *user;
+} cui_color_hsla_entry_handler;
+cui_color_hsla_entry_result cui_base_color_hsla_entry(
+    cui_context *, cui_id, cui_str name, cui_color_hsla_entry_state *,
+    cui_color_hsla_entry_options, cui_color_hsla_entry_handler);
+cui_color_hsla_entry_result cui_color_hsla_entry(
+    cui_context *, cui_id, const cui_theme *, cui_str name,
+    cui_color_hsla_entry_state *, cui_color_hsla_entry_options,
+    cui_color_hsla_entry_handler);
+```
+
+All required pointer outputs must be nonnull except parse's output, which may
+be NULL for validation. Present float values require finite normalized channels;
+absent optional values ignore their color and store zeroed color. Parse grammar
+and admission remain as specified above. Parse failure writes nothing. Conversion
+failure writes nothing. Format validates color and output arguments before any
+write: NULL with capacity zero is a length probe (CAPACITY with required 7/9),
+NULL with nonzero capacity is INVALID_ARGUMENT, and insufficient capacity leaves
+all destination bytes unchanged. Invalid format arguments return required zero.
+All input/output extents must be disjoint. No malloc is needed for primitives.
+
+Initialization requires a zeroed state; double init and use-after-destroy return
+INVALID_ARGUMENT. State members remain read-only to callers, address-stable and
+noncopyable. Init/sync/preview/restore/direct-value commit use this replacement
+transaction: validate state/value/mode and dirty conflict first; format the new
+display into a local ten-byte array; save the old owned draft locally; copy the
+candidate into the final owned buffer and allocate a fresh editor bound to that
+final address. No user callback or UI submission runs during this synchronous
+temporary buffer replacement. On allocation failure restore every old buffer
+byte and keep the old editor, selection/history, input state and float values.
+Only after allocation succeeds destroy the old editor, install the new editor,
+zero retained Input view state, then publish float/model fields. Destroy remains
+idempotent. These operations are forbidden during submission and before prior
+render consumption. There is no allocation after the transaction's publish point.
+
+Successful sync sets committed=preview=the copied optional owner value, sets the
+formatted draft/status and clears dirty. Preview replaces only preview/display
+and clears dirty, retaining committed. Restore applies committed to preview/display
+and clears dirty. Neither operation commits or invokes a handler. A dirty draft
+conflicts unless replacement was requested; even an equal owner value cannot
+silently erase a dirty draft. Set-draft uses editor's atomic whole-content operation,
+marks dirty, and parses complete text into preview only; failure leaves all model
+fields unchanged. It may preserve editor undo history, unlike replacement sync.
+
+Commit-hex validates kind, reparses the exact current draft regardless of dirty,
+and on COMPLETE publishes parsed committed=preview and clears dirty. It does not
+rewrite editor bytes/history while Input borrows them. Failure returns committed
+false/close_requested false and copied unchanged previous/value; incomplete has
+INCOMPLETE outcome, malformed state/text has INVALID_ARGUMENT. Direct-value commit
+uses the replacement transaction and copies the supplied floats, never hex-parsing
+their display. Successful SELECT sets close_requested true, successful UPDATE
+sets it false; both set committed true even for equal values. Neither changes or
+owns popup open state. Optional clearing occurs through silent owner sync only.
+
+The real hex field always uses SELECT for accepted Enter submits. Every successful
+submit increments commit_count and close_request_count, including same value;
+an incomplete accepted submit increments rejected_commit_count. Counts are bounded
+by the frame's input event count and independent of an installed handler. Close
+request count is evidence of requested policy, not completed popup dismissals.
+The inline field never closes a popup. A later popup coordinator must consume these
+requests before its own outer observer to match source close-before-Change timing;
+it must not pass an early inner observer through unchanged.
+
+`previous` snapshots committed at field entry; `committed` and `preview` snapshot
+the final model after ordered reduction. `draft_changed` tracks accepted text
+changes, not cursor motion or owner sync. `submitted` snapshots a valid active
+non-inert/non-layout-only submission with disabled/readonly false. Metadata kind
+is SUBMIT, target is field ID, source UNKNOWN, and HAS_FRAME is present only for
+that eligible submission; no INDEX/SOURCE/ACTIVATION flags are invented. Invalid
+arguments return input.error INVALID_ARGUMENT, submitted false and no metadata.
+An external observer is invoked once only when commit_count>0, after final Base
+semantics or styled paint. It receives the same copied summary returned to the
+caller. The handler and user are entry snapshots, borrowed through outer return.
+All previously stated mutation/reentrancy/render-lifetime restrictions apply.
+
+Production remains gated on review of this addendum. The first implementation
+must prove primitive reuse independently of the owned field, precision retention
+versus explicit hex quantization, transaction rollback, queue ordering and close
+request facts. Popup open ownership, HSLA sliders/tabs and foreign builders remain
+separate approved implementation slices, not declarations hidden in this model.

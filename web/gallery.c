@@ -20,6 +20,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_effects.h"
 #include "cui/cui_form.h"
 #include "cui/cui_icon.h"
+#include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_numeric.h"
@@ -35,6 +36,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_sidebar.h"
 #include "cui/cui_speech.h"
 #include "cui/cui_status.h"
+#include "cui/cui_stepper_navigation.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
 #include "cui/cui_text_view.h"
@@ -1480,6 +1482,17 @@ static char number_buffer[128] = "42";
 static cui_number_state number_state;
 static double number = 42;
 static size_t page_number = 3, current_step;
+static bool stepper_details_confirmed, stepper_validation_failed;
+static unsigned stepper_request_count;
+static void gallery_stepper_request(void *user, const cui_stepper_navigation_request *request) {
+    (void)user;
+    stepper_request_count++;
+    stepper_validation_failed = request->requested > 0 && !stepper_details_confirmed;
+    if (!stepper_validation_failed)
+        current_step = request->requested;
+    /* The request callback changes owner data; borrowed descriptors stay stable. */
+    cui_invalidate(ui);
+}
 static float rating = 3;
 static cui_id dock_serial = 3;
 static uint64_t dock_active_panel = 1;
@@ -4458,7 +4471,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_end_group_box(ui);
         break;
     case 17:
-        cui_kbd(ui, cui_id_from(ui, "kbd"), &t, cui_string("Ctrl + K"));
+        cui_label(ui, &t, cui_string("Shortcut hints"));
+        cui_begin_box(ui, cui_id_from(ui, "shortcut-hints"), (cui_box){.row = true, .gap = t.gap});
+        cui_kbd_ex(ui, cui_id_from(ui, "kbd"), &t,
+                   (cui_kbd_stroke){.modifiers = CUI_MOD_CTRL | CUI_MOD_SHIFT, .key = CUI_STR("k")},
+                   (cui_kbd_options){0});
+        cui_kbd_ex(ui, cui_id_from(ui, "kbd-outline"), &t,
+                   (cui_kbd_stroke){.key = CUI_STR("escape")}, (cui_kbd_options){.outline = true});
+        cui_kbd_ex(ui, cui_id_from(ui, "kbd-plain"), &t, (cui_kbd_stroke){.key = CUI_STR("enter")},
+                   (cui_kbd_options){.plain = true});
+        cui_end_box(ui);
+        cui_label(ui, &t, cui_string("Hints do not register shortcuts."));
         break;
     case 18: {
         cui_skeleton_options options = cui_skeleton_options_default();
@@ -5417,10 +5440,29 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                         .width = width > 360 ? 280 : width - 128});
         break;
     case 36: {
-        cui_step steps[3] = {{cui_string("Details"), cui_string(""), CUI_STEP_COMPLETE, false},
-                             {cui_string("Review"), cui_string(""), CUI_STEP_ACTIVE, false},
-                             {cui_string("Finish"), cui_string(""), CUI_STEP_PENDING, false}};
-        cui_stepper(ui, cui_id_from(ui, "stepper"), &t, steps, 3, &current_step, true, disabled);
+        if (cui_checkbox(ui, cui_id_from(ui, "stepper-details"), &t,
+                         cui_string("Details confirmed"), &stepper_details_confirmed, disabled))
+            stepper_validation_failed = false;
+        const cui_step steps[3] = {
+            {cui_string("Details"), cui_string("Confirm before continuing"),
+             stepper_validation_failed ? CUI_STEP_ERROR
+             : current_step > 0        ? CUI_STEP_COMPLETE
+                                       : CUI_STEP_ACTIVE,
+             false},
+            {cui_string("Review"), cui_string("Review application"),
+             current_step > 1 ? CUI_STEP_COMPLETE : CUI_STEP_PENDING, false},
+            {cui_string("Finish"), cui_string("Ready to submit"), CUI_STEP_PENDING, false}};
+        cui_stepper_navigation(ui, cui_id_from(ui, "stepper"), &t, steps, 3, current_step, true,
+                               disabled,
+                               (cui_stepper_navigation_handler){gallery_stepper_request, NULL});
+        char status[160];
+        snprintf(status, sizeof status, "Step %zu of 3", current_step + 1);
+        cui_label(ui, &t, cui_string(status));
+        snprintf(status, sizeof status, "Navigation requests: %u", stepper_request_count);
+        cui_label(ui, &t, cui_string(status));
+        if (stepper_validation_failed)
+            cui_label(ui, &t, cui_string("Confirm details to continue."));
+        cui_label(ui, &t, cui_string("Your app validates each request."));
         break;
     }
     case 37: {

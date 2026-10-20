@@ -337,9 +337,9 @@ API: `cui_image`. [Public header](../include/cui/cui_media.h); [guide](MEDIA.md)
 
 **Interaction:** Presentation only; shortcut dispatch belongs to the application.
 
-**Usage:** Format host conventions explicitly and submit the chord label.
+**Usage:** Submit typed single-stroke hints; compose several as ordinary row children. Host shortcut registration remains separate.
 
-API: `cui_kbd`, `cui_kbd_format`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_kbd`, `cui_kbd_format`, `cui_kbd_ex`, `cui_kbd_format_stroke`. [Public header](../include/cui/cui_content.h); [typed hints](../include/cui/cui_kbd.h); [guide](KBD.md).
 
 ## Label
 
@@ -497,11 +497,11 @@ API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loadin
 
 **State:** Caller owns step descriptors and size_t active step.
 
-**Interaction:** Returns true when active step changes.
+**Interaction:** Legacy reducer updates the active index; additive navigation requests let the application validate and choose the next submitted index.
 
 **Usage:** Submit step descriptors and the current step; validate application data before progressing elsewhere.
 
-API: `cui_stepper`. [Public header](../include/cui/cui_numeric.h); [guide](NUMERIC.md).
+API: `cui_stepper`, `cui_stepper_events`, `cui_stepper_navigation`, `cui_base_stepper_navigation`. [Public header](../include/cui/cui_numeric.h); [controlled requests](../include/cui/cui_stepper_navigation.h); [guide](STEPPER_NAVIGATION.md).
 
 Additional event includes: `cui/cui_numeric_selection_events.h`.
 

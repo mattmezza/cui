@@ -460,20 +460,29 @@
     {
       "api_symbols": [
         "cui_kbd",
-        "cui_kbd_format"
+        "cui_kbd_format",
+        "cui_kbd_ex",
+        "cui_kbd_format_stroke"
       ],
-      "state_types": [],
+      "state_types": [
+        "cui_kbd_stroke",
+        "cui_kbd_options"
+      ],
       "state_ownership": "Caller owns shortcut text and optional formatting buffer.",
       "interaction": "Presentation only; shortcut dispatch belongs to the application.",
-      "usage": "Format host conventions explicitly and submit the chord label.",
+      "usage": "Submit typed single-stroke hints; compose several as ordinary row children. Host shortcut registration remains separate.",
       "docs": [
-        "docs/CONTENT.md"
+        "docs/CONTENT.md",
+        "docs/KBD.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
       "name": "Kbd",
       "public_header": "include/cui/cui_content.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_kbd.h"
+      ]
     },
     {
       "api_symbols": [
@@ -761,17 +770,20 @@
     {
       "api_symbols": [
         "cui_stepper",
-        "cui_stepper_events"
+        "cui_stepper_events",
+        "cui_stepper_navigation",
+        "cui_base_stepper_navigation"
       ],
       "state_types": [
         "cui_step"
       ],
       "state_ownership": "Caller owns step descriptors and size_t active step.",
-      "interaction": "Returns true when active step changes.",
+      "interaction": "Legacy reducer updates the active index; additive navigation requests let the application validate and choose the next submitted index.",
       "usage": "Submit step descriptors and the current step; validate application data before progressing elsewhere.",
       "docs": [
         "docs/NUMERIC.md",
-        "docs/NUMERIC_SELECTION_EVENTS.md"
+        "docs/NUMERIC_SELECTION_EVENTS.md",
+        "docs/STEPPER_NAVIGATION.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -779,7 +791,8 @@
       "public_header": "include/cui/cui_numeric.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
-        "include/cui/cui_numeric_selection_events.h"
+        "include/cui/cui_numeric_selection_events.h",
+        "include/cui/cui_stepper_navigation.h"
       ]
     },
     {

@@ -497,6 +497,13 @@
       "sources": [
         "src/base/cui_questionnaire_snapshots.c"
       ]
+    },
+    {
+      "header": "cui_questionnaire_observer.h",
+      "macro": "CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_questionnaire_observer.c"
+      ]
     }
   ]
 }

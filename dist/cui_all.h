@@ -66,6 +66,7 @@
 #include "cui_color_hsla.h"
 #include "cui_color_hsla_entry.h"
 #include "cui_questionnaire_snapshots.h"
+#include "cui_questionnaire_observer.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -329,4 +330,8 @@
 #define CUI_QUESTIONNAIRE_SNAPSHOTS_IMPLEMENTATION
 #endif
 #include "cui_questionnaire_snapshots.h"
+#ifndef CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION
+#define CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION
+#endif
+#include "cui_questionnaire_observer.h"
 #endif

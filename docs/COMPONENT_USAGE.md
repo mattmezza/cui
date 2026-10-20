@@ -703,13 +703,15 @@ Additional event includes: `cui/cui_otp_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains question definitions, state and all workspace buffers.
+**State:** Caller retains question definitions, state and all workspace buffers. An attached observer, handler/userdata and disjoint frame arenas remain alive through detach and all in-flight callbacks; rebuild matching headers/library after the state pointer ABI extension.
 
-**Interaction:** cui_questionnaire_event_fn emits model events; cui_questionnaire_validate_fn validates answers.
+**Interaction:** cui_questionnaire_event_fn emits live legacy model events; cui_questionnaire_validate_fn validates answers. The optional persistent typed observer runs synchronously before each legacy callback with frozen bounded copied payloads; handlers are observational and input metadata is UNKNOWN.
 
-**Usage:** Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies. Pure answer/submission snapshots copy effective values into caller-owned bounded storage without callbacks or model mutation; query_copy reports scalar state. Language builders omit snapshot APIs.
+**Usage:** Initialize definitions/workspace once; compose current controls each frame and handle answer/submit events. Optional masked slot styles refine boxes; six localized labels override defaults. Rebuild consumers after changing the by-value options ABI. Additive keyboard policies offer OFF/letters/numbers, item-only answer entry and host-selected Control/Meta submission; zero preserves legacy routing. Language builders omit these policies. Pure answer/submission snapshots copy effective values into caller-owned bounded storage without callbacks or model mutation; query_copy reports scalar state. Language builders omit snapshot APIs. Optional typed observation freezes Completed/Submit as one pair, preserves legacy callback replacement and nested mutations, and reports capacity/depth failures without suppressing legacy events. Detach can return BUSY while an outer callback pins resources. Language builders omit observer attachment, typed payloads and arenas.
 
 API: `cui_questionnaire_init`, `cui_questionnaire_begin`, `cui_questionnaire_end`, `cui_questionnaire_begin_with_keyboard`. [Public header](../include/cui/cui_questionnaire.h); [guide](QUESTIONNAIRE.md); [keyboard policies](QUESTIONNAIRE_KEYBOARD.md); [retained snapshots](QUESTIONNAIRE_SNAPSHOTS.md).
+
+Typed observation: `cui/cui_questionnaire_observer.h`; [lifetime and copied-payload guide](QUESTIONNAIRE_OBSERVER.md).
 
 ## Select
 

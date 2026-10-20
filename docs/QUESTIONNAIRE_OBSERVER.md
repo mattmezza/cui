@@ -128,6 +128,9 @@ outer versus nested submit data, event/user replacement, live choose/skip follow
 capacity/depth errors, detach pinning, copied names including empty identity,
 ordered input plus actual key/pointer/accessibility routes and delayed timer.
 Existing Questionnaire, Styled, keyboard and snapshot suites remain regressions.
-The worker fixture compiles this example and a C++ header consumer; WASI uses a
-worker extension of the pinned runner. General event/binding uniformity, physical AT
+Canonical CMake compiles this example and a C++ header consumer. The worker
+fixture delegates to those canonical registrations. The pinned WASI runner includes
+the observer suite and fingerprints its private header. The all-in-one distribution
+runs the same focused observer regression suite; direct observer, legacy model,
+keyboard and snapshot implementation entries have strict declaration checks. General event/binding uniformity, physical AT
 acceptance and the family's presentation/localization/Form/style gaps remain open.

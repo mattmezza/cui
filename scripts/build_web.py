@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCES = ["src/base/cui_otp_events.c", "src/base/cui_number_events.c", "src/base/cui_numeric_selection_events.c", "src/base/cui_tabs_events.c", "src/components/cui_text_overflow.c", "web/modules/cui_shadow_bridge.c", "src/base/cui_button_group.c", 'examples/composed_apps/app.c', 'src/effects/cui_effects.c', 'src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
+SOURCES = ["src/base/cui_otp_events.c", "src/base/cui_number_events.c", "src/base/cui_numeric_selection_events.c", "src/base/cui_tabs_events.c", "src/components/cui_text_overflow.c", "web/modules/cui_shadow_bridge.c", "src/base/cui_button_group.c", 'examples/composed_apps/app.c', 'src/effects/cui_effects.c', 'src/base/cui_questionnaire_observer.c', 'src/base/cui_questionnaire_snapshots.c', 'src/base/cui_questionnaire.c', 'src/components/cui_questionnaire.c', 'src/base/cui_speech.c', 'src/components/cui_speech.c',
            'src/base/cui_chart.c', 'src/components/cui_chart.c',
            'src/base/cui_text_view.c', 'src/components/cui_text_view.c',
            'src/base/cui_root.c', 'src/components/cui_root.c',

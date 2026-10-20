@@ -184,3 +184,5 @@ foreign builders. For a separate precision-preserving float-HSLA owner/entry, re
 `include/cui/cui_color_hsla_entry.h`. Derived hex display never updates float state;
 explicit hex commit reparses/truncates and can quantize an unchanged display.
 SELECT reports a close request and owns no popup.
+
+Questionnaire typed observation is an optional persistent C attachment, separate from pure snapshot copy-out. Consult `docs/QUESTIONNAIRE_OBSERVER.md` for matching-header/library rebuild, caller-owned observer/handler/frame arenas, BUSY detach pinning, frozen Completed/Submit payloads and capacity/depth failures. Typed handlers are observational; input metadata is UNKNOWN. Language builders do not expose this observer facade.

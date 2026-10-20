@@ -37,3 +37,5 @@ Navigation reports `navigated`, never `changed` or `activated` by itself. Existi
 This implements independent month access, host-supplied today paint and opt-in neighboring cells under CUI's one-to-three-month/six-row bounds. Arbitrary item styling and unrestricted month counts remain outside this API. Seven builtin locale tables and custom tables already exist; this is not an OS locale engine, arbitrary date-pattern parser, non-Gregorian calendar or RTL layout implementation. Frozen GPUI source does not define a dedicated Calendar arrow-key contract; CUI's existing traversal contract is preserved.
 
 DatePicker retains its legacy composition and does not accept this presentation record. The cell helper and presentation calls do not allocate or retain per-cell pointers; frame data and borrowed locale/policy lifetimes remain as described above.
+
+The legacy range, year-view and recenter defaults above can be selected independently through [Calendar behavior policies](CALENDAR_BEHAVIOR.md), including optional completed-endpoint validation. These are separate value-only options and APIs; they do not resize the presentation record or change legacy calls.

@@ -108,6 +108,16 @@ class SourceManifest(unittest.TestCase):
             for name in expected:
                 self.assertEqual((source / name).read_bytes(), (ROOT / name).read_bytes())
                 self.assertIn('  ' + name + '\n', (source / 'SOURCE_FILES.sha256').read_text())
+            # Reproduce the actual wheel's docless CMake configuration. Consumer
+            # guide compilation must not become a package build dependency.
+            self.assertFalse((source / 'docs').exists())
+            if shutil.which('cmake'):
+                configured = subprocess.run(
+                    [shutil.which('cmake'), '-S', str(source / 'bindings/bridge'),
+                     '-B', str(directory / 'docless-build'), '-DCUI_BUILD_NATIVE=OFF',
+                     '-DCMAKE_BUILD_TYPE=Release'],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
+                self.assertEqual(configured.returncode, 0, configured.stdout[-8000:])
 
 
 if __name__ == '__main__': unittest.main()

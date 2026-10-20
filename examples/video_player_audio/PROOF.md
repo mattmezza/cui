@@ -1,7 +1,7 @@
 # Native sound example proof
 
 GCC16.2.1, C11, `-Wall -Wextra -Wpedantic -Werror`, pinned clang-format23.1.2:
-**21/21 normal and21/21 ASan/UBSan focused wrapper checks passed**, including real
+**22/22 normal and22/22 ASan/UBSan focused wrapper checks passed**, including real
 native rendering on private Xvfb with SDL dummy audio. Runtime SDL revision:
 `SDL-release-3.4.18-0-g829a65d76`. No desktop, speakers, physical output, network,
 permission prompt or installation was used.
@@ -43,3 +43,15 @@ absent. No broad component parity promotion follows.
 Root integration owns canonical CI/build registration, metadata, guides and
 consumer-skill regeneration. Local builds under home cache requested only the
 new example/tests and their CUI/text/software dependencies, not all root targets.
+
+Startup failure regression: the actual callback executable rejects a protocol-like
+local path synchronously before session creation, prints zero frame/generation
+without dereferencing a missing session, and exits with status1. Missing-font and
+unavailable-video-driver cases cover failed initialization before acquisition and
+after font acquisition. All three run only under the private wrapper, with dummy
+audio; no output-device activation is required. Sanitizers report no errors.
+The runner publishes callback state before calling initialize and routes quit to
+the application even when initialize fails. Application-owned partial resources
+are therefore unwound from its fields, independently of output host/UI pointers
+(which are published only on success). Context, SDL host and font destructors
+accept NULL; audio subsystem shutdown now pairs only successful audio initialization.

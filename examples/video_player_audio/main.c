@@ -17,7 +17,7 @@ typedef struct {
     unsigned stage, paused_frames;
     uint64_t paused_position, paused_revision;
     Uint64 started;
-    bool printed_error;
+    bool printed_error, audio_initialized;
 } application;
 static void requested(void *u, const cui_video_request *r) {
     application *a = u;
@@ -76,6 +76,7 @@ static bool initialize(void *u, int argc, char **argv, cui_sdl3 **host, cui_cont
         return false;
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
         return false;
+    a->audio_initialized = true;
     if (a->captures && strcmp(SDL_GetCurrentAudioDriver(), "dummy"))
         return false;
     a->ui = cui_create((cui_config){.width = 640,
@@ -100,7 +101,7 @@ static bool initialize(void *u, int argc, char **argv, cui_sdl3 **host, cui_cont
     return true;
 }
 static int failed(application *a, int line) {
-    video_sound_status s = video_sound_snapshot(a->session);
+    video_sound_status s = a->session ? video_sound_snapshot(a->session) : (video_sound_status){0};
     fprintf(stderr, "Player failure line %d stage %u frame %llu generation %llu UI error %d\n",
             line, a->stage, (unsigned long long)s.position_frames, (unsigned long long)s.generation,
             (int)cui_last_error(a->ui));
@@ -231,7 +232,8 @@ static void shutdown(void *u, bool success) {
                 "Session teardown did not quiesce; preserving resources until process exit\n");
         abort();
     }
-    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    if (a->audio_initialized)
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
     cui_destroy(a->ui);
     cui_sdl3_destroy(a->host);
     cui_font_close(a->font);

@@ -1,5 +1,5 @@
 {
-  "origin": "Original FFmpeg lavfi testsrc2; no external media; silent",
+  "origin": "Original FFmpeg lavfi testsrc2 and quiet 440 Hz sine; no external media",
   "license": "CC0-1.0",
   "tool": "ffmpeg version n9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
   "commands": [
@@ -13,10 +13,23 @@
       "lavfi",
       "-i",
       "testsrc2=size=320x180:rate=15:duration=12",
-      "-an",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=12",
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-af",
+      "volume=0.25,afade=t=in:st=0:d=0.1,afade=t=out:st=11.9:d=0.1",
+      "-t",
+      "12",
       "-fflags",
       "+bitexact",
       "-flags:v",
+      "+bitexact",
+      "-flags:a",
       "+bitexact",
       "-map_metadata",
       "-1",
@@ -30,6 +43,10 @@
       "140k",
       "-deadline",
       "best",
+      "-c:a",
+      "libopus",
+      "-b:a",
+      "24k",
       "sample.webm"
     ],
     [
@@ -42,10 +59,23 @@
       "lavfi",
       "-i",
       "testsrc2=size=320x180:rate=15:duration=12",
-      "-an",
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:sample_rate=48000:duration=12",
+      "-map",
+      "0:v:0",
+      "-map",
+      "1:a:0",
+      "-af",
+      "volume=0.25,afade=t=in:st=0:d=0.1,afade=t=out:st=11.9:d=0.1",
+      "-t",
+      "12",
       "-fflags",
       "+bitexact",
       "-flags:v",
+      "+bitexact",
+      "-flags:a",
       "+bitexact",
       "-map_metadata",
       "-1",
@@ -59,17 +89,141 @@
       "30",
       "-movflags",
       "+faststart",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "48k",
       "sample.mp4"
     ]
   ],
+  "audio": {
+    "source": "440 Hz mono sine, 48000 Hz, 12 seconds",
+    "gain": 0.25,
+    "approximate_source_peak_dbfs": -30.1,
+    "fade_in_seconds": 0.1,
+    "fade_out_seconds": 0.1,
+    "note": "Encoded streams may include codec delay/padding; decoded PCM verified nonzero."
+  },
   "files": {
     "sample.webm": {
-      "sha256": "9d39a9c8f884df170ea626b1f958e80a3177c68b448458d9967964ea453fa8a0",
-      "bytes": 211499
+      "sha256": "d18e7cbd3bb599a9e3f49abb302ca02e7eb9460fb28d934f15df2a71c6e9c934",
+      "bytes": 272749,
+      "probe_command": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_type,codec_name,width,height,sample_rate,channels,duration,nb_frames:format=duration",
+        "-of",
+        "json",
+        "sample.webm"
+      ],
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "vp8",
+            "codec_type": "video",
+            "width": 320,
+            "height": 180
+          },
+          {
+            "codec_name": "opus",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 1
+          }
+        ],
+        "format": {
+          "duration": "12.008000"
+        }
+      },
+      "audio_decode_command": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "sample.webm",
+        "-map",
+        "0:a:0",
+        "-ac",
+        "1",
+        "-ar",
+        "48000",
+        "-f",
+        "s16le",
+        "-"
+      ],
+      "decoded_audio": {
+        "format": "mono signed 16-bit little-endian PCM, 48000 Hz",
+        "samples": 576000,
+        "peak": 1063,
+        "rms": 719.976727,
+        "sha256": "6887e02d96d1cbac027ca78bfadeb52b4d84552dc08ba0b7d6125c7e4d4225cf"
+      }
     },
     "sample.mp4": {
-      "sha256": "7762a18424bd42983c8dd442fc70e9e0aed7bb36aa8ceea093965944a2704ac8",
-      "bytes": 145653
+      "sha256": "cdf20411cfe2e589b2b3aa9c802e8ea7779619bc9e0857a4b0542a0a94fe8969",
+      "bytes": 223084,
+      "probe_command": [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "stream=codec_type,codec_name,width,height,sample_rate,channels,duration,nb_frames:format=duration",
+        "-of",
+        "json",
+        "sample.mp4"
+      ],
+      "probe": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "codec_type": "video",
+            "width": 320,
+            "height": 180,
+            "duration": "12.000000",
+            "nb_frames": "180"
+          },
+          {
+            "codec_name": "aac",
+            "codec_type": "audio",
+            "sample_rate": "48000",
+            "channels": 1,
+            "duration": "12.000000",
+            "nb_frames": "564"
+          }
+        ],
+        "format": {
+          "duration": "12.000000"
+        }
+      },
+      "audio_decode_command": [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-i",
+        "sample.mp4",
+        "-map",
+        "0:a:0",
+        "-ac",
+        "1",
+        "-ar",
+        "48000",
+        "-f",
+        "s16le",
+        "-"
+      ],
+      "decoded_audio": {
+        "format": "mono signed 16-bit little-endian PCM, 48000 Hz",
+        "samples": 576000,
+        "peak": 1134,
+        "rms": 718.755084,
+        "sha256": "05038781c16802894c0d001b4f52ebe835a73b000dcd908ac4199bd78a9fc882"
+      }
     }
   }
 }

@@ -505,6 +505,13 @@
         "src/base/cui_date_picker_actions.c",
         "src/components/cui_date_picker_actions.c"
       ]
+    },
+    {
+      "header": "cui_questionnaire_observer.h",
+      "macro": "CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_questionnaire_observer.c"
+      ]
     }
   ]
 }

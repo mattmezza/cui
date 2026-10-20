@@ -1,10 +1,32 @@
 # Questionnaire typed observation contract and architecture decision
 
-Design only. No observer or event facade is implemented by this checkpoint.
-Audit base is `bba4eb75` (pure copy-out snapshots), with frozen source commit
-`87d10ae5e1299d1be18670a37570c5402f952e34`. This proposal must be reviewed before
-production ownership or public state layout changes. Snapshot queries alone do
-not make legacy events carry immutable source payloads.
+Implementation checkpoint: the architectural review selected persistent caller-owned
+attachment, implemented in `cui_questionnaire_observer.h` and Base hooks on the
+`9c6d0db2` integration base. One public-state pointer is the documented ABI change;
+consumers must rebuild matching headers/library. Exact implemented declarations
+and lifetimes are authoritative in that header and `docs/QUESTIONNAIRE_OBSERVER.md`.
+The design rationale/source audit below records the alternatives considered; it
+does not expose an additional wrapper or input metadata API. The implementation
+also reports defensive PAYLOAD_INVALID for failed copy preflight rather than
+mislabeling it overflow. Pure copy-out remains independent of event-time freezing.
+
+Original audit base is `bba4eb75`, frozen source commit
+`87d10ae5e1299d1be18670a37570c5402f952e34`. Broader Questionnaire parity and
+foreign bindings are not claimed by this observation slice.
+
+## Implemented verification boundary
+
+The worker implementation passed strict Release private-wrapper Questionnaire
+observer/model/Styled/keyboard/snapshot tests (5/5), focused WASI equivalents
+(5/5), focused ASan/UBSan observer execution, compiled C guide and C++ header,
+and actual pinned final format.py --check. Tests compare attached/unattached
+legacy callback mutations and handler/user replacement, freeze outer versus
+nested Completed/Submit payloads, preserve failed-pair capacity across reset/
+disabling, and characterize ordered key/pointer/accessibility/text/timer paths
+with UNKNOWN metadata. They also exercise detach pinning and BUSY replacement.
+Canonical registration/generated resources and foreign bindings remain separate.
+The remaining proposed proof matrix below records broader future acceptance,
+not a claim that every future scenario or binding is implemented here.
 
 ## Actual legacy emission and timing
 
@@ -80,13 +102,13 @@ choose the event-time freeze boundary or hold a shared pair on their own.
    No global registry, thread-local forwarding, allocation, input dispatcher,
    capture/bubble rewrite or replacement of event/user is necessary.
 
-Option 3 is an explicit architecture/ABI decision: public state grows by a pointer,
+Option 3 was selected in architecture review. It is an explicit ABI decision: public state grows by a pointer,
 so matching headers/library and binding layout rebuilds are mandatory. Legacy init
 must initialize that pointer to NULL; attaching occurs after successful init.
 Reset retains the attachment. Copying/moving an attached model/observer by value
 is forbidden. An external global registry avoids the layout edit but adds hidden
-ownership/thread-safety/teardown problems and is not recommended. No implementation
-is authorized merely by this document.
+ownership/thread-safety/teardown problems and is not recommended. The implementation authority was the subsequent explicit architecture decision,
+not the original design checkpoint alone.
 
 ## Proposed typed payload and origin contract
 
@@ -183,11 +205,12 @@ need not perform a copy, but counts must distinguish attempts from deliveries.
 
 Proposed observer statistics are saturating attempted/delivered/payload-failure
 counts plus an overflow flag, queryable without changing the model. Exhausted
-snapshot capacity is an observation failure, not a failed model submit. Exact
-public attach/result/statistics signatures and public observer storage layout
-require the architecture review; no opaque stack-allocation fiction is proposed.
-A caller-owned public observer control record with reserved private bookkeeping
-and explicit frame records is the no-allocation implementation direction.
+snapshot capacity is an observation failure, not a failed model submit. The implemented attach/detach/statistics signatures and public observer control
+record are in the new header. Its private-prefixed bookkeeping and explicit
+workspace frames implement this no-allocation direction. Idle attach to an
+unattached model remains a caller precondition; known in-flight attachments reject
+reattachment with BUSY. There is no global registry that could detect every
+unattached active operation.
 
 The observation pointer and nested views are borrowed through that callback only.
 READY bytes are independent of model edits, but frame reuse ends their storage
@@ -246,5 +269,6 @@ new dependencies. Browser marshalling requires a separate binding slice: existin
 generic last-event fields do not own copied names/answers/submission arrays and
 foreign callback/user lifetimes need an explicit design. Snapshot/observer support
 does not complete compound presentation, localization, Form or general styling.
-No canonical metadata, generated resources or implementation changes in this
-checkpoint, and no full-family promotion is justified.
+Canonical metadata, generated resources and bindings remain integrator-owned.
+The focused observer implementation is the only new family event surface here;
+no full-family promotion is justified.

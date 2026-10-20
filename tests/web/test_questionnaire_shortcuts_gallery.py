@@ -67,9 +67,23 @@ def main():
                     a.page.keyboard.press('b')
                 a.page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===1')
                 assert a.page.evaluate('cuiGallery.exports.gallery_questionnaire_stats(9)') == 1
+                # Model advancement happens during submission; wait for the next
+                # composed question before reading reset-button geometry.
+                for _ in range(60):
+                    if any(n['name'] == 'Your note' for n in a.snapshot()):
+                        break
+                    a.page.wait_for_timeout(50)
+                else:
+                    raise AssertionError('Advanced question was not composed')
                 # Reset, then prove number mode uses the same retained model.
                 point = a.point(a.target('Start over', 1))
-                a.page.mouse.click(point['x'], point['y'])
+                # Give the immediate-mode host a frame for each physical phase;
+                # an instantaneous click can otherwise coalesce under CI load.
+                a.page.mouse.move(point['x'], point['y'])
+                a.page.wait_for_timeout(80)
+                a.page.mouse.down()
+                a.page.wait_for_timeout(80)
+                a.page.mouse.up()
                 a.page.wait_for_function('cuiGallery.exports.gallery_questionnaire_stats(0)===0')
                 a.page.locator('#questionnaire-shortcuts').check()
                 a.page.locator('#questionnaire-numbers').check()

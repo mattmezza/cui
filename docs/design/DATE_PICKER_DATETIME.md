@@ -386,3 +386,17 @@ subsequent TimeField input suppressed after confirmation. Record legacy
 Calendar/date-only picker results for equivalent queues with NULL visitor.
 Run native wrapper, strict C11/C++ header checks, sanitizer and deterministic
 WASI vectors. No claim of corrected behavior until those tests pass.
+
+### Base slice1 implementation result
+
+The ordered visitor checkpoint above was approved and is implemented by the
+Base-only slice. The public header declares only implemented Base/value/sync and
+semantics-only helper functions. The helper split and private visitor add no
+Core/public Calendar state or dispatch changes. Native wrapper and ASan/UBSan
+wrapper each pass the three focused suites (datetime, legacy picker, date-only
+actions); datetime has 579 assertions, with the same 579 passing under pinned
+WASI. The standalone fixture also compiles the C++11 public-header probe.
+Strict warning builds and pinned clang-format checks pass. No Styled facade,
+canonical build registration, bindings, gallery or full DatePicker parity is
+claimed. See `docs/DATE_TIME_PICKER.md` for phase-order and net TimeField source
+notification limits and the exact consumer composition order.

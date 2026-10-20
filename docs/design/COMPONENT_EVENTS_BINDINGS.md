@@ -498,3 +498,7 @@ presentational; its arbitrary child actions remain separate. See
 Direct C `cui_button_styled_ex`/`cui_button_styled_paint` add borrowed pure paint handlers; these are not interaction observers and are not exposed by Python, JS/TS, Go or Rust wrappers. Existing event wrappers and Group do not accept these new style records. See [Button styles](../BUTTON_STYLES.md).
 
 Direct C `cui_begin_hover_card_extended` combines the existing lifecycle observer with an opt-in caller-accepted tap policy and semantic relationship snapshots. Existing foreign HoverCard wrappers retain their legacy behavior; no policy workspace or synchronous callback bridge is exposed. See [HoverCard extended policy](../HOVER_CARD_EXTENDED.md).
+
+## Controlled Stepper navigation and typed Kbd hints
+
+Direct C `cui_base_stepper_navigation` and `cui_stepper_navigation` expose synchronous typed REQUEST handlers. Existing Python, JS/TS, Go and Rust Stepper wrappers retain their current behavior and do not expose this request facade. The new `cui_kbd_ex` typed stroke/options surface is also C-only; existing foreign literal shortcut hints remain available. Bundled C sources include both APIs; bundling does not establish language-wrapper support. See [Stepper navigation](../STEPPER_NAVIGATION.md) and [Kbd](../KBD.md).

@@ -96,4 +96,8 @@ set(CUI_SOURCES
  src/components/cui_picker_events.c
  src/base/cui_otp_events.c
  src/components/cui_hover_card_extended.c
+ src/base/cui_kbd.c
+ src/components/cui_kbd.c
+ src/base/cui_stepper_navigation.c
+ src/components/cui_stepper_navigation.c
 )

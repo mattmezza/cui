@@ -356,23 +356,15 @@ cui_numeric_selection_event_result cui_rating_events(cui_context *ui, cui_id id,
         cui_rating_common(ui, id, theme, name, value, options, &handler, &result.change_count);
     return result;
 }
-static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t,
-                               const cui_step *steps, size_t count, size_t *current, bool vertical,
-                               bool disabled, const cui_stepper_event_handler *handler,
-                               size_t *change_count) {
-    if (!t || !current || (!steps && count) || count > 100)
-        return false;
-    bool changed;
-    if (handler) {
-        cui_numeric_selection_event_result result =
-            cui_base_stepper_events(ui, id, steps, count, current, disabled, *handler);
-        changed = result.control;
-        *change_count = result.change_count;
-    } else
-        changed = cui_base_stepper(ui, id, steps, count, current, disabled);
+/* Private shared paint seam; not part of the public API. */
+void cui_numeric_stepper_paint(cui_context *, cui_id, const cui_theme *, const cui_step *, size_t,
+                               size_t, bool, bool);
+void cui_numeric_stepper_paint(cui_context *ui, cui_id id, const cui_theme *t,
+                               const cui_step *steps, size_t count, size_t current, bool vertical,
+                               bool disabled) {
     cui_begin_box(ui, id, (cui_box){.row = !vertical, .gap = t->gap});
     for (size_t i = 0; i < count; ++i) {
-        bool selected = i == *current;
+        bool selected = i == current;
         const char *status = selected                               ? "Current"
                              : steps[i].status == CUI_STEP_ERROR    ? "Error"
                              : steps[i].status == CUI_STEP_COMPLETE ? "Complete"
@@ -390,6 +382,22 @@ static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t,
         cui_end_box(ui);
     }
     cui_end_box(ui);
+}
+static bool cui_stepper_common(cui_context *ui, cui_id id, const cui_theme *t,
+                               const cui_step *steps, size_t count, size_t *current, bool vertical,
+                               bool disabled, const cui_stepper_event_handler *handler,
+                               size_t *change_count) {
+    if (!t || !current || (!steps && count) || count > 100)
+        return false;
+    bool changed;
+    if (handler) {
+        cui_numeric_selection_event_result result =
+            cui_base_stepper_events(ui, id, steps, count, current, disabled, *handler);
+        changed = result.control;
+        *change_count = result.change_count;
+    } else
+        changed = cui_base_stepper(ui, id, steps, count, current, disabled);
+    cui_numeric_stepper_paint(ui, id, t, steps, count, *current, vertical, disabled);
     return changed;
 }
 bool cui_stepper(cui_context *ui, cui_id id, const cui_theme *theme, const cui_step *steps,

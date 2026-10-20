@@ -451,6 +451,22 @@
       "sources": [
         "src/components/cui_hover_card_extended.c"
       ]
+    },
+    {
+      "header": "cui_kbd.h",
+      "macro": "CUI_KBD_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_kbd.c",
+        "src/components/cui_kbd.c"
+      ]
+    },
+    {
+      "header": "cui_stepper_navigation.h",
+      "macro": "CUI_STEPPER_NAVIGATION_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_stepper_navigation.c",
+        "src/components/cui_stepper_navigation.c"
+      ]
     }
   ]
 }

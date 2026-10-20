@@ -25,3 +25,5 @@ continue to use `custom_ring`/`ring`.
 ## Explicit HoverCard tap mode and relationships
 
 [HoverCard extended policy](HOVER_CARD_EXTENDED.md) adds caller-accepted trigger toggles, a bounded outside-tap workspace and optional current-trigger controls/expanded snapshots. The legacy hover helper is unchanged. Strict outside taps differ from arbitrary mouse-up-out; collapsed native accessibility state and foreign wrappers remain separate work.
+
+Typed single-stroke hints and ordinary grouped composition are documented in [Keyboard shortcut hints](KBD.md). For decorative Skeletons with an application-owned busy region and completion status, see the [loading-region example](../examples/loading_region/README.md). These examples distinguish Core/DOM/native event evidence from unverified screen-reader speech.

@@ -24,6 +24,8 @@ def generate(name,sources):
         lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']
     if name == "cui_hover_card_extended":
         lines += ['#ifndef CUI_CONTENT_IMPLEMENTATION', '#define CUI_CONTENT_IMPLEMENTATION', '#endif', '#include "cui_content.h"']
+    if name == "cui_stepper_navigation":
+        lines += ['#ifndef CUI_NUMERIC_IMPLEMENTATION', '#define CUI_NUMERIC_IMPLEMENTATION', '#endif', '#include "cui_numeric.h"']
     if name == "cui_base":
         lines += ['#include "cui_slider_events.h"', '#include "cui_text_input_events.h"']
     if name == "cui_textarea":

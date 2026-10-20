@@ -242,6 +242,14 @@
     "cui_button_styles": [],
     "cui_hover_card_extended": [
       "src/components/cui_hover_card_extended.c"
+    ],
+    "cui_kbd": [
+      "src/base/cui_kbd.c",
+      "src/components/cui_kbd.c"
+    ],
+    "cui_stepper_navigation": [
+      "src/base/cui_stepper_navigation.c",
+      "src/components/cui_stepper_navigation.c"
     ]
   },
   "native": {

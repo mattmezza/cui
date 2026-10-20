@@ -60,6 +60,8 @@
 #include "cui_picker_events.h"
 #include "cui_otp_events.h"
 #include "cui_hover_card_extended.h"
+#include "cui_kbd.h"
+#include "cui_stepper_navigation.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -299,4 +301,12 @@
 #define CUI_HOVER_CARD_EXTENDED_IMPLEMENTATION
 #endif
 #include "cui_hover_card_extended.h"
+#ifndef CUI_KBD_IMPLEMENTATION
+#define CUI_KBD_IMPLEMENTATION
+#endif
+#include "cui_kbd.h"
+#ifndef CUI_STEPPER_NAVIGATION_IMPLEMENTATION
+#define CUI_STEPPER_NAVIGATION_IMPLEMENTATION
+#endif
+#include "cui_stepper_navigation.h"
 #endif

@@ -154,7 +154,7 @@ Reference: https://gpui-kit.com/component/image/
 Reference: https://gpui-kit.com/component/kbd/
 
 - platform key labels
-- grouped shortcut rendering
+- grouped shortcut rendering (ordinary sibling composition; see [Kbd guide](KBD.md))
 - accessible description
 
 ## Label
@@ -242,7 +242,7 @@ Reference: https://gpui-kit.com/component/shimmer/
 Reference: https://gpui-kit.com/component/skeleton/
 
 - placeholder sizes/layout
-- loading semantics
+- loading semantics (decorative Skeleton plus application-owned busy region; see [example](../examples/loading_region/README.md))
 - theme/motion states
 
 ## Spinner
@@ -258,7 +258,7 @@ Reference: https://gpui-kit.com/component/spinner/
 Reference: https://gpui-kit.com/component/stepper/
 
 - steps/current/completed state
-- navigation/validation
+- navigation/validation (controlled requests and application-owned validation; see [guide](STEPPER_NAVIGATION.md))
 - keyboard and semantic progress
 
 ## Switch

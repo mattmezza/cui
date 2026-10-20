@@ -186,7 +186,10 @@
       "tests": [
         "tests/unit/test_content.c",
         "tests/unit/test_alert_bubble_slots.c",
-        "tests/web/test_alert_bubble_slots.py"
+        "tests/web/test_alert_bubble_slots.py",
+        "tests/unit/test_alert_loading_semantics.c",
+        "tests/web/test_alert_loading_dom.py",
+        "examples/loading_region/test_native.c"
       ],
       "status": "tested",
       "platforms": {
@@ -194,7 +197,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Semantic default/info/success/warning/error colors, optional title and borderless banner, rich title/content/action slots and bounded announcement request semantics tested. Native OS announcement delivery remains a platform integration gap."
+        "Severity, rich slots and controlled dismissal tested. Core/DOM semantics and actual private Linux AT-SPI announcement events tested. Live screen-reader speech and macOS/Windows delivery remain unverified; see examples/loading_region/README.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -216,8 +219,15 @@
         },
         {
           "name": "accessible announcement",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_alert_loading_semantics.c",
+            "tests/web/test_alert_loading_dom.py",
+            "examples/loading_region/test_native.c"
+          ],
+          "limitations": [
+            "Actual private Linux AT-SPI assertive announcement events tested; pinned AccessKit maps Alert to Notification. Live screen-reader speech and macOS/Windows announcement delivery remain unverified."
+          ]
         },
         {
           "name": "controlled pointer dismissal and omitted subtree",
@@ -1602,7 +1612,8 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_kbd.c"
       ],
       "status": "tested",
       "platforms": {
@@ -1610,7 +1621,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Platform modifier formatting and styled UTF-8-safe hint tested. Action/keybinding lookup and grouped shortcut composition pending."
+        "Typed single-stroke normal, outline and plain hints, platform labels and ordinary sibling composition tested. Host Action/keybinding lookup, non-ASCII case conversion and arbitrary source Styled properties remain unsupported; see docs/KBD.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1624,12 +1635,14 @@
         },
         {
           "name": "grouped shortcut rendering",
-          "status": "not_started",
+          "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_kbd.c",
+            "docs/design/KBD_SOURCE_AUDIT.md",
+            "docs/KBD.md"
           ],
           "limitations": [
-            "Pinned Kbd models one Keystroke and host Action binding lookup (crates/component/src/kbd.rs); the original grouped-shortcut wording has no mapped multi-shortcut API contract. CUI formats one chord; grouped composition and host binding lookup are not established by modifier-format tests."
+            "Pinned source models one stroke; grouped hints are ordinary sibling composition, demonstrated by the compiled guide. No sequence recognition or host binding lookup is claimed."
           ]
         },
         {
@@ -2566,12 +2579,14 @@
         },
         {
           "name": "loading semantics",
-          "status": "not_started",
+          "status": "tested",
           "evidence": [
-            "tests/unit/test_status_motion.c"
+            "tests/unit/test_alert_loading_semantics.c",
+            "examples/loading_region/scene.c",
+            "docs/design/ALERT_SKELETON_SEMANTICS_AUDIT.md"
           ],
           "limitations": [
-            "The pinned source Skeleton is decorative and has no loading boolean, status role or busy relationship (crates/component/src/skeleton.rs). Extended CUI skeleton intentionally emits no semantics, asserted by tests/unit/test_status_motion.c; applications own loading announcements. This original row is retained as a scope clarification, not an unimplemented upstream loading API."
+            "Pinned source Skeleton is decorative. Tested application-owned busy region and completion status composition; no per-Skeleton loading state or screen-reader speech guarantee."
           ]
         },
         {
@@ -2693,7 +2708,8 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_numeric.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_stepper_navigation.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2701,7 +2717,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled current index, explicit pending/active/completed/error states, pointer/keyboard navigation and semantic snapshots tested. Validation callbacks, connectors/custom icons and exact density variants pending."
+        "Controlled per-activation navigation requests and application-owned validation tested; legacy aggregate CHANGE timing remains unchanged. Source connectors, custom icons and exact density/style fidelity remain incomplete. See docs/STEPPER_NAVIGATION.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2715,8 +2731,12 @@
         },
         {
           "name": "navigation/validation",
-          "status": "not_started",
-          "evidence": []
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_stepper_navigation.c",
+            "examples/stepper_navigation/main.c",
+            "docs/design/STEPPER_NAVIGATION_AUDIT.md"
+          ]
         },
         {
           "name": "keyboard and semantic progress",

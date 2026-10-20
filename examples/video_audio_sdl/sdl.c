@@ -1,10 +1,23 @@
 /* SPDX-License-Identifier: MIT */
 #include "output.h"
 #include <SDL3/SDL.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 typedef struct {
     SDL_AudioStream *stream;
+    atomic_bool invalid;
+    bool watching;
 } backend;
+/* No host/UI/sink pointer reaches this atomic-only endpoint. */
+static bool SDLCALL device_event(void *u, SDL_Event *event) {
+    backend *b = u;
+    if ((event->type == SDL_EVENT_AUDIO_DEVICE_ADDED ||
+         event->type == SDL_EVENT_AUDIO_DEVICE_REMOVED ||
+         event->type == SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) &&
+        !event->adevice.recording)
+        atomic_store(&b->invalid, true);
+    return true;
+}
 static bool lock(void *u) {
     return SDL_LockAudioStream(((backend *)u)->stream);
 }
@@ -14,9 +27,11 @@ static void unlock(void *u) {
 static bool format(void *u) {
     SDL_AudioStream *stream = ((backend *)u)->stream;
     SDL_AudioSpec in, out;
-    return SDL_GetAudioStreamFormat(stream, &in, &out) && in.freq == 48000 && out.freq == 48000 &&
-           in.channels == 2 && out.channels == 2 && in.format == SDL_AUDIO_F32 &&
-           out.format == SDL_AUDIO_F32 && SDL_GetAudioStreamFrequencyRatio(stream) == 1.0f;
+    return !atomic_load(&((backend *)u)->invalid) && SDL_GetAudioStreamFormat(stream, &in, &out) &&
+           in.freq == 48000 && out.freq == 48000 && in.channels == 2 && out.channels == 2 &&
+           in.format == SDL_AUDIO_F32 && out.format == SDL_AUDIO_F32 &&
+           SDL_GetAudioStreamFrequencyRatio(stream) == 1.0f &&
+           !atomic_load(&((backend *)u)->invalid);
 }
 static int queued(void *u) {
     return SDL_GetAudioStreamQueued(((backend *)u)->stream);
@@ -35,6 +50,10 @@ static bool clear(void *u) {
 }
 static void close_backend(void *u) {
     backend *b = u;
+    /* Pinned SDL3.4.18 dispatch and remove share watcher-list mutex. Owner-only
+     * removal outside callbacks/stream locks quiesces endpoint accesses. */
+    if (b->watching)
+        SDL_RemoveEventWatch(device_event, b);
     SDL_DestroyAudioStream(b->stream);
     free(b);
 }
@@ -52,6 +71,15 @@ video_sdl_output *video_sdl_open(size_t max, size_t chunk) {
         free(b);
         return NULL;
     }
+    atomic_init(&b->invalid, false);
+    if (!SDL_EventEnabled(SDL_EVENT_AUDIO_DEVICE_ADDED) ||
+        !SDL_EventEnabled(SDL_EVENT_AUDIO_DEVICE_REMOVED) ||
+        !SDL_EventEnabled(SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) ||
+        !SDL_AddEventWatch(device_event, b)) {
+        close_backend(b);
+        return NULL;
+    }
+    b->watching = true;
     video_sdl_backend ops = {lock,         unlock,        format, queued,        put,
                              pause_device, resume_device, clear,  close_backend, b};
     video_sdl_output *s = video_sdl_create(ops, max, chunk);

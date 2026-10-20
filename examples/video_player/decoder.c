@@ -3,6 +3,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/mathematics.h>
 #include <libswscale/swscale.h>
 #include <math.h>
 #include <stdlib.h>
@@ -24,7 +25,7 @@ struct video_decoder {
     char *path;
     uint64_t source, generation, command;
     double seek_to;
-    bool stop, seek, seek_preview;
+    bool stop, seek, seek_preview, common_clock;
     video_decoder_status status;
     frame_slot slots[3];
 };
@@ -35,7 +36,7 @@ static void fail(video_decoder *d) {
     mtx_unlock(&d->mutex);
 }
 static bool publish(video_decoder *d, AVFrame *frame, struct SwsContext **scaler,
-                    uint64_t generation, uint64_t command, double pts) {
+                    uint64_t generation, uint64_t command, double pts, uint64_t end_frame) {
     mtx_lock(&d->mutex);
     unsigned slot = 3;
     while (!d->stop && d->command == command) {
@@ -91,6 +92,8 @@ static bool publish(video_decoder *d, AVFrame *frame, struct SwsContext **scaler
         }
         ++s->revision;
         s->state = QUEUED;
+        if (d->common_clock && end_frame > d->status.end_frame)
+            d->status.end_frame = end_frame;
     }
     cnd_broadcast(&d->changed);
     mtx_unlock(&d->mutex);
@@ -126,6 +129,10 @@ static int decode(void *user) {
     if (stream < 0 || !decoder)
         goto done;
     AVStream *video = format->streams[stream];
+    if (d->common_clock &&
+        (video->codecpar->codec_id != AV_CODEC_ID_FFV1 || format->start_time < 0 ||
+         video->time_base.num <= 0 || video->time_base.den <= 0))
+        goto done;
     codec = avcodec_alloc_context3(decoder);
     if (!codec || avcodec_parameters_to_context(codec, video->codecpar) < 0)
         goto done;
@@ -139,11 +146,19 @@ static int decode(void *user) {
         goto done;
     double origin =
         video->start_time == AV_NOPTS_VALUE ? 0 : video->start_time * av_q2d(video->time_base);
+    int64_t origin_ticks =
+        d->common_clock ? av_rescale_q(format->start_time, AV_TIME_BASE_Q, (AVRational){1, 48000})
+                        : 0;
+    if (d->common_clock)
+        origin = (double)origin_ticks / 48000;
     double duration = video->duration != AV_NOPTS_VALUE ? video->duration * av_q2d(video->time_base)
                       : format->duration != AV_NOPTS_VALUE ? (double)format->duration / AV_TIME_BASE
                                                            : 0;
     mtx_lock(&d->mutex);
     d->status.ready = true;
+    d->status.common_clock = d->common_clock;
+    d->status.common_origin_us = d->common_clock ? format->start_time : 0;
+    d->status.clock_generation = d->generation;
     d->status.duration_known = isfinite(duration) && duration > 0;
     d->status.duration = d->status.duration_known ? duration : 0;
     uint64_t command = d->command, generation = d->generation;
@@ -161,6 +176,8 @@ static int decode(void *user) {
             generation = d->generation;
             d->seek = false;
             d->status.eof = false;
+            d->status.clock_generation = generation;
+            d->status.end_frame = 0;
         }
         mtx_unlock(&d->mutex);
         if (stop) {
@@ -182,9 +199,25 @@ static int decode(void *user) {
             if (frame->best_effort_timestamp == AV_NOPTS_VALUE)
                 goto done;
             double pts = frame->best_effort_timestamp * av_q2d(video->time_base) - origin;
+            uint64_t end_frame = 0;
+            if (d->common_clock) {
+                int64_t ticks = av_rescale_q(frame->best_effort_timestamp, video->time_base,
+                                             (AVRational){1, 48000});
+                if (ticks < origin_ticks || ticks - origin_ticks > 480000)
+                    goto done;
+                ticks -= origin_ticks;
+                int64_t span = frame->duration > 0 ? av_rescale_q(frame->duration, video->time_base,
+                                                                  (AVRational){1, 48000})
+                                                   : 0;
+                if (span <= 0 || span > 48000 || ticks + span > 480000)
+                    goto done;
+                pts = (double)ticks / 48000;
+                end_frame = (uint64_t)(ticks + span);
+            }
             if (!isfinite(pts))
                 goto done;
-            if (pts >= discard_before && !publish(d, frame, &scaler, generation, command, pts))
+            if (pts >= discard_before &&
+                !publish(d, frame, &scaler, generation, command, pts, end_frame))
                 goto done;
             av_frame_unref(frame);
             continue;
@@ -220,7 +253,8 @@ done:
     avformat_close_input(&format);
     return ok ? 0 : 1;
 }
-video_decoder *video_decoder_open(const char *path, uint64_t source, uint64_t generation) {
+static video_decoder *open_mode(const char *path, uint64_t source, uint64_t generation,
+                                bool common) {
     if (!path || !source || !generation)
         return NULL;
     video_decoder *d = calloc(1, sizeof *d);
@@ -232,6 +266,7 @@ video_decoder *video_decoder_open(const char *path, uint64_t source, uint64_t ge
         return NULL;
     }
     strcpy(d->path, path);
+    d->common_clock = common;
     d->source = source;
     d->generation = generation;
     if (mtx_init(&d->mutex, mtx_plain) != thrd_success) {
@@ -253,6 +288,12 @@ video_decoder *video_decoder_open(const char *path, uint64_t source, uint64_t ge
         return NULL;
     }
     return d;
+}
+video_decoder *video_decoder_open(const char *p, uint64_t source, uint64_t g) {
+    return open_mode(p, source, g, false);
+}
+video_decoder *video_decoder_open_common(const char *p, uint64_t source, uint64_t g) {
+    return open_mode(p, source, g, true);
 }
 bool video_decoder_seek(video_decoder *d, uint64_t generation, double seconds) {
     if (!d || !generation || !isfinite(seconds) || seconds < 0)

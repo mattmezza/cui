@@ -300,6 +300,180 @@ static size_t avatar_stack_frame(cui_context *ui, cui_avatar_image *image, cui_b
     cui_end_frame(ui);
     return selected;
 }
+static double avatar_luminance(cui_color c) {
+    double values[] = {c.r / 255., c.g / 255., c.b / 255.};
+    for (size_t i = 0; i < 3; i++)
+        values[i] = values[i] <= .04045 ? values[i] / 12.92 : pow((values[i] + .055) / 1.055, 2.4);
+    return .2126 * values[0] + .7152 * values[1] + .0722 * values[2];
+}
+static void avatar_variants(void) {
+    cui_avatar_palette palette = {0}, stable, saved;
+    cui_color borders[2][12];
+    for (unsigned dark = 0; dark < 2; dark++)
+        for (unsigned hue = 0; hue < 12; hue++) {
+            assert(cui_avatar_identity(cui_string("Ada"), dark != 0, true, hue, &palette));
+            for (unsigned earlier = 0; earlier < hue; earlier++)
+                assert(memcmp(&borders[dark][earlier], &palette.border, sizeof(cui_color)));
+            borders[dark][hue] = palette.border;
+            double a = avatar_luminance(palette.background),
+                   b = avatar_luminance(palette.foreground);
+            assert((fmax(a, b) + .05) / (fmin(a, b) + .05) >= 4.5);
+            assert(palette.border.r > 0 && palette.border.r < 255 && palette.border.g > 0 &&
+                   palette.border.g < 255 && palette.border.b > 0 && palette.border.b < 255);
+        }
+    assert(cui_avatar_identity(cui_string("Ada Lovelace"), false, false, 0, &palette));
+    assert(cui_avatar_identity(cui_string("Alan Lewis"), false, false, 99, &stable));
+    assert(!memcmp(&palette, &stable, sizeof palette));
+    saved = palette;
+    assert(!cui_avatar_identity(cui_string("Ada"), false, true, 12, &palette));
+    assert(!memcmp(&palette, &saved, sizeof palette));
+    assert(!cui_avatar_identity(cui_string("Ada"), false, false, 0, NULL));
+
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 600});
+    assert(ui);
+    cui_theme t = cui_theme_light();
+    float previous = 0;
+    for (int value = CUI_DESIGN_XS; value <= CUI_DESIGN_9XL; value++) {
+        cui_design_size size = (cui_design_size)value;
+        cui_avatar_metrics metrics;
+        assert(cui_avatar_measure(size, 16, &metrics));
+        assert(metrics.diameter >= previous && metrics.diameter <= 512);
+        previous = metrics.diameter;
+        const float frozen[] = {0, 16, 24, 48, 48, 80};
+        const float fonts[] = {0, 10.4f, 12, 14, 14, 30};
+        if (value <= CUI_DESIGN_LG) {
+            assert(metrics.diameter == frozen[value]);
+            assert(fabsf(metrics.font_size - fonts[value]) < .001f);
+        }
+        assert(metrics.text_style.weight ==
+               (value >= CUI_DESIGN_LG ? CUI_TEXT_WEIGHT_SEMIBOLD : CUI_TEXT_WEIGHT_NORMAL));
+        assert(cui_begin_frame(ui, 600, 600, .016f));
+        cui_avatar_ex(
+            ui, 9000, &t, cui_string("Ada Lovelace"),
+            (cui_avatar_options){.size = 7, .design_size = size, .identity_colors = true});
+        cui_draw_list draw = cui_end_frame(ui);
+        assert(cui_bounds(ui, 9000).w == metrics.diameter);
+        bool text = false;
+        for (size_t i = 0; i < draw.count; i++)
+            if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                text = true;
+                assert(fabsf(draw.commands[i].font_size - metrics.font_size) < .01f);
+                assert(draw.commands[i].text_style.weight == metrics.text_style.weight);
+                assert(!memcmp(&draw.commands[i].color, &palette.foreground, sizeof(cui_color)));
+            }
+        assert(text);
+    }
+    cui_avatar_metrics metrics = {.diameter = 123};
+    assert(!cui_avatar_measure(CUI_DESIGN_INHERIT, 16, &metrics) && metrics.diameter == 123);
+    assert(!cui_avatar_measure(CUI_DESIGN_LG, NAN, &metrics) && metrics.diameter == 123);
+    assert(cui_avatar_measure(CUI_DESIGN_LG, 32, &metrics) && metrics.diameter == 160 &&
+           metrics.font_size == 60);
+
+    cui_icon_state icon = {0};
+    cui_icon_state_init(&icon);
+    assert(cui_icon_set_data(
+        &icon, cui_string("<svg viewBox='0 0 10 10'><rect width='10' height='10'/></svg>")));
+    for (unsigned mode = 0; mode < 6; mode++) {
+        t = mode == 4 ? cui_theme_dark() : cui_theme_light();
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        cui_avatar_ex(
+            ui, 9000, &t, mode == 3 || mode == 4 ? cui_string("Ada Lovelace") : cui_string(""),
+            (cui_avatar_options){.size = 48,
+                                 .anonymous_icon = mode != 0,
+                                 .placeholder = mode == 1 || mode == 3 || mode == 4 ? &icon : NULL,
+                                 .placeholder_name = mode == 1   ? cui_string("missing-icon")
+                                                     : mode == 2 ? cui_string("circle-check")
+                                                                 : cui_string(""),
+                                 .identity_colors = mode >= 3,
+                                 .custom_identity_hue = true,
+                                 .identity_hue = 2});
+        cui_draw_list draw = cui_end_frame(ui);
+        size_t images = 0, texts = 0;
+        for (size_t i = 0; i < draw.count; i++) {
+            images += draw.commands[i].type == CUI_DRAW_IMAGE;
+            texts += draw.commands[i].type == CUI_DRAW_TEXT;
+        }
+        assert(images == (mode == 1 || mode == 2 || mode == 5 ? 1u : 0u));
+        assert(texts == (mode == 0 || mode == 3 || mode == 4 ? 1u : 0u));
+        size_t count;
+        const cui_semantic *sem = cui_semantics(ui, &count);
+        assert(count == 1 && sem[0].id == 9000 && sem[0].role == CUI_ROLE_IMAGE);
+        if (mode == 3 || mode == 4) {
+            assert(cui_avatar_identity(cui_string("Ada Lovelace"), t.dark, true, 2, &palette));
+            bool fill = false;
+            for (size_t i = 0; i < draw.count; i++)
+                if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 48) {
+                    fill = true;
+                    assert(
+                        !memcmp(&draw.commands[i].color, &palette.background, sizeof(cui_color)));
+                }
+            assert(fill);
+        } else if (mode == 1 || mode == 2 || mode == 5) {
+            cui_software *renderer = cui_software_create(100, 100, NULL);
+            assert(renderer && cui_software_render(renderer, &draw, t.background));
+            const unsigned char *pixels = cui_software_pixels(renderer, NULL, NULL);
+            size_t center = (24 * 100 + 24) * 4;
+            if (mode == 1)
+                assert(pixels[center] == t.on_primary.r && pixels[center + 1] == t.on_primary.g);
+            else {
+                bool ink = false;
+                for (size_t y = 12; y < 36; y++)
+                    for (size_t x = 12; x < 36; x++) {
+                        size_t sample = (y * 100 + x) * 4;
+                        ink |= pixels[sample] == t.on_primary.r &&
+                               pixels[sample + 1] == t.on_primary.g;
+                    }
+                assert(ink);
+            }
+            cui_software_destroy(renderer);
+        }
+    }
+    for (unsigned custom = 0; custom < 2; custom++) {
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        cui_color fill = {10, 20, 30, 255}, ink = {40, 50, 60, 255};
+        cui_avatar_ex(ui, 9000, &t, cui_string("Ada Lovelace"),
+                      (cui_avatar_options){.size = 40,
+                                           .identity_colors = true,
+                                           .custom_identity_hue = true,
+                                           .identity_hue = 99,
+                                           .custom_background = custom != 0,
+                                           .background = fill,
+                                           .custom_foreground = custom != 0,
+                                           .foreground = ink});
+        cui_draw_list draw = cui_end_frame(ui);
+        for (size_t i = 0; i < draw.count; i++) {
+            if (draw.commands[i].type == CUI_DRAW_RECT && draw.commands[i].bounds.w == 40) {
+                cui_color expected = custom ? fill : t.primary;
+                assert(!memcmp(&draw.commands[i].color, &expected, sizeof expected));
+            }
+            if (draw.commands[i].type == CUI_DRAW_TEXT) {
+                cui_color expected = custom ? ink : t.on_primary;
+                assert(!memcmp(&draw.commands[i].color, &expected, sizeof expected));
+                assert(fabsf(draw.commands[i].font_size - 15.2f) < .01f);
+            }
+        }
+    }
+    unsigned char photo_source[] = {200, 10, 20, 255};
+    unsigned char photo_storage[4 * 4 * 4];
+    cui_avatar_image photo = {0};
+    assert(cui_avatar_image_init(&photo, photo_storage, sizeof photo_storage, 4));
+    size_t raster_count = icon.raster_count;
+    assert(cui_begin_frame(ui, 100, 100, .016f));
+    cui_avatar_ex(ui, 9000, &t, cui_string(""),
+                  (cui_avatar_options){.size = 48, .anonymous_icon = true, .placeholder = &icon,
+                                       .image = {photo_source, 1, 1, 4, 1}, .image_state = &photo});
+    cui_draw_list draw = cui_end_frame(ui);
+    size_t photos = 0;
+    for (size_t i = 0; i < draw.count; i++)
+        if (draw.commands[i].type == CUI_DRAW_IMAGE) {
+            photos++;
+            assert(draw.commands[i].bitmap.bitmap.pixels == photo_storage);
+        }
+    assert(photos == 1 && icon.raster_count == raster_count);
+    cui_icon_state_destroy(&icon);
+    cui_destroy(ui);
+}
+
 static void image_avatars(void) {
     unsigned char source[8 * 4 * 4];
     for (size_t y = 0; y < 4; y++)
@@ -357,7 +531,9 @@ static void image_avatars(void) {
     cui_theme t = cui_theme_light();
     cui_avatar_ex(
         ui, 3000, &t, cui_string("Photo"),
-        (cui_avatar_options){.size = 48, .ring_width = 2, .image = bitmap, .image_state = &image});
+        (cui_avatar_options){.size = 48, .ring_width = 2, .image = bitmap, .image_state = &image,
+                             .identity_colors = true, .anonymous_icon = true,
+                             .placeholder_name = cui_string("user")});
     draw = cui_end_frame(ui);
     size_t photos = 0;
     for (size_t i = 0; i < draw.count; i++)
@@ -494,6 +670,7 @@ static void image_avatars(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    avatar_variants();
     image_avatars();
     semantic_colors();
     hover_panels();

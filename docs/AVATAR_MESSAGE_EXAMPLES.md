@@ -43,6 +43,50 @@ bool profile_draw(cui_context *ui, const cui_theme *theme, cui_bitmap borrowed) 
 }
 ```
 
+Opt into named initials colors with `.identity_colors = true`. The palette uses
+`theme.dark` and the frozen twelve 30-degree OkLCH hues. The default assignment
+hashes the UTF-8 bytes of CUI's initials using 32-bit FNV-1a; this is stable within
+CUI but differs from GPUI's private hash and initials rules. Set
+`.custom_identity_hue = true, .identity_hue = 0` to choose a hue index in 0–11.
+Invalid overrides retain legacy colors. Explicit `custom_background` and
+`custom_foreground` override the palette; initials keep the identity outline.
+Photos and anonymous placeholders keep neutral outlines. `cui_avatar_identity`
+exposes the same palette for application composition and leaves output untouched
+on invalid arguments.
+
+`.anonymous_icon = true` replaces the empty-name question mark with the default
+User SVG. `.placeholder_name = cui_string("building-2")` selects a named icon;
+a borrowed `.placeholder` points to an existing `cui_icon_state` for custom SVG.
+The typed state wins over a name. A supplied name still selects initials, and a
+valid photo still wins over both. All icons remain decorative within the existing
+Avatar image/button semantic record; the anonymous accessible name stays
+“Anonymous”. SVG loading errors follow the existing Icon contract and do not
+silently substitute a different glyph. Keep borrowed icon state and mask versions
+alive until rendering finishes; collect or destroy only afterward. Named icons
+use the bounded context cache, whose draw borrows expire at the next frame.
+
+`.design_size` opts into the shared `CUI_DESIGN_XS` through `CUI_DESIGN_9XL` scale.
+An explicit variant wins over `.size`; `INHERIT` keeps the existing custom diameter
+and .38 text ratio. `.rem_size = 0` uses 16 logical pixels per rem; positive values
+up to 512 scale variant geometry and typography. No fonts are loaded implicitly.
+Use `cui_avatar_measure` to inspect the resulting diameter, text size and weight.
+
+| Variant | Diameter at rem=16 | Initials text | Weight |
+| --- | ---: | ---: | --- |
+| XS | 16 | 10.4 | normal |
+| SM | 24 | 12 | normal |
+| BASE / MD | 48 | 14 | normal |
+| LG | 80 | 30 | semibold |
+| XL through 9XL | 2 × shared control height, capped at 512 | shared font size × 30/18 | semibold |
+
+The first four sizes reproduce frozen Avatar preset geometry and text sizes.
+BASE aliases MD. XL through 9XL extend CUI's shared design scale; they are not
+upstream presets. Their diameters are 96, 112, 128, 160, 208, 256, 304, 400 and
+512 at rem=16. All variant diameters stay bounded to 512 after rem scaling.
+Custom GPUI `Size` sets initials-child dimensions; CUI does not claim identical
+custom text layout. Invalid variants or rem values fall back to legacy metrics.
+These opt-ins do not change `cui_avatar` or `cui_avatar_stack` defaults.
+
 `cui_avatar_stack` takes up to 64 items with stable application keys. Its default
 shows three portraits and a passive overflow count. Later portraits paint and
 receive pointer hits above earlier portraits. Positive `width` reduces the number

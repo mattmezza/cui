@@ -3,6 +3,7 @@
 #define CUI_CONTENT_H
 #include "cui_base.h"
 #include "cui_theme.h"
+#include "cui_icon.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -50,16 +51,47 @@ bool cui_avatar_image_init(cui_avatar_image *, unsigned char *storage, size_t ca
  * not ready: a retained successful cache does not make a failed source valid. */
 bool cui_avatar_image_prepare(cui_avatar_image *, cui_bitmap source);
 typedef struct {
+    float diameter, font_size;
+    cui_text_style text_style;
+} cui_avatar_metrics;
+/* Explicit variants only. rem: finite (0,512]; false leaves output unchanged.
+ * XS/SM/BASE=MD/LG preserve frozen 16/24/48/80px metrics at rem=16.
+ * XL..9XL extend the shared scale; diameter is bounded to 512. */
+bool cui_avatar_measure(cui_design_size, float rem, cui_avatar_metrics *);
+typedef struct {
+    cui_color background, foreground, border;
+} cui_avatar_palette;
+/* Deterministic CUI UTF-8 initials hash selects one of 12 OkLCH hues. The
+ * assignment differs from GPUI's private hash. custom_hue accepts 0..11.
+ * Invalid override/output leaves output unchanged. dark uses theme.dark. */
+bool cui_avatar_identity(cui_str name, bool dark, bool custom_hue, unsigned hue,
+                         cui_avatar_palette *);
+typedef struct {
     float size, ring_width;
     cui_color ring;
     bool custom_ring, interactive, disabled;
     cui_bitmap image;
     cui_avatar_image *image_state;
-    /* Initials fallback only; flags permit explicit transparent/black colors. */
+    /* Fallback colors; flags permit explicit transparent/black colors. */
     bool custom_background, custom_foreground;
     cui_color background, foreground;
+    /* INHERIT preserves size and legacy .38 text ratio. Explicit variants win
+     * over size; rem_size zero uses 16 logical px. No font is loaded implicitly. */
+    cui_design_size design_size;
+    float rem_size;
+    bool identity_colors, custom_identity_hue;
+    unsigned identity_hue; /* 0..11; invalid selection falls back to legacy colors. */
+    /* Empty-name fallback only, opt-in; photo and named initials take precedence.
+     * Borrowed typed state wins name, then default user icon. State and all mask
+     * versions must survive rendering; collect/destroy only after draw completion.
+     * Named masks use the bounded context icon cache and expire next begin_frame.
+     * Icons are decorative within the Avatar's existing semantic record. */
+    bool anonymous_icon;
+    cui_str placeholder_name;
+    cui_icon_state *placeholder;
 } cui_avatar_options;
-/* Invalid/missing image/cache falls back to legacy initials. Returns activation
+/* Invalid/missing image/cache falls back to initials (or opt-in anonymous icon).
+ * Returns activation
  * only when interactive; image name remains the supplied accessible name. */
 bool cui_avatar_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_avatar_options);
 typedef struct {

@@ -171,6 +171,66 @@ bool cui_avatar_image_prepare(cui_avatar_image *s, cui_bitmap source) {
     s->ready = true;
     return true;
 }
+bool cui_avatar_measure(cui_design_size size, float rem, cui_avatar_metrics *out) {
+    cui_design_metrics shared;
+    if (!out || !isfinite(rem) || rem <= 0 || rem > 512 || !cui_design_measure(size, 1, &shared))
+        return false;
+    float scale = rem / 16;
+    float diameter = size == CUI_DESIGN_XS                              ? 16
+                     : size == CUI_DESIGN_SM                            ? 24
+                     : size == CUI_DESIGN_BASE || size == CUI_DESIGN_MD ? 48
+                     : size == CUI_DESIGN_LG                            ? 80
+                                                                        : shared.control_height * 2;
+    float text = size == CUI_DESIGN_XS                              ? 10.4f
+                 : size == CUI_DESIGN_SM                            ? 12
+                 : size == CUI_DESIGN_BASE || size == CUI_DESIGN_MD ? 14
+                 : size == CUI_DESIGN_LG ? 30
+                                         : shared.font_size * (30.f / 18.f);
+    *out = (cui_avatar_metrics){.diameter = fminf(diameter * scale, 512),
+                                .font_size = text * scale,
+                                .text_style = {.weight = size >= CUI_DESIGN_LG
+                                                             ? CUI_TEXT_WEIGHT_SEMIBOLD
+                                                             : CUI_TEXT_WEIGHT_NORMAL}};
+    return true;
+}
+static uint8_t cui_avatar_channel(double linear) {
+    double srgb = linear <= .0031308 ? linear * 12.92 : 1.055 * pow(linear, 1 / 2.4) - .055;
+    return (uint8_t)floor(fmax(0, fmin(1, srgb)) * 255 + .5);
+}
+static cui_color cui_avatar_oklch(double light, double chroma, unsigned hue) {
+    double angle = hue * (3.14159265358979323846 / 6);
+    double a = chroma * cos(angle), b = chroma * sin(angle);
+    double l = light + .3963377774 * a + .2158037573 * b;
+    double m = light - .1055613458 * a - .0638541728 * b;
+    double n = light - .0894841775 * a - 1.2914855480 * b;
+    l = l * l * l;
+    m = m * m * m;
+    n = n * n * n;
+    return (cui_color){cui_avatar_channel(4.0767416621 * l - 3.3077115913 * m + .2309699292 * n),
+                       cui_avatar_channel(-1.2684380046 * l + 2.6097574011 * m - .3413193965 * n),
+                       cui_avatar_channel(-.0041960863 * l - .7034186147 * m + 1.7076147010 * n),
+                       255};
+}
+bool cui_avatar_identity(cui_str name, bool dark, bool custom_hue, unsigned hue,
+                         cui_avatar_palette *out) {
+    if (!out || (custom_hue && hue >= 12))
+        return false;
+    if (!custom_hue) {
+        char initials[9];
+        size_t length = cui_avatar_initials(name, initials);
+        uint32_t hash = UINT32_C(2166136261);
+        for (size_t i = 0; i < length; i++)
+            hash = (hash ^ (unsigned char)initials[i]) * UINT32_C(16777619);
+        hue = hash % 12;
+    }
+    *out = dark ? (cui_avatar_palette){cui_avatar_oklch(.30, .05, hue),
+                                       cui_avatar_oklch(.82, .11, hue),
+                                       cui_avatar_oklch(.36, .06, hue)}
+                : (cui_avatar_palette){cui_avatar_oklch(.97, .032, hue),
+                                       cui_avatar_oklch(.50, .145, hue),
+                                       cui_avatar_oklch(.89, .05, hue)};
+    return true;
+}
 bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                    cui_avatar_options o) {
     if (!ui || !t)
@@ -183,22 +243,36 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
         cui_report_diagnostic(ui, &diagnostic);
         return false;
     }
-    float size = fminf(cui_content_positive(o.size, 48), 512);
+    cui_avatar_metrics metrics = {0};
+    bool variant = cui_avatar_measure(o.design_size, o.rem_size == 0 ? 16 : o.rem_size, &metrics);
+    float size = variant ? metrics.diameter : fminf(cui_content_positive(o.size, 48), 512);
     float ring = isfinite(o.ring_width) ? fmaxf(0, fminf(o.ring_width, size * .25f)) : 0;
     bool photo = o.image_state && cui_avatar_image_prepare(o.image_state, o.image);
-    cui_begin_box(ui, id,
-                  (cui_box){.width = size,
-                            .height = size,
-                            .fixed_width = true,
-                            .fixed_height = true,
-                            .radius = size * .5f,
-                            .padding = photo ? ring : 0,
-                            .align_x = CUI_ALIGN_CENTER,
-                            .align_y = CUI_ALIGN_CENTER,
-                            .background = photo ? (o.custom_ring ? o.ring : t->surface)
-                                                : (o.custom_background ? o.background : t->primary),
-                            .border = cui_focused(ui) == id ? t->primary : t->border,
-                            .border_width = photo ? 0 : 1});
+    cui_avatar_palette palette = {0};
+    bool identity =
+        !photo && name.length && o.identity_colors &&
+        cui_avatar_identity(name, t->dark, o.custom_identity_hue, o.identity_hue, &palette);
+    cui_color background = o.custom_background ? o.background
+                           : identity          ? palette.background
+                                               : t->primary;
+    cui_color foreground = o.custom_foreground ? o.foreground
+                           : identity          ? palette.foreground
+                                               : t->on_primary;
+    cui_begin_box(
+        ui, id,
+        (cui_box){.width = size,
+                  .height = size,
+                  .fixed_width = true,
+                  .fixed_height = true,
+                  .radius = size * .5f,
+                  .padding = photo ? ring : 0,
+                  .align_x = CUI_ALIGN_CENTER,
+                  .align_y = CUI_ALIGN_CENTER,
+                  .background = photo ? (o.custom_ring ? o.ring : t->surface) : background,
+                  .border = cui_focused(ui) == id ? t->primary
+                            : identity            ? palette.border
+                                                  : t->border,
+                  .border_width = photo ? 0 : 1});
     cui_interaction interaction =
         cui_interact(ui, id, o.interactive ? CUI_ROLE_BUTTON : CUI_ROLE_IMAGE,
                      name.length ? name : cui_string("Anonymous"), o.disabled, false, 0);
@@ -212,11 +286,23 @@ bool cui_avatar_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
                                    .height = size - 2 * ring,
                                    .fixed_width = true,
                                    .fixed_height = true});
-    else {
+    else if (!name.length && o.anonymous_icon) {
+        cui_icon_options icon = {.size = CUI_ICON_CUSTOM,
+                                 .custom_size = size * .6f,
+                                 .custom_color = true,
+                                 .color = foreground,
+                                 .decorative = true};
+        if (o.placeholder)
+            cui_icon(ui, cui_content_child(id, 32), t, o.placeholder, icon);
+        else
+            cui_icon_named(ui, cui_content_child(id, 32), t,
+                           o.placeholder_name.length ? o.placeholder_name : cui_string("user"),
+                           icon);
+    } else {
         char initials[9];
         size_t n = cui_avatar_initials(name, initials);
-        cui_text(ui, (cui_str){initials, n}, size * .38f,
-                 o.custom_foreground ? o.foreground : t->on_primary);
+        cui_text_ex(ui, (cui_str){initials, n}, variant ? metrics.font_size : size * .38f,
+                    foreground, 0, metrics.text_style);
     }
     cui_end_box(ui);
     size_t count;

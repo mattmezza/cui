@@ -1,7 +1,8 @@
 # Optional macOS Speech recognizer: design checkpoint
 
 Status: design approved; portable slices 1/2 implemented and injected offline
-fixtures validated. Private Objective-C transport and macOS CI remain pending.
+fixtures validated. Private Objective-C transport and its injected fixture
+sources are present; macOS compile/test evidence remains pending actual CI.
 Base: CUI `3df1ad51`. This design changes no Core, Speech state/input dispatch,
 release, manifest, or public framework API. Native recognition and real macOS
 permissions remain unimplemented/unvalidated by this checkpoint.

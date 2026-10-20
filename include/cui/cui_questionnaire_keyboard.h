@@ -5,8 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* CONTRACT CHECKPOINT: declarations are proposed; implementation follows review.
- * Additive policies: no changes to cui_questionnaire_options or retained model.
+/* Additive policies: no changes to cui_questionnaire_options or retained model.
  * Zero/NULL preserves legacy behavior. Unknown enum values normalize independently
  * to LEGACY; they do not reject the other valid fields. */
 typedef enum {
@@ -63,10 +62,10 @@ bool cui_questionnaire_choice_control_with_keyboard(cui_context *, cui_id, const
  * container for ITEM_FOCUS_ONLY; zero means no item-focus restoration. Choice IDs
  * remain schema ordered. Policies are copied at entry, not retained. Only the
  * relevant field is read: answer_entry, shortcuts, or submit respectively.
- * shortcuts LEGACY uses numbers. OFF returns false without activation/consumption.
- * confirm LEGACY uses the explicit legacy_submit_modifier exactly as the existing
- * confirm_keys helper does (unlike the automatic root's dual-modifier legacy).
- * Existing helpers remain unchanged. These functions do not paint or dispatch. */
+ * shortcuts LEGACY preserves the supplied bool numbers argument. OFF returns false without
+ * activation/consumption. confirm LEGACY uses the explicit legacy_submit_modifier exactly as the
+ * existing confirm_keys helper does (unlike the automatic root's dual-modifier legacy). Existing
+ * helpers remain unchanged. These functions do not paint or dispatch. */
 bool cui_questionnaire_answer_keys_with_keyboard(cui_context *, cui_id scope,
                                                  cui_questionnaire_state *,
                                                  const cui_id *choice_ids, size_t count,

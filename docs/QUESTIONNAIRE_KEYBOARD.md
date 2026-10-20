@@ -1,9 +1,8 @@
-# Questionnaire keyboard policy contract checkpoint
+# Questionnaire keyboard policies
 
-This header-only checkpoint proposes additive APIs in
-`cui_questionnaire_keyboard.h`. They have declarations but no implementation yet;
-do not link consumer code against them until the implementation slice is reviewed.
-It implements no snapshot/event facade and changes no existing API.
+Include `cui_questionnaire_keyboard.h` with a matching library revision. These
+additive entry points preserve the existing options/model layout. They provide
+keyboard policy, not a snapshot/event facade. Existing APIs remain available.
 
 Zero/NULL preserves the corresponding legacy entry point. The three enum fields
 normalize unknown values independently to legacy. A copied options record carries
@@ -32,16 +31,64 @@ Control or Meta; standalone legacy preserves its existing explicit modifier inpu
 
 Nested roots currently share a context route stack. Each begin captures before
 pushing itself; therefore an outer root may inspect events before a later inner
-begin. A stack is not evidence of nearest-root dispatch isolation. Implementation
-will add a characterization test (including distinct states and omitted parts)
-and preserve existing consumption order. No nesting architecture change is part
-of this slice; source capture ordering must be measured before claiming parity.
+begin. A stack is not evidence of nearest-root dispatch isolation. The
+characterization test with distinct states confirms that outer capture can consume
+the key before the inner root sees it. Existing consumption order remains. No
+nesting architecture change is part of this slice; source capture ordering must
+be measured before claiming parity.
 
-Production acceptance requires differential queued-key tests for OFF/letters/
-numbers; item versus action focus; host modifiers; unknown enums independently;
-IME/repeat/consumed guards; editor ownership; disabled transitions; and delayed
-confirmation. Test real badge pixels/semantic names/custom renderer calls and
-zero-policy draw/semantics/callback equivalence. Run strict Release through the
-private headless wrapper, focused WASI proof, C/C++ header checks, and actual pinned
-repository formatting after the final source edit. Canonical registration,
+The focused fixture covers queued keys for OFF/letters/numbers, item versus action
+focus, host modifiers, independent enum fallback, IME/repeat/modifier guards,
+standalone helper policies, real badge pixels, semantic names, custom renderer
+calls, zero-policy pixel/semantics/callback equivalence, and pointer/accessibility
+activation with shortcuts OFF. Existing Styled regressions cover editor ownership,
+disabled transitions and delayed confirmation. Validation uses strict Release via
+the private headless wrapper, focused WASI, compiled C guide and C++ header, and
+actual pinned repository formatting after the final source edit. Canonical registration,
 generated distributions, metadata and skills remain integrator-owned.
+
+## Consumer composition
+
+The host chooses its submit modifier explicitly. Submit the policy once on the
+root; ordinary choice parts inherit its shortcut mode. OFF suppresses shortcut
+adornments (including custom shortcut callbacks) and letter/number activation,
+while pointer, focused-control keys and accessibility activation remain enabled.
+A standalone choice override only changes that part's display; it does not change
+root-wide shortcut routing. Keep root and part policies consistent.
+
+```c
+#include "cui/cui_questionnaire_keyboard.h"
+void questionnaire_page(cui_context *ui, const cui_theme *theme,
+                        cui_questionnaire_state *state) {
+    const cui_questionnaire_keyboard_options keyboard = {
+        .shortcuts = CUI_QUESTIONNAIRE_SHORTCUT_OFF,
+        .answer_entry = CUI_QUESTIONNAIRE_ENTRY_ITEM_FOCUS_ONLY,
+        .submit = CUI_QUESTIONNAIRE_SUBMIT_CONTROL
+    };
+    const cui_questionnaire_options options = {.width = 300};
+    if (!cui_questionnaire_begin_with_keyboard(ui, 100, theme, state, options, &keyboard))
+        return;
+    size_t item = state->current;
+    if (cui_questionnaire_item_begin(ui, 101, state, item, options)) {
+        cui_questionnaire_heading(ui, 102, theme, state, item, options);
+        for (size_t choice = 0; choice < state->items[item].choice_count; ++choice)
+            (void)cui_questionnaire_choice_control(ui, 1000 + choice, theme, state,
+                                                   item, choice, options);
+        cui_questionnaire_part_end(ui);
+    }
+    cui_questionnaire_end(ui);
+}
+```
+
+Definitions and caller workspace still outlive the retained state. The record is
+copied synchronously and may be stack allocated. IDs must remain stable and unique
+in the host tree; the example uses a single active item. Root capture uses previous
+frame bindings, so draw an initial frame before sending keyboard input. Standalone
+helpers do not inherit root options; pass their record explicitly. Their LEGACY
+shortcut mode preserves both `numbers=false` (letters) and `numbers=true`.
+
+The worker fixture registers the focused test and compiles this example without
+changing canonical build files. The private WASI driver extends the existing
+suite list in memory; canonical registration is an integrator follow-up. This
+slice does not complete the family's payload, compound presentation, localization,
+Form semantic or general styling gaps.

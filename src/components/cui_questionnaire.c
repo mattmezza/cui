@@ -1,11 +1,38 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_questionnaire.h"
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_components.h"
+#include "cui/cui_questionnaire_keyboard.h"
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+static cui_questionnaire_keyboard_options
+cui_questionnaire_keyboard_normalize(const cui_questionnaire_keyboard_options *options) {
+    cui_questionnaire_keyboard_options o =
+        options ? *options : (cui_questionnaire_keyboard_options){0};
+    if (o.shortcuts < CUI_QUESTIONNAIRE_SHORTCUT_LEGACY ||
+        o.shortcuts > CUI_QUESTIONNAIRE_SHORTCUT_NUMBERS)
+        o.shortcuts = CUI_QUESTIONNAIRE_SHORTCUT_LEGACY;
+    if (o.answer_entry < CUI_QUESTIONNAIRE_ENTRY_LEGACY ||
+        o.answer_entry > CUI_QUESTIONNAIRE_ENTRY_ITEM_FOCUS_ONLY)
+        o.answer_entry = CUI_QUESTIONNAIRE_ENTRY_LEGACY;
+    if (o.submit < CUI_QUESTIONNAIRE_SUBMIT_LEGACY || o.submit > CUI_QUESTIONNAIRE_SUBMIT_META)
+        o.submit = CUI_QUESTIONNAIRE_SUBMIT_LEGACY;
+    return o;
+}
+static bool cui_questionnaire_keyboard_numbers(cui_questionnaire_keyboard_options o, bool legacy) {
+    return o.shortcuts == CUI_QUESTIONNAIRE_SHORTCUT_NUMBERS ||
+           (o.shortcuts == CUI_QUESTIONNAIRE_SHORTCUT_LEGACY && legacy);
+}
+static bool cui_questionnaire_keyboard_modified(cui_questionnaire_submit_policy policy,
+                                                unsigned modifiers) {
+    if (policy == CUI_QUESTIONNAIRE_SUBMIT_CONTROL)
+        return modifiers == CUI_MOD_CTRL;
+    if (policy == CUI_QUESTIONNAIRE_SUBMIT_META)
+        return modifiers == CUI_MOD_META;
+    return policy == CUI_QUESTIONNAIRE_SUBMIT_LEGACY &&
+           (modifiers == CUI_MOD_CTRL || modifiers == CUI_MOD_META);
+}
 typedef struct {
     cui_questionnaire_slot_style styles[3];
     cui_questionnaire_labels labels;
@@ -203,6 +230,7 @@ struct cui_questionnaire_route {
     cui_id scope;
     size_t opened_item;
     bool focus_pending, invalid_pending, numeric;
+    cui_questionnaire_keyboard_options keyboard;
 };
 typedef struct {
     cui_questionnaire_route *active;
@@ -259,7 +287,7 @@ static bool cui_questionnaire_root_key(cui_context *ui, cui_questionnaire_route 
             current = c;
     }
     if (e->key == CUI_KEY_ENTER) {
-        bool modified = e->modifiers == CUI_MOD_CTRL || e->modifiers == CUI_MOD_META;
+        bool modified = cui_questionnaire_keyboard_modified(r->keyboard.submit, e->modifiers);
         bool filled = input_focused ? cui_questionnaire_freeform(s, item).length != 0
                                     : current != SIZE_MAX &&
                                           cui_questionnaire_choice_selected(s, item, current);
@@ -283,7 +311,9 @@ static bool cui_questionnaire_root_key(cui_context *ui, cui_questionnaire_route 
         size_t slots = count + 1;
         if (input_focused)
             current = count;
-        if (current == SIZE_MAX) {
+        if (current == SIZE_MAX && (r->keyboard.answer_entry == CUI_QUESTIONNAIRE_ENTRY_LEGACY ||
+                                    (cui_questionnaire_bound(r, item, 0, 0) &&
+                                     focused == cui_questionnaire_bound(r, item, 0, 0)->id))) {
             for (size_t step = 0; step < slots; ++step) {
                 size_t next = previous ? slots - 1 - step : step;
                 cui_questionnaire_binding *b =
@@ -340,6 +370,8 @@ static bool cui_questionnaire_root_key(cui_context *ui, cui_questionnaire_route 
         }
         return false;
     }
+    if (r->keyboard.shortcuts == CUI_QUESTIONNAIRE_SHORTCUT_OFF)
+        return false;
     char key = cui_key_character(e->key);
     if (!key)
         return false;
@@ -384,6 +416,11 @@ static void cui_questionnaire_root_capture(cui_context *ui, cui_questionnaire_ro
 }
 bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
                              cui_questionnaire_state *s, cui_questionnaire_options o) {
+    return cui_questionnaire_begin_with_keyboard(ui, id, theme, s, o, NULL);
+}
+bool cui_questionnaire_begin_with_keyboard(cui_context *ui, cui_id id, const cui_theme *theme,
+                                           cui_questionnaire_state *s, cui_questionnaire_options o,
+                                           const cui_questionnaire_keyboard_options *keyboard) {
     cui_questionnaire_options_snapshot snapshot;
     if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
@@ -406,7 +443,8 @@ bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
         route->state = s;
     }
     route->scope = id;
-    route->numeric = o.numeric_shortcuts;
+    route->keyboard = cui_questionnaire_keyboard_normalize(keyboard);
+    route->numeric = cui_questionnaire_keyboard_numbers(route->keyboard, o.numeric_shortcuts);
     route->opened_item = s->current;
     cui_questionnaire_root_capture(ui, route, o.disabled);
     cui_questionnaire_metrics m = cui_questionnaire_measure(o);
@@ -560,6 +598,17 @@ void cui_questionnaire_progress(cui_context *ui, cui_id id, const cui_theme *t,
 bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_theme *t,
                                       cui_questionnaire_state *s, size_t item, size_t choice,
                                       cui_questionnaire_options o) {
+    return cui_questionnaire_choice_control_with_keyboard(ui, id, t, s, item, choice, o, NULL);
+}
+bool cui_questionnaire_choice_control_with_keyboard(
+    cui_context *ui, cui_id id, const cui_theme *t, cui_questionnaire_state *s, size_t item,
+    size_t choice, cui_questionnaire_options o,
+    const cui_questionnaire_keyboard_options *keyboard) {
+    cui_questionnaire_keyboard_options k = {0};
+    if (keyboard)
+        k.shortcuts = keyboard->shortcuts;
+    k = cui_questionnaire_keyboard_normalize(&k);
+    bool legacy_numbers = o.numeric_shortcuts;
     cui_questionnaire_options_snapshot snapshot;
     if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
@@ -595,7 +644,15 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
                                .pos_in_set = position <= UINT_MAX ? (unsigned)position : 0,
                                .set_size = total <= UINT_MAX ? (unsigned)total : 0,
                                .pointer_activatable = true});
-    char key = cui_questionnaire_shortcut(s, item, choice, o.numeric_shortcuts);
+    cui_questionnaire_routes *routes = cui_questionnaire_route_stack(ui);
+    if (!keyboard && routes && routes->active && routes->active->state == s) {
+        k = routes->active->keyboard;
+        legacy_numbers = routes->active->numeric;
+    }
+    char key = k.shortcuts == CUI_QUESTIONNAIRE_SHORTCUT_OFF
+                   ? 0
+                   : cui_questionnaire_shortcut(
+                         s, item, choice, cui_questionnaire_keyboard_numbers(k, legacy_numbers));
     cui_questionnaire_choice_view view = {.item = item,
                                           .choice = choice,
                                           .size = o.size,
@@ -692,7 +749,7 @@ bool cui_questionnaire_choice_control(cui_context *ui, cui_id id, const cui_them
                                       m.line);
     }
     cui_end_box(ui);
-    if (o.render_shortcut) {
+    if (k.shortcuts != CUI_QUESTIONNAIRE_SHORTCUT_OFF && o.render_shortcut) {
         cui_begin_box(ui, 0, (cui_box){0});
         cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.shortcut) / 2)});
         cui_end_box(ui);
@@ -1005,6 +1062,15 @@ bool cui_questionnaire_radio_keys(cui_context *ui, cui_questionnaire_state *s, c
 }
 bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionnaire_state *s,
                                    const cui_id *ids, size_t count, cui_id input_id) {
+    return cui_questionnaire_answer_keys_with_keyboard(ui, scope, s, ids, count, input_id, 0, NULL);
+}
+bool cui_questionnaire_answer_keys_with_keyboard(
+    cui_context *ui, cui_id scope, cui_questionnaire_state *s, const cui_id *ids, size_t count,
+    cui_id input_id, cui_id item_id, const cui_questionnaire_keyboard_options *keyboard) {
+    cui_questionnaire_keyboard_options k = {0};
+    if (keyboard)
+        k.answer_entry = keyboard->answer_entry;
+    k = cui_questionnaire_keyboard_normalize(&k);
     if (!ui || !scope || !s || !s->initialized || s->current >= s->count || (count && !ids) ||
         count == SIZE_MAX || !cui_focus_within(ui, scope))
         return false;
@@ -1034,7 +1100,8 @@ bool cui_questionnaire_answer_keys(cui_context *ui, cui_id scope, cui_questionna
             current = count;
         /* Entering the answers from an item/action focus restores a filled
          * answer first, without selecting an unrelated radio. */
-        if (current == SIZE_MAX) {
+        if (current == SIZE_MAX &&
+            (k.answer_entry == CUI_QUESTIONNAIRE_ENTRY_LEGACY || (item_id && focused == item_id))) {
             bool restored = false;
             for (size_t step = 0; step < slots; step++) {
                 size_t next = previous ? slots - 1 - step : step;
@@ -1153,4 +1220,34 @@ bool cui_questionnaire_confirm_keys(cui_context *ui, cui_id scope, cui_questionn
         }
     }
     return handled;
+}
+
+bool cui_questionnaire_shortcut_keys_with_keyboard(
+    cui_context *ui, cui_id scope, cui_questionnaire_state *s, const cui_id *ids, size_t count,
+    cui_id input_id, bool numbers, const cui_questionnaire_keyboard_options *keyboard) {
+    cui_questionnaire_keyboard_options k = {0};
+    if (keyboard)
+        k.shortcuts = keyboard->shortcuts;
+    k = cui_questionnaire_keyboard_normalize(&k);
+    if (k.shortcuts == CUI_QUESTIONNAIRE_SHORTCUT_OFF)
+        return false;
+    return cui_questionnaire_shortcut_keys(ui, scope, s, ids, count, input_id,
+                                           cui_questionnaire_keyboard_numbers(k, numbers));
+}
+bool cui_questionnaire_confirm_keys_with_keyboard(
+    cui_context *ui, cui_id scope, cui_questionnaire_state *s, const cui_id *ids, size_t count,
+    cui_id input_id, unsigned legacy_submit_modifier,
+    const cui_questionnaire_keyboard_options *keyboard) {
+    cui_questionnaire_keyboard_options k = {0};
+    if (keyboard)
+        k.submit = keyboard->submit;
+    k = cui_questionnaire_keyboard_normalize(&k);
+    unsigned modifier = legacy_submit_modifier;
+    if (k.submit == CUI_QUESTIONNAIRE_SUBMIT_CONTROL)
+        modifier = CUI_MOD_CTRL;
+    else if (k.submit == CUI_QUESTIONNAIRE_SUBMIT_META)
+        modifier = CUI_MOD_META;
+    else if (k.submit == CUI_QUESTIONNAIRE_SUBMIT_UNMODIFIED_ONLY)
+        modifier = 0;
+    return cui_questionnaire_confirm_keys(ui, scope, s, ids, count, input_id, modifier);
 }

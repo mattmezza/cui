@@ -49,7 +49,8 @@ submitted consumer cannot undo an earlier HoverCard decision. Consumption is
 sampled at the helper call, not retrospectively. Do not introduce a dispatcher,
 focus trap or a fabricated accepted-activation event to solve this slice.
 
-Recommended first slice: an additive, typed HoverCard-only extended entry point
+Initial relationship-only alternative (superseded as the recommended first slice
+by the mobile amendment below): an additive, typed HoverCard-only extended entry point
 with an explicitly enabled relationship policy. Existing entry points, Tooltip,
 options layout and all-zero/absent policy retain their exact behavior. This can
 reuse the private panel helper with default-preserving internal policy parameters;
@@ -150,3 +151,129 @@ exclusive Escape routing, live AT announcements and explicit collapsed adapter
 state remain separate work. The combined manifest item cannot be called fully
 complete from relationship snapshots alone. Root/integrator owns any approved
 metadata, generated SDK/distribution and consumer skill updates after review.
+
+
+## Review amendment: mobile toggle and bounded outside release
+
+The first implementation proposal must cover genuine frozen mobile behavior as
+well as the manifest relationship requirement. Relationship snapshots alone do
+not close the source gap. This amendment supersedes the relationship-only first-
+slice recommendation; all legacy compatibility and AT limitations above remain.
+No production work is authorized by this amendment until separately reviewed.
+
+### Accepted trigger input and explicit mode
+
+Propose one additive extended HoverCard API with a typed policy containing
+DESKTOP_HOVER (zero/default) and TAP_TOGGLE modes, relationship opt-in, explicit
+accepted-trigger input and optional bounded outside-release tracking. Retain the
+existing caller-owned hover state; add a separate caller-owned mobile workspace
+rather than appending fields to the public existing state/options. No automatic
+platform detection: the application selects touch/mobile policy. TAP_TOGGLE can
+be selected on desktop for headless tests and mouse/pen accessibility consistency.
+The old functions and an absent extended policy use the exact old helper path.
+
+The application submits its trigger first and passes whether that trigger actually
+accepted activation in this frame, using its Button bool/event result. The API
+must name this input accepted_trigger_activation, not raw pressed/tapped. False
+means no toggle; it must never be inferred from pointer-up coordinates, focus or
+cui_interaction_state alone. This is an explicit application assertion, not a
+claim that a public boolean is cryptographically validated. The implementation
+can prove its documented integration using real Button acceptance and cancelled-
+activation tests; arbitrary callers can still supply an incorrect assertion.
+
+An optional copied activation snapshot may accompany the assertion only when
+obtained at the trigger acceptance point. Validate target and current frame if
+used; never turn absent evidence into an invented source/index/press. If detailed
+snapshots add unnecessary scope, omit them entirely and keep UNKNOWN lifecycle
+metadata. In particular do not rescan events after Button consumption to decide
+whether its already accepted activation happened: accessibility acceptance can be
+cancelled by later consumption, while ordinary accepted activation has different
+rules. No change to either Core contract is proposed.
+
+Snapshot entry open before applying outside dismissal or the accepted toggle.
+A true trigger assertion sets open=!entry_open once, coalescing the aggregate
+Button result; it does not toggle once per raw event. This matches the frozen
+mobile trigger listener's captured rendered-open value and its explicit comment
+about outside dismissal handling the same release first. If several transitions
+must be represented within one frame in the future, a bool is insufficient; that
+requires a separately specified ordered accepted-input API.
+
+TAP_TOGGLE ignores hover/focus and open/close delays. It cancels pending elapsed
+policy work, and keeps the open card until accepted trigger toggle, permitted
+outside release, disabled close, legacy-global Escape or geometry fallback.
+Retain the old Escape predicate, including consumed/repeated/modified input;
+Escape wins over a toggle in the same aggregate call, with suppression preserved.
+Do not ship ignore_consumed_escape as an accidental new default. The desktop
+mode keeps its old reducer/containment rules. Closed or disabled mode, omission
+resumption and explicit mode changes reset the outside workspace, preventing a
+stale contact from closing a later card. On resume after a skipped frame, reset
+pending contact instead of assuming omitted input did not cancel it.
+
+### Outside release support that current Core can prove
+
+Core authorities: cui_event_target resolves against previous-frame regions and
+may identify captured content even after the pointer leaves it. The scope-hit
+helpers require active focus scopes; current HoverCard creates none. Final
+cui_pressed is current capture state, not per-release history. Core touch handling
+tracks contacts, drag threshold, generated cancellation and scroll suppression,
+but no public universal accepted blank-space release snapshot exists. A blank
+outside tap therefore cannot honestly be described as an accepted widget
+activation. Existing overlay/surface outside policies dismiss on pointer-down;
+they cannot be reused unchanged to claim the frozen mouse-up-out contract.
+
+Propose an explicitly bounded outside-tap policy with one caller-owned pending
+contact: record primary down outside both previous valid panel and trigger bounds,
+its type/device/contact, starting point and frame. Accept a matching unconsumed
+primary up outside both regions only if no cancellation or drag invalidated that
+contact and ordinary submission/modal admission still permits the card. Reject
+nonfinite/unknown bounds, missing down, unmatched up, secondary button, mode or
+context reset, and ambiguous simultaneous contacts. Observe matching cancel even
+if consumed, so cancelled state cannot survive until a later release. Consumed
+matching down/move/up, scroll/gesture takeover, or movement reaching an explicit
+8-logical-pixel radial threshold invalidates the pending tap; do not rearm within
+that contact. Include final up displacement. This threshold is the new policy's
+bounded rule, not a promise of universal host gesture equivalence. Movement must
+be processed in input order even when the final pointer returns near its start.
+Do not consume input or capture the outside target on behalf of this card.
+
+A down inside card/trigger never arms outside dismissal. Thus child clicks stay
+open, trigger release is owned by the accepted trigger assertion, and a drag from
+card to outside does not dismiss. A blank outside down/up does dismiss, including
+across adjacent frames. Touch cancellation, scrolling and pinch must retain the
+card. Multiple contacts fail closed for dismissal rather than guessing the primary
+finger. The tracker must see relevant events every submitted frame; it is not a
+second global dispatcher and does not establish topmost-popup ownership. Modal
+checks use existing cui_pointer_scope_allowed; unrelated overlays without a
+shared ownership protocol remain outside this guarantee.
+
+This strict outside-tap contract intentionally narrows frozen mouse-up-out, which
+does not itself require an outside press origin or a movement threshold. Preserve
+that distinction in status/consumer guidance: required frozen happy paths can be
+covered while drag/cancel safety receives its own explicit rule. If exact arbitrary
+mouse-up-out semantics are also required, expose a separately named raw-release
+policy and document its drag behavior; never claim the strict tap mode is exact
+full parity. Prefer the strict policy first for the user's touch requirement.
+
+### Composition, observation and proof
+
+Apply the final mobile open decision before normal shared placement/admission.
+Reuse the existing observer contract after final model and relation patch, before
+children, without retaining handlers or changing payload/result meaning. A toggle
+plus outside close coalesces into the final model transition; no fabricated input
+multiplicity or completed dismissal event. Lifecycle metadata stays UNKNOWN/frame-
+only even when the application has supplied a real trigger snapshot: this
+aggregate can also include Escape, disabled or placement fallback. Relationship
+reflects actual admission, and collapsed AccessKit limitations remain explicit.
+
+Before production approval, required focused tests must additionally use actual
+Button accepted activation (mouse, touch, keyboard and accessibility as policy
+permits), cancelled trigger release and accessibility consumption timing; mobile
+hover/delay no-op; open, trigger retoggle, content click retention and blank outside
+release; same-frame trigger/outside ordering; cross-frame down/up; cancel before
+up; drag across threshold and back; consumed release; card-child drag out; contact/
+device mismatch; second contact/pinch/scroll; mode switch, omitted frame, disabled,
+Escape and invalid-geometry reset; modal blocking; no-handler results and callback
+ordering. Keep the frozen upstream test scenarios traceable separately from new
+safety cases. Tests run through the repository headless wrapper with assertions
+and strict warnings. No new source, bridge/binding coverage, adapter promise or
+full touch/full parity status is implied by this design-only checkpoint.

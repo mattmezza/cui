@@ -289,6 +289,7 @@ static void equivalence(void) {
 }
 static void invalid_and_omission(void) {
     fixture f = create(false);
+    f.presentation.neighboring_days = true;
     CHECK(cui_begin_frame(f.ui, 800, 500, .016f));
     cui_calendar_result r =
         cui_calendar_ex(f.ui, 10, NULL, &f.state, &f.selection, f.options, f.presentation);
@@ -307,7 +308,295 @@ static void invalid_and_omission(void) {
     CHECK(f.state.month.year == 2024 && f.state.month.month == 2);
     cui_destroy(f.ui);
 }
+static cui_calendar_cell_info cell_for(fixture *f, unsigned panel, cui_date date) {
+    for (unsigned cell = 0; cell < 42; cell++) {
+        cui_calendar_cell_info info;
+        if (cui_calendar_cell_resolve(10, f->state.month, cui_calendar_first_weekday(f->options),
+                                      panel, cell, &info) &&
+            !cui_date_compare(info.date, date))
+            return info;
+    }
+    CHECK(false);
+    return (cui_calendar_cell_info){0};
+}
+static void cell_queries(void) {
+    cui_calendar_cell_info info = {.id = 42};
+    CHECK(!cui_calendar_cell_resolve(0, (cui_date){2024, 2, 1}, 1, 0, 0, &info) && !info.id);
+    CHECK(!cui_calendar_cell_resolve(10, (cui_date){2024, 2, 30}, 1, 0, 0, &info) && !info.id);
+    CHECK(!cui_calendar_cell_resolve(10, (cui_date){2024, 2, 1}, 1, 3, 0, &info) && !info.id);
+    CHECK(!cui_calendar_cell_resolve(10, (cui_date){2024, 2, 1}, 1, 0, 42, &info) && !info.id);
+    CHECK(!cui_calendar_cell_resolve(10, (cui_date){2024, 2, 1}, 1, 0, 0, NULL));
+    CHECK(!cui_calendar_cell_resolve(10, (cui_date){9999, 12, 1}, 1, 1, 0, &info) && !info.id);
+    CHECK(!cui_calendar_cell_resolve(10, (cui_date){1, 1, 1}, 0, 0, 0, &info) && !info.id);
+    const cui_date starts[] = {{2024, 2, 1}, {2023, 12, 1}, {1, 1, 1}, {9999, 11, 1}};
+    for (unsigned start = 0; start < sizeof starts / sizeof starts[0]; start++)
+        for (unsigned first = 0; first < 7; first++) {
+            cui_id ids[126];
+            size_t count = 0;
+            for (unsigned panel = 0; panel < 3; panel++)
+                for (unsigned cell = 0; cell < 42; cell++) {
+                    if (!cui_calendar_cell_resolve(10, starts[start], first, panel, cell, &info))
+                        continue;
+                    for (size_t i = 0; i < count; i++)
+                        CHECK(ids[i] != info.id);
+                    ids[count++] = info.id;
+                    if (!info.neighboring)
+                        CHECK(info.id == cui_calendar_day_id(10, info.date));
+                    else
+                        CHECK(info.id != cui_calendar_day_id(10, info.date));
+                    cui_calendar_cell_info same;
+                    CHECK(cui_calendar_cell_resolve(10, starts[start], first + 7, panel, cell,
+                                                    &same));
+                    CHECK(same.id == info.id && !cui_date_compare(same.date, info.date));
+                    /* Construct a root whose XOR-derived occurrence would be zero. */
+                    cui_id zero_root = info.id ^ 10;
+                    CHECK(!cui_calendar_cell_resolve(zero_root, starts[start], first, panel, cell,
+                                                     &same));
+                    CHECK(!same.id && !cui_date_valid(same.date));
+                    zero_root = cui_calendar_day_id(10, info.date) ^ 10;
+                    CHECK(!cui_calendar_cell_resolve(zero_root, starts[start], first, panel, cell,
+                                                     &same));
+                    CHECK(!same.id && !cui_date_valid(same.date));
+                }
+        }
+}
+static void neighbor_geometry(void) {
+    for (unsigned months = 1; months <= 3; months++) {
+        fixture f = create(false);
+        f.options.months = months;
+        f.presentation.neighboring_days = true;
+        frame(&f, 1);
+        unsigned tab_days = 0;
+        for (unsigned panel = 0; panel < months; panel++)
+            for (unsigned cell = 0; cell < 42; cell++) {
+                cui_calendar_cell_info info;
+                CHECK(cui_calendar_cell_resolve(
+                    10, f.state.month, cui_calendar_first_weekday(f.options), panel, cell, &info));
+                const cui_semantic *sem = semantic(&f, info.id);
+                CHECK(sem && sem->role == CUI_ROLE_BUTTON && sem->details.parent == 10);
+                CHECK(sem->bounds.w > 0 && sem->bounds.h > 0 && sem->name.length > 0);
+                if (!sem->tab_stop_disabled)
+                    tab_days++;
+                if (info.neighboring)
+                    CHECK(sem->tab_stop_disabled);
+            }
+        CHECK(tab_days == 1);
+        cui_focus(f.ui, cui_calendar_day_id(10, f.state.cursor));
+        for (unsigned tab = 0; tab < 8; tab++) {
+            key(&f, CUI_KEY_TAB);
+            frame(&f, 1);
+            for (unsigned panel = 0; panel < months; panel++)
+                for (unsigned cell = 0; cell < 42; cell++) {
+                    cui_calendar_cell_info info;
+                    CHECK(cui_calendar_cell_resolve(10, f.state.month,
+                                                    cui_calendar_first_weekday(f.options), panel,
+                                                    cell, &info));
+                    if (info.neighboring)
+                        CHECK(cui_focused(f.ui) != info.id);
+                }
+        }
+
+        if (months > 1) {
+            cui_calendar_cell_info neighbor = cell_for(&f, 0, (cui_date){2024, 3, 1});
+            cui_calendar_cell_info canonical = cell_for(&f, 1, (cui_date){2024, 3, 1});
+            CHECK(neighbor.neighboring && !canonical.neighboring && neighbor.id != canonical.id);
+            activate(&f, neighbor.id, 2);
+            frame(&f, 1);
+            CHECK(f.state.month.month == 2 && f.selection.start.month == 3);
+            CHECK(cui_focused(f.ui) == canonical.id);
+        }
+        cui_destroy(f.ui);
+    }
+}
+static void neighbor_routing(void) {
+    for (unsigned kind = 0; kind < 3; kind++) {
+        fixture f = create(false);
+        f.presentation.neighboring_days = true;
+        frame(&f, 1);
+        cui_calendar_cell_info before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+        activate(&f, before.id, kind);
+        frame(&f, 1);
+        CHECK(f.result.activated && f.result.changed && f.result.navigated);
+        CHECK(f.selection.start.month == 1 && f.selection.start.day == 29);
+        CHECK(f.state.month.month == 1 &&
+              cui_focused(f.ui) == cui_calendar_day_id(10, before.date));
+        cui_destroy(f.ui);
+        /* Two activations must complete a range, not collapse into one selection. */
+        f = create(false);
+        f.options.range = true;
+        f.presentation.neighboring_days = true;
+        frame(&f, 1);
+        before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+        cui_calendar_cell_info after = cell_for(&f, 0, (cui_date){2024, 3, 10});
+        if (kind == 1) {
+            cui_focus(f.ui, before.id);
+            key(&f, CUI_KEY_ENTER);
+            key(&f, CUI_KEY_ENTER);
+        } else {
+            activate(&f, before.id, kind);
+            activate(&f, after.id, kind);
+        }
+        frame(&f, 1);
+        CHECK(f.result.activated && !f.state.selecting_end && cui_date_valid(f.selection.end));
+        CHECK(!cui_date_compare(f.selection.start, before.date));
+        CHECK(!cui_date_compare(f.selection.end, kind == 1 ? before.date : after.date));
+        cui_destroy(f.ui);
+        /* A preceding month navigation does not remap the old cell to a new date. */
+        if (kind != 1) {
+            f = create(false);
+            f.presentation.neighboring_days = true;
+            frame(&f, 1);
+            before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+            activate(&f, cui_calendar_navigation_id(10, 3), kind);
+            activate(&f, before.id, kind);
+            frame(&f, 1);
+            CHECK(!cui_date_compare(f.selection.start, before.date) && f.state.month.month == 1);
+            cui_destroy(f.ui);
+            f = create(false);
+            f.presentation.neighboring_days = true;
+            frame(&f, 1);
+            before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+            activate(&f, before.id, kind);
+            activate(&f, cui_calendar_month_toggle_id(10), kind);
+            frame(&f, 1);
+            CHECK(f.state.view == CUI_CALENDAR_MONTHS && f.state.month.month == 1);
+            CHECK(!cui_date_compare(f.selection.start, before.date));
+            cui_destroy(f.ui);
+        }
+    }
+    fixture f = create(false);
+    f.presentation.neighboring_days = true;
+    unsigned blocked = 0;
+    f.options.is_disabled = policy;
+    f.options.disabled_user = &blocked;
+    frame(&f, 1);
+    cui_calendar_cell_info before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+    activate(&f, before.id, 2);
+    blocked = 1;
+    frame(&f, 1);
+    CHECK(!f.result.activated && !f.result.changed && f.state.month.month == 2);
+    CHECK(semantic(&f, before.id)->disabled);
+    blocked = 0;
+    frame(&f, 1);
+    activate(&f, before.id, 2);
+    frame(&f, 1);
+    CHECK(f.result.activated && f.selection.start.month == 1);
+    cui_destroy(f.ui);
+}
+static void neighbor_edges_and_space(void) {
+    fixture range = create(false);
+    range.presentation.neighboring_days = true;
+    range.options.range = true;
+    range.state.selecting_end = true;
+    frame(&range, 1);
+    cui_calendar_cell_info earlier = cell_for(&range, 0, (cui_date){2024, 1, 29});
+    activate(&range, earlier.id, 2);
+    frame(&range, 1);
+    CHECK(!cui_date_compare(range.selection.start, earlier.date));
+    CHECK(!cui_date_compare(range.selection.end, (cui_date){2024, 2, 15}));
+    CHECK(!range.state.selecting_end && range.state.month.month == 1);
+    cui_destroy(range.ui);
+
+    fixture f = create(false);
+    f.presentation.neighboring_days = true;
+    frame(&f, 1);
+    cui_calendar_cell_info before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+    cui_focus(f.ui, before.id);
+    key(&f, CUI_KEY_SPACE);
+    CHECK(cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = CUI_KEY_SPACE}));
+    frame(&f, 1);
+    CHECK(f.result.activated && !cui_date_compare(f.selection.start, before.date));
+    cui_destroy(f.ui);
+    f = create(false);
+    f.presentation.neighboring_days = true;
+    frame(&f, 1);
+    before = cell_for(&f, 0, (cui_date){2024, 1, 29});
+    cui_calendar_cell_info after = cell_for(&f, 0, (cui_date){2024, 3, 10});
+    activate(&f, before.id, 2);
+    activate(&f, after.id, 2);
+    f.options.minimum = (cui_date){2024, 2, 10};
+    f.options.maximum = (cui_date){2024, 2, 20};
+    frame(&f, 1);
+    CHECK(!f.result.activated && !f.result.changed);
+    CHECK(semantic(&f, before.id)->disabled && semantic(&f, after.id)->disabled);
+    cui_destroy(f.ui);
+    const cui_date edges[] = {{1, 1, 1}, {9999, 12, 1}};
+    for (unsigned edge = 0; edge < 2; edge++) {
+        f = create(false);
+        f.presentation.neighboring_days = true;
+        f.options.months = 3;
+        cui_calendar_init(&f.state, edges[edge]);
+        f.selection.start = edges[edge];
+        frame(&f, 1);
+        unsigned valid = 0;
+        for (unsigned panel = 0; panel < 3; panel++)
+            for (unsigned cell = 0; cell < 42; cell++) {
+                cui_calendar_cell_info info;
+                if (cui_calendar_cell_resolve(10, edges[edge],
+                                              cui_calendar_first_weekday(f.options), panel, cell,
+                                              &info)) {
+                    CHECK(semantic(&f, info.id));
+                    valid++;
+                }
+            }
+        CHECK(valid > 0 && valid <= 126);
+        CHECK(cui_date_valid(f.state.cursor));
+        cui_destroy(f.ui);
+    }
+}
+static void neighbor_paint(void) {
+    unsigned char *image = malloc(800 * 500 * 4);
+    CHECK(image);
+    for (unsigned dark = 0; dark < 2; dark++)
+        for (unsigned state = 0; state < 5; state++) {
+            fixture f = create(dark != 0);
+            f.presentation.neighboring_days = true;
+            cui_date date = {2024, 1, 29};
+            unsigned blocked = state == 3 ? 1 : 0;
+            f.options.is_disabled = policy;
+            f.options.disabled_user = &blocked;
+            if (state == 1 || state == 2 || state == 3)
+                f.selection.start = date;
+            if (state == 2) {
+                f.options.range = true;
+                f.selection.end = (cui_date){2024, 2, 10};
+            }
+            if (state == 4)
+                f.presentation.today = date;
+            cui_draw_list draw = frame(&f, 1);
+            cui_calendar_cell_info info = cell_for(&f, 0, date);
+            cui_rect bounds = cui_bounds(f.ui, info.id);
+            cui_color fg = state == 0 || state == 3 ? f.theme.muted
+                           : state == 4             ? f.theme.accent_foreground
+                                                    : f.theme.on_primary;
+            cui_color bg = state == 0   ? f.theme.surface
+                           : state == 4 ? f.theme.accent
+                                        : f.theme.primary;
+            pixels(draw, image);
+            unsigned x = (unsigned)(bounds.x + bounds.w / 2),
+                     y = (unsigned)(bounds.y + bounds.h / 2);
+            CHECK(!memcmp(image + (y * 800 + x) * 4, &bg, 4));
+            bool found = false;
+            for (size_t i = 0; i < draw.count; i++) {
+                const cui_draw_command *c = &draw.commands[i];
+                if (c->type == CUI_DRAW_TEXT && c->bounds.x >= bounds.x &&
+                    c->bounds.x < bounds.x + bounds.w && c->bounds.y >= bounds.y &&
+                    c->bounds.y < bounds.y + bounds.h) {
+                    CHECK(color_equal(c->color, fg));
+                    found = true;
+                }
+            }
+            CHECK(found && !f.result.changed);
+            cui_destroy(f.ui);
+        }
+    free(image);
+}
 int main(void) {
+    cell_queries();
+    neighbor_geometry();
+    neighbor_routing();
+    neighbor_paint();
+    neighbor_edges_and_space();
     navigation();
     policies();
     today();

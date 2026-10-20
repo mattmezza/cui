@@ -216,6 +216,51 @@ static cui_date cui_picker_target_date(cui_id id, cui_id target, cui_date month,
     }
     return (cui_date){0};
 }
+bool cui_calendar_cell_resolve(cui_id root, cui_date first_month, unsigned first_weekday,
+                               unsigned panel, unsigned cell, cui_calendar_cell_info *output) {
+    if (!output)
+        return false;
+    *output = (cui_calendar_cell_info){0};
+    if (!root || !cui_date_valid(first_month) || panel > 2 || cell >= 42)
+        return false;
+    first_month.day = 1;
+    cui_date month = cui_date_add_months(first_month, (int)panel), grid[42];
+    if (!cui_date_valid(month))
+        return false;
+    cui_calendar_grid(month, first_weekday, grid);
+    cui_date date = grid[cell];
+    if (!cui_date_valid(date))
+        return false;
+    bool neighboring = date.year != month.year || date.month != month.month;
+    uint64_t code = (uint64_t)date.year * 10000 + (uint64_t)date.month * 100 + (unsigned)date.day;
+    cui_id id = neighboring ? cui_picker_part(root, UINT64_C(400000000) + code * 3 + panel)
+                            : cui_calendar_day_id(root, date);
+    if (!id || !cui_calendar_day_id(root, date))
+        return false;
+    *output = (cui_calendar_cell_info){.date = date, .id = id, .neighboring = neighboring};
+    return true;
+}
+static cui_date cui_picker_target_occurrence(cui_id root, cui_id target, cui_date month,
+                                             unsigned months, unsigned first) {
+    for (unsigned panel = 0; panel < months; panel++)
+        for (unsigned cell = 0; cell < 42; cell++) {
+            cui_calendar_cell_info info;
+            if (cui_calendar_cell_resolve(root, month, first, panel, cell, &info) &&
+                info.id == target)
+                return info.date;
+        }
+    return (cui_date){0};
+}
+static cui_date cui_picker_last_displayed(cui_date first, unsigned months) {
+    cui_date last = first;
+    for (unsigned panel = 1; panel < months; panel++) {
+        cui_date next = cui_date_add_months(first, (int)panel);
+        if (cui_date_valid(next))
+            last = next;
+    }
+    last.day = cui_date_days_in_month(last.year, last.month);
+    return last;
+}
 static void cui_picker_select(cui_calendar_state *state, cui_date_selection *selection,
                               cui_date date, bool range) {
     if (range && state->selecting_end && cui_date_valid(selection->start)) {
@@ -506,8 +551,11 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
             }
             continue;
         }
-        cui_date target = cui_picker_target_date(id, cui_event_target(ui, e), old_month, months,
-                                                 cui_calendar_first_weekday(o));
+        cui_date target = presentation.neighboring_days
+                              ? cui_picker_target_occurrence(id, cui_event_target(ui, e), old_month,
+                                                             months, cui_calendar_first_weekday(o))
+                              : cui_picker_target_date(id, cui_event_target(ui, e), old_month,
+                                                       months, cui_calendar_first_weekday(o));
         if (!cui_date_valid(target))
             continue;
         bool keyboard = events[e].type == CUI_EVENT_KEY_DOWN || events[e].type == CUI_EVENT_KEY_UP;
@@ -519,6 +567,15 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
             cui_date chosen = keyboard ? s->cursor : target;
             if (cui_calendar_date_enabled(chosen, o)) {
                 cui_picker_select(s, selection, chosen, o.range);
+                if (presentation.neighboring_days) {
+                    cui_date last = cui_picker_last_displayed(s->month, months);
+                    if (cui_date_compare(chosen, s->month) < 0 ||
+                        cui_date_compare(chosen, last) > 0) {
+                        s->month = (cui_date){chosen.year, chosen.month, 1};
+                        result.navigated = true;
+                    }
+                    cui_focus(ui, cui_calendar_day_id(id, chosen));
+                }
                 result.activated = true;
             }
             if (!keyboard)
@@ -561,6 +618,8 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
             s->cursor = next;
             cui_date end = cui_date_add_months(s->month, (int)months - 1);
             end.day = cui_date_days_in_month(end.year, end.month);
+            if (presentation.neighboring_days)
+                end = cui_picker_last_displayed(s->month, months);
             if (cui_date_compare(next, s->month) < 0 || cui_date_compare(next, end) > 0)
                 s->month = (cui_date){next.year, next.month, 1};
             cui_focus(ui, cui_calendar_day_id(id, next));
@@ -569,6 +628,8 @@ cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calen
     }
     cui_date final_month = cui_date_add_months(s->month, (int)months - 1);
     final_month.day = cui_date_days_in_month(final_month.year, final_month.month);
+    if (presentation.neighboring_days)
+        final_month = cui_picker_last_displayed(s->month, months);
     if (!cui_calendar_date_enabled(s->cursor, o) || cui_date_compare(s->cursor, s->month) < 0 ||
         cui_date_compare(s->cursor, final_month) > 0) {
         cui_date candidate = s->month;
@@ -664,25 +725,36 @@ void cui_calendar_submit_ex(cui_context *ui, cui_id id, cui_calendar_state *s,
         cui_date month = cui_date_add_months(s->month, (int)m), grid[42];
         cui_calendar_grid(month, cui_calendar_first_weekday(o), grid);
         for (unsigned i = 0; i < 42; ++i) {
-            if (!cui_date_valid(grid[i]) || grid[i].month != month.month ||
-                grid[i].year != month.year)
-                continue;
-            bool duplicate = false;
-            for (size_t j = 0; j < seen_count; ++j)
-                if (!cui_date_compare(seen[j], grid[i]))
-                    duplicate = true;
-            if (duplicate)
-                continue;
-            seen[seen_count++] = grid[i];
+            cui_calendar_cell_info info = {0};
+            bool neighboring = false;
+            cui_id day;
+            if (presentation.neighboring_days) {
+                if (!cui_calendar_cell_resolve(id, s->month, cui_calendar_first_weekday(o), m, i,
+                                               &info))
+                    continue;
+                day = info.id;
+                neighboring = info.neighboring;
+            } else {
+                if (!cui_date_valid(grid[i]) || grid[i].month != month.month ||
+                    grid[i].year != month.year)
+                    continue;
+                bool duplicate = false;
+                for (size_t j = 0; j < seen_count; ++j)
+                    if (!cui_date_compare(seen[j], grid[i]))
+                        duplicate = true;
+                if (duplicate)
+                    continue;
+                seen[seen_count++] = grid[i];
+                day = cui_calendar_day_id(id, grid[i]);
+            }
             char name[96];
             cui_date_format_locale(grid[i], o.locale, name, sizeof name);
-            cui_id day = cui_calendar_day_id(id, grid[i]);
             bool selected = cui_picker_selected(grid[i], selection, o.range);
             cui_interact(ui, day, CUI_ROLE_BUTTON, cui_string(name),
                          !cui_calendar_date_enabled(grid[i], o), selected, (float)grid[i].day);
             cui_set_semantic_details(ui, day,
                                      (cui_semantic_details){.selected = selected, .parent = id});
-            cui_set_tab_stop(ui, day, !cui_date_compare(s->cursor, grid[i]));
+            cui_set_tab_stop(ui, day, !neighboring && !cui_date_compare(s->cursor, grid[i]));
         }
     }
 }

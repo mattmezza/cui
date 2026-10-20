@@ -24,6 +24,14 @@ example connects to a speaker or the native video UI yet. Native sound output
 therefore remains unimplemented; passing these tests does not prove audibility
 or audio/video synchronization.
 
+The optional [SDL output transport](../examples/video_audio_sdl/README.md) supplies
+the controller's output interface. Its owner-thread pump submits bounded PCM
+chunks and reconciles SDL's software queue drain without registering application
+callbacks with the mixer. Headless tests use SDL's dummy driver and injected
+failures. That evidence covers pause, resume, discard and ordered consumption;
+it does not prove physical audibility or a DAC clock. The decoder and transport
+are not yet wired into the native video example.
+
 ## Initialize and advance
 
 ```c

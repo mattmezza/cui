@@ -8,6 +8,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_chart.h"
 #include "cui/cui_choice.h"
 #include "cui/cui_chrome.h"
+#include "cui/cui_color_entry.h"
 #include "cui/cui_command.h"
 #include "cui/cui_components.h"
 #ifdef CUI_GALLERY_REGEX
@@ -1453,6 +1454,9 @@ static cui_time_state time_state;
 static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
+static cui_color_entry_state color_entry;
+static bool color_entry_restore;
+static size_t color_entry_commits;
 static cui_plot_viewport plot_viewport;
 static unsigned char plot_pixels[640 * 180 * 4];
 static cui_plot_numeric_tick plot_x_ticks[16], plot_y_ticks[16];
@@ -2159,6 +2163,8 @@ float gallery_app_stat(int field) {
 int gallery_init(void) {
     if (ui)
         return 1;
+    if (!cui_color_entry_init(&color_entry, (cui_color_entry_value){true, chosen_color}))
+        return 0;
     gallery_app = composed_app_create(NULL, NULL);
     if (!gallery_app)
         return 0;
@@ -2792,6 +2798,18 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     current_theme = t;
     if (story == 80)
         composed_app_set_theme(gallery_app, &t);
+    /* Owner synchronization runs before submission and after prior draw consumption. A dirty draft
+     * survives picker changes until the owner explicitly replaces it. */
+    cui_color selected = color_entry.committed.color;
+    bool color_changed = !color_entry.committed.present || selected.r != chosen_color.r ||
+                         selected.g != chosen_color.g || selected.b != chosen_color.b ||
+                         selected.a != chosen_color.a;
+    if (color_entry_restore || (!color_entry.dirty && color_changed)) {
+        if (cui_color_entry_sync(&color_entry, (cui_color_entry_value){true, chosen_color},
+                                 color_entry_restore) == CUI_COLOR_ENTRY_OK)
+            redraw = true;
+    }
+    color_entry_restore = false;
     cui_begin_frame(ui, width, height, host_dt);
     cui_set_reduced_motion(ui, reduced_motion);
     if (story != 75 && story != 80)
@@ -5577,6 +5595,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                     .width = width > 360 ? 280 : width - 68,
                                                     .palette = palette,
                                                     .palette_count = 4});
+        cui_label(ui, &t, cui_string("Hex draft · Enter commits"));
+        cui_color_entry_result entry = cui_color_entry(
+            ui, cui_id_from(ui, "color-hex-entry"), &t, cui_string("Hex color"), &color_entry,
+            (cui_color_entry_options){.disabled = disabled,
+                                      .width = width > 360 ? 280 : width - 68},
+            (cui_color_entry_handler){0});
+        if (entry.commit_count && entry.committed.present) {
+            chosen_color = entry.committed.color;
+            color_entry_commits += entry.commit_count;
+            redraw = true;
+        }
+        char entry_status[96];
+        snprintf(entry_status, sizeof entry_status, "Hex commits: %zu%s", color_entry_commits,
+                 entry.status == CUI_COLOR_HEX_INCOMPLETE ? " · incomplete draft" : "");
+        cui_label(ui, &t, cui_string(entry_status));
+        color_entry_restore = cui_button(ui, cui_id_from(ui, "color-hex-restore"), &t,
+                                         cui_string("Use picker color"), disabled);
+        if (color_entry_restore)
+            redraw = true;
         break;
     }
     default:

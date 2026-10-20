@@ -118,6 +118,16 @@ Dock's gallery opts into `cui_dock_create_nary`: repeated horizontal splits beco
 
 Editor's gallery attaches eight live selection slots, bounded history snapshots and measured-column anchors. Ctrl/Alt+Up/Down or Alt-click adds cursors; text is inserted at each cursor as one undoable edit, and Escape collapses extras. The browser checks three-cursor typing and collection restoration through Undo/Redo. Further multi-range clipboard, indentation, rectangular dragging and IME behavior remain separate source work.
 
+## Hex-entry example
+
+ColorPicker also demonstrates the owned byte-RGBA hex entry from
+[COLOR_ENTRY.md](COLOR_ENTRY.md). Editing changes its draft and preview; Enter
+commits a complete value into the picker. Incomplete drafts remain editable.
+Picker changes preserve a dirty draft until **Use picker color** explicitly
+replaces it. Owner synchronization runs before the next frame, after the previous
+draw list has been consumed. This demo is separate from the float-HSLA entry API;
+it does not establish HSLA popup or tab coverage.
+
 ## CI execution
 
 Pages builds the default and regex-enabled gallery once, then shares those exact

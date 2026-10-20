@@ -23,6 +23,30 @@ extern "C" {
  * CHANGE/COMMIT/SUBMIT, resource lifecycle or foreign callback facade implied. */
 cui_component_action_result cui_avatar_events(cui_context *, cui_id, const cui_theme *, cui_str,
                                               cui_avatar_options, cui_component_activation_handler);
+typedef struct {
+    cui_component_event_metadata event; /* Target=stack; activation.target=child. */
+    size_t index;
+    uint64_t key; /* Original application key, including zero. */
+} cui_avatar_stack_activation;
+typedef void (*cui_avatar_stack_activation_fn)(void *, const cui_avatar_stack_activation *);
+typedef struct {
+    cui_avatar_stack_activation_fn callback;
+    void *user;
+} cui_avatar_stack_handler;
+typedef struct {
+    size_t control;                     /* Legacy highest activated visible index, or SIZE_MAX. */
+    cui_component_action_result action; /* request_count always zero. */
+} cui_avatar_stack_event_result;
+/* One original stack submission. Child-submission order, then each child's
+ * event-index order; not global input order. Hidden items/passive overflow never
+ * notify. A callback does not enable interactive. Aggregate control retains the
+ * original index semantics, while action counts every observed activation.
+ * Same metadata/mutation/lifetime rules as above; items are borrowed and must
+ * not be changed/rebound/freed during the active stack submission. */
+cui_avatar_stack_event_result cui_avatar_stack_events(cui_context *, cui_id, const cui_theme *,
+                                                      const cui_avatar_item *, size_t count,
+                                                      cui_avatar_stack_options,
+                                                      cui_avatar_stack_handler);
 #ifdef __cplusplus
 }
 #endif

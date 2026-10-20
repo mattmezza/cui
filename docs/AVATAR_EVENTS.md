@@ -67,9 +67,51 @@ outer return and renderer consumption. No runtime destruction guard, owner veto,
 CHANGE/COMMIT/SUBMIT, image loading lifecycle or foreign-language callback facade
 is introduced.
 
-This is phase one only. `cui_avatar_stack` still returns its legacy aggregate
-index and has no new typed stack observer. Its distinct child/event ordering
-requires the separately reviewed phase two in the
-[design checkpoint](design/AVATAR_EVENTS_SLICE.md). Complete Avatar parity is not
-claimed. Integrator work includes test/module registration, generated SDK/API/
-skill exports and honest binding availability.
+## Stack activations
+
+`cui_avatar_stack_events` adds the separately reviewed stack observer while
+`cui_avatar_stack` retains its old aggregate index API:
+
+```c
+static void choose_person(void *user, const cui_avatar_stack_activation *event) {
+    team_owner *owner = user;
+    owner->chosen_index = event->index;
+    owner->chosen_key = event->key;
+    owner->last_activation = event->event;
+}
+cui_avatar_stack_event_result result = cui_avatar_stack_events(
+    ui, id, &theme, people, people_count,
+    (cui_avatar_stack_options){.size = 48, .interactive = true},
+    (cui_avatar_stack_handler){choose_person, owner});
+```
+
+Callbacks follow visible child submission order, then that child's event-index
+order. They are not sorted across the compound by input chronology. For events
+on children 2, 0 and 1 in that time order, callbacks report children 0, 1 and 2;
+`result.control` is 2, preserving the highest activated visible index returned
+by the old API. Several events on one child generate several callbacks.
+`result.action` uses the same validity/submission/count/overflow fields as the
+single Avatar; request_count stays zero. A missing handler still counts and
+preserves the legacy aggregate index and consumption.
+
+The payload's metadata target is the stack ID, while genuine activation evidence
+retains its child target. Index and application key are copied from the actual
+visible iteration, including an original zero key. Nonzero keys retain stable
+child identity across reorder; zero retains the existing index-based identity
+rule. The payload does not replace zero with a generated key. A frame-only
+fallback has no claimed child activation snapshot; index/key still identify the
+actual legacy iteration. The regression exercises this with real routed input
+and a duplicate-semantic Core error.
+
+Width-limited hidden items and passive overflow never notify. Existing overlap
+hit order, default visible count, images, semantics and appearance remain
+unchanged. Active item arrays are borrowed and must not be mutated/rebound/freed
+inside callbacks. Consuming later input can suppress later events/children; no
+queue or replay is introduced. Resource lifetimes and deferred teardown rules
+are identical to the single-Avatar observer.
+
+The [checkpoint](design/AVATAR_EVENTS_SLICE.md) remains the reviewed design
+history. Complete Avatar parity is not claimed. Integrator work includes test/
+module registration, generated SDK/API/skill exports and honest binding
+availability; a C declaration copied into an SDK does not expose a working
+foreign callback facade.

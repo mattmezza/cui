@@ -19,18 +19,40 @@ float. Offline tests check sample content, resampler draining, exact replay-base
 seeks, a shared video/audio origin, cancellation and pending-worker shutdown.
 This optional example currently admits only bounded PCM media and replays from
 the beginning for seeks; it is not general compressed-media playback. Its pinned
-FFmpeg package has GPLv3-or-later licensing, documented in the example. Neither
-example connects to a speaker or the native video UI yet. Native sound output
-therefore remains unimplemented; passing these tests does not prove audibility
-or audio/video synchronization.
+FFmpeg package has GPLv3-or-later licensing, documented in the example. These
+standalone proofs do not themselves connect a video UI to a device.
 
 The optional [SDL output transport](../examples/video_audio_sdl/README.md) supplies
 the controller's output interface. Its owner-thread pump submits bounded PCM
 chunks and reconciles SDL's software queue drain without registering application
 callbacks with the mixer. Headless tests use SDL's dummy driver and injected
 failures. That evidence covers pause, resume, discard and ordered consumption;
-it does not prove physical audibility or a DAC clock. The decoder and transport
-are not yet wired into the native video example.
+it does not prove physical audibility or a DAC clock.
+
+The separate [native video with PCM sound example](../examples/video_player_audio/README.md)
+connects both workers and the SDL output to a real CUI VideoPlayer UI. Its initial
+supported profile is immutable local Matroska with FFV1 video and PCM audio,
+known zero container origin and duration at most 10 seconds. It offers play,
+pause, seek, skip and replay, and selects decoded video frames against observed
+SDL software-mixer consumption. It does not claim a physical DAC clock or
+speaker-level synchronization. Native fullscreen, rate controls, general
+MP4/AAC/Opus playback and actual device hotplug recovery remain unsupported in
+this example. The existing silent video example remains available independently.
+
+Build and test from the repository root with the pinned development dependencies
+listed in that example's README:
+
+```sh
+cmake -S examples/video_player_audio -B build-video-sound -G Ninja -DVIDEO_SOUND_UI=ON
+cmake --build build-video-sound --target video_player_audio test_sound test_sound_watch test_sound_output test_sound_legacy
+python scripts/test_local.py --build-dir build-video-sound -- -R '^sound_'
+```
+
+Automated native checks use private Xvfb, forced SDL dummy audio and captured
+actual decoded pixels. They do not open a desktop window or exercise speakers.
+The README provides a separate explicit interactive launch command and explains
+PCM conversion, package licensing, device invalidation, bounded buffering,
+software-clock limitations and shutdown ownership.
 
 ## Initialize and advance
 

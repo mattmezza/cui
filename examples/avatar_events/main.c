@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_avatar_events.h"
-#include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 /* A profile-picker owner: the handler copies evidence and requests deferred
  * dismissal. No handler frees UI state or repeats the action from frame counts. */
 typedef struct {
@@ -27,31 +27,38 @@ static cui_component_action_result draw_picker(cui_context *ui, const cui_theme 
 }
 int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
-    assert(ui);
+    if (!ui)
+        return EXIT_FAILURE;
+    int status = EXIT_FAILURE;
     cui_theme theme = cui_theme_light();
     profile_picker owner = {.open = true};
     /* This portable demonstration supplies one synthetic Core accessibility
      * action after registration. It does not claim native screen-reader proof. */
     for (unsigned frame = 0; frame < 3; frame++) {
-        if (frame == 1)
-            assert(cui_queue_accessibility_action(ui, 200, CUI_ACCESSIBILITY_ACTIVATE));
-        assert(cui_begin_frame(ui, 200, 100, .016f));
+        if (frame == 1 && !cui_queue_accessibility_action(ui, 200, CUI_ACCESSIBILITY_ACTIVATE))
+            goto done;
+        if (!cui_begin_frame(ui, 200, 100, .016f))
+            goto done;
         cui_component_action_result result = draw_picker(ui, &theme, &owner);
         cui_draw_list draw = cui_end_frame(ui);
         (void)draw;
         /* A real host must consume draw here before applying teardown. This
          * model-only program has no renderer or borrowed external image state. */
         if (owner.dismiss_pending) {
-            assert(owner.open && owner.profile_opens == 1 && result.activation_count == 1);
+            if (!owner.open || owner.profile_opens != 1 || result.activation_count != 1)
+                goto done;
             owner.open = false;
             owner.dismiss_pending = false;
         }
-        if (frame == 2)
-            assert(!result.submitted && !result.activation_count);
+        if (frame == 2 && (result.submitted || result.activation_count))
+            goto done;
     }
-    assert(owner.profile_opens == 1 && !owner.open);
+    if (owner.profile_opens == 1 && !owner.open &&
+        owner.last_activation.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY) {
+        puts("One profile opened; picker omitted on the next submission; evidence copied.");
+        status = EXIT_SUCCESS;
+    }
+done:
     cui_destroy(ui);
-    assert(owner.last_activation.source == CUI_COMPONENT_EVENT_SOURCE_ACCESSIBILITY);
-    puts("One profile opened; picker omitted on the next submission; evidence copied.");
-    return 0;
+    return status;
 }

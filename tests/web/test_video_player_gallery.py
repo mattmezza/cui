@@ -17,7 +17,9 @@ from playwright.sync_api import sync_playwright
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--directory', type=Path)
+    source=parser.add_mutually_exclusive_group()
+    source.add_argument('--directory', type=Path)
+    source.add_argument('--url', help='Deployed gallery base URL, including its trailing path')
     parser.add_argument('--offline', action='store_true')
     parser.add_argument('--chromium')
     args = parser.parse_args()
@@ -45,21 +47,26 @@ def main():
     if args.offline:
         print('PASS: public version validation, required WASM sources, encoded asset hashes/bounds')
         return
-    if not args.directory: parser.error('--directory required for browser proof')
+    if not args.directory and not args.url: parser.error('--directory or --url required for browser proof')
+    if args.url and not args.url.startswith(('https://','http://')): parser.error('--url must use HTTP(S)')
     class Handler(SimpleHTTPRequestHandler):
         def translate_path(self, path):
             return super().translate_path(path[4:] if path.startswith('/cui/') else path)
         def log_message(self, *args):
             pass
-    server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Handler, directory=str(args.directory.resolve())))
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    server=None
+    base_url=args.url.rstrip('/')+'/' if args.url else None
+    if args.directory:
+        server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Handler, directory=str(args.directory.resolve())))
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        base_url=f'http://127.0.0.1:{server.server_port}/cui/'
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True, **({'executable_path': args.chromium} if args.chromium else {}))
             page = browser.new_page(viewport={'width':1280,'height':1000}, device_scale_factor=2)
             errors=[]
             page.on('pageerror',lambda e:errors.append(str(e)))
-            page.goto(f'http://127.0.0.1:{server.server_port}/cui/#VideoPlayer')
+            page.goto(base_url+'#VideoPlayer')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="VideoPlayer" && cuiGallery.video.snapshot().frames>0')
             assert page.evaluate('cuiGallery.catalog.components.length')==78
             assert page.evaluate('cuiGallery.catalog.components.every(c=>c.name!=="VideoPlayer")')
@@ -217,7 +224,7 @@ def main():
             pending=[]
             late=browser.new_page()
             late.route('**/assets/video/sample.webm',lambda route:pending.append(route))
-            late.goto(f'http://127.0.0.1:{server.server_port}/cui/#VideoPlayer')
+            late.goto(base_url+'#VideoPlayer')
             late.wait_for_function('window.cuiGallery?.video.snapshot().active')
             late.wait_for_timeout(50)
             late.evaluate('location.hash="Button"')
@@ -232,13 +239,13 @@ def main():
             # preferred media, is distinct from synthetic host-error checks.
             alternate=browser.new_page()
             alternate.route('**/assets/video/sample.webm',lambda route:route.fulfill(body=b'not a WebM',content_type='video/webm'))
-            alternate.goto(f'http://127.0.0.1:{server.server_port}/cui/#VideoPlayer')
+            alternate.goto(base_url+'#VideoPlayer')
             alternate.wait_for_function('window.cuiGallery?.video.snapshot().frames>0')
             assert alternate.evaluate('cuiGallery.video.snapshot().asset.endsWith("sample.mp4")')
             alternate.close()
             oversized=browser.new_page()
             oversized.route('**/assets/video/sample.webm',lambda route:route.fulfill(body=b'x'*(512*1024+1),content_type='video/webm'))
-            oversized.goto(f'http://127.0.0.1:{server.server_port}/cui/#VideoPlayer')
+            oversized.goto(base_url+'#VideoPlayer')
             oversized.wait_for_function('window.cuiGallery?.video.snapshot().error.includes("512 KiB")')
             assert oversized.evaluate('cuiGallery.video.snapshot().frames===0')
             oversized.close()
@@ -246,7 +253,8 @@ def main():
             browser.close()
             print('PASS: VideoPlayer real video/audio decode, painted default skip glyphs, +/-2s seek, stage fullscreen/Escape, mobile DPR2 and cleanup')
     finally:
-        server.shutdown();server.server_close()
+        if server:
+            server.shutdown();server.server_close()
 
 if __name__=='__main__':
     main()

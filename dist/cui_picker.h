@@ -1090,7 +1090,8 @@ static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigge
                                                   cui_str name, cui_date_picker_state *s,
                                                   cui_date_selection *selection,
                                                   cui_date_picker_options o,
-                                                  cui_date_picker_calendar_options extension) {
+                                                  cui_date_picker_calendar_options extension,
+                                                  bool submit, bool *open_after_trigger) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
@@ -1108,6 +1109,8 @@ static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigge
             }
     }
     cui_picker_update_trigger(ui, trigger, s, o.disabled);
+    if (open_after_trigger)
+        *open_after_trigger = s->overlay.open;
     if (s->overlay.open) {
         cui_calendar_options options = o.calendar;
         options.disabled = options.disabled || o.disabled;
@@ -1116,6 +1119,8 @@ static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigge
         if (result.activated && (!options.range || !s->calendar.selecting_end))
             cui_overlay_close(ui, &s->overlay);
     }
+    if (!submit)
+        return result;
     char formatted[200], end_value[96];
     if (o.calendar.locale && cui_date_valid(selection->start)) {
         cui_date_format_locale(selection->start, o.calendar.locale, formatted, sizeof formatted);
@@ -1132,6 +1137,17 @@ static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigge
         (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
     return result;
 }
+/* Private date-only action seam: one legacy Calendar/overlay reduction,
+ * with trigger semantics submitted by the action facade after its final pass. */
+cui_calendar_result cui_picker_actions_reduce(cui_context *ui, cui_id trigger, cui_id calendar,
+                                              cui_date_picker_state *s,
+                                              cui_date_selection *selection,
+                                              cui_date_picker_options o,
+                                              cui_date_picker_calendar_options extension,
+                                              bool *open_after_trigger) {
+    return cui_picker_date_picker(ui, trigger, calendar, (cui_str){0}, s, selection, o, extension,
+                                  false, open_after_trigger);
+}
 cui_id cui_date_picker_calendar_id(cui_id trigger) {
     if (!trigger)
         return 0;
@@ -1142,13 +1158,14 @@ cui_calendar_result cui_base_date_picker_ex(cui_context *ui, cui_id trigger, cui
                                             cui_date_selection *selection,
                                             cui_date_picker_options o,
                                             cui_date_picker_calendar_options extension) {
-    return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o, extension);
+    return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o, extension, true,
+                                  NULL);
 }
 cui_calendar_result cui_base_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
                                          cui_str name, cui_date_picker_state *s,
                                          cui_date_selection *selection, cui_date_picker_options o) {
     return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o,
-                                  (cui_date_picker_calendar_options){0});
+                                  (cui_date_picker_calendar_options){0}, true, NULL);
 }
 bool cui_time_valid(cui_time time) {
     return time.hour < 24 && time.minute < 60 && time.second < 60;
@@ -1898,6 +1915,12 @@ cui_calendar_result cui_calendar_with_behavior(cui_context *ui, cui_id id, const
         cui_base_calendar_with_behavior(ui, id, s, selection, o, presentation, behavior);
     cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
     return result;
+}
+/* Private action facade paint seam; never reduces or submits semantics. */
+void cui_picker_actions_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_calendar_state *s,
+                              cui_date_selection *value, cui_calendar_options o,
+                              cui_calendar_presentation_options presentation) {
+    cui_picker_paint_calendar(ui, id, t, s, value, o, presentation);
 }
 static bool cui_picker_date_picker_styled(cui_context *ui, cui_id id, const cui_theme *t,
                                           cui_str name, cui_date_picker_state *s,

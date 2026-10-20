@@ -28,6 +28,8 @@ def generate(name,sources):
         lines += ['#include "cui_components.h"', '#include "cui_calendar_presentation.h"', '#include "cui_calendar_behavior.h"', '#include "cui_date_picker_calendar.h"']
     if name in {"cui_calendar_presentation", "cui_calendar_behavior", "cui_date_picker_calendar"}:
         lines += ['#ifndef CUI_PICKER_IMPLEMENTATION', '#define CUI_PICKER_IMPLEMENTATION', '#endif', '#include "cui_picker.h"']
+    if name == "cui_date_picker_actions":
+        lines += ['#include "cui_components.h"', '#ifndef CUI_PICKER_IMPLEMENTATION', '#define CUI_PICKER_IMPLEMENTATION', '#endif', '#include "cui_picker.h"']
     if name == "cui_button_styles":
         lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']
     if name == "cui_hover_card_extended":

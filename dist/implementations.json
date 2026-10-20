@@ -497,6 +497,14 @@
       "sources": [
         "src/base/cui_questionnaire_snapshots.c"
       ]
+    },
+    {
+      "header": "cui_date_picker_actions.h",
+      "macro": "CUI_DATE_PICKER_ACTIONS_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_date_picker_actions.c",
+        "src/components/cui_date_picker_actions.c"
+      ]
     }
   ]
 }

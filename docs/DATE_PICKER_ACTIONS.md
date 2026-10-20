@@ -3,9 +3,8 @@
 Include `cui/cui_date_picker_actions.h` and rebuild with matching sources and
 headers. This opt-in facade adds bounded presets and clear actions. Existing
 DatePicker APIs and layouts are unchanged. It is not date-time editing, an event
-observer, arbitrary styling or a complete DatePicker parity claim. Root integration
-must register the two new implementation files; the standalone fixture does so
-locally without modifying canonical registration.
+observer, arbitrary styling or a complete DatePicker parity claim. The canonical library and generated distributions include both implementation
+files. The focused tests compile and execute the example below.
 
 This Base composition is compiled by the private fixture. Call it once inside a
 frame; state and value persist across frames. Use a real host viewport rather

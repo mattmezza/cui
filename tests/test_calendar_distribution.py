@@ -27,7 +27,7 @@ class CalendarDistributionTests(unittest.TestCase):
                     (output / (name + '.h')).write_text(generator.generate(name, sources), encoding='utf-8')
             for name in ('cui_platform.h', 'cui_renderer.h'):
                 (output / name).write_bytes((ROOT / 'include/cui' / name).read_bytes())
-            for entry in ('cui_picker', 'cui_calendar_presentation', 'cui_calendar_behavior', 'cui_date_picker_calendar'):
+            for entry in ('cui_picker', 'cui_calendar_presentation', 'cui_calendar_behavior', 'cui_date_picker_calendar', 'cui_date_picker_actions'):
                 with self.subTest(entry=entry):
                     source = output / 'calendar.c'
                     source.write_text(f'#define {entry.upper()}_IMPLEMENTATION\n#include "{entry}.h"\n', encoding='utf-8')
@@ -38,7 +38,7 @@ class CalendarDistributionTests(unittest.TestCase):
             cxx = shlex.split(os.environ.get('CXX', 'c++'))
             if cxx and shutil.which(cxx[0]):
                 source = output / 'calendar.cpp'
-                source.write_text('#include "cui_date_picker_calendar.h"\n', encoding='utf-8')
+                source.write_text('#include "cui_date_picker_actions.h"\n', encoding='utf-8')
                 result = subprocess.run(cxx + ['-std=c++11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                                               '-fsyntax-only', '-I' + directory, str(source)],
                                         text=True, capture_output=True, timeout=60)

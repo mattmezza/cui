@@ -1041,20 +1041,25 @@
         "cui_base_date_picker",
         "cui_date_picker_ex",
         "cui_base_date_picker_ex",
-        "cui_date_picker_calendar_id"
+        "cui_date_picker_calendar_id",
+        "cui_date_picker_actions_init",
+        "cui_date_picker_actions"
       ],
       "state_types": [
         "cui_date_picker_state",
         "cui_date_selection",
-        "cui_date_picker_calendar_options"
+        "cui_date_picker_calendar_options",
+        "cui_date_picker_actions_state",
+        "cui_date_picker_value"
       ],
       "state_ownership": "Caller retains cui_date_picker_state and cui_date_selection.",
       "interaction": "Returns final selection changes; live cui_date_disabled_fn restricts dates. The extended API forwards Calendar presentation/behavior and preserves final-queue completion close/focus; legacy CHANGE wrappers do not accept the extension or observe lifecycle.",
-      "usage": "Initialize stable popup identity once; submit caller state and selection each frame. Optional cui_date_picker_ex forwards month/today/neighbor presentation and independent range/year/recenter policies. Zero extension preserves legacy behavior, including late-error bool; rebuild matching headers/library.",
+      "usage": "Initialize stable popup identity once; submit caller state and selection each frame. Optional cui_date_picker_ex forwards month/today/neighbor presentation and independent range/year/recenter policies. Zero extension preserves legacy behavior, including late-error bool; rebuild matching headers/library. The separate date-only actions facade adds bounded presets, an optional clear button and explicit Delete scope with retained child selection; language builders omit it.",
       "docs": [
         "docs/PICKERS.md",
         "docs/PICKER_EVENTS.md",
-        "docs/DATE_PICKER_CALENDAR.md"
+        "docs/DATE_PICKER_CALENDAR.md",
+        "docs/DATE_PICKER_ACTIONS.md"
       ],
       "callback_symbols": [
         "cui_date_disabled_fn"
@@ -1065,7 +1070,8 @@
       "composition": "application model + frame composition",
       "additional_public_headers": [
         "include/cui/cui_picker_events.h",
-        "include/cui/cui_date_picker_calendar.h"
+        "include/cui/cui_date_picker_calendar.h",
+        "include/cui/cui_date_picker_actions.h"
       ]
     },
     {

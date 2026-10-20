@@ -7,6 +7,7 @@ enable_testing()
 get_filename_component(CUI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 set(CUI_BUILD_NATIVE OFF CACHE BOOL "Portable worker fixture" FORCE)
 add_subdirectory("${CUI_SOURCE_DIR}" cui EXCLUDE_FROM_ALL)
+if(NOT TARGET test_date_picker_actions)
 target_sources(cui PRIVATE "${CUI_SOURCE_DIR}/src/base/cui_date_picker_actions.c" "${CUI_SOURCE_DIR}/src/components/cui_date_picker_actions.c")
 add_executable(test_date_picker_actions "${CUI_SOURCE_DIR}/tests/unit/test_date_picker_actions.c")
 target_link_libraries(test_date_picker_actions PRIVATE cui_software cui)
@@ -26,3 +27,5 @@ add_library(date_picker_actions_guide OBJECT "${CMAKE_CURRENT_BINARY_DIR}/date_p
 target_link_libraries(date_picker_actions_guide PRIVATE cui)
 cui_warnings(date_picker_actions_guide)
 target_sources(test_date_picker_actions PRIVATE $<TARGET_OBJECTS:date_picker_actions_guide>)
+
+endif()

@@ -4,6 +4,7 @@
 #include "cui_component_events.h"
 
 int main(void) {
+    cui_date_picker_actions_init(NULL, 0, (cui_date){0});
     cui_questionnaire_query_snapshot query;
     if (cui_questionnaire_query_copy(NULL, &query) != CUI_QUESTIONNAIRE_SNAPSHOT_INVALID)
         return 1;

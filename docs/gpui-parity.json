@@ -4416,7 +4416,8 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Injected-provider lifecycle, bounded copied report queue, transcript handling, level meter and graphical controls are tested. An optional SDL input host has offline lifecycle, conversion, callback and concurrency coverage; real microphone operation, platform recognizers, fallback policy, application event-loop/device-removal integration and live-device acceptance remain unfinished; see docs/SPEECH.md."
+        "Injected-provider lifecycle, bounded copied report queue, transcript handling, level meter and graphical controls are tested. An optional SDL input host has offline lifecycle, conversion, callback and concurrency coverage; real microphone operation, platform recognizers, fallback policy, application event-loop/device-removal integration and live-device acceptance remain unfinished; see docs/SPEECH.md.",
+        "Optional macOS host now compiles on Apple SDK and passes injected native transport tests; the broad platform-integration row remains unfinished pending live-device acceptance and other system recognizers."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4466,6 +4467,19 @@
           ],
           "limitations": [
             "Offline injected-device and unbound-stream proof only. No microphone hardware or native OS recognizer acceptance; application owns polling, wake integration, permissions and device-removal events."
+          ]
+        },
+        {
+          "name": "optional bounded on-device macOS recognizer host and injected transport",
+          "status": "tested",
+          "evidence": [
+            "examples/speech_macos_recognizer/test_host.c",
+            "examples/speech_macos_recognizer/test_macos.m",
+            "examples/speech_macos_recognizer/README.md",
+            ".github/workflows/speech-macos.yml"
+          ],
+          "limitations": [
+            "Apple Debug/Release compile and injected fixtures tested; no live consent, microphone, real recognizer task, model availability or recognition-quality claim. Not a built-in Core service or a foreign-language wrapper."
           ]
         }
       ],

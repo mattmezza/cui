@@ -1,8 +1,9 @@
 # Optional macOS Speech recognizer host
 
-Portable application-host slices are implemented with an injected service.
-Native Objective-C service execution, macOS compilation, permission dialogs and
-live recognition remain deferred. This is not a native-recognition support or
+The bounded portable host and private Objective-C transport are implemented.
+Actual Apple CI compiled and linked both Debug and Release builds and passed
+all seven injected fixtures in each. Permission dialogs, microphone capture and
+live on-device recognition remain unverified. This is not a native-recognition support or
 full Speech parity claim. See [the design and native validation plan](../../docs/design/SPEECH_MACOS_RECOGNIZER.md).
 
 `host.h` exposes only C11/CUI types. `host.c` contains the bounded callback pool,
@@ -101,14 +102,15 @@ this isolated optional example; integration checks belong to the integrator.
 
 ## Native service work remaining
 
-Private Objective-C ARC/blocks transport will link Foundation, Speech and
-AVFoundation with deployment target macOS 13.0+. Native compile/link and injected
-ObjC service fixture need actual macOS CI; Linux fixtures do not prove them.
+Private Objective-C ARC/blocks transport links Foundation, Speech and
+AVFoundation with deployment target macOS 13.0+. [Apple CI](https://github.com/mattmezza/cui/actions/runs/39396253418)
+passed Debug and Release, seven fixtures each, at source `4ece99ec`. Linux
+fixtures independently passed all six portable cases during integration.
 Real microphone consent/capture, Speech authorization, locale/model availability,
 on-device recognition and real stop/no-speech behavior remain explicit manual
 validation. None is executed automatically or inferred from portable tests.
 
-## Private Objective-C slice: source ready, macOS validation pending
+## Private Objective-C transport and injected validation
 
 `host_macos.h` adds only opaque C factory/service types. `host_macos.m` keeps
 Foundation/Speech/AVFoundation objects and ARC callback blocks private. The
@@ -135,9 +137,9 @@ dependency. Run through `scripts/test_local.py` using the portable-only cache
 already set by this project. The independent example currently supplies a
 POSIX mutex and explicitly rejects Windows configuration.
 
-These Objective-C sources have only been formatted/reviewed on Linux so far;
-**macOS compilation and all native fixture results are pending actual macOS CI**.
-Linux's six portable cases still pass after adding the conditional native build.
-Do not infer native build/test success, live permission behavior, microphone
-operation or recognition quality from those results. Integrator owns the CI
-change and resulting evidence update.
+The Apple run used Xcode 26.6, macOS SDK 26.5 and Apple Clang 21 with a
+13.0 deployment target. It compiled the real backend but executed only injected
+service objects. This establishes native compilation, linkage and injected
+transport behavior; it does not establish real permission, microphone or
+recognition operation. The integration's six portable Release cases passed
+through the private-display wrapper as well.

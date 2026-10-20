@@ -39,3 +39,14 @@ python scripts/test_local.py --build-dir /tmp/cui-speech-input-build
 This requires CMake 3.20+, a C11 compiler, pkg-config and SDL3 development files (SDL >= 3.2). These commands run four offline Linux fixtures and never open a microphone. They test injected lifecycle/error handling, real unbound SDL conversion, intercepted SDL device operations and concurrent producer delivery. The example's CMake file records exact compiler and linker settings. It is an optional application-host example, not a new Core API or a built-in recognizer.
 
 For actual capture, the application supplies a recognizer and explicitly initializes SDL audio. See the example's integration section for start/poll/pump/shutdown ordering, timer and wake obligations, device-removal handling and OS permission limits. The host must outlive all provider callbacks; generation checks do not make reports safe after state storage is freed. macOS/Windows compilation, microphone hardware and recognition accuracy still require separate evidence.
+
+## Optional macOS recognizer host
+
+The [macOS recognizer host guide](../examples/speech_macos_recognizer/README.md)
+provides a bounded C11 mailbox/lifetime layer and a private Objective-C
+Speech/AVFoundation transport. The C11 provider uses the existing Speech API;
+no platform types enter public headers. Actual Apple Debug/Release compilation
+and injected transport tests pass. It requires explicit application consent,
+on-device service availability and a separate PCM input provider. Live consent,
+microphone capture and recognition acceptance remain unverified. Windows/Linux
+system recognizers and full Speech family parity remain unfinished.

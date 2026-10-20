@@ -59,6 +59,7 @@
 #include "cui_numeric_selection_events.h"
 #include "cui_picker_events.h"
 #include "cui_otp_events.h"
+#include "cui_hover_card_extended.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -294,4 +295,8 @@
 #define CUI_OTP_EVENTS_IMPLEMENTATION
 #endif
 #include "cui_otp_events.h"
+#ifndef CUI_HOVER_CARD_EXTENDED_IMPLEMENTATION
+#define CUI_HOVER_CARD_EXTENDED_IMPLEMENTATION
+#endif
+#include "cui_hover_card_extended.h"
 #endif

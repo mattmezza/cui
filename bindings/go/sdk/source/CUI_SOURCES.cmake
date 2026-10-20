@@ -95,4 +95,5 @@ set(CUI_SOURCES
  src/base/cui_picker_events.c
  src/components/cui_picker_events.c
  src/base/cui_otp_events.c
+ src/components/cui_hover_card_extended.c
 )

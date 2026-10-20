@@ -67,3 +67,7 @@ control for toggle semantics. Full upstream button parity, including independent
 explicit toggle metadata and richer icon/tooltip/animation options, is still
 under audit. Tests exercise all variants/densities across four themes plus
 colored-outline painting, pointer activation and disabled keyboard suppression.
+
+## Bounded paint handlers
+
+Use [Button styles](BUTTON_STYLES.md) for additive instance, hover, active, selected, disabled and focus paint refinements. Explicit masks preserve zero values; callbacks are borrowed pure calculations and cannot change geometry or dispatch input. Legacy submission remains available.

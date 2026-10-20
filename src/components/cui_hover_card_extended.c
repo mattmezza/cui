@@ -3,25 +3,27 @@
 #include <math.h>
 #include <string.h>
 /* Private shared placement seam, defined in cui_content.c. */
-bool cui_content_begin_hover_card_model(cui_context *, cui_id, const cui_theme *,
-                                        cui_hover_state *, cui_str, cui_hover_options, bool);
-static bool rect_valid(cui_rect r) {
+bool cui_content_begin_hover_card_model(cui_context *, cui_id, const cui_theme *, cui_hover_state *,
+                                        cui_str, cui_hover_options, bool);
+static bool cui_hover_card_ext_rect_valid(cui_rect r) {
     return isfinite(r.x) && isfinite(r.y) && isfinite(r.w) && isfinite(r.h) && r.w > 0 && r.h > 0;
 }
-static bool contains(cui_rect r, float x, float y) {
+static bool cui_hover_card_ext_contains(cui_rect r, float x, float y) {
     return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
 }
-static bool same_contact(const cui_hover_card_contact *c, cui_event e) {
+static bool cui_hover_card_ext_same_contact(const cui_hover_card_contact *c, cui_event e) {
     return c->type == e.pointer_type && c->contact == e.pointer_id && c->device == e.pointer_device;
 }
-static bool outside_release(cui_context *ui, cui_id id, cui_id trigger,
-                             cui_hover_card_contact *c, const cui_event *events, size_t n) {
+static bool cui_hover_card_ext_outside_release(cui_context *ui, cui_id id, cui_id trigger,
+                                               cui_hover_card_contact *c, const cui_event *events,
+                                               size_t n) {
     const cui_rect panel = cui_bounds(ui, id), anchor = cui_bounds(ui, trigger);
     bool dismissed = false;
     for (size_t i = 0; i < n; ++i) {
         const cui_event e = events[i];
         if (e.type == CUI_EVENT_CANCEL) {
-            if (e.pointer_type != CUI_POINTER_TOUCH || !c->active || same_contact(c, e)) {
+            if (e.pointer_type != CUI_POINTER_TOUCH || !c->active ||
+                cui_hover_card_ext_same_contact(c, e)) {
                 c->active = c->pending = c->ambiguous = false;
             }
             continue;
@@ -47,13 +49,14 @@ static bool outside_release(cui_context *ui, cui_id id, cui_id trigger,
             c->device = e.pointer_device;
             c->start_x = e.x;
             c->start_y = e.y;
-            c->pending = !cui_event_consumed(ui, i) && isfinite(e.x) && isfinite(e.y) &&
-                         rect_valid(panel) && rect_valid(anchor) &&
-                         !contains(panel, e.x, e.y) && !contains(anchor, e.x, e.y) &&
-                         cui_pointer_scope_allowed(ui, id);
+            c->pending =
+                !cui_event_consumed(ui, i) && isfinite(e.x) && isfinite(e.y) &&
+                cui_hover_card_ext_rect_valid(panel) && cui_hover_card_ext_rect_valid(anchor) &&
+                !cui_hover_card_ext_contains(panel, e.x, e.y) &&
+                !cui_hover_card_ext_contains(anchor, e.x, e.y) && cui_pointer_scope_allowed(ui, id);
             continue;
         }
-        if (!c->active || !same_contact(c, e))
+        if (!c->active || !cui_hover_card_ext_same_contact(c, e))
             continue;
         double dx = (double)e.x - c->start_x, dy = (double)e.y - c->start_y;
         if (!isfinite(e.x) || !isfinite(e.y) || dx * dx + dy * dy >= 64 ||
@@ -61,15 +64,17 @@ static bool outside_release(cui_context *ui, cui_id id, cui_id trigger,
             c->pending = false;
         if (e.type == CUI_EVENT_POINTER_UP) {
             if (c->pending && !c->ambiguous && e.pointer_button == CUI_POINTER_PRIMARY &&
-                rect_valid(panel) && rect_valid(anchor) && !contains(panel, e.x, e.y) &&
-                !contains(anchor, e.x, e.y) && cui_pointer_scope_allowed(ui, id))
+                cui_hover_card_ext_rect_valid(panel) && cui_hover_card_ext_rect_valid(anchor) &&
+                !cui_hover_card_ext_contains(panel, e.x, e.y) &&
+                !cui_hover_card_ext_contains(anchor, e.x, e.y) && cui_pointer_scope_allowed(ui, id))
                 dismissed = true;
             c->active = c->pending = false;
         }
     }
     return dismissed;
 }
-static bool relationship(cui_context *ui, cui_id trigger, cui_id card, bool admitted) {
+static bool cui_hover_card_ext_relationship(cui_context *ui, cui_id trigger, cui_id card,
+                                            bool admitted) {
     size_t n = 0;
     const cui_semantic *semantics = cui_semantics(ui, &n);
     for (size_t i = 0; i < n; ++i) {
@@ -83,10 +88,11 @@ static bool relationship(cui_context *ui, cui_id trigger, cui_id card, bool admi
     }
     return false;
 }
-cui_hover_card_extended_result cui_begin_hover_card_extended(
-    cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_state *state, cui_str name,
-    cui_hover_options options, const cui_hover_card_policy *policy,
-    cui_hover_card_contact *contact, cui_hover_handler handler) {
+cui_hover_card_extended_result
+cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme,
+                              cui_hover_state *state, cui_str name, cui_hover_options options,
+                              const cui_hover_card_policy *policy, cui_hover_card_contact *contact,
+                              cui_hover_handler handler) {
     cui_hover_card_extended_result result;
     memset(&result, 0, sizeof(result));
     cui_hover_card_policy p = {0};
@@ -115,7 +121,8 @@ cui_hover_card_extended_result cui_begin_hover_card_extended(
             if (events[i].type == CUI_EVENT_KEY_DOWN && events[i].key == CUI_KEY_ESCAPE)
                 escape = true;
         if (frame && previous && p.outside_tap && !options.disabled)
-            outside = outside_release(ui, id, options.trigger, contact, events, n);
+            outside =
+                cui_hover_card_ext_outside_release(ui, id, options.trigger, contact, events, n);
         /* Protected work does not accept caller asserted input or outside taps. */
         bool open = previous;
         if (frame && outside)
@@ -124,8 +131,8 @@ cui_hover_card_extended_result cui_begin_hover_card_extended(
             open = !previous;
         if (options.disabled || escape)
             open = false;
-        *state = (cui_hover_state){.open = open, .target = open,
-                                  .suppressed = escape || (state->suppressed && !open)};
+        *state = (cui_hover_state){
+            .open = open, .target = open, .suppressed = escape || (state->suppressed && !open)};
         if (contact) {
             if (!open || options.disabled || escape || !p.outside_tap)
                 memset(contact, 0, sizeof(*contact));
@@ -141,9 +148,11 @@ cui_hover_card_extended_result cui_begin_hover_card_extended(
             memset(contact, 0, sizeof(*contact));
     }
     if (p.relationship && frame && frame == cui_frame_sequence(ui))
-        result.relationship_applied = relationship(ui, options.trigger, id, result.lifecycle.control_result);
+        result.relationship_applied = cui_hover_card_ext_relationship(
+            ui, options.trigger, id, result.lifecycle.control_result);
     result.lifecycle.changed = previous != state->open;
-    if (result.lifecycle.changed && frame && frame == cui_frame_sequence(ui) && observer.on_change) {
+    if (result.lifecycle.changed && frame && frame == cui_frame_sequence(ui) &&
+        observer.on_change) {
         cui_hover_lifecycle_event event;
         memset(&event, 0, sizeof(event));
         (void)cui_component_event_init(&event.event, CUI_COMPONENT_EVENT_LIFECYCLE, id,

@@ -18,6 +18,12 @@ def generate(name,sources):
     lines += [f'#if defined({macro}) && defined({ready}) && !defined({macro}_ONCE)',f'#define {macro}_ONCE']
     if name in {"cui_content", "cui_choice", "cui_surface", "cui_form", "cui_status", "cui_message", "cui_text_view", "cui_questionnaire", "cui_virtual_scroll", "cui_editor"}:
         lines += ['#include "cui_components.h"']
+    if name == "cui_components":
+        lines += ['#include "cui_button_styles.h"']
+    if name == "cui_button_styles":
+        lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']
+    if name == "cui_hover_card_extended":
+        lines += ['#ifndef CUI_CONTENT_IMPLEMENTATION', '#define CUI_CONTENT_IMPLEMENTATION', '#endif', '#include "cui_content.h"']
     if name == "cui_base":
         lines += ['#include "cui_slider_events.h"', '#include "cui_text_input_events.h"']
     if name == "cui_textarea":

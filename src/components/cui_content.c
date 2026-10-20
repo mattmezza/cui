@@ -1034,8 +1034,8 @@ static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme 
         cui_id focused = cui_focused(ui);
         cui_rect previous = cui_bounds(ui, id), focus_bounds = cui_bounds(ui, focused);
         bool inside_focus = card && state->open && focused && focused != o.trigger &&
-                            focus_bounds.w > 0 && focus_bounds.h > 0 && focus_bounds.x >= previous.x &&
-                            focus_bounds.y >= previous.y &&
+                            focus_bounds.w > 0 && focus_bounds.h > 0 &&
+                            focus_bounds.x >= previous.x && focus_bounds.y >= previous.y &&
                             focus_bounds.x + focus_bounds.w <= previous.x + previous.w &&
                             focus_bounds.y + focus_bounds.h <= previous.y + previous.h;
         bool changed = cui_hover_update(
@@ -1134,8 +1134,8 @@ bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state
     return true;
 }
 /* Private shared placement seam; not part of the public API. */
-bool cui_content_begin_hover_card_model(cui_context *, cui_id, const cui_theme *,
-                                        cui_hover_state *, cui_str, cui_hover_options, bool);
+bool cui_content_begin_hover_card_model(cui_context *, cui_id, const cui_theme *, cui_hover_state *,
+                                        cui_str, cui_hover_options, bool);
 bool cui_content_begin_hover_card_model(cui_context *ui, cui_id id, const cui_theme *t,
                                         cui_hover_state *state, cui_str name,
                                         cui_hover_options options, bool update_model) {

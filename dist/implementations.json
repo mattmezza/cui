@@ -444,6 +444,13 @@
       "sources": [
         "src/base/cui_otp_events.c"
       ]
+    },
+    {
+      "header": "cui_hover_card_extended.h",
+      "macro": "CUI_HOVER_CARD_EXTENDED_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_hover_card_extended.c"
+      ]
     }
   ]
 }

@@ -5,10 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-typedef enum {
-    CUI_HOVER_CARD_DESKTOP_HOVER,
-    CUI_HOVER_CARD_TAP_TOGGLE
-} cui_hover_card_mode;
+typedef enum { CUI_HOVER_CARD_DESKTOP_HOVER, CUI_HOVER_CARD_TAP_TOGGLE } cui_hover_card_mode;
 /* Caller-owned, zero-initialized workspace. Treat fields as private. Reset on
  * context recreation; no handlers or event pointers are retained. Ambiguous
  * multi-contact input disables outside dismissal until reset/close/cancel. */
@@ -26,7 +23,7 @@ typedef struct {
      * Aggregated once from entry open; never inferred from raw release/focus. */
     bool accepted_trigger_activation;
     bool relationship; /* Own trigger controls/expanded; preserve other details. */
-    bool outside_tap; /* TAP_TOGGLE only; requires a contact workspace. */
+    bool outside_tap;  /* TAP_TOGGLE only; requires a contact workspace. */
 } cui_hover_card_policy;
 typedef struct {
     cui_hover_event_result lifecycle;
@@ -42,10 +39,10 @@ typedef struct {
  * Observe every frame; omission resets a pending contact. See guide for limits.
  * Callback: final model/relation applied, before arbitrary children, UNKNOWN
  * source/frame only. Existing hover callback mutation/reentry rules apply. */
-cui_hover_card_extended_result cui_begin_hover_card_extended(
-    cui_context *, cui_id, const cui_theme *, cui_hover_state *, cui_str name,
-    cui_hover_options, const cui_hover_card_policy *, cui_hover_card_contact *,
-    cui_hover_handler);
+cui_hover_card_extended_result
+cui_begin_hover_card_extended(cui_context *, cui_id, const cui_theme *, cui_hover_state *,
+                              cui_str name, cui_hover_options, const cui_hover_card_policy *,
+                              cui_hover_card_contact *, cui_hover_handler);
 #ifdef __cplusplus
 }
 #endif

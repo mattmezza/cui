@@ -1021,27 +1021,29 @@ typedef struct {
 } cui_hover_card_measurement;
 static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme *t,
                                     cui_hover_state *state, cui_str name, cui_hover_options o,
-                                    bool card) {
+                                    bool card, bool update_model) {
     if (!ui || !t || !state)
         return false;
-    size_t n = 0;
-    const cui_event *events = cui_frame_events(ui, &n);
-    bool escape = false;
-    for (size_t i = 0; i < n; ++i)
-        if (events[i].type == CUI_EVENT_KEY_DOWN && events[i].key == CUI_KEY_ESCAPE)
-            escape = true;
-    cui_id focused = cui_focused(ui);
-    cui_rect previous = cui_bounds(ui, id), focus_bounds = cui_bounds(ui, focused);
-    bool inside_focus = card && state->open && focused && focused != o.trigger &&
-                        focus_bounds.w > 0 && focus_bounds.h > 0 && focus_bounds.x >= previous.x &&
-                        focus_bounds.y >= previous.y &&
-                        focus_bounds.x + focus_bounds.w <= previous.x + previous.w &&
-                        focus_bounds.y + focus_bounds.h <= previous.y + previous.h;
-    bool changed = cui_hover_update(
-        state, cui_hovered(ui, o.trigger), card && (cui_hovered(ui, id) || inside_focus),
-        focused == o.trigger, escape, o.disabled, o.dt, o.open_delay, o.close_delay);
-    if (changed || state->pending)
-        cui_invalidate(ui);
+    if (update_model) {
+        size_t n = 0;
+        const cui_event *events = cui_frame_events(ui, &n);
+        bool escape = false;
+        for (size_t i = 0; i < n; ++i)
+            if (events[i].type == CUI_EVENT_KEY_DOWN && events[i].key == CUI_KEY_ESCAPE)
+                escape = true;
+        cui_id focused = cui_focused(ui);
+        cui_rect previous = cui_bounds(ui, id), focus_bounds = cui_bounds(ui, focused);
+        bool inside_focus = card && state->open && focused && focused != o.trigger &&
+                            focus_bounds.w > 0 && focus_bounds.h > 0 &&
+                            focus_bounds.x >= previous.x && focus_bounds.y >= previous.y &&
+                            focus_bounds.x + focus_bounds.w <= previous.x + previous.w &&
+                            focus_bounds.y + focus_bounds.h <= previous.y + previous.h;
+        bool changed = cui_hover_update(
+            state, cui_hovered(ui, o.trigger), card && (cui_hovered(ui, id) || inside_focus),
+            focused == o.trigger, escape, o.disabled, o.dt, o.open_delay, o.close_delay);
+        if (changed || state->pending)
+            cui_invalidate(ui);
+    }
     if (!state->open)
         return false;
     cui_rect anchor = cui_bounds(ui, o.trigger);
@@ -1125,15 +1127,19 @@ static bool cui_content_hover_panel(cui_context *ui, cui_id id, const cui_theme 
 }
 bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state *state,
                  cui_str text, cui_hover_options options) {
-    if (!cui_content_hover_panel(ui, id, t, state, text, options, false))
+    if (!cui_content_hover_panel(ui, id, t, state, text, options, false, true))
         return false;
     cui_text(ui, text, t->font_size, t->text);
     cui_end_box(ui);
     return true;
 }
-bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state *state,
-                          cui_str name, cui_hover_options options) {
-    if (!cui_content_hover_panel(ui, id, t, state, name, options, true))
+/* Private shared placement seam; not part of the public API. */
+bool cui_content_begin_hover_card_model(cui_context *, cui_id, const cui_theme *, cui_hover_state *,
+                                        cui_str, cui_hover_options, bool);
+bool cui_content_begin_hover_card_model(cui_context *ui, cui_id id, const cui_theme *t,
+                                        cui_hover_state *state, cui_str name,
+                                        cui_hover_options options, bool update_model) {
+    if (!cui_content_hover_panel(ui, id, t, state, name, options, true, update_model))
         return false;
     /* A clipping container permits horizontal overflow in Clay. Constrain a
      * non-scrolling inner content box so text actually reflows at card width. */
@@ -1148,6 +1154,10 @@ bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *t, cui_ho
             cui_track_bounds(ui, cui_content_child(id, 17), &measurement->content);
     }
     return true;
+}
+bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *t, cui_hover_state *state,
+                          cui_str name, cui_hover_options options) {
+    return cui_content_begin_hover_card_model(ui, id, t, state, name, options, true);
 }
 void cui_end_hover_card(cui_context *ui) {
     cui_end_box(ui);

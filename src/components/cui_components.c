@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
-#include "cui/cui_button_styles.h"
 #include "../base/cui_design_metrics.h"
+#include "cui/cui_button_styles.h"
 #include "cui/cui_icon.h"
 #include "cui_input_private.h"
 #include <math.h>
@@ -1106,7 +1106,8 @@ bool cui_button_group_ex(cui_context *ui, cui_id id, const cui_theme *theme,
                                                     .right = width,
                                                     .bottom = width};
             }
-            cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i], NULL);
+            cui_button_paint_state(ui, child.id, t, child.label, o, w->behavior.interactions[i],
+                                   NULL);
             if (!passive)
                 cui_button_tooltip(ui, child.id, t, o);
         }

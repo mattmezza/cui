@@ -614,7 +614,8 @@
         "tests/integration/test_button_artwork_font.c",
         "tests/web/test_button_artwork.py",
         "tests/unit/test_tab_order_source.c",
-        "tests/unit/test_button_tab_order_source.c"
+        "tests/unit/test_button_tab_order_source.c",
+        "tests/unit/test_button_styles.c"
       ],
       "status": "tested",
       "platforms": {
@@ -624,7 +625,8 @@
       "limitations": [
         "Twelve variants, source XS/S/M/L and all14 design sizes, centered labels, real bundled SVG leading/trailing/caret and custom child slots, bounded grapheme-safe ellipsis, inert loading, hover/click callbacks, tooltip and custom cursor/pointer-focus policy tested. Loading source foreground opacity, compact/custom height/font/radius controls and keyboard/focus opt-outs have headless tests. Actual integrated browser11/11 passes. Shadows, ordered tab indices, action-tooltip registries and complete native accessibility remain partial. Named icons outside the default bundled set explicitly return NOT_FOUND unless all assets or a provider is supplied.",
         "Caller-owned controlled joined ButtonGroup, ordered accepted-event callbacks, pointer-only source callback policy and explicit all-activation extension are tested across864 size/density/axis/variant cases and actual SDL/browser touch/keyboard paths. Complete remaining Button contracts still require source audit; see docs/BUTTON_GROUP.md.",
-        "Numeric sizing, independent open presentation, passive lifecycle, release-derived click payload and typed loading artwork have bounded tests. Press snapshots, previous keyboard hitbox evidence, exact focus styles, ordered tab indices, event-local capture/bubble propagation, action tooltips, arbitrary shadow/gradient refinement and full accessibility remain incomplete."
+        "Numeric sizing, independent open presentation, passive lifecycle, release-derived click payload and typed loading artwork have bounded tests. Press snapshots, previous keyboard hitbox evidence, exact focus styles, ordered tab indices, event-local capture/bubble propagation, action tooltips, arbitrary shadow/gradient refinement and full accessibility remain incomplete.",
+        "Additive cui_button_styled_ex and passive styled paint support bounded paint fields only. Complete source state-style refinement remains incomplete; see docs/BUTTON_STYLES.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -776,6 +778,15 @@
           "limitations": [
             "Explicit custom_tab_index opts into signed ordering; legacy zero/-1 details remain compatible. General inherited style/action framework parity is not established."
           ]
+        },
+        {
+          "name": "bounded caller-instance Button paint refinement",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_button_styles.c",
+            "docs/BUTTON_STYLES.md"
+          ],
+          "scope": "Explicit field masks, once-only borrowed pure callbacks, Component instance replay, pointer/selected/disabled/loading/focus order, unchanged geometry and legacy input timing. Arbitrary layout/typography/shadow modifiers, Group and event facade integration, and foreign handlers remain unsupported."
         }
       ],
       "upstream_doc": {
@@ -1343,7 +1354,9 @@
       "public_header": "include/cui/cui_content.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_content.c"
+        "tests/unit/test_content.c",
+        "tests/unit/test_hover_card_extended.c",
+        "tests/unit/test_hover_card_extended_header.cpp"
       ],
       "status": "tested",
       "platforms": {
@@ -1351,7 +1364,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending."
+        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending.",
+        "Opt-in mobile tap policy and Core relationship snapshots are implemented, but strict outside taps do not establish full raw mouse-up-out parity, exclusive overlay ownership or explicit collapsed AccessKit state. See docs/HOVER_CARD_EXTENDED.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1374,6 +1388,17 @@
           "name": "dismissal and accessible relationship",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "explicit tap toggle, conservative outside taps and admitted-panel semantic relationship",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_hover_card_extended.c",
+            "tests/unit/test_hover_card_extended_header.cpp",
+            "examples/hover_card_extended/main.c",
+            "docs/HOVER_CARD_EXTENDED.md"
+          ],
+          "scope": "Application supplies accepted trigger activation; separate bounded contact workspace requires matching primary outside down/up below8 logical pixels without consumption/cancellation/gesture takeover. Preserves legacy global Escape. Controls/expanded reflect actual admission in Core snapshots. Strict tap differs from raw upstream mouse-up-out; collapsed AccessKit state, live AT and foreign bindings remain unsupported."
         }
       ],
       "upstream_doc": {

@@ -11,7 +11,7 @@ The record is named `cui_button_style_paint` because the proposed name
 its name. It contains initialized root box and foreground values. The dropdown
 caret retains its independent normal-ink rule.
 
-This real C11 owner example is compiled by the standalone worker fixture:
+This real C11 owner example is compiled by the CMake consumer fixture:
 
 ```c
 #include "cui/cui_button_styles.h"

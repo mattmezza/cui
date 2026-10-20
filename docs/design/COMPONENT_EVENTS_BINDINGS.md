@@ -492,3 +492,9 @@ optional visibility assignment. Python, JS/TS, Go and Rust do not expose this
 handler/result facade or per-input Dismiss events. The retained bridge Alert is
 presentational; its arbitrary child actions remain separate. See
 [the guide](../ALERT_EVENTS.md); no foreign close/veto support is implied.
+
+## Bounded Button styles and extended HoverCard policy
+
+Direct C `cui_button_styled_ex`/`cui_button_styled_paint` add borrowed pure paint handlers; these are not interaction observers and are not exposed by Python, JS/TS, Go or Rust wrappers. Existing event wrappers and Group do not accept these new style records. See [Button styles](../BUTTON_STYLES.md).
+
+Direct C `cui_begin_hover_card_extended` combines the existing lifecycle observer with an opt-in caller-accepted tap policy and semantic relationship snapshots. Existing foreign HoverCard wrappers retain their legacy behavior; no policy workspace or synchronous callback bridge is exposed. See [HoverCard extended policy](../HOVER_CARD_EXTENDED.md).

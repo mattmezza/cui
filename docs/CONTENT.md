@@ -21,3 +21,7 @@ Avatar initials in `cui_avatar_ex` support independent `custom_background` and
 retain the theme primary/on-primary defaults; explicit colors apply only when the
 image is missing or invalid, including transparent colors. Photo ring colors
 continue to use `custom_ring`/`ring`.
+
+## Explicit HoverCard tap mode and relationships
+
+[HoverCard extended policy](HOVER_CARD_EXTENDED.md) adds caller-accepted trigger toggles, a bounded outside-tap workspace and optional current-trigger controls/expanded snapshots. The legacy hover helper is unchanged. Strict outside taps differ from arbitrary mouse-up-out; collapsed native accessibility state and foreign wrappers remain separate work.

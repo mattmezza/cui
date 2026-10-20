@@ -4,10 +4,14 @@ enable_testing()
 get_filename_component(CUI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 set(CUI_BUILD_NATIVE OFF CACHE BOOL "Portable worker fixture" FORCE)
 add_subdirectory("${CUI_SOURCE_DIR}" cui EXCLUDE_FROM_ALL)
+if(NOT TARGET test_button_styles)
 add_executable(test_button_styles "${CUI_SOURCE_DIR}/tests/unit/test_button_styles.c")
 target_link_libraries(test_button_styles PRIVATE cui_software cui)
 cui_warnings(test_button_styles)
 add_test(NAME button_styles COMMAND test_button_styles)
+endif()
+# Guide compilation is registered by the parent CUI project.
+if(NOT TARGET button_styles_guide)
 # Compile exactly the C example distributed in the consumer guide.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
  "${CUI_SOURCE_DIR}/docs/BUTTON_STYLES.md")
@@ -20,3 +24,4 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/button_styles_guide.c" "${CMAKE_MATCH_1}
 add_library(button_styles_guide OBJECT "${CMAKE_CURRENT_BINARY_DIR}/button_styles_guide.c")
 target_link_libraries(button_styles_guide PRIVATE cui)
 cui_warnings(button_styles_guide)
+endif()

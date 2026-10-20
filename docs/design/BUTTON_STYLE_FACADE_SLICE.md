@@ -1,5 +1,9 @@
 # Proposed Button style facade
 
+Historical design checkpoint. The bounded implementation has since landed in the
+integration branch; use [the current API guide](../BUTTON_STYLES.md) for implemented
+names, behavior and remaining limitations. The proposal below records its review scope.
+
 **Design only; no API below exists yet.** This checkpoint follows the built-in
 state corrections in `2dceccce`. Production approval covers only that earlier
 slice. This document proposes an additive portable C11 facade; it neither

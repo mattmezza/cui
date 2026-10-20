@@ -1,5 +1,9 @@
 # HoverCard dismissal and accessible relationship audit
 
+Historical design checkpoint. The bounded implementation has since landed in the
+integration branch; use [the current API guide](../HOVER_CARD_EXTENDED.md) for implemented
+names, behavior and remaining limitations. The proposal below records its review scope.
+
 Design checkpoint only. No production change or parity-status promotion is authorized
 by this document. CUI baseline: `876c654e`; frozen reference checkout:
 `87d10ae5e1299d1be18670a37570c5402f952e34` (`/tmp/cui-gpui-reference`).

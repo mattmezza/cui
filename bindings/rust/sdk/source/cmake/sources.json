@@ -238,7 +238,11 @@
     "cui_virtual_events": [],
     "cui_message_events": [],
     "cui_avatar_events": [],
-    "cui_alert_events": []
+    "cui_alert_events": [],
+    "cui_button_styles": [],
+    "cui_hover_card_extended": [
+      "src/components/cui_hover_card_extended.c"
+    ]
   },
   "native": {
     "text": [

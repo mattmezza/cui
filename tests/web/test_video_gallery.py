@@ -69,6 +69,7 @@ def main():
             assert page.locator('#catalog a[href="#Video"]').count()==1
             page.locator('#search').fill('')
             assert page.locator('.version').inner_text()==version
+            assert page.locator('.version').is_visible()
             assert 'cui_video_player' in page.locator('#snippet').inner_text()
             assert page.locator('#component-guides a').count()>=1
             assert page.locator('video').count()==0, 'decoder must not be a visible HTML overlay'
@@ -118,8 +119,12 @@ def main():
             # Physical surface pixels, not just timeline state, changed on actual decode.
             assert page.evaluate('cuiGallery.exports.gallery_count()>0')
             # Mobile/DPR2 layout still exposes the CUI controls within its logical root.
-            page.set_viewport_size({'width':390,'height':844})
-            page.wait_for_timeout(150)
+            for width in (320, 390):
+                page.set_viewport_size({'width':width,'height':844})
+                page.wait_for_timeout(150)
+                assert page.locator('.version').is_visible()
+                assert page.locator('.version').inner_text()==version
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
             assert page.locator('#preview').evaluate('(c)=>c.width===Math.round(c.clientWidth*2)')
             assert page.evaluate('''()=>{let w=cuiGallery.exports;return Array.from({length:w.gallery_semantic_count()},(_,i)=>i).filter(i=>w.gallery_semantic(i,0)===1).every(i=>w.gallery_semantic(i,1)>=0&&w.gallery_semantic(i,1)+w.gallery_semantic(i,3)<=document.querySelector('#preview').clientWidth+1);}''')
             # Genuine stale-source/generation rejection at the staging boundary.

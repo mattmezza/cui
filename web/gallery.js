@@ -202,7 +202,8 @@ const snippets = {
  * draw_choice_content has cui_questionnaire_choice_render_fn signature. */
 options.render_content = draw_choice_content;
 options.render_user = &theme;
-if (cui_questionnaire_begin(ui, root_id, &theme, &state, options)) {
+if (cui_questionnaire_begin_with_keyboard(ui, root_id, &theme, &state, options,
+        &(cui_questionnaire_keyboard_options){.shortcuts = CUI_QUESTIONNAIRE_SHORTCUT_OFF})) {
     cui_questionnaire_progress(ui, progress_id, &theme, &state, options);
     if (cui_questionnaire_item_begin(ui, item_id, &state, item, options)) {
         cui_questionnaire_heading(ui, heading_id, &theme, &state, item, options);
@@ -563,7 +564,7 @@ function render(){
  wasm.gallery_chart_content(Number($('chart-custom-rows').checked));
  wasm.gallery_chart_appearance(Number($('chart-tooltip-appearance').value));
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));
- wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),Number($('questionnaire-numbers').checked),Number($('questionnaire-custom').checked));
+ wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),$('questionnaire-shortcuts').checked?Number($('questionnaire-numbers').checked):-1,Number($('questionnaire-custom').checked));
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
@@ -886,8 +887,8 @@ function selectComponent(){
  for(const id of ['settings-size','settings-variant'])$(id).hidden=selected.name!=='Settings';
  for(const id of ['carousel-axis','carousel-loop-control'])$(id).hidden=selected.name!=='Carousel';
  for(const id of ['speech-size','speech-unavailable-control'])$(id).hidden=selected.name!=='Speech';
- for(const id of ['questionnaire-size','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
- $('questionnaire-size').value='0';$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
+ for(const id of ['questionnaire-size','questionnaire-shortcuts-control','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
+ $('questionnaire-size').value='0';$('questionnaire-shortcuts').checked=true;$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
  $('speech-size').value='0';$('speech-unavailable').checked=false;
  for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control','chart-custom-rows-control','chart-tooltip-appearance'])$(id).hidden=selected.name!=='Chart';
  $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;$('chart-custom-rows').checked=false;$('chart-tooltip-appearance').value='0';
@@ -1131,7 +1132,7 @@ for(const id of ['image-state','image-fit','image-grayscale','image-opacity','at
 for(const id of ['description-columns','description-size','description-vertical','description-plain','status-right','status-custom','resizable-vertical','resizable-disabled','icon-choice','icon-size','icon-rotate','icon-color'])$(id).addEventListener('change',requestFrame);
 for(const id of ['toolbar-size','toolbar-grouped','toolbar-input'])$(id).addEventListener('change',requestFrame);
 for(const id of ['title-decoration','title-close','title-fullscreen'])$(id).addEventListener('change',requestFrame);
-for(const id of ['motion-duration','motion-stagger','motion-easing','questionnaire-size','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','chart-custom-rows','chart-tooltip-appearance','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
+for(const id of ['motion-duration','motion-stagger','motion-easing','questionnaire-size','questionnaire-shortcuts','questionnaire-numbers','questionnaire-custom','speech-size','speech-unavailable','chart-kind','chart-curve','chart-dots','chart-labels','chart-animate','chart-custom-rows','chart-tooltip-appearance','text-view-format','text-view-scroll','text-view-fade','settings-size','settings-variant','carousel-axis','carousel-loop','command-modal','command-loading','command-filterable','sidebar-mode','sidebar-side','sidebar-collapsed','textarea-rows','textarea-grow','textarea-readonly','textarea-nowrap'])$(id).addEventListener('change',requestFrame);
 for(const id of ['button-collection','control-size','choice-required','choice-invalid','choice-skip-tab','switch-side','switch-color','toggle-variant','toggle-segmented','toggle-selection'])$(id).addEventListener('change',requestFrame);
 for(const id of ['design-size','design-radius','design-spacing'])$(id).addEventListener('change',requestFrame);
 $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(Number($('checkbox-state').value));requestFrame();});

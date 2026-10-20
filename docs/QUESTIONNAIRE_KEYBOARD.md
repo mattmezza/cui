@@ -97,3 +97,5 @@ changing canonical build files. The private WASI driver extends the existing
 suite list in memory; canonical registration is an integrator follow-up. This
 slice does not complete the family's payload, compound presentation, localization,
 Form semantic or general styling gaps.
+
+The interactive gallery exposes an Enable choice shortcuts control alongside the existing numeric-hints switch. Its actual C composition uses `cui_questionnaire_begin_with_keyboard` and the matching standalone shortcut helper, so OFF applies to both rendering and activation. The copyable usage example shows explicit OFF. Headless `tests/web/test_questionnaire_shortcuts_gallery.py` checks actual Tab focus, ignored shortcut keys, default/custom hint suppression, letter/number selection and genuine touch selection while shortcuts are off. It does not establish the remaining snapshot, localization, style or binding surfaces.

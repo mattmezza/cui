@@ -30,7 +30,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_otp.h"
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
-#include "cui/cui_questionnaire.h"
+#include "cui/cui_questionnaire_keyboard.h"
 #include "cui/cui_radio_group.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_root.h"
@@ -340,7 +340,7 @@ static void gallery_questionnaire_event(const cui_questionnaire_state *state,
 }
 void gallery_questionnaire_options(int size, int numbers, int custom) {
     questionnaire_size = size >= 0 && size <= 3 ? size : 0;
-    questionnaire_numbers = numbers != 0;
+    questionnaire_numbers = numbers < 0 ? -1 : numbers != 0;
     questionnaire_custom = custom != 0;
 }
 float gallery_questionnaire_stats(int field) {
@@ -3526,7 +3526,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                              .design_size = design_size,
                                              .width = width > 520 ? 480 : width - 40,
                                              .disabled = disabled,
-                                             .numeric_shortcuts = questionnaire_numbers != 0};
+                                             .numeric_shortcuts = questionnaire_numbers > 0};
         if (questionnaire_custom) {
             options.render_indicator = questionnaire_indicator;
             options.render_content = questionnaire_content;
@@ -3535,7 +3535,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         }
         cui_id root_id = cui_id_from(ui, "questionnaire-root");
         size_t item = questionnaire_state.current;
-        if (cui_questionnaire_begin(ui, root_id, &t, &questionnaire_state, options)) {
+        cui_questionnaire_keyboard_options keyboard = {
+            .shortcuts = questionnaire_numbers < 0   ? CUI_QUESTIONNAIRE_SHORTCUT_OFF
+                         : questionnaire_numbers > 0 ? CUI_QUESTIONNAIRE_SHORTCUT_NUMBERS
+                                                     : CUI_QUESTIONNAIRE_SHORTCUT_LETTERS};
+        if (cui_questionnaire_begin_with_keyboard(ui, root_id, &t, &questionnaire_state, options,
+                                                  &keyboard)) {
             cui_questionnaire_progress(ui, cui_id_from(ui, "questionnaire-progress"), &t,
                                        &questionnaire_state, options);
             if (cui_questionnaire_item_begin(ui, cui_id_from(ui, "questionnaire-item"),
@@ -3552,8 +3557,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 (void)cui_questionnaire_radio_keys(ui, &questionnaire_state, choice_ids, count);
                 (void)cui_questionnaire_answer_keys(ui, root_id, &questionnaire_state, choice_ids,
                                                     count, input_id);
-                (void)cui_questionnaire_shortcut_keys(ui, root_id, &questionnaire_state, choice_ids,
-                                                      count, input_id, options.numeric_shortcuts);
+                (void)cui_questionnaire_shortcut_keys_with_keyboard(
+                    ui, root_id, &questionnaire_state, choice_ids, count, input_id,
+                    options.numeric_shortcuts, &keyboard);
                 if (cui_questionnaire_choices_begin(ui, cui_id_from(ui, "questionnaire-choices"),
                                                     &questionnaire_state, item, options)) {
                     for (size_t choice = 0; choice < count; choice++)

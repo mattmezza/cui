@@ -1607,17 +1607,22 @@
         "cui_surface_begin",
         "cui_surface_end",
         "cui_surface_take_result",
-        "cui_surface_begin_events"
+        "cui_surface_begin_events",
+        "cui_popover_position_resolve",
+        "cui_popover_arrow_resolve",
+        "cui_popover_begin",
+        "cui_popover_surface_geometry"
       ],
       "state_types": [
         "cui_surface_state"
       ],
       "state_ownership": "Caller retains cui_surface_state and child form/application data.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.",
+      "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning, paired with surface_end; legacy surface_begin keeps its original placement. Arrow rendering requires a mesh-capable adapter; SDL3 support remains pending.",
       "docs": [
         "docs/SURFACES.md",
-        "docs/SURFACE_EVENTS.md"
+        "docs/SURFACE_EVENTS.md",
+        "docs/POPOVER_ANCHORS.md"
       ],
       "callback_symbols": [
         "cui_surface_decision_fn",

@@ -639,7 +639,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose cui_popover_begin, cui_popover_surface_geometry, cui_popover_position_resolve, cui_popover_arrow_resolve or their typed positioning descriptors. Source SDK inclusion does not imply authoring support."
+      ]
     },
     {
       "name": "Resizable",

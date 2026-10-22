@@ -5320,7 +5320,10 @@
         "tests/unit/test_popover_appearance.c",
         "tests/integration/test_popover_appearance_native.c",
         "tests/web/test_popover_appearance.py",
-        "tests/web/test_surface_shadow_gallery.py"
+        "tests/web/test_surface_shadow_gallery.py",
+        "tests/unit/test_popover_position.c",
+        "tests/unit/test_popover_surface.c",
+        "tests/integration/test_popover_surface_native.c"
       ],
       "status": "tested",
       "platforms": {
@@ -5329,15 +5332,23 @@
       },
       "limitations": [
         "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.",
-        "Current side-based flip/clamp differs from upstream anchor-only clamp. Complete anchor/offset/arrow, right-click trigger and accessible trigger relationships are pending."
+        "Legacy placement retains side-based flip/clamp. Explicit C anchor positioning is additive; right-click trigger and accessible trigger relationships remain pending.",
+        "Additive C anchor/offset/arrow positioning retains legacy defaults and uses frame-owned copied paint. Scoped software/WASI and private-Xvfb Sokol evidence does not establish complete family parity: SDL3 mesh support, browser evidence and exact reference stroke/raster antialiasing remain pending; language builders omit the positioning API."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
       "features": [
         {
           "name": "anchor placement/collision",
-          "status": "not_started",
-          "evidence": []
+          "status": "implemented",
+          "evidence": [
+            "include/cui/cui_surface.h",
+            "docs/POPOVER_ANCHORS.md",
+            "tests/unit/test_popover_position.c",
+            "tests/unit/test_popover_surface.c",
+            "tests/integration/test_popover_surface_native.c"
+          ],
+          "scope": "Additive explicit eight-anchor placement, signed offset, viewport clamp and copied arrow paint; legacy placement unchanged. Native/software subset only. SDL3 mesh, actual browser validation and exact reference rasterization remain pending; this feature is not complete across hosts."
         },
         {
           "name": "controlled open/dismissal",

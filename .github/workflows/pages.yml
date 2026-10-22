@@ -228,7 +228,9 @@ jobs:
         run: uv run tests/web/test_touch_page_navigation.py
       - name: Verify visible pane resizing across desktop mobile and touch
         if: ${{ matrix.shard == 2 }}
-        run: uv run tests/web/test_resizable_drag.py --directory build/web
+        run: |
+          uv run tests/web/test_resizable_drag.py --directory build/web
+          uv run tests/web/test_resizable_repeated_drag.py --directory build/web
       - name: Verify interaction guides design controls and composed app
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_site_extensions.py

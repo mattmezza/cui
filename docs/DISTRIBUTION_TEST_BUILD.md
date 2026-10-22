@@ -25,7 +25,7 @@ running CTest. This was MSVC Release, not a GCC `-O3` measurement. Distribution
 target diagnostic-to-link spans overlap and cannot establish isolated costs or
 predicted savings. CTest also spent 149.25 seconds on package-source checks and
 140.24 seconds on installed-skill checks. Consolidation does not remove those
-checks. No Windows improvement is established until subsequent CI measurements.
+checks. This run is the historical comparison point, not an isolated compilation benchmark.
 
 Alternatives are retaining all repeated compilations (maximum same-TU coverage)
 or adding compiled-output caches (more invalidation and provenance complexity).
@@ -37,3 +37,13 @@ after consolidation 118.969 seconds. Both configurations kept `-O3`, `-UNDEBUG`,
 strict C11 and the existing warnings. This is one wall-clock sample on a shared
 host, not a controlled benchmark or a Windows speedup claim. The after sample
 includes compiling the shared provider once; later feature consumers reuse it.
+
+A subsequent [Windows Release run 39781543234](https://github.com/mattmezza/cui/actions/runs/39781543234)
+at `ab8fddbbbca4b78e3b2cc1b14752dd0c4ac96b30` completed the build in 204 seconds
+(12:49:57–12:53:21 UTC) and CTest in 347 seconds (12:53:21–12:59:08 UTC).
+Both steps passed, with the same MSVC Release configuration and parallelism2.
+This is an observed reduction from 463/410 seconds in the earlier run; the commits,
+hosted runners and workload differ, so it does not isolate the shared-object change
+or establish a repeatable speedup. The overall workflow was still running when
+these completed job-step timings were recorded. Full optimization and the runtime,
+standalone and independent self-contained checks remain enabled.

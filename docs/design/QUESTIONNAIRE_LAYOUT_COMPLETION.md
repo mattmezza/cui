@@ -182,3 +182,17 @@ usage and generated consumer resources. Root owns manifest/integration changes.
 This checkpoint runs no production tests because it changes documentation only.
 No production/API/status promotion is included; the compound/button seam and
 geometry feasibility questions require review before those implementation slices.
+
+## Approved first-slice contract checkpoint
+
+The proposed declarations in `include/cui/cui_questionnaire_presentation.h` narrow
+this implementation to independent named text parts and noninteractive Error
+content. No container/card/input/action changes. Legacy zero named text metrics
+are extracted from heading; separate wrappers do not reproduce heading's internal
+gap automatically. Error zero preserves its existing current-item gate and Alert
+name, including localized model error with decorative replacement children.
+Source-like standalone error visibility remains deferred. TOKEN policy uses the
+frozen four-size text table; shared design sizes retain CUI scaling explicitly.
+Existing Alert composition is a single interact+box+text seam with no reducer;
+it supports custom noninteractive content without an architectural change.
+Production and evidence remain pending at this checkpoint.

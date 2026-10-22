@@ -129,6 +129,9 @@ jobs:
       - name: Verify DatePicker presets clear and scoped Delete
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_date_picker_actions_gallery.py --directory build/web
+      - name: Verify DateTime editing presets and copied usage
+        if: ${{ matrix.shard == 3 }}
+        run: uv run tests/web/test_date_time_picker_gallery.py --directory build/web
       - name: Verify Questionnaire optional shortcuts and real touch selection
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_questionnaire_shortcuts_gallery.py --directory build/web

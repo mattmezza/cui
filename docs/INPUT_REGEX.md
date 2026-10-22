@@ -71,3 +71,23 @@ PKG_CONFIG_PATH="$PWD/install/lib/pkgconfig" \
 ```
 
 Include `cui/cui_regex.h`. Generated distribution headers also contain the matcher and regex declarations, but the optional compiled Rust archive remains a separate link dependency. Defining a distribution implementation macro does not generate the regex engine.
+
+The optional-regex CI job shares Pages' exact OS/architecture/checksum-pin cache
+key for only `channel.toml`, `host.tar.xz` and `wasi.tar.xz` under
+`build/regex-toolchain`. Every run still verifies all three inputs, extracts and
+installs the private toolchain, builds the provider offline, and runs all source
+and CUI checks. Installed tooling, extracted sources and compiled outputs are
+not cached. `tests/test_native_ci_cache.py` checks this policy offline.
+
+A completed baseline, [CUI run 39773195384](https://github.com/mattmezza/cui/actions/runs/39773195384)
+(22 October 2026), spent 44 seconds preparing this toolchain, 215 seconds building
+CUI in optional-regex and 154 seconds testing it. Native Linux GCC build/test
+steps took 293/218 seconds; Clang took 122/176 seconds. macOS native dependency
+builds took 110 seconds, followed by 196 seconds building CUI and 148 seconds
+testing. [Native binding run 39774911345](https://github.com/mattmezza/cui/actions/runs/39774911345)
+spent 104 seconds on native dependency download/configure/build/install and
+178 seconds validating callbacks. These combined steps do not establish their
+download-only cost. No compiled dependency cache or skipped checks were added.
+Warm-cache savings have not been measured: checksum verification and installation
+still cost time, misses download normally, and cache transfer overhead can offset
+savings. Compilation and test costs remain.

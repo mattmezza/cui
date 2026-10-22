@@ -197,6 +197,17 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
+      - name: Verify native dependency cache policy
+        run: python tests/test_native_ci_cache.py
+      # Raw inputs only; the next step verifies checksums and reinstalls tooling.
+      - name: Cache pinned regex toolchain archives
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            build/regex-toolchain/channel.toml
+            build/regex-toolchain/host.tar.xz
+            build/regex-toolchain/wasi.tar.xz
+          key: pages-regex-archives-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('backends/regex/pin.json') }}
       - name: Prepare checksum-verified private optional toolchain
         run: python scripts/prepare_regex_toolchain.py --cache build/regex-toolchain
       - name: Build pinned optional provider offline

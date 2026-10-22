@@ -8,10 +8,13 @@
   outside this API; existing date-only entry points remain available.
 - Adds Questionnaire progress and named title/description/error presentation,
   token sizes and copied usage examples. Legacy presentation defaults remain
-  available; general container/input geometry parity is still incomplete.
+  available. Adds checked container/card metrics, masked box refinements and
+  borrowed custom-child views; Input and general styling parity remain incomplete.
 - Adds opt-in Popover anchor positioning, signed offsets and arrows, with
-  software/WASI and private-Xvfb Sokol validation. Baseline SDL3 arrow rendering,
-  exact reference rasterization and positioning builders remain unsupported.
+  desktop/touch gallery controls, software/WASI and private-Xvfb validation.
+  SDL3 and Canvas consume bounded analytic meshes with pixel and recovery tests;
+  exact reference rasterization, untested native drivers and positioning builders
+  remain outside the verified scope.
 - Adds opt-in date-only DatePicker presets, clear/Delete actions and an interactive
   desktop/touch gallery mode. Legacy date-only APIs remain available.
 - Adds bounded Questionnaire copy-out snapshots, keyboard shortcut policies and
@@ -22,7 +25,7 @@
   checks DatePicker semantic values independently of C struct padding.
 - Rebuild C consumers and bindings with matching headers and libraries:
   `cui_questionnaire_state` gained an observer pointer. Language builders do not
-  expose the new C observer/payload arenas, Questionnaire presentation options,
+  expose the new C observer/payload arenas, Questionnaire presentation/geometry options,
   DateTime/DatePicker action options or explicit Popover positioning.
 - Release artifacts and registry publication are not yet available for alpha.3.
   All 78 catalog families remain present; full feature parity is unfinished.

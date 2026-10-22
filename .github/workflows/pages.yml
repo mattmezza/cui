@@ -153,6 +153,9 @@ jobs:
       - name: Verify native IME composition in built-in text consumers
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_ime.py
+      - name: Gallery Popover anchors arrows and layer interaction
+        if: ${{ matrix.shard == 3 }}
+        run: uv run tests/web/test_popover_anchor_gallery.py --directory build/web
       - name: Gallery analytic mesh pixels and bounded preparation
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_mesh_canvas.py --directory build/web

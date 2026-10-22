@@ -77,7 +77,8 @@ tip and seam equations do not establish exact pixel parity. Software, SDL_GPU an
 Sokol support Core mesh commands. SDL3 now supports bounded analytic meshes
 through prepared CPU coverage textures; see `design/SDL3_MESH.md` for its limits.
 The browser Canvas adapter has exact headless mesh-mask and opacity evidence at
-DPR 1 and 2; full Popover positioning gallery coverage is a separate check.
+DPR 1 and 2. The gallery additionally tests all eight anchors, signed offsets,
+clamping, opacity, inert paint and modal ordering with desktop and touch input.
 Physical GPU hardware checks remain separate from Xvfb/software validation.
 This slice does not cover
 Popover transition, right-click trigger or focus/control parity.

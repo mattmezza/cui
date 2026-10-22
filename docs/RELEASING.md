@@ -15,6 +15,22 @@ native video/audio and macOS Speech host integrations. Injected Apple fixtures
 are separate from physical microphone, permission and recognizer acceptance.
 Linux/Windows speech recognizers and broader native media support remain gaps.
 
+The pending batch also adds opt-in Stepper connectors, bitmap indicators and
+shared design sizes, with a controlled interactive gallery; nested Resizable
+examples and repeated desktop/touch drag regression coverage; split-button styling
+and metadata; and growing InputGroup containment. Stepper centered/flexible source
+geometry, complete interaction styling and corresponding language builders remain
+separate gaps. Input caret/selection/IME projection after viewport changes still
+has a documented one-frame limitation. These additions do not establish complete
+Stepper, Input or Resizable parity or native GPU acceptance.
+
+CI preparation reuses checksum-verified raw optional-regex downloads and shares a
+private umbrella implementation across feature distribution tests. Independent
+self-contained distribution and standalone-module checks remain. Local timing
+samples are documented in `DISTRIBUTION_TEST_BUILD.md`; no Windows speedup is
+established by those samples. Describe final CI results from the frozen revision,
+not preparation runs from an earlier candidate.
+
 Rebuild consumers with matching headers and libraries: the Questionnaire state
 and several by-value options changed since alpha.2. Read the current binding
 coverage for C-only options; source packaging does not imply equivalent foreign

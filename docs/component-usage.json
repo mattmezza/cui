@@ -766,11 +766,13 @@
       "state_types": [
         "cui_loading_motion",
         "cui_spinner_options",
-        "cui_loading_motion_result"
+        "cui_loading_motion_result",
+        "cui_spinner_sizing",
+        "cui_spinner_size"
       ],
-      "state_ownership": "Caller owns persistent motion state, the monotonic host clock and reduced-motion preference.",
+      "state_ownership": "Caller owns persistent motion state, the monotonic host clock and reduced-motion preference. Optional size descriptors and callback userdata are borrowed through submission.",
       "interaction": "Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.",
-      "usage": "Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon.",
+      "usage": "Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon. Optional cui_spinner_sizing preserves named rem versus custom pixels; finite eased turns may exceed [0,1], reduced motion evaluates ease(0), and nonfinite easing rejects atomically.",
       "docs": [
         "docs/SPINNER.md",
         "docs/CONTENT.md"

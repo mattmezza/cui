@@ -6,6 +6,7 @@ import {paintGradientText} from "./modules/cui_text_paint.js";
 import {selectedUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
+import {spinnerUsage} from "./modules/cui_spinner_usage.js";
 import {dropdownUsage} from "./modules/cui_dropdown_usage.js";
 let shadowRenderer;
 const meshRenderer=createCuiMeshRenderer();
@@ -261,11 +262,13 @@ for(const [id,label,choices] of [
  ['spinner-size','Spinner size',[['12','Extra small · 12px'],['14','Small · 14px'],['16','Medium · 16px'],['24','Large · 24px'],['64','Custom · 64px']]],
  ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right']]],
  ['spinner-color','Spinner color',[['0','Theme foreground'],['1','Custom pink'],['2','Transparent']]],
- ['spinner-easing','Spinner easing',[['0','Source ease in out'],['1','Linear']]],
+ ['spinner-easing','Spinner easing',[['0','Source ease in out'],['1','Linear'],['2','Quarter turn'],['3','Negative −0.75 turns'],['4','Extra 1.25 turns'],['5','Shifted linear +0.25'],['6','Reject NaN'],['7','Reject +Infinity'],['8','Reject −Infinity']]],
+ ['spinner-sizing','Spinner size identity',[['0','Legacy pixels'],['1','Named XS'],['2','Named S'],['3','Named M'],['4','Named L'],['5','Custom pixels']]],
+ ['spinner-rem','Spinner rem size',[['0','Default rem (16px)'],['16','Rem · 16px'],['20','Rem · 20px'],['32','Rem · 32px']]],
 ]){
  const control=document.createElement('select');control.id=id;control.hidden=true;control.setAttribute('aria-label',label);
  for(const [value,name] of choices){const option=document.createElement('option');option.value=value;option.textContent=name;control.append(option);}
- if(id==='spinner-size')control.value='16';
+ if(id==='spinner-size'||id==='spinner-rem')control.value='16';
  $('text-weight').after(control);control.addEventListener('change',requestFrame);
 }
 
@@ -894,6 +897,7 @@ function render(){
  wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
  wasm.gallery_progress_mode(Number($('progress-mode').value));
  wasm.gallery_progress_shape(Number($('progress-shape').value));
+ wasm.gallery_spinner_contract_options(Number($('spinner-sizing').value),Number($('spinner-rem').value));
  wasm.gallery_spinner_options(Number($('spinner-size').value),Number($('spinner-icon').value),Number($('spinner-color').value),Number($('spinner-easing').value));
  wasm.gallery_shimmer_mode(Number($('shimmer-mode').value));
  wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
@@ -973,6 +977,7 @@ function render(){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
+ if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='Stepper') {
   for(const k of ['density','icons','design'])$('stepper-'+k).parentElement.hidden=$('stepper-mode').value==='0';
@@ -1198,7 +1203,7 @@ function selectComponent(){
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
 
  stepperControls.hidden=selected.name!=='Stepper';resetStepperControls();
- for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing'])$(id).hidden=selected.name!=='Spinner';
+ for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing','spinner-sizing','spinner-rem'])$(id).hidden=selected.name!=='Spinner';
  $('icon-catalog-panel').hidden=selected.name!=='Icon';if(selected.name==='Icon')loadIconCatalog();
  loadComponentApi(selected);
  const usage=selected.usage;

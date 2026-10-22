@@ -210,19 +210,84 @@ static cui_progress_circle_state progress_circle_state = {progress_circle_pixels
 static cui_progress_motion progress_motion;
 static cui_loading_motion spinner_motion, skeleton_motion;
 static float spinner_size = 16;
-static int spinner_icon, spinner_color, spinner_easing;
+static int spinner_icon, spinner_color, spinner_easing, spinner_sizing;
+static float spinner_rem = 16, spinner_paint_size, spinner_paint_radians, spinner_ease_input;
+static unsigned spinner_paints, spinner_ease_calls;
+static cui_loading_motion_result spinner_result;
+static bool spinner_valid, spinner_unchanged;
 void gallery_spinner_options(float size, int icon, int color, int easing) {
     spinner_size = isfinite(size) && size >= 1 && size <= 128 ? size : 16;
     spinner_icon = icon >= 0 && icon <= 2 ? icon : 0;
     spinner_color = color >= 0 && color <= 2 ? color : 0;
-    spinner_easing = easing == 1;
+    spinner_easing = easing >= 0 && easing <= 8 ? easing : 0;
 }
-static float gallery_spinner_linear(float phase, void *user) {
+void gallery_spinner_contract_options(int sizing, float rem) {
+    spinner_sizing = sizing >= 0 && sizing <= 5 ? sizing : 0;
+    spinner_rem = isfinite(rem) && rem >= 0 && rem <= 64 ? rem : 16;
+}
+double gallery_spinner_contract(unsigned field) {
+    switch (field) {
+    case 0:
+        return spinner_valid;
+    case 1:
+        return spinner_result.phase;
+    case 2:
+        return spinner_result.active;
+    case 3:
+        return spinner_result.next_wake_seconds;
+    case 4:
+        return spinner_paints;
+    case 5:
+        return spinner_paint_size;
+    case 6:
+        return spinner_paint_radians;
+    case 7:
+        return spinner_unchanged;
+    case 8:
+        return spinner_motion.last_time;
+    case 9:
+        return spinner_motion.started;
+    case 10:
+        return spinner_ease_calls;
+    case 11:
+        return spinner_ease_input;
+    case 12:
+        return cui_bounds(ui, cui_id_from(ui, "spinner")).w;
+    case 13:
+        return cui_bounds(ui, cui_id_from(ui, "spinner")).h;
+    default:
+        return 0;
+    }
+}
+static float gallery_spinner_ease(float phase, void *user) {
     (void)user;
-    return phase;
+    spinner_ease_calls++;
+    spinner_ease_input = phase;
+    switch (spinner_easing) {
+    case 2:
+        return .25f;
+    case 3:
+        return -.75f;
+    case 4:
+        return 1.25f;
+    case 5:
+        return phase + .25f;
+    case 6:
+        return NAN;
+    case 7:
+        return INFINITY;
+    case 8:
+        return -INFINITY;
+    default:
+        return phase;
+    }
 }
+
 static bool gallery_spinner_icon(cui_context *context, cui_id id, const cui_theme *theme,
                                  float size, cui_color color, float radians, void *user) {
+    spinner_paints++;
+    spinner_paint_size = size;
+    spinner_paint_radians = radians;
     return cui_icon_named(context, id, theme, cui_string(user),
                           (cui_icon_options){.size = CUI_ICON_CUSTOM,
                                              .custom_size = size,
@@ -4764,18 +4829,35 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.size = spinner_size;
         options.custom_color = spinner_color != 0;
         options.color = (cui_color){220, 40, 90, spinner_color == 2 ? 0 : 255};
-        options.ease = spinner_easing ? gallery_spinner_linear : NULL;
+        options.ease = spinner_easing ? gallery_spinner_ease : NULL;
+        cui_spinner_sizing sizing = {.size = spinner_sizing == 5 ? CUI_SPINNER_CUSTOM
+                                                                 : (cui_spinner_size)spinner_sizing,
+                                     .pixels = spinner_size,
+                                     .rem_size = spinner_rem};
+        if (spinner_sizing)
+            options.sizing = &sizing;
         if (spinner_icon) {
             options.paint = gallery_spinner_icon;
             options.paint_user = spinner_icon == 1 ? "loader-circle" : "arrow-right";
         }
         options.now_seconds = cui_frame_time(ui);
         options.reduced_motion = reduced_motion;
-        cui_loading_motion_result motion;
-        if (cui_spinner_ex(ui, cui_id_from(ui, "spinner"), &t, &spinner_motion, options, &motion))
-            next_wake = motion.next_wake_seconds > 0
-                            ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui))
-                            : 0;
+        cui_loading_motion before = spinner_motion;
+        cui_loading_motion_result prior = spinner_result;
+        spinner_valid = cui_spinner_ex(ui, cui_id_from(ui, "spinner"), &t, &spinner_motion, options,
+                                       &spinner_result);
+        spinner_unchanged =
+            before.ready == spinner_motion.ready && before.started == spinner_motion.started &&
+            before.last_time == spinner_motion.last_time && prior.phase == spinner_result.phase &&
+            prior.opacity == spinner_result.opacity && prior.active == spinner_result.active &&
+            prior.next_wake_seconds == spinner_result.next_wake_seconds;
+        if (spinner_valid)
+            next_wake =
+                spinner_result.next_wake_seconds > 0
+                    ? host_seconds + fmax(0, spinner_result.next_wake_seconds - cui_frame_time(ui))
+                    : 0;
+        else
+            cui_label(ui, &t, cui_string("Custom easing rejected: expected finite turns."));
         break;
     }
     case 20: {

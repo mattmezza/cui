@@ -488,11 +488,11 @@ API: `cui_skeleton`, `cui_loading_phase`. [Public header](../include/cui/cui_con
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns persistent motion state, the monotonic host clock and reduced-motion preference.
+**State:** Caller owns persistent motion state, the monotonic host clock and reduced-motion preference. Optional size descriptors and callback userdata are borrowed through submission.
 
 **Interaction:** Decorative presentation; paint/ease callbacks customize appearance and phase, with no action callback or implicit busy semantics.
 
-**Usage:** Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon.
+**Usage:** Submit cui_spinner_ex each frame while loading and schedule result.next_wake_seconds; zero deadline means idle. Use a custom paint callback for another SVG icon. Optional cui_spinner_sizing preserves named rem versus custom pixels; finite eased turns may exceed [0,1], reduced motion evaluates ease(0), and nonfinite easing rejects atomically.
 
 API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loading_phase`. [Public header](../include/cui/cui_content.h); [guide](SPINNER.md).
 

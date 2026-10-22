@@ -128,7 +128,10 @@ wake scheduling. The two APIs intentionally have distinct contracts.
 
 The existing **Spinner** gallery entry offers source preset/custom sizes,
 Loader/Loader circle/Arrow right, theme/custom/transparent colors, and default
-quadratic/linear easing. Copy its example and open this guide from the component.
+quadratic/linear easing. Optional size-identity/rem selectors exercise the named
+descriptor while legacy pixels remain the default. Additional easing choices
+show quarter, negative/extra turns, shifted linear easing and deliberate nonfinite
+rejection. Copy its concrete C example and open this guide from the component.
 No extra catalog family is introduced.
 
 `tests/unit/test_spinner_contract.c` verifies all source pixel sizes plus custom
@@ -146,7 +149,13 @@ The native contract regression additionally compares real asymmetric Arrow right
 pixels for quarter-turn/1.25-turn/negative equivalent turns, opposite turns and
 large finite whole turns. It checks reduced custom ease(0), nonfinite failure
 atomicity, live-to-reduced transitions and named rem/default/custom pixel sizing
-through both default and custom Icon painters. These additions do not establish
-browser coverage of the new descriptor/overshoot cases; the existing gallery
-continues to use explicit pixel sizes and default/linear easing. Complete inherited
-Icon styling, source-style bridge Spinner and broader host acceptance remain open.
+through both default and custom Icon painters. Actual WASM now covers these descriptor and finite-turn cases in
+`tests/web/test_spinner_contract_gallery.py`: desktop/390px, DPR 1/2, asymmetric
+Arrow-right bitmap and canvas equivalence for .25/−.75/1.25 turns, reduced
+shifted ease(0), NaN/±Infinity rejection without painter or state/result commit,
+recovery and no stale wake after rejection. Named rem 0/16/20/32 is checked through
+both default/custom painters, while CUSTOM and NULL-descriptor pixels stay fixed.
+Logical layout size is exact; rotated bitmap bounds may include a one-pixel
+raster-rounding fringe, so bitmap bounds are not the rem metric. Complete inherited
+Icon styling, source-style bridge Spinner, combined raw-data lifecycle and broader
+host acceptance remain open.

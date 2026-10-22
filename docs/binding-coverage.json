@@ -366,7 +366,28 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_content.h",
+          "languages": [
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust"
+          ],
+          "types": [
+            "cui_spinner_options",
+            "cui_spinner_sizing",
+            "cui_loading_motion_result"
+          ],
+          "symbols": [
+            "cui_spinner_ex"
+          ],
+          "note": "Packaged sources carry the C API, but language builders retain the legacy eight-dot Spinner primitive. No source-style decorative SVG/easing/rem descriptor/reduced-motion facade is claimed."
+        }
+      ]
     },
     {
       "name": "Stepper",

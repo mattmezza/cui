@@ -2665,7 +2665,10 @@
       "tests": [
         "tests/unit/test_content.c",
         "tests/unit/test_status_motion.c",
-        "tests/web/test_status_motion.py"
+        "tests/web/test_status_motion.py",
+        "tests/unit/test_spinner_contract.c",
+        "tests/web/test_spinner_gallery.py",
+        "tests/web/test_spinner_contract_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2673,7 +2676,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Source-audited default SVG Loader, custom content, caller-clocked duration/easing, bounded finite wake deadlines, idle quiescence and reduced-motion snaps tested in native/software and real WASM. Spinner is decorative; the application owns loading announcements. Complete inherited styling remains pending."
+        "Decorative source-style SVG, selected finite-turn easing/reduced ease(0), nonfinite rejection/recovery and named-rem/custom-pixel sizing are tested in native/software and actual WASM. Caller owns announcements and scheduling; 60Hz deadlines do not claim hardware refresh equivalence. Complete inherited Icon style/raw-data lifecycle, broader custom-curve/mount cases, source-style language-builder facade and hardware/GPU acceptance remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2683,21 +2686,27 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_status_motion.c",
-            "tests/web/test_status_motion.py"
+            "tests/web/test_status_motion.py",
+            "tests/web/test_spinner_contract_gallery.py"
           ]
         },
         {
           "name": "sizes and theme",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_content.c",
+            "tests/unit/test_spinner_contract.c",
+            "tests/web/test_spinner_gallery.py",
+            "tests/web/test_spinner_contract_gallery.py"
           ]
         },
         {
           "name": "reduced motion and status semantics",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_content.c",
+            "tests/unit/test_spinner_contract.c",
+            "tests/web/test_spinner_contract_gallery.py"
           ]
         }
       ],

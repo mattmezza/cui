@@ -4,7 +4,9 @@ Audit target: CUI `7b2b8f85905880adab3ac493a8c7103a582d6fb5`.
 Reference: GPUI Kit 0.7.1 `87d10ae5e1299d1be18670a37570c5402f952e34`.
 This is an evidence map, not a ledger promotion or a new component family.
 Follow-up at next39 (base `e6e4bb68`) implements the three bounded motion/size
-corrections below. Remaining inherited Icon/bridge/browser proof gaps stay open.
+corrections below. Follow-up at base `ab8fddbb` adds actual-WASM proof for finite turns, reduced
+ease(0), nonfinite rejection and named-rem/custom-pixel sizing. Inherited
+Icon/bridge and the explicitly listed broader proof gaps remain open.
 **Recommendation: retain tested/partial; do not mark the entire family verified.**
 
 ## Source authority
@@ -37,10 +39,10 @@ behavior differences below; inspecting only Spinner's wrapper misses them.
 | --- | --- | --- |
 | Default Loader SVG, Medium, foreground, 0.8s quadratic repeating rotation | `include/cui/cui_content.h:229`, `src/base/cui_status.c:337`, `src/components/cui_content.c:735` | `test_status_motion.c` checks default options, sample angle, real mask/software pixels; `test_spinner_contract.c` checks default tint and decorative semantics. Default Loader and LoaderCircle embedded bytes exactly match frozen assets. |
 | Alternate LoaderCircle and arbitrary compatible Icon | `cui_spinner_options.paint`, `cui_icon_named`, caller-owned `cui_icon_state` | `test_spinner_contract.c` rotates loader-circle/arrow-right and checks raster changes; `test_status_motion.c` checks custom callback arguments. Generic raw-data/path ownership is tested by `test_icon.c`, not by a combined Spinner raw-data fixture. |
-| XS/S/M/L plus custom pixels | `options.size` gives explicit pixels; `cui_icon_spinner` separately supports `cui_icon_options` presets/rem | `test_spinner_contract.c` covers 12/14/16/24/64 at one root scale; gallery covers the same choices. The additive `cui_spinner_sizing` now preserves named rem versus custom pixels; native descriptor tests cover rem 16/20/32, including custom paint. New browser cases remain pending. |
+| XS/S/M/L plus custom pixels | `options.size` gives explicit pixels; `cui_icon_spinner` separately supports `cui_icon_options` presets/rem | `test_spinner_contract.c` covers 12/14/16/24/64 at one root scale; gallery covers the same choices. The additive `cui_spinner_sizing` now preserves named rem versus custom pixels; native descriptor tests cover rem 16/20/32, including custom paint. `test_spinner_contract_gallery.py` checks rem 0/16/20/32 and fixed pixels through default/custom painters in actual WASM. |
 | Explicit color, otherwise custom Icon color/ambient foreground | `options.custom_color/color`, theme foreground, arbitrary painter | Explicit/transparent colors and ancestor opacity pass software/gallery checks. Ambient text-scope inheritance remains unsupported by Core/Icon; custom Icon style precedence must be assembled by the painter. |
 | User-provided easing | `cui_loading_motion_sample`, callback user data | Standard default/linear timing and invalid-result atomicity are tested. Spinner now accepts all finite turns and reduces before radians; the legacy shared sampler/Skeleton remain bounded. |
-| Reduced motion: static repeating animation, no requested frame | context/option reduced motion, inactive result and zero wake | Native/software and real gallery tests prove quiescence/static default output. Spinner now evaluates custom ease(0) and preserves no-wake behavior; native tests cover shifted angles and nonfinite failure. |
+| Reduced motion: static repeating animation, no requested frame | context/option reduced motion, inactive result and zero wake | Native/software and real gallery tests prove quiescence/static default output. Spinner now evaluates custom ease(0) and preserves no-wake behavior; native and actual-WASM tests cover shifted angles, nonfinite failure and zero wake. |
 | Decorative/no native loading status or focus stop | `cui_spinner_ex` submits decorative Icon | `test_spinner_contract.c`, `test_status_motion.c`, `test_spinner_gallery.py`, `test_status_motion.py` inspect absent status/busy semantics and idle redraw. Completion/action callbacks are not upstream contracts. |
 | Custom Icon box style and leaf layout | `cui_icon_options.style/constraints`, `src/base/cui_icon_layout.h`, `src/components/cui_icon.c` | New `test_icon_style_source.c` proves padding/border floors, minima/maxima, transforms and retained masks; Spinner fixture proves background/radius and ancestor opacity/clip. General inherited Icon styling remains partial. |
 | Asset/callback lifetime | Icon owns SVG copy; source closures stored by Rust; C callbacks borrowed synchronously | `test_icon.c` tests source replacement, loader revisions, old masks; `test_icon_style_source.c` consumes three retained versions after replacement. Spinner motion/result rollback and resource exhaustion are in `test_status_motion.c`. A combined Spinner caller-owned-data/reload/destroy sequence is still absent. |
@@ -64,8 +66,9 @@ or gallery suites during this audit.
    A shifted easing freezes shifted, without active motion/deadline/invalidation.
    Nonfinite ease(0) now fails without advancing state/result or calling paint.
    The legacy pure sampler and Skeleton deliberately retain their bypass policy.
-   Native tests cover both option and context reduction. Broader source curves
-   and gallery proof of these new cases remain unverified.
+   Native tests cover both option and context reduction. `test_spinner_contract_gallery.py` proves selected finite, shifted and rejected
+   curves plus live/reduced recovery; broader source bounce/quint curves remain
+   outside this selected browser matrix.
 
 3. **Named/custom size identity: additive opt-in implemented.**
    `cui_spinner_sizing` distinguishes XS/S/M/L rem multipliers from custom pixels.
@@ -74,7 +77,8 @@ or gallery suites during this audit.
    Resolved size is shared by default/custom painters. Native tests cover every
    preset at rem 16/20/32, fixed custom64, descriptor precedence and invalid
    preflight atomicity. This does not add automatic ambient scope inheritance or
-   prove new descriptor behavior in browser/foreign bindings.
+   provide foreign binding support. Actual-WASM descriptor proof now lives in
+   `test_spinner_contract_gallery.py`.
 
 4. **Ambient/custom Icon style support is not complete.** New numeric box-style
    tests resolve important gaps; they do not establish general flex/percentage
@@ -114,14 +118,17 @@ optimization is established by current evidence.
 
 ## Meaningful proof before reconsidering verification
 
-- Native fixtures now cover finite negative/>1 turns, shifted ease(0), nonfinite
-  rejection and reduced transitions with real asymmetric SVG pixels. Extend the
-  browser fixture to these new contracts before claiming equivalent browser proof.
-- Check complete deterministic 0/.2/.4/.6/.8/.2-next-cycle angles and no trailing
-  wake after reduction/removal. Add source bounce/quint curves, independent
+- Native and actual-WASM fixtures now cover finite negative/>1 turns, shifted
+  ease(0), nonfinite rejection/recovery and reduced transitions with asymmetric
+  SVG masks/canvas pixels. This bounded browser gap is closed; broader custom
+  curve families and independent instance mount/remount remain unproved here.
+- Existing real-WASM scheduling tests already prove moving frames/pixels, finite
+  wakes, no perpetual invalidation and quiescence after reduction. Exact sampled
+  browser cycle angles and independently timed mounts are separate proof gaps. Add source bounce/quint curves, independent
   instances mounted at different times, and omission/remount policy.
-- Native named sizes now cover three rem values independently of text font size
-  with custom64 fixed. Repeat the new descriptor in real gallery WASM.
+- Native and actual-WASM named-size fixtures cover rem 0/16/20/32 independently
+  of text font size, with legacy/custom64 fixed. Both default/custom painters use
+  the same logical size; rasterized rotated bounds may add a pixel fringe.
 - Combine a caller-owned raw-data Icon, style padding/border/min/max, explicit
   color precedence, rotation and source replacement in one Spinner frame; consume
   all returned draws before collect/destroy. Existing separate Icon tests are
@@ -133,14 +140,14 @@ optimization is established by current evidence.
 
 The ledger's current three features remain `tested`, both listed platforms remain
 `tested_partial`, and its explicit inherited-style limitation remains justified.
-It omits newer `test_spinner_contract.c`/`test_spinner_gallery.py` from its evidence
-lists; an integrator can refresh evidence after review without promoting status.
+Its evidence lists now include the contract, existing gallery and new bounded
+actual-WASM fixtures. Platform statuses remain partial; no family promotion.
 
-## Isolated probe executed in this audit
+## Historical isolated probe before the bounded fixes
 
-A temporary strict ISO C11 probe links only the audited `cui_status.c` motion
-sections (unused sections garbage-collected). It confirms finite 1.25 output is
-rejected atomically and reduced motion never calls shifted easing. This is a
+The original pre-fix audit used a temporary strict ISO C11 probe linking only the audited `cui_status.c` motion
+sections (unused sections garbage-collected). It characterized the old rejection of finite 1.25 output and bypass of
+shifted reduced easing; it is not evidence of current behavior. This is a
 passing characterization of a source difference, **not** a parity acceptance test.
 
 ```sh

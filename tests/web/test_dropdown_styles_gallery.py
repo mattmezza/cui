@@ -56,6 +56,19 @@ def main():
                     activate('Priority', 16)
                     assert a.page.evaluate('cuiGallery.exports.gallery_modal()') == 0
                     assert a.page.evaluate('cuiGallery.exports.gallery_clicks()') == before+1
+                if not mobile:
+                    a.configure('theme', '1')
+                    a.configure('dropdown-variant', '5')
+                    point = a.point(a.target('Export workspace', 1))
+                    a.page.mouse.move(point['x'], point['y'])
+                    a.page.wait_for_timeout(80)
+                    def action_alpha():
+                        bounds = a.target('Export workspace', 1)['f'][1:5]
+                        return a.page.evaluate('''b=>{const e=cuiGallery.exports;for(let i=0;i<e.gallery_count();i++)if(e.gallery_command(i,0)===0&&[1,2,3,4].every((f,k)=>Math.abs(e.gallery_command(i,f)-b[k])<.01))return e.gallery_command(i,8);throw Error('missing action surface');}''',bounds)
+                    assert action_alpha() == 255 // 2, action_alpha()
+                    a.configure('dropdown-paint', '0')
+                    assert action_alpha() == 255
+                    a.configure('dropdown-paint', '1')
                 a.configure('dropdown-variant', '11')
                 assert not a.page.locator('#dropdown-shadow').is_disabled()
                 assert shadows() == 0

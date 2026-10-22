@@ -66,8 +66,8 @@ typedef struct {
     size_t shadow_count;
     cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
 } cui_popover_style;
-/* Geometry-only API: these options are not yet consumed by surface_begin.
- * No public surface struct ABI changes in this geometry-only slice. */
+/* Additive positioning options consumed by cui_popover_begin only.
+ * Existing surface options/state struct ABI and surface_begin are unchanged. */
 typedef enum {
     CUI_POPOVER_POSITION_LEGACY = 0,
     CUI_POPOVER_POSITION_ANCHOR
@@ -138,6 +138,11 @@ typedef struct {
     cui_popover_appearance popover_appearance;
     cui_popover_refinement popover_refinement;
 } cui_surface_options;
+/* Pure surface defaults + placement. LEGACY ignores every other position field
+ * and delegates existing Popover geometry. ANCHOR uses finite width/height <=0
+ * defaults420/260 without shrinking; margin must be finite nonnegative. Failure
+ * leaves output untouched. options.anchor is the current-frame trigger bounds. */
+bool cui_popover_surface_geometry(cui_surface_options, cui_popover_position, cui_rect *out);
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
 void cui_surface_close(cui_context *, cui_surface_state *, cui_surface_result);
@@ -160,6 +165,20 @@ void cui_base_surface_submit_body(cui_context *, cui_surface_state *);
 /* Caller composes arbitrary children, then ends the surface. */
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);
+/* Opt-in source anchor/offset/arrow consumption; requires POPOVER state. LEGACY
+ * delegates surface_begin and ignores inactive position fields. Balance true
+ * with surface_end. Invalid active geometry returns false before state update.
+ * Arrow is decoration only: panel-only hit/dismiss/semantic bounds are retained.
+ * Arrow fill follows refinement (NONE without explicit background uses popover);
+ * 1px theme-text alpha26 outline is omitted for NONE. Corner inset uses theme
+ * radius, not refined radius. Arrow clips to options.viewport and host viewport,
+ * inherits panel opacity, paints after panel contents at its layer. Logical
+ * positioning retains fractions; no host pixel snapping. Portable bounded-miter
+ * mesh raster/AA differs from GPUI PathBuilder; exact pixel parity is not claimed.
+ * Capacity failure balances internal boxes, returns false, and empties frame
+ * draw output; subsequent frames may retry. No legacy public struct ABI change. */
+bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
+                       cui_str description, cui_surface_options, cui_popover_position);
 void cui_surface_end(cui_context *);
 /* Close the body and begin a fixed footer row; surface_end closes the footer. */
 void cui_surface_footer_begin(cui_context *, const cui_theme *);

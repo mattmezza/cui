@@ -506,7 +506,7 @@ API: `cui_spinner_ex`, `cui_spinner_options_default`, `cui_spinner`, `cui_loadin
 
 **Usage:** Submit step descriptors and the current step; validate application data before progressing elsewhere.
 
-API: `cui_stepper`, `cui_stepper_events`, `cui_stepper_navigation`, `cui_base_stepper_navigation`. [Public header](../include/cui/cui_numeric.h); [controlled requests](../include/cui/cui_stepper_navigation.h); [guide](STEPPER_NAVIGATION.md).
+API: `cui_stepper`, `cui_stepper_events`, `cui_stepper_navigation`, `cui_base_stepper_navigation`. [Public header](../include/cui/cui_numeric.h); [controlled requests](../include/cui/cui_stepper_navigation.h); [guide](STEPPER_NAVIGATION.md). Foreign visual authoring: [binding builders](BINDING_BUILDERS.md).
 
 Additional event includes: `cui/cui_numeric_selection_events.h`.
 

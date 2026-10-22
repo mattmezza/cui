@@ -1800,3 +1800,32 @@ fn avatar_style() {
     app.remove(person).unwrap();
     assert!(app.design_size(person, DesignSize::Md).is_err());
 }
+
+#[test]
+fn stepper_visual_authoring() {
+ let _guard=NATIVE.lock().unwrap();
+ let mut app=App::headless(800.,800.).unwrap();
+ let root=app.root(Kind::Column,"root").unwrap();
+ let steps=app.child(root,Kind::Stepper,"steps").unwrap();
+ let first=app.child(steps,Kind::Item,"first").unwrap();
+ let second=app.child(steps,Kind::Item,"second").unwrap();
+ app.text(first,"First").unwrap().text(second,"Second").unwrap();
+ app.image_rgba(first,&[255,255,255,255],1,1,4).unwrap();
+ app.stepper_visual(steps,true,false,StepperDensity::Md).unwrap().design_size(steps,DesignSize::Lg).unwrap();
+ let changes=Rc::new(Cell::new(0));let changed=changes.clone();
+ app.on_change(steps,move||changed.set(changed.get()+1)).unwrap();
+ app.step(0.016).unwrap();
+ let b=app.numeric_part_bounds(steps,2).unwrap();
+ app.pointer(Phase::Down,b.x+b.width/2.,b.y+b.height/2.).unwrap();
+ app.pointer(Phase::Up,b.x+b.width/2.,b.y+b.height/2.).unwrap();app.frame(0.016).unwrap();
+ assert_eq!(app.selected(steps).unwrap(),Some(second));assert_eq!(changes.get(),1);
+ app.pointer(Phase::Down,b.x+b.width/2.,b.y+b.height/2.).unwrap();
+ app.pointer(Phase::Up,b.x+b.width/2.,b.y+b.height/2.).unwrap();app.frame(0.016).unwrap();
+ assert_eq!(changes.get(),1);
+ for density in [StepperDensity::Md,StepperDensity::Xs,StepperDensity::Sm,StepperDensity::Lg] {
+  app.stepper_visual(steps,true,true,density).unwrap();app.step(0.016).unwrap();
+  assert!(app.numeric_part_bounds(steps,2).unwrap().y>app.numeric_part_bounds(steps,1).unwrap().y);
+ }
+ app.stepper_visual(steps,false,false,StepperDensity::Md).unwrap();app.step(0.016).unwrap();
+ assert!(app.stepper_visual(first,true,false,StepperDensity::Md).is_err());
+}

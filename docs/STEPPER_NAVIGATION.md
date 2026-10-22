@@ -157,3 +157,16 @@ reset. It compiles the exact displayed C snippets with strict C11 warnings.
 Desktop checks include both axes; touch390 uses vertical composition. Centered
 layout, automatic responsive flex growth, arbitrary styling and exact source
 pixel fidelity remain unfinished. The gallery does not establish live AT parity.
+
+## Foreign builder visual authoring
+
+Python/JS/TS, Go and Rust now expose the existing non-centered visual composition
+through an opt-in builder method; see [binding builders](BINDING_BUILDERS.md).
+They keep the legacy bridge selected Item and aggregate CHANGE model rather than
+exporting controlled C REQUEST callbacks. Icons are copied from owned RGBA bytes;
+bridge groups remain bounded at 64 Items. Examples are
+[`stepper_visual.py`](../bindings/python/examples/stepper_visual.py),
+[`stepper_visual.cjs`](../bindings/node/examples/stepper_visual.cjs),
+[`stepper_visual.ts`](../bindings/typescript/examples/stepper_visual.ts),
+[Go](../bindings/go/examples/stepper_visual/main.go) and
+[Rust](../bindings/rust/examples/stepper_visual.rs).

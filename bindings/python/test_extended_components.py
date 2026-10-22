@@ -44,6 +44,30 @@ class Extended(unittest.TestCase):
                 if name in ('empty_view','message'):node.detail('Description')
                 app.mount(c.column().children(node));app.step();self.assertGreater(app.bounds(node)[2],0)
 
+    def test_stepper_visual(self):
+        with c.App(width=800,height=800) as app:
+            data=bytearray([255,255,255,255]*4)
+            first=c.item('first','First').image_rgba(data,2,2)
+            second=c.item('second','Second')
+            node=c.stepper('steps').stepper_visual().design_size('lg').children(first,second)
+            events=[];node.on_change(events.append)
+            app.mount(c.column().children(node));app.step()
+            data[0]=0
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch()
+            self.assertIs(node.selected(),second);self.assertEqual(len(events),1)
+            self.press_rect(app,app.numeric_part_bounds(node,2));app.dispatch();self.assertEqual(len(events),1)
+            for density in ('md','xs','sm','lg'):
+                node.stepper_visual(True,True,density);app.step()
+                a=app.numeric_part_bounds(node,1);b=app.numeric_part_bounds(node,2)
+                self.assertGreater(b[1],a[1])
+            first.image_rgba(bytes([255]*16),2,2)
+            node.stepper_visual(False);app.step()
+            with self.assertRaises(ValueError):node.stepper_visual(density='bad')
+            with self.assertRaises(ValueError):first.image_rgba(bytes(16),2,2,2**32-1)
+        with c.App() as app:
+            bad=c.item('bad','Bad').image_rgba(bytes(4),1,1)
+            with self.assertRaises(c.BridgeError):app.mount(c.column().children(c.menu('menu').children(bad)))
+
     def test_navigation(self):
         for name in ('list_view','menu','stepper'):
             with self.subTest(name=name),c.App(width=800,height=800) as app:

@@ -65,6 +65,7 @@ static char bridge_error_buf[80];
  X(set_visual_size, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, float w, float h), (a,n,w,h)) \
  X(set_gap, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, float v), (a,n,v)) \
  X(set_button_variant, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_button_variant v), (a,n,v)) \
+ X(set_stepper_visual, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t enabled, uint32_t vertical, uint32_t density), (a,n,enabled,vertical,density)) \
  X(set_design_size, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, cui_bridge_button_size v), (a,n,v)) \
  X(set_avatar_identity, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t enabled, uint32_t custom, uint32_t hue), (a,n,enabled,custom,hue)) \
  X(set_avatar_placeholder, cui_bridge_status, (cui_bridge_app *a, cui_bridge_node n, uint32_t enabled, const char *name), (a,n,enabled,name)) \
@@ -377,12 +378,14 @@ type Node struct {
 	err                                  error
 	removed                              bool
 
-	designSize                                        int
-	hasDesignSize                                     bool
+	stepperVisual, stepperVertical, hasStepperVisual   bool
+	stepperDensity                                     StepperDensity
+	designSize                                         int
+	hasDesignSize                                      bool
 	avatarIdentity, avatarCustomHue, hasAvatarIdentity bool
-	avatarHue                                         uint8
+	avatarHue                                          uint8
 	avatarAnonymous, hasAvatarPlaceholder              bool
-	avatarPlaceholder                                 string
+	avatarPlaceholder                                  string
 }
 type Rect struct{ X, Y, Width, Height float32 }
 type Handle struct{ Slot, Generation uint32 }
@@ -400,7 +403,7 @@ type Event struct {
 	CloseResult    int
 }
 
-// DesignSize uses the shared scale currently supported by Button and Avatar.
+// DesignSize uses the shared scale currently supported by Button, Avatar and Stepper.
 type DesignSize = Size
 
 type Size int
@@ -1121,7 +1124,47 @@ func (n *Node) Size(v Size) *Node {
 	return n
 }
 
-// DesignSize applies the shared scale to Button and Avatar only.
+// StepperDensity selects the source visual proportions.
+type StepperDensity uint32
+
+const (
+	StepperMD StepperDensity = iota
+	StepperXS
+	StepperSM
+	StepperLG
+)
+
+// StepperVisual opts into connectors/icons; selection still dispatches aggregate CHANGE.
+func (n *Node) StepperVisual(enabled, vertical bool, density StepperDensity) *Node {
+	if n.err != nil {
+		return n
+	}
+	if n.kind != 44 || density > StepperLG {
+		n.err = errors.New("invalid Stepper visual options")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		var on, axis C.uint32_t
+		if enabled {
+			on = 1
+		}
+		if vertical {
+			axis = 1
+		}
+		if e := result(C.go_set_stepper_visual(n.app.ptr, n.handle, on, axis, C.uint32_t(density))); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.stepperVisual, n.stepperVertical, n.stepperDensity, n.hasStepperVisual = enabled, vertical, density, true
+	return n
+}
+
+// DesignSize applies the shared scale to Button, Avatar and Stepper.
 func (n *Node) DesignSize(v DesignSize) *Node {
 	if n.kind == 4 {
 		return n.Size(v)
@@ -1129,8 +1172,8 @@ func (n *Node) DesignSize(v DesignSize) *Node {
 	if n.err != nil {
 		return n
 	}
-	if n.kind != 30 || v < Inherit || v > Size9XL {
-		n.err = errors.New("design size requires Button or Avatar and a supported size")
+	if (n.kind != 30 && n.kind != 44) || v < Inherit || v > Size9XL {
+		n.err = errors.New("design size requires Button, Avatar or Stepper and a supported size")
 		return n
 	}
 	if n.app != nil {
@@ -1499,6 +1542,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasStepStatus {
 			if e := result(C.go_set_step_status(a.ptr, h, C.uint32_t(n.stepStatus))); e != nil {
+				return e
+			}
+		}
+		if n.hasStepperVisual {
+			if e := n.StepperVisual(n.stepperVisual, n.stepperVertical, n.stepperDensity).err; e != nil {
 				return e
 			}
 		}
@@ -3220,8 +3268,8 @@ func (n *Node) RGBA(pixels []byte, width, height, stride uint32) *Node {
 	return n
 }
 func (n *Node) SetRGBA(pixels []byte, width, height, stride uint32) error {
-	if n == nil || n.kind != 53 {
-		return errors.New("RGBA requires Image")
+	if n == nil || (n.kind != 53 && n.kind != 20) {
+		return errors.New("RGBA requires Image or Stepper Item")
 	}
 	if n.removed {
 		return errors.New("removed image")

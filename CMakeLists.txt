@@ -1950,3 +1950,8 @@ foreach(target
  target_link_libraries(${target} PRIVATE dist_all_implementation)
 endforeach()
 add_test(NAME distribution_shared_policy COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_distribution_shared.py)
+
+add_executable(test_bridge_stepper_visual tests/unit/test_bridge_stepper_visual.c)
+target_link_libraries(test_bridge_stepper_visual PRIVATE cui_software)
+cui_warnings(test_bridge_stepper_visual)
+add_test(NAME bridge_stepper_visual COMMAND test_bridge_stepper_visual)

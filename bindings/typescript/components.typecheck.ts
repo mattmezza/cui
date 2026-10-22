@@ -80,3 +80,9 @@ styledAvatar.size('md');
 styledAvatar.design_size('huge');
 // @ts-expect-error Foreign bindings do not accept borrowed icon-state objects.
 styledAvatar.anonymous_icon(true, {});
+
+import {stepper as visualStepper, item as visualStep} from './index';
+visualStepper('visual-steps').stepper_visual(true, true, 'sm').design_size('lg')
+  .children(visualStep('first', 'First').image_rgba(new Uint8Array([255,255,255,255]),1,1));
+// @ts-expect-error unknown density
+visualStepper().stepper_visual(true, false, 'huge');

@@ -162,6 +162,7 @@ class _API:
         self.set_text = bind("set_text", C.c_int, C.c_void_p, _Handle, C.c_char_p)
         self.set_gap = bind("set_gap", C.c_int, C.c_void_p, _Handle, C.c_float)
         self.set_variant = bind("set_button_variant", C.c_int, C.c_void_p, _Handle, C.c_int)
+        self.set_stepper_visual = bind("set_stepper_visual", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
         self.set_design_size = bind("set_design_size", C.c_int, C.c_void_p, _Handle, C.c_int)
         self.set_avatar_identity = bind("set_avatar_identity", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_uint32)
         self.set_avatar_placeholder = bind("set_avatar_placeholder", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_char_p)
@@ -363,6 +364,7 @@ class Widget:
         self._variant = "primary"
         self._size = "base"
         self._design_size = None
+        self._stepper_visual = None
         self._avatar_identity = None
         self._avatar_placeholder = None
         self._rounding = "theme"
@@ -476,11 +478,11 @@ class Widget:
         return self
 
     def design_size(self, value: DesignSize) -> "Widget":
-        """Shared scale: currently Button and Avatar only."""
+        """Shared scale: currently Button, Avatar and Stepper."""
         if self.kind == "button":
             return self.size(value)
-        if self.kind != "avatar" or value not in _SIZE:
-            raise ValueError("design_size requires Button or Avatar and a supported size")
+        if self.kind not in {"avatar", "stepper"} or value not in _SIZE:
+            raise ValueError("design_size requires Button, Avatar or Stepper and a supported size")
         self._change("set_design_size", _SIZE[value])
         self._design_size = value
         return self
@@ -703,9 +705,18 @@ class Widget:
         self._attachment = names[status]
         return self
 
+    def stepper_visual(self, enabled: bool = True, vertical: bool = False, density: str = "md") -> "Widget":
+        densities = {"md": 0, "xs": 1, "sm": 2, "lg": 3}
+        if self.kind != "stepper" or type(enabled) is not bool or type(vertical) is not bool or density not in densities:
+            raise ValueError("stepper_visual requires Stepper, bools and md/xs/sm/lg density")
+        value = (int(enabled), int(vertical), densities[density])
+        self._change("set_stepper_visual", *value)
+        self._stepper_visual = value
+        return self
+
     def image_rgba(self, pixels: bytes | bytearray | memoryview, width: int,
                    height: int, stride: int | None = None) -> "Widget":
-        if self.kind != "image" or any(type(x) is not int or not 1 <= x <= 2048 for x in (width,height)):
+        if self.kind not in {"image", "item"} or any(type(x) is not int or not 1 <= x <= 2048 for x in (width,height)):
             raise ValueError("invalid image dimensions")
         stride = width * 4 if stride is None else stride
         if type(stride) is not int or stride < width * 4 or stride * height > 16777216:
@@ -1416,7 +1427,7 @@ class App:
                 if node.kind in _NUMERIC:
                     node._change("set_value", node._value)
                 if node.kind == "attachment": node._change("set_attachment",node._attachment)
-                if node.kind == "image" and node._image is not None: node._change("set_image",*node._image)
+                if node._image is not None: node._change("set_image",*node._image)
                 if node.kind == "time_field": node._change("set_time",_Time(*node._time))
                 if node.kind in {"calendar", "date_picker"}: node._change("set_date",_Date(*node._date))
                 if node.kind == "color_picker": node._change("set_color",node._color)
@@ -1440,6 +1451,8 @@ class App:
                     node._change("set_open", int(node._open))
                 if node.kind in _DETAIL:
                     node._change("set_detail", _utf8(node._detail))
+                if node._stepper_visual is not None:
+                    node._change("set_stepper_visual", *node._stepper_visual)
                 if node._design_size is not None:
                     node._change("set_design_size", _SIZE[node._design_size])
                 if node._avatar_identity is not None:

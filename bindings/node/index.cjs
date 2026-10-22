@@ -88,7 +88,7 @@ class Node {
   design_size(value) {
     if (this.kind === 4) return this.size(value);
     const names = {inherit:0,xs:1,sm:2,base:3,md:4,lg:5,xl:6,"2xl":7,"3xl":8,"4xl":9,"5xl":10,"6xl":11,"7xl":12,"8xl":13,"9xl":14};
-    if (this.kind !== 30 || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button or Avatar and a supported size');
+    if (![30,44].includes(this.kind) || typeof value !== 'string' || !Object.hasOwn(names,value)) throw new TypeError('design_size requires Button, Avatar or Stepper and a supported size');
     if (this.owner) native.setDesignSize(this.owner.handle,this[NODE],names[value]);
     this.designSizeValue=names[value]; return this;
   }
@@ -163,8 +163,15 @@ class Node {
     if(this.owner)native.setAttachmentStatus(this.owner.handle,this[NODE],names[value]);
     this.attachmentValue=names[value];return this;
   }
+  stepper_visual(enabled=true,vertical=false,density='md') {
+    const densities={md:0,xs:1,sm:2,lg:3};
+    if(this.kind!==44 || typeof enabled!=='boolean' || typeof vertical!=='boolean' || !Object.hasOwn(densities,density))throw new TypeError('stepper_visual requires Stepper, bools and md/xs/sm/lg density');
+    const value=[+enabled,+vertical,densities[density]];
+    if(this.owner)native.setStepperVisual(this.owner.handle,this[NODE],...value);
+    this.stepperVisualValue=value;return this;
+  }
   image_rgba(pixels,width,height,stride=width*4) {
-    if(this.kind!==53 || !(pixels instanceof Uint8Array) || ![width,height].every(x=>Number.isInteger(x)&&x>0&&x<=2048) ||
+    if(![53,20].includes(this.kind) || !(pixels instanceof Uint8Array) || ![width,height].every(x=>Number.isInteger(x)&&x>0&&x<=2048) ||
        !Number.isInteger(stride) || stride<width*4 || stride*height>16777216 || pixels.byteLength!==stride*height)
        throw new TypeError('invalid RGBA byte buffer/dimensions/stride');
     const copy=Uint8Array.from(pixels);
@@ -383,6 +390,7 @@ class App {
       if(node.extentValue)native.setScrollExtent(this.handle,node[NODE],...node.extentValue);
       if(node.visualValue)native.setVisualSize(this.handle,node[NODE],...node.visualValue);
       if(node.statusValue!==null)native.setStepStatus(this.handle,node[NODE],node.statusValue);
+      if(node.stepperVisualValue)native.setStepperVisual(this.handle,node[NODE],...node.stepperVisualValue);
       if(node.designSizeValue!==undefined)native.setDesignSize(this.handle,node[NODE],node.designSizeValue);
       if(node.avatarIdentityValue)native.setAvatarIdentity(this.handle,node[NODE],...node.avatarIdentityValue);
       if(node.avatarPlaceholderValue)native.setAvatarPlaceholder(this.handle,node[NODE],...node.avatarPlaceholderValue);

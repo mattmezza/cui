@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
+#include "cui/cui_stepper_visual.h"
 #include "cui_bridge_internal.h"
 #include <math.h>
 #include <stdio.h>
@@ -2223,6 +2224,22 @@ cui_bridge_status cui_bridge_set_attachment_status(cui_bridge_app *app, cui_brid
     node->attachment_status = value;
     return CUI_BRIDGE_OK;
 }
+cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *app, cui_bridge_node handle,
+                                                uint32_t enabled, uint32_t vertical,
+                                                uint32_t density) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (node->kind != CUI_BRIDGE_STEPPER)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (enabled > 1 || vertical > 1 || density > CUI_STEPPER_DENSITY_LG)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->stepper_visual = enabled != 0;
+    node->stepper_vertical = vertical != 0;
+    node->stepper_density = density;
+    return CUI_BRIDGE_OK;
+}
 cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *app, cui_bridge_node handle,
                                             const uint8_t *pixels, uint32_t width, uint32_t height,
                                             uint32_t stride, uint32_t byte_count) {
@@ -2230,7 +2247,8 @@ cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *app, cui_bridge_node
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
         return status;
-    if (node->kind != CUI_BRIDGE_IMAGE)
+    if (node->kind != CUI_BRIDGE_IMAGE && !(node->kind == CUI_BRIDGE_ITEM && node->parent &&
+                                            app->nodes[node->parent].kind == CUI_BRIDGE_STEPPER))
         return CUI_BRIDGE_INVALID_STATE;
     if (!pixels || !width || !height || width > 2048 || height > 2048 || stride < width * 4u ||
         (uint64_t)stride * height > UINT32_C(16777216) || byte_count != (uint64_t)stride * height)
@@ -2577,7 +2595,8 @@ cui_bridge_status cui_bridge_set_design_size(cui_bridge_app *app, cui_bridge_nod
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
         return status;
-    if (node->kind != CUI_BRIDGE_BUTTON && node->kind != CUI_BRIDGE_AVATAR)
+    if (node->kind != CUI_BRIDGE_BUTTON && node->kind != CUI_BRIDGE_AVATAR &&
+        node->kind != CUI_BRIDGE_STEPPER)
         return CUI_BRIDGE_INVALID_STATE;
     if (size < CUI_BRIDGE_SIZE_INHERIT || size > CUI_BRIDGE_SIZE_9XL)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -3015,10 +3034,17 @@ typedef struct {
     cui_choice_item tabs[64];
     cui_menu_entry menu_entries[64];
     cui_step steps[64];
+    cui_stepper_icon step_icons[64];
     cui_disclosure_item disclosures[64];
     bool opened[64];
     cui_choice_item filtered[64];
 } bridge_group_scratch;
+typedef struct {
+    size_t requested;
+} bridge_stepper_request;
+static void bridge_stepper_requested(void *user, const cui_stepper_navigation_request *request) {
+    ((bridge_stepper_request *)user)->requested = request->requested;
+}
 static void bridge_group_panel(cui_context *ui, size_t index, void *user) {
     (void)ui;
     bridge_group_binding *binding = user;
@@ -3141,6 +3167,13 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                                            .description = cui_string(item->detail),
                                            .status = (cui_step_status)item->step_status,
                                            .disabled = item->disabled};
+        scratch->step_icons[count] =
+            (cui_stepper_icon){.present = item->image_pixels != NULL,
+                               .bitmap = {.pixels = item->image_pixels,
+                                          .width = item->image_frame.width,
+                                          .height = item->image_frame.height,
+                                          .stride = item->image_frame.stride,
+                                          .revision = item->image_frame.revision}};
         scratch->disclosures[count] =
             (cui_disclosure_item){item->id, cui_string(item->text), item->disabled};
         scratch->opened[count] = item->checked;
@@ -3209,8 +3242,27 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
             for (size_t i = 0; i < count; i++)
                 if (scratch->binding.slots[i] == (uint32_t)node->value)
                     current = i;
-            if (cui_stepper(app->ui, node->id, &app->theme, scratch->steps, count, &current, false,
-                            node->disabled)) {
+            bool changed;
+            if (node->stepper_visual) {
+                bridge_stepper_request request = {current};
+                cui_stepper_navigation_result result = cui_stepper_visual_navigation(
+                    app->ui, node->id, &app->theme, scratch->steps, count, current,
+                    (cui_stepper_visual_options){.vertical = node->stepper_vertical,
+                                                 .disabled = node->disabled,
+                                                 .density =
+                                                     (cui_stepper_density)node->stepper_density,
+                                                 .design_size = (cui_design_size)node->size,
+                                                 .icons = scratch->step_icons,
+                                                 .icon_count = count},
+                    (cui_stepper_navigation_handler){bridge_stepper_requested, &request});
+                changed = result.valid && request.requested != current;
+                if (changed)
+                    current = request.requested;
+            } else {
+                changed = cui_stepper(app->ui, node->id, &app->theme, scratch->steps, count,
+                                      &current, false, node->disabled);
+            }
+            if (changed) {
                 node->value = scratch->binding.slots[current];
                 bridge_change(app, slot);
             }

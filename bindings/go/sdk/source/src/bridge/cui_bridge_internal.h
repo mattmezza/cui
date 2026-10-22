@@ -44,6 +44,8 @@ typedef struct {
     char *avatar_placeholder;
     bool avatar_identity, avatar_custom_hue, avatar_anonymous;
     unsigned avatar_hue;
+    bool stepper_visual, stepper_vertical;
+    unsigned stepper_density;
     cui_bridge_button_rounding rounding;
     bool disabled, custom_hover;
     cui_color hover;

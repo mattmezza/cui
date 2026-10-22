@@ -1915,3 +1915,56 @@ func TestVirtualList(t *testing.T) {
 		t.Fatal("negative offset accepted")
 	}
 }
+
+func TestStepperVisual(t *testing.T) {
+	a := app(t)
+	pixels := []byte{255, 255, 255, 255}
+	first := Item("first", "First").RGBA(pixels, 1, 1, 4)
+	second := Item("second", "Second")
+	steps := Stepper("steps").StepperVisual(true, false, StepperMD).DesignSize(LG).Children(first, second)
+	changes := 0
+	steps.OnChange(func(Event) { changes++ })
+	check(t, a.Mount(Column("root").Children(steps)))
+	check(t, a.Step(.016))
+	pixels[0] = 0
+	r, e := a.NumericPartBounds(steps, 2)
+	check(t, e)
+	clickRect(t, a, r)
+	if changes != 0 {
+		t.Fatal("CHANGE dispatched during step")
+	}
+	_, e = a.Dispatch()
+	check(t, e)
+	if changes != 1 {
+		t.Fatal("missing aggregate CHANGE")
+	}
+	clickRect(t, a, r)
+	_, e = a.Dispatch()
+	check(t, e)
+	if changes != 1 {
+		t.Fatal("same selection emitted CHANGE")
+	}
+	selected, e := a.Selected(steps)
+	check(t, e)
+	if selected != second {
+		t.Fatal("visual selection")
+	}
+	for _, density := range []StepperDensity{StepperMD, StepperXS, StepperSM, StepperLG} {
+		steps.StepperVisual(true, true, density)
+		check(t, steps.Err())
+		check(t, a.Step(.016))
+		one, e := a.NumericPartBounds(steps, 1)
+		check(t, e)
+		two, e := a.NumericPartBounds(steps, 2)
+		check(t, e)
+		if two.Y <= one.Y {
+			t.Fatal("vertical placement")
+		}
+	}
+	steps.StepperVisual(false, false, StepperMD)
+	check(t, steps.Err())
+	check(t, a.Step(.016))
+	if Stepper("bad").StepperVisual(true, false, StepperDensity(4)).Err() == nil {
+		t.Fatal("invalid density")
+	}
+}

@@ -499,6 +499,19 @@ static napi_value set_anchor(napi_env env, napi_callback_info info) {
     cui_bridge_status code = cui_bridge_set_anchor(app->bridge, node->node, anchor->node);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
+static napi_value set_stepper_visual(napi_env env, napi_callback_info info) {
+    napi_value v[5];
+    js_app *app;
+    js_node *node;
+    uint32_t enabled, vertical, density;
+    if (!args(env, info, 5, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &enabled) || !uint_arg(env, v[3], &vertical) ||
+        !uint_arg(env, v[4], &density))
+        return NULL;
+    cui_bridge_status code =
+        cui_bridge_set_stepper_visual(app->bridge, node->node, enabled, vertical, density);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
 static napi_value set_avatar_identity(napi_env env, napi_callback_info info) {
     napi_value v[5];
     js_app *app;
@@ -1833,6 +1846,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("setVariant", set_num, 2);
     EXPORT("setSize", set_num, 3);
     EXPORT("setDesignSize", set_num, 14);
+    EXPORT("setStepperVisual", set_stepper_visual, 0);
     EXPORT("setAvatarIdentity", set_avatar_identity, 0);
     EXPORT("setAvatarPlaceholder", set_avatar_placeholder, 0);
     EXPORT("setRounding", set_num, 4);

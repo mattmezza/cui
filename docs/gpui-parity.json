@@ -2798,6 +2798,22 @@
             "tests/web/test_stepper_visual_gallery.py",
             "web/modules/cui_stepper_usage.js"
           ]
+        },
+        {
+          "name": "foreign builder opt-in visual authoring",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_stepper_visual.c",
+            "bindings/python/test_extended_components.py",
+            "bindings/node/test/binding.test.cjs",
+            "bindings/typescript/components.typecheck.ts",
+            "bindings/go/cui/native_test.go",
+            "bindings/rust/tests/builders.rs",
+            "docs/BINDING_BUILDERS.md"
+          ],
+          "limitations": [
+            "Bridge retains 64 Items and aggregate CHANGE, not C controlled REQUEST callbacks. Icons are copied host RGBA; connector composition has no independent toggle. Legacy mode is default."
+          ]
         }
       ],
       "upstream_doc": {

@@ -399,8 +399,26 @@ manual-loop compatibility contract, see [binding native runners](BINDING_NATIVE_
 
 The optional `cui_date_time_picker.h` single civil date/time API is C-only in this revision. Generated source SDKs carry its header/implementation, but Python/JavaScript/TypeScript/Go/Rust builders and bridge records do not expose its typed value/state, assignment, options, helpers or result. Do not pass legacy date-only builder storage to it. See `docs/DATE_TIME_PICKER.md`.
 
-The opt-in C Stepper visual facade (`cui_stepper_visual.h`) adds non-centered
-connectors and borrowed bitmap icons to controlled navigation. Its typed density,
-icon/options and request handler are not exposed by language builders or bridge
-records; bundled source SDK availability does not imply binding support. See
-[Stepper navigation](STEPPER_NAVIGATION.md).
+Stepper builders opt into non-centered connectors and per-Item RGBA icons with
+`stepper_visual(true, false, "md")` (Python uses `True`/`False`; Go uses
+`StepperVisual(true, false, cui.StepperMD)`; Rust uses
+`stepper_visual(node, true, false, StepperDensity::Md)`). The default remains
+legacy rendering. Density is `md/xs/sm/lg`; shared `design_size` also accepts
+Stepper. Connectors have no independent toggle in the current C visual API.
+
+Use the existing Item `image_rgba` method (Go `RGBA`, Rust `image_rgba`) to supply
+straight-alpha RGBA icons. Builders and bridge copy bytes; use white RGB for
+monochrome foreground tint. Only Item children of Stepper accept this image
+storage; other Item parents reject it at mount/update. Replacement validates and
+allocates before releasing the previous copy; removing the Item releases it.
+Missing icons use ordinals, while XS hides icons and ordinals. Existing image
+limits remain 2048 per dimension and 16 MiB including stride padding.
+
+The bridge keeps its 64-Item limit, selected Item and aggregate CHANGE phase.
+Visual paint uses a selection snapshot; accepted selection appears on the next
+submission. Selecting the already selected Item emits no CHANGE; accepted changed
+selection queues one existing aggregate CHANGE after rendering. This is not the C
+controlled REQUEST callback surface. Legacy mode preserves its prior behavior.
+Use matching bridge/addon/SDK revisions for the additive methods. See
+[Stepper navigation](STEPPER_NAVIGATION.md) and the
+[binding design contract](STEPPER_BINDING_VISUAL_DESIGN.md).

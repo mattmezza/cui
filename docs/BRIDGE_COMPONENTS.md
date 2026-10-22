@@ -47,7 +47,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Menu | `cui_menu` | menu Item action, change, disabled | Up to 64 leaf actions |
 | Pagination | `cui_pagination` | current page, total, change, disabled | One-based page, total <= 1,000,000 |
 | Rating | `cui_rating` | value, maximum, change, disabled | Maximum <= 10 |
-| Stepper | `cui_stepper` | selected Item, status, change, disabled | Up to 64 Items |
+| Stepper | `cui_stepper` / opt-in `cui_stepper_visual_navigation` | selected Item, status, aggregate change, disabled; opt-in density/orientation/shared size and copied RGBA Item icons | Up to 64 Items; visual selection paints on next submission; no foreign controlled REQUEST handlers |
 | DescriptionList | `cui_description_list` | Item label/value pairs | Up to 64 Items, default columns |
 | Scrollable | `cui_scrollable_begin/end_ex` | child tree, viewport/extents, wheel change | Vertical viewport |
 | StatusBar | `cui_status_bar` | Item labels in left/center/right regions | Set Item step status to 0/1/2 for region |

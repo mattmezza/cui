@@ -475,7 +475,15 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_step_status(cui_bridge_app *, cu
                                                             uint32_t status);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_attachment_status(
     cui_bridge_app *, cui_bridge_node attachment, cui_bridge_attachment_status status);
-/* Copies a tightly packed or padded RGBA8 image (at most 16 MiB). */
+/* Opt-in Stepper visual composition. Density: 0 MD, 1 XS, 2 SM, 3 LG.
+ * Legacy is default; bridge remains selection-owned with aggregate CHANGE.
+ * Visual paint snapshots selection until the next frame. Group cap remains 64. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_stepper_visual(cui_bridge_app *, cui_bridge_node,
+                                                               uint32_t enabled, uint32_t vertical,
+                                                               uint32_t density);
+/* Copies a tightly packed or padded RGBA8 image (at most 16 MiB).
+ * Also accepts Item children of Stepper as optional tinted visual icons.
+ * Item icon bytes remain owned through replacement/removal; other parents reject. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_image_rgba(cui_bridge_app *, cui_bridge_node image,
                                                            const uint8_t *pixels, uint32_t width,
                                                            uint32_t height, uint32_t stride,
@@ -514,8 +522,8 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_variant(cui_bridge_app *a
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_button_size(cui_bridge_app *app,
                                                             cui_bridge_node node,
                                                             cui_bridge_button_size size);
-/* INHERIT restores the component's legacy sizing; explicit variants win over
- * Avatar visual_size. Other component kinds return INVALID_STATE. */
+/* Button, Avatar and Stepper. INHERIT restores legacy/source density sizing;
+ * explicit variants win over Avatar visual_size. Other kinds reject. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_design_size(cui_bridge_app *, cui_bridge_node,
                                                             cui_bridge_design_size);
 /* Avatar only. Flags are 0/1; custom hue is 0..11. No other palette/ring API. */

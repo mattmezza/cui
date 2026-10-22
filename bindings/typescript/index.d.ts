@@ -12,7 +12,7 @@ export interface Row extends Container {}
 export interface Column extends Container {}
 export interface Label extends Node { label(value: string): this }
 export type DesignSize = 'inherit' | 'xs' | 'sm' | 'base' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl' | '7xl' | '8xl' | '9xl';
-/** Shared scale is currently supported only by Button and Avatar. */
+/** Shared scale is currently supported by Button, Avatar and Stepper. */
 export interface DesignSized {design_size(value: DesignSize): this}
 export interface Button extends Node, DesignSized {
   label(value: string): this; primary(): this; secondary(): this; outline(): this; ghost(): this;
@@ -122,7 +122,8 @@ export interface Pagination extends NumericControl {total(value: number): this; 
 export interface Rating extends Pagination {}
 export function list_view(key?: string, text?: string): Group;
 export function menu(key?: string, text?: string): Group;
-export function stepper(key?: string, text?: string): Group & {numeric_part_bounds(part: number): Bounds};
+export interface Stepper extends Group, DesignSized {stepper_visual(enabled?: boolean, vertical?: boolean, density?: "md" | "xs" | "sm" | "lg"): this; numeric_part_bounds(part: number): Bounds}
+export function stepper(key?: string, text?: string): Stepper;
 export function pagination(key?: string, text?: string): Pagination;
 export function rating(key?: string, text?: string): Rating;
 export function description_list(key?: string, text?: string): Composite;
@@ -250,3 +251,6 @@ export interface SelectionChangeNotificationV1 extends NotificationBaseV1 {
   readonly kind: 'selection-change'; readonly selectedHandle: NotificationHandleV1; readonly selectedNode?: Node;
 }
 export type ValueNotificationV1 = NotificationV1 | ScalarChangeNotificationV1 | TextChangeNotificationV1 | SelectionChangeNotificationV1;
+
+/** RGBA icons apply only to Item children of Stepper; bytes are copied. */
+export interface Item {image_rgba(pixels: Uint8Array, width: number, height: number, stride?: number): this}

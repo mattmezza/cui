@@ -1,9 +1,24 @@
 // SPDX-License-Identifier: MIT
 'use strict';
 const assert = require('node:assert/strict');
-const {App, row, column, label, button, avatar} = require('..');
+const {App, row, column, label, button, avatar, stepper, item} = require('..');
 
 async function main() {
+  const stepApp=new App({width:800,height:800});
+  const iconBytes=new Uint8Array([255,255,255,255]);
+  const one=item('one','First').image_rgba(iconBytes,1,1), two=item('two','Second');
+  const steps=stepper('steps').stepper_visual().design_size('lg').children(one,two);
+  const changes=[];steps.on_change(e=>changes.push(e));
+  stepApp.mount(column().children(steps));stepApp.step();iconBytes[0]=0;
+  let part=steps.numeric_part_bounds(2);
+  for(let i=0;i<2;i++){stepApp.pointer('down',part.x+part.width/2,part.y+part.height/2).pointer('up',part.x+part.width/2,part.y+part.height/2);stepApp.step();}
+  assert.equal(steps.selected(),two);assert.equal(changes.length,1);
+  for(const density of ['md','xs','sm','lg']){steps.stepper_visual(true,true,density);stepApp.step();assert(steps.numeric_part_bounds(2).y>steps.numeric_part_bounds(1).y);}
+  one.image_rgba(new Uint8Array([255,255,255,255]),1,1);
+  steps.stepper_visual(false);stepApp.step();
+  assert.throws(()=>steps.stepper_visual(true,false,'bad'));
+  assert.throws(()=>one.image_rgba(new Uint8Array(4),1,1,0xffffffff));
+  stepApp.dispose();assert.throws(()=>steps.stepper_visual());
   const avatarApp = new App({width:600,height:400});
   const person = avatar('person','Ada Lovelace').design_size('md').identity_colors(true,4);
   const anonymous = avatar('anonymous').anonymous_icon(true,'user');

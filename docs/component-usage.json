@@ -802,7 +802,8 @@
       "docs": [
         "docs/NUMERIC.md",
         "docs/NUMERIC_SELECTION_EVENTS.md",
-        "docs/STEPPER_NAVIGATION.md"
+        "docs/STEPPER_NAVIGATION.md",
+        "docs/BINDING_BUILDERS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",

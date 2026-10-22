@@ -234,7 +234,7 @@ type ValueNotificationPollV1 = unsafe extern "C" fn(
 #[cfg(cui_bridge_static)]
 fn notification_functions_v1(
 ) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
-    extern "C" {
+extern "C" {
         fn cui_bridge_notification_v1_size() -> u32;
         fn cui_bridge_notification_versions() -> u32;
         fn cui_bridge_poll_notification_v1(
@@ -434,6 +434,10 @@ impl ChangeEvent {
         }
     }
 }
+/// Source Stepper visual density; shared DesignSize is an independent scale.
+#[repr(u32)]
+#[derive(Clone, Copy, Debug)]
+pub enum StepperDensity { Md = 0, Xs = 1, Sm = 2, Lg = 3 }
 #[cfg_attr(not(cui_bridge_static), link(name = "cui_bridge"))]
 extern "C" {
     fn cui_bridge_abi_version() -> u32;
@@ -541,6 +545,7 @@ extern "C" {
     fn cui_bridge_set_text(a: *mut c_void, n: RawNode, t: *const c_char) -> u32;
     fn cui_bridge_set_gap(a: *mut c_void, n: RawNode, g: f32) -> u32;
     fn cui_bridge_set_button_variant(a: *mut c_void, n: RawNode, v: u32) -> u32;
+    fn cui_bridge_set_stepper_visual(a: *mut c_void, n: RawNode, enabled: u32, vertical: u32, density: u32) -> u32;
     fn cui_bridge_set_design_size(a: *mut c_void, n: RawNode, v: u32) -> u32;
     fn cui_bridge_set_avatar_identity(a: *mut c_void, n: RawNode, enabled: u32, custom_hue: u32, hue: u32) -> u32;
     fn cui_bridge_set_avatar_placeholder(a: *mut c_void, n: RawNode, enabled: u32, name: *const c_char) -> u32;
@@ -1092,7 +1097,12 @@ impl App {
         check(unsafe { cui_bridge_set_button_size(self.raw, n, v as u32) })?;
         Ok(self)
     }
-    /// Shared scale for Button and Avatar only; other kinds return an error.
+    /// Shared scale for Button, Avatar and Stepper; other kinds return an error.
+    pub fn stepper_visual(&mut self, n: Node, enabled: bool, vertical: bool, density: StepperDensity) -> Result<&mut Self> {
+        let n = self.valid(n)?;
+        check(unsafe { cui_bridge_set_stepper_visual(self.raw, n, enabled as u32, vertical as u32, density as u32) })?;
+        Ok(self)
+    }
     pub fn design_size(&mut self, n: Node, v: DesignSize) -> Result<&mut Self> {
         let n = self.valid(n)?;
         check(unsafe { cui_bridge_set_design_size(self.raw, n, v as u32) })?;
@@ -2149,6 +2159,10 @@ impl<'a> Builder<'a> {
     }
     pub fn size(self, v: Size) -> Result<Self> {
         self.app.size(self.node, v)?;
+        Ok(self)
+    }
+    pub fn stepper_visual(self, enabled: bool, vertical: bool, density: StepperDensity) -> Result<Self> {
+        self.app.stepper_visual(self.node, enabled, vertical, density)?;
         Ok(self)
     }
     pub fn design_size(self, v: DesignSize) -> Result<Self> {

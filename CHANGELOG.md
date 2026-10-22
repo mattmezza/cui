@@ -2,6 +2,12 @@
 
 ## 0.1.0-alpha.3 — unreleased
 
+- Adds opt-in Stepper indicators/connectors, bitmap icons and shared xs–9xl
+  sizing, with controlled navigation and copied gallery examples. Centered and
+  responsive composition, exact source styling and language builders remain gaps.
+- Adds a nested Resizable explorer/editor/console example with independent
+  handles and copied C usage; repeated desktop/touch drag regressions are covered.
+
 - Constrains populated grow-width Input viewports during parent resizing,
   including InputGroup prefix/suffix composition, while preserving clipping.
   Caret/selection scroll and IME projection can still lag one resize frame.

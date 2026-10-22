@@ -190,6 +190,9 @@ jobs:
       - name: Gallery split-button names and keyboard ordering
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_dropdown_metadata_gallery.py --directory build/web
+      - name: Gallery Stepper connectors icons and controlled navigation
+        if: ${{ matrix.shard == 1 }}
+        run: uv run tests/web/test_stepper_visual_gallery.py --directory build/web
       - name: Gallery analytic mesh pixels and bounded preparation
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_mesh_canvas.py --directory build/web

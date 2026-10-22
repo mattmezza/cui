@@ -605,17 +605,19 @@ API: `cui_combobox`. [Public header](../include/cui/cui_choice.h); [guide](CHOIC
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_date_picker_state and cui_date_selection.
+**State:** Caller retains cui_date_picker_state and cui_date_selection. DateTime uses separately initialized cui_date_time_picker_state plus cui_date_time_value; both are owner-thread/context local.
 
 **Interaction:** Returns final selection changes; live cui_date_disabled_fn restricts dates. The extended API forwards Calendar presentation/behavior and preserves final-queue completion close/focus; legacy CHANGE wrappers do not accept the extension or observe lifecycle.
 
-**Usage:** Initialize stable popup identity once; submit caller state and selection each frame. Optional cui_date_picker_ex forwards month/today/neighbor presentation and independent range/year/recenter policies. Zero extension preserves legacy behavior, including late-error bool; rebuild matching headers/library. The separate date-only actions facade adds bounded presets, an optional clear button and explicit Delete scope with retained child selection; language builders omit it.
+**Usage:** Initialize stable popup identity once; submit caller state and selection each frame. Optional cui_date_picker_ex forwards month/today/neighbor presentation and independent range/year/recenter policies. Zero extension preserves legacy behavior, including late-error bool; rebuild matching headers/library. The separate date-only actions facade adds bounded presets, an optional clear button and explicit Delete scope with retained child selection; language builders omit it. Optional cui_date_time_picker is a separate single civil date/time model with retained time, explicit assignment, bounded presets/clear and one-reduction Styled composition; Base helpers submit semantics inside caller-owned popup. No timezone/range/chrono parser, typed callback stream or binding facade is provided. The DatePicker gallery has an explicit single-date Date + time mode with desktop/touch segment editing, presets/clear and copyable C11 snippet; turning it off retains the date in legacy/actions modes.
 
 API: `cui_date_picker_init`, `cui_date_picker`, `cui_date_picker_events`, `cui_base_date_picker`, `cui_date_picker_ex`, `cui_base_date_picker_ex`, `cui_date_picker_calendar_id`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
 
 Additional event includes: `cui/cui_picker_events.h`.
 
 Calendar forwarding: `cui/cui_date_picker_calendar.h`; [presentation and behavior guide](DATE_PICKER_CALENDAR.md).
+
+Optional civil date/time: [DateTime picker guide](DATE_TIME_PICKER.md); `cui/cui_date_time_picker.h`.
 
 ## Editor
 

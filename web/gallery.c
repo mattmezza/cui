@@ -1158,7 +1158,7 @@ static void gallery_toggle_group_change(void *user, const bool *requested, size_
             memcpy(toggle_group_values, requested, count * sizeof(*requested));
     }
 }
-static bool renderer_fixture_enabled;
+static int renderer_fixture_enabled;
 static const unsigned char renderer_fixture_pixels[80] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0,
     255, 255, 255, 255, 200, 100, 0,   255, 200, 100, 0,   255, 255, 255, 255, 255, 0, 0, 0, 0,
@@ -1166,9 +1166,24 @@ static const unsigned char renderer_fixture_pixels[80] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0};
 /* Browser pixel regression fixture; absent from the ordinary component preview. */
 void gallery_renderer_fixture(int enabled) {
-    renderer_fixture_enabled = enabled != 0;
+    renderer_fixture_enabled = enabled;
 }
 static void gallery_paint_renderer_fixture(cui_context *ui) {
+    if (renderer_fixture_enabled == 2) {
+        static const cui_mesh_vertex vertices[] = {
+            {0, 0, 0, 1}, {24, 0, 0, 1}, {0, 24, 0, 1}};
+        cui_begin_box(ui, cui_id_from(ui, "renderer-mesh-opacity"),
+                      (cui_box){.width = 32, .height = 32, .opacity = .5f,
+                                .custom_opacity = true});
+        cui_paint_mesh(ui, cui_id_from(ui, "renderer-mesh"),
+                       (cui_mesh_paint){.vertices = vertices,
+                                        .vertex_count = 3,
+                                        .scale = 1,
+                                        .color = {.5f, 0, 0, .5f}},
+                       (cui_box){.width = 24, .height = 24});
+        cui_end_box(ui);
+        return;
+    }
     cui_begin_box(ui, cui_id_from(ui, "renderer-fixture-clip"),
                   (cui_box){.width = 32, .height = 32, .clip = true});
     cui_paint_bitmap(ui, cui_id_from(ui, "renderer-fixture-image"),
@@ -6151,7 +6166,31 @@ float gallery_command(unsigned i, unsigned field) {
         return c->text_paint.y1;
     case 30:
         return (float)c->text_paint.stop_count;
+    case 71:
+        return c->type == CUI_DRAW_MESH ? (float)c->mesh.vertex_count : 0;
+    case 72:
+        return c->mesh.origin_x;
+    case 73:
+        return c->mesh.origin_y;
+    case 74:
+        return c->mesh.scale;
+    case 75:
+        return c->mesh.color.r;
+    case 76:
+        return c->mesh.color.g;
+    case 77:
+        return c->mesh.color.b;
+    case 78:
+        return c->mesh.color.a;
     default:
+        if (field >= 79 && c->type == CUI_DRAW_MESH) {
+            size_t vertex = (field - 79) / 4;
+            if (vertex >= c->mesh.vertex_count || !c->mesh.vertices)
+                return 0;
+            cui_mesh_vertex v = c->mesh.vertices[vertex];
+            const float values[] = {v.x, v.y, v.s, v.t};
+            return values[(field - 79) % 4];
+        }
         if (field >= 31 && field < 71) {
             size_t stop = (field - 31) / 5;
             if (stop >= c->text_paint.stop_count || !c->text_paint.stops)

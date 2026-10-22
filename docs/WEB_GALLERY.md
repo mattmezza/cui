@@ -20,6 +20,18 @@ Use pointer input or focus the preview and use Tab, Enter/Space and arrow keys. 
 Checkbox and Radio demonstrate four sizes, required and invalid semantics, skipped Tab stops, disabled behavior, and graphical selection marks. Switch demonstrates label placement, a custom active color, spring travel and reduced-motion settling. Toggle includes standalone selection and a three-item toolbar with single or multiple selection, segmented edges, and ghost or outline styling.
 The Canvas host applies the CUI core's resolved pointer cursor after each frame and mirrors toolbar and separator roles with orientation and range metadata when present.
 
+The Canvas mesh consumer decodes actual CUI expanded triangles, including analytic
+ST coverage and linear premultiplied colors. It rasterizes physical pixel centers
+at the gallery's positive uniform DPR scale plus translation, preserves ordered
+translucent triangles and nested pixel-center clips, and consumes Core ancestor
+opacity once. Other Canvas matrices and composition modes are rejected. Bounded
+preflight completes before resizing or clearing the target; invalid geometry or
+resource exhaustion leaves the existing image intact. The host limits and memory
+accounting are specified in [the adapter design](design/CANVAS_MESH.md).
+`tests/web/test_mesh_canvas.py` checks exact Canvas reference images at DPR1/2 and
+a Core-emitted opacity fixture. This establishes this browser host's mesh path;
+it does not establish exact GPUI path rasterization or support in native adapters.
+
 An earlier light/dark Chromium audit of the first 62 live stories identified ASCII stand-ins in C components. The subsequent source icon artwork implementation replaced those glyphs in Button, Disclosure, Tree, DropdownButton, Input Group and Notification. The gallery’s custom disclosure header still uses `+`/`-` in `web/gallery.c`; it is sample-owned content rather than component painting. The Message avatar is intentionally bottom-aligned: `src/components/cui_message.c` follows the frozen reference's `message.rs` bottom alignment. Input Group's separate block addon rows follow `src/components/cui_form.c`; the gallery gives its inline action enough width to keep “Open address” on one line.
 An idle-frame audit found continuous frames only for Skeleton, Spinner, Shimmer, and Attachment's brief entrance animation; Image schedules a load deadline. With reduced motion, all 62 stories in that audit stopped scheduling continuous frames.
 

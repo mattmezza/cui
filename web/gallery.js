@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: MIT */
 import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
+import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
 import {selectedUsage} from "./modules/cui_usage.js";
 let shadowRenderer;
+const meshRenderer=createCuiMeshRenderer();
 let iconCatalog=null,apiIndex=null;
 const $ = id => document.getElementById(id);
 // Freeze the asset root before shareable paths change the current document URL.
@@ -812,13 +814,22 @@ function render(){
  if(['Video','VideoPlayer'].includes(selected.name))videoHost.sync();
  if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
  applyTouchPageFallback();
- const commands=Array.from({length:wasm.gallery_count()},(_,i)=>{
+ const commandCount=wasm.gallery_count();let meshVertices=0;
+ if(commandCount>131072)throw Error('CUI mesh command capacity');
+ const commands=Array.from({length:commandCount},(_,i)=>{
   const type=wasm.gallery_command(i,0);
+  if(type===6){
+   const n=wasm.gallery_command(i,71);
+   if(!Number.isSafeInteger(n)||n<=0||n%3||n>262144-meshVertices)throw Error('CUI mesh vertex capacity');
+   meshVertices+=n;
+   return {type:'mesh',mesh:{vertexCount:n,originX:wasm.gallery_command(i,72),originY:wasm.gallery_command(i,73),scale:wasm.gallery_command(i,74),color:Array.from({length:4},(_,j)=>wasm.gallery_command(i,75+j)),vertices:Array.from({length:n*4},(_,j)=>wasm.gallery_command(i,79+j))}};
+  }
   return(type===7||type===8)?{type:type===8?'insetShadow':'shadow',values:Array.from({length:16},(_,field)=>wasm.gallery_shadow_value(i,field))}
    :type===3?{type:'clipPush',bounds:[1,2,3,4].map(field=>wasm.gallery_command(i,field))}
    :type===4?{type:'clipPop'}:{type:'other'};
  });
  const prepared=shadowRenderer.prepare(commands,ctx,width,height);
+ const meshes=meshRenderer.prepare(commands,ctx,width,height);
  // Canvas dimension assignment also clears pixels: defer it until Core and
  // every owned shadow raster have passed preflight.
  const physicalWidth=Math.round(width*dpr),physicalHeight=Math.round(height*dpr);
@@ -830,11 +841,11 @@ function render(){
   const f=n=>wasm.gallery_command(i,n);const type=f(0),x=f(1),y=f(2),w=f(3),h=f(4);
   if(type===3){ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();clips.push([x,y,w,h]);continue;}
   if(type===4){if(clips.length){ctx.restore();clips.pop();}continue;}
-  if(type===7||type===8){
-   // Shadow's prepared physical covered mask owns clipping; a fractional
-   // browser clip would incorrectly trim source-covered boundary pixels.
+  if(type===6||type===7||type===8){
+   // Prepared physical shadow/mesh masks own clipping; a fractional browser
+   // clip would incorrectly trim covered boundary pixels.
    for(let n=0;n<clips.length;n++)ctx.restore();
-   prepared.draw(i,ctx,{unclipped:true});
+   (type===6?meshes:prepared).draw(i,ctx,{unclipped:true});
    for(const bounds of clips){ctx.save();ctx.beginPath();ctx.rect(...bounds);ctx.clip();}
    continue;
   }

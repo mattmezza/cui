@@ -1068,7 +1068,8 @@
         "tests/unit/test_dropdown_events.c",
         "tests/test_dropdown_button_styles_distribution.py",
         "tests/unit/test_dropdown_button_metadata.c",
-        "tests/test_dropdown_button_metadata_distribution.py"
+        "tests/test_dropdown_button_metadata_distribution.py",
+        "tests/web/test_dropdown_metadata_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -1131,7 +1132,8 @@
           "evidence": [
             "include/cui/cui_dropdown_button_metadata.h",
             "tests/unit/test_dropdown_button_metadata.c",
-            "docs/DROPDOWN_BUTTON_METADATA.md"
+            "docs/DROPDOWN_BUTTON_METADATA.md",
+            "tests/web/test_dropdown_metadata_gallery.py"
           ],
           "limitations": [
             "Action checked/value convention only; no optional toggled presence or binding facade."

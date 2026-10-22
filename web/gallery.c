@@ -12,6 +12,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_color_entry.h"
 #include "cui/cui_command.h"
 #include "cui/cui_components.h"
+#include "cui/cui_dropdown_button_metadata.h"
 #include "cui/cui_dropdown_button_styles.h"
 #ifdef CUI_GALLERY_REGEX
 #include "cui/cui_regex.h"
@@ -1366,6 +1367,7 @@ static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
 static int dropdown_paint = 1;
 static bool dropdown_shadow;
+static int dropdown_names, dropdown_order, dropdown_skip, dropdown_toggle;
 static bool dropdown_outline, dropdown_selected;
 static cui_id selected_tab;
 static int tabs_mode, tabs_size, tabs_variant = CUI_TAB_UNDERLINE;
@@ -5562,7 +5564,22 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 .paint_policy = (cui_dropdown_button_paint_policy)dropdown_paint,
                 .custom_shadow = dropdown_shadow,
                 .host_shadows_enabled = true};
-            cui_dropdown_button_result result = cui_dropdown_button_styled_ex(
+            cui_dropdown_button_metadata metadata = {
+                .action = {.custom_name = dropdown_names != 0,
+                           .name = dropdown_names == 2 ? cui_string("")
+                                                       : cui_string("Exporter le projet"),
+                           .custom_tab_index = dropdown_order != 0,
+                           .tab_index = dropdown_order == 2 ? 2 : -2,
+                           .skip_tab = dropdown_skip == 1},
+                .trigger = {.custom_name = dropdown_names != 0,
+                            .name =
+                                dropdown_names == 2 ? cui_string("") : cui_string("Autres exports"),
+                            .custom_tab_index = dropdown_order != 0,
+                            .tab_index = dropdown_order == 2 ? -2 : 2,
+                            .skip_tab = dropdown_skip == 2},
+                .toggle_semantics = dropdown_toggle != 0,
+                .toggled = dropdown_toggle == 2};
+            cui_dropdown_button_result result = cui_dropdown_button_with_metadata_ex(
                 ui, cui_id_from(ui, "split-button"), cui_id_from(ui, "split-action"),
                 cui_id_from(ui, "split-trigger"), &t, cui_string("Export workspace"),
                 cui_string("Export options"), entries, 9, &menu_action, &menu_tree,
@@ -5584,7 +5601,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                          {90, 60, 190, 255},
                                                          {40, 20, 120, 255}},
                                               .menu = options},
-                &styles);
+                &styles, &metadata);
             if (result.action_activated)
                 clicks++;
             invoked = result.menu_activated;
@@ -6317,6 +6334,21 @@ double gallery_bitmap(unsigned i, unsigned field) {
         return 0;
     }
 }
+int gallery_tab_compare(unsigned a, unsigned b) {
+    if (a >= semantic_count || b >= semantic_count)
+        return 0;
+    const cui_semantic *x = &semantics[a], *y = &semantics[b];
+    size_t xn = x->tab_path_count + 1, yn = y->tab_path_count + 1;
+    for (size_t n = 0; n < xn && n < yn; n++) {
+        int xv = n < x->tab_path_count ? x->tab_path[n] : x->tab_index;
+        int yv = n < y->tab_path_count ? y->tab_path[n] : y->tab_index;
+        if (xv != yv)
+            return xv < yv ? -1 : 1;
+    }
+    if (xn != yn)
+        return xn < yn ? -1 : 1;
+    return a == b ? 0 : a < b ? -1 : 1;
+}
 unsigned gallery_semantic_count(void) {
     return (unsigned)semantic_count;
 }
@@ -6397,6 +6429,10 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->details.pointer_activatable;
     case 35:
         return s->details.handles_tab;
+    case 36:
+        return s->tab_ordered;
+    case 37:
+        return s->tab_stop_disabled;
     default:
         return 0;
     }
@@ -6740,6 +6776,13 @@ float gallery_tabs_scroll(unsigned field) {
     default:
         return 0;
     }
+}
+
+void gallery_dropdown_metadata_options(int names, int order, int skip, int toggle) {
+    dropdown_names = names >= 0 && names <= 2 ? names : 0;
+    dropdown_order = order >= 0 && order <= 2 ? order : 0;
+    dropdown_skip = skip >= 0 && skip <= 2 ? skip : 0;
+    dropdown_toggle = toggle >= 0 && toggle <= 2 ? toggle : 0;
 }
 
 void gallery_dropdown_style_options(int policy, int shadow) {

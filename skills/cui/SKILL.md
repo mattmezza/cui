@@ -217,7 +217,8 @@ after selected/disabled. Container has no foreground cascade. Custom XS shadows
 require both explicit intent and the host-enable gate. For independent accessible names and signed tab ordering, read
 `docs/DROPDOWN_BUTTON_METADATA.md` and its authoritative sibling header. Names
 are UTF-8, explicitly empty when masked, and borrowed immutable through submission.
-Metadata is visible before existing synchronous callbacks. Checked/value follows
+Metadata is visible before existing synchronous callbacks. The gallery has opt-in
+name/order/skip-tab/checked-value selectors and a compilable C snippet. Checked/value follows
 the existing Button convention; optional toggled presence/pressed-button adapter
 mapping and language-builder facades remain gaps. Use matching rebuilt source,
 standalone distribution headers or packaged SDKs; do not mix revisions.

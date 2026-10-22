@@ -1,9 +1,10 @@
 # DropdownButton inherited Button refinement audit
 
-Design checkpoint only, 2026-10-22. CUI base `ef086a41`; frozen v0.7.1 source
+Initial design checkpoint, 2026-10-22. CUI base `ef086a41`; frozen v0.7.1 source
 `87d10ae5e1299d1be18670a37570c5402f952e34`, verified in the local reference checkout.
-No production edits, status promotion, generated changes or new dispatch design.
-All 78 entries remain. Tests below were inspected, not rerun for this audit.
+That checkpoint made no production edits, status promotion, generated changes or
+new dispatch design. All 78 entries remain. Its inspected tests and proposal are
+preserved below; the separate implementation evidence follows at the end.
 
 ## Exact source and coverage
 
@@ -145,3 +146,36 @@ or tooltip-builder lifecycle forwarding needs separate storage/lifetime review.
 ## Final declaration checkpoint
 
 The additive contract is now in `include/cui/cui_dropdown_button_styles.h`. It avoids the Choice/Components include cycle. Explicit BUTTON selects source state formulas; two gates select Custom XS shadow; zero stays legacy. Metadata is separate. Source `Colorize::opacity` (`theme/color.rs:156-161`) clamps its multiplier to[0,1], so Secondary disabled .opacity(1.5) preserves alpha rather than increasing it. Tests must cover translucent colors and exact byte rounding. No Theme/Core ABI or new conversion dependency is required.
+
+## Implemented style slice and evidence
+
+The declarations are implemented through the existing Dropdown common submission
+path. Base/events reduce once, descriptors copy before reduction, and legacy
+callbacks retain their mutation/timing behavior. The metadata proposal above is
+still unimplemented. Canonical registration, generated distributions, consumer
+skill export and browser demonstration remain separate integration work; no
+manifest status is promoted here.
+
+`tests/fixtures/dropdown_button_styles/legacy_box.h` freezes the pre-change
+`ef086a41` paint helper and complete submission/paint tree. The new test compares
+that oracle with NULL/zero descriptors across every variant, all four existing
+sizes and normal/selected/disabled/loading/outlined/omitted-action cases, using
+draw values, actual software pixels and memberwise semantic values. Additional
+tests verify independently calculated source colors (including translucent
+Secondary and distinct border palettes), instance replay/invalid patch discard,
+container rejection, real pointer/touch/Enter/Space/accessibility multiplicity,
+descriptor-copy behavior under legacy event-handler mutation, body-once and
+trigger-open distinction. Actual software pixels exercise hover/selection and
+the two shadow gates. Text shaping and source theme-token equality are not
+claimed by these software tests.
+
+Frozen `gpui-pre = 0.3.8` runtime evidence (`src/elements/div.rs:3438-3473,3520-3523`)
+applies group-hover before own hover/active. Thus an action's own pointer state
+overrides its group-held background; the trigger does not inherit that group.
+
+Verified in the private fixture: strict Release native wrapper 3/3 (new styles,
+existing Choice and Dropdown events), ASan+UBSan wrapper 1/1, pinned Zig 0.16.0 /
+wasmtime 49.0.0 WASI 1/1, strict compiled C11 guide and C++ header, and actual
+`python scripts/format.py --check` with clang-format 23.1.2. All builds live under
+`/home/matteo/.cache/cui-validation/dropdown-button-styles{,-asan,-wasi}`;
+no desktop window, dependency install or full-suite rebuild was used.

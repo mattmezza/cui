@@ -77,10 +77,10 @@ jobs:
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_input_regex_gallery.py --directory build/web --default-directory build/web-default
       - name: Verify Core Unicode reflow with Chromium Canvas measurements
-        if: ${{ matrix.shard == 2 }}
+        if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_unicode_wrap_core.py
       - name: Verify Icon box styling and retained raster snapshots
-        if: ${{ matrix.shard == 2 }}
+        if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_icon_style.py
       - name: Verify copied Button activation evidence with real input
         if: ${{ matrix.shard == 1 }}
@@ -89,7 +89,7 @@ jobs:
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_notification_source_motion.py --output build/notification-source-motion-probe
       - name: Verify segmented Tab shadow branches and measured caster
-        if: ${{ matrix.shard == 2 }}
+        if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_tabs_source_shadows.py --output build/tabs-source-shadows-probe
       - name: Actual Popover appearance consumers
         if: ${{ matrix.shard == 2 }}

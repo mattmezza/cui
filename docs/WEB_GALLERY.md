@@ -155,7 +155,35 @@ required; deployment waits for the build and every group. Each group has a priva
 runner and headless Chromium, so probes and temporary servers remain isolated.
 The transfer contains only generated gallery/fixture files, including `.nojekyll`;
 its artifact expires after one day. Dependency versions and Action revisions remain
-pinned. No cross-revision binary cache is used.
+pinned. No cross-revision CUI gallery or fixture binary cache is used.
+
+Pages caches dependency inputs separately from those tested artifacts. The existing
+Python setup caches pip downloads using the workflow as its dependency key, covering
+the pinned uv 0.10.8 and Zig 0.16.0 distributions. Browser groups cache uv's package
+cache per OS, architecture, Python/uv/Playwright version, shard and test-source hash;
+a fallback is restricted to that same host/version/shard prefix. Chromium downloads
+use a separate exact OS/architecture/Playwright 1.58.0 key, shared by the shards.
+Only the optional Rust toolchain's manifest and two input archives are cached against
+`backends/regex/pin.json`; installed Rust executables, regex libraries and gallery
+build outputs are excluded. The preparation script still verifies each archive's
+checksum and reinstalls the private toolchain on every run. Pip installation,
+Playwright installation with Linux OS dependencies, every test and deployment gates
+also run on cache hits. `tests/test_pages_tool_cache.py` checks this policy offline.
+
+Before this cache change, run
+[39769287993](https://github.com/mattmezza/cui/actions/runs/39769287993)
+recorded 6 seconds for build-tool installation, 45 seconds for private Rust
+preparation and 50 seconds for the regex build. Browser-tool installation took
+25 and 29 seconds on shards 1 and 2. Shard 3's same step eventually completed in
+11 minutes 53 seconds (2026-10-22 11:19:25–11:31:18 UTC).
+Its full job logs were still unavailable, so these observations do not identify whether
+package downloads, browser downloads or Linux dependency installation caused the
+delay. No warm-cache timing has been measured for this change. Cold misses still
+download dependencies; simultaneous cold shards can download the same browser
+before any job has saved its cache. Cache transfer and save overhead can offset
+download savings. Playwright specifically cautions that browser-cache restoration
+can take as long as downloading, and Linux OS dependencies still require normal
+installation ([upstream CI guidance](https://playwright.dev/python/docs/ci#caching-browsers)).
 
 The baseline Pages run [39397271176](https://github.com/mattmezza/cui/actions/runs/39397271176)
 spent 25.6 minutes in its sequential build/check job. The three groups were balanced

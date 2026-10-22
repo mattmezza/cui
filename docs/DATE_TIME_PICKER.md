@@ -1,8 +1,8 @@
-# Base single-date time picker
+# Single-date time picker
 
 This opt-in portable C11 API composes one civil date and time. It implements the
-Base/value/synchronization slice of `design/DATE_PICKER_DATETIME.md`. No Styled
-factory, timezone/range editor, arbitrary date parser/formatter, typed event
+Base/value/synchronization and Styled slices of `design/DATE_PICKER_DATETIME.md`.
+No timezone/range editor, arbitrary date parser/formatter, typed event
 wrapper, binding builder or browser demonstration is included yet. Existing
 DatePicker/actions and TimeField calls keep their behavior.
 
@@ -134,13 +134,16 @@ the same frame. Legacy public record layouts stay unchanged; new record users
 must rebuild with matching headers.
 
 Private fixture: `cmake -S tests/fixtures/date_time_picker -B BUILD -G Ninja`,
-then build `test_date_time_picker test_picker test_date_picker_actions date_time_header`.
+then build `test_date_time_picker test_date_time_picker_styled test_picker
+test_date_picker_actions date_time_header datetime_guide`.
 Run through `python scripts/test_local.py --build-dir BUILD -- -V -R
-'^(date_time_picker|picker|date_picker_actions)$'`. Repeat in a separate
+'^(date_time_picker|date_time_picker_styled|picker|date_picker_actions)$'`. Repeat in a separate
 `-DCUI_SANITIZE=ON` build. `tests/fixtures/date_time_picker/test_wasi.py --build-dir
 BUILD` uses the repository's existing pinned offline WASI driver. This slice adds
 no browser/live-AT or full source-parity evidence. Final worker results will be
-reported with the signed checkpoint.
+reported with the signed checkpoint. Configure a separate fixture with
+`-DCUI_DATETIME_BUILD_STYLED=OFF` to build/run the Base test without the optional
+Styled source.
 
 Accepted Calendar selections are evaluated in queue order against the immediately
 preceding outer date. A→B→A remains open with source_change true and
@@ -153,3 +156,80 @@ rule describes CUI routing, not GPUI scheduler equivalence.
 TimeField source_change uses the existing reducer's net phase result: Up then
 Down restoring the entry time does not report a time source change. There is no
 ordered callback stream or per-intermediate-time-edit notification claim.
+
+
+## Styled composition
+
+`cui_date_time_picker` calls Base once and owns the single popup scope, Calendar,
+paint-only TimeField, and preset/clear paint. Use this instead of manually calling
+Base/helpers in that frame. Calendar root is `cui_date_picker_calendar_id(trigger)`;
+time root is `cui_date_time_picker_time_id(trigger)`. No extra resources are retained.
+The trigger displays a bounded locale date plus 12/24-hour minute/second time;
+there is no chrono pattern API. This display is separate from its accessible
+name supplied by the caller. `time_label` labels both the visible row and group.
+
+Styled validates theme metrics and rejects a popup larger than the supplied
+viewport before reducing input or mutating value/state. It does not silently
+clip away time/actions or add scrolling. Supply enough room, fewer months/presets,
+or smaller Calendar cells. DatePicker has no `design_size` field: actual supported
+metrics are Calendar cell_size (20–128, default32), 1–3 months, and finite theme
+font/padding/gap/radius; XS–9XL enums from other components are not accepted here.
+A bounded formatter can truncate very long localized date labels; custom source
+format patterns remain unsupported. Native/browser text shaping follows the
+existing host; software geometry tests omit glyph rasterization without a font.
+
+The following complete C11/C++11-compatible example is compiled by the standalone
+fixture. The application calls init once, retains both objects, and calls frame
+inside its own begun CUI frame. It links the Base source plus optional
+`src/components/cui_date_time_picker.c` and ordinary components/Calendar sources.
+
+<!-- datetime-example-begin -->
+```c
+#include "cui/cui_date_time_picker.h"
+#include <string.h>
+
+void example_datetime_init(cui_date_time_picker_state *state,
+                           cui_date_time_value *value) {
+    cui_date initial;
+    initial.year = 2024; initial.month = 2; initial.day = 15;
+    memset(value, 0, sizeof *value);
+    value->date = initial;
+    value->time.hour = 9; value->time.minute = 30;
+    cui_date_time_picker_init(state, 702, initial);
+}
+
+cui_date_time_picker_result example_datetime_frame(cui_context *ui,
+    const cui_theme *theme, cui_date_time_picker_state *state,
+    cui_date_time_value *value, cui_rect viewport) {
+    cui_date_time_picker_options options;
+    cui_date_time_preset preset;
+    memset(&options, 0, sizeof options);
+    memset(&preset, 0, sizeof preset);
+    preset.id = 704; preset.label = cui_string("Tomorrow");
+    preset.date.year = 2024; preset.date.month = 2; preset.date.day = 16;
+    options.picker.viewport = viewport;
+    options.precision = CUI_DATE_TIME_SECOND;
+    options.default_time.hour = 8;
+    options.presets = &preset; options.preset_count = 1;
+    options.cleanable = true;
+    options.clear_id = 703; options.clear_label = cui_string("Clear");
+    options.delete_policy = CUI_DATE_PICKER_DELETE_SCOPE;
+    return cui_date_time_picker(ui, 701, theme, cui_string("Appointment"),
+                                 state, value, options);
+}
+```
+<!-- datetime-example-end -->
+
+The local preset array is borrowed only during submission; its literal label
+remains readable for rendering. Application-owned dynamic strings must follow
+the frame lifetime rules above. Bindings and a WASM gallery mode remain separate.
+
+Styled slice validation: focused native and ASan/UBSan wrapper checks each pass
+4/4 suites; pinned WASI passes Base579 and Styled695 assertions. Base-only
+configuration passes its 579 assertions without the optional Styled source.
+Software tests cover 1–3 months, minute/second and 12/24-hour segments, actual
+popup containment, supported cell metrics/theme variants, eight presets, narrow
+rejection, draft/Tab/preset/clear behavior, and legacy TimeField memberwise
+semantics/nontext pixel equivalence. Existing date-only actions tests retain
+legacy zero-option picker equivalence. Guide/header compile as C11/C++11.
+These are headless software/semantic checks, not browser, live-AT or GPU proof.

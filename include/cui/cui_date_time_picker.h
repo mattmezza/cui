@@ -5,7 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Base-only, single civil date/time. See docs/DATE_TIME_PICKER.md. */
+/* Single civil date/time, Base and Styled. See docs/DATE_TIME_PICKER.md. */
 typedef enum { CUI_DATE_TIME_MINUTE = 0, CUI_DATE_TIME_SECOND } cui_date_time_precision;
 typedef struct {
     cui_date date; /* All-zero means absent. No timezone or range. */
@@ -59,6 +59,11 @@ cui_date_time_picker_result cui_base_date_time_picker(cui_context *, cui_id trig
                                                       cui_date_time_picker_state *,
                                                       cui_date_time_value *,
                                                       cui_date_time_picker_options);
+/* Styled: owns the popup scope and paints Calendar/time/actions once. */
+cui_date_time_picker_result cui_date_time_picker(cui_context *, cui_id trigger, const cui_theme *,
+                                                 cui_str name, cui_date_time_picker_state *,
+                                                 cui_date_time_value *,
+                                                 cui_date_time_picker_options);
 /* Inside caller's one open popup scope AFTER Base reduction: semantics only.
  * Submit Calendar separately. Neither helper reduces input or begins a scope. */
 void cui_date_time_picker_submit_time(cui_context *, cui_id time, cui_date_time_picker_state *,

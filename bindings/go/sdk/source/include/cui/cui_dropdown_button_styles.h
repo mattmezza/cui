@@ -18,7 +18,8 @@ typedef enum {
  * container patch rejects before reduction/state changes. Invalid callback
  * output discards its whole patch without undoing accepted activations.
  * Descriptors copied at entry. Functions/user/current/info/out are synchronous
- * borrowed and pure: no CUI calls, input consumption, mutation or reentry.
+ * borrowed and pure: no CUI calls, input consumption, owner/options/styles
+ * mutation or reentry. Only the output patch changes the submitted paint.
  * Instance runs once per visible half; its captured value replays after
  * selected/disabled. Hidden halves invoke no callback. Old body still runs once.
  * BUTTON suppresses pointer paint for selected/open/loading/disabled; trigger

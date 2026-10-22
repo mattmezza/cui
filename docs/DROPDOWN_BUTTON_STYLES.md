@@ -36,7 +36,8 @@ Initialize the caller-owned menu once with `cui_menu_tree_init(menu, 103)`.
 Names, menu entries, callbacks and userdata follow the existing submission and
 menu ownership rules. Style descriptors are copied before reduction; callback
 arguments are borrowed for the synchronous call. Callbacks must be pure: no CUI
-calls, input consumption, mutation or reentry. The legacy body still runs once,
+calls, input consumption, owner/options/style mutation or reentry. Only the
+output patch changes the submitted paint. The legacy body still runs once,
 after the same Base/event reduction; this API does not invoke Button reduction.
 
 Each visible half gets an independent Button-style instance callback, then its

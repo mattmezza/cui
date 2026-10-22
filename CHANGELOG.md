@@ -15,6 +15,10 @@
   SDL3 and Canvas consume bounded analytic meshes with pixel and recovery tests;
   exact reference rasterization, untested native drivers and positioning builders
   remain outside the verified scope.
+- Adds independent DropdownButton paint refinements and explicit custom-shadow
+  gates, with desktop/touch gallery controls and compilable usage. Null/zero
+  descriptors retain the legacy path. New paint options are C-only; metadata,
+  toggle and source theme-token parity remain incomplete.
 - Adds opt-in date-only DatePicker presets, clear/Delete actions and an interactive
   desktop/touch gallery mode. Legacy date-only APIs remain available.
 - Adds bounded Questionnaire copy-out snapshots, keyboard shortcut policies and
@@ -33,7 +37,8 @@
 - Rebuild C consumers and bindings with matching headers and libraries:
   `cui_questionnaire_state` gained an observer pointer. Language builders do not
   expose the new C observer/payload arenas, Questionnaire presentation/geometry options,
-  DateTime/DatePicker action options or explicit Popover positioning.
+  DateTime/DatePicker action options, explicit Popover positioning or split-button
+  paint refinements.
 - Release artifacts and registry publication are not yet available for alpha.3.
   All 78 catalog families remain present; full feature parity is unfinished.
 

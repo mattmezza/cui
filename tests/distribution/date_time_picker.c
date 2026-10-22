@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #ifdef CUI_DATETIME_ALL
+#ifndef CUI_DIST_ALL_SHARED
 #define CUI_IMPLEMENTATION_ALL
+#endif
 #include "cui_all.h"
 #else
 #define CUI_IMPLEMENTATION

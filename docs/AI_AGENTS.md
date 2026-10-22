@@ -74,6 +74,12 @@ then [Layout](LAYOUT_GUIDE.md), [IDs/lifetimes](IDS_AND_LIFETIMES.md) and
 [Debugging](DEBUGGING.md). Respect Core → base → components; adapters depend on
 Core. Do not introduce platform/Clay types into public APIs.
 
+Feature umbrella distribution tests share a private implementation object;
+`dist_all` independently compiles implementation and consumer together. Standalone
+and module-entry tests remain independent. Preserve this coverage and the existing
+Release optimization, assertions and warning policy; see
+[distribution test compilation](DISTRIBUTION_TEST_BUILD.md) for the coverage tradeoff.
+
 ## Download documentation without browser rendering
 
 The built website publishes:

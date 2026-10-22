@@ -387,7 +387,7 @@ add_test(NAME popover_surface COMMAND test_popover_surface)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tests/unit/test_popover_surface.c)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/test_popover_surface.c" CUI_POPOVER_DIST_TEST)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/popover_distribution.c"
- "#define CUI_IMPLEMENTATION_ALL\n#include \"cui_all.h\"\n${CUI_POPOVER_DIST_TEST}\n")
+ "#ifndef CUI_DIST_ALL_SHARED\n#define CUI_IMPLEMENTATION_ALL\n#endif\n#include \"cui_all.h\"\n${CUI_POPOVER_DIST_TEST}\n")
 add_executable(dist_popover_surface "${CMAKE_CURRENT_BINARY_DIR}/popover_distribution.c" backends/software/cui_software.c)
 target_include_directories(dist_popover_surface PRIVATE dist include)
 if(NOT MSVC)
@@ -1930,3 +1930,23 @@ if(CUI_BUILD_CPP_EXAMPLE AND CMAKE_CXX_COMPILER)
  set_property(TARGET test_stepper_visual_header PROPERTY CXX_STANDARD 17)
  add_test(NAME stepper_visual_header COMMAND test_stepper_visual_header)
 endif()
+
+# Private test-only umbrella implementation. Never install/export this target.
+add_library(dist_all_implementation OBJECT tests/distribution/all_implementation.c)
+target_include_directories(dist_all_implementation PRIVATE dist)
+cui_warnings(dist_all_implementation)
+foreach(target
+ dist_video_controls
+ dist_dropdown_button_styles_all
+ dist_dropdown_button_metadata_all
+ dist_questionnaire_geometry_all
+ dist_questionnaire_presentation_all
+ dist_questionnaire_progress
+ dist_questionnaire_observer
+ dist_date_time_all
+ dist_stepper_visual_all
+ dist_popover_surface)
+ target_compile_definitions(${target} PRIVATE CUI_DIST_ALL_SHARED=1)
+ target_link_libraries(${target} PRIVATE dist_all_implementation)
+endforeach()
+add_test(NAME distribution_shared_policy COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_distribution_shared.py)

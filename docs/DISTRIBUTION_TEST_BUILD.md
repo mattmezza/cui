@@ -30,3 +30,10 @@ checks. No Windows improvement is established until subsequent CI measurements.
 Alternatives are retaining all repeated compilations (maximum same-TU coverage)
 or adding compiled-output caches (more invalidation and provenance complexity).
 Lowering optimization or dropping runtime/standalone tests is excluded.
+
+A local fresh Ninja Release sample on Linux/GCC 16 built only VideoControls and
+Stepper ALL targets with parallelism 2: before consolidation 130.277 seconds;
+after consolidation 118.969 seconds. Both configurations kept `-O3`, `-UNDEBUG`,
+strict C11 and the existing warnings. This is one wall-clock sample on a shared
+host, not a controlled benchmark or a Windows speedup claim. The after sample
+includes compiling the shared provider once; later feature consumers reuse it.

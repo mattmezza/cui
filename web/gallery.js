@@ -20,6 +20,56 @@ function shareRoute(path,raw,title,description){
  document.querySelector('link[rel=canonical]')?.setAttribute('href',canonical);
  for(const [selector,value] of [['meta[name=description]',description],['meta[property="og:title"]',title],['meta[property="og:description"]',description],['meta[property="og:url"]',canonical],['meta[name="twitter:title"]',title],['meta[name="twitter:description"]',description]])document.querySelector(selector)?.setAttribute('content',value);
 }
+const questionnaireProgressControl=document.createElement('select');
+questionnaireProgressControl.id='questionnaire-progress';questionnaireProgressControl.hidden=true;
+questionnaireProgressControl.setAttribute('aria-label','Questionnaire progress presentation');
+for(const [value,label] of [['0','Default progress'],['1','Localized progress'],['2','Short visible count'],['3','Decorative progress'],['4','Text metrics']]){
+ const option=document.createElement('option');option.value=value;option.textContent=label;questionnaireProgressControl.append(option);
+}
+$('questionnaire-size').after(questionnaireProgressControl);
+questionnaireProgressControl.addEventListener('change',requestFrame);
+function questionnaireProgressUsage(mode){
+ if(!mode)return null;
+ const custom=mode===3?`static void progress_child(cui_context *ui, cui_id id,
+        const cui_questionnaire_progress_view *view, void *user) {
+    progress_text *storage = user;
+    cui_begin_box(ui, id, (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});
+    cui_text_ex(ui, cui_string(storage->visible), view->font_size,
+                view->color, view->line_height, view->style);
+    cui_color track = view->color; track.a = 32;
+    cui_begin_box(ui, 0, (cui_box){.width = 96, .height = 4, .background = track});
+    cui_begin_box(ui, 0, (cui_box){.width = view->total ? 96.f * (float)view->current / (float)view->total : 0,
+                                  .height = 4, .background = view->color});
+    cui_end_box(ui); cui_end_box(ui); cui_end_box(ui);
+}
+`:'';
+ const refinement=mode===2?`    p.fields |= CUI_QUESTIONNAIRE_PROGRESS_VISIBLE;
+    p.visible = (cui_str){storage->visible, (size_t)b};`:mode===3?`    p.render_child = progress_child;
+    p.render_user = storage;`:mode===4?`    p.text = (cui_questionnaire_text_refinement){
+        .fields = CUI_QUESTIONNAIRE_TEXT_SIZE | CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT |
+                  CUI_QUESTIONNAIRE_TEXT_STYLE,
+        .font_size = 18, .line_height = 28, .style = {.weight = CUI_TEXT_WEIGHT_NORMAL}};`:'';
+ return `#include <cui/cui_questionnaire_progress.h>
+#include <stdio.h>
+/* Retain storage through completed-frame draw/semantic consumption. */
+typedef struct { char label[96], visible[48]; } progress_text;
+${custom}
+bool draw_progress(cui_context *ui, cui_id id, const cui_theme *theme,
+                   const cui_questionnaire_state *state, progress_text *storage) {
+    size_t position = cui_questionnaire_position(state);
+    size_t current = position == SIZE_MAX ? 0 : position + 1;
+    size_t total = cui_questionnaire_total(state);
+    int a = snprintf(storage->label, sizeof storage->label, "Frage %zu von %zu", current, total);
+    int b = snprintf(storage->visible, sizeof storage->visible, "%zu / %zu", current, total);
+    if (a < 0 || (size_t)a >= sizeof storage->label || b < 0 || (size_t)b >= sizeof storage->visible)
+        return false;
+    cui_questionnaire_progress_options p = {
+        .fields = CUI_QUESTIONNAIRE_PROGRESS_LABEL, .label = {storage->label, (size_t)a}};
+${refinement}
+    return cui_questionnaire_progress_ex(ui, id, theme, state,
+                                          (cui_questionnaire_options){0}, p);
+}`;
+}
 const canvas = $('preview'), ctx = canvas.getContext('2d');
 const iconLayoutControl=document.createElement('select');iconLayoutControl.id='icon-layout';
 iconLayoutControl.hidden=true;iconLayoutControl.setAttribute('aria-label','Icon box styling');
@@ -601,6 +651,7 @@ function render(){
  wasm.gallery_chart_appearance(Number($('chart-tooltip-appearance').value));
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));
  wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),$('questionnaire-shortcuts').checked?Number($('questionnaire-numbers').checked):-1,Number($('questionnaire-custom').checked));
+ wasm.gallery_questionnaire_progress_mode(Number($('questionnaire-progress').value));
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
@@ -687,6 +738,7 @@ function render(){
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
  if(selected.name==='DatePicker')$('snippet').textContent=wasm.gallery_control_stats(7)?dateActionsSnippet(Boolean(wasm.gallery_control_stats(8))):snippets.DatePicker;
+ if(selected.name==='Questionnaire')$('snippet').textContent=questionnaireProgressUsage(Number($('questionnaire-progress').value))||snippets.Questionnaire;
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));
  if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
@@ -924,8 +976,8 @@ function selectComponent(){
  for(const id of ['settings-size','settings-variant'])$(id).hidden=selected.name!=='Settings';
  for(const id of ['carousel-axis','carousel-loop-control'])$(id).hidden=selected.name!=='Carousel';
  for(const id of ['speech-size','speech-unavailable-control'])$(id).hidden=selected.name!=='Speech';
- for(const id of ['questionnaire-size','questionnaire-shortcuts-control','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
- $('questionnaire-size').value='0';$('questionnaire-shortcuts').checked=true;$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
+ for(const id of ['questionnaire-progress','questionnaire-size','questionnaire-shortcuts-control','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
+ $('questionnaire-progress').value='0';$('questionnaire-size').value='0';$('questionnaire-shortcuts').checked=true;$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
  $('speech-size').value='0';$('speech-unavailable').checked=false;
  for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control','chart-custom-rows-control','chart-tooltip-appearance'])$(id).hidden=selected.name!=='Chart';
  $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;$('chart-custom-rows').checked=false;$('chart-tooltip-appearance').value='0';

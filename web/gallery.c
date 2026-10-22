@@ -32,6 +32,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_questionnaire_keyboard.h"
+#include "cui/cui_questionnaire_progress.h"
 #include "cui/cui_radio_group.h"
 #include "cui/cui_resizable.h"
 #include "cui/cui_root.h"
@@ -296,7 +297,9 @@ static char questionnaire_input_buffer[128];
 static cui_edit *questionnaire_edit;
 static cui_questionnaire_input_state questionnaire_input_view;
 static unsigned questionnaire_events[4];
-static int questionnaire_size, questionnaire_numbers, questionnaire_custom;
+static int questionnaire_size, questionnaire_numbers, questionnaire_custom,
+    questionnaire_progress_mode;
+static char questionnaire_progress_label[96], questionnaire_progress_visible[48];
 static const cui_questionnaire_choice questionnaire_choices[] = {
     {.value = {"build", 5},
      .label = {"Build a native app", 18},
@@ -343,6 +346,59 @@ void gallery_questionnaire_options(int size, int numbers, int custom) {
     questionnaire_size = size >= 0 && size <= 3 ? size : 0;
     questionnaire_numbers = numbers < 0 ? -1 : numbers != 0;
     questionnaire_custom = custom != 0;
+}
+void gallery_questionnaire_progress_mode(int mode) {
+    questionnaire_progress_mode = mode >= 0 && mode <= 4 ? mode : 0;
+}
+static void questionnaire_progress_child(cui_context *context, cui_id id,
+                                         const cui_questionnaire_progress_view *view, void *user) {
+    (void)user;
+    cui_begin_box(context, id, (cui_box){.row = true, .gap = 8, .align_y = CUI_ALIGN_CENTER});
+    cui_text_ex(context, cui_string(questionnaire_progress_visible), view->font_size, view->color,
+                view->line_height, view->style);
+    cui_color track = view->color;
+    track.a = 32;
+    cui_begin_box(context, 0, (cui_box){.width = 96, .height = 4, .background = track});
+    cui_begin_box(
+        context, 0,
+        (cui_box){.width = view->total ? 96.f * (float)view->current / (float)view->total : 0,
+                  .height = 4,
+                  .background = view->color});
+    cui_end_box(context);
+    cui_end_box(context);
+    cui_end_box(context);
+}
+static void gallery_questionnaire_progress(cui_id id, const cui_theme *theme,
+                                           cui_questionnaire_options options) {
+    if (!questionnaire_progress_mode) {
+        cui_questionnaire_progress(ui, id, theme, &questionnaire_state, options);
+        return;
+    }
+    size_t position = cui_questionnaire_position(&questionnaire_state);
+    size_t current = position == SIZE_MAX ? 0 : position + 1;
+    size_t total = cui_questionnaire_total(&questionnaire_state);
+    int a = snprintf(questionnaire_progress_label, sizeof questionnaire_progress_label,
+                     "Frage %zu von %zu", current, total);
+    int b = snprintf(questionnaire_progress_visible, sizeof questionnaire_progress_visible,
+                     "%zu / %zu", current, total);
+    if (a < 0 || (size_t)a >= sizeof questionnaire_progress_label || b < 0 ||
+        (size_t)b >= sizeof questionnaire_progress_visible)
+        return;
+    cui_questionnaire_progress_options p = {.fields = CUI_QUESTIONNAIRE_PROGRESS_LABEL,
+                                            .label = {questionnaire_progress_label, (size_t)a}};
+    if (questionnaire_progress_mode == 2) {
+        p.fields |= CUI_QUESTIONNAIRE_PROGRESS_VISIBLE;
+        p.visible = (cui_str){questionnaire_progress_visible, (size_t)b};
+    } else if (questionnaire_progress_mode == 3)
+        p.render_child = questionnaire_progress_child;
+    else if (questionnaire_progress_mode == 4)
+        p.text = (cui_questionnaire_text_refinement){.fields = CUI_QUESTIONNAIRE_TEXT_SIZE |
+                                                               CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT |
+                                                               CUI_QUESTIONNAIRE_TEXT_STYLE,
+                                                     .font_size = 18,
+                                                     .line_height = 28,
+                                                     .style = {.weight = CUI_TEXT_WEIGHT_NORMAL}};
+    (void)cui_questionnaire_progress_ex(ui, id, theme, &questionnaire_state, options, p);
 }
 float gallery_questionnaire_stats(int field) {
     return field == 0    ? (float)questionnaire_state.current
@@ -3548,8 +3604,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                      : CUI_QUESTIONNAIRE_SHORTCUT_LETTERS};
         if (cui_questionnaire_begin_with_keyboard(ui, root_id, &t, &questionnaire_state, options,
                                                   &keyboard)) {
-            cui_questionnaire_progress(ui, cui_id_from(ui, "questionnaire-progress"), &t,
-                                       &questionnaire_state, options);
+            gallery_questionnaire_progress(cui_id_from(ui, "questionnaire-progress"), &t, options);
             if (cui_questionnaire_item_begin(ui, cui_id_from(ui, "questionnaire-item"),
                                              &questionnaire_state, item, options)) {
                 cui_questionnaire_heading(ui, cui_id_from(ui, "questionnaire-heading"), &t,

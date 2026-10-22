@@ -19,6 +19,12 @@
   desktop/touch gallery mode. Legacy date-only APIs remain available.
 - Adds bounded Questionnaire copy-out snapshots, keyboard shortcut policies and
   persistent typed observation with explicit payload, nesting and lifetime rules.
+- Adds Avatar metrics, identity palettes, SVG placeholders and typed activation
+  observers, including ordered stack-child observation.
+- Adds reusable VideoPlayer defaults, seek icons, player-only browser fullscreen
+  and an audible browser sample.
+- Adds an optional macOS Speech transport with injected Apple SDK tests; physical
+  microphone/permission acceptance and Linux/Windows recognizers remain unverified.
 - Adds an optional native FFmpeg/SDL video-audio example with a local bounded
   fixture; this does not imply general codec, device or platform acceptance.
 - Fixes source-package configuration when documentation examples are absent, and

@@ -1,18 +1,27 @@
 # Prerelease preparation: v0.1.0-alpha.3
 
-This document prepares **v0.1.0-alpha.3**; it is not evidence that publication
-has occurred or that the release source is frozen. The current development batch
-adds opt-in Avatar metrics, identity palettes, SVG placeholders and language
-bindings, further large-document Editor improvements, and an optional bounded
-SDL audio-input host example. It also adds reusable compact VideoPlayer defaults,
-embedded seek icons, player-only browser fullscreen and an audible browser sample.
-The appended controls-options field requires rebuilding C consumers against
-matching headers and library. Native speech recognition remains separate work;
-no physical microphone or platform recognizer acceptance is implied. These
-additions preserve the original 78 baseline. Full feature parity and uniform
-foreign event coverage are not claimed. Final integrated validation, source
-freeze and artifact checks remain pending. Final release notes must describe the
-actual frozen commit and distinguish completed APIs from proposals.
+This document prepares **v0.1.0-alpha.3**. It does not establish publication,
+a frozen release revision or validated release artifacts. The current batch adds
+civil DateTime selection, date-only picker actions, Questionnaire observations,
+snapshots, keyboard policies, progress, presentation and checked geometry, plus
+explicit Popover anchors/arrows. SDL3 and the browser gallery gain bounded
+analytic mesh consumers with pixel and failure-path evidence. The gallery has
+actual desktop/touch controls and compiled usage examples for the new options.
+
+The batch also includes Avatar metrics, identity palettes, SVG placeholders and
+typed activation observers; reusable VideoPlayer defaults, seek icons,
+player-only browser fullscreen and an audible sample; and optional bounded
+native video/audio and macOS Speech host integrations. Injected Apple fixtures
+are separate from physical microphone, permission and recognizer acceptance.
+Linux/Windows speech recognizers and broader native media support remain gaps.
+
+Rebuild consumers with matching headers and libraries: the Questionnaire state
+and several by-value options changed since alpha.2. Read the current binding
+coverage for C-only options; source packaging does not imply equivalent foreign
+APIs or registry publication. All 78 baseline families remain present, with
+feature-level omissions documented. Full parity is unfinished. Final integrated
+validation, release source freeze and artifact checks remain pending. Describe
+the actual frozen revision and supported subset in the published release notes.
 
 Published alpha.2 (`v0.1.0-alpha.2`, Python `0.1.0a2`) remains immutable. This document prepares the next development version, not another publication claim.
 

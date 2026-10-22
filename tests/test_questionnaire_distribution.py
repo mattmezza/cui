@@ -45,7 +45,7 @@ class QuestionnaireDistributionTests(unittest.TestCase):
                     (output / (name + '.h')).write_text(generator.generate(name, sources), encoding='utf-8')
             for name in ('cui_platform.h', 'cui_renderer.h'):
                 (output / name).write_bytes((ROOT / 'include/cui' / name).read_bytes())
-            for entry in ('cui_questionnaire', 'cui_questionnaire_keyboard', 'cui_questionnaire_snapshots'):
+            for entry in ('cui_questionnaire', 'cui_questionnaire_keyboard', 'cui_questionnaire_snapshots', 'cui_questionnaire_observer'):
                 with self.subTest(entry=entry):
                     source = output / 'questionnaire.c'
                     source.write_text(f'#define {entry.upper()}_IMPLEMENTATION\n#include "{entry}.h"\n', encoding='utf-8')
@@ -56,7 +56,7 @@ class QuestionnaireDistributionTests(unittest.TestCase):
             cxx = shlex.split(os.environ.get('CXX', 'c++'))
             if cxx and shutil.which(cxx[0]):
                 source = output / 'questionnaire.cpp'
-                source.write_text('#include "cui_questionnaire_keyboard.h"\n#include "cui_questionnaire_snapshots.h"\n', encoding='utf-8')
+                source.write_text('#include "cui_questionnaire_keyboard.h"\n#include "cui_questionnaire_snapshots.h"\n#include "cui_questionnaire_observer.h"\n', encoding='utf-8')
                 result = subprocess.run(cxx + ['-std=c++11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                                               '-fsyntax-only', '-I' + directory, str(source)],
                                         text=True, capture_output=True, timeout=60)

@@ -484,7 +484,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "limitations": [
+        "Language builders omit C keyboard policies, snapshot copy-out and persistent typed observer attachment/payload/frame arenas. Packaged C sources and headers do not constitute a language event facade."
+      ]
     },
     {
       "name": "Select",

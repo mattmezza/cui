@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 typedef struct cui_questionnaire_state cui_questionnaire_state;
+typedef struct cui_questionnaire_observer cui_questionnaire_observer;
 typedef enum {
     CUI_QUESTIONNAIRE_OK,
     CUI_QUESTIONNAIRE_INVALID,
@@ -94,6 +95,10 @@ struct cui_questionnaire_state {
     size_t pending_item;
     double pending_deadline;
     bool initialized, complete, pending_confirm;
+    /* Optional caller-owned attachment. ABI extension: rebuild consumers with
+     * matching headers/library. Init clears this; reset retains it. Configure
+     * only via cui_questionnaire_observer APIs, not by writing/copying this field. */
+    cui_questionnaire_observer *observer;
 };
 /* Definitions/editors and workspace outlive state. No allocation. Empty schemas
  * are valid. All storage regions must be disjoint. Index SIZE_MAX means none. */

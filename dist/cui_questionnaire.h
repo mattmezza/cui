@@ -9,6 +9,7 @@
 extern "C" {
 #endif
 typedef struct cui_questionnaire_state cui_questionnaire_state;
+typedef struct cui_questionnaire_observer cui_questionnaire_observer;
 typedef enum {
     CUI_QUESTIONNAIRE_OK,
     CUI_QUESTIONNAIRE_INVALID,
@@ -95,6 +96,10 @@ struct cui_questionnaire_state {
     size_t pending_item;
     double pending_deadline;
     bool initialized, complete, pending_confirm;
+    /* Optional caller-owned attachment. ABI extension: rebuild consumers with
+     * matching headers/library. Init clears this; reset retains it. Configure
+     * only via cui_questionnaire_observer APIs, not by writing/copying this field. */
+    cui_questionnaire_observer *observer;
 };
 /* Definitions/editors and workspace outlive state. No allocation. Empty schemas
  * are valid. All storage regions must be disjoint. Index SIZE_MAX means none. */
@@ -305,8 +310,34 @@ bool cui_questionnaire_choice_control(cui_context *, cui_id, const cui_theme *,
 #define CUI_QUESTIONNAIRE_IMPLEMENTATION_ONCE
 #include "cui_components.h"
 #include "cui_questionnaire_keyboard.h"
+#include "cui_questionnaire_observer.h"
+#ifndef CUI_QUESTIONNAIRE_SNAPSHOTS_IMPLEMENTATION
+#define CUI_QUESTIONNAIRE_SNAPSHOTS_IMPLEMENTATION
+#endif
+#include "cui_questionnaire_snapshots.h"
+#ifndef CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION
+#define CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION
+#endif
+#include "cui_questionnaire_observer.h"
 /* src/base/cui_questionnaire.c */
 /* SPDX-License-Identifier: MIT */
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_QUESTIONNAIRE_OBSERVER_INTERNAL_H
+#define CUI_QUESTIONNAIRE_OBSERVER_INTERNAL_H
+
+typedef struct {
+    cui_questionnaire_observer *observer;
+    cui_questionnaire_observation payload;
+    bool frame;
+} cui_questionnaire_observation_scope;
+cui_questionnaire_observation_scope
+cui_questionnaire_observation_begin(cui_questionnaire_state *, cui_questionnaire_event_kind,
+                                    size_t item, size_t previous);
+void cui_questionnaire_observation_deliver(cui_questionnaire_observation_scope *,
+                                           cui_questionnaire_event_kind);
+void cui_questionnaire_observation_end(cui_questionnaire_observation_scope *);
+#endif
 
 #include <math.h>
 #include <string.h>
@@ -333,10 +364,20 @@ static bool cui_questionnaire_blank(cui_str t) {
     }
     return true;
 }
-static void cui_questionnaire_emit(cui_questionnaire_state *s, cui_questionnaire_event_kind kind,
-                                   size_t item, size_t previous) {
+static void cui_questionnaire_emit_scope(cui_questionnaire_state *s,
+                                         cui_questionnaire_event_kind kind, size_t item,
+                                         size_t previous,
+                                         cui_questionnaire_observation_scope *scope) {
+    cui_questionnaire_observation_deliver(scope, kind);
     if (s->event)
         s->event(s, (cui_questionnaire_event){kind, item, previous}, s->event_user);
+}
+static void cui_questionnaire_emit(cui_questionnaire_state *s, cui_questionnaire_event_kind kind,
+                                   size_t item, size_t previous) {
+    cui_questionnaire_observation_scope scope =
+        cui_questionnaire_observation_begin(s, kind, item, previous);
+    cui_questionnaire_emit_scope(s, kind, item, previous, &scope);
+    cui_questionnaire_observation_end(&scope);
 }
 size_t cui_questionnaire_find(const cui_questionnaire_state *s, cui_str name) {
     if (s && s->initialized)
@@ -802,11 +843,14 @@ bool cui_questionnaire_submit(cui_questionnaire_state *s) {
         cui_questionnaire_current(s, first, true);
         return false;
     }
+    cui_questionnaire_observation_scope scope =
+        cui_questionnaire_observation_begin(s, CUI_QUESTIONNAIRE_SUBMIT, SIZE_MAX, SIZE_MAX);
     if (!s->complete) {
         s->complete = true;
-        cui_questionnaire_emit(s, CUI_QUESTIONNAIRE_COMPLETED, SIZE_MAX, SIZE_MAX);
+        cui_questionnaire_emit_scope(s, CUI_QUESTIONNAIRE_COMPLETED, SIZE_MAX, SIZE_MAX, &scope);
     }
-    cui_questionnaire_emit(s, CUI_QUESTIONNAIRE_SUBMIT, SIZE_MAX, SIZE_MAX);
+    cui_questionnaire_emit_scope(s, CUI_QUESTIONNAIRE_SUBMIT, SIZE_MAX, SIZE_MAX, &scope);
+    cui_questionnaire_observation_end(&scope);
     return true;
 }
 bool cui_questionnaire_confirm(cui_questionnaire_state *s) {

@@ -67,8 +67,8 @@ typedef struct {
     size_t shadow_count;
     cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
 } cui_popover_style;
-/* Geometry-only API: these options are not yet consumed by surface_begin.
- * No public surface struct ABI changes in this geometry-only slice. */
+/* Additive positioning options consumed by cui_popover_begin only.
+ * Existing surface options/state struct ABI and surface_begin are unchanged. */
 typedef enum {
     CUI_POPOVER_POSITION_LEGACY = 0,
     CUI_POPOVER_POSITION_ANCHOR
@@ -139,6 +139,11 @@ typedef struct {
     cui_popover_appearance popover_appearance;
     cui_popover_refinement popover_refinement;
 } cui_surface_options;
+/* Pure surface defaults + placement. LEGACY ignores every other position field
+ * and delegates existing Popover geometry. ANCHOR uses finite width/height <=0
+ * defaults420/260 without shrinking; margin must be finite nonnegative. Failure
+ * leaves output untouched. options.anchor is the current-frame trigger bounds. */
+bool cui_popover_surface_geometry(cui_surface_options, cui_popover_position, cui_rect *out);
 void cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
 void cui_surface_open(cui_context *, cui_surface_state *, cui_id trigger);
 void cui_surface_close(cui_context *, cui_surface_state *, cui_surface_result);
@@ -148,7 +153,8 @@ cui_surface_result cui_surface_take_result(cui_surface_state *);
 cui_rect cui_surface_geometry(cui_surface_kind, cui_surface_options);
 cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_options);
 cui_rect cui_surface_resize_bounds(const cui_surface_state *, cui_surface_options);
-/* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport, 7 body content. */
+/* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport,
+ * 7 body content, 8 passive arrow paint portal (no semantics/input). */
 cui_id cui_surface_part_id(cui_id, unsigned part);
 /* Reduction precedes submission. Animated sheets retain their modal through exit. */
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
@@ -161,6 +167,22 @@ void cui_base_surface_submit_body(cui_context *, cui_surface_state *);
 /* Caller composes arbitrary children, then ends the surface. */
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);
+/* Opt-in source anchor/offset/arrow consumption; requires POPOVER state. LEGACY
+ * delegates surface_begin and ignores inactive position fields. Balance true
+ * with surface_end. Invalid active geometry returns false before state update.
+ * Arrow is decoration only: panel-only hit/dismiss/semantic bounds are retained.
+ * Arrow fill follows refinement (NONE without explicit background uses popover);
+ * 1px theme-text alpha26 outline is omitted for NONE. Corner inset uses theme
+ * radius, not refined radius. Arrow clips to options.viewport and host viewport,
+ * inherits panel opacity, paints after panel contents at its layer. Logical
+ * positioning retains fractions; no host pixel snapping. Portable bounded-miter
+ * mesh raster/AA differs from GPUI PathBuilder; exact pixel parity is not claimed.
+ * Arrow payload/paint-command capacity failure balances internal boxes and
+ * suppresses frame draw output. Layout-node capacity follows the existing Core
+ * contract (balanced failure, potentially partial ordinary paint). Later frames
+ * may retry. No legacy public struct ABI change. */
+bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
+                       cui_str description, cui_surface_options, cui_popover_position);
 void cui_surface_end(cui_context *);
 /* Close the body and begin a fixed footer row; surface_end closes the footer. */
 void cui_surface_footer_begin(cui_context *, const cui_theme *);
@@ -411,6 +433,22 @@ cui_rect cui_surface_geometry(cui_surface_kind kind, cui_surface_options o) {
                           width, area.h};
     }
     return (cui_rect){area.x + (area.w - width) / 2, area.y + (area.h - height) / 2, width, height};
+}
+bool cui_popover_surface_geometry(cui_surface_options o, cui_popover_position p, cui_rect *out) {
+    if (!out)
+        return false;
+    if (p.mode == CUI_POPOVER_POSITION_LEGACY) {
+        cui_rect next = cui_surface_geometry(CUI_SURFACE_POPOVER, o);
+        if (!cui_popover_rect(next, true))
+            return false;
+        *out = next;
+        return true;
+    }
+    if (!isfinite(o.width) || !isfinite(o.height))
+        return false;
+    return cui_popover_position_resolve(o.anchor,
+        (cui_size){o.width > 0 ? o.width : 420, o.height > 0 ? o.height : 260},
+        o.viewport, o.margin, p, out);
 }
 static bool cui_surface_vertical_sheet(cui_surface_options o) {
     return o.edge == CUI_SHEET_TOP || o.edge == CUI_SHEET_BOTTOM;
@@ -677,6 +715,158 @@ void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
 
 
 #include <math.h>
+#include <string.h>
+/* SPDX-License-Identifier: MIT */
+/* Private fixed-size frame-copy payload. No contained borrowed pointers. */
+typedef struct {
+    cui_mesh_vertex fill[15], outline[60];
+    size_t fill_count, outline_count;
+    cui_rect join;
+    cui_color background;
+    cui_linear_color fill_color, outline_color;
+} cui_popover_paint;
+static float cui_popover_channel(unsigned char channel) {
+    float c = channel / 255.0f;
+    return c <= .04045f ? c / 12.92f : powf((c + .055f) / 1.055f, 2.4f);
+}
+static cui_linear_color cui_popover_linear(cui_color c) {
+    float a = c.a / 255.0f;
+    return (cui_linear_color){cui_popover_channel(c.r) * a, cui_popover_channel(c.g) * a,
+                              cui_popover_channel(c.b) * a, a};
+}
+static cui_rect cui_popover_intersection(cui_rect a, cui_rect b) {
+    float x = fmaxf(a.x, b.x), y = fmaxf(a.y, b.y);
+    return (cui_rect){x, y, fmaxf(0, fminf(a.x + a.w, b.x + b.w) - x),
+                      fmaxf(0, fminf(a.y + a.h, b.y + b.h) - y)};
+}
+/* A triangle clipped by four rectangle half-planes has at most seven vertices.
+ * Fan triangulation therefore needs at most15 output vertices. */
+static bool cui_popover_clip_triangle(cui_popover_point a, cui_popover_point b, cui_popover_point c,
+                                      cui_rect viewport, cui_mesh_vertex *vertices, size_t capacity,
+                                      size_t *used) {
+    cui_popover_point polygon[8] = {a, b, c}, scratch[8];
+    size_t count = 3;
+    for (unsigned edge = 0; edge < 4 && count; ++edge) {
+        size_t next = 0;
+        double limit = edge == 0   ? viewport.x
+                       : edge == 1 ? (double)viewport.x + viewport.w
+                       : edge == 2 ? viewport.y
+                                   : (double)viewport.y + viewport.h;
+        for (size_t i = 0; i < count; ++i) {
+            cui_popover_point from = polygon[i], to = polygon[(i + 1) % count];
+            double f = edge < 2 ? from.x : from.y, t = edge < 2 ? to.x : to.y;
+            bool inside_f = edge == 0 || edge == 2 ? f >= limit : f <= limit;
+            bool inside_t = edge == 0 || edge == 2 ? t >= limit : t <= limit;
+            if (inside_f != inside_t) {
+                double weight = (limit - f) / (t - f);
+                cui_popover_point crossing = {(float)(from.x + ((double)to.x - from.x) * weight),
+                                              (float)(from.y + ((double)to.y - from.y) * weight)};
+                if (next == 8)
+                    return false;
+                scratch[next++] = crossing;
+            }
+            if (inside_t) {
+                if (next == 8)
+                    return false;
+                scratch[next++] = to;
+            }
+        }
+        memcpy(polygon, scratch, next * sizeof(*polygon));
+        count = next;
+    }
+    if (count < 3)
+        return true;
+    if ((count - 2) * 3 > capacity - *used)
+        return false;
+    for (size_t i = 1; i + 1 < count; ++i) {
+        cui_popover_point points[3] = {polygon[0], polygon[i], polygon[i + 1]};
+        for (unsigned j = 0; j < 3; ++j)
+            vertices[(*used)++] = (cui_mesh_vertex){points[j].x, points[j].y, 0, 1};
+    }
+    return true;
+}
+static bool cui_popover_paint_build(cui_rect surface, cui_rect trigger, cui_rect viewport,
+                                    cui_popover_position p, const cui_theme *theme,
+                                    cui_popover_style style, cui_surface_options options,
+                                    cui_popover_paint *out) {
+    float rem = p.reference_rem == 0 ? 16 : p.reference_rem;
+    cui_popover_arrow_geometry geometry;
+    if (!cui_popover_arrow_resolve(surface, trigger, p.anchor, rem * .375f, theme->radius,
+                                   &geometry))
+        return false;
+    *out = (cui_popover_paint){0};
+    out->background = options.popover_appearance == CUI_POPOVER_APPEARANCE_NONE &&
+                              !(options.popover_refinement.flags & CUI_POPOVER_REFINE_BACKGROUND)
+                          ? theme->popover
+                          : style.background;
+    out->fill_color = cui_popover_linear(out->background);
+    out->outline_color =
+        cui_popover_linear((cui_color){theme->text.r, theme->text.g, theme->text.b, 26});
+    out->join = cui_popover_intersection(geometry.join, viewport);
+    cui_popover_point *v = geometry.points;
+    if (!cui_popover_clip_triangle(v[0], v[1], v[2], viewport, out->fill, 15, &out->fill_count))
+        return false;
+    if (options.popover_appearance == CUI_POPOVER_APPEARANCE_NONE)
+        return true;
+    double dx1 = (double)v[1].x - v[0].x, dy1 = (double)v[1].y - v[0].y;
+    double dx2 = (double)v[2].x - v[1].x, dy2 = (double)v[2].y - v[1].y;
+    double length1 = hypot(dx1, dy1), length2 = hypot(dx2, dy2);
+    if (length1 == 0 || length2 == 0)
+        return true;
+    double nx1 = -dy1 / length1 * .5, ny1 = dx1 / length1 * .5;
+    double nx2 = -dy2 / length2 * .5, ny2 = dx2 / length2 * .5;
+    double denom = 1 + 4 * (nx1 * nx2 + ny1 * ny2);
+    double mx = denom > 0 ? (nx1 + nx2) / denom : 0;
+    double my = denom > 0 ? (ny1 + ny2) / denom : 0;
+    double miter = hypot(mx, my);
+    if (miter > 2) {
+        mx *= 2 / miter;
+        my *= 2 / miter;
+    }
+    cui_popover_point strip[6] = {{(float)(v[0].x + nx1), (float)(v[0].y + ny1)},
+                                  {(float)(v[0].x - nx1), (float)(v[0].y - ny1)},
+                                  {(float)(v[1].x + mx), (float)(v[1].y + my)},
+                                  {(float)(v[1].x - mx), (float)(v[1].y - my)},
+                                  {(float)(v[2].x + nx2), (float)(v[2].y + ny2)},
+                                  {(float)(v[2].x - nx2), (float)(v[2].y - ny2)}};
+    const unsigned indices[12] = {0, 1, 2, 1, 3, 2, 2, 3, 4, 3, 5, 4};
+    for (unsigned i = 0; i < 12; i += 3)
+        if (!cui_popover_clip_triangle(strip[indices[i]], strip[indices[i + 1]],
+                                       strip[indices[i + 2]], viewport, out->outline, 60,
+                                       &out->outline_count))
+            return false;
+    return true;
+}
+static bool cui_popover_paint_callback(const cui_prepaint_info *info, const void *copied,
+                                       cui_prepaint_writer *writer) {
+    const cui_popover_paint *p = copied;
+    (void)info; /* Input eligibility does not suppress visual decoration. */
+    if (p->fill_count) {
+        cui_draw_command fill = {.type = CUI_DRAW_MESH,
+                                 .mesh = {.vertices = p->fill,
+                                          .vertex_count = p->fill_count,
+                                          .scale = 1,
+                                          .color = p->fill_color}};
+        if (!cui_prepaint_emit(writer, &fill, false))
+            return false;
+    }
+    if (p->join.w > 0 && p->join.h > 0) {
+        cui_draw_command join = {.type = CUI_DRAW_RECT, .bounds = p->join, .color = p->background};
+        if (!cui_prepaint_emit(writer, &join, false))
+            return false;
+    }
+    if (p->outline_count) {
+        cui_draw_command outline = {.type = CUI_DRAW_MESH,
+                                    .mesh = {.vertices = p->outline,
+                                             .vertex_count = p->outline_count,
+                                             .scale = 1,
+                                             .color = p->outline_color}};
+        if (!cui_prepaint_emit(writer, &outline, false))
+            return false;
+    }
+    return true;
+}
+
 bool cui_popover_style_resolve(const cui_theme *t, cui_popover_appearance appearance,
                                cui_popover_refinement r, cui_popover_style *out) {
     if (!t || !out || !cui_popover_refinement_valid(appearance, r))
@@ -780,9 +970,10 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
     cui_begin_box(ui, cui_surface_part_id(s->overlay.id, 7),
                   (cui_box){.width = width, .fixed_width = true, .gap = t->gap});
 }
-bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
-                       cui_str description, cui_surface_options o) {
-    cui_rect bounds = s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
+static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_surface_state *s,
+                                       cui_str title, cui_str description, cui_surface_options o,
+                                       const cui_rect *positioned, const cui_popover_paint *arrow) {
+    cui_rect bounds = positioned ? *positioned : s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
     if (!t || bounds.w <= 0 || bounds.h <= 0)
         return false;
     cui_popover_style style = {.background = t->surface,
@@ -810,7 +1001,7 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
         entry->theme.scrollbar = *skin;
         entry->theme.scrollbar.reduced_motion |= o.reduced_motion;
     }
-    bounds = cui_surface_current_geometry(s, o);
+    bounds = positioned ? *positioned : cui_surface_current_geometry(s, o);
     int16_t layer = o.layer > 0 && o.layer < 32766 ? o.layer : 100;
     cui_rect handle = cui_surface_resize_bounds(s, o);
     if (handle.w > 0 && handle.h > 0) {
@@ -834,6 +1025,24 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
                                .border = style.border,
                                .border_width = style.border_width},
                      bounds, (int16_t)(layer + 1));
+    if (arrow) {
+        /* A detached paint-only portal keeps the arrow outside the panel clip.
+         * Local prepaint remains visible when inert or behind another modal;
+         * deferred streams intentionally require modal input eligibility. */
+        cui_begin_portal(ui, cui_surface_part_id(s->overlay.id, 8), (cui_box){.inert = true},
+                         o.viewport, (int16_t)(layer + 1));
+        bool painted = cui_set_prepaint(ui, (cui_prepaint_options){
+            .callback = cui_popover_paint_callback, .payload = arrow,
+            .payload_bytes = sizeof(*arrow), .command_budget = 5});
+        cui_end_box(ui);
+        if (!painted) {
+            cui_end_box(ui);
+            cui_base_surface_end(ui);
+            if (stack)
+                stack->depth--;
+            return false;
+        }
+    }
     if (style.shadow_count)
         cui_set_box_shadows(
             ui, style.shadows, style.shadow_count,
@@ -859,6 +1068,26 @@ bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
         cui_surface_body_begin(ui, t, s, false, body_width);
     cui_overlay_set_bounds(&s->overlay, bounds);
     return true;
+}
+bool cui_surface_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
+                       cui_str description, cui_surface_options o) {
+    return cui_surface_begin_internal(ui, t, s, title, description, o, NULL, NULL);
+}
+bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s, cui_str title,
+                       cui_str description, cui_surface_options o, cui_popover_position p) {
+    if (!s || s->kind != CUI_SURFACE_POPOVER)
+        return false;
+    if (p.mode == CUI_POPOVER_POSITION_LEGACY)
+        return cui_surface_begin(ui, t, s, title, description, o);
+    cui_rect bounds;
+    cui_popover_style style;
+    if (!t || !cui_popover_surface_geometry(o, p, &bounds) ||
+        !cui_popover_style_resolve(t, o.popover_appearance, o.popover_refinement, &style))
+        return false;
+    cui_popover_paint paint;
+    if (p.arrow && !cui_popover_paint_build(bounds, o.anchor, o.viewport, p, t, style, o, &paint))
+        return false;
+    return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds, p.arrow ? &paint : NULL);
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)

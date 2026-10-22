@@ -863,7 +863,7 @@ API: `cui_menu_tree`, `cui_menu`. [Public header](../include/cui/cui_choice.h); 
 
 **Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
 
-**Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.
+**Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning, paired with surface_end; legacy surface_begin keeps its original placement. Arrow rendering requires a mesh-capable adapter; SDL3 support remains pending.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 

@@ -39,7 +39,9 @@ the final clamped rectangle. Read `cui_surface.h` for finite-input, overflow and
 output-preservation rules. Geometry remains fractional; host pixel snapping is
 separate.
 
-These are pure C geometry helpers in this revision. `cui_surface_begin` does not
-consume `cui_popover_position`, and these helpers do not paint arrows or change
-legacy placement. Language builders omit them. Actual surface integration remains
-unfinished; see the [design checkpoint](design/POPOVER_ANCHOR_PLAN.md).
+Use `cui_popover_begin` to apply this positioning and paint an optional arrow,
+then balance a successful begin with `cui_surface_end`. Existing
+`cui_surface_begin` retains legacy placement. See [Popover anchors](POPOVER_ANCHORS.md)
+for ownership, failure, rendering and adapter limits. SDL3 mesh support and exact
+reference raster antialiasing remain unfinished; this is scoped C support, not
+complete family or language-builder parity.

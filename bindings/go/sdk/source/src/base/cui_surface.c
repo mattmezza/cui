@@ -233,6 +233,22 @@ cui_rect cui_surface_geometry(cui_surface_kind kind, cui_surface_options o) {
     }
     return (cui_rect){area.x + (area.w - width) / 2, area.y + (area.h - height) / 2, width, height};
 }
+bool cui_popover_surface_geometry(cui_surface_options o, cui_popover_position p, cui_rect *out) {
+    if (!out)
+        return false;
+    if (p.mode == CUI_POPOVER_POSITION_LEGACY) {
+        cui_rect next = cui_surface_geometry(CUI_SURFACE_POPOVER, o);
+        if (!cui_popover_rect(next, true))
+            return false;
+        *out = next;
+        return true;
+    }
+    if (!isfinite(o.width) || !isfinite(o.height))
+        return false;
+    return cui_popover_position_resolve(o.anchor,
+        (cui_size){o.width > 0 ? o.width : 420, o.height > 0 ? o.height : 260},
+        o.viewport, o.margin, p, out);
+}
 static bool cui_surface_vertical_sheet(cui_surface_options o) {
     return o.edge == CUI_SHEET_TOP || o.edge == CUI_SHEET_BOTTOM;
 }

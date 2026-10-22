@@ -122,7 +122,7 @@ SUITES = ("date_picker_actions", "questionnaire_observer", "questionnaire_snapsh
 
 
 def source_fingerprint(root: pathlib.Path) -> str:
-    paths = list(SOURCES) + ["docs/DATE_PICKER_ACTIONS.md", "src/base/cui_questionnaire_observer_internal.h", "src/base/cui_questionnaire_snapshot_math.h", "src/base/cui_color_hsla_entry_internal.h", "tests/distribution/color_hsla_entry.c","src/base/cui_color_entry_internal.h","src/base/cui_icon_layout.h","src/core/cui_text_paint_internal.h", "src/core/cui_unicode_grapheme.h", "tests/unit/cui_edit_grapheme_tests.inc", "backends/software/cui_shadow.h", "backends/software/cui_bitmap.h", "src/core/cui_drop_shadow_bounds_internal.h", "tests/distribution/drop_shadow_effects.c", "tests/distribution/inset_shadow_effects.c"]
+    paths = list(SOURCES) + ["src/components/cui_popover_paint.h", "docs/DATE_PICKER_ACTIONS.md", "src/base/cui_questionnaire_observer_internal.h", "src/base/cui_questionnaire_snapshot_math.h", "src/base/cui_color_hsla_entry_internal.h", "tests/distribution/color_hsla_entry.c","src/base/cui_color_entry_internal.h","src/base/cui_icon_layout.h","src/core/cui_text_paint_internal.h", "src/core/cui_unicode_grapheme.h", "tests/unit/cui_edit_grapheme_tests.inc", "backends/software/cui_shadow.h", "backends/software/cui_bitmap.h", "src/core/cui_drop_shadow_bounds_internal.h", "tests/distribution/drop_shadow_effects.c", "tests/distribution/inset_shadow_effects.c"]
     paths += [f"tests/unit/test_{name}.c" for name in SUITES]
     paths += ["tests/unit/test_prepaint_parts.c", "tests/unit/test_layout_only_clips.c", "tests/unit/test_core_embed.c", "tests/distribution/single.c",
               "tests/distribution/implementation.c", "tests/distribution/consumer.c",

@@ -172,6 +172,45 @@ function paintBitmap(i,x,y,w,h,radii){
 }
 const stories = {Button:0,Checkbox:1,Switch:2,Toggle:3,Radio:4,Slider:5,Input:6,Label:7,Badge:8,Progress:9,Theme:11,Alert:12,Avatar:13,Bubble:14,Empty:15,GroupBox:16,Kbd:17,Skeleton:18,Spinner:19,Accordion:20,Collapsible:21,Tabs:22,Tooltip:23,HoverCard:24,Editor:25,VirtualList:26,Dock:27,Plot:28,Calendar:29,List:30,Select:31,Menu:32,NumberInput:33,Pagination:34,Rating:35,Stepper:36,Combobox:37,'Focus Trap':38,Clipboard:39,DatePicker:40,TimeField:41,ColorPicker:42,Tree:43,Scrollable:44,DataTable:45,Table:46,Dialog:48,AlertDialog:49,Sheet:50,Popover:51,DropdownButton:52,Form:53,'Input Group':54,OtpInput:55,Tag:56,Marker:57,Notification:58,Shimmer:59,Message:60,MessageScroller:61,Image:62,Attachment:63,DescriptionList:64,StatusBar:65,Resizable:66,Icon:67,Toolbar:68,TitleBar:69,Sidebar:70,Textarea:71,Settings:72,Carousel:73,Command:74,'Root View':75,TextView:76,Chart:77,Speech:78,Questionnaire:79,Video:81,VideoPlayer:82};
 const modelStories = new Set(['Focus Trap']);
+function dateTimeSnippet(seconds,twelve,clear){
+ const names=['EN_US','EN_GB','IT','FR','DE','ES','JA'],locale=Number($('date-locale').value);
+ const localeExpression=locale<0?'NULL':`cui_date_locale_builtin(CUI_DATE_LOCALE_${names[locale]})`;
+ return `#include "cui/cui_date_time_picker.h"
+
+/* One owner UI context; retain state/value, and submit once per frame. */
+void render_date_time(cui_context *ui, const cui_theme *theme,
+                      float width, float height, bool disabled) {
+    static cui_date_time_picker_state state;
+    static cui_date_time_value value = {{2026, 10, 12}, {9, 30, 0}};
+    static bool initialized;
+    if (!initialized) {
+        cui_date_time_picker_init(&state, cui_id_from(ui, "date-time-popup"), value.date);
+        initialized = true;
+    }
+    const cui_date_time_preset presets[] = {
+        {.id = cui_id_from(ui, "launch"), .label = cui_string("Launch day"),
+         .date = {2026, 11, 5}},
+        {.id = cui_id_from(ui, "review"), .label = cui_string("Timed review"),
+         .date = {2026, 12, 18}, .has_time = true, .time = {23, 15, 30}},
+    };
+    cui_date_time_picker(ui, cui_id_from(ui, "date-picker"), theme,
+        cui_string("Date and time"), &state, &value,
+        (cui_date_time_picker_options){
+            .picker = {.calendar = {.first_weekday = 1, .cell_size = 28,
+                .locale = ${localeExpression}},
+                .viewport = {0, 0, width, height}, .disabled = disabled,
+                .width = width > 360 ? 280 : width - 48},
+            .calendar = {.presentation = {.month_toggle = true, .neighboring_days = true}},
+            .precision = ${seconds?'CUI_DATE_TIME_SECOND':'CUI_DATE_TIME_MINUTE'},
+            .twelve_hour = ${twelve}, .default_time = {9, 30, 0},
+            .presets = presets, .preset_count = 2,
+            .clear_id = cui_id_from(ui, "clear-date"), .clear_label = cui_string("Clear date"),
+            .cleanable = ${clear},
+            .delete_policy = ${clear?'CUI_DATE_PICKER_DELETE_SCOPE':'CUI_DATE_PICKER_DELETE_OFF'}});
+    /* Single civil date/time: no timezone/range. Empty date has year == 0.
+       Same-day selection confirms; changed day stays open for time editing.
+       Popup requires enough viewport space. Bindings and full source events differ. */
+}`;}
 function dateActionsSnippet(clear){return `#include "cui/cui_date_picker_actions.h"
 
 /* Retain state/value across frames; call once per frame on the owner thread. */
@@ -622,7 +661,7 @@ function render(){
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,designScale>0?8*designHeights[designScale]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?520:selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,designScale>0?8*designHeights[designScale]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -737,7 +776,7 @@ function render(){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
- if(selected.name==='DatePicker')$('snippet').textContent=wasm.gallery_control_stats(7)?dateActionsSnippet(Boolean(wasm.gallery_control_stats(8))):snippets.DatePicker;
+ if(selected.name==='DatePicker')$('snippet').textContent=wasm.gallery_control_stats(9)?dateTimeSnippet(Boolean(wasm.gallery_control_stats(10)),Boolean(wasm.gallery_control_stats(11)),Boolean(wasm.gallery_control_stats(13))):wasm.gallery_control_stats(7)?dateActionsSnippet(Boolean(wasm.gallery_control_stats(8))):snippets.DatePicker;
  if(selected.name==='Questionnaire')$('snippet').textContent=questionnaireProgressUsage(Number($('questionnaire-progress').value))||snippets.Questionnaire;
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));

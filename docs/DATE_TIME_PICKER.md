@@ -3,7 +3,7 @@
 This opt-in portable C11 API composes one civil date and time. It implements the
 Base/value/synchronization and Styled slices of `design/DATE_PICKER_DATETIME.md`.
 No timezone/range editor, arbitrary date parser/formatter, typed event
-wrapper, binding builder or browser demonstration is included yet. Existing
+wrapper or binding builder is included. Existing
 DatePicker/actions and TimeField calls keep their behavior.
 
 Include `cui/cui_date_time_picker.h`; link `src/base/cui_date_time_picker.c` along
@@ -140,8 +140,8 @@ test_date_picker_actions date_time_picker_header date_time_picker_guide date_tim
 Run through `python scripts/test_local.py --build-dir BUILD -- -V -R
 '^(date_time_picker|date_time_picker_styled|picker|date_picker_actions)$'`. Repeat in a separate
 `-DCUI_SANITIZE=ON` build. `tests/fixtures/date_time_picker/test_wasi.py --build-dir
-BUILD` uses the repository's existing pinned offline WASI driver. This slice adds
-no browser/live-AT or full source-parity evidence. Final worker results will be
+BUILD` uses the repository's existing pinned offline WASI driver. The Base/Styled checks alone add
+no live-AT or full source-parity evidence. Final worker results will be
 reported with the signed checkpoint. Configure a separate fixture with
 `-DCUI_DATETIME_BUILD_STYLED=OFF` to build/run the Base test without the optional
 Styled source.
@@ -223,7 +223,7 @@ cui_date_time_picker_result example_datetime_frame(cui_context *ui,
 
 The local preset array is borrowed only during submission; its literal label
 remains readable for rendering. Application-owned dynamic strings must follow
-the frame lifetime rules above. Bindings and a WASM gallery mode remain separate.
+the frame lifetime rules above. Bindings remain separate; the gallery mode below uses the C API directly.
 
 Styled slice validation: focused native and ASan/UBSan wrapper checks each pass
 4/4 suites; pinned WASI passes Base579 and Styled695 assertions. Base-only
@@ -251,3 +251,31 @@ Components implementation macros once, then `CUI_DATE_TIME_PICKER_IMPLEMENTATION
 and include `cui_date_time_picker.h`. The exact independent recipe is compiled
 and executed in `tests/distribution/date_time_picker.c`; its CUI_ALL mode uses
 `CUI_IMPLEMENTATION_ALL` instead. Declarations alone do not enable implementation.
+
+
+## Browser gallery mode
+
+The DatePicker story defaults to its existing date-only presentation. Enable
+**Date + time** for the single civil date/time facade; only then do Include
+seconds, 12-hour clock and optional clear/Delete controls appear. Configure those
+controls while the popup is closed. Date-only actions are hidden during time mode
+and restored when it is turned off. The current date transfers between modes;
+entering time mode retains its last time, while clear restores 09:30 and precision
+reduction permanently drops seconds. Time mode is single-date and discards a
+range end; the gallery does not offer a date-time range control.
+
+Launch day preserves time; Timed review replaces date/time (and truncates seconds
+at minute precision). A changed day leaves the popup open for time editing;
+selecting that same day confirms. Clear/Delete empties the date and resets time.
+The visible date/time label follows the selected date locale and time appearance;
+Time/segment names and preset labels are explicit English sample strings. The
+copied complete C11 snippet reflects precision, period, clear/Delete and locale.
+No timezone conversion or localization service is involved.
+
+`tests/web/test_date_time_picker_gallery.py` uses actual headless Chromium mouse/
+keyboard and CDP touch input to exercise numeric drafts across idle frames,
+seconds/AM-PM, changed/same-day confirmation, timed/date-only presets, clear and
+scope Delete from a time segment, disabled state, EN_US/FR and mode transfers.
+It copies and strictly compiles the displayed snippets. Existing date-only
+presentation/actions desktop/touch tests remain passing. This is sample/browser
+host evidence, not Safari/mobile-OS keyboard/live-AT or full event-stream parity.

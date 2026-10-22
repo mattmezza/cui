@@ -18,6 +18,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_content.h"
 #include "cui/cui_date_picker_actions.h"
 #include "cui/cui_date_picker_calendar.h"
+#include "cui/cui_date_time_picker.h"
 #include "cui/cui_description.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
@@ -1511,6 +1512,9 @@ static int date_locale = -1;
 static cui_date_selection date_selection = {{2026, 10, 12}, {0}};
 static cui_date_picker_state date_picker;
 static bool date_actions_enabled, date_actions_clear;
+static bool date_time_enabled, date_time_seconds, date_time_twelve, date_time_clear;
+static cui_date_time_picker_state date_time_picker;
+static cui_date_time_value date_time_value = {{2026, 10, 12}, {9, 30, 45}};
 static cui_date_picker_actions_state date_actions;
 static cui_date_picker_value date_actions_value;
 
@@ -2836,6 +2840,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_overlay_close(ui, &combo_popup.overlay);
         cui_overlay_close(ui, &date_picker.overlay);
         cui_overlay_close(ui, &date_actions.picker.overlay);
+        cui_overlay_close(ui, &date_time_picker.actions.picker.overlay);
         cui_overlay_close(ui, &trap);
         cui_overlay_close(ui, &dialog_surface.overlay);
         cui_overlay_close(ui, &nested_surface.overlay);
@@ -5652,6 +5657,72 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 40: {
+        bool previous_time = date_time_enabled;
+        cui_checkbox(ui, cui_id_from(ui, "date-time-mode"), &t, cui_string("Date + time"),
+                     &date_time_enabled, disabled);
+        if (previous_time != date_time_enabled) {
+            cui_overlay_close(ui, &date_picker.overlay);
+            cui_overlay_close(ui, &date_actions.picker.overlay);
+            if (date_time_enabled) {
+                date_time_value.date = date_selection.start;
+                cui_date_time_picker_init(
+                    &date_time_picker, cui_id_from(ui, "date-time-popup"),
+                    cui_date_valid(date_selection.start) ? date_selection.start : date);
+            } else {
+                cui_overlay_close(ui, &date_time_picker.actions.picker.overlay);
+                cui_date_picker_init(&date_picker, cui_id_from(ui, "date-popup"),
+                                     cui_date_valid(date_selection.start) ? date_selection.start
+                                                                          : date);
+                cui_date_picker_actions_init(
+                    &date_actions, cui_id_from(ui, "date-actions-popup"),
+                    cui_date_valid(date_selection.start) ? date_selection.start : date);
+                date_actions_value = (cui_date_picker_value){.dates = date_selection};
+            }
+        }
+        if (date_time_enabled) {
+            cui_checkbox(ui, cui_id_from(ui, "date-time-seconds"), &t,
+                         cui_string("Include seconds"), &date_time_seconds, disabled);
+            cui_checkbox(ui, cui_id_from(ui, "date-time-twelve"), &t, cui_string("12-hour clock"),
+                         &date_time_twelve, disabled);
+            cui_checkbox(ui, cui_id_from(ui, "date-time-clear"), &t,
+                         cui_string("Clear button and Delete"), &date_time_clear, disabled);
+            const cui_date_time_preset presets[] = {
+                {.id = cui_id_from(ui, "date-time-launch"),
+                 .label = cui_string("Launch day"),
+                 .date = {2026, 11, 5}},
+                {.id = cui_id_from(ui, "date-time-review"),
+                 .label = cui_string("Timed review"),
+                 .date = {2026, 12, 18},
+                 .has_time = true,
+                 .time = {23, 15, 30}},
+            };
+            cui_date_time_picker(
+                ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date and time"),
+                &date_time_picker, &date_time_value,
+                (cui_date_time_picker_options){
+                    .picker = {.calendar = {.first_weekday = 1,
+                                            .cell_size = 28,
+                                            .locale = cui_date_locale_builtin(
+                                                (cui_date_locale_kind)date_locale)},
+                               .viewport = {0, 0, width, height},
+                               .disabled = disabled,
+                               .width = width > 360 ? 280 : width - 48},
+                    .calendar = {.presentation = {.month_toggle = true,
+                                                  .neighboring_days = true,
+                                                  .today = calendar_today}},
+                    .precision = date_time_seconds ? CUI_DATE_TIME_SECOND : CUI_DATE_TIME_MINUTE,
+                    .twelve_hour = date_time_twelve,
+                    .default_time = {9, 30, 0},
+                    .presets = presets,
+                    .preset_count = 2,
+                    .clear_id = cui_id_from(ui, "date-time-clear-button"),
+                    .clear_label = cui_string("Clear date"),
+                    .cleanable = date_time_clear,
+                    .delete_policy = date_time_clear ? CUI_DATE_PICKER_DELETE_SCOPE
+                                                     : CUI_DATE_PICKER_DELETE_OFF});
+            date_selection = (cui_date_selection){.start = date_time_value.date};
+            break;
+        }
         bool previous_actions = date_actions_enabled;
         cui_checkbox(ui, cui_id_from(ui, "date-actions-mode"), &t, cui_string("Date-only actions"),
                      &date_actions_enabled, disabled);
@@ -6387,7 +6458,8 @@ int gallery_modal(void) {
         return 1;
     return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open ||
            trap.open || date_picker.overlay.open || date_actions.picker.overlay.open ||
-           menu_tree.overlay.open || context_menu.overlay.open;
+           date_time_picker.actions.picker.overlay.open || menu_tree.overlay.open ||
+           context_menu.overlay.open;
 }
 
 int gallery_clipboard_request(void) {
@@ -6577,6 +6649,17 @@ double gallery_control_stats(unsigned field) {
         return date_actions_enabled;
     case 8:
         return date_actions_clear;
+    case 9:
+        return date_time_enabled;
+    case 10:
+        return date_time_seconds;
+    case 11:
+        return date_time_twelve;
+    case 12:
+        return date_time_value.time.hour * 10000 + date_time_value.time.minute * 100 +
+               date_time_value.time.second;
+    case 13:
+        return date_time_clear;
     default:
         return 0;
     }

@@ -165,3 +165,5 @@ mode and includes retained state/value initialization for the actions example.
 Dismiss an open modal popup before using its outside clear button. Desktop and
 touch tests exercise these actions and compile both copied C snippets. This
 coverage excludes date-time editing, arbitrary styling, observers and bindings.
+
+DatePicker additionally offers an explicit **Date + time** mode using the optional single civil date/time C facade. Minute/second, 12/24-hour and clear/Delete controls appear only in that mode; date-only/Date-only actions modes remain available when it is off. See `docs/DATE_TIME_PICKER.md` for state transfer, preset/default-time and source-event limits. Headless desktop and CDP touch proof lives in `tests/web/test_date_time_picker_gallery.py`; copied snippets strictly compile as C11.

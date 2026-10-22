@@ -517,7 +517,8 @@
       },
       "limitations": [
         "Language builders omit C keyboard policies, snapshot copy-out and persistent typed observer attachment/payload/frame arenas. Packaged C sources and headers do not constitute a language event facade.",
-        "Localized/custom progress presentation and text refinement records/callbacks remain C-only; packaged C headers do not expose a language-builder facade."
+        "Localized/custom progress presentation and text refinement records/callbacks remain C-only; packaged C headers do not expose a language-builder facade.",
+        "Named text presentation policies/options, text child callback and decorative Error replacement remain C-only; no language-builder presentation facade."
       ]
     },
     {

@@ -31,7 +31,8 @@
     ],
     "cui_questionnaire": [
       "src/base/cui_questionnaire.c",
-      "src/components/cui_questionnaire.c"
+      "src/components/cui_questionnaire.c",
+      "src/components/cui_questionnaire_presentation.c"
     ],
     "cui_speech": [
       "src/base/cui_speech.c",
@@ -267,6 +268,7 @@
     "cui_date_picker_calendar": [],
     "cui_questionnaire_keyboard": [],
     "cui_questionnaire_progress": [],
+    "cui_questionnaire_presentation": [],
     "cui_questionnaire_snapshots": ["src/base/cui_questionnaire_snapshots.c"],
     "cui_date_time_picker": ["src/base/cui_date_time_picker.c", "src/components/cui_date_time_picker.c"],
     "cui_date_picker_actions": ["src/base/cui_date_picker_actions.c", "src/components/cui_date_picker_actions.c"],

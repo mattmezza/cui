@@ -193,3 +193,10 @@ and `include/cui/cui_questionnaire_progress.h`. Masks preserve explicit empty/ze
 values; strings survive frame consumption and child callbacks are borrowed/pure.
 Numeric progress stays model-derived. This is C-only bounded presentation, not a
 family typography cascade or language-builder facade.
+
+For independent Questionnaire Title/Description/ChoiceDescription and decorative
+Error content, read `docs/QUESTIONNAIRE_PRESENTATION.md` and the matching
+`include/cui/cui_questionnaire_presentation.h`. Zero preserves extracted legacy
+text/Error paint; token typography is explicit, shared scale tiers are CUI
+extensions. Schema text needs Item gating; Error retains one localized Alert.
+No root style cascade, binding facade or custom action content is implied.

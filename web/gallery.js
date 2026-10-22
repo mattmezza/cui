@@ -28,6 +28,93 @@ for(const [value,label] of [['0','Default progress'],['1','Localized progress'],
 }
 $('questionnaire-size').after(questionnaireProgressControl);
 questionnaireProgressControl.addEventListener('change',requestFrame);
+const questionnairePresentationControl=document.createElement('select');
+questionnairePresentationControl.id='questionnaire-presentation';questionnairePresentationControl.hidden=true;
+questionnairePresentationControl.setAttribute('aria-label','Questionnaire named text presentation');
+for(const [value,label] of [['0','Default text'],['1','Named text parts'],['2','Localized token text'],['3','Refined text metrics'],['4','Decorative error content']]){
+ const option=document.createElement('option');option.value=value;option.textContent=label;questionnairePresentationControl.append(option);
+}
+questionnaireProgressControl.after(questionnairePresentationControl);
+questionnairePresentationControl.addEventListener('change',requestFrame);
+function questionnairePresentationUsage(mode){
+ if(!mode)return null;
+ const custom=mode===4?`static void error_child(cui_context *ui, cui_id id,
+        const cui_questionnaire_text_view *view, void *user) {
+    (void)user;
+    cui_begin_box(ui, id, (cui_box){.width = -1, .gap = 4});
+    cui_begin_box(ui, 0, (cui_box){.width = 88, .height = 3, .background = view->color});
+    cui_end_box(ui);
+    cui_text_ex(ui, view->text, view->font_size, view->color, view->line_height, view->style);
+    cui_end_box(ui);
+}
+`:'';
+ const policy=mode>=2?'CUI_QUESTIONNAIRE_TEXT_TOKENS':'CUI_QUESTIONNAIRE_TEXT_LEGACY';
+ const choiceRefine=mode===3?', .text = {.fields = CUI_QUESTIONNAIRE_TEXT_SIZE | CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT | CUI_QUESTIONNAIRE_TEXT_STYLE, .font_size = 17, .line_height = 26, .style = {.weight = CUI_TEXT_WEIGHT_NORMAL}}':'';
+ const refine=mode===3?`    text.text = (cui_questionnaire_text_refinement){
+        .fields = CUI_QUESTIONNAIRE_TEXT_SIZE | CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT |
+                  CUI_QUESTIONNAIRE_TEXT_STYLE,
+        .font_size = 17, .line_height = 26, .style = {.weight = CUI_TEXT_WEIGHT_NORMAL}};`:'';
+ const localized=mode>=2?`        text.fields = CUI_QUESTIONNAIRE_TEXT_VISIBLE;
+        text.visible = cui_string("Wählen Sie eine Richtung für Ihr nächstes Projekt. Die Beschreibung bleibt auch auf einem schmalen Bildschirm vollständig lesbar.");`:'';
+ const error=mode===4?`        text.fields = CUI_QUESTIONNAIRE_TEXT_VISIBLE;
+        text.visible = cui_string("Bitte prüfen Sie Ihre Auswahl.");
+        text.render_child = error_child;`:'';
+ return `#include <cui/cui_questionnaire_presentation.h>
+/* Model/editor bytes survive frames; callbacks and stack descriptors are borrowed
+ * only during submission. Reserve these IDs for this composition. */
+${custom}
+typedef struct { const cui_theme *theme; const cui_questionnaire_state *state; } choice_content;
+static void named_choice(cui_context *ui, cui_id id,
+        const cui_questionnaire_choice_view *view, void *user) {
+    const choice_content *content = user;
+    const cui_questionnaire_choice *choice = &content->state->items[view->item].choices[view->choice];
+    cui_text(ui, choice->label, content->theme->font_size, content->theme->text);
+    (void)cui_questionnaire_choice_description_ex(ui, id, content->theme, choice->description,
+        (cui_questionnaire_options){.size = view->size, .design_size = view->design_size,
+            .density = view->design_size ? content->theme->font_size / 16 : 0},
+        (cui_questionnaire_text_options){.policy = ${policy}${choiceRefine}});
+}
+void draw_named_question(cui_context *ui, const cui_theme *theme,
+        cui_questionnaire_state *state, cui_questionnaire_input_state *input) {
+    if (!state || !state->initialized || state->current >= state->count) return;
+    size_t item = state->current;
+    const cui_questionnaire_item *definition = &state->items[item];
+    if (definition->choice_count > 3) return; /* This sample reserves three choice IDs. */
+    choice_content content = {theme, state};
+    cui_questionnaire_labels labels = {.fields = CUI_QUESTIONNAIRE_LABEL_REQUIRED,
+        .required = cui_string("Bitte wählen Sie eine Antwort.")};
+    cui_questionnaire_options base = {.labels = &labels,
+        .design_size = (cui_design_size)${Number($('design-size').value)},
+        .render_content = named_choice, .render_user = &content};
+    cui_questionnaire_text_options text = {.policy = ${policy}};
+${refine}
+    if (!cui_questionnaire_begin(ui, 100, theme, state, base)) return;
+    if (cui_questionnaire_item_begin(ui, 101, state, item, base)) {
+        (void)cui_questionnaire_title_ex(ui, 102, theme, state, item, base, text);
+${localized}
+        (void)cui_questionnaire_description_ex(ui, 103, theme, state, item, base, text);
+        if (cui_questionnaire_choices_begin(ui, 104, state, item, base)) {
+            for (size_t i = 0; i < definition->choice_count; ++i)
+                (void)cui_questionnaire_choice_control(ui, 200 + i, theme, state, item, i, base);
+            cui_questionnaire_part_end(ui);
+        }
+        if (definition->input && input)
+            (void)cui_questionnaire_input_control(ui, 105, theme, state, item, input, NULL, base);
+        text.fields = 0;
+${error}
+        (void)cui_questionnaire_error_ex(ui, 106, theme, state, item, base, text);
+        cui_questionnaire_part_end(ui);
+    }
+    if (cui_questionnaire_actions_begin(ui, 107, state, base)) {
+        (void)cui_questionnaire_action_control(ui, 108, theme, state,
+            CUI_QUESTIONNAIRE_NEXT, (cui_str){0}, base);
+        (void)cui_questionnaire_action_control(ui, 109, theme, state,
+            CUI_QUESTIONNAIRE_FINISH, (cui_str){0}, base);
+        cui_questionnaire_part_end(ui);
+    }
+    cui_questionnaire_end(ui);
+}`;
+}
 function questionnaireProgressUsage(mode){
  if(!mode)return null;
  const custom=mode===3?`static void progress_child(cui_context *ui, cui_id id,
@@ -691,6 +778,7 @@ function render(){
  wasm.gallery_speech_options(Number($('speech-size').value),Number($('speech-unavailable').checked));
  wasm.gallery_questionnaire_options(Number($('questionnaire-size').value),$('questionnaire-shortcuts').checked?Number($('questionnaire-numbers').checked):-1,Number($('questionnaire-custom').checked));
  wasm.gallery_questionnaire_progress_mode(Number($('questionnaire-progress').value));
+ wasm.gallery_questionnaire_presentation_mode(Number(questionnairePresentationControl.value));
  wasm.gallery_sidebar_options(Number($('sidebar-mode').value),Number($('sidebar-side').value),Number($('sidebar-collapsed').checked));
  wasm.gallery_textarea_options(Number($('textarea-rows').value),Number($('textarea-grow').checked),Number($('textarea-readonly').checked),Number($('textarea-nowrap').checked));
  wasm.gallery_title_options(Number($('title-decoration').value),Number($('title-close').checked),Number($('title-fullscreen').checked));
@@ -777,7 +865,7 @@ function render(){
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
  if(selected.name==='DatePicker')$('snippet').textContent=wasm.gallery_control_stats(9)?dateTimeSnippet(Boolean(wasm.gallery_control_stats(10)),Boolean(wasm.gallery_control_stats(11)),Boolean(wasm.gallery_control_stats(13))):wasm.gallery_control_stats(7)?dateActionsSnippet(Boolean(wasm.gallery_control_stats(8))):snippets.DatePicker;
- if(selected.name==='Questionnaire')$('snippet').textContent=questionnaireProgressUsage(Number($('questionnaire-progress').value))||snippets.Questionnaire;
+ if(selected.name==='Questionnaire')$('snippet').textContent=questionnairePresentationUsage(Number(questionnairePresentationControl.value))||questionnaireProgressUsage(Number($('questionnaire-progress').value))||snippets.Questionnaire;
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));
  if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
@@ -1015,8 +1103,8 @@ function selectComponent(){
  for(const id of ['settings-size','settings-variant'])$(id).hidden=selected.name!=='Settings';
  for(const id of ['carousel-axis','carousel-loop-control'])$(id).hidden=selected.name!=='Carousel';
  for(const id of ['speech-size','speech-unavailable-control'])$(id).hidden=selected.name!=='Speech';
- for(const id of ['questionnaire-progress','questionnaire-size','questionnaire-shortcuts-control','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
- $('questionnaire-progress').value='0';$('questionnaire-size').value='0';$('questionnaire-shortcuts').checked=true;$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
+ for(const id of ['questionnaire-presentation','questionnaire-progress','questionnaire-size','questionnaire-shortcuts-control','questionnaire-numbers-control','questionnaire-custom-control'])$(id).hidden=selected.name!=='Questionnaire';
+ questionnairePresentationControl.value='0';$('questionnaire-progress').value='0';$('questionnaire-size').value='0';$('questionnaire-shortcuts').checked=true;$('questionnaire-numbers').checked=false;$('questionnaire-custom').checked=false;
  $('speech-size').value='0';$('speech-unavailable').checked=false;
  for(const id of ['chart-kind','chart-curve','chart-dots-control','chart-labels-control','chart-animate-control','chart-custom-rows-control','chart-tooltip-appearance'])$(id).hidden=selected.name!=='Chart';
  $('chart-kind').value='0';$('chart-curve').value='0';$('chart-dots').checked=false;$('chart-labels').checked=false;$('chart-animate').checked=false;$('chart-custom-rows').checked=false;$('chart-tooltip-appearance').value='0';

@@ -33,6 +33,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_picker.h"
 #include "cui/cui_plot.h"
 #include "cui/cui_questionnaire_keyboard.h"
+#include "cui/cui_questionnaire_presentation.h"
 #include "cui/cui_questionnaire_progress.h"
 #include "cui/cui_radio_group.h"
 #include "cui/cui_resizable.h"
@@ -299,7 +300,7 @@ static cui_edit *questionnaire_edit;
 static cui_questionnaire_input_state questionnaire_input_view;
 static unsigned questionnaire_events[4];
 static int questionnaire_size, questionnaire_numbers, questionnaire_custom,
-    questionnaire_progress_mode;
+    questionnaire_progress_mode, questionnaire_presentation_mode;
 static char questionnaire_progress_label[96], questionnaire_progress_visible[48];
 static const cui_questionnaire_choice questionnaire_choices[] = {
     {.value = {"build", 5},
@@ -350,6 +351,42 @@ void gallery_questionnaire_options(int size, int numbers, int custom) {
 }
 void gallery_questionnaire_progress_mode(int mode) {
     questionnaire_progress_mode = mode >= 0 && mode <= 4 ? mode : 0;
+}
+void gallery_questionnaire_presentation_mode(int mode) {
+    questionnaire_presentation_mode = mode >= 0 && mode <= 4 ? mode : 0;
+}
+static cui_questionnaire_text_options gallery_questionnaire_text(void) {
+    cui_questionnaire_text_options p = {0};
+    if (questionnaire_presentation_mode >= 2)
+        p.policy = CUI_QUESTIONNAIRE_TEXT_TOKENS;
+    if (questionnaire_presentation_mode == 3)
+        p.text = (cui_questionnaire_text_refinement){.fields = CUI_QUESTIONNAIRE_TEXT_SIZE |
+                                                               CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT |
+                                                               CUI_QUESTIONNAIRE_TEXT_STYLE,
+                                                     .font_size = 17,
+                                                     .line_height = 26,
+                                                     .style = {.weight = CUI_TEXT_WEIGHT_NORMAL}};
+    return p;
+}
+static void questionnaire_named_content(cui_context *context, cui_id id,
+                                        const cui_questionnaire_choice_view *view, void *user) {
+    const cui_theme *theme = user;
+    cui_text(context, questionnaire_choices[view->choice].label, theme->font_size, theme->text);
+    cui_questionnaire_options base = {.size = view->size,
+                                      .design_size = view->design_size,
+                                      .density = view->design_size ? theme->font_size / 16 : 0};
+    (void)cui_questionnaire_choice_description_ex(context, id, theme,
+                                                  questionnaire_choices[view->choice].description,
+                                                  base, gallery_questionnaire_text());
+}
+static void questionnaire_error_child(cui_context *context, cui_id id,
+                                      const cui_questionnaire_text_view *view, void *user) {
+    (void)user;
+    cui_begin_box(context, id, (cui_box){.width = -1, .gap = 4});
+    cui_begin_box(context, 0, (cui_box){.width = 88, .height = 3, .background = view->color});
+    cui_end_box(context);
+    cui_text_ex(context, view->text, view->font_size, view->color, view->line_height, view->style);
+    cui_end_box(context);
 }
 static void questionnaire_progress_child(cui_context *context, cui_id id,
                                          const cui_questionnaire_progress_view *view, void *user) {
@@ -3601,6 +3638,16 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             options.render_shortcut = questionnaire_shortcut;
             options.render_user = &t;
         }
+        cui_questionnaire_labels labels = {.fields = CUI_QUESTIONNAIRE_LABEL_REQUIRED,
+                                           .required =
+                                               cui_string("Bitte wählen Sie eine Antwort.")};
+        if (questionnaire_presentation_mode) {
+            options.labels = &labels;
+            if (!questionnaire_custom) {
+                options.render_content = questionnaire_named_content;
+                options.render_user = &t;
+            }
+        }
         cui_id root_id = cui_id_from(ui, "questionnaire-root");
         size_t item = questionnaire_state.current;
         cui_questionnaire_keyboard_options keyboard = {
@@ -3612,8 +3659,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             gallery_questionnaire_progress(cui_id_from(ui, "questionnaire-progress"), &t, options);
             if (cui_questionnaire_item_begin(ui, cui_id_from(ui, "questionnaire-item"),
                                              &questionnaire_state, item, options)) {
-                cui_questionnaire_heading(ui, cui_id_from(ui, "questionnaire-heading"), &t,
-                                          &questionnaire_state, item, options);
+                if (!questionnaire_presentation_mode)
+                    cui_questionnaire_heading(ui, cui_id_from(ui, "questionnaire-heading"), &t,
+                                              &questionnaire_state, item, options);
+                else {
+                    cui_questionnaire_text_options p = gallery_questionnaire_text();
+                    (void)cui_questionnaire_title_ex(ui, cui_id_from(ui, "questionnaire-title"), &t,
+                                                     &questionnaire_state, item, options, p);
+                    if (questionnaire_presentation_mode >= 2) {
+                        p.fields = CUI_QUESTIONNAIRE_TEXT_VISIBLE;
+                        p.visible = cui_string(
+                            "Wählen Sie eine Richtung für Ihr nächstes Projekt. Die Beschreibung "
+                            "bleibt auch auf einem schmalen Bildschirm vollständig lesbar.");
+                    }
+                    (void)cui_questionnaire_description_ex(
+                        ui, cui_id_from(ui, "questionnaire-description"), &t, &questionnaire_state,
+                        item, options, p);
+                }
                 cui_id choice_ids[3] = {cui_id_from(ui, "questionnaire-build"),
                                         cui_id_from(ui, "questionnaire-explore"),
                                         cui_id_from(ui, "questionnaire-prototype")};
@@ -3639,8 +3701,19 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                     (void)cui_questionnaire_input_control(ui, input_id, &t, &questionnaire_state,
                                                           item, &questionnaire_input_view, NULL,
                                                           options);
-                cui_questionnaire_error_control(ui, cui_id_from(ui, "questionnaire-error"), &t,
-                                                &questionnaire_state, item, options);
+                if (!questionnaire_presentation_mode)
+                    cui_questionnaire_error_control(ui, cui_id_from(ui, "questionnaire-error"), &t,
+                                                    &questionnaire_state, item, options);
+                else {
+                    cui_questionnaire_text_options p = gallery_questionnaire_text();
+                    if (questionnaire_presentation_mode == 4) {
+                        p.fields = CUI_QUESTIONNAIRE_TEXT_VISIBLE;
+                        p.visible = cui_string("Bitte prüfen Sie Ihre Auswahl.");
+                        p.render_child = questionnaire_error_child;
+                    }
+                    (void)cui_questionnaire_error_ex(ui, cui_id_from(ui, "questionnaire-error"), &t,
+                                                     &questionnaire_state, item, options, p);
+                }
                 cui_questionnaire_part_end(ui);
             }
             if (cui_questionnaire_actions_begin(ui, cui_id_from(ui, "questionnaire-actions"),

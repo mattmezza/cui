@@ -37,7 +37,30 @@ runs before clear only when shadows are present. Glyph/resource failures and
 several command checks can still occur after clear; existing rendering is not a
 transactional frame API.
 
-## Proposed first supported slice
+## Review decision and first extraction slice
+
+The initial opaque/uniform restrictions below are **superseded as final adapter
+scope**. Preserve SDL's existing target compositing contract; its transparent
+storage representation is not itself grounds to reject a mesh. Future comparisons
+must use visible composites or an explicit SDL blend reference when straight-RGBA
+software storage differs. DPI 1/2 and opaque clear are starting test vectors only.
+Before deciding transform/target restrictions, inspect the actual public SDL host
+configuration surface and demonstrate concrete unsupported mappings. Nonuniform
+axis derivatives are mathematically available; a shadow-specific uniform check
+must not silently become a mesh restriction. Full supporting SDL mesh integration
+remains required and is not implemented by this checkpoint.
+
+Only extraction is approved/implemented here. `backends/software/cui_mesh.h` is a
+private synchronous CPU traversal with caller-owned output callback; it retains
+nothing and performs no destination blending. Software keeps its original blend
+function and receives samples in original triangle/pixel order. The original
+pre-extraction raster/color/blend implementation is preserved independently in
+`tests/unit/mesh_oracle.h` (base 939c5c2f), not rewritten using shared helpers.
+The standalone `tests/fixtures/mesh_cpu` fixture compares every RGBA byte and
+asserts specific gradient-zero, shared-edge and overlap results. No SDL code is
+changed. The callback traversal is not a performance or hard-real-time claim.
+
+## Initial adapter proposal (restrictions subject to revised decision above)
 
 Extract a **private CPU coverage helper**, with no SDL dependency or public ABI,
 from the software mesh path. Preserve software arithmetic, top-left and color
@@ -155,5 +178,25 @@ or falls back to pinned SDL revision
 3.4.18; they expose geometry, presentation/viewport/scale, readback and blend
 contracts, but are not runtime evidence for the fallback revision. Implementation
 must compile against the supported pinned fallback as well as the selected CI
-system version. This checkpoint is source inspection only: no native window,
-readback fixture, build or renderer capability promotion was performed.
+system version. The original design checkpoint was source inspection only. The extraction
+follow-up validation below adds software builds/tests; no SDL readback fixture,
+native window or renderer capability promotion was performed.
+
+## Extraction validation
+
+The extraction follow-up runs only the new standalone fixture and existing
+`render` test, not the full native adapter suite. Reproduce with:
+
+```sh
+cmake -S tests/fixtures/mesh_cpu -B build-mesh -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build-mesh --target test_mesh_cpu test_render
+python scripts/test_local.py --build-dir build-mesh -R '^(mesh_cpu|render)$' --output-on-failure
+```
+
+Repeat in a separate Debug build with `-DCUI_SANITIZE=ON` for ASan/UBSan. The
+fixture applies the repository's `-Wall -Wextra -Wpedantic -Werror` policy. The
+oracle suite contains 171 full-buffer comparisons, including two-color ordering;
+known alpha assertions independently detect shared-edge double coverage and
+zero-gradient behavior. This establishes the software extraction contract, not
+SDL compositing or SDL readback support. No public API, capability, component
+behavior or consumer setup changes; generated consumer resources are unaffected.

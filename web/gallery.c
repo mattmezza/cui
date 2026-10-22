@@ -1170,17 +1170,14 @@ void gallery_renderer_fixture(int enabled) {
 }
 static void gallery_paint_renderer_fixture(cui_context *ui) {
     if (renderer_fixture_enabled == 2) {
-        static const cui_mesh_vertex vertices[] = {
-            {0, 0, 0, 1}, {24, 0, 0, 1}, {0, 24, 0, 1}};
+        static const cui_mesh_vertex vertices[] = {{0, 0, 0, 1}, {24, 0, 0, 1}, {0, 24, 0, 1}};
         cui_begin_box(ui, cui_id_from(ui, "renderer-mesh-opacity"),
-                      (cui_box){.width = 32, .height = 32, .opacity = .5f,
-                                .custom_opacity = true});
-        cui_paint_mesh(ui, cui_id_from(ui, "renderer-mesh"),
-                       (cui_mesh_paint){.vertices = vertices,
-                                        .vertex_count = 3,
-                                        .scale = 1,
-                                        .color = {.5f, 0, 0, .5f}},
-                       (cui_box){.width = 24, .height = 24});
+                      (cui_box){.width = 32, .height = 32, .opacity = .5f, .custom_opacity = true});
+        cui_paint_mesh(
+            ui, cui_id_from(ui, "renderer-mesh"),
+            (cui_mesh_paint){
+                .vertices = vertices, .vertex_count = 3, .scale = 1, .color = {.5f, 0, 0, .5f}},
+            (cui_box){.width = 24, .height = 24});
         cui_end_box(ui);
         return;
     }

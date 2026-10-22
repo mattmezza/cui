@@ -196,3 +196,10 @@ frozen four-size text table; shared design sizes retain CUI scaling explicitly.
 Existing Alert composition is a single interact+box+text seam with no reducer;
 it supports custom noninteractive content without an architectural change.
 Production and evidence remain pending at this checkpoint.
+
+Implementation checkpoint: the first slice now supplies the four named APIs in
+`cui_questionnaire_presentation.h`, a separate Styled implementation and one
+private legacy option/metrics seam. Legacy Error delegates zero options. It does
+not implement the earlier proposed schema-error visibility policy, container/card/
+input geometry, action children or trailing anchors. No full family promotion.
+The worker fixture owns temporary source registration until canonical integration.

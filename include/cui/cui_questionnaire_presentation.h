@@ -50,21 +50,21 @@ typedef struct {
  * callback. True means accepted (including omission), not child/layout success.
  * These parts do not validate, flush editors, consume events or emit events. */
 bool cui_questionnaire_title_ex(cui_context *, cui_id, const cui_theme *,
-                                 const cui_questionnaire_state *, size_t item,
-                                 cui_questionnaire_options, cui_questionnaire_text_options);
+                                const cui_questionnaire_state *, size_t item,
+                                cui_questionnaire_options, cui_questionnaire_text_options);
 bool cui_questionnaire_description_ex(cui_context *, cui_id, const cui_theme *,
-                                       const cui_questionnaire_state *, size_t item,
-                                       cui_questionnaire_options, cui_questionnaire_text_options);
+                                      const cui_questionnaire_state *, size_t item,
+                                      cui_questionnaire_options, cui_questionnaire_text_options);
 bool cui_questionnaire_choice_description_ex(cui_context *, cui_id, const cui_theme *, cui_str,
-                                              cui_questionnaire_options,
-                                              cui_questionnaire_text_options);
+                                             cui_questionnaire_options,
+                                             cui_questionnaire_text_options);
 /* Zero retains legacy current-item/error gating and Alert name. No separate
  * schema-error visibility policy in this slice. TOKENS adds secondary line box
- * and an8px top spacer; explicit refinement wins. Custom child never replaces
+ * and an 8px top spacer; explicit refinement wins. Custom child never replaces
  * model error/Alert semantics. Valid/no-current-error omits output and callback. */
 bool cui_questionnaire_error_ex(cui_context *, cui_id, const cui_theme *,
-                                 const cui_questionnaire_state *, size_t item,
-                                 cui_questionnaire_options, cui_questionnaire_text_options);
+                                const cui_questionnaire_state *, size_t item,
+                                cui_questionnaire_options, cui_questionnaire_text_options);
 #ifdef __cplusplus
 }
 #endif

@@ -284,7 +284,8 @@
     "cui_questionnaire_observer": [
       "src/base/cui_questionnaire_observer.c"
     ],
-    "cui_dropdown_button_styles": []
+    "cui_dropdown_button_styles": [],
+    "cui_dropdown_button_metadata": []
   },
   "native": {
     "text": [

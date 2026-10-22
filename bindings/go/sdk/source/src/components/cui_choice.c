@@ -1,3 +1,4 @@
+#include "../base/cui_dropdown_metadata_internal.h"
 #include "cui/cui_dropdown_button_styles.h"
 /* SPDX-License-Identifier: MIT */
 #include "../base/cui_design_metrics.h"
@@ -2681,8 +2682,13 @@ static cui_dropdown_button_result cui_choice_render_dropdown(
     cui_str action_name, cui_str menu_name, const cui_menu_entry *items, size_t count,
     cui_id *menu_action, cui_menu_tree_state *state, cui_dropdown_button_options options,
     cui_dropdown_event_handlers handlers, cui_dropdown_event_result *observed,
-    const cui_dropdown_button_styles *styles) {
+    const cui_dropdown_button_styles *styles, const cui_dropdown_button_metadata *metadata) {
     cui_dropdown_button_result result = {0};
+    cui_dropdown_button_metadata metadata_copy;
+    if (!cui_choice_dropdown_metadata_prepare(&metadata_copy, metadata, !options.hide_action,
+                                              !options.hide_menu))
+        return result;
+    metadata = cui_choice_dropdown_metadata_active(&metadata_copy) ? &metadata_copy : NULL;
     cui_dropdown_button_styles copied = {0};
     if (styles)
         copied = *styles;
@@ -2718,7 +2724,14 @@ static cui_dropdown_button_result cui_choice_render_dropdown(
                                                 d.indicator_size};
     }
     state->drag_scroll = options.menu.drag_scroll;
-    if (observed) {
+    if (metadata)
+        result = cui_choice_dropdown_submit_metadata(
+            ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id,
+            action_name, menu_name, items, count, menu_action, state,
+            options.disabled || options.menu.popup.disabled, options.action_disabled,
+            options.action_loading, options.menu.popup.dt, options.menu.keep_open_checks, handlers,
+            observed, metadata);
+    else if (observed) {
         *observed = cui_base_dropdown_button_events(
             ui, options.hide_action ? 0 : action_id, options.hide_menu ? 0 : trigger_id,
             action_name, menu_name, items, count, menu_action, state,
@@ -2867,7 +2880,7 @@ cui_dropdown_button_result cui_dropdown_button(cui_context *ui, cui_id container
                                                cui_dropdown_button_options options) {
     return cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme, action_name,
                                       menu_name, items, count, menu_action, state, options,
-                                      (cui_dropdown_event_handlers){0}, NULL, NULL);
+                                      (cui_dropdown_event_handlers){0}, NULL, NULL, NULL);
 }
 cui_dropdown_event_result
 cui_dropdown_button_events(cui_context *ui, cui_id container, cui_id action_id, cui_id trigger_id,
@@ -2879,7 +2892,7 @@ cui_dropdown_button_events(cui_context *ui, cui_id container, cui_id action_id, 
     memset(&result, 0, sizeof(result));
     result.legacy = cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme,
                                                action_name, menu_name, items, count, menu_action,
-                                               state, options, handlers, &result, NULL);
+                                               state, options, handlers, &result, NULL, NULL);
     return result;
 }
 
@@ -2890,7 +2903,7 @@ cui_dropdown_button_result cui_dropdown_button_styled_ex(
     const cui_dropdown_button_styles *styles) {
     return cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme, action_name,
                                       menu_name, items, count, menu_action, state, options,
-                                      (cui_dropdown_event_handlers){0}, NULL, styles);
+                                      (cui_dropdown_event_handlers){0}, NULL, styles, NULL);
 }
 cui_dropdown_event_result cui_dropdown_button_styled_events(
     cui_context *ui, cui_id container, cui_id action_id, cui_id trigger_id, const cui_theme *theme,
@@ -2900,6 +2913,28 @@ cui_dropdown_event_result cui_dropdown_button_styled_events(
     cui_dropdown_event_result result = {0};
     result.legacy = cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme,
                                                action_name, menu_name, items, count, menu_action,
-                                               state, options, handlers, &result, styles);
+                                               state, options, handlers, &result, styles, NULL);
+    return result;
+}
+
+cui_dropdown_button_result cui_dropdown_button_with_metadata_ex(
+    cui_context *ui, cui_id container, cui_id action_id, cui_id trigger_id, const cui_theme *theme,
+    cui_str action_name, cui_str menu_name, const cui_menu_entry *items, size_t count,
+    cui_id *menu_action, cui_menu_tree_state *state, cui_dropdown_button_options options,
+    const struct cui_dropdown_button_styles *styles, const cui_dropdown_button_metadata *metadata) {
+    return cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme, action_name,
+                                      menu_name, items, count, menu_action, state, options,
+                                      (cui_dropdown_event_handlers){0}, NULL, styles, metadata);
+}
+cui_dropdown_event_result cui_dropdown_button_with_metadata_events(
+    cui_context *ui, cui_id container, cui_id action_id, cui_id trigger_id, const cui_theme *theme,
+    cui_str action_name, cui_str menu_name, const cui_menu_entry *items, size_t count,
+    cui_id *menu_action, cui_menu_tree_state *state, cui_dropdown_button_options options,
+    const struct cui_dropdown_button_styles *styles, const cui_dropdown_button_metadata *metadata,
+    cui_dropdown_event_handlers handlers) {
+    cui_dropdown_event_result result = {0};
+    result.legacy = cui_choice_render_dropdown(ui, container, action_id, trigger_id, theme,
+                                               action_name, menu_name, items, count, menu_action,
+                                               state, options, handlers, &result, styles, metadata);
     return result;
 }

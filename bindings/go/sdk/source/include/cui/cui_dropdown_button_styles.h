@@ -26,7 +26,7 @@ typedef enum {
  * open uses selected paint, action ghost gets only held group surface. Loading
  * fades after replay; focus uses focus-visible and theme gate. LEGACY preserves
  * old palette/state rules. No metadata/tab/toggle or binding facade is added. */
-typedef struct {
+typedef struct cui_dropdown_button_styles {
     cui_dropdown_button_paint_policy paint_policy;
     cui_button_styles action, trigger;
     cui_button_paint_patch container;

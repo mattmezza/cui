@@ -247,14 +247,15 @@ Additional event includes: `cui/cui_disclosure_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains menu tree state and menu entries; style descriptors copy at entry, while pure style callbacks and userdata are synchronously borrowed.
+**State:** Caller retains menu tree state and menu entries; style descriptors copy at entry, while pure style callbacks and userdata are synchronously borrowed. Metadata descriptors copy at entry; custom name bytes remain borrowed and immutable through submission, then Core retains frame copies.
 
-**Interaction:** cui_dropdown_button_result separates main activation from menu interaction; styled entries preserve the same Base/events reduction and legacy callback mutations.
+**Interaction:** cui_dropdown_button_result separates main activation from menu interaction; styled entries preserve the same Base/events reduction and legacy callback mutations. Metadata names/order apply before existing callbacks; skip-tab does not suppress pointer/AT eligibility.
 
-**Usage:** Opt into bounded action/trigger/container paint through cui_dropdown_button_styles; NULL/zero preserves legacy paint. Metadata forwarding and language-builder styles remain separate gaps.
+**Usage:** Use independent optional metadata for UTF-8 accessible names, signed tab ordering and skip-tab. NULL/zero preserves legacy behavior. Checked/value matches the existing Button convention; optional toggled presence and language-builder facades remain gaps.
 
 API: `cui_dropdown_button`, `cui_dropdown_button_events`,
-`cui_dropdown_button_styled_ex`, `cui_dropdown_button_styled_events`.
+`cui_dropdown_button_styled_ex`, `cui_dropdown_button_styled_events`,
+`cui_dropdown_button_with_metadata_ex`, `cui_dropdown_button_with_metadata_events`.
 [Legacy header](../include/cui/cui_choice.h);
 [paint header](../include/cui/cui_dropdown_button_styles.h);
 [paint guide](DROPDOWN_BUTTON_STYLES.md).

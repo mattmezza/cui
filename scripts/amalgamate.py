@@ -75,10 +75,10 @@ def generate(name,sources):
         lines += ['#include "cui_tree_events.h"']
     if name == "cui_disclosure":
         lines += ['#include "cui_disclosure_events.h"']
-    if name == "cui_dropdown_button_styles":
+    if name in ("cui_dropdown_button_styles", "cui_dropdown_button_metadata"):
         lines += ['#ifndef CUI_CHOICE_IMPLEMENTATION', '#define CUI_CHOICE_IMPLEMENTATION', '#endif', '#include "cui_choice.h"']
     if name == "cui_choice":
-        lines += ['#include "cui_dropdown_button_styles.h"']
+        lines += ['#include "cui_dropdown_button_styles.h"', '#include "cui_dropdown_button_metadata.h"']
         lines += ['#include "cui_list_events.h"']
         lines += ['#ifndef CUI_TABS_EVENTS_IMPLEMENTATION', '#define CUI_TABS_EVENTS_IMPLEMENTATION', '#endif', '#include "cui_tabs_events.h"']
     if name == "cui_tabs_events":
@@ -134,7 +134,7 @@ def generate(name,sources):
             code=code.replace(private_include, (ROOT/'src/base/cui_icon_layout.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_textarea_geometry.h').read_text(encoding='utf-8'))
-        for private_path in ['src/components/cui_popover_paint.h', 'src/components/cui_questionnaire_presentation_private.h', 'src/base/cui_questionnaire_observer_internal.h', 'src/base/cui_questionnaire_snapshot_math.h', 'src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h', 'src/base/cui_picker_composition_internal.h', 'src/base/cui_date_time_internal.h', 'src/components/cui_picker_paint_internal.h']:
+        for private_path in ['src/base/cui_dropdown_metadata_internal.h', 'src/components/cui_popover_paint.h', 'src/components/cui_questionnaire_presentation_private.h', 'src/base/cui_questionnaire_observer_internal.h', 'src/base/cui_questionnaire_snapshot_math.h', 'src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h', 'src/base/cui_picker_composition_internal.h', 'src/base/cui_date_time_internal.h', 'src/components/cui_picker_paint_internal.h']:
             private_name = private_path.rsplit("/", 1)[-1]
             for private_include in [f'#include "{private_name}"', f'#include "../base/{private_name}"', f'#include "../components/{private_name}"']:
                 code = code.replace(private_include, (ROOT/private_path).read_text(encoding='utf-8'))

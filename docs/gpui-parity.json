@@ -1066,14 +1066,16 @@
         "tests/web/test_browser.py",
         "tests/unit/test_dropdown_button_styles.c",
         "tests/unit/test_dropdown_events.c",
-        "tests/test_dropdown_button_styles_distribution.py"
+        "tests/test_dropdown_button_styles_distribution.py",
+        "tests/unit/test_dropdown_button_metadata.c",
+        "tests/test_dropdown_button_metadata_distribution.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Split actions and bounded opt-in Button paint refinements are covered, including source state ordering, captured instance replay and explicit custom-shadow gates. Source theme-token equality, metadata/name/tab/toggle forwarding, arbitrary styles and language-builder refinements remain incomplete; no full family parity is claimed."
+        "Split actions, bounded opt-in Button paint refinements, custom names and independent signed tab ordering/eligibility are covered. Optional toggled presence and pressed-button AT adapter mapping still require Core/adapter work; checked/value alone does not close that gap. Source theme-token equality, arbitrary styles and language-builder refinements remain incomplete; no full family parity is claimed."
       ],
       "owner": "compound-controls",
       "last_verified_commit": null,
@@ -1120,7 +1122,19 @@
             "docs/DROPDOWN_BUTTON_STYLES.md"
           ],
           "limitations": [
-            "C-only paint masks and synchronous pure callbacks; source color formulas use CUI palette tokens and byte alpha precision. Metadata forwarding and binding facades remain separate."
+            "C-only paint masks and synchronous pure callbacks; source color formulas use CUI palette tokens and byte alpha precision. Binding facades remain separate."
+          ]
+        },
+        {
+          "name": "explicit accessible names and signed tab forwarding",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_dropdown_button_metadata.h",
+            "tests/unit/test_dropdown_button_metadata.c",
+            "docs/DROPDOWN_BUTTON_METADATA.md"
+          ],
+          "limitations": [
+            "Action checked/value convention only; no optional toggled presence or binding facade."
           ]
         }
       ],

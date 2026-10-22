@@ -214,6 +214,10 @@ For bounded DropdownButton paint, read `docs/DROPDOWN_BUTTON_STYLES.md` and
 explicit BUTTON policy enables source state ordering with CUI palette tokens.
 Independent action/trigger callbacks are borrowed and pure; instance values replay
 after selected/disabled. Container has no foreground cascade. Custom XS shadows
-require both explicit intent and the host-enable gate. This adds no metadata/tab/
-toggle forwarding or language-builder style facade. Use matching rebuilt source,
+require both explicit intent and the host-enable gate. For independent accessible names and signed tab ordering, read
+`docs/DROPDOWN_BUTTON_METADATA.md` and its authoritative sibling header. Names
+are UTF-8, explicitly empty when masked, and borrowed immutable through submission.
+Metadata is visible before existing synchronous callbacks. Checked/value follows
+the existing Button convention; optional toggled presence/pressed-button adapter
+mapping and language-builder facades remain gaps. Use matching rebuilt source,
 standalone distribution headers or packaged SDKs; do not mix revisions.

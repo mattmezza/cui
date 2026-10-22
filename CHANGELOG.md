@@ -2,6 +2,16 @@
 
 ## 0.1.0-alpha.3 — unreleased
 
+- Adds a separate civil DateTime picker with minute/second precision, 12/24-hour
+  display, explicit assignment, presets and clear actions; includes compiled C
+  examples and real desktop/touch gallery controls. Timezones and date ranges are
+  outside this API; existing date-only entry points remain available.
+- Adds Questionnaire progress and named title/description/error presentation,
+  token sizes and copied usage examples. Legacy presentation defaults remain
+  available; general container/input geometry parity is still incomplete.
+- Adds opt-in Popover anchor positioning, signed offsets and arrows, with
+  software/WASI and private-Xvfb Sokol validation. Baseline SDL3 arrow rendering,
+  exact reference rasterization and positioning builders remain unsupported.
 - Adds opt-in date-only DatePicker presets, clear/Delete actions and an interactive
   desktop/touch gallery mode. Legacy date-only APIs remain available.
 - Adds bounded Questionnaire copy-out snapshots, keyboard shortcut policies and
@@ -12,7 +22,8 @@
   checks DatePicker semantic values independently of C struct padding.
 - Rebuild C consumers and bindings with matching headers and libraries:
   `cui_questionnaire_state` gained an observer pointer. Language builders do not
-  expose the new C observer/payload arenas or DatePicker action options.
+  expose the new C observer/payload arenas, Questionnaire presentation options,
+  DateTime/DatePicker action options or explicit Popover positioning.
 - Release artifacts and registry publication are not yet available for alpha.3.
   All 78 catalog families remain present; full feature parity is unfinished.
 

@@ -132,6 +132,9 @@ jobs:
       - name: Verify Questionnaire optional shortcuts and real touch selection
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_questionnaire_shortcuts_gallery.py --directory build/web
+      - name: Verify Questionnaire named text and Error presentation
+        if: ${{ matrix.shard == 3 }}
+        run: uv run tests/web/test_questionnaire_presentation_gallery.py --directory build/web
       - name: Verify Questionnaire progress presentation and copyable examples
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_questionnaire_progress_gallery.py --directory build/web

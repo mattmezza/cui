@@ -69,6 +69,7 @@
 #include "cui_date_time_picker.h"
 #include "cui_date_picker_actions.h"
 #include "cui_questionnaire_observer.h"
+#include "cui_stepper_visual.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -344,4 +345,8 @@
 #define CUI_QUESTIONNAIRE_OBSERVER_IMPLEMENTATION
 #endif
 #include "cui_questionnaire_observer.h"
+#ifndef CUI_STEPPER_VISUAL_IMPLEMENTATION
+#define CUI_STEPPER_VISUAL_IMPLEMENTATION
+#endif
+#include "cui_stepper_visual.h"
 #endif

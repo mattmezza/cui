@@ -2741,7 +2741,8 @@
       "tests": [
         "tests/unit/test_numeric.c",
         "tests/web/test_browser.py",
-        "tests/unit/test_stepper_navigation.c"
+        "tests/unit/test_stepper_navigation.c",
+        "tests/unit/test_stepper_visual.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2749,7 +2750,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled per-activation navigation requests and application-owned validation tested; legacy aggregate CHANGE timing remains unchanged. Source connectors, custom icons and exact density/style fidelity remain incomplete. See docs/STEPPER_NAVIGATION.md."
+        "Controlled per-activation navigation requests and application-owned validation tested; legacy aggregate CHANGE timing/rendering remains unchanged. Opt-in non-centered connectors and bitmap custom icons are tested in native software rendering. Centered/responsive source composition, arbitrary children/style and exact density fidelity remain incomplete; no browser or live AT proof for the visual facade. See docs/STEPPER_NAVIGATION.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2775,6 +2776,15 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_numeric.c"
+          ]
+        },
+        {
+          "name": "opt-in non-centered connectors, custom bitmap icons and shared XS..9XL sizing",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_stepper_visual.h",
+            "tests/unit/test_stepper_visual.c",
+            "docs/STEPPER_NAVIGATION.md"
           ]
         }
       ],

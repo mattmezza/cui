@@ -285,7 +285,10 @@
       "src/base/cui_questionnaire_observer.c"
     ],
     "cui_dropdown_button_styles": [],
-    "cui_dropdown_button_metadata": []
+    "cui_dropdown_button_metadata": [],
+    "cui_stepper_visual": [
+      "src/components/cui_stepper_visual.c"
+    ]
   },
   "native": {
     "text": [

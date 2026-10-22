@@ -376,7 +376,28 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_stepper_visual.h",
+          "languages": [
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust"
+          ],
+          "types": [
+            "cui_stepper_density",
+            "cui_stepper_icon",
+            "cui_stepper_visual_options"
+          ],
+          "symbols": [
+            "cui_stepper_visual_navigation"
+          ],
+          "note": "Source SDK carries the C module; language builders/bridge records do not expose visual descriptors or typed navigation handlers. Legacy tested_subset statuses do not imply connector/icon authoring."
+        }
+      ]
     },
     {
       "name": "Switch",

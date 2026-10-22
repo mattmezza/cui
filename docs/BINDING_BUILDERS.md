@@ -398,3 +398,9 @@ For native callback loops, live resizing, callback failure containment and the
 manual-loop compatibility contract, see [binding native runners](BINDING_NATIVE_RUN.md).
 
 The optional `cui_date_time_picker.h` single civil date/time API is C-only in this revision. Generated source SDKs carry its header/implementation, but Python/JavaScript/TypeScript/Go/Rust builders and bridge records do not expose its typed value/state, assignment, options, helpers or result. Do not pass legacy date-only builder storage to it. See `docs/DATE_TIME_PICKER.md`.
+
+The opt-in C Stepper visual facade (`cui_stepper_visual.h`) adds non-centered
+connectors and borrowed bitmap icons to controlled navigation. Its typed density,
+icon/options and request handler are not exposed by language builders or bridge
+records; bundled source SDK availability does not imply binding support. See
+[Stepper navigation](STEPPER_NAVIGATION.md).

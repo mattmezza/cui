@@ -59,7 +59,73 @@ delivered; future input acceptance is not promised to survive forbidden routing
 changes.
 
 Styled rendering reuses the legacy private paint path, including horizontal and
-vertical layout and explicit caller error/complete statuses. This API does not
+vertical layout and explicit caller error/complete statuses. This legacy paint path does not
 add upstream icons, arbitrary children, sizing, checked separators, ListItem
-hierarchy or live AT announcements. There is no Python/Node/TypeScript/Go/Rust
+hierarchy or live AT announcements. The opt-in visual facade below adds a bounded
+connector/icon composition. There is no Python/Node/TypeScript/Go/Rust
 binding surface for these requests yet. Source and platform parity remain partial.
+
+## Opt-in connectors and custom icons
+
+Include `cui/cui_stepper_visual.h` and call `cui_stepper_visual_navigation` to
+choose non-centered indicator/connector composition. The legacy functions above
+keep their previous button/status rendering and callback timing. This facade
+calls the same Base request reducer once; selection remains application-owned.
+It has no loading state. Decorations add no focusable or semantic targets.
+
+```c
+#include "cui/cui_stepper_visual.h"
+void draw_steps(cui_context *ui, const cui_theme *theme, size_t selected,
+                cui_stepper_navigation_handler handler) {
+    const cui_step steps[] = {
+        {.title = CUI_STR("Start")},
+        {.title = CUI_STR("Review"), .description = CUI_STR("Check details")},
+        {.title = CUI_STR("Finish")}
+    };
+    (void)cui_stepper_visual_navigation(ui, 100, theme, steps, 3, selected,
+        (cui_stepper_visual_options){.density = CUI_STEPPER_DENSITY_MD}, handler);
+}
+```
+
+Density selects indicator diameters8/18/24/32 for XS/SM/MD/LG and connector
+thickness1.5/2/2/3. A separator follows each item except the last. Passed
+connectors use primary when their index is less than selected; passed/current
+indicators use primary even when disabled. Caller COMPLETE/ERROR statuses do not
+determine passed color. ERROR retains a visible CUI-specific label. Other explicit
+status labels remain available through legacy rendering, not this source-style
+facade. Source pixels, theme sizes and general style refinements are not identical.
+
+To replace ordinals, pass an array of `cui_stepper_icon` with exactly one entry per
+step. Set `present` and a valid `cui_bitmap` on entries to replace. Unset entries
+use their ordinal. XS suppresses both icon and ordinal, but still validates all
+present bitmaps. Existing Icon state can rasterize an SVG before submission; the
+facade does not load/rasterize assets. Icons use foreground tint multiplied by
+source RGB and preserve source alpha; use white RGB for a monochrome alpha mask.
+All images are straight-alpha RGBA8 under `cui_bitmap_valid`: nonnull pixels,
+nonzero dimensions<=16384, stride>=width*4, and height*stride without overflow.
+This cannot validate the caller's allocation length; provide that full storage.
+
+Options, descriptor arrays, strings and theme are borrowed through return and
+must stay stable during callbacks. Bitmap metadata is copied into draw commands;
+no stack icon-descriptor pointer is retained. **Pixel bytes must remain valid
+through renderer completion**, and revision must change when they change. Invalid
+icons/count/density fail before semantic registration or callbacks. `valid` is
+argument preflight, not completed layout/resource-capacity or visibility proof.
+The returned request count and callback restrictions match the existing API.
+
+Centered text/separators, responsive flex growth, arbitrary child content/style,
+exact source density and language builders remain unfinished. Follow-up slices
+should add independently tested centered/flexible geometry and then theme/style
+controls without changing the request reducer. Native software tests cover this
+bounded composition and actual pointer/touch/keyboard requests; no browser or live
+assistive-technology acceptance is claimed.
+
+`options.design_size` accepts the existing shared XS/SM/BASE/MD/LG/XL/2XL..9XL
+scale. INHERIT (zero) leaves the source-density dimensions above unchanged.
+Explicit design sizing resolves shared metrics at `theme->font_size / 16`: source
+indicator diameter, separator thickness and connector lengths scale by
+`metrics.indicator_size / 16`; labels use shared font size and spacing uses shared
+gap. Thus `density` selects source proportions/suppression while `design_size`
+selects the app's shared scale. All tokens are tested, including9XL; invalid
+tokens or invalid resolved density fail before semantics/callbacks. These metrics
+do not claim frozen GPUI pixel fidelity or responsive/centered layout completion.

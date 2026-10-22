@@ -521,6 +521,13 @@
       "sources": [
         "src/base/cui_questionnaire_observer.c"
       ]
+    },
+    {
+      "header": "cui_stepper_visual.h",
+      "macro": "CUI_STEPPER_VISUAL_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_stepper_visual.c"
+      ]
     }
   ]
 }

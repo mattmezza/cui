@@ -67,3 +67,10 @@ tests remain green. Strict native tests use the private Xvfb wrapper; sanitizer,
 C++ header and standalone/amalgamation/package tests cover the new public entry.
 SDK/distribution/skill generation and binding omission metadata follow production;
 no binding or full Stepper parity claim is made.
+
+Approved production refinement: the optional `design_size` member uses the shared
+`cui_design_size` XS..9XL range. Zero preserves source-density geometry; explicit
+sizes use shared font/gap and scale source indicator/separator/connector geometry
+by the resolved indicator size divided by16. All tokens and invalid preflight are
+covered independently of the frozen four source densities. This is app sizing,
+not a claim of exact source style or responsive centered composition.

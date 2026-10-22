@@ -12,6 +12,77 @@ const $ = id => document.getElementById(id);
 const siteAssetRoot=new URL('.',document.baseURI);
 const siteBaseElement=document.querySelector('base')||document.head.appendChild(document.createElement('base'));
 siteBaseElement.href=siteAssetRoot.href;
+const popoverControls=document.createElement('span');
+popoverControls.id='popover-controls';popoverControls.hidden=true;
+const popoverAnchors=['TOP_LEFT','TOP_CENTER','TOP_RIGHT','BOTTOM_LEFT','BOTTOM_CENTER','BOTTOM_RIGHT','LEFT_CENTER','RIGHT_CENTER'];
+function popoverControl(id,label,options,value){
+ const wrapper=document.createElement('label');wrapper.textContent=label+' ';
+ const input=document.createElement(options?'select':'input');input.id='popover-'+id;
+ input.setAttribute('aria-label','Popover '+label);
+ if(options)for(const [v,text] of options){const option=document.createElement('option');option.value=v;option.textContent=text;input.append(option);}
+ else input.type='checkbox';
+ if(options)input.value=value;else input.checked=!!value;
+ input.addEventListener('change',requestFrame);wrapper.append(input);popoverControls.append(wrapper,' ');return input;
+}
+popoverControl('mode','Positioning',[[0,'Legacy placement'],[1,'Source anchors (opt in)']],0);
+popoverControl('anchor','Popup anchor',popoverAnchors.map((name,i)=>[i,name.toLowerCase().replaceAll('_',' ')]),0);
+popoverControl('custom-offset','Custom signed gap',null,false);
+popoverControl('offset','Gap',[-24,-8,0,8,24].map(n=>[n,String(n)]),8);
+popoverControl('arrow','Arrow',null,true);
+popoverControl('rem','Reference rem',[[0,'Default (16px)'],[16,'16px'],[24,'24px'],[32,'32px']],16);
+popoverControl('edge','Edge clamp',null,false);
+popoverControl('opacity','Opacity',[[1,'100%'],[.5,'50%']],1);
+popoverControl('inert','Inert ancestor',null,false);
+popoverControl('modal','Modal above card',null,false);
+$('surface-variant').after(popoverControls);
+function popoverValues(){return [Number($('popover-mode').value),Number($('popover-anchor').value),Number($('popover-custom-offset').checked),Number($('popover-offset').value),Number($('popover-arrow').checked),Number($('popover-rem').value),Number($('popover-edge').checked),Number($('popover-opacity').value),Number($('popover-inert').checked),Number($('popover-modal').checked)];}
+function popoverUsage(){
+ const [mode,anchor,custom,offset,arrow,rem,edge,opacity,inert,modal]=popoverValues();
+ const position=mode?`    cui_popover_position position = {
+        .mode = CUI_POPOVER_POSITION_ANCHOR, .anchor = CUI_POPOVER_${popoverAnchors[anchor]},
+        .reference_rem = ${rem}, .custom_offset = ${!!custom}, .offset = ${offset}, .arrow = ${!!arrow}};
+    /* Reference rem comes from app/host root sizing, never the theme font. */
+    cui_begin_box(ui, cui_id_from(ui, "account-stage"),
+        (cui_box){.width = width - 48, .height = height - 48,
+          .align_x = CUI_ALIGN_${edge?'END':'CENTER'}, .align_y = CUI_ALIGN_${edge?'END':'CENTER'},
+          .custom_opacity = true, .opacity = ${Number(opacity).toFixed(1)}f, .inert = ${!!inert}});`:'';
+ const begin=mode?'cui_popover_begin(ui, theme, card, cui_string("Alex Morgan"),\n            cui_string("Maintainer"), options, position)':'cui_surface_begin(ui, theme, card, cui_string("Alex Morgan"),\n            cui_string("Maintainer"), options)';
+ return `#include <cui/cui_surface.h>
+#include <cui/cui_components.h>
+/* Retain card and layer across frames. Call init once before drawing. */
+void account_init(cui_context *ui, cui_surface_state *card, cui_surface_state *layer) {
+    cui_surface_init(card, cui_id_from(ui, "account"), CUI_SURFACE_POPOVER);
+    cui_surface_init(layer, cui_id_from(ui, "account-modal"), CUI_SURFACE_DIALOG);
+}
+${modal&&mode?`/* Call from an application action after opening the card. */
+void account_modal_open(cui_context *ui, cui_surface_state *layer) {
+    cui_surface_open(ui, layer, 0);
+}
+`:''}void account_draw(cui_context *ui, const cui_theme *theme,
+        cui_surface_state *card, cui_surface_state *layer, float width, float height) {
+    (void)layer;
+${position}
+    cui_id trigger = cui_id_from(ui, "account-trigger");
+    if (cui_button(ui, trigger, theme, cui_string("Open account card"), false))
+        cui_surface_open(ui, card, trigger);
+    cui_surface_options options = {.viewport = {0, 0, width, height},
+        .anchor = cui_bounds(ui, trigger), .width = width > 500 ? 340 : width - 48,
+        .height = 190, .margin = 12, .side = CUI_POPUP_BELOW,
+        .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
+    if (${begin}) {
+        cui_label(ui, theme, cui_string("Profile content"));
+        cui_surface_end(ui);
+    }
+${mode?'    cui_end_box(ui);\n':''}${modal&&mode?`    cui_surface_options modal = {.viewport = {0, 0, width, height},
+        .width = width > 500 ? 260 : width - 72, .height = 120, .layer = 200};
+    if (cui_surface_begin(ui, theme, layer, cui_string("Layering modal"),
+            cui_string("The account card remains below"), modal))
+        cui_surface_end(ui);
+`:''}}
+/* Source anchors clamp without flipping or shrinking. Arrows are decoration;
+ * keep the mesh-capable host and state alive through draw-list consumption.
+ * Open the card before selecting inert/modal demonstration controls. */`;
+}
 function componentSlug(name){return name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
 function shareRoute(path,raw,title,description){
  document.body.dataset.route=raw;
@@ -750,7 +821,7 @@ function render(){
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,designScale>0?8*designHeights[designScale]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Popover'&&$('popover-mode').value==='1'?520:selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?360:selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,designScale>0?8*designHeights[designScale]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -759,6 +830,8 @@ function render(){
  wasm.gallery_table_mode(Number($('table-mode').value));
  wasm.gallery_table_selection_mode(Number($('table-selection').value));
  wasm.gallery_surface_variant(Number($('surface-variant').value));
+ wasm.gallery_popover_options(...popoverValues());
+ for(const input of popoverControls.querySelectorAll('select,input'))if(input.id!=='popover-mode')input.disabled=$('popover-mode').value==='0';
  wasm.gallery_button_collection(Number($('button-collection').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
@@ -877,6 +950,10 @@ function render(){
  }
  if(selected.name==='DatePicker')$('snippet').textContent=wasm.gallery_control_stats(9)?dateTimeSnippet(Boolean(wasm.gallery_control_stats(10)),Boolean(wasm.gallery_control_stats(11)),Boolean(wasm.gallery_control_stats(13))):wasm.gallery_control_stats(7)?dateActionsSnippet(Boolean(wasm.gallery_control_stats(8))):snippets.DatePicker;
  if(selected.name==='Questionnaire')$('snippet').textContent=questionnairePresentationUsage(Number(questionnairePresentationControl.value))||questionnaireProgressUsage(Number($('questionnaire-progress').value))||snippets.Questionnaire;
+ if(selected.name==='Popover'){
+  if($('popover-modal').checked&&!wasm.gallery_surface_open(0))$('popover-modal').checked=false;
+  $('snippet').textContent=popoverUsage();
+ }
  if(selected.name==='Checkbox')$('checkbox-state').value=String(wasm.gallery_checkbox_state(-1));
  if(selected.name==='Sidebar')$('sidebar-collapsed').checked=Boolean(wasm.gallery_sidebar_stats(0));
  if(selected.name==='Attachment')$('attachment-status').value=String(wasm.gallery_attachment_stats(9));
@@ -1105,6 +1182,10 @@ function selectComponent(){
  $('table-mode').hidden=selected.name!=='DataTable';$('table-mode').value='0';
  $('table-selection').hidden=selected.name!=='DataTable';$('table-selection').value='2';
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
+ popoverControls.hidden=selected.name!=='Popover';
+ for(const [id,value] of [['mode','0'],['anchor','0'],['offset','8'],['rem','16'],['opacity','1']])$('popover-'+id).value=value;
+ for(const id of ['custom-offset','edge','inert','modal'])$('popover-'+id).checked=false;
+ $('popover-arrow').checked=true;
  $('disclosure-mode').hidden=!['Accordion','Collapsible'].includes(selected.name);$('disclosure-mode').value='0';
  $('disclosure-multiple-control').hidden=selected.name!=='Accordion';$('disclosure-multiple').checked=false;
  for(const id of ['avatar-source','avatar-palette-control','avatar-hue','avatar-placeholder','avatar-rem'])$(id).hidden=selected.name!=='Avatar';

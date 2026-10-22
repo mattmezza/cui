@@ -81,3 +81,34 @@ DPR 1 and 2; full Popover positioning gallery coverage is a separate check.
 Physical GPU hardware checks remain separate from Xvfb/software validation.
 This slice does not cover
 Popover transition, right-click trigger or focus/control parity.
+
+## Browser gallery
+
+The Popover story starts with its existing legacy account card. Select **Source
+anchors (opt in)** to use `cui_popover_begin` and a real centered CUI trigger.
+All eight names identify the popup's own anchor. Controls map directly to
+`mode`, `anchor`, `custom_offset`, signed scalar `offset`, `arrow` and
+`reference_rem`. The latter is explicit application/host root sizing: zero means
+16 logical pixels; the sample also offers 16, 24 and 32. It is never inferred
+from the theme font. Inactive controls are disabled in legacy mode.
+
+Edge clamp moves the actual trigger to the lower corner. The gallery schedules
+one settling frame when the newly laid-out trigger differs from the bounds used
+for composition, then returns to idle. It retains popup size and anchor direction.
+Opacity and inert controls wrap the real stage. Open the card first to observe
+paint persisting under an inert ancestor while child semantics/input disappear.
+The modal demonstration uses a separate ordinary dialog at explicit layer 200,
+above the card's default layer; it does not implement automatic overlay ordering.
+Closing that dialog updates its control. Route changes close both surfaces and
+reset the demonstration controls. The complete C11 snippet reflects the current
+positioning and stage settings.
+
+`tests/web/test_popover_anchor_gallery.py` drives actual mouse/CDP touch input,
+checks all eight source equations against real CUI bounds and mesh vertices,
+compiles the displayed snippets with strict C11 warnings, and reads actual Canvas
+pixels for centered arrow joins, opacity, inert persistence and modal backdrop
+ordering. Fractional clamped Canvas rectangle edges can still antialias the join
+differently from mesh pixel-center coverage: a dark fill value 10 can read 9 at
+an adjacent join pixel. Clamped geometry is checked separately; exact centered
+join assertions retain exact values. This known raster difference is not claimed
+as GPUI pixel parity. Browser font, accessibility and focus limitations remain.

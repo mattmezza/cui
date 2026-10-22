@@ -1994,6 +1994,10 @@ static cui_surface_state dialog_surface, alert_dialog_surface, sheet_surface, po
     nested_surface;
 static int surface_variant, alert_attempts;
 static bool dialog_updates = true, popover_updates;
+static cui_popover_position gallery_popover_position;
+static bool popover_edge, popover_inert, popover_modal;
+static float popover_opacity = 1;
+static cui_rect popover_anchor_used;
 static bool alert_decision(void *user, cui_surface_result result) {
     int *attempts = user;
     if (result != CUI_SURFACE_ACCEPTED)
@@ -5442,10 +5446,21 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 51: {
+        bool positioned = gallery_popover_position.mode == CUI_POPOVER_POSITION_ANCHOR;
+        if (positioned)
+            cui_begin_box(ui, cui_id_from(ui, "popover-position-stage"),
+                          (cui_box){.width = width - 48,
+                                    .height = height - 48,
+                                    .align_x = popover_edge ? CUI_ALIGN_END : CUI_ALIGN_CENTER,
+                                    .align_y = popover_edge ? CUI_ALIGN_END : CUI_ALIGN_CENTER,
+                                    .inert = popover_inert,
+                                    .opacity = popover_opacity,
+                                    .custom_opacity = true});
         cui_id trigger = cui_id_from(ui, "popover-trigger");
         if (cui_button(ui, trigger, &t, cui_string("Open account card"), disabled))
             cui_surface_open(ui, &popover_surface, trigger);
         cui_rect anchor = cui_bounds(ui, trigger);
+        popover_anchor_used = anchor;
         cui_surface_options options = {.viewport = {0, 0, width, height},
                                        .anchor = anchor,
                                        .width = width > 500 ? 340 : width - 48,
@@ -5453,8 +5468,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                        .margin = 12,
                                        .side = CUI_POPUP_BELOW,
                                        .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
-        if (cui_surface_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
-                              cui_string("Maintainer · Portable UI systems"), options)) {
+        if (cui_popover_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
+                              cui_string("Maintainer · Portable UI systems"), options,
+                              gallery_popover_position)) {
             cui_avatar(ui, cui_id_from(ui, "popover-avatar"), &t, cui_string("Alex Morgan"), 40);
             cui_checkbox(ui, cui_id_from(ui, "popover-updates"), &t,
                          cui_string("Notify me about releases"), &popover_updates, false);
@@ -5462,6 +5478,21 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                            false))
                 cui_surface_close(ui, &popover_surface, CUI_SURFACE_ACCEPTED);
             cui_surface_end(ui);
+        }
+        if (positioned)
+            cui_end_box(ui);
+        if (positioned && popover_modal && dialog_surface.overlay.open) {
+            cui_surface_options modal = {.viewport = {0, 0, width, height},
+                                         .width = width > 500 ? 260 : width - 72,
+                                         .height = 120,
+                                         .layer = 200};
+            if (cui_surface_begin(ui, &t, &dialog_surface, cui_string("Layering modal"),
+                                  cui_string("The account card remains painted below."), modal)) {
+                if (cui_button(ui, cui_id_from(ui, "popover-layer-close"), &t,
+                               cui_string("Close layering modal"), false))
+                    cui_surface_close(ui, &dialog_surface, CUI_SURFACE_ACCEPTED);
+                cui_surface_end(ui);
+            }
         }
         break;
     }
@@ -5914,6 +5945,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_end_box(ui);
     cui_touch_page_dispatch(&page_touch_host, ui);
     draw = cui_end_frame(ui);
+    if (story == 51 && gallery_popover_position.mode == CUI_POPOVER_POSITION_ANCHOR) {
+        /* Bounds queries during composition refer to the preceding layout.
+         * Settle a moved/resized trigger before returning the preview to idle. */
+        cui_rect current = cui_bounds(ui, cui_id_from(ui, "popover-trigger"));
+        if (current.x != popover_anchor_used.x || current.y != popover_anchor_used.y ||
+            current.w != popover_anchor_used.w || current.h != popover_anchor_used.h)
+            redraw = true;
+    }
     cui_touch_page_finish(&page_touch_host, ui);
     if (notification_clear) {
         cui_notification_clear(&notification_state, host_seconds);
@@ -6504,6 +6543,29 @@ int gallery_form_submissions(void) {
 }
 double gallery_sheet_motion(unsigned field) {
     return field == 0 ? sheet_surface.sheet_progress : sheet_surface.sheet_closing;
+}
+/* Browser-host descriptor. The first six values map directly to the portable
+ * positioning descriptor; the remainder configure only this demonstration. */
+void gallery_popover_options(int mode, int anchor, int custom_offset, float offset, int arrow,
+                             float reference_rem, int edge, float opacity, int inert, int modal) {
+    gallery_popover_position = (cui_popover_position){
+        .mode = mode == 1 ? CUI_POPOVER_POSITION_ANCHOR : CUI_POPOVER_POSITION_LEGACY,
+        .anchor = anchor >= 0 && anchor <= 7 ? (cui_popover_anchor)anchor : CUI_POPOVER_TOP_LEFT,
+        .reference_rem = isfinite(reference_rem) && reference_rem >= 0 && reference_rem <= 64
+                             ? reference_rem
+                             : 16,
+        .offset = isfinite(offset) && offset >= -64 && offset <= 64 ? offset : 0,
+        .custom_offset = custom_offset != 0,
+        .arrow = arrow != 0};
+    popover_edge = edge != 0;
+    popover_opacity = isfinite(opacity) && opacity >= 0 && opacity <= 1 ? opacity : 1;
+    popover_inert = inert != 0;
+    bool next_modal = mode == 1 && modal != 0;
+    if (next_modal && !popover_modal)
+        cui_surface_open(ui, &dialog_surface, 0);
+    else if (!next_modal && popover_modal)
+        cui_surface_close(ui, &dialog_surface, CUI_SURFACE_CANCELLED);
+    popover_modal = next_modal;
 }
 void gallery_surface_variant(int variant) {
     if (surface_variant != variant)

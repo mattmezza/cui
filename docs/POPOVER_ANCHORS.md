@@ -74,8 +74,10 @@ a later adequately sized frame.
 The portable outline uses a bounded 2px miter and triangle meshes. GPUI's external
 PathBuilder tessellation/raster AA is not reproduced exactly. Source fill, anchor,
 tip and seam equations do not establish exact pixel parity. Software, SDL_GPU and
-Sokol support Core mesh commands. The baseline SDL3 renderer does not support mesh
-commands, so arrow rendering there requires adapter coverage; use arrow=false for
-positioning until that gap is addressed. Browser evidence and physical GPU hardware
-checks are separate from native Xvfb/software validation. This slice does not cover
+Sokol support Core mesh commands. SDL3 now supports bounded analytic meshes
+through prepared CPU coverage textures; see `design/SDL3_MESH.md` for its limits.
+The browser Canvas adapter has exact headless mesh-mask and opacity evidence at
+DPR 1 and 2; full Popover positioning gallery coverage is a separate check.
+Physical GPU hardware checks remain separate from Xvfb/software validation.
+This slice does not cover
 Popover transition, right-click trigger or focus/control parity.

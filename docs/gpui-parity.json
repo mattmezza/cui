@@ -5333,7 +5333,7 @@
       "limitations": [
         "Partial surface behavior; see docs/SURFACES.md for exact upstream gaps. Automatic root overlay management, independent scrolling with pinned footer, frame-independent close requests, customizable part styles and transitions remain pending.",
         "Legacy placement retains side-based flip/clamp. Explicit C anchor positioning is additive; right-click trigger and accessible trigger relationships remain pending.",
-        "Additive C anchor/offset/arrow positioning retains legacy defaults and uses frame-owned copied paint. Scoped software/WASI and private-Xvfb Sokol evidence does not establish complete family parity: SDL3 mesh support, browser evidence and exact reference stroke/raster antialiasing remain pending; language builders omit the positioning API."
+        "Additive C anchor/offset/arrow positioning retains legacy defaults and uses frame-owned copied paint. Scoped software/WASI and private-Xvfb Sokol evidence does not establish complete family parity: SDL3 and Canvas analytic mesh subsets have runtime pixel evidence, but full browser positioning coverage and exact reference stroke/raster antialiasing remain pending; language builders omit the positioning API."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5348,7 +5348,7 @@
             "tests/unit/test_popover_surface.c",
             "tests/integration/test_popover_surface_native.c"
           ],
-          "scope": "Additive explicit eight-anchor placement, signed offset, viewport clamp and copied arrow paint; legacy placement unchanged. Native/software subset only. SDL3 mesh, actual browser validation and exact reference rasterization remain pending; this feature is not complete across hosts."
+          "scope": "Additive explicit eight-anchor placement, signed offset, viewport clamp and copied arrow paint; legacy placement unchanged. Software, SDL3 and Canvas analytic mesh subsets are verified with documented bounds. Full browser positioning validation and exact reference rasterization remain pending; this feature is not complete across hosts."
         },
         {
           "name": "controlled open/dismissal",

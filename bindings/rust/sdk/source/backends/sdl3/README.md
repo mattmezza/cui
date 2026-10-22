@@ -30,6 +30,17 @@ dimensions, coverage hash and byte comparison; texture color/alpha modulation
 allows reuse across theme changes. Allocation, font and draw failures propagate
 as `false`. Glyphs that exceed the cache memory budget fail explicitly.
 
+Analytic triangle meshes use bounded CPU coverage rasters uploaded as ordered
+SDL textures. Per frame the adapter permits 256 triangles and 8 million clipped
+texels (32 MiB uploaded RGBA), plus one triangle scratch buffer of up to 32 MiB;
+SDL/driver allocations are additional. Unsupported transforms, malformed commands
+and capacity exhaustion fail explicitly. Mesh preparation occurs before clearing;
+later draw failures are not whole-frame atomic. Resources are released on failure
+and the next frame can retry. See [the mesh contract](../../docs/design/SDL3_MESH.md)
+for clipping, presentation transforms, limits and recovery. Private-Xvfb software
+readback tests cover pixels and injected failures; physical GPU and other OS
+drivers remain separate validation requirements.
+
 Use `cui_sdl3_render_capture()` to save a BMP before presentation while framebuffer
 contents are defined. The lower-level `cui_sdl3_save_bmp()` reads the current
 framebuffer; do not rely on its contents after `SDL_RenderPresent`.

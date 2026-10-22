@@ -1618,7 +1618,7 @@
       ],
       "state_ownership": "Caller retains cui_surface_state and child form/application data.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning, paired with surface_end; legacy surface_begin keeps its original placement. Arrow rendering requires a mesh-capable adapter; SDL3 support remains pending.",
+      "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning, paired with surface_end; legacy surface_begin keeps its original placement. Arrow rendering requires a mesh-capable adapter; SDL3 and browser adapters support bounded analytic meshes with documented limits.",
       "docs": [
         "docs/SURFACES.md",
         "docs/SURFACE_EVENTS.md",

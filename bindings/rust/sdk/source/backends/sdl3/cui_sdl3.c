@@ -3,6 +3,7 @@
 #include "../../src/core/cui_text_paint_internal.h"
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
+#include "cui_sdl3_mesh.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <math.h>
@@ -779,6 +780,56 @@ static bool bitmap_draw(cui_sdl3 *s, const cui_draw_command *c, bool prepare_onl
         ok = false;
     return ok;
 }
+static bool sdl_command_valid(const cui_draw_command *c) {
+    return !(
+        !isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
+        !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
+        !isfinite(c->stroke) || fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f ||
+        (!cui_shadow_type(c->type) && (fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)));
+}
+/* Validate the complete mesh-bearing list before resource routines can convert
+ * bounds to integer raster dimensions. No allocation, paint or input reduction. */
+static bool sdl_mesh_list_valid(const cui_draw_list *list, bool has_font) {
+    if (list->count > 131072)
+        return false;
+    size_t depth = 0, triangles = 0;
+    for (size_t i = 0; i < list->count; i++) {
+        const cui_draw_command *c = &list->commands[i];
+        if (!sdl_command_valid(c))
+            return false;
+        switch (c->type) {
+        case CUI_DRAW_MESH:
+            if (c->mesh.vertex_count / 3 > CUI_SDL_MESH_TRIANGLES - triangles ||
+                !cui_mesh_valid(c->mesh))
+                return false;
+            triangles += c->mesh.vertex_count / 3;
+            break;
+        case CUI_DRAW_CLIP_PUSH:
+            if (depth == 64 || c->bounds.w < 0 || c->bounds.h < 0)
+                return false;
+            depth++;
+            break;
+        case CUI_DRAW_CLIP_POP:
+            if (!depth)
+                return false;
+            depth--;
+            break;
+        case CUI_DRAW_TEXT:
+            if (!has_font)
+                return false;
+            break;
+        case CUI_DRAW_INSET_SHADOW:
+        case CUI_DRAW_DROP_SHADOW:
+        case CUI_DRAW_IMAGE:
+        case CUI_DRAW_RECT:
+        case CUI_DRAW_BORDER:
+            break;
+        default:
+            return false;
+        }
+    }
+    return depth == 0;
+}
 bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color clear,
                              const char *path) {
     if (!s || !list || (!list->commands && list->count) || !isfinite(list->width) ||
@@ -790,10 +841,18 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
         return false;
     if (!render_density(s))
         return false;
+    bool meshes = false;
+    for (size_t i = 0; i < list->count; i++)
+        meshes |= list->commands[i].type == CUI_DRAW_MESH;
+    if (meshes && !sdl_mesh_list_valid(list, s->font != NULL))
+        return false;
+    cui_sdl_mesh_frame mesh_frame = {0};
+    cui_sdl_mesh_view mesh_view = {0};
     s->frame++;
-    s->shadow_frame = cui_shadow_present(list);
+    bool shadows = cui_shadow_present(list);
+    s->shadow_frame = shadows || meshes;
     cui_draw_list prepared;
-    if (s->shadow_frame) {
+    if (shadows) {
         SDL_RendererLogicalPresentation mode;
         int lw, lh;
         float sx, sy;
@@ -803,11 +862,11 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
             !SDL_GetRenderLogicalPresentationRect(s->renderer, &presentation) ||
             !SDL_GetRenderScale(s->renderer, &sx, &sy) ||
             !SDL_GetRenderViewport(s->renderer, &viewport))
-            return false;
+            goto failure;
         float px = 1, py = 1, ox = 0, oy = 0;
         if (mode != SDL_LOGICAL_PRESENTATION_DISABLED) {
             if (lw <= 0 || lh <= 0)
-                return false;
+                goto failure;
             px = presentation.w / lw;
             py = presentation.h / lh;
             ox = presentation.x;
@@ -816,85 +875,142 @@ bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color c
         ox += viewport.x * px * sx;
         oy += viewport.y * py * sy;
         if (!cui_shadow_prepare(&s->shadows, list, px * sx, py * sy, ox, oy, &prepared))
-            return false;
+            goto failure;
         list = &prepared;
+    }
+    if (shadows || meshes) {
         /* Resource creation is complete before clear; no texture draw here. */
         for (size_t i = 0; i < list->count; i++)
             if ((cui_shadow_type(list->commands[i].type) ||
                  list->commands[i].type == CUI_DRAW_IMAGE) &&
                 !bitmap_draw(s, &list->commands[i], true))
-                return false;
+                goto failure;
     }
-    SDL_SetRenderClipRect(s->renderer, NULL);
-    SDL_SetRenderDrawColor(s->renderer, clear.r, clear.g, clear.b, clear.a);
+    if (meshes) {
+        if (list->count > 131072 || !cui_sdl_mesh_snapshot(s->renderer, &mesh_view))
+            goto failure;
+        SDL_Rect stack[64], clip = {0, 0, (int)ceilf(list->width), (int)ceilf(list->height)};
+        size_t depth = 0;
+        for (size_t i = 0; i < list->count; i++) {
+            const cui_draw_command *c = &list->commands[i];
+            if (!sdl_command_valid(c))
+                goto failure;
+            switch (c->type) {
+            case CUI_DRAW_MESH:
+                if (!cui_sdl_mesh_prepare(s->renderer, &mesh_frame, &mesh_view, &c->mesh, i,
+                                          depth ? &clip : NULL))
+                    goto failure;
+                break;
+            case CUI_DRAW_CLIP_PUSH: {
+                if (depth == 64 || c->bounds.w < 0 || c->bounds.h < 0)
+                    goto failure;
+                stack[depth++] = clip;
+                SDL_Rect next = {(int)floorf(c->bounds.x), (int)floorf(c->bounds.y),
+                                 (int)ceilf(c->bounds.w), (int)ceilf(c->bounds.h)};
+                if (!SDL_GetRectIntersection(&clip, &next, &clip))
+                    clip = (SDL_Rect){0};
+                break;
+            }
+            case CUI_DRAW_CLIP_POP:
+                if (!depth)
+                    goto failure;
+                clip = stack[--depth];
+                break;
+            case CUI_DRAW_TEXT:
+                if (!s->font)
+                    goto failure;
+                break;
+            case CUI_DRAW_INSET_SHADOW:
+            case CUI_DRAW_DROP_SHADOW:
+            case CUI_DRAW_IMAGE:
+            case CUI_DRAW_RECT:
+            case CUI_DRAW_BORDER:
+                break;
+            default:
+                goto failure;
+            }
+        }
+        if (depth)
+            goto failure;
+    }
+    if (!SDL_SetRenderClipRect(s->renderer, NULL) ||
+        !SDL_SetRenderDrawColor(s->renderer, clear.r, clear.g, clear.b, clear.a))
+        goto failure;
     if (!SDL_RenderClear(s->renderer))
-        return false;
+        goto failure;
     SDL_Rect stack[64], clip = {0, 0, (int)ceilf(list->width), (int)ceilf(list->height)};
     size_t depth = 0;
     for (size_t i = 0; i < list->count; i++) {
         const cui_draw_command *c = &list->commands[i];
-        if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || !isfinite(c->bounds.w) ||
-            !isfinite(c->bounds.h) || !cui_shape_valid(c) || !isfinite(c->radius) ||
-            !isfinite(c->stroke) || fabsf(c->bounds.x) > 1e6f || fabsf(c->bounds.y) > 1e6f ||
-            (!cui_shadow_type(c->type) &&
-             (fabsf(c->bounds.w) > 16384 || fabsf(c->bounds.h) > 16384)))
-            return false;
+        if (!sdl_command_valid(c))
+            goto failure;
         switch (c->type) {
+        case CUI_DRAW_MESH:
+            if (!cui_sdl_mesh_draw(s->renderer, &mesh_frame, &mesh_view, i, depth ? &clip : NULL))
+                goto failure;
+            break;
         case CUI_DRAW_INSET_SHADOW:
         case CUI_DRAW_DROP_SHADOW: {
             SDL_Rect saved;
             bool enabled = SDL_RenderClipEnabled(s->renderer);
             if (!SDL_GetRenderClipRect(s->renderer, &saved) ||
                 !SDL_SetRenderClipRect(s->renderer, NULL))
-                return false;
+                goto failure;
             bool ok = bitmap_draw(s, c, false);
             if (!SDL_SetRenderClipRect(s->renderer, enabled ? &saved : NULL))
                 ok = false;
             if (!ok)
-                return false;
+                goto failure;
             break;
         }
         case CUI_DRAW_IMAGE:
             if (!bitmap_draw(s, c, false))
-                return false;
+                goto failure;
             break;
         case CUI_DRAW_RECT:
         case CUI_DRAW_BORDER:
             if (!rect(s, c))
-                return false;
+                goto failure;
             break;
         case CUI_DRAW_TEXT:
             s->ink = c->color;
             s->glyph_ok = true;
             if (!s->font || !text_draw(s, c) || !s->glyph_ok)
-                return false;
+                goto failure;
             break;
         case CUI_DRAW_CLIP_PUSH: {
             if (depth == 64)
-                return false;
+                goto failure;
             stack[depth++] = clip;
             SDL_Rect next = {(int)floorf(c->bounds.x), (int)floorf(c->bounds.y),
                              (int)ceilf(c->bounds.w), (int)ceilf(c->bounds.h)};
             if (!SDL_GetRectIntersection(&clip, &next, &clip))
                 clip = (SDL_Rect){0, 0, 0, 0};
-            SDL_SetRenderClipRect(s->renderer, &clip);
+            if (!SDL_SetRenderClipRect(s->renderer, &clip))
+                goto failure;
             break;
         }
         case CUI_DRAW_CLIP_POP:
             if (!depth)
-                return false;
+                goto failure;
             clip = stack[--depth];
-            SDL_SetRenderClipRect(s->renderer, depth ? &clip : NULL);
+            if (!SDL_SetRenderClipRect(s->renderer, depth ? &clip : NULL))
+                goto failure;
             break;
         default:
-            return false;
+            goto failure;
         }
     }
     if (depth)
-        return false;
+        goto failure;
     if (path && !cui_sdl3_save_bmp(s, path))
-        return false;
-    return SDL_RenderPresent(s->renderer);
+        goto failure;
+    bool ok = SDL_RenderPresent(s->renderer);
+    cui_sdl_mesh_release(&mesh_frame);
+    return ok;
+failure:
+    cui_sdl_mesh_release(&mesh_frame);
+    return false;
 }
 bool cui_sdl3_render(cui_sdl3 *s, const cui_draw_list *list, cui_color clear) {
     return cui_sdl3_render_capture(s, list, clear, NULL);
@@ -969,7 +1085,7 @@ cui_renderer cui_sdl3_interface(cui_sdl3 *s) {
     return (cui_renderer){s, name,
                           (s && s->font ? CUI_RENDER_TEXT | CUI_RENDER_TEXT_LINEAR_GRADIENT : 0) |
                               CUI_RENDER_ROUNDED | CUI_RENDER_CLIP | CUI_RENDER_IMAGE |
-                              CUI_RENDER_DROP_SHADOW | CUI_RENDER_INSET_SHADOW |
+                              CUI_RENDER_MESH | CUI_RENDER_DROP_SHADOW | CUI_RENDER_INSET_SHADOW |
                               (s && strcmp(name, "software") ? CUI_RENDER_ACCELERATED : 0),
                           render, destroy};
 }

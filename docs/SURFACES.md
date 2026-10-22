@@ -42,6 +42,6 @@ separate.
 Use `cui_popover_begin` to apply this positioning and paint an optional arrow,
 then balance a successful begin with `cui_surface_end`. Existing
 `cui_surface_begin` retains legacy placement. See [Popover anchors](POPOVER_ANCHORS.md)
-for ownership, failure, rendering and adapter limits. SDL3 mesh support and exact
-reference raster antialiasing remain unfinished; this is scoped C support, not
+for ownership, failure, rendering and adapter limits. SDL3 and browser mesh adapters have bounded analytic coverage; exact
+reference raster antialiasing remains unfinished. This is scoped C support, not
 complete family or language-builder parity.

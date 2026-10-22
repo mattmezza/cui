@@ -152,7 +152,8 @@ This design-only commit changes no behavior and requires no native launch.
 
 ## Accepted sequencing after integrator review
 
-The first implementation commit contains public contract and pure base geometry
-plus headless and WASI coverage only. Styled arrow paint is deferred until the
+The first implementation commit contains standalone public types/helpers and pure base geometry
+plus headless and WASI coverage only. It does not append the proposed options
+field or connect helpers to surface placement yet. Styled arrow paint is deferred until the
 prepaint copied-storage path above is tested. Canonical/generated metadata updates
 are deferred to integrator coordination; no shipped behavior parity claim yet.

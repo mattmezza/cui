@@ -208,3 +208,12 @@ then masks override. NULL/zero keeps the legacy tree. Extended child snapshots a
 pure borrowed submission values; new callbacks win over old. Minimum blank area
 belongs to the same interactive card. Input asymmetric padding/editor styles,
 Button/trailing actions and language-builder geometry remain separate gaps.
+
+For bounded DropdownButton paint, read `docs/DROPDOWN_BUTTON_STYLES.md` and
+`include/cui/cui_dropdown_button_styles.h`. NULL/zero retains the legacy path;
+explicit BUTTON policy enables source state ordering with CUI palette tokens.
+Independent action/trigger callbacks are borrowed and pure; instance values replay
+after selected/disabled. Container has no foreground cascade. Custom XS shadows
+require both explicit intent and the host-enable gate. This adds no metadata/tab/
+toggle forwarding or language-builder style facade. Use matching rebuilt source,
+standalone distribution headers or packaged SDKs; do not mix revisions.

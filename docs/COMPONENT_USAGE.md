@@ -247,13 +247,17 @@ Additional event includes: `cui/cui_disclosure_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains menu tree state and menu entries.
+**State:** Caller retains menu tree state and menu entries; style descriptors copy at entry, while pure style callbacks and userdata are synchronously borrowed.
 
-**Interaction:** cui_dropdown_button_result separates main action activation from menu interaction.
+**Interaction:** cui_dropdown_button_result separates main activation from menu interaction; styled entries preserve the same Base/events reduction and legacy callback mutations.
 
-**Usage:** Handle the primary action result separately from the adjacent menu trigger.
+**Usage:** Opt into bounded action/trigger/container paint through cui_dropdown_button_styles; NULL/zero preserves legacy paint. Metadata forwarding and language-builder styles remain separate gaps.
 
-API: `cui_dropdown_button`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.md).
+API: `cui_dropdown_button`, `cui_dropdown_button_events`,
+`cui_dropdown_button_styled_ex`, `cui_dropdown_button_styled_events`.
+[Legacy header](../include/cui/cui_choice.h);
+[paint header](../include/cui/cui_dropdown_button_styles.h);
+[paint guide](DROPDOWN_BUTTON_STYLES.md).
 
 ## Empty
 

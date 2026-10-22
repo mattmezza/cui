@@ -134,7 +134,30 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_dropdown_button_styles.h",
+          "languages": [
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust"
+          ],
+          "types": [
+            "cui_dropdown_button_styles",
+            "cui_dropdown_button_paint_policy",
+            "cui_button_styles",
+            "cui_button_paint_patch"
+          ],
+          "symbols": [
+            "cui_dropdown_button_styled_ex",
+            "cui_dropdown_button_styled_events"
+          ],
+          "note": "Packaged source SDKs carry the C paint API; language builders/bridge do not expose its style callbacks, masks, source paint policy or shadow gates. Existing tested_subset statuses describe legacy split-control authoring."
+        }
+      ]
     },
     {
       "name": "Empty",

@@ -1063,14 +1063,17 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_choice.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_dropdown_button_styles.c",
+        "tests/unit/test_dropdown_events.c",
+        "tests/test_dropdown_button_styles_distribution.py"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial"
       },
       "limitations": [
-        "Split actions, optional halves, tooltip, inner style inheritance, shared ghost state, corner anchors, joined geometry and eight semantic variants/four sizes tested. Remaining inherited Button style/metadata surface is under reference audit."
+        "Split actions and bounded opt-in Button paint refinements are covered, including source state ordering, captured instance replay and explicit custom-shadow gates. Source theme-token equality, metadata/name/tab/toggle forwarding, arbitrary styles and language-builder refinements remain incomplete; no full family parity is claimed."
       ],
       "owner": "compound-controls",
       "last_verified_commit": null,
@@ -1106,6 +1109,19 @@
             "tests/unit/test_choice.c",
             "docs/validation/gcc-integrated-51.txt"
           ]
+        },
+        {
+          "name": "bounded inherited Button paint refinements",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_dropdown_button_styles.h",
+            "tests/unit/test_dropdown_button_styles.c",
+            "tests/test_dropdown_button_styles_distribution.py",
+            "docs/DROPDOWN_BUTTON_STYLES.md"
+          ],
+          "limitations": [
+            "C-only paint masks and synchronous pure callbacks; source color formulas use CUI palette tokens and byte alpha precision. Metadata forwarding and binding facades remain separate."
+          ]
         }
       ],
       "upstream_doc": {
@@ -1113,7 +1129,7 @@
         "sha256": "8395bb36c1344dce73e4c13055d3c525c0929af3b2d507d2783b75efee6bb281",
         "headings": []
       },
-      "last_tested_commit": "42cafb8"
+      "last_tested_commit": "d357992b"
     },
     {
       "name": "Empty",

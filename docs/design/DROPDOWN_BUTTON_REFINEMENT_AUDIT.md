@@ -152,9 +152,10 @@ The additive contract is now in `include/cui/cui_dropdown_button_styles.h`. It a
 The declarations are implemented through the existing Dropdown common submission
 path. Base/events reduce once, descriptors copy before reduction, and legacy
 callbacks retain their mutation/timing behavior. The metadata proposal above is
-still unimplemented. Canonical registration, generated distributions, consumer
-skill export and browser demonstration remain separate integration work; no
-manifest status is promoted here.
+still unimplemented. At the initial implementation handoff, canonical
+registration, generated distributions, consumer skill export and browser
+demonstration remained separate integration work. The canonical followup below
+adds the build/export coverage; no full-family status is promoted.
 
 `tests/fixtures/dropdown_button_styles/legacy_box.h` freezes the pre-change
 `ef086a41` paint helper and complete submission/paint tree. The new test compares
@@ -179,3 +180,23 @@ wasmtime 49.0.0 WASI 1/1, strict compiled C11 guide and C++ header, and actual
 `python scripts/format.py --check` with clang-format 23.1.2. All builds live under
 `/home/matteo/.cache/cui-validation/dropdown-button-styles{,-asan,-wasi}`;
 no desktop window, dependency install or full-suite rebuild was used.
+
+## Canonical integration followup
+
+The independent module delegates its implementation macro to Choice. Choice
+includes the new declarations before embedding its renderer, so the legacy
+implementation entry remains self-contained with respect to the new API.
+Object-definition tests prove both entry points define the two functions before
+any archive participates. CUI_ALL and both standalone entries run real rendering
+and accessibility activation assertions. C++ declarations and the exact guide
+snippet are compiled; guide targets are optional in packaged trees without docs.
+
+Canonical Release wrapper checks passed 7/7 (styles, Choice/events, three runtime
+distribution entries, and standalone/package contract); pinned WASI passed 4/4
+(styles plus the same three distribution entries). Usage metadata tests passed
+6/6; generated SDK/distribution freshness and pinned formatting passed. Source
+metadata and its human mirror retain all 78 entries, explicitly omit foreign
+style facades, and preserve the remaining metadata/style-token limitations.
+Native artifacts are under `/home/matteo/.cache/cui-validation/dropdown-canonical`
+and WASI artifacts under the sibling `dropdown-canonical-wasi` directory.
+Browser/gallery integration is owned separately and not changed by this followup.

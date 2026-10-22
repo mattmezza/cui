@@ -72,3 +72,15 @@ disabled suppresses it, loading retains it. The host renderer must support CUI
 shadow commands. Focus paint uses focus-visible and `theme.hide_focus_ring` in
 BUTTON; LEGACY preserves the old focus rule. No full DropdownButton parity is
 claimed: metadata/name/tab/toggle forwarding remains a separate slice.
+
+Canonical builds register the styles unit test, optional compiled guide and C++
+declaration check. The portable WASI runner exposes `dropdown_button_styles`
+and `dropdown_button_styles_{all,legacy,styles}_distribution` suites.
+Standalone users may define `CUI_DROPDOWN_BUTTON_STYLES_IMPLEMENTATION` before
+including `dist/cui_dropdown_button_styles.h`; it delegates to Choice once.
+The legacy `CUI_CHOICE_IMPLEMENTATION` entry also defines these additive
+functions, and `CUI_IMPLEMENTATION_ALL` includes their implementation. Include
+the explicit styles header for declarations. Link the remaining required CUI
+modules as usual; these entry points do not create a second Button reducer.
+Source SDKs include the header and implementation. Python, JS/TS, Go and Rust
+builders do not expose this style facade or its borrowed callbacks.

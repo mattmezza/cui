@@ -30,6 +30,26 @@ typedef struct {
     /* Current trigger details patched; independent of begin admission. */
     bool relationship_applied;
 } cui_hover_card_extended_result;
+/* Zero retains policy.outside_tap and the original conservative contact rules.
+ * RAW_PRIMARY_RELEASE is TAP_TOGGLE-only: any unconsumed primary POINTER_UP
+ * outside previous valid panel bounds may close, including over the trigger,
+ * without a matching down or movement threshold. Existing modal permission is
+ * required. CANCEL/SCROLL/GESTURE do not themselves dismiss or veto a later raw
+ * release: hosts must cancel/consume suppressed releases. No capture/consumption.
+ * Raw release precedes accepted trigger activation using frozen entry open;
+ * disabled/global Escape and placement rejection retain final precedence.
+ * Invalid enum/mode fails before mutation. No contact workspace is required for
+ * raw release; supplied workspace is cleared. All descriptors/handlers borrowed
+ * only through submission; no new retained ownership or semantic layout. */
+typedef enum {
+    CUI_HOVER_CARD_RELEASE_LEGACY,
+    CUI_HOVER_CARD_RELEASE_RAW_PRIMARY
+} cui_hover_card_release_policy;
+cui_hover_card_extended_result
+cui_begin_hover_card_with_release(cui_context *, cui_id, const cui_theme *, cui_hover_state *,
+                                  cui_str name, cui_hover_options, const cui_hover_card_policy *,
+                                  cui_hover_card_contact *, cui_hover_card_release_policy,
+                                  cui_hover_handler);
 /* Zero/NULL policy preserves legacy begin behavior. lifecycle.control_result
  * alone determines whether to compose children and call cui_end_hover_card.
  * TAP_TOGGLE ignores hover/focus/delays; legacy global Escape still wins, even

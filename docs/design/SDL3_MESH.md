@@ -1,8 +1,9 @@
 # SDL3 analytic mesh: current adapter contract
 
-Design for review, based on signed extraction `d4ca8c15`; no SDL mesh implementation
-or SDL mesh readback proof exists yet. This document is the current proposal,
-replacing earlier opaque-only/uniform-only restrictions.
+Current implemented adapter slice, based on signed extraction `d4ca8c15` and
+reviewed design `9e7ce80f`. No opaque-only/uniform-only restriction applies.
+The validation section distinguishes actual software-SDL proof from remaining
+driver/integration work.
 
 ## Existing behavior and source authority
 
@@ -20,9 +21,9 @@ explicit zero-gradient outcomes. Color unpremultiplies linear RGB, clamps SDR,
 encodes sRGB and rounds; coverage scales alpha. SDL_RenderGeometry alone cannot
 evaluate that analytic fragment coverage.
 
-SDL currently has no mesh switch case (`backends/sdl3/cui_sdl3.c`,
-`cui_sdl3_render_capture`); rejection occurs after clear. Software/SDL_GPU/Sokol
-support does not establish SDL3 support. Existing shadow preparation owns copied
+Before this slice SDL had no mesh switch case and rejected it after clear.
+The new `cui_sdl3_render_capture` path prepares mesh resources before clear and
+advertises its implemented mesh capability. Existing shadow preparation owns copied
 commands/pixels and pins resources before clear, but its uniform-scale condition
 is a shadow limitation, not a mesh requirement.
 
@@ -83,8 +84,7 @@ The adapter currently clears incoming SDL clip state at frame start; preserve
 that existing contract, not a newly invented external-clip intersection.
 
 Project XY into physical coordinates in double precision **before** calculating
-S/T derivatives. Keep ST unchanged. Add a private axis-transform entry point or
-internal projection seam to the shared helper; keep the existing software scalar
+S/T derivatives. Keep ST unchanged. The private device-triangle entry point provides that projection seam; keep the existing software scalar
 path/arithmetic unchanged. Do not round transformed mesh vertices through an
 intermediate float payload. Anisotropic scale changes both derivatives and
 coverage; scaling a uniform-resolution coverage bitmap is insufficient.
@@ -104,9 +104,12 @@ of every renderer driver's rasterization.
 Prepare one transparent raster per visible triangle and submit in original order;
 flattening an overlapping command can change intermediate quantization. Initially
 no cross-frame mesh cache: copied RGBA and owned textures remove borrowed-payload
-lifetime hazards. Proposed fixed limits: 256 triangles/frame, 16384 pixels/axis,
-8,388,608 total clipped raster texels (32 MiB uploaded RGBA payload). Confirm these
-limits against actual component producers before implementation. Check counts,
+lifetime hazards. Implemented fixed limits: 256 triangles/frame, 16384 pixels/axis,
+8,388,608 total clipped raster texels (32 MiB uploaded RGBA payload). Direct read-only audit of `src/components/cui_popover_paint.h` at integration
+commit `b0101a389d7475b1f081db755be9ccd890f5f873` confirms fill[15] plus outline[60]
+vertices: at most 25 triangles/arrow. Ten worst-case arrow payloads fit (250
+triangles), not eleven. This is a bounded admission choice, not an optimal budget
+or unlimited-popup claim; other producers share the same frame budget. Check counts,
 coordinates and byte arithmetic before allocation/casts. Degenerate or fully
 clipped triangles need no texture. CPU scratch is reused one triangle at a time;
 SDL surface wrappers borrow it only until synchronous texture creation completes.
@@ -132,16 +135,15 @@ to all glyphs requires a separately reviewed phase.
    gradient-zero/shared-edge/overlap assertions. Strict Release and Debug
    ASan/UBSan each pass new `mesh_cpu` plus existing `render` (2/2) through the
    native wrapper. This is software proof only.
-2. Next adapter slice, after review: bounded preparation plus private axis
-   projection seam, no public ABI/Core/component changes. Add private test access
-   and deterministic allocator/upload/configuration failure injection.
+2. Implemented adapter slice: bounded preparation plus private axis
+   projection seam, no public ABI/Core/component changes. Private linker wrapping
+   supplies deterministic allocator/upload/configuration failure injection.
 3. Actual SDL readback through `scripts/test_local.py` private Xvfb: DPI 1/2,
    positive nonuniform scale, stretch/letterbox/integer/overscan presentation,
    fractional offsets, explicit/default viewport, nested clips, resize and
    transparent/opaque clears. Compare analytic coverage/top-left ownership to
-   software at device coordinates. Compare SDL compositing to independent SDL
-   texture/point reference or visible composites when target storage differs;
-   establish tight per-vector rounding bounds, not broad image tolerance.
+   software at device coordinates. Compare SDL compositing to independently rasterized full-target SDL textures;
+   actual fixture comparisons are exact, with no broad image tolerance.
    Include winding/degenerate/zero-gradient/overlap, alpha 0/0.5/1, sRGB threshold
    and out-of-gamut clamp, and mixed mesh/image/text/shape command ordering.
 4. Sentinel readback before Present for malformed-last-payload, clip imbalance,
@@ -162,3 +164,43 @@ No dependency was fetched or installed. CMake accepts system SDL >=3.2 or its
 pinned fallback above; local system headers are SDL 3.4.18. Check the pinned
 fallback and selected CI SDL version during production validation. No gallery,
 Core, public capability or generated consumer guidance is changed by this design.
+
+## Actual adapter verification and integration limits
+
+The private `tests/fixtures/sdl3_mesh` fixture builds only the adapter, new tests
+and selected existing render/rounded-geometry targets. Strict Release and Debug ASan/UBSan checks use the
+repository wrapper/private Xvfb. It compares cropped preparation to full-target
+textures made by the independent device-space oracle, **exactly**, with no pixel
+tolerance. Both use the existing SDL texture BLEND equation. Point drawing was
+rejected as an invalid reference after actual window-target readback showed
+different stored alpha; no opaque-only rejection was substituted.
+
+Actual vectors cover five presentation modes, DPI1/2/nonuniform axes, explicit
+viewport and fractional offsets, transparent/opaque clears, a real RGBA texture
+target, resize, shared edges/winding/gradient zero/SDR conversion, mixed ordered
+rect/mesh draws, and following image/text mapping. Preparation failures cover
+allocation, surface, upload, blend/scale configuration, malformed/unknown final
+command, invalid image, 257 triangles and 8M-texel exhaustion. Sentinel readback
+is unchanged; partial frame textures are released and a later valid frame works.
+Post-clear submission/state failures return false, release frame textures and
+attempt each restoration. A failed SDL restoration itself cannot guarantee that
+property was restored. No whole-frame transaction, hard realtime, hardware GPU
+or cross-platform driver proof is claimed.
+
+The separate cached-prefix build compiles against SDL3.2.28 headers/library in
+`/tmp/cui-deps-prefix`; its SDL_render.h SHA256 equals the header in the exact
+pinned archive above (`e32fcbc32e80d06bd69a3d36855bdac412b2d00195b83a5181458ced4cd317bf`).
+No dependency fetch/install occurred. The fixture README gives reproduction and
+integration responsibilities. Existing image/glyph caches keep their existing
+budgets; mesh resources have no cross-frame payload retention. Canonical CI,
+metadata and generated consumer resources remain the integrator's follow-up.
+
+Final local results: strict system-SDL Release 4/4 (mesh, CPU oracle, software
+render and existing SDL rounded geometry), system-SDL Debug ASan/UBSan 3/3, and
+cached SDL3.2.28 Release 3/3. The mesh fixture reports 108 exact readback comparisons
+plus preparation-failure/recovery assertions and a real final Present call.
+All use the private wrapper. Concurrent Xvfb startup initially failed; final runs
+were sequential and passed. Runtime linkage for the cached-prefix executable
+resolves SDL/FreeType/HarfBuzz under that existing prefix. Build logs live under
+`/home/matteo/.cache/cui-validation/sdl3-mesh*`; no other worker artifacts were
+modified or removed.

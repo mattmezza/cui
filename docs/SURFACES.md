@@ -26,3 +26,20 @@ content; the next invalidated frame settles its height. Viewport margins still
 cap the dialog, and overflowing content remains scrollable. Explicit positive
 heights retain the fixed viewport contract. Resize, font or content changes can
 require another measured frame.
+
+## Independent Popover geometry
+
+`cui_popover_position_resolve` calculates an anchor-mode rectangle without opening
+a surface or modifying state. It supports eight anchors named for the popup's
+own edge, signed explicit offsets, nonzero viewport origins and no-flip/no-shrink
+clamping. Set `reference_rem` from application root sizing; zero selects 16 logical
+pixels. The default gap is one quarter rem; enabling the arrow adds three eighths
+rem. `cui_popover_arrow_resolve` calculates the triangle and border join patch for
+the final clamped rectangle. Read `cui_surface.h` for finite-input, overflow and
+output-preservation rules. Geometry remains fractional; host pixel snapping is
+separate.
+
+These are pure C geometry helpers in this revision. `cui_surface_begin` does not
+consume `cui_popover_position`, and these helpers do not paint arrows or change
+legacy placement. Language builders omit them. Actual surface integration remains
+unfinished; see the [design checkpoint](design/POPOVER_ANCHOR_PLAN.md).

@@ -1,202 +1,164 @@
-# SDL3 analytic mesh preparation checkpoint
+# SDL3 analytic mesh: current adapter contract
 
-Design only; no renderer implementation or runtime mesh/readback proof is included.
-Audited base: `939c5c2faa7d24c4c8cd2b2fad84cc4284f5a7e0` (cached
-`origin/main`). The DateTime gallery worker branch is preserved separately.
+Design for review, based on signed extraction `d4ca8c15`; no SDL mesh implementation
+or SDL mesh readback proof exists yet. This document is the current proposal,
+replacing earlier opaque-only/uniform-only restrictions.
 
-## Existing contract and gap
+## Existing behavior and source authority
 
-`include/cui/cui.h:473–497` and `src/core/cui.c:1991–2018` define borrowed
-triangle vertices, finite XY/ST, positive scalar placement, linear premultiplied
-color and alpha in [0,1]. Degenerate triangles are valid empty geometry. Core
-validation imposes no renderer allocation budget. Vertices must remain alive
-through render completion; a renderer must not retain their addresses as a cache
-identity after that call.
+Core (`include/cui/cui.h`, mesh declarations; `src/core/cui.c`, `cui_mesh_valid`)
+provides borrowed triangle vertices, finite XY/ST, positive scalar placement,
+linear premultiplied color and alpha in [0,1]. Degenerate triangles are empty.
+Borrowed vertices live through rendering; no renderer may retain a pointer as
+cross-frame content identity. Core validity is separate from adapter capacity.
 
-`backends/software/cui_software.c:73–151` is the coverage authority. It transforms
-XY in double precision, normalizes winding, applies pixel-center top-left edge
-ownership, interpolates ST, and evaluates `S*S-T`. Coverage uses its screen-space
-gradient; the solid-S threshold is 0.001 and zero gradient has explicit inside,
-outside and half-coverage outcomes. Color conversion unpremultiplies linear RGB,
-clamps SDR channels, applies sRGB encoding, and rounds to bytes. Coverage scales
-alpha. Each triangle blends into straight RGBA8 in input order, including rounding
-after each blend (`blend`, immediately above the mesh code).
+`backends/software/cui_mesh.h` now owns private CPU traversal/color conversion;
+software retains its original ordered RGBA8 destination blending. Coverage uses
+double XY, normalized winding, pixel-center top-left edges, interpolated ST and
+`S*S-T` with screen-space derivatives, the existing 0.001 solid-S threshold and
+explicit zero-gradient outcomes. Color unpremultiplies linear RGB, clamps SDR,
+encodes sRGB and rounds; coverage scales alpha. SDL_RenderGeometry alone cannot
+evaluate that analytic fragment coverage.
 
-SDL_GPU and Sokol have mesh paths; this does not establish SDL3 support.
-`backends/sdl3/cui_sdl3.c:782–898` clears before command dispatch and has no mesh
-case: a valid mesh currently fails through `default` after clearing, potentially
-after earlier commands. SDL_RenderGeometry exposes vertex color/texture
-interpolation, not the required programmable analytic ST coverage. Plain geometry
-submission therefore cannot implement this contract.
+SDL currently has no mesh switch case (`backends/sdl3/cui_sdl3.c`,
+`cui_sdl3_render_capture`); rejection occurs after clear. Software/SDL_GPU/Sokol
+support does not establish SDL3 support. Existing shadow preparation owns copied
+commands/pixels and pins resources before clear, but its uniform-scale condition
+is a shadow limitation, not a mesh requirement.
 
-The SDL shadow path is a useful preparation precedent, not a mesh cache ready
-for reuse. `backends/software/cui_shadow.h` owns copied commands/pixels, bounds
-cache capacity and pins current-frame entries. Its transform accepts only nearly
-uniform positive scale (four float epsilons). SDL bitmap preparation currently
-runs before clear only when shadows are present. Glyph/resource failures and
-several command checks can still occur after clear; existing rendering is not a
-transactional frame API.
+## Actual host surface and target contract
 
-## Review decision and first extraction slice
+`include/cui/cui_sdl3.h` exposes an opaque backend, create/destroy, size, render,
+render_capture and BMP capture. All operations run on the main thread. There is
+no borrowed renderer constructor, raw SDL renderer getter or public target,
+viewport, clip, scale or presentation setter. `cui_sdl3_create` creates an owned
+resizable high-pixel-density window and default SDL renderer; it selects standard
+SDL_BLENDMODE_BLEND. `cui_sdl3_size` queries logical window size and selects
+SDL_LOGICAL_PRESENTATION_STRETCH at that size. No production path sets a texture
+render target. Thus the supported public path is the owned window target, whose
+physical resolution/presentation can change on resize/display migration; it is
+not a user-configurable offscreen-renderer API. Do not add such an API here.
 
-The initial opaque/uniform restrictions below are **superseded as final adapter
-scope**. Preserve SDL's existing target compositing contract; its transparent
-storage representation is not itself grounds to reject a mesh. Future comparisons
-must use visible composites or an explicit SDL blend reference when straight-RGBA
-software storage differs. DPI 1/2 and opaque clear are starting test vectors only.
-Before deciding transform/target restrictions, inspect the actual public SDL host
-configuration surface and demonstrate concrete unsupported mappings. Nonuniform
-axis derivatives are mathematically available; a shadow-specific uniform check
-must not silently become a mesh restriction. Full supporting SDL mesh integration
-remains required and is not implemented by this checkpoint.
+Mesh supports the same host target/compositing behavior as existing images and
+shapes, including transparent clear values. Use straight sRGB texture RGB and
+coverage alpha with SDL_BLENDMODE_BLEND. Do not require clear alpha 255. SDL's
+encoded target storage/compositing can differ from software's straight-RGBA8
+storage on transparent destinations: compare visible composites or an independent
+SDL blend reference, not an invalid raw-storage equality assertion. Preserve
+alpha and command/triangle order; do not normalize away a genuine blend error.
+Linear mesh color conversion remains the existing SDR conversion, not new HDR
+or linear-light target blending support.
 
-Only extraction is approved/implemented here. `backends/software/cui_mesh.h` is a
-private synchronous CPU traversal with caller-owned output callback; it retains
-nothing and performs no destination blending. Software keeps its original blend
-function and receives samples in original triangle/pixel order. The original
-pre-extraction raster/color/blend implementation is preserved independently in
-`tests/unit/mesh_oracle.h` (base 939c5c2f), not rewritten using shared helpers.
-The standalone `tests/fixtures/mesh_cpu` fixture compares every RGBA byte and
-asserts specific gradient-zero, shared-edge and overlap results. No SDL code is
-changed. The callback traversal is not a performance or hard-real-time claim.
+For robustness and tests, a private fixture can configure viewport/presentation/
+scale on the owned renderer. Do not reject positive nonuniform mappings: stretch
+and scale are axis-specific. Respect existing render_density admission (finite,
+positive effective axis scales <=16), target/resource size bounds and real query
+failures. Texture-target injection may test the preparation mechanism privately;
+it does not create a public offscreen support promise. No new target-kind
+rejection should be introduced without a concrete unsupported operation.
 
-## Initial adapter proposal (restrictions subject to revised decision above)
+## Coordinate mapping and restoration
 
-Extract a **private CPU coverage helper**, with no SDL dependency or public ABI,
-from the software mesh path. Preserve software arithmetic, top-left and color
-rules bit for bit before using it from SDL. The helper accepts device-space XY,
-unchanged ST, integer clipped raster bounds and a destination supplied by the
-caller. Keep software's ordered destination blending separate from texture
-preparation.
+The cached archive `/tmp/cui-deps-SDL.tar.gz` names pinned SDL revision
+`7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`. Its `src/render/SDL_render.c` functions
+`UpdatePixelViewport`, `UpdatePixelClipRect` and `UpdateLogicalPresentation`
+establish the mapping, rather than the shadow approximation:
 
-SDL owns a frame preparation object. Prepare one transparent RGBA8 raster per
-visible triangle, then draw those textures in original command/triangle order.
-Do not flatten overlapping triangles into one command texture: an extra
-intermediate RGBA8 blend can change ordered quantization. No retained vertex
-pointer or cross-frame mesh cache is needed initially. Repeated mutable payloads
-at the same address must produce fresh content.
+- Effective axis scales are SDL render scale times presentation rectangle size
+  divided by logical size (or render scale alone when presentation is disabled).
+- Physical viewport origin is **floor(viewport origin * effective scale + logical
+  presentation offset)** independently on X/Y; explicit viewport extents use
+  ceil(extent * effective scale). Default viewport uses the active pixel extent.
+- SDL clip is relative to that viewport; its physical origin uses floor(clip
+  origin * scale), and its extent uses ceil(clip extent * scale), not a substituted
+  ceil(right)-floor(left) rule. Preserve the current adapter's logical clip-stack
+  rounding before applying this mapping.
 
-Proposed admission limits, to be confirmed against representative component
-meshes before production: 256 triangles total, at most 16384 pixels per raster
-axis, and 8,388,608 total clipped raster texels (32 MiB RGBA payload). Count and
-multiply with checked arithmetic before allocating. Empty/degenerate triangles
-consume no texture. These are adapter capacity limits, not changes to
-`cui_mesh_valid`. CPU scratch is reused one triangle at a time; uploaded frame
-textures remain owned until submission/present completes. Release previous-frame
-resources before preparing another frame. SDL/driver internal allocations are
-outside this application-owned byte bound.
+Snapshot presentation dimensions/mode/rectangle, axis scales, viewport and its
+explicit-set flag, active target and physical target extent. Query the window's
+true output size for the public window target; SDL_GetCurrentRenderOutputSize
+is presentation-adjusted and alone is not the full physical target extent.
+Bake device clipping against target/viewport and the current CUI clip stack.
+The adapter currently clears incoming SDL clip state at frame start; preserve
+that existing contract, not a newly invented external-clip intersection.
 
-Surface wrappers borrow scratch only during synchronous texture creation; destroy
-the wrapper before reusing scratch. On any preparation failure, destroy all new
-textures and leave the target uncleared. Destruction handles partial preparation.
-An execution/device failure after clear cannot be rolled back: return false,
-avoid presenting, release frame resources and allow a later valid frame to retry.
-No hard-real-time claim follows from bounded memory.
+Project XY into physical coordinates in double precision **before** calculating
+S/T derivatives. Keep ST unchanged. Add a private axis-transform entry point or
+internal projection seam to the shared helper; keep the existing software scalar
+path/arithmetic unchanged. Do not round transformed mesh vertices through an
+intermediate float payload. Anisotropic scale changes both derivatives and
+coverage; scaling a uniform-resolution coverage bitmap is insufficient.
 
-### Color and target restriction requiring review
+Draw prepared rasters in integer physical coordinates with presentation disabled,
+scale one, viewport/clip reset after clipping is baked. Restore presentation,
+scale, viewport-set state and the command-stream clip after each mesh draw so
+following commands observe their original state. Restore every property even if
+another restoration fails. Do not change target ownership or leave a different
+active target. Query/set failures return false. Verify the pinned mapping against
+actual SDL readback, including fractional presentation offsets, before claiming
+it implemented; source arithmetic is evidence for a testable design, not proof
+of every renderer driver's rasterization.
 
-Use straight sRGB texture RGB with coverage in alpha and SDL_BLENDMODE_BLEND.
-The first slice should accept mesh frames only with **opaque clear alpha** and
-an ordinary SDR render target. SDL's documented BLEND equation does not preserve
-the software renderer's straight RGB storage on a transparent destination.
-Premultiplied blending alone does not resolve that representation difference.
-Reject unsupported transparent-clear mesh frames before clear rather than claim
-RGBA equivalence. Existing commands can themselves reduce destination alpha only
-if their blend mode permits it; validate the opaque-destination invariant for the
-whole supported command set. RGB rounding can still differ between SDL renderers;
-measure and bound it in differential tests rather than advertise byte identity.
-Transparent-target support needs a separate representation/compositing decision.
+## Bounded preparation and failure boundary
 
-### Transform and clip restriction requiring review
+Prepare one transparent raster per visible triangle and submit in original order;
+flattening an overlapping command can change intermediate quantization. Initially
+no cross-frame mesh cache: copied RGBA and owned textures remove borrowed-payload
+lifetime hazards. Proposed fixed limits: 256 triangles/frame, 16384 pixels/axis,
+8,388,608 total clipped raster texels (32 MiB uploaded RGBA payload). Confirm these
+limits against actual component producers before implementation. Check counts,
+coordinates and byte arithmetic before allocation/casts. Degenerate or fully
+clipped triangles need no texture. CPU scratch is reused one triangle at a time;
+SDL surface wrappers borrow it only until synchronous texture creation completes.
+Free wrappers before scratch reuse. Retain textures through draw/present completion
+and release previous frame resources before preparing another. Application-owned
+budgets exclude SDL/driver internal staging; no hard-real-time claim.
 
-Snapshot SDL logical presentation, its physical rectangle, render scale,
-viewport, target dimensions and clip state on the rendering/main thread.
-The existing shadow path computes presentation ratios and adds viewport offset
-scaled by those ratios and render scale. Verify that mapping with actual SDL
-readback; do not treat the formula as proof. First support positive uniform
-effective scales (including DPI 1 and 2), finite translation, and a documented
-ordinary window target. Reject nonuniform scales, unsupported targets or mappings
-before clear; this is an adapter limitation, not a Core mesh limitation.
+Before clear, validate the entire mesh-bearing list's payloads, supported command
+kinds/bounds and balanced clip stack, snapshot mapping, enforce budgets and create/
+configure all mesh resources. Prepare images/shadows in such frames regardless
+of shadow presence; frame-pin them against eviction during preparation. An invalid
+last mesh or failed last mesh upload must not clear earlier contents. Failure
+cleans all partial mesh resources; next valid frame retries. Do not claim whole
+frame transactionality: late SDL draw failures or unprepared glyph allocation
+can still fail after clear. Return false without presenting on such failure,
+restore state, clean resources and permit recovery. Extending resource preflight
+to all glyphs requires a separately reviewed phase.
 
-Transform XY before deriving ST gradients: coverage is sampled at physical pixel
-centers. Bake CUI ancestor clips and effective viewport/presentation/target bounds
-into each raster using an explicitly tested edge-rounding rule. Draw prepared
-rasters at integer physical positions with logical presentation disabled, scale
-one and viewport/clip reset. Restore every saved SDL property independently on
-success and failure; restoration failure itself fails the render. Do not alter
-legacy non-mesh transform behavior in this slice. Nonuniform mesh support can
-follow using axis-specific derivatives after separate differential proof.
+## Implementation gates and meaningful proof
 
-### Before-clear boundary
+1. Completed extraction: frozen independent pre-change raster/color/blend oracle
+   in `tests/unit/mesh_oracle.h`; 171 exact full-buffer comparisons plus known
+   gradient-zero/shared-edge/overlap assertions. Strict Release and Debug
+   ASan/UBSan each pass new `mesh_cpu` plus existing `render` (2/2) through the
+   native wrapper. This is software proof only.
+2. Next adapter slice, after review: bounded preparation plus private axis
+   projection seam, no public ABI/Core/component changes. Add private test access
+   and deterministic allocator/upload/configuration failure injection.
+3. Actual SDL readback through `scripts/test_local.py` private Xvfb: DPI 1/2,
+   positive nonuniform scale, stretch/letterbox/integer/overscan presentation,
+   fractional offsets, explicit/default viewport, nested clips, resize and
+   transparent/opaque clears. Compare analytic coverage/top-left ownership to
+   software at device coordinates. Compare SDL compositing to independent SDL
+   texture/point reference or visible composites when target storage differs;
+   establish tight per-vector rounding bounds, not broad image tolerance.
+   Include winding/degenerate/zero-gradient/overlap, alpha 0/0.5/1, sRGB threshold
+   and out-of-gamut clamp, and mixed mesh/image/text/shape command ordering.
+4. Sentinel readback before Present for malformed-last-payload, clip imbalance,
+   capacities and each injected resource failure; target unchanged on preparation
+   failure. Check partial cleanup, same-pointer mutation, destroy after failure,
+   state restoration on every exit and next-frame recovery. Strict warnings and
+   ASan/UBSan; compare owned resource counters with zero outstanding frame leases.
+   Hardware GPU and non-Linux driver proof remain separate gates.
 
-Walk the whole mesh-bearing list before clear: validate all mesh payloads,
-command kinds/bounds, clip balance/depth, transform support, capacities and
-required mesh texture creation/configuration. Preflight image/shadow resources
-in such frames regardless of shadow presence; reject text without a font early.
-Mesh payloads must not be concurrently mutated during preparation/rendering.
-A malformed final mesh or failed final mesh upload must not clear/draw earlier
-commands. This guarantee covers validation and prepared resources, not arbitrary
-late SDL draw failures or unprepared glyph allocation. Extending it to every
-glyph requires an explicit additional preparation phase, not a false atomicity
-claim.
+Reproduce extraction only with `cmake -S tests/fixtures/mesh_cpu -B build-mesh -G
+Ninja`, build targets `test_mesh_cpu test_render`, then
+`python scripts/test_local.py --build-dir build-mesh -R '^(mesh_cpu|render)$'
+--output-on-failure`. Use a separate Debug build with `-DCUI_SANITIZE=ON`.
+Existing rounded-geometry and shadow adapter fixtures demonstrate actual SDL
+capture/fault-injection patterns, not mesh correctness.
 
-## Independently reviewable implementation and proof
-
-1. Extract private raster math and prove software output unchanged with solid,
-   analytic, winding, degenerate, shared-edge and overlapping-alpha vectors.
-2. Implement the bounded SDL preparation path and private test access needed for
-   SDL state setup/readback/fault injection. No new public renderer ABI or Core
-   dependency is necessary. Keep component mesh producers unchanged.
-3. Run actual SDL readback under `scripts/test_local.py` (private Xvfb), against
-   the software helper/reference. Cover DPI 1/2, fractional placement, viewport
-   offsets, logical letterbox/integer presentation, nested clips, offscreen
-   bounds and supported uniform scale. Assert explicit pre-clear rejection for
-   nonuniform and transparent-target cases. Test RGB threshold/out-of-gamut,
-   alpha 0/0.5/1, ST gradient zero, shared edges and multiple overlapping layers.
-   Compare RGBA after normalizing readback format; opaque output alpha must be
-   255. Establish RGB rounding tolerance from specific blend vectors, with tight
-   per-vector bounds; do not hide edge/coverage errors behind a broad tolerance.
-4. Preserve a sentinel target for malformed-last-command, clip errors, triangle/
-   byte overflow, allocation/texture/upload/configuration failure. Inject failure
-   at each prepared resource, check cleanup and next-frame recovery. Exercise
-   state restoration, resize, same-pointer payload mutation, repeated render and
-   destroy-after-partial-preparation under strict C11 warnings and ASan/UBSan.
-   Tests should inspect readback before Present where needed; a failed frame
-   must not accidentally pass by reading a previous presented capture.
-
-Existing `tests/unit/test_sdl3_rounded_geometry.c` demonstrates real SDL capture
-and linker-wrapped failure/submission checks; shadow adapter fixtures provide
-further transform patterns. A private fixture may expose renderer access without
-adding public API. Software-renderer SDL proof does not establish hardware GPU,
-macOS or Windows driver behavior. Those remain separate gates.
-
-## Dependency and evidence limits
-
-No dependency was added, fetched or installed. CMake accepts system SDL3 >=3.2
-or falls back to pinned SDL revision
-`7f3ae3d57459e59943a4ecfefc8f6277ec6bf540`. Locally installed SDL headers report
-3.4.18; they expose geometry, presentation/viewport/scale, readback and blend
-contracts, but are not runtime evidence for the fallback revision. Implementation
-must compile against the supported pinned fallback as well as the selected CI
-system version. The original design checkpoint was source inspection only. The extraction
-follow-up validation below adds software builds/tests; no SDL readback fixture,
-native window or renderer capability promotion was performed.
-
-## Extraction validation
-
-The extraction follow-up runs only the new standalone fixture and existing
-`render` test, not the full native adapter suite. Reproduce with:
-
-```sh
-cmake -S tests/fixtures/mesh_cpu -B build-mesh -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build-mesh --target test_mesh_cpu test_render
-python scripts/test_local.py --build-dir build-mesh -R '^(mesh_cpu|render)$' --output-on-failure
-```
-
-Repeat in a separate Debug build with `-DCUI_SANITIZE=ON` for ASan/UBSan. The
-fixture applies the repository's `-Wall -Wextra -Wpedantic -Werror` policy. The
-oracle suite contains 171 full-buffer comparisons, including two-color ordering;
-known alpha assertions independently detect shared-edge double coverage and
-zero-gradient behavior. This establishes the software extraction contract, not
-SDL compositing or SDL readback support. No public API, capability, component
-behavior or consumer setup changes; generated consumer resources are unaffected.
+No dependency was fetched or installed. CMake accepts system SDL >=3.2 or its
+pinned fallback above; local system headers are SDL 3.4.18. Check the pinned
+fallback and selected CI SDL version during production validation. No gallery,
+Core, public capability or generated consumer guidance is changed by this design.

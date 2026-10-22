@@ -232,4 +232,6 @@ For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots ali
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.
 Repeated mouse/touch dragging has focused actual-WASM coverage; native window/GPU
-interaction remains separate. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.
+interaction remains separate. The gallery nested editor/console mode uses distinct
+caller-owned states/IDs and supplies current outer pane width to the inner group;
+copy its compilable C example. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.

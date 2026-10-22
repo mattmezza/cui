@@ -36,3 +36,16 @@ uv run --offline scripts/test_wasi.py --build-dir /path/outside/source/wasi --su
 
 The native build must first configure the source and build `test_resizable`.
 No dependencies were installed from the network and no desktop windows opened.
+
+## Nested gallery follow-up
+
+`tests/web/test_resizable_nested_gallery.py` exercises the selectable explorer /
+code / console composition on desktop DPR 1/2 and CDP touch at 390 px/DPR 2.
+Both independent handles are dragged and released repeatedly. It checks actual
+pane and paint bounds, inner capture preserving the outer split, outer resizing
+updating both inner widths while preserving heights, pointer and keyboard bounds,
+local/global disabled policies and a route transition during capture followed by
+a fresh working nested split. The concrete default and nested copied C examples
+compile with strict C11 warnings. This closes the earlier browser-nesting test
+gap for this composition; native window/GPU and arbitrary consumer nesting remain
+separate validation scopes.

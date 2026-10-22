@@ -240,7 +240,10 @@ static bool checked, enabled = true, toggled;
 static int description_columns = 3, description_vertical, description_plain, description_size;
 static cui_scroll_state description_preview_scroll;
 static int status_right = 1, status_custom;
-static int resizable_vertical, resizable_disabled;
+static int resizable_vertical, resizable_disabled, resizable_nested;
+static cui_resizable_slot resizable_inner_slots[2];
+static cui_resizable_state resizable_inner_state;
+static bool resizable_inner_disabled;
 static unsigned resizable_document;
 static cui_resizable_slot resizable_slots[2];
 static cui_resizable_state resizable_state;
@@ -1069,6 +1072,43 @@ static void resizable_content(cui_context *context, void *user) {
         cui_end_box(context);
     }
     cui_end_box(context);
+}
+static void resizable_console(cui_context *context, void *user) {
+    (void)user;
+    cui_begin_box(context, 0,
+                  (cui_box){.width = -1, .height = -1, .padding = 10, .gap = 6, .clip = true});
+    cui_text(context, cui_string("Console"), 14, current_theme.text);
+    cui_text(context, cui_string("Build complete"), 12, current_theme.muted);
+    cui_end_box(context);
+}
+static void resizable_workspace(cui_context *context, void *user) {
+    (void)user;
+    cui_resizable_panel panels[2] = {{.id = cui_id_from(context, "resizable-code"),
+                                      .accessibility_label = {"Code panel", 10},
+                                      .has_initial_size = true,
+                                      .initial_size = 180,
+                                      .custom_range = true,
+                                      .minimum = 100,
+                                      .maximum = 240,
+                                      .content = resizable_content,
+                                      .content_user = (void *)(uintptr_t)1},
+                                     {.id = cui_id_from(context, "resizable-console"),
+                                      .accessibility_label = {"Console panel", 13},
+                                      .custom_range = true,
+                                      .minimum = 60,
+                                      .maximum = 200,
+                                      .content = resizable_console}};
+    panels[0].box.background = current_theme.background;
+    panels[1].box.background = current_theme.surface;
+    cui_resizable_options options = cui_resizable_options_default();
+    options.axis = CUI_RESIZABLE_VERTICAL;
+    options.extent = 300;
+    options.cross_size = resizable_state.slots[1].size;
+    options.disabled = resizable_inner_disabled;
+    options.reduced_motion = reduced_motion;
+    options.now_seconds = host_seconds;
+    cui_resizable(context, cui_id_from(context, "resizable-inner"), &current_theme,
+                  &resizable_inner_state, panels, 2, options);
 }
 static void gallery_carousel_changed(size_t index, void *user) {
     (void)index;
@@ -2348,7 +2388,8 @@ int gallery_init(void) {
                                                       .capacity = sizeof(toolbar_query_buffer)});
     if (!toolbar_query)
         return 0;
-    if (!cui_resizable_state_init(&resizable_state, resizable_slots, 2))
+    if (!cui_resizable_state_init(&resizable_state, resizable_slots, 2) ||
+        !cui_resizable_state_init(&resizable_inner_state, resizable_inner_slots, 2))
         return 0;
     if (!cui_sidebar_state_init(&sidebar_state, sidebar_cache, 2) ||
         !cui_textarea_state_init(&textarea_state, textarea_lines, 256))
@@ -3086,7 +3127,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         panels[0] = cui_resizable_panel_default(cui_id_from(ui, "resizable-explorer"));
         panels[1] = cui_resizable_panel_default(cui_id_from(ui, "resizable-editor"));
         panels[0].accessibility_label = cui_string("Explorer panel");
-        panels[1].accessibility_label = cui_string("Editor panel");
+        panels[1].accessibility_label =
+            cui_string(resizable_nested ? "Workspace panel" : "Editor panel");
         panels[0].initial_size = resizable_vertical ? 105 : 140;
         panels[0].has_initial_size = true;
         panels[0].minimum = 80;
@@ -3098,7 +3140,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         panels[1].maximum = resizable_vertical ? 210 : width - 48;
         panels[1].custom_range = true;
         panels[0].content = resizable_content;
-        panels[1].content = resizable_content;
+        panels[1].content = resizable_nested ? resizable_workspace : resizable_content;
         panels[0].content_user = (void *)(uintptr_t)0;
         panels[1].content_user = (void *)(uintptr_t)1;
         panels[0].box.background = t.secondary;
@@ -3108,8 +3150,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_resizable_options options = cui_resizable_options_default();
         options.axis = resizable_vertical ? CUI_RESIZABLE_VERTICAL : CUI_RESIZABLE_HORIZONTAL;
         options.extent = resizable_vertical ? 210 : width - 48;
-        options.cross_size = resizable_vertical ? width - 48 : 160;
+        options.cross_size = resizable_nested ? 300 : resizable_vertical ? width - 48 : 160;
         options.disabled = disabled || resizable_disabled;
+        resizable_inner_disabled = options.disabled;
         options.reduced_motion = reduced_motion;
         options.now_seconds = host_seconds;
         cui_resizable(ui, cui_id_from(ui, "resizable-group"), &t, &resizable_state, panels, 2,
@@ -6091,7 +6134,16 @@ unsigned gallery_date_value(void) {
     return (unsigned)(date_selection.start.year * 10000 + date_selection.start.month * 100 +
                       date_selection.start.day);
 }
+void gallery_resizable_nested_options(int nested) {
+    if (resizable_nested != (nested != 0)) {
+        cui_resizable_clear(&resizable_state);
+        cui_resizable_clear(&resizable_inner_state);
+    }
+    resizable_nested = nested != 0;
+}
 void gallery_resizable_options(int vertical, int disabled) {
+    if (resizable_nested)
+        vertical = 0;
     if (resizable_vertical != (vertical != 0))
         cui_resizable_clear(&resizable_state);
     resizable_vertical = vertical != 0;

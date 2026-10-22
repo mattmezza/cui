@@ -5468,7 +5468,8 @@
       "tests": [
         "tests/unit/test_resizable.c",
         "tests/web/test_resizable_drag.py",
-        "tests/web/test_resizable_repeated_drag.py"
+        "tests/web/test_resizable_repeated_drag.py",
+        "tests/web/test_resizable_nested_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -5476,7 +5477,7 @@
         "browser": "tested_partial"
       },
       "limitations": [
-        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Fresh actual-WASM browser audits cover repeated release/regrab, desktop DPR1/2, touch390/DPR2, responsive pane geometry and clamps; nesting is covered by native-headless/WASI fixtures, not a browser nested story. Native window/GPU interaction remains unaudited. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native source drag-payload adapter or full family parity claim."
+        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Actual-WASM browser audits cover repeated release/regrab, desktop DPR1/2, touch390/DPR2, responsive pane geometry and clamps, plus a nested explorer/code/console composition with independent capture and cross-axis sizing. Native window/GPU interaction and arbitrary consumer composition remain unaudited. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native source drag-payload adapter or full family parity claim."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5503,6 +5504,16 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_resizable.c"
+          ]
+        },
+        {
+          "name": "nested browser composition and independent capture",
+          "status": "tested",
+          "evidence": [
+            "tests/web/test_resizable_nested_gallery.py",
+            "web/gallery.c",
+            "web/modules/cui_resizable_usage.js",
+            "docs/RESIZABLE.md"
           ]
         }
       ],

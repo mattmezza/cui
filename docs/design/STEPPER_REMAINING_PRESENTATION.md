@@ -107,3 +107,70 @@ right/bottom expressions, asymmetric vertical margins and intrinsic-size clamps
 need their own frozen-reference proof before promotion. Native tests use the
 private Xvfb wrapper. This audit runs no builds or browsers and claims no live AT,
 complete styling, binding or full Stepper parity.
+
+## Approved first-slice contract (2026-10-22)
+
+This section supersedes the tentative zero-settings/focus-ring direction above.
+The existing visual entry and options retain their ABI, pixels and reducer. A new
+`cui_stepper_presentation.h` exposes an explicitly opt-in entry:
+
+```c
+typedef enum {
+    CUI_STEPPER_LAYOUT_CONTENT = 0,
+    CUI_STEPPER_LAYOUT_FILL
+} cui_stepper_layout;
+typedef struct {
+    cui_color normal, hover, pressed, foreground;
+} cui_stepper_indicator_palette;
+typedef struct {
+    cui_stepper_layout layout;
+    float width, height;
+    bool custom_palette;
+    cui_stepper_indicator_palette palette;
+} cui_stepper_presentation_options;
+cui_stepper_navigation_result cui_stepper_present(
+    cui_context *ui, cui_id id, const cui_theme *theme,
+    const cui_step *steps, size_t count, size_t selected,
+    cui_stepper_visual_options visual,
+    cui_stepper_presentation_options presentation,
+    cui_stepper_navigation_handler handler);
+```
+
+Calling this new entry opts into secondary indicator colors, current-layout
+indicator hover/press feedback and theme-radius behavior even with zero options.
+CONTENT retains the existing fixed connector spacer layout. FILL has zero-flow
+non-centered connectors; its root width0 grows to available parent width, positive
+width is explicit. Height0 is intrinsic, positive height is explicit (including
+vertical available height). CONTENT requires width=height=0. Reject unknown enums,
+nonfinite/negative extents, invalid visual/icon/design settings before registering
+semantics or reducing input. All existing count/selection/string validation remains
+owned by the single Base navigation call. Failure returns invalid; no new callback
+or dispatch path exists. Shared design sizes remain available through `visual`.
+
+Normal/hover/foreground defaults are secondary/secondary_hover/secondary_foreground.
+Pressed defaults to `buttons[CUI_THEME_BUTTON_SECONDARY].active`: this approved CUI
+fallback can differ from frozen global secondary_active. `custom_palette` replaces
+all four unchecked colors. Checked primary/on_primary wins in every interaction
+state; disabled unchecked indicators never use hover/pressed. Radius is zero when
+theme radius is zero, otherwise half the indicator side. No focus ring is added.
+
+Passive indicator prepaint observes current clipped/occlusion-aware geometry. It
+adds no semantic or input target. Press is only decorative observation of the
+already accepted trigger capture: primary-pointer capture paints pressed while
+that pointer is visibly over the indicator; Space capture paints pressed without
+requiring pointer hover. Label-origin capture dragged onto the indicator follows
+this CUI policy too. This is not a claim about GPUI engine press-origin, drag
+re-entry, or keyboard-active equivalence. There is no private gesture state or
+second event reduction to become stale after omission, cancel or disable. Painting
+uses captured options and selection, so callbacks updating owner state still take
+effect on the next submission. Current-layout passive blockers/modal admission
+remain authoritative for pointer feedback.
+
+Prepaint payloads copy colors, dimensions, trigger identity and interaction flags;
+never caller descriptor-array pointers. Bitmap metadata is copied by existing
+paint submission and bytes remain borrowed through renderer completion. No new
+application-retained state is introduced. FILL connector rectangles stay within
+their item and clamp negative lengths to empty; centered crossing connectors and
+exact source typography remain deferred. Tests must cover legacy command/pixel
+stability, independent fill geometry, indicator-only hover, accepted capture,
+Space, cancel/disabled, occlusion, callbacks, shared sizing and invalid preflight.

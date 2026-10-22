@@ -12,6 +12,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_color_entry.h"
 #include "cui/cui_command.h"
 #include "cui/cui_components.h"
+#include "cui/cui_dropdown_button_styles.h"
 #ifdef CUI_GALLERY_REGEX
 #include "cui/cui_regex.h"
 #endif
@@ -1363,6 +1364,8 @@ static void gallery_bubble_reaction(cui_context *context, const cui_theme *theme
 }
 static bool alert_visible = true, open[3] = {true, false, false}, collapsed;
 static int dropdown_variant, dropdown_size, dropdown_halves, dropdown_action, dropdown_anchor;
+static int dropdown_paint = 1;
+static bool dropdown_shadow;
 static bool dropdown_outline, dropdown_selected;
 static cui_id selected_tab;
 static int tabs_mode, tabs_size, tabs_variant = CUI_TAB_UNDERLINE;
@@ -5555,7 +5558,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             invoked = cui_context_menu(ui, target, &t, cui_string("Context actions"), entries, 9,
                                        &menu_action, &context_menu, options);
         } else if (story == 52) {
-            cui_dropdown_button_result result = cui_dropdown_button(
+            cui_dropdown_button_styles styles = {
+                .paint_policy = (cui_dropdown_button_paint_policy)dropdown_paint,
+                .custom_shadow = dropdown_shadow,
+                .host_shadows_enabled = true};
+            cui_dropdown_button_result result = cui_dropdown_button_styled_ex(
                 ui, cui_id_from(ui, "split-button"), cui_id_from(ui, "split-action"),
                 cui_id_from(ui, "split-trigger"), &t, cui_string("Export workspace"),
                 cui_string("Export options"), entries, 9, &menu_action, &menu_tree,
@@ -5576,7 +5583,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                          {255, 255, 255, 255},
                                                          {90, 60, 190, 255},
                                                          {40, 20, 120, 255}},
-                                              .menu = options});
+                                              .menu = options},
+                &styles);
             if (result.action_activated)
                 clicks++;
             invoked = result.menu_activated;
@@ -6732,6 +6740,11 @@ float gallery_tabs_scroll(unsigned field) {
     default:
         return 0;
     }
+}
+
+void gallery_dropdown_style_options(int policy, int shadow) {
+    dropdown_paint = policy == 0 ? 0 : 1;
+    dropdown_shadow = shadow != 0;
 }
 
 void gallery_dropdown_options(int variant, int size, int halves, int action, int anchor,

@@ -156,6 +156,9 @@ jobs:
       - name: Gallery Popover anchors arrows and layer interaction
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_popover_anchor_gallery.py --directory build/web
+      - name: Gallery split-button paint policies and shadow gates
+        if: ${{ matrix.shard == 3 }}
+        run: uv run tests/web/test_dropdown_styles_gallery.py --directory build/web
       - name: Gallery analytic mesh pixels and bounded preparation
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_mesh_canvas.py --directory build/web

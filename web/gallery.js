@@ -4,6 +4,7 @@ import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_sha
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
 import {selectedUsage} from "./modules/cui_usage.js";
+import {dropdownUsage} from "./modules/cui_dropdown_usage.js";
 let shadowRenderer;
 const meshRenderer=createCuiMeshRenderer();
 let iconCatalog=null,apiIndex=null;
@@ -865,6 +866,8 @@ function render(){
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value));
  wasm.gallery_avatar_options(Number($('avatar-source').value),Number($('avatar-palette').checked),Number($('avatar-hue').value),Number($('avatar-placeholder').value),Number($('avatar-rem').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
+ $('dropdown-shadow').disabled=$('dropdown-paint').value==='0'||$('dropdown-variant').value!=='11';
+ wasm.gallery_dropdown_style_options(Number($('dropdown-paint').value),Number($('dropdown-shadow').checked));
  wasm.gallery_dropdown_options(...['variant','size','halves','action','anchor'].map(k=>Number($('dropdown-'+k).value)),Number($('dropdown-outline').checked),Number($('dropdown-selected').checked));
  wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
  wasm.gallery_progress_mode(Number($('progress-mode').value));
@@ -948,6 +951,7 @@ function render(){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
+ if(selected.name==='DropdownButton')$('snippet').textContent=dropdownUsage(Number($('dropdown-paint').value),$('dropdown-shadow').checked);
  if(selected.name==='DatePicker')$('snippet').textContent=wasm.gallery_control_stats(9)?dateTimeSnippet(Boolean(wasm.gallery_control_stats(10)),Boolean(wasm.gallery_control_stats(11)),Boolean(wasm.gallery_control_stats(13))):wasm.gallery_control_stats(7)?dateActionsSnippet(Boolean(wasm.gallery_control_stats(8))):snippets.DatePicker;
  if(selected.name==='Questionnaire')$('snippet').textContent=questionnairePresentationUsage(Number(questionnairePresentationControl.value))||questionnaireProgressUsage(Number($('questionnaire-progress').value))||snippets.Questionnaire;
  if(selected.name==='Popover'){
@@ -1236,7 +1240,8 @@ function selectComponent(){
  $('textarea-rows').value='4';$('textarea-grow').checked=false;$('textarea-readonly').checked=false;$('textarea-nowrap').checked=false;
  $('message-scrollbar-control').hidden=selected.name!=='MessageScroller';
  $('message-alignment').value='0';$('message-variant').value='1';$('message-inset').value='0';$('message-avatar').checked=true;$('message-scrollbar').checked=true;
- for(const id of ['dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline-control','dropdown-selected-control'])$(id).hidden=selected.name!=='DropdownButton';
+ for(const id of ['dropdown-paint','dropdown-shadow-control','dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline-control','dropdown-selected-control'])$(id).hidden=selected.name!=='DropdownButton';
+ $('dropdown-paint').value='1';$('dropdown-shadow').checked=false;
  for(const k of ['variant','size','halves','action','anchor'])$('dropdown-'+k).value='0';$('dropdown-outline').checked=false;$('dropdown-selected').checked=false;
  for(const id of ['tabs-mode','tabs-size','tabs-variant','tabs-manual-control'])$(id).hidden=selected.name!=='Tabs';
  $('tabs-mode').value='0';$('tabs-size').value='0';$('tabs-variant').value='1';$('tabs-manual').checked=false;
@@ -1447,7 +1452,7 @@ $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(N
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
-for(const id of ['avatar-source','avatar-palette','avatar-hue','avatar-placeholder','avatar-rem','message-alignment','message-variant','message-inset','message-avatar','message-scrollbar','dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline','dropdown-selected','tabs-mode','tabs-size','tabs-variant','tabs-manual','progress-shape','progress-mode','shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
+for(const id of ['avatar-source','avatar-palette','avatar-hue','avatar-placeholder','avatar-rem','message-alignment','message-variant','message-inset','message-avatar','message-scrollbar','dropdown-paint','dropdown-shadow','dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline','dropdown-selected','tabs-mode','tabs-size','tabs-variant','tabs-manual','progress-shape','progress-mode','shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);
 $('group-mode').addEventListener('change',requestFrame);

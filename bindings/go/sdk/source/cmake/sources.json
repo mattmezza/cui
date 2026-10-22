@@ -269,6 +269,7 @@
     "cui_questionnaire_keyboard": [],
     "cui_questionnaire_progress": [],
     "cui_questionnaire_presentation": [],
+    "cui_questionnaire_geometry": [],
     "cui_questionnaire_snapshots": ["src/base/cui_questionnaire_snapshots.c"],
     "cui_date_time_picker": ["src/base/cui_date_time_picker.c", "src/components/cui_date_time_picker.c"],
     "cui_date_picker_actions": ["src/base/cui_date_picker_actions.c", "src/components/cui_date_picker_actions.c"],

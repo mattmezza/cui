@@ -200,3 +200,11 @@ Error content, read `docs/QUESTIONNAIRE_PRESENTATION.md` and the matching
 text/Error paint; token typography is explicit, shared scale tiers are CUI
 extensions. Schema text needs Item gating; Error retains one localized Alert.
 No root style cascade, binding facade or custom action content is implied.
+
+For bounded Questionnaire geometry, read `docs/QUESTIONNAIRE_GEOMETRY.md` and
+`include/cui/cui_questionnaire_geometry.h`. Pass numeric/box/text options explicitly
+to each part; root never publishes these opt-ins. Shared size beats custom scalar,
+then masks override. NULL/zero keeps the legacy tree. Extended child snapshots are
+pure borrowed submission values; new callbacks win over old. Minimum blank area
+belongs to the same interactive card. Input asymmetric padding/editor styles,
+Button/trailing actions and language-builder geometry remain separate gaps.

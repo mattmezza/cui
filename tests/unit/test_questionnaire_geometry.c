@@ -527,6 +527,37 @@ static void invalid(void) {
         assert(events == before && new_calls == calls && state.current == 0);
     }
 }
+static void default_text_pixels(void) {
+    cui_questionnaire_geometry_options g = {
+        .answer = {.fields = 15,
+                   .font_size = 21,
+                   .line_height = 30,
+                   .color = {17, 99, 181, 255},
+                   .style = {.weight = CUI_TEXT_WEIGHT_BOLD, .family = 42}},
+        .card = {.fields = CUI_QUESTIONNAIRE_BOX_OPACITY, .opacity = 1}};
+    cui_draw_list list = frame((cui_questionnaire_options){.disabled = true}, &g, false);
+    bool found = false;
+    for (size_t i = 0; i < list.count; i++) {
+        const cui_draw_command *d = &list.commands[i];
+        if (d->type == CUI_DRAW_TEXT && d->font_size == 21) {
+            assert(d->text_style.weight == CUI_TEXT_WEIGHT_BOLD && d->text_style.family == 42 &&
+                   d->bounds.h == 30 && color(d->color, g.answer.color));
+            found = true;
+        }
+    }
+    assert(found);
+    cui_software *r = cui_software_create(360, 300, (cui_font *)&state);
+    assert(r && cui_software_render(r, &list, theme.background));
+    const unsigned char *px = cui_software_pixels(r, NULL, NULL);
+    size_t ink = 0;
+    for (size_t i = 0; i < 360u * 300u * 4u; i += 4)
+        ink += px[i] == 17 && px[i + 1] == 99 && px[i + 2] == 181;
+    assert(ink > 100);
+    cui_software_destroy(r);
+    size_t n;
+    const cui_semantic *sem = cui_semantics(ui, &n);
+    assert(n == 1 && sem->disabled);
+}
 static void callback_mutation(void) {
     for (unsigned old = 0; old < 2; old++) {
         assert(cui_questionnaire_reset(&state));
@@ -555,6 +586,7 @@ int main(void) {
     clipping();
     invalid();
     callback_mutation();
+    default_text_pixels();
     cui_destroy(ui);
     puts("Questionnaire geometry: PASS");
     return 0;

@@ -21,10 +21,10 @@ def generate(name,sources):
     if name == "cui_components":
         lines += ['#include "cui_button_styles.h"']
     if name == "cui_questionnaire":
-        lines += ['#include "cui_questionnaire_keyboard.h"', '#include "cui_questionnaire_observer.h"', '#include "cui_questionnaire_progress.h"', '#include "cui_questionnaire_presentation.h"']
+        lines += ['#include "cui_questionnaire_keyboard.h"', '#include "cui_questionnaire_observer.h"', '#include "cui_questionnaire_progress.h"', '#include "cui_questionnaire_presentation.h"', '#include "cui_questionnaire_geometry.h"']
         for dependency in ['cui_questionnaire_snapshots', 'cui_questionnaire_observer']:
             lines += [f'#ifndef {dependency.upper()}_IMPLEMENTATION', f'#define {dependency.upper()}_IMPLEMENTATION', '#endif', f'#include "{dependency}.h"']
-    if name in {"cui_questionnaire_keyboard", "cui_questionnaire_observer", "cui_questionnaire_progress", "cui_questionnaire_presentation"}:
+    if name in {"cui_questionnaire_keyboard", "cui_questionnaire_observer", "cui_questionnaire_progress", "cui_questionnaire_presentation", "cui_questionnaire_geometry"}:
         lines += ['#ifndef CUI_QUESTIONNAIRE_IMPLEMENTATION', '#define CUI_QUESTIONNAIRE_IMPLEMENTATION', '#endif', '#include "cui_questionnaire.h"']
     if name == "cui_picker":
         lines += ['#include "cui_components.h"', '#include "cui_calendar_presentation.h"', '#include "cui_calendar_behavior.h"', '#include "cui_date_picker_calendar.h"']

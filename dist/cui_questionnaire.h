@@ -313,6 +313,7 @@ bool cui_questionnaire_choice_control(cui_context *, cui_id, const cui_theme *,
 #include "cui_questionnaire_observer.h"
 #include "cui_questionnaire_progress.h"
 #include "cui_questionnaire_presentation.h"
+#include "cui_questionnaire_geometry.h"
 #ifndef CUI_QUESTIONNAIRE_SNAPSHOTS_IMPLEMENTATION
 #define CUI_QUESTIONNAIRE_SNAPSHOTS_IMPLEMENTATION
 #endif
@@ -977,6 +978,7 @@ static inline bool cui_design_resolve(cui_design_size size, float density,
 
 
 
+
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_QUESTIONNAIRE_PRESENTATION_PRIVATE_H
 #define CUI_QUESTIONNAIRE_PRESENTATION_PRIVATE_H
@@ -1143,6 +1145,285 @@ static cui_questionnaire_metrics cui_questionnaire_measure(cui_questionnaire_opt
 static cui_color cui_questionnaire_opacity(cui_color color, float opacity) {
     color.a = (uint8_t)(color.a * opacity + .5f);
     return color;
+}
+
+static float cui_questionnaire_choices_gap(cui_questionnaire_size);
+static bool cui_questionnaire_geometry_text_valid(cui_questionnaire_text_refinement r) {
+    return !(r.fields & ~UINT32_C(15)) &&
+           (!(r.fields & CUI_QUESTIONNAIRE_TEXT_SIZE) ||
+            (isfinite(r.font_size) && r.font_size > 0 && r.font_size <= 512)) &&
+           (!(r.fields & CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT) ||
+            cui_questionnaire_length(r.line_height, false)) &&
+           (!(r.fields & CUI_QUESTIONNAIRE_TEXT_STYLE) ||
+            ((unsigned)r.style.weight <= CUI_TEXT_WEIGHT_BOLD && isfinite(r.style.letter_spacing)));
+}
+static bool cui_questionnaire_geometry_box_valid(cui_questionnaire_box_refinement p) {
+    return !(p.fields & ~UINT32_C(255)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_WIDTH) || cui_questionnaire_length(p.width, true)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_PADDING) ||
+            (cui_questionnaire_length(p.padding.left, false) &&
+             cui_questionnaire_length(p.padding.right, false) &&
+             cui_questionnaire_length(p.padding.top, false) &&
+             cui_questionnaire_length(p.padding.bottom, false) &&
+             p.padding.left + p.padding.right <= 4096 &&
+             p.padding.top + p.padding.bottom <= 4096)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_GAP) || cui_questionnaire_length(p.gap, false)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_RADIUS) ||
+            cui_questionnaire_length(p.radius, false)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_BORDER) ||
+            cui_questionnaire_length(p.border_width, false)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_ALIGN) ||
+            ((unsigned)p.align_x <= CUI_ALIGN_END && (unsigned)p.align_y <= CUI_ALIGN_END)) &&
+           (!(p.fields & CUI_QUESTIONNAIRE_BOX_OPACITY) ||
+            (isfinite(p.opacity) && p.opacity >= 0 && p.opacity <= 1));
+}
+static cui_box cui_questionnaire_geometry_box(cui_box b, cui_questionnaire_box_refinement p) {
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_WIDTH) {
+        b.width = p.width;
+        b.fixed_width = p.width == 0 && p.fixed_zero_width;
+    }
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_PADDING) {
+        b.custom_padding = true;
+        b.padding_edges = p.padding;
+    }
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_GAP)
+        b.gap = p.gap;
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_RADIUS)
+        b.radius = p.radius;
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_BACKGROUND)
+        b.background = p.background;
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_BORDER) {
+        b.border = p.border;
+        b.border_width = p.border_width;
+    }
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_ALIGN) {
+        b.align_x = p.align_x;
+        b.align_y = p.align_y;
+    }
+    if (p.fields & CUI_QUESTIONNAIRE_BOX_OPACITY) {
+        b.custom_opacity = true;
+        b.opacity = p.opacity;
+    }
+    return b;
+}
+/* Memberwise activation: never compare structure padding or inactive values. */
+static bool cui_questionnaire_geometry_active(const cui_questionnaire_geometry_options *g) {
+    return g && (g->root.fields || g->item.fields || g->choices.fields || g->actions.fields ||
+                 g->card.fields || g->custom_scalar != 0 || g->metric_fields || g->card_fields ||
+                 g->answer.fields || g->secondary.fields || g->shortcut.fields ||
+                 g->render_indicator || g->render_content || g->render_shortcut);
+}
+bool cui_questionnaire_geometry_resolve(const cui_theme *t, cui_questionnaire_options o,
+                                        const cui_questionnaire_geometry_options *options,
+                                        cui_questionnaire_geometry_metrics *out) {
+    if (!t || !out || !cui_design_valid(o.design_size) || !isfinite(o.density) || o.density < 0 ||
+        o.density > 32)
+        return false;
+    cui_questionnaire_geometry_options g =
+        options ? *options : (cui_questionnaire_geometry_options){0};
+    if (!isfinite(g.custom_scalar) || g.custom_scalar < 0 || g.custom_scalar > 256 ||
+        (g.metric_fields & ~UINT32_C(33554431)) || (g.card_fields & ~UINT32_C(1)) ||
+        !cui_questionnaire_geometry_box_valid(g.root) ||
+        !cui_questionnaire_geometry_box_valid(g.item) ||
+        !cui_questionnaire_geometry_box_valid(g.choices) ||
+        !cui_questionnaire_geometry_box_valid(g.actions) ||
+        !cui_questionnaire_geometry_box_valid(g.card) ||
+        !cui_questionnaire_geometry_text_valid(g.answer) ||
+        !cui_questionnaire_geometry_text_valid(g.secondary) ||
+        !cui_questionnaire_geometry_text_valid(g.shortcut))
+        return false;
+    if (o.design_size && !o.density)
+        o.density = t->font_size / 16;
+    cui_design_metrics checked;
+    if (o.design_size && !cui_design_resolve(o.design_size, o.density, &checked))
+        return false;
+    cui_questionnaire_metrics m = cui_questionnaire_measure(o);
+    cui_questionnaire_geometry_metrics r = {
+        .root_gap = m.root_gap,
+        .item_gap = m.root_gap,
+        .choices_gap = o.design_size ? m.gap : cui_questionnaire_choices_gap(o.size),
+        .answer_gap = m.gap,
+        .content_gap = m.content_gap,
+        .padding_x = m.px,
+        .padding_y = m.py,
+        .minimum_height = m.height,
+        .card_radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius
+                       : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius * 2
+                                                           : t->radius_lg,
+        .indicator_size = m.indicator,
+        .mark_size = m.mark,
+        .check_size = m.indicator - 2,
+        .indicator_radius = t->radius / 2,
+        .shortcut_size = m.shortcut,
+        .shortcut_font = o.design_size                        ? m.font * .625f
+                         : o.size == CUI_QUESTIONNAIRE_XSMALL ? 8
+                         : o.size == CUI_QUESTIONNAIRE_SMALL  ? 9
+                         : o.size == CUI_QUESTIONNAIRE_LARGE  ? 12
+                                                              : 10,
+        .shortcut_radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius / 2
+                           : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius_lg
+                                                               : t->radius,
+        .answer_font = m.font,
+        .answer_line = m.line,
+        .secondary_font = m.font > 14 ? m.font - 2 : 12,
+        .secondary_line = m.line,
+        .title_font = m.font + 2,
+        .title_line = m.line + 4,
+        .progress_font = o.design_size                       ? m.font * .75f
+                         : o.size == CUI_QUESTIONNAIRE_LARGE ? 14
+                                                             : 12};
+    if (g.custom_scalar && !o.design_size) {
+        float v = g.custom_scalar;
+        r = (cui_questionnaire_geometry_metrics){.root_gap = v,
+                                                 .item_gap = v,
+                                                 .choices_gap = .5f * v,
+                                                 .answer_gap = .625f * v,
+                                                 .content_gap = .125f * v,
+                                                 .padding_x = .75f * v,
+                                                 .padding_y = .625f * v,
+                                                 .minimum_height = 2.75f * v,
+                                                 .card_radius = t->radius_lg,
+                                                 .indicator_size = v,
+                                                 .mark_size = .5f * v,
+                                                 .check_size = .875f * v,
+                                                 .indicator_radius = t->radius / 2,
+                                                 .shortcut_size = 1.25f * v,
+                                                 .shortcut_font = .625f * v,
+                                                 .shortcut_radius = t->radius,
+                                                 .answer_font = v,
+                                                 .answer_line = 1.5f * v,
+                                                 .secondary_font = .875f * v,
+                                                 .title_font = 1.125f * v,
+                                                 .progress_font = .75f * v};
+    }
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_ROOT_GAP)
+        r.root_gap = g.metrics.root_gap;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_ITEM_GAP)
+        r.item_gap = g.metrics.item_gap;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_CHOICES_GAP)
+        r.choices_gap = g.metrics.choices_gap;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_ANSWER_GAP)
+        r.answer_gap = g.metrics.answer_gap;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_CONTENT_GAP)
+        r.content_gap = g.metrics.content_gap;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_PADDING_X)
+        r.padding_x = g.metrics.padding_x;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_PADDING_Y)
+        r.padding_y = g.metrics.padding_y;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_MINIMUM_HEIGHT)
+        r.minimum_height = g.metrics.minimum_height;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_CARD_RADIUS)
+        r.card_radius = g.metrics.card_radius;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_INDICATOR_SIZE)
+        r.indicator_size = g.metrics.indicator_size;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_MARK_SIZE)
+        r.mark_size = g.metrics.mark_size;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_CHECK_SIZE)
+        r.check_size = g.metrics.check_size;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_INDICATOR_RADIUS)
+        r.indicator_radius = g.metrics.indicator_radius;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_SHORTCUT_SIZE)
+        r.shortcut_size = g.metrics.shortcut_size;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_SHORTCUT_FONT)
+        r.shortcut_font = g.metrics.shortcut_font;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_SHORTCUT_LINE)
+        r.shortcut_line = g.metrics.shortcut_line;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_SHORTCUT_RADIUS)
+        r.shortcut_radius = g.metrics.shortcut_radius;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_ANSWER_FONT)
+        r.answer_font = g.metrics.answer_font;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_ANSWER_LINE)
+        r.answer_line = g.metrics.answer_line;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_SECONDARY_FONT)
+        r.secondary_font = g.metrics.secondary_font;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_SECONDARY_LINE)
+        r.secondary_line = g.metrics.secondary_line;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_TITLE_FONT)
+        r.title_font = g.metrics.title_font;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_TITLE_LINE)
+        r.title_line = g.metrics.title_line;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_PROGRESS_FONT)
+        r.progress_font = g.metrics.progress_font;
+    if (g.metric_fields & CUI_QUESTIONNAIRE_METRIC_PROGRESS_LINE)
+        r.progress_line = g.metrics.progress_line;
+    if (!isfinite(r.root_gap) || r.root_gap < 0 || r.root_gap > 4096)
+        return false;
+    if (!isfinite(r.item_gap) || r.item_gap < 0 || r.item_gap > 4096)
+        return false;
+    if (!isfinite(r.choices_gap) || r.choices_gap < 0 || r.choices_gap > 4096)
+        return false;
+    if (!isfinite(r.answer_gap) || r.answer_gap < 0 || r.answer_gap > 4096)
+        return false;
+    if (!isfinite(r.content_gap) || r.content_gap < 0 || r.content_gap > 4096)
+        return false;
+    if (!isfinite(r.padding_x) || r.padding_x < 0 || r.padding_x > 4096)
+        return false;
+    if (!isfinite(r.padding_y) || r.padding_y < 0 || r.padding_y > 4096)
+        return false;
+    if (!isfinite(r.minimum_height) || r.minimum_height < 0 || r.minimum_height > 4096)
+        return false;
+    if (!isfinite(r.card_radius) || r.card_radius < 0 || r.card_radius > 4096)
+        return false;
+    if (!isfinite(r.indicator_size) || r.indicator_size < 0 || r.indicator_size > 4096)
+        return false;
+    if (!isfinite(r.mark_size) || r.mark_size < 0 || r.mark_size > 4096)
+        return false;
+    if (!isfinite(r.check_size) || r.check_size < 0 || r.check_size > 4096)
+        return false;
+    if (!isfinite(r.indicator_radius) || r.indicator_radius < 0 || r.indicator_radius > 4096)
+        return false;
+    if (!isfinite(r.shortcut_size) || r.shortcut_size < 0 || r.shortcut_size > 4096)
+        return false;
+    if (!isfinite(r.shortcut_font) || r.shortcut_font <= 0 || r.shortcut_font > 512)
+        return false;
+    if (!isfinite(r.shortcut_line) || r.shortcut_line < 0 || r.shortcut_line > 4096)
+        return false;
+    if (!isfinite(r.shortcut_radius) || r.shortcut_radius < 0 || r.shortcut_radius > 4096)
+        return false;
+    if (!isfinite(r.answer_font) || r.answer_font <= 0 || r.answer_font > 512)
+        return false;
+    if (!isfinite(r.answer_line) || r.answer_line < 0 || r.answer_line > 4096)
+        return false;
+    if (!isfinite(r.secondary_font) || r.secondary_font <= 0 || r.secondary_font > 512)
+        return false;
+    if (!isfinite(r.secondary_line) || r.secondary_line < 0 || r.secondary_line > 4096)
+        return false;
+    if (!isfinite(r.title_font) || r.title_font <= 0 || r.title_font > 512)
+        return false;
+    if (!isfinite(r.title_line) || r.title_line < 0 || r.title_line > 4096)
+        return false;
+    if (!isfinite(r.progress_font) || r.progress_font <= 0 || r.progress_font > 512)
+        return false;
+    if (!isfinite(r.progress_line) || r.progress_line < 0 || r.progress_line > 4096)
+        return false;
+
+    float vertical = (g.card.fields & CUI_QUESTIONNAIRE_BOX_PADDING)
+                         ? g.card.padding.top + g.card.padding.bottom
+                         : 2 * r.padding_y;
+    if (2 * r.padding_x > 4096 || 2 * r.padding_y > 4096 ||
+        ((g.card_fields & CUI_QUESTIONNAIRE_CARD_FIXED_HEIGHT) &&
+         (!cui_questionnaire_length(g.card_height, false) || g.card_height < r.minimum_height ||
+          g.card_height < vertical)))
+        return false;
+    *out = r;
+    return true;
+}
+static cui_questionnaire_text_view
+cui_questionnaire_geometry_text(cui_str text, float font, float line, cui_color color,
+                                cui_text_style style, cui_questionnaire_text_refinement p) {
+    cui_questionnaire_text_view v = {text, font, line, color, style};
+    if (p.fields & CUI_QUESTIONNAIRE_TEXT_SIZE)
+        v.font_size = p.font_size;
+    if (p.fields & CUI_QUESTIONNAIRE_TEXT_LINE_HEIGHT)
+        v.line_height = p.line_height;
+    if (p.fields & CUI_QUESTIONNAIRE_TEXT_COLOR)
+        v.color = p.color;
+    if (p.fields & CUI_QUESTIONNAIRE_TEXT_STYLE)
+        v.style = p.style;
+    return v;
+}
+static void cui_questionnaire_geometry_draw(cui_context *ui, cui_questionnaire_text_view v) {
+    cui_text_ex(ui, v.text, v.font_size, v.color, v.line_height, v.style);
 }
 /* Match the source's bounded per-state scale publication without process globals. */
 #define CUI_QUESTIONNAIRE_TRACKED_SIZES 128
@@ -1422,6 +1703,18 @@ bool cui_questionnaire_begin(cui_context *ui, cui_id id, const cui_theme *theme,
 bool cui_questionnaire_begin_with_keyboard(cui_context *ui, cui_id id, const cui_theme *theme,
                                            cui_questionnaire_state *s, cui_questionnaire_options o,
                                            const cui_questionnaire_keyboard_options *keyboard) {
+    return cui_questionnaire_begin_ex(ui, id, theme, s, o, keyboard, NULL);
+}
+bool cui_questionnaire_begin_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                                cui_questionnaire_state *s, cui_questionnaire_options o,
+                                const cui_questionnaire_keyboard_options *keyboard,
+                                const cui_questionnaire_geometry_options *geometry) {
+    cui_questionnaire_geometry_options g =
+        geometry ? *geometry : (cui_questionnaire_geometry_options){0};
+    bool active = cui_questionnaire_geometry_active(&g);
+    cui_questionnaire_geometry_metrics gm = {0};
+    if (active && !cui_questionnaire_geometry_resolve(theme, o, &g, &gm))
+        return false;
     cui_questionnaire_options_snapshot snapshot;
     if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
@@ -1463,7 +1756,8 @@ bool cui_questionnaire_begin_with_keyboard(cui_context *ui, cui_id id, const cui
     cui_interact(ui, id, CUI_ROLE_GROUP, (cui_str){0}, o.disabled, false, 0);
     cui_set_semantic_details(ui, id, (cui_semantic_details){.focusable = true});
     cui_set_tab_stop(ui, id, false);
-    cui_begin_box(ui, id, (cui_box){.width = o.width > 0 ? o.width : -1, .gap = m.root_gap});
+    cui_box box = {.width = o.width > 0 ? o.width : -1, .gap = active ? gm.root_gap : m.root_gap};
+    cui_begin_box(ui, id, active ? cui_questionnaire_geometry_box(box, g.root) : box);
     return true;
 }
 void cui_questionnaire_end(cui_context *ui) {
@@ -1519,13 +1813,25 @@ static float cui_questionnaire_choices_gap(cui_questionnaire_size size) {
 }
 bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
                                   size_t item, cui_questionnaire_options o) {
+    return cui_questionnaire_item_begin_ex(ui, id, s, item, o, NULL);
+}
+bool cui_questionnaire_item_begin_ex(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
+                                     size_t item, cui_questionnaire_options o,
+                                     const cui_questionnaire_geometry_options *geometry) {
+    cui_questionnaire_geometry_options g =
+        geometry ? *geometry : (cui_questionnaire_geometry_options){0};
+    bool active = cui_questionnaire_geometry_active(&g);
+    cui_questionnaire_geometry_metrics gm = {0};
+    cui_theme validation_theme = {.font_size = 16};
     cui_questionnaire_options_snapshot snapshot;
     if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
-    cui_questionnaire_bind(ui, id, s, item, 0, 0, o.disabled);
     o = cui_questionnaire_resolve_size(ui, s, o);
+    if (active && !cui_questionnaire_geometry_resolve(&validation_theme, o, &g, &gm))
+        return false;
+    cui_questionnaire_bind(ui, id, s, item, 0, 0, o.disabled);
     const cui_questionnaire_item *definition = &s->items[item];
     cui_interact(ui, id, CUI_ROLE_GROUP,
                  definition->label.length ? definition->label : definition->name, o.disabled, false,
@@ -1533,39 +1839,69 @@ bool cui_questionnaire_item_begin(cui_context *ui, cui_id id, const cui_question
     cui_set_semantic_details(
         ui, id, (cui_semantic_details){.description = definition->description, .focusable = true});
     cui_set_tab_stop(ui, id, false);
-    cui_begin_box(ui, id, (cui_box){.width = -1, .gap = cui_questionnaire_measure(o).root_gap});
+    cui_box box = {.width = -1,
+                   .gap = active ? gm.item_gap : cui_questionnaire_measure(o).root_gap};
+    cui_begin_box(ui, id, active ? cui_questionnaire_geometry_box(box, g.item) : box);
     return true;
 }
 bool cui_questionnaire_choices_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
                                      size_t item, cui_questionnaire_options o) {
+    return cui_questionnaire_choices_begin_ex(ui, id, s, item, o, NULL);
+}
+bool cui_questionnaire_choices_begin_ex(cui_context *ui, cui_id id,
+                                        const cui_questionnaire_state *s, size_t item,
+                                        cui_questionnaire_options o,
+                                        const cui_questionnaire_geometry_options *geometry) {
+    cui_questionnaire_geometry_options g =
+        geometry ? *geometry : (cui_questionnaire_geometry_options){0};
+    bool active = cui_questionnaire_geometry_active(&g);
+    cui_questionnaire_geometry_metrics gm = {0};
+    cui_theme validation_theme = {.font_size = 16};
     cui_questionnaire_options_snapshot snapshot;
     if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !cui_questionnaire_visible_item(s, item))
         return false;
     o = cui_questionnaire_resolve_size(ui, s, o);
+    if (active && !cui_questionnaire_geometry_resolve(&validation_theme, o, &g, &gm))
+        return false;
     cui_interact(ui, id, s->items[item].multiple ? CUI_ROLE_GROUP : CUI_ROLE_RADIOGROUP,
                  (cui_str){0}, o.disabled, false, 0);
-    cui_begin_box(ui, id,
-                  (cui_box){.width = -1,
-                            .gap = (o.design_size ? cui_questionnaire_measure(o).gap
-                                                  : cui_questionnaire_choices_gap(o.size))});
+    cui_box box = {.width = -1,
+                   .gap = active ? gm.choices_gap
+                                 : (o.design_size ? cui_questionnaire_measure(o).gap
+                                                  : cui_questionnaire_choices_gap(o.size))};
+    cui_begin_box(ui, id, active ? cui_questionnaire_geometry_box(box, g.choices) : box);
     return true;
 }
 bool cui_questionnaire_actions_begin(cui_context *ui, cui_id id, const cui_questionnaire_state *s,
                                      cui_questionnaire_options o) {
+    return cui_questionnaire_actions_begin_ex(ui, id, s, o, NULL);
+}
+bool cui_questionnaire_actions_begin_ex(cui_context *ui, cui_id id,
+                                        const cui_questionnaire_state *s,
+                                        cui_questionnaire_options o,
+                                        const cui_questionnaire_geometry_options *geometry) {
+    cui_questionnaire_geometry_options g =
+        geometry ? *geometry : (cui_questionnaire_geometry_options){0};
+    bool active = cui_questionnaire_geometry_active(&g);
+    cui_questionnaire_geometry_metrics gm = {0};
+    cui_theme validation_theme = {.font_size = 16};
     cui_questionnaire_options_snapshot snapshot;
     if (!cui_questionnaire_snapshot(&o, &snapshot))
         return false;
     if (!ui || !id || !s || !s->initialized)
         return false;
     o = cui_questionnaire_resolve_size(ui, s, o);
-    cui_begin_box(ui, id,
-                  (cui_box){.width = -1,
-                            .row = true,
-                            .align_y = CUI_ALIGN_CENTER,
-                            .gap = (o.design_size ? cui_questionnaire_measure(o).gap
-                                                  : cui_questionnaire_choices_gap(o.size))});
+    if (active && !cui_questionnaire_geometry_resolve(&validation_theme, o, &g, &gm))
+        return false;
+    cui_box box = {.width = -1,
+                   .row = true,
+                   .align_y = CUI_ALIGN_CENTER,
+                   .gap = active ? gm.choices_gap
+                                 : (o.design_size ? cui_questionnaire_measure(o).gap
+                                                  : cui_questionnaire_choices_gap(o.size))};
+    cui_begin_box(ui, id, active ? cui_questionnaire_geometry_box(box, g.actions) : box);
     return true;
 }
 void cui_questionnaire_part_end(cui_context *ui) {
@@ -1640,6 +1976,17 @@ bool cui_questionnaire_choice_control_with_keyboard(
     cui_context *ui, cui_id id, const cui_theme *t, cui_questionnaire_state *s, size_t item,
     size_t choice, cui_questionnaire_options o,
     const cui_questionnaire_keyboard_options *keyboard) {
+    return cui_questionnaire_choice_control_ex(ui, id, t, s, item, choice, o, keyboard, NULL);
+}
+bool cui_questionnaire_choice_control_ex(cui_context *ui, cui_id id, const cui_theme *t,
+                                         cui_questionnaire_state *s, size_t item, size_t choice,
+                                         cui_questionnaire_options o,
+                                         const cui_questionnaire_keyboard_options *keyboard,
+                                         const cui_questionnaire_geometry_options *geometry) {
+    cui_questionnaire_geometry_options g =
+        geometry ? *geometry : (cui_questionnaire_geometry_options){0};
+    bool active = cui_questionnaire_geometry_active(&g);
+    cui_questionnaire_geometry_metrics gm = {0};
     cui_questionnaire_keyboard_options k = {0};
     if (keyboard)
         k.shortcuts = keyboard->shortcuts;
@@ -1652,6 +1999,28 @@ bool cui_questionnaire_choice_control_with_keyboard(
         choice >= s->items[item].choice_count)
         return false;
     o = cui_questionnaire_resolve_size(ui, s, o);
+    if (active && !cui_questionnaire_geometry_resolve(t, o, &g, &gm))
+        return false;
+    cui_questionnaire_text_view answer = {0}, secondary = {0}, shortcut = {0};
+    float effective_line = 0;
+    if (active) {
+        answer = cui_questionnaire_geometry_text((cui_str){0}, gm.answer_font, gm.answer_line,
+                                                 t->text, (cui_text_style){0}, g.answer);
+        secondary =
+            cui_questionnaire_geometry_text((cui_str){0}, gm.secondary_font, gm.secondary_line,
+                                            t->muted, (cui_text_style){0}, g.secondary);
+        shortcut = cui_questionnaire_geometry_text(
+            (cui_str){0}, gm.shortcut_font, gm.shortcut_line, t->muted,
+            (cui_text_style){.weight = CUI_TEXT_WEIGHT_MEDIUM, .monospace = true}, g.shortcut);
+        effective_line = answer.line_height;
+        if (!effective_line) {
+            cui_font_metrics fm;
+            if (!cui_measure_font_metrics(ui, answer.font_size, answer.style, &fm) ||
+                !isfinite(fm.line_height) || fm.line_height < 0 || fm.line_height > 4096)
+                return false;
+            effective_line = fm.line_height;
+        }
+    }
     const cui_questionnaire_item *d = &s->items[item];
     const cui_questionnaire_choice *c = &d->choices[choice];
     bool disabled = o.disabled || s->storage.items[item].disabled ||
@@ -1669,6 +2038,11 @@ bool cui_questionnaire_choice_control_with_keyboard(
         cui_invalidate(ui);
     }
     cui_questionnaire_metrics m = cui_questionnaire_measure(o);
+    if (active)
+        m = (cui_questionnaire_metrics){gm.root_gap,       gm.answer_gap, gm.content_gap,
+                                        gm.padding_x,      gm.padding_y,  gm.minimum_height,
+                                        gm.indicator_size, gm.mark_size,  gm.shortcut_size,
+                                        answer.font_size,  effective_line};
     bool invalid = cui_questionnaire_item_error(s, item).kind != CUI_QUESTIONNAIRE_VALID;
     size_t position = 0, total = 0;
     (void)cui_questionnaire_choice_position(s, item, choice, &position, &total);
@@ -1699,6 +2073,10 @@ bool cui_questionnaire_choice_control_with_keyboard(
                                           .invalid = invalid,
                                           .focused = cui_focused(ui) == id,
                                           .shortcut = key};
+    answer.text = label;
+    secondary.text = c->description;
+    shortcut.text = (cui_str){&key, key ? 1u : 0u};
+    const cui_questionnaire_geometry_view extended = {view, gm, answer, secondary, shortcut};
     float card_radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius
                         : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius * 2
                                                             : t->radius_lg;
@@ -1707,20 +2085,33 @@ bool cui_questionnaire_choice_control_with_keyboard(
                  : cui_questionnaire_opacity(t->dark ? t->input : t->background, t->dark ? .2f : 0);
     if (interaction.hovered && !disabled)
         card_background = cui_questionnaire_opacity(t->muted_background, .5f);
-    cui_begin_box(ui, id,
-                  (cui_box){.width = -1,
-                            .padding = m.py,
-                            .row = true,
-                            .gap = 0,
-                            .radius = card_radius,
-                            .border_width = 1,
-                            .border = view.focused ? t->focus
-                                      : invalid    ? t->danger
-                                      : selected   ? cui_questionnaire_opacity(t->primary, .4f)
-                                                   : t->input,
-                            .background = card_background,
-                            .custom_opacity = disabled,
-                            .opacity = .5f});
+    cui_box card = {.width = -1,
+                    .padding = m.py,
+                    .row = true,
+                    .gap = 0,
+                    .radius = card_radius,
+                    .border_width = 1,
+                    .border = view.focused ? t->focus
+                              : invalid    ? t->danger
+                              : selected   ? cui_questionnaire_opacity(t->primary, .4f)
+                                           : t->input,
+                    .background = card_background,
+                    .custom_opacity = disabled,
+                    .opacity = .5f};
+    if (active) {
+        card.radius = gm.card_radius;
+        card.custom_padding = true;
+        card.padding_edges =
+            (cui_border_edges){.left = m.px, .right = m.px, .top = m.py, .bottom = m.py};
+        card = cui_questionnaire_geometry_box(card, g.card);
+        card.gap = 0; /* gap patch belongs to the real answer row */
+        if (g.card_fields & CUI_QUESTIONNAIRE_CARD_FIXED_HEIGHT) {
+            card.height = g.card_height;
+            card.fixed_height = true;
+        }
+        card_radius = card.radius;
+    }
+    cui_begin_box(ui, id, card);
     if (view.focused && !t->hide_focus_ring) {
         cui_color ring = t->focus;
         ring.a = 127;
@@ -1730,14 +2121,28 @@ bool cui_questionnaire_choice_control_with_keyboard(
     /* Side spacers supply independent horizontal padding and the card's minimum
      * height without centering the indicator against multi-line descriptions. */
     cui_begin_box(
-        ui, 0, (cui_box){.width = m.px - m.py, .fixed_width = true, .height = m.height - 2 * m.py});
+        ui, 0,
+        active
+            ? (cui_box){.width = 0,
+                        .fixed_width = true,
+                        .height =
+                            fmaxf(0, m.height - card.padding_edges.top - card.padding_edges.bottom)}
+            : (cui_box){.width = m.px - m.py, .fixed_width = true, .height = m.height - 2 * m.py});
     cui_end_box(ui);
-    cui_begin_box(ui, 0, (cui_box){.width = -1, .row = true, .gap = m.gap});
-    if (o.render_indicator) {
+    cui_begin_box(ui, 0,
+                  (cui_box){.width = -1,
+                            .row = true,
+                            .gap = active && (g.card.fields & CUI_QUESTIONNAIRE_BOX_GAP)
+                                       ? g.card.gap
+                                       : m.gap});
+    if ((active && g.render_indicator) || o.render_indicator) {
         cui_begin_box(ui, 0, (cui_box){0});
         cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.indicator) / 2)});
         cui_end_box(ui);
-        o.render_indicator(ui, id ^ UINT64_C(0x751ec681a5920310), &view, o.render_user);
+        if (active && g.render_indicator)
+            g.render_indicator(ui, id ^ UINT64_C(0x751ec681a5920310), &extended, g.render_user);
+        else
+            o.render_indicator(ui, id ^ UINT64_C(0x751ec681a5920310), &view, o.render_user);
         cui_end_box(ui);
     } else {
         cui_begin_box(ui, 0,
@@ -1747,20 +2152,22 @@ bool cui_questionnaire_choice_control_with_keyboard(
             cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.indicator) / 2)});
             cui_end_box(ui);
         }
-        cui_begin_box(ui, 0,
-                      cui_questionnaire_refine(
-                          (cui_box){.width = m.indicator,
-                                    .height = m.indicator,
-                                    .radius = d->multiple ? t->radius / 2 : m.indicator / 2,
-                                    .border_width = 1,
-                                    .border = selected ? t->primary : t->input,
-                                    .background = selected ? t->primary : t->input_background,
-                                    .align_x = CUI_ALIGN_CENTER,
-                                    .align_y = CUI_ALIGN_CENTER},
-                          o.indicator_style));
+        cui_begin_box(
+            ui, 0,
+            cui_questionnaire_refine(
+                (cui_box){.width = m.indicator,
+                          .height = m.indicator,
+                          .radius = d->multiple ? (active ? gm.indicator_radius : t->radius / 2)
+                                                : m.indicator / 2,
+                          .border_width = 1,
+                          .border = selected ? t->primary : t->input,
+                          .background = selected ? t->primary : t->input_background,
+                          .align_x = CUI_ALIGN_CENTER,
+                          .align_y = CUI_ALIGN_CENTER},
+                o.indicator_style));
         if (selected) {
             if (d->multiple)
-                cui_checkmark(ui, m.indicator - 2, t->on_primary);
+                cui_checkmark(ui, active ? gm.check_size : m.indicator - 2, t->on_primary);
             else {
                 cui_begin_box(ui, 0,
                               (cui_box){.width = m.mark,
@@ -1776,20 +2183,30 @@ bool cui_questionnaire_choice_control_with_keyboard(
     cui_begin_box(
         ui, 0,
         cui_questionnaire_refine((cui_box){.width = -1, .gap = m.content_gap}, o.content_style));
-    if (o.render_content)
+    if (active && g.render_content)
+        g.render_content(ui, id ^ UINT64_C(0x1f0e69b892345708), &extended, g.render_user);
+    else if (o.render_content)
         o.render_content(ui, id ^ UINT64_C(0x1f0e69b892345708), &view, o.render_user);
-    else {
+    else if (active) {
+        cui_questionnaire_geometry_draw(ui, answer);
+        if (c->description.length)
+            cui_questionnaire_geometry_draw(ui, secondary);
+    } else {
         cui_text_with_line_height(ui, label, m.font, t->text, m.line);
         if (c->description.length)
             cui_text_with_line_height(ui, c->description, m.font > 14 ? m.font - 2 : 12, t->muted,
                                       m.line);
     }
     cui_end_box(ui);
-    if (k.shortcuts != CUI_QUESTIONNAIRE_SHORTCUT_OFF && o.render_shortcut) {
+    if (k.shortcuts != CUI_QUESTIONNAIRE_SHORTCUT_OFF &&
+        ((active && g.render_shortcut) || o.render_shortcut)) {
         cui_begin_box(ui, 0, (cui_box){0});
         cui_begin_box(ui, 0, (cui_box){.height = fmaxf(0, (m.line - m.shortcut) / 2)});
         cui_end_box(ui);
-        o.render_shortcut(ui, id ^ UINT64_C(0x931ac84625c0a917), &view, o.render_user);
+        if (active && g.render_shortcut)
+            g.render_shortcut(ui, id ^ UINT64_C(0x931ac84625c0a917), &extended, g.render_user);
+        else
+            o.render_shortcut(ui, id ^ UINT64_C(0x931ac84625c0a917), &view, o.render_user);
         cui_end_box(ui);
     } else if (key) {
         cui_begin_box(ui, 0,
@@ -1807,9 +2224,10 @@ bool cui_questionnaire_choice_control_with_keyboard(
                                     .background = t->background,
                                     .border_width = 1,
                                     .border = t->input,
-                                    .radius = o.size == CUI_QUESTIONNAIRE_XSMALL  ? t->radius / 2
-                                              : o.size == CUI_QUESTIONNAIRE_LARGE ? t->radius_lg
-                                                                                  : t->radius,
+                                    .radius = active ? gm.shortcut_radius
+                                              : o.size == CUI_QUESTIONNAIRE_XSMALL ? t->radius / 2
+                                              : o.size == CUI_QUESTIONNAIRE_LARGE  ? t->radius_lg
+                                                                                   : t->radius,
                                     .align_x = CUI_ALIGN_CENTER,
                                     .align_y = CUI_ALIGN_CENTER},
                           o.shortcut_style));
@@ -1818,14 +2236,19 @@ bool cui_questionnaire_choice_control_with_keyboard(
                               : o.size == CUI_QUESTIONNAIRE_SMALL  ? 9
                               : o.size == CUI_QUESTIONNAIRE_LARGE  ? 12
                                                                    : 10;
-        cui_text_ex(ui, (cui_str){&key, 1}, shortcut_font, t->muted, 0,
-                    (cui_text_style){.weight = CUI_TEXT_WEIGHT_MEDIUM, .monospace = true});
+        if (active)
+            cui_questionnaire_geometry_draw(ui, shortcut);
+        else
+            cui_text_ex(ui, (cui_str){&key, 1}, shortcut_font, t->muted, 0,
+                        (cui_text_style){.weight = CUI_TEXT_WEIGHT_MEDIUM, .monospace = true});
         cui_end_box(ui);
         cui_end_box(ui);
     }
     cui_end_box(ui); /* answer row */
-    cui_begin_box(ui, 0, (cui_box){.width = m.px - m.py, .fixed_width = true});
-    cui_end_box(ui);
+    if (!active) {
+        cui_begin_box(ui, 0, (cui_box){.width = m.px - m.py, .fixed_width = true});
+        cui_end_box(ui);
+    }
     cui_end_box(ui); /* card */
     return changed;
 }

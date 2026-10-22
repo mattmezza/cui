@@ -2742,7 +2742,8 @@
         "tests/unit/test_numeric.c",
         "tests/web/test_browser.py",
         "tests/unit/test_stepper_navigation.c",
-        "tests/unit/test_stepper_visual.c"
+        "tests/unit/test_stepper_visual.c",
+        "tests/web/test_stepper_visual_gallery.py"
       ],
       "status": "tested",
       "platforms": {
@@ -2750,7 +2751,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled per-activation navigation requests and application-owned validation tested; legacy aggregate CHANGE timing/rendering remains unchanged. Opt-in non-centered connectors and bitmap custom icons are tested in native software rendering. Centered/responsive source composition, arbitrary children/style and exact density fidelity remain incomplete; no browser or live AT proof for the visual facade. See docs/STEPPER_NAVIGATION.md."
+        "Controlled per-activation navigation requests and application-owned validation tested; legacy aggregate CHANGE timing/rendering remains unchanged. Opt-in non-centered connectors and bitmap custom icons are tested in native software and actual WASM gallery Canvas at desktop DPR1/2 and touch390 DPR2. Centered/responsive source composition, arbitrary children/style and exact density fidelity remain incomplete; live AT is untested. See docs/STEPPER_NAVIGATION.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2784,7 +2785,9 @@
           "evidence": [
             "include/cui/cui_stepper_visual.h",
             "tests/unit/test_stepper_visual.c",
-            "docs/STEPPER_NAVIGATION.md"
+            "docs/STEPPER_NAVIGATION.md",
+            "tests/web/test_stepper_visual_gallery.py",
+            "web/modules/cui_stepper_usage.js"
           ]
         }
       ],

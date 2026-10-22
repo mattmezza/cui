@@ -117,8 +117,9 @@ Centered text/separators, responsive flex growth, arbitrary child content/style,
 exact source density and language builders remain unfinished. Follow-up slices
 should add independently tested centered/flexible geometry and then theme/style
 controls without changing the request reducer. Native software tests cover this
-bounded composition and actual pointer/touch/keyboard requests; no browser or live
-assistive-technology acceptance is claimed.
+bounded composition and actual pointer/touch/keyboard requests. The WASM gallery
+fixture additionally covers desktop DPR1/2 and touch390 DPR2 for the bounded
+visual facade. Live assistive-technology acceptance remains untested.
 
 `options.design_size` accepts the existing shared XS/SM/BASE/MD/LG/XL/2XL..9XL
 scale. INHERIT (zero) leaves the source-density dimensions above unchanged.
@@ -129,3 +130,30 @@ gap. Thus `density` selects source proportions/suppression while `design_size`
 selects the app's shared scale. All tokens are tested, including9XL; invalid
 tokens or invalid resolved density fail before semantics/callbacks. These metrics
 do not claim frozen GPUI pixel fidelity or responsive/centered layout completion.
+
+
+## WASM gallery
+
+The Stepper story defaults to its original legacy button rendering and controlled
+validation demo. "Rendering" opts into indicators/connectors. Orientation applies
+to both renderers; source density, optional application-owned RGBA bitmap icons
+and shared design scale appear only for visual rendering. "Source density" in
+the design control keeps INHERIT; other choices use the public shared XS..9XL
+metrics. These are independent from the source-density proportions. Leaving the
+story hides and resets its controls; selection/validation remain application-owned.
+
+The Details confirmed checkbox gates later steps. Rejected requests still count;
+the current step stays unchanged. Same-index requests count too. Disabling the
+story suppresses interaction without erasing progress. The displayed module snippet
+tracks the chosen API/options and includes the controlled owner callback; the icon
+variant includes real static RGBA bytes with renderer-safe lifetime. The application
+must set `owner.confirmed` from its form before submission.
+
+`tests/web/test_stepper_visual_gallery.py` verifies actual WASM mouse, touch and
+keyboard requests, rejection/disabled behavior, connector geometry and Canvas
+pixel composites at DPR1/2 (including fractional strokes), image alpha/tint,
+source-density glyph suppression, one explicit shared design token and route
+reset. It compiles the exact displayed C snippets with strict C11 warnings.
+Desktop checks include both axes; touch390 uses vertical composition. Centered
+layout, automatic responsive flex growth, arbitrary styling and exact source
+pixel fidelity remain unfinished. The gallery does not establish live AT parity.

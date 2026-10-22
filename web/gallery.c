@@ -46,6 +46,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_speech.h"
 #include "cui/cui_status.h"
 #include "cui/cui_stepper_navigation.h"
+#include "cui/cui_stepper_visual.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
 #include "cui/cui_text_view.h"
@@ -1651,6 +1652,34 @@ static double number = 42;
 static size_t page_number = 3, current_step;
 static bool stepper_details_confirmed, stepper_validation_failed;
 static unsigned stepper_request_count;
+static bool stepper_visual, stepper_vertical = true, stepper_icons;
+static cui_stepper_density stepper_density;
+static cui_design_size stepper_design_size;
+static unsigned char stepper_icon_pixels[3][8 * 8 * 4];
+void gallery_stepper_options(int visual, int vertical, int density, int icons, int size) {
+    stepper_visual = visual != 0;
+    stepper_vertical = vertical != 0;
+    stepper_density = density >= CUI_STEPPER_DENSITY_MD && density <= CUI_STEPPER_DENSITY_LG
+                          ? (cui_stepper_density)density
+                          : CUI_STEPPER_DENSITY_MD;
+    stepper_icons = icons != 0;
+    stepper_design_size = size >= CUI_DESIGN_INHERIT && size <= CUI_DESIGN_9XL
+                              ? (cui_design_size)size
+                              : CUI_DESIGN_INHERIT;
+}
+static void gallery_stepper_icon_data(void) {
+    /* Application-owned white RGB/alpha masks; persistent through Canvas render. */
+    static const unsigned char masks[3][8] = {{0, 24, 24, 126, 126, 24, 24, 0},
+                                              {24, 60, 126, 255, 255, 126, 60, 24},
+                                              {0, 1, 3, 70, 108, 56, 16, 0}};
+    for (unsigned i = 0; i < 3; ++i)
+        for (unsigned y = 0; y < 8; ++y)
+            for (unsigned x = 0; x < 8; ++x) {
+                unsigned char *pixel = &stepper_icon_pixels[i][(y * 8 + x) * 4];
+                pixel[0] = pixel[1] = pixel[2] = 255;
+                pixel[3] = masks[i][y] & (1u << (7 - x)) ? 255 : 0;
+            }
+}
 static void gallery_stepper_request(void *user, const cui_stepper_navigation_request *request) {
     (void)user;
     stepper_request_count++;
@@ -5744,9 +5773,25 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_string("Review"), cui_string("Review application"),
              current_step > 1 ? CUI_STEP_COMPLETE : CUI_STEP_PENDING, false},
             {cui_string("Finish"), cui_string("Ready to submit"), CUI_STEP_PENDING, false}};
-        cui_stepper_navigation(ui, cui_id_from(ui, "stepper"), &t, steps, 3, current_step, true,
-                               disabled,
-                               (cui_stepper_navigation_handler){gallery_stepper_request, NULL});
+        if (stepper_visual) {
+            gallery_stepper_icon_data();
+            cui_stepper_icon icons[3];
+            for (unsigned i = 0; i < 3; ++i)
+                icons[i] = (cui_stepper_icon){.present = true,
+                                              .bitmap = {stepper_icon_pixels[i], 8, 8, 32, 1}};
+            cui_stepper_visual_navigation(
+                ui, cui_id_from(ui, "stepper"), &t, steps, 3, current_step,
+                (cui_stepper_visual_options){.vertical = stepper_vertical,
+                                             .disabled = disabled,
+                                             .density = stepper_density,
+                                             .design_size = stepper_design_size,
+                                             .icons = stepper_icons ? icons : NULL,
+                                             .icon_count = stepper_icons ? 3 : 0},
+                (cui_stepper_navigation_handler){gallery_stepper_request, NULL});
+        } else
+            cui_stepper_navigation(ui, cui_id_from(ui, "stepper"), &t, steps, 3, current_step,
+                                   stepper_vertical, disabled,
+                                   (cui_stepper_navigation_handler){gallery_stepper_request, NULL});
         char status[160];
         snprintf(status, sizeof status, "Step %zu of 3", current_step + 1);
         cui_label(ui, &t, cui_string(status));
@@ -5755,6 +5800,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         if (stepper_validation_failed)
             cui_label(ui, &t, cui_string("Confirm details to continue."));
         cui_label(ui, &t, cui_string("Your app validates each request."));
+        if (stepper_visual)
+            cui_label(ui, &t, cui_string("Centered/responsive styling is partial."));
         break;
     }
     case 37: {

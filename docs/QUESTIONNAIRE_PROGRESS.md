@@ -74,4 +74,7 @@ retain their previous behavior.
 The focused tests use deterministic metrics and a test-only rectangular-glyph
 coverage provider with the actual software renderer. This proves layout/style/
 color transport and pixels, not FreeType shaping, system fonts or physical AT.
-Native/WASI evidence is separate from a future headless actual-WASM gallery proof.
+Headless actual-WASM gallery tests additionally cover opt-in localized/short/custom/
+text-metric modes, stable numeric semantics, unchanged default presentation,
+compiled selected C snippets and desktop pointer/touch model advancement. This
+does not establish native font shaping or full family browser parity.

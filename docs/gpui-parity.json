@@ -4259,7 +4259,8 @@
         "tests/unit/test_questionnaire_snapshots.c",
         "tests/unit/test_questionnaire_observer.c",
         "tests/test_questionnaire_distribution.py",
-        "tests/unit/test_questionnaire_progress.c"
+        "tests/unit/test_questionnaire_progress.c",
+        "tests/web/test_questionnaire_progress_gallery.py"
       ],
       "status": "implemented",
       "platforms": {
@@ -4267,10 +4268,11 @@
       },
       "limitations": [
         "Retained models, automatic root keyboard capture, cross-item focus transfer, ordered input routing, palette/size cards and custom slot renderers have scoped tests. Bounded box-only indicator/content/shortcut refinements and six localized action/error labels are covered by headless tests; see docs/QUESTIONNAIRE.md for precedence and ABI rebuild requirements. General Styled typography/inheritance, complete nested-root and callback choreography, comprehensive localization and physical accessibility acceptance remain unfinished. Existing browser story evidence predates the new slot/localization API; no browser proof of those additions is claimed.",
-        "Additive C keyboard policies cover shortcut OFF/letters/numbers, item-only answer-entry restoration and explicit host submit modifiers; source-differential native/WASI tests preserve legacy root shortcut inheritance. Nested roots retain outer-first capture, not nearest-root dispatch. Language builders omit these policies. Separate compound parts, progress localization, Form semantics and general styling remain unfinished. Actual WASM desktop/touch checks additionally cover shortcut OFF, custom hint suppression, letters/numbers and touch selection; this is not complete family browser parity.",
+        "Additive C keyboard policies cover shortcut OFF/letters/numbers, item-only answer-entry restoration and explicit host submit modifiers; source-differential native/WASI tests preserve legacy root shortcut inheritance. Nested roots retain outer-first capture, not nearest-root dispatch. Language builders omit these policies. Separate compound parts, comprehensive family localization, Form semantics and general styling remain unfinished. Actual WASM desktop/touch checks additionally cover shortcut OFF, custom hint suppression, letters/numbers and touch selection; this is not complete family browser parity.",
         "Pure Base answer/submission copy-out and scalar queries have focused native/WASI tests, caller-owned checked storage and preflight failure guarantees; see docs/QUESTIONNAIRE_SNAPSHOTS.md. Copy-out itself adds no event timing or language-builder snapshot support.",
         "Optional persistent C typed observation has bounded copied names/answers and one frozen Completed/Submit pair, synchronous pre-legacy delivery and preserved callback mutations; see docs/QUESTIONNAIRE_OBSERVER.md. State layout changes require matching headers/library. Caller owns observer/handler/frame lifetimes; payload capacity/depth failures remain observable without suppressing legacy callbacks. Input origin is UNKNOWN, handlers are pure, and language builders expose no typed observer facade. This does not establish complete family styling, compound parts, localization or physical accessibility parity.",
-        "Optional C progress presentation adds masked localized accessible/visible text, custom decorative children and bounded explicit font/style/color/linebox refinements, preserving legacy zero paint and numeric enabled-position semantics. Native/WASI/deterministic software coverage is scoped; complete family token mapping, root Form role, arbitrary Styled inheritance and language-builder presentation remain unfinished. See docs/QUESTIONNAIRE_PROGRESS.md."
+        "Optional C progress presentation adds masked localized accessible/visible text, custom decorative children and bounded explicit font/style/color/linebox refinements, preserving legacy zero paint and numeric enabled-position semantics. Native/WASI/deterministic software coverage is scoped; complete family token mapping, root Form role, arbitrary Styled inheritance and language-builder presentation remain unfinished. See docs/QUESTIONNAIRE_PROGRESS.md.",
+        "Actual WASM desktop/touch progress tests cover opt-in localized labels, short visible text, decorative children, explicit text metrics, compiled selected usage, numeric semantics and real choice navigation; default presentation remains unchanged. This is scoped browser evidence, not complete family styling/localization/accessibility parity."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,17 +35,21 @@ class DropdownDistributionTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('dropdown_amalgamate', ROOT / 'scripts/amalgamate.py')
         generator = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(generator)
-        with tempfile.TemporaryDirectory(prefix='cui-dropdown-dist-') as directory:
+        # Exercise Windows' cp1252 default even on a UTF-8 development host.
+        # Generated C includes localized strings and must select UTF-8 itself.
+        with mock.patch('pathlib.io.text_encoding',
+                        side_effect=lambda encoding, *args: 'cp1252' if encoding in (None, 'locale') else encoding), \
+                tempfile.TemporaryDirectory(prefix='cui-dropdown-dist-') as directory:
             out = Path(directory)
             for name, sources in generator.MODULES.items():
                 if (ROOT / 'include/cui' / (name + '.h')).exists():
-                    (out / (name + '.h')).write_text(generator.generate(name, sources))
+                    (out / (name + '.h')).write_text(generator.generate(name, sources), encoding='utf-8')
             for name in ('cui_platform.h', 'cui_renderer.h'):
                 (out / name).write_bytes((ROOT / 'include/cui' / name).read_bytes())
             for entry in ('cui_choice', 'cui_dropdown_button_styles'):
                 with self.subTest(entry=entry):
                     source = out / 'entry.c'
-                    source.write_text(f'#define {entry.upper()}_IMPLEMENTATION\n#include "{entry}.h"\n')
+                    source.write_text(f'#define {entry.upper()}_IMPLEMENTATION\n#include "{entry}.h"\n', encoding='utf-8')
                     obj = out / 'entry.o'
                     result = subprocess.run(cc + ['-std=c11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                         '-I' + directory, '-c', str(source), '-o', str(obj)], capture_output=True, text=True)
@@ -59,7 +64,7 @@ class DropdownDistributionTests(unittest.TestCase):
             cxx = shlex.split(os.environ.get('CXX', 'c++'))
             if cxx and shutil.which(cxx[0]):
                 source = out / 'entry.cpp'
-                source.write_text('#include "cui_dropdown_button_styles.h"\n')
+                source.write_text('#include "cui_dropdown_button_styles.h"\n', encoding='utf-8')
                 result = subprocess.run(cxx + ['-std=c++11', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                     '-I' + directory, '-fsyntax-only', str(source)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

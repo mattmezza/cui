@@ -3847,6 +3847,7 @@
       "tests": [
         "tests/unit/test_components.c",
         "tests/unit/test_input.c",
+        "tests/unit/test_input_grow_width.c",
         "tests/web/test_browser.py",
         "tests/unit/test_input_reference_contracts.c",
         "tests/unit/test_input_format_engine.c",
@@ -3873,7 +3874,7 @@
       },
       "limitations": [
         "Single-line caret/selection paint, pointer positioning, horizontal scrolling, disabled/readonly semantics, synchronous host clipboard and bounded history have tests. Single-selection IME preedit/commit/cancel and one-step Undo pass headless, injected SDL and native Chromium composition tests. Physical OS candidate windows, mobile keyboards, bidi caret geometry and asynchronous browser clipboard remain unverified.",
-        "Design sizes, centered field text, unwrapped single-line placeholders in fixed/grow inputs and fixed-width viewport bounds are tested. Grow-width populated long values can still expand internal viewport bounds; use explicit widths for reliable caret/hit geometry. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
+        "Design sizes, centered field text, unwrapped single-line placeholders in fixed/grow inputs and fixed-width viewport bounds are tested. Populated grow-width values now retain constrained viewport bounds on first layout and resize, including InputGroup prefix/suffix composition. Current-frame caret/selection scroll and IME projection still use prior viewport geometry during resize; a separate opt-in failing probe documents the remaining one-frame lag. Native shaping is separate from browser Canvas; complete cluster hit testing and native menu behavior remain partial. See docs/INPUT.md and docs/IME.md.",
         "Composed history, grapheme navigation, focus/rebind grouping and vertical-key delegation are tested. Bounded single-line whole-value acceptance and opt-in CR/LF normalization are tested, including IME endpoint mapping and rejected host commit cancellation. Bounded single-line pattern and grouped-number formatting are tested; multiline, token and multiple-selection masks, enabled NUL separators and full content-type/lifecycle behavior remain incomplete; the optional pinned whole-value Unicode regex provider is a separately tested subset; see docs/INPUT_ACCEPTANCE.md, docs/INPUT_NORMALIZATION.md and docs/INPUT_REFERENCE_CONTRACTS.md.",
         "Opt-in hidden/revealed password and new-password purposes, scalar-bullet presentation, guarded clipboard, finalized focus generations, native SDL input hints and transient secure browser proxy pass headless/native/browser tests. Actual window-blur handler clears preedit DOM data. Physical OS autofill/privacy, all content purposes and complete accessibility remain unverified; see docs/PASSWORD_INPUT_STAGE2.md."
       ],

@@ -2,6 +2,10 @@
 
 ## 0.1.0-alpha.3 — unreleased
 
+- Constrains populated grow-width Input viewports during parent resizing,
+  including InputGroup prefix/suffix composition, while preserving clipping.
+  Caret/selection scroll and IME projection can still lag one resize frame.
+
 - Adds a separate civil DateTime picker with minute/second precision, 12/24-hour
   display, explicit assignment, presets and clear actions; includes compiled C
   examples and real desktop/touch gallery controls. Timezones and date ranges are
@@ -17,8 +21,9 @@
   remain outside the verified scope.
 - Adds independent DropdownButton paint refinements and explicit custom-shadow
   gates, with desktop/touch gallery controls and compilable usage. Null/zero
-  descriptors retain the legacy path. New paint options are C-only; metadata,
-  toggle and source theme-token parity remain incomplete.
+  descriptors retain the legacy path. New options are C-only. Adds separate semantic names, signed
+  tab ordering and skip-tab controls for each half; optional pressed-button
+  accessibility mapping and source theme-token parity remain incomplete.
 - Adds opt-in date-only DatePicker presets, clear/Delete actions and an interactive
   desktop/touch gallery mode. Legacy date-only APIs remain available.
 - Adds bounded Questionnaire copy-out snapshots, keyboard shortcut policies and

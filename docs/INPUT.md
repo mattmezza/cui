@@ -34,8 +34,14 @@ including when the host supplies only a measurement callback. The content viewpo
 clips overflow; focused values scroll horizontally to keep the caret visible.
 A long placeholder does not increase the input height or wrap into extra lines.
 
-Known layout limitation: a grow-width input (`width = -1`) containing a long
-value can report a content-sized viewport even inside a narrower fixed parent.
-Ancestor clipping still limits painting, but viewport-based hit geometry and
-caret scrolling may be inaccurate. Use an explicit input width for this case.
-Long placeholders in empty grow-width inputs retain the constrained viewport.
+Growing single-line fields (`width = -1`) constrain long populated values to the
+resolved frame width on the first frame and after parent resizing. The outer and
+text-viewport clips remain active; InputGroup prefix/suffix segments retain their
+widths. An extra internal layout row provides this containment.
+
+Remaining resize limitation: horizontal scroll, caret/selection projection and
+host IME geometry can use the previous frame's viewport during a width change.
+A focused end caret may be clipped for the first shrinking frame, or retain excess
+scroll for the first growing frame; the next frame converges. Width containment
+does not fix that separate projection defect. See
+[the characterization and opt-in failing probe](design/INPUT_GROW_WIDTH.md).

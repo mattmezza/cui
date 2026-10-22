@@ -3424,6 +3424,17 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
             state->scroll_x = caret + 1 - viewport_width;
     }
     state->scroll_x = fminf(state->scroll_x, fmaxf(0, total - viewport_width));
+    /* A clipped Clay row does not compress growing children. A percentage row
+     * takes the resolved frame width independently of its long text, then its
+     * unclipped flex layout constrains the inner viewport between the insets.
+     * Keep the outer clip and fixed-width composition unchanged. */
+    if (width < 0)
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = 1,
+                                .width_percent = true,
+                                .row = true,
+                                .height = metrics.line_height,
+                                .fixed_height = true});
     cui_begin_box(ui, 0, (cui_box){.width = inset});
     cui_end_box(ui);
     cui_begin_box(ui, viewport_id,
@@ -3518,6 +3529,8 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     cui_end_box(ui);
     cui_begin_box(ui, 0, (cui_box){.width = inset});
     cui_end_box(ui);
+    if (width < 0)
+        cui_end_box(ui);
     cui_end_box(ui);
 }
 static cui_input_result

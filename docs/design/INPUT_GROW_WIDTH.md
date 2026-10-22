@@ -64,10 +64,9 @@ state inside Styled InputGroup: a deferred callback must not retain that state
 pointer. An architecture proposal must resolve that lifetime and geometry
 ownership, not silently add an end-frame borrowing requirement to existing APIs.
 
-Reproduction is in `tests/fixtures/input_grow_width/README.md`. Source metadata,
-consumer-guidance regeneration and canonical registration are integrator work
-under separate review. The guide should replace the old content-sized-viewport
-warning with the narrower current-frame grow-caret/scroll limitation above. No
+Reproduction is in `tests/fixtures/input_grow_width/README.md`. Canonical registration, source metadata and consumer guidance include the
+containment test and retain the narrower current-frame grow-caret/scroll
+limitation above. No
 full Input parity, browser acceptance or general text-engine completion claimed.
 
 Verified on this slice: strict-warning Release and ASan/UBSan builds each pass

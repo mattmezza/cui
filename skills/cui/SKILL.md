@@ -221,3 +221,8 @@ Metadata is visible before existing synchronous callbacks. Checked/value follows
 the existing Button convention; optional toggled presence/pressed-button adapter
 mapping and language-builder facades remain gaps. Use matching rebuilt source,
 standalone distribution headers or packaged SDKs; do not mix revisions.
+
+Growing single-line Input now contains long populated values within its resolved
+frame, including InputGroup composition. During resize, caret/selection scroll
+and IME geometry may lag by one frame; read `docs/INPUT.md`. Do not describe this
+containment fix as complete responsive text-input behavior.

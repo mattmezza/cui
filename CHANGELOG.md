@@ -27,8 +27,9 @@
   microphone/permission acceptance and Linux/Windows recognizers remain unverified.
 - Adds an optional native FFmpeg/SDL video-audio example with a local bounded
   fixture; this does not imply general codec, device or platform acceptance.
-- Fixes source-package configuration when documentation examples are absent, and
-  checks DatePicker semantic values independently of C struct padding.
+- Fixes source-package configuration when documentation examples are absent,
+  keeps C++ header checks optional for C-only builds, and checks DatePicker
+  semantic values independently of C struct padding.
 - Rebuild C consumers and bindings with matching headers and libraries:
   `cui_questionnaire_state` gained an observer pointer. Language builders do not
   expose the new C observer/payload arenas, Questionnaire presentation/geometry options,

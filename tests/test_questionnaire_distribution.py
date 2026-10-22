@@ -31,6 +31,19 @@ class QuestionnaireDistributionTests(unittest.TestCase):
                 text=True, capture_output=True, timeout=90)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_root_configures_with_cpp_disabled(self):
+        if not shutil.which('cmake'):
+            self.skipTest('CMake unavailable')
+        generator = ['-G', 'Ninja'] if os.name != 'nt' and shutil.which('ninja') else []
+        with tempfile.TemporaryDirectory(prefix='cui-questionnaire-c-only-') as directory:
+            result = subprocess.run(
+                ['cmake', *generator, '-S', str(ROOT), '-B', directory,
+                 '-DCUI_BUILD_NATIVE=OFF', '-DCUI_BUILD_BIDI=OFF',
+                 '-DCUI_BUILD_REGEX=OFF', '-DCUI_BUILD_CPP_EXAMPLE=OFF'],
+                text=True, capture_output=True, timeout=90)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn('CXX compiler identification', result.stdout)
+
     def test_direct_implementation_and_cpp_declarations(self):
         compiler = shlex.split(os.environ.get('CC', 'cc'))
         if not compiler or not shutil.which(compiler[0]):

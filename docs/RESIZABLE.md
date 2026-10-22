@@ -122,3 +122,5 @@ provides substantive sizing, composition, painting and real input, not a claim o
 complete native API equivalence.
 
 The gallery demonstrates a small workspace with selectable files, a read-only code preview, contrasting pane backgrounds and live pane dimensions. Drag the divider or focus it and press arrow keys; the browser checks both the retained sizes and the visible pane widths/positions. The vertical mode demonstrates the same model with pane heights.
+
+Repeated release/regrab, DPR 1/2 desktop and 390 px touch dragging, keyboard sizing and responsive clamps are verified by the focused browser tests; see `docs/RESIZABLE_BROWSER_REAUDIT.md`. A pane already at its minimum/maximum cannot move farther in that direction. Keep the sum of visible minima at or below the available extent and the sum of maxima at or above it: an infeasible container cannot provide the requested resizing range. The current gallery uses a responsive maximum for its flexible editor pane. Native window/GPU interaction remains a separate audit.

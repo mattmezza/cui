@@ -5454,16 +5454,19 @@
       "category": "layout",
       "base_behavior": [],
       "public_header": "include/cui/cui_resizable.h",
-      "sample": null,
+      "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_resizable.c"
+        "tests/unit/test_resizable.c",
+        "tests/web/test_resizable_drag.py",
+        "tests/web/test_resizable_repeated_drag.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "browser": "tested_partial"
       },
       "limitations": [
-        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Browser/native audit pending. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native GPUI drag payload adapter."
+        "Caller-bounded panels, constraints, nesting, persistence, captured drag and keyboard handles tested. Fresh actual-WASM browser audits cover repeated release/regrab, desktop DPR1/2, touch390/DPR2, responsive pane geometry and clamps; nesting is covered by native-headless/WASI fixtures, not a browser nested story. Native window/GPU interaction remains unaudited. Edge pill follows ancestor clipping; motion duration/easing supplied explicitly; no native source drag-payload adapter or full family parity claim."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -5479,7 +5482,10 @@
           "name": "pointer drag and keyboard resize",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_resizable.c"
+            "tests/unit/test_resizable.c",
+            "tests/web/test_resizable_drag.py",
+            "tests/web/test_resizable_repeated_drag.py",
+            "docs/RESIZABLE_BROWSER_REAUDIT.md"
           ]
         },
         {

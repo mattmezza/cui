@@ -227,3 +227,9 @@ Growing single-line Input now contains long populated values within its resolved
 frame, including InputGroup composition. During resize, caret/selection scroll
 and IME geometry may lag by one frame; read `docs/INPUT.md`. Do not describe this
 containment fix as complete responsive text-input behavior.
+
+For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
+through frame completion and ensure the container fits the panels' combined
+min/max range. A pane at its constraint cannot move farther in that direction.
+Repeated mouse/touch dragging has focused actual-WASM coverage; native window/GPU
+interaction remains separate. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.

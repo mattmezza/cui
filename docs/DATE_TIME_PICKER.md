@@ -7,8 +7,9 @@ wrapper, binding builder or browser demonstration is included yet. Existing
 DatePicker/actions and TimeField calls keep their behavior.
 
 Include `cui/cui_date_time_picker.h`; link `src/base/cui_date_time_picker.c` along
-with the normal picker/actions/Calendar sources. This worker fixture registers
-it privately; canonical registration/distribution remains integrator-owned.
+with the normal picker/actions/Calendar sources. Canonical builds register the Base and Styled sources, standalone optional
+`CUI_DATE_TIME_PICKER_IMPLEMENTATION` and `CUI_IMPLEMENTATION_ALL` distribution
+paths. Native source SDKs carry the API; language builders do not expose it.
 
 ## Ownership and frame order
 
@@ -135,7 +136,7 @@ must rebuild with matching headers.
 
 Private fixture: `cmake -S tests/fixtures/date_time_picker -B BUILD -G Ninja`,
 then build `test_date_time_picker test_date_time_picker_styled test_picker
-test_date_picker_actions date_time_header datetime_guide`.
+test_date_picker_actions date_time_picker_header date_time_picker_guide date_time_picker_guide_cpp`.
 Run through `python scripts/test_local.py --build-dir BUILD -- -V -R
 '^(date_time_picker|date_time_picker_styled|picker|date_picker_actions)$'`. Repeat in a separate
 `-DCUI_SANITIZE=ON` build. `tests/fixtures/date_time_picker/test_wasi.py --build-dir
@@ -233,3 +234,20 @@ rejection, draft/Tab/preset/clear behavior, and legacy TimeField memberwise
 semantics/nontext pixel equivalence. Existing date-only actions tests retain
 legacy zero-option picker equivalence. Guide/header compile as C11/C++11.
 These are headless software/semantic checks, not browser, live-AT or GPU proof.
+
+
+Canonical integration additionally compiles and executes the exact guide example
+in the native and WASI Styled suite (701 assertions including that example).
+Standalone optional-module and CUI_ALL fixtures create a real popup, edit its
+TimeField, and confirm the selected date. The packaged Python source tree omits
+docs, configures and builds both native DateTime tests, and runs them through the
+private-display wrapper. Consumer SDK/distribution headers are generated; language
+builder/bridge omissions remain explicit above. This stays within the existing
+DatePicker family; it does not add a 79th manifest entry or claim complete parity.
+
+
+For standalone header implementation, emit the ordinary Core, Base, Theme and
+Components implementation macros once, then `CUI_DATE_TIME_PICKER_IMPLEMENTATION`
+and include `cui_date_time_picker.h`. The exact independent recipe is compiled
+and executed in `tests/distribution/date_time_picker.c`; its CUI_ALL mode uses
+`CUI_IMPLEMENTATION_ALL` instead. Declarations alone do not enable implementation.

@@ -5,6 +5,7 @@
 #include "cui/cui_components.h"
 #include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_icon.h"
+#include "cui_picker_paint_internal.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -409,11 +410,10 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     return cui_picker_date_picker_styled(ui, id, t, name, s, selection, o,
                                          (cui_date_picker_calendar_options){0});
 }
-bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                    cui_time_state *state, cui_time *time, cui_time_options options) {
-    if (!t || !state || !time || !cui_time_valid(*time))
-        return false;
-    bool changed = cui_base_time_field(ui, id, name, state, time, options);
+void cui_picker_time_paint(cui_context *ui, cui_id id, const cui_theme *t, const cui_time *time,
+                           cui_time_options options) {
+    if (!ui || !t || !time || !cui_time_valid(*time))
+        return;
     cui_begin_box(ui, id,
                   (cui_box){.row = true,
                             .gap = 4,
@@ -450,6 +450,13 @@ bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name
             cui_text(ui, cui_string(":"), t->font_size, t->muted);
     }
     cui_end_box(ui);
+}
+bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                    cui_time_state *state, cui_time *time, cui_time_options options) {
+    if (!t || !state || !time || !cui_time_valid(*time))
+        return false;
+    bool changed = cui_base_time_field(ui, id, name, state, time, options);
+    cui_picker_time_paint(ui, id, t, time, options);
     return changed;
 }
 bool cui_color_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_color_state *state,

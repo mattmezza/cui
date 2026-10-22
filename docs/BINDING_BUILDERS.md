@@ -396,3 +396,5 @@ record the combined checks and their platform limits.
 
 For native callback loops, live resizing, callback failure containment and the
 manual-loop compatibility contract, see [binding native runners](BINDING_NATIVE_RUN.md).
+
+The optional `cui_date_time_picker.h` single civil date/time API is C-only in this revision. Generated source SDKs carry its header/implementation, but Python/JavaScript/TypeScript/Go/Rust builders and bridge records do not expose its typed value/state, assignment, options, helpers or result. Do not pass legacy date-only builder storage to it. See `docs/DATE_TIME_PICKER.md`.

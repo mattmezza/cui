@@ -106,6 +106,8 @@ set(CUI_SOURCES
  src/base/cui_color_hsla_entry.c
  src/components/cui_color_hsla_entry.c
  src/base/cui_questionnaire_snapshots.c
+ src/base/cui_date_time_picker.c
+ src/components/cui_date_time_picker.c
  src/base/cui_date_picker_actions.c
  src/components/cui_date_picker_actions.c
  src/base/cui_questionnaire_observer.c

@@ -414,7 +414,37 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_date_time_picker.h",
+          "languages": [
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust"
+          ],
+          "types": [
+            "cui_date_time_precision",
+            "cui_date_time_value",
+            "cui_date_time_preset",
+            "cui_date_time_picker_options",
+            "cui_date_time_picker_state",
+            "cui_date_time_picker_result"
+          ],
+          "symbols": [
+            "cui_date_time_picker_init",
+            "cui_date_time_picker_assign",
+            "cui_date_time_picker_time_id",
+            "cui_base_date_time_picker",
+            "cui_date_time_picker",
+            "cui_date_time_picker_submit_time",
+            "cui_date_time_picker_submit_presets"
+          ],
+          "note": "Source SDKs carry the optional C module; language builders and bridge records do not expose its typed value/state/options, sync, helpers or results. Existing tested_subset statuses describe legacy date-only authoring, not DateTime support."
+        }
+      ]
     },
     {
       "name": "Editor",

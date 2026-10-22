@@ -118,6 +118,25 @@ class SourceManifest(unittest.TestCase):
                      '-DCMAKE_BUILD_TYPE=Release'],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
                 self.assertEqual(configured.returncode, 0, configured.stdout[-8000:])
+                for name in ('include/cui/cui_date_time_picker.h',
+                             'src/base/cui_date_time_picker.c',
+                             'src/base/cui_date_time_internal.h',
+                             'src/base/cui_picker_composition_internal.h',
+                             'src/components/cui_date_time_picker.c',
+                             'src/components/cui_picker_paint_internal.h'):
+                    self.assertTrue((source / name).is_file(), name)
+                built = subprocess.run(
+                    [shutil.which('cmake'), '--build', str(directory / 'docless-build'),
+                     '--target', 'test_date_time_picker', 'test_date_time_picker_styled', '--parallel', '4'],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300)
+                self.assertEqual(built.returncode, 0, built.stdout[-8000:])
+                tested = subprocess.run(
+                    [__import__('sys').executable, str(ROOT / 'scripts/test_local.py'),
+                     '--build-dir', str(directory / 'docless-build/cui_source'), '--',
+                     '-R', '^date_time_picker(_styled)?$', '--output-on-failure'],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
+                self.assertEqual(tested.returncode, 0, tested.stdout[-8000:])
+
 
 
 if __name__ == '__main__': unittest.main()

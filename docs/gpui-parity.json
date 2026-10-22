@@ -3470,7 +3470,10 @@
         "tests/test_calendar_distribution.py",
         "tests/unit/test_date_picker_actions.c",
         "tests/web/test_date_picker_presentation_gallery.py",
-        "tests/web/test_date_picker_actions_gallery.py"
+        "tests/web/test_date_picker_actions_gallery.py",
+        "tests/unit/test_date_time_picker.c",
+        "tests/unit/test_date_time_picker_styled.c",
+        "tests/distribution/date_time_picker.c"
       ],
       "status": "tested",
       "platforms": {
@@ -3480,8 +3483,9 @@
       },
       "limitations": [
         "Bounded Gregorian popup, locale/custom-label formatting, live bounds/disabled policy, keyboard/AT semantics and legacy close/focus are tested. Additive Calendar presentation/behavior forwarding is native/WASI-tested; zero extension preserves legacy defaults, pass ordering and late-error bool. Actual desktop/touch browser checks cover the month menu, neighboring-date selection, Escape and disabled trigger. Other behavior policies lack comprehensive browser coverage; language builders omit the extensions.",
-        "Editable date masks, arbitrary format parsing, date-time editing, responsive scrolling and arbitrary styling remain pending. Existing typed CHANGE observes final actual endpoint changes on legacy paths; extension observers, open/close lifecycle causes and full source event semantics remain unsupported.",
-        "Opt-in date-only presets and clear/Delete actions have native and WASI coverage with separate retained Calendar selection, bounded identities and stale-target protection. Existing partial-range behavior and modal outside-clear restrictions are documented. Actual desktop/touch checks cover the opt-in presets, clear/Delete, disabled popup and both compiled copyable examples. The facade has no language-builder or typed observer coverage; see docs/DATE_PICKER_ACTIONS.md."
+        "Editable date masks, arbitrary format parsing, date-time range editing, responsive scrolling and arbitrary styling remain pending. Existing typed CHANGE observes final actual endpoint changes on legacy paths; extension observers, open/close lifecycle causes and full source event semantics remain unsupported.",
+        "Opt-in date-only presets and clear/Delete actions have native and WASI coverage with separate retained Calendar selection, bounded identities and stale-target protection. Existing partial-range behavior and modal outside-clear restrictions are documented. Actual desktop/touch checks cover the opt-in presets, clear/Delete, disabled popup and both compiled copyable examples. The facade has no language-builder or typed observer coverage; see docs/DATE_PICKER_ACTIONS.md.",
+        "Optional separate single-date time model and Base/Styled facade have native/WASI coverage for sync/drafts/defaults, ordered changed-day versus same-day confirmation, retained-child divergence, presets/clear, disabled routing and software popup geometry. Source changes are coalesced, TimeField uses net phase change, and Calendar/time/actions do not globally interleave. No date-time range/timezone/arbitrary format parser, bindings, gallery/browser, live-AT or GPU proof; see docs/DATE_TIME_PICKER.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -3532,6 +3536,17 @@
             "tests/unit/test_date_picker_calendar.c",
             "tests/unit/test_picker.c",
             "tests/unit/test_picker_events.c"
+          ]
+        },
+        {
+          "name": "opt-in single civil date/time Base and Styled composition (native/WASI)",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_date_time_picker.h",
+            "docs/DATE_TIME_PICKER.md",
+            "tests/unit/test_date_time_picker.c",
+            "tests/unit/test_date_time_picker_styled.c",
+            "tests/distribution/date_time_picker.c"
           ]
         }
       ],

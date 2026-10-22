@@ -165,6 +165,25 @@ bool cui_color_picker(cui_context *, cui_id, const cui_theme *, cui_color_state 
 
 
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PICKER_COMPOSITION_INTERNAL_H
+#define CUI_PICKER_COMPOSITION_INTERNAL_H
+
+typedef enum { CUI_PICKER_ACCEPT_CONTINUE, CUI_PICKER_ACCEPT_STOP } cui_picker_accept_flow;
+typedef cui_picker_accept_flow (*cui_picker_accept_visitor)(void *, size_t, cui_date_selection);
+/* Private value composition; legacy public factories still reduce+submit/close. */
+cui_calendar_result cui_picker_datetime_reduce(cui_context *, cui_id, cui_id,
+                                               cui_date_picker_state *, cui_date_selection *,
+                                               cui_date_picker_options,
+                                               cui_date_picker_calendar_options,
+                                               bool *open_after_trigger, cui_picker_accept_visitor,
+                                               void *);
+bool cui_picker_time_reduce(cui_context *, cui_id, cui_str, cui_time_state *, cui_time *,
+                            cui_time_options);
+void cui_picker_time_submit(cui_context *, cui_id, cui_str, cui_time_state *, cui_time *,
+                            cui_time_options);
+#endif
+
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -508,11 +527,12 @@ static bool cui_picker_focus_visible(cui_context *ui, cui_id id, cui_calendar_st
 cui_id cui_calendar_month_toggle_id(cui_id root) {
     return cui_calendar_navigation_id(root, 6);
 }
-cui_calendar_result
-cui_calendar_reduce_with_behavior(cui_context *ui, cui_id id, cui_calendar_state *s,
-                                  cui_date_selection *selection, cui_calendar_options o,
-                                  cui_calendar_presentation_options presentation,
-                                  cui_calendar_behavior_options behavior) {
+static cui_calendar_result
+cui_picker_calendar_traced(cui_context *ui, cui_id id, cui_calendar_state *s,
+                           cui_date_selection *selection, cui_calendar_options o,
+                           cui_calendar_presentation_options presentation,
+                           cui_calendar_behavior_options behavior,
+                           cui_picker_accept_visitor visitor, void *visitor_context) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
@@ -830,6 +850,9 @@ cui_calendar_reduce_with_behavior(cui_context *ui, cui_id id, cui_calendar_state
                     cui_focus(ui, cui_calendar_day_id(id, chosen));
                 }
                 result.activated = true;
+                if (visitor &&
+                    visitor(visitor_context, e, *selection) != CUI_PICKER_ACCEPT_CONTINUE)
+                    break;
             }
             if (!keyboard)
                 keyboard_source = 0;
@@ -903,6 +926,13 @@ cui_calendar_reduce_with_behavior(cui_context *ui, cui_id id, cui_calendar_state
     if (result.changed || result.navigated)
         cui_invalidate(ui);
     return result;
+}
+cui_calendar_result
+cui_calendar_reduce_with_behavior(cui_context *ui, cui_id id, cui_calendar_state *s,
+                                  cui_date_selection *selection, cui_calendar_options o,
+                                  cui_calendar_presentation_options presentation,
+                                  cui_calendar_behavior_options behavior) {
+    return cui_picker_calendar_traced(ui, id, s, selection, o, presentation, behavior, NULL, NULL);
 }
 cui_calendar_result cui_calendar_reduce_ex(cui_context *ui, cui_id id, cui_calendar_state *s,
                                            cui_date_selection *selection, cui_calendar_options o,
@@ -1086,12 +1116,12 @@ void cui_base_date_picker_trigger(cui_context *ui, cui_id id, cui_str name,
         ui, id, (cui_semantic_details){.expanded = s->overlay.open, .controls = s->overlay.id});
 }
 
-static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
-                                                  cui_str name, cui_date_picker_state *s,
-                                                  cui_date_selection *selection,
-                                                  cui_date_picker_options o,
-                                                  cui_date_picker_calendar_options extension,
-                                                  bool submit, bool *open_after_trigger) {
+static cui_calendar_result
+cui_picker_date_picker(cui_context *ui, cui_id trigger, cui_id calendar, cui_str name,
+                       cui_date_picker_state *s, cui_date_selection *selection,
+                       cui_date_picker_options o, cui_date_picker_calendar_options extension,
+                       bool submit, bool close_selection, bool *open_after_trigger,
+                       cui_picker_accept_visitor visitor, void *visitor_context) {
     cui_calendar_result result = {0};
     if (!ui || !s || !selection)
         return result;
@@ -1114,9 +1144,10 @@ static cui_calendar_result cui_picker_date_picker(cui_context *ui, cui_id trigge
     if (s->overlay.open) {
         cui_calendar_options options = o.calendar;
         options.disabled = options.disabled || o.disabled;
-        result = cui_calendar_reduce_with_behavior(ui, calendar, &s->calendar, selection, options,
-                                                   extension.presentation, extension.behavior);
-        if (result.activated && (!options.range || !s->calendar.selecting_end))
+        result = cui_picker_calendar_traced(ui, calendar, &s->calendar, selection, options,
+                                            extension.presentation, extension.behavior, visitor,
+                                            visitor_context);
+        if (close_selection && result.activated && (!options.range || !s->calendar.selecting_end))
             cui_overlay_close(ui, &s->overlay);
     }
     if (!submit)
@@ -1146,7 +1177,18 @@ cui_calendar_result cui_picker_actions_reduce(cui_context *ui, cui_id trigger, c
                                               cui_date_picker_calendar_options extension,
                                               bool *open_after_trigger) {
     return cui_picker_date_picker(ui, trigger, calendar, (cui_str){0}, s, selection, o, extension,
-                                  false, open_after_trigger);
+                                  false, true, open_after_trigger, NULL, NULL);
+}
+/* Datetime selects its close policy after comparing child with outer date. */
+cui_calendar_result cui_picker_datetime_reduce(cui_context *ui, cui_id trigger, cui_id calendar,
+                                               cui_date_picker_state *s,
+                                               cui_date_selection *selection,
+                                               cui_date_picker_options o,
+                                               cui_date_picker_calendar_options extension,
+                                               bool *open_after_trigger,
+                                               cui_picker_accept_visitor visitor, void *context) {
+    return cui_picker_date_picker(ui, trigger, calendar, (cui_str){0}, s, selection, o, extension,
+                                  false, false, open_after_trigger, visitor, context);
 }
 cui_id cui_date_picker_calendar_id(cui_id trigger) {
     if (!trigger)
@@ -1159,13 +1201,14 @@ cui_calendar_result cui_base_date_picker_ex(cui_context *ui, cui_id trigger, cui
                                             cui_date_picker_options o,
                                             cui_date_picker_calendar_options extension) {
     return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o, extension, true,
-                                  NULL);
+                                  true, NULL, NULL, NULL);
 }
 cui_calendar_result cui_base_date_picker(cui_context *ui, cui_id trigger, cui_id calendar,
                                          cui_str name, cui_date_picker_state *s,
                                          cui_date_selection *selection, cui_date_picker_options o) {
     return cui_picker_date_picker(ui, trigger, calendar, name, s, selection, o,
-                                  (cui_date_picker_calendar_options){0}, true, NULL);
+                                  (cui_date_picker_calendar_options){0}, true, true, NULL, NULL,
+                                  NULL);
 }
 bool cui_time_valid(cui_time time) {
     return time.hour < 24 && time.minute < 60 && time.second < 60;
@@ -1217,10 +1260,11 @@ static unsigned cui_picker_time_next(unsigned segment, cui_time_options options,
             index = i;
     return segments[direction < 0 ? (index ? index - 1 : count - 1) : (index + 1) % count];
 }
-bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_state *state,
-                         cui_time *time, cui_time_options options) {
+bool cui_picker_time_reduce(cui_context *ui, cui_id id, cui_str name, cui_time_state *state,
+                            cui_time *time, cui_time_options options) {
     if (!ui || !state || !time || !cui_time_valid(*time))
         return false;
+    (void)name;
     cui_time before = *time;
     if (state->segment > 3 || (state->segment == 2 && !options.seconds) ||
         (state->segment == 3 && !options.twelve_hour))
@@ -1310,6 +1354,16 @@ bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_stat
             }
         }
     }
+    bool changed =
+        before.hour != time->hour || before.minute != time->minute || before.second != time->second;
+    if (changed)
+        cui_invalidate(ui);
+    return changed;
+}
+void cui_picker_time_submit(cui_context *ui, cui_id id, cui_str name, cui_time_state *state,
+                            cui_time *time, cui_time_options options) {
+    if (!ui || !state || !time || !cui_time_valid(*time))
+        return;
     cui_interact(ui, id, CUI_ROLE_GROUP, name, options.disabled, false, 0);
     cui_set_tab_stop(ui, id, false);
     const char *labels[] = {"Hour", "Minute", "Second", "AM/PM"};
@@ -1335,10 +1389,11 @@ bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_stat
                                                        : 59});
         cui_set_tab_stop(ui, segment, i == state->segment);
     }
-    bool changed =
-        before.hour != time->hour || before.minute != time->minute || before.second != time->second;
-    if (changed)
-        cui_invalidate(ui);
+}
+bool cui_base_time_field(cui_context *ui, cui_id id, cui_str name, cui_time_state *state,
+                         cui_time *time, cui_time_options options) {
+    bool changed = cui_picker_time_reduce(ui, id, name, state, time, options);
+    cui_picker_time_submit(ui, id, name, state, time, options);
     return changed;
 }
 static float cui_picker_unit(float value) {
@@ -1602,6 +1657,17 @@ bool cui_base_color_picker(cui_context *ui, cui_id id, cui_color_state *s, cui_c
 
 
 
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_PICKER_PAINT_INTERNAL_H
+#define CUI_PICKER_PAINT_INTERNAL_H
+
+void cui_picker_time_paint(cui_context *, cui_id, const cui_theme *, const cui_time *,
+                           cui_time_options);
+void cui_picker_actions_paint(cui_context *, cui_id, const cui_theme *, cui_calendar_state *,
+                              cui_date_selection *, cui_calendar_options,
+                              cui_calendar_presentation_options);
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -2007,11 +2073,10 @@ bool cui_date_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     return cui_picker_date_picker_styled(ui, id, t, name, s, selection, o,
                                          (cui_date_picker_calendar_options){0});
 }
-bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
-                    cui_time_state *state, cui_time *time, cui_time_options options) {
-    if (!t || !state || !time || !cui_time_valid(*time))
-        return false;
-    bool changed = cui_base_time_field(ui, id, name, state, time, options);
+void cui_picker_time_paint(cui_context *ui, cui_id id, const cui_theme *t, const cui_time *time,
+                           cui_time_options options) {
+    if (!ui || !t || !time || !cui_time_valid(*time))
+        return;
     cui_begin_box(ui, id,
                   (cui_box){.row = true,
                             .gap = 4,
@@ -2048,6 +2113,13 @@ bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name
             cui_text(ui, cui_string(":"), t->font_size, t->muted);
     }
     cui_end_box(ui);
+}
+bool cui_time_field(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                    cui_time_state *state, cui_time *time, cui_time_options options) {
+    if (!t || !state || !time || !cui_time_valid(*time))
+        return false;
+    bool changed = cui_base_time_field(ui, id, name, state, time, options);
+    cui_picker_time_paint(ui, id, t, time, options);
     return changed;
 }
 bool cui_color_picker(cui_context *ui, cui_id id, const cui_theme *t, cui_color_state *state,

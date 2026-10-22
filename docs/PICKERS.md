@@ -36,3 +36,5 @@ if (cui_color_parse_hex(cui_string("#1A8F64"), &sampled)) {
 ```
 
 The browser requires a secure context and a user gesture; call `new EyeDropper().open()` directly in the click handler before awaiting anything or scheduling a C frame. A resolved `sRGBHex` can be parsed with `cui_color_parse_hex`; cancelled or rejected requests must leave the value unchanged. See the [Chrome EyeDropper guide](https://developer.chrome.com/docs/capabilities/web-apis/eyedropper) and [API specification](https://wicg.github.io/eyedropper-api/). CUI's native adapters currently do not implement an OS screen picker; applications provide that host capability.
+
+Optional single-date time editing uses the separate `cui_date_time_picker.h` model and Base/Styled facade, not legacy DatePicker selection storage. See [DateTime picker](DATE_TIME_PICKER.md) for explicit sync, ordered day confirmation, draft preservation, presets/clear, popup-fit policy and binding/source-event limitations. No timezone or date-time range is supported.

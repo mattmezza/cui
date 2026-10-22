@@ -275,7 +275,32 @@ static void legacy_time_equivalence(void) {
     cui_destroy(a.ui);
     cui_destroy(b.ui);
 }
+#ifdef CUI_DATETIME_GUIDE_AVAILABLE
+void example_datetime_init(cui_date_time_picker_state *, cui_date_time_value *);
+cui_date_time_picker_result example_datetime_frame(cui_context *, const cui_theme *,
+                                                   cui_date_time_picker_state *,
+                                                   cui_date_time_value *, cui_rect);
+static void guide_example(void) {
+    fixture f;
+    create(&f);
+    example_datetime_init(&f.s, &f.v);
+    CHECK(cui_begin_frame(f.ui, 1000, 800, .016f));
+    cui_date_time_picker_result r =
+        example_datetime_frame(f.ui, &f.theme, &f.s, &f.v, (cui_rect){0, 0, 1000, 800});
+    cui_end_frame(f.ui);
+    CHECK(r.valid && cui_last_error(f.ui) == CUI_OK);
+    CHECK(cui_queue_accessibility_action(f.ui, 701, CUI_ACCESSIBILITY_ACTIVATE));
+    CHECK(cui_begin_frame(f.ui, 1000, 800, .016f));
+    r = example_datetime_frame(f.ui, &f.theme, &f.s, &f.v, (cui_rect){0, 0, 1000, 800});
+    cui_end_frame(f.ui);
+    CHECK(r.valid && cui_last_error(f.ui) == CUI_OK && f.s.actions.picker.overlay.open);
+    cui_destroy(f.ui);
+}
+#endif
 int main(void) {
+#ifdef CUI_DATETIME_GUIDE_AVAILABLE
+    guide_example();
+#endif
     geometry();
     supported_metrics();
     interactions();

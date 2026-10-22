@@ -33,7 +33,7 @@ def main():
             target_js = '''name=>{const w=cuiGallery.exports,d=new TextDecoder();
               for(let i=0;i<w.gallery_semantic_count();i++){
                 const text=d.decode(new Uint8Array(w.memory.buffer,w.gallery_semantic_name(i),w.gallery_semantic_length(i)));
-                if(text===name)return {i,x:w.gallery_semantic(i,1),y:w.gallery_semantic(i,2),width:w.gallery_semantic(i,3),height:w.gallery_semantic(i,4)};
+                if(text===name)return {i,x:w.gallery_semantic(i,1),y:w.gallery_semantic(i,2),width:w.gallery_semantic(i,3),height:w.gallery_semantic(i,4),disabled:!!w.gallery_semantic(i,5)};
               }return null;}'''
             def target(name):
                 page.wait_for_function('(name)=>('+target_js+')(name)!==null', arg=name)
@@ -67,9 +67,11 @@ def main():
             target('2026-02-02')
             assert page.evaluate('cuiGallery.exports.gallery_date_value()') == 20260928
             page.locator('#disabled').check()
+            page.wait_for_function('(name)=>('+target_js+')(name)?.disabled===true', arg='2026-02-02')
             click('2026-02-02')
             assert page.evaluate('cuiGallery.exports.gallery_date_value()') == 20260928
             page.locator('#disabled').uncheck()
+            page.wait_for_function('(name)=>('+target_js+')(name)?.disabled===false', arg='2026-02-02')
             click('2026-02-02')
             page.wait_for_function('cuiGallery.exports.gallery_date_value()===20260202')
             click('Mark today')

@@ -46,17 +46,18 @@ typedef enum {
 typedef struct {
     cui_popover_position_mode mode;
     cui_popover_anchor anchor;
+    float reference_rem; /* zero defaults to 16; otherwise finite positive */
     float offset;       /* signed logical pixels; used when custom_offset */
     bool custom_offset, arrow;
 } cui_popover_position;
 ```
 
 Zero mode must preserve current placement byte-for-byte and ignore new fields.
-Anchor mode defaults to TopLeft, offset 4 and arrow off at the established 16px
-reference rem. Explicit offset 0 is distinct from default; finite negative offsets
-are supported as upstream accepts signed Pixels. Arrow depth is 6px. Document
-this fixed-rem limitation (source is rem-relative); do not silently infer rem from
-theme font size. A future host rem parameter is a separate API decision.
+Anchor mode defaults to TopLeft, offset reference_rem*0.25 and arrow off.
+Zero reference_rem selects 16 logical pixels; active nonzero values must be finite
+positive. Arrow depth is reference_rem*0.375. Applications configure reference_rem
+from their host's root sizing configuration, never by inferring theme font size.
+Explicit offset 0 is distinct from default; finite negative offsets are supported.
 
 TopLeft/Center/Right put popup top left/center/right against trigger bottom
 left/center/right. Bottom variants put popup bottom against trigger top.
@@ -93,7 +94,14 @@ review explicitly chooses a documented departure.
 Geometry and validation belong to base; component owns themed arrow drawing and
 join ordering. Core's portable mesh paint can draw triangles/slopes without new
 renderer protocol, but borrowed mesh vertices must remain alive through renderer
-completion: use context-owned frame storage, never stack arrays. Render arrow
+completion: use context-owned frame storage, never retained stack arrays. Current concrete
+path: `cui_set_prepaint_parts` copies payload plus tail into Core frame storage
+(`cui_core_frame_copy_parts`, `src/core/cui.c:2811`); a prepaint callback reads
+its copied payload/tail and emits a borrowed mesh pointing into those copied
+vertices through `cui_prepaint_emit`. This allocation survives until next begin
+frame, as does draw data. Tail alignment must be proved (payload size multiple
+of vertex alignment) and callback budget/capacity rollback tested before Styled
+arrow work. No new Core allocation API is currently needed. Render arrow
 after panel border/shadow and before/after children as dictated by source overlay
 canvas; its join must cover the panel border on both sides. Verify portal clip
 and ordering with draw-list assertions before choosing storage/layout changes.
@@ -109,7 +117,7 @@ C-only. Reject invalid enums/nonfinite active geometry before begin mutates stat
 preserve outputs and balanced begin/end behavior on rejection. Define overflow
 validation and degenerate zero-size trigger acceptance explicitly in headers.
 
-Integrator decisions: accept separate opt-in mode; accept fixed 16px-rem values;
+Integrator decisions: accept separate opt-in mode; accept explicit reference_rem with zero default16;
 accept oversized/no-shrink source mode; confirm source theme-radius inset and
 appearance NONE fill fallback. These are review decisions, not implemented facts.
 
@@ -141,3 +149,10 @@ appearance NONE fill fallback. These are review decisions, not implemented facts
    offset and arrow slice coverage; do not claim complete Popover parity.
 
 This design-only commit changes no behavior and requires no native launch.
+
+## Accepted sequencing after integrator review
+
+The first implementation commit contains public contract and pure base geometry
+plus headless and WASI coverage only. Styled arrow paint is deferred until the
+prepaint copied-storage path above is tested. Canonical/generated metadata updates
+are deferred to integrator coordination; no shipped behavior parity claim yet.

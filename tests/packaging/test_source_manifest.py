@@ -125,14 +125,25 @@ class SourceManifest(unittest.TestCase):
                              'src/components/cui_date_time_picker.c',
                              'src/components/cui_picker_paint_internal.h'):
                     self.assertTrue((source / name).is_file(), name)
+                # The bridge excludes the CUI subdirectory from its default
+                # build. Visual Studio cannot address those child test projects
+                # from the bridge solution by bare target name. Configure the
+                # same packaged, docless CUI source as its own test project;
+                # retain the separate bridge configuration check above.
+                test_build = directory / 'docless-tests'
+                configured_tests = subprocess.run(
+                    [shutil.which('cmake'), '-S', str(source), '-B', str(test_build),
+                     '-DCUI_BUILD_NATIVE=OFF', '-DCMAKE_BUILD_TYPE=Release'],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
+                self.assertEqual(configured_tests.returncode, 0, configured_tests.stdout[-8000:])
                 built = subprocess.run(
-                    [shutil.which('cmake'), '--build', str(directory / 'docless-build'),
+                    [shutil.which('cmake'), '--build', str(test_build), '--config', 'Release',
                      '--target', 'test_date_time_picker', 'test_date_time_picker_styled', '--parallel', '4'],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300)
                 self.assertEqual(built.returncode, 0, built.stdout[-8000:])
                 tested = subprocess.run(
                     [__import__('sys').executable, str(ROOT / 'scripts/test_local.py'),
-                     '--build-dir', str(directory / 'docless-build/cui_source'), '--',
+                     '--build-dir', str(test_build), '--', '-C', 'Release',
                      '-R', '^date_time_picker(_styled)?$', '--output-on-failure'],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=120)
                 self.assertEqual(tested.returncode, 0, tested.stdout[-8000:])

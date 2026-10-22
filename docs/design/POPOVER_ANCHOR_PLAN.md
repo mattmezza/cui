@@ -157,3 +157,48 @@ plus headless and WASI coverage only. It does not append the proposed options
 field or connect helpers to surface placement yet. Styled arrow paint is deferred until the
 prepaint copied-storage path above is tested. Canonical/generated metadata updates
 are deferred to integrator coordination; no shipped behavior parity claim yet.
+
+## Styled consumption contract (second slice)
+
+Keep `cui_surface_options` and `cui_surface_state` unchanged. Add
+`bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *,
+cui_str title, cui_str description, cui_surface_options, cui_popover_position)`.
+It requires a Popover state; callers balance successful begins with existing
+`cui_surface_end`. Mode LEGACY delegates the existing surface begin exactly and
+ignores every other position field. No other surface kind is affected. Mode
+ANCHOR resolves placement afresh from the supplied trigger every submitted frame;
+width/height <=0 use420/260, finite positive dimensions retain their size even
+when larger than usable viewport. Invalid active geometry rejects before overlay
+update/begin. Pure `cui_popover_surface_geometry(options,position,out)` shares
+those defaults and legacy delegation, with untouched output on failure. There is
+no binary struct ABI change; clients link the new symbols only when using them.
+
+Implementation will factor the existing Styled begin into an internal routine
+with optional prevalidated explicit bounds and arrow payload. Existing public
+begin takes the identical legacy path; Base's geometry remains unchanged for all
+existing callers. No focus/event/semantic code is replaced. Decoration has no ID,
+hover hitbox, semantic entry or layout effect, and outside dismissal continues to
+use only the panel rectangle.
+
+Build fixed vertex arrays before submission, embedded directly in one copied
+prepaint payload struct. In its callback reconstruct mesh pointers into that
+copied struct, never retain pointers to caller stack data. Register on the panel
+portal and use deferred stream at the panel layer, after its border/children and
+before later layers. The stream inherits panel opacity and Core's host viewport
+clip. Clip arrow triangles to `options.viewport` in portable geometry before
+emission (fixed polygon buffers, no caller clip commands); intersect the join
+rectangle too. Panel placement retains existing portal clipping behavior. Frame arena failure rolls back registration
+and Core suppresses the final draw list; balance any already-opened internal
+boxes before returning false. Public successful begins retain their usual end
+contract, including a later frame-level capacity failure.
+
+Arrow fill uses resolved refined background except appearance NONE without an
+explicit background refinement uses theme popover. Outline is present for
+LEGACY/SOURCE appearance, absent for NONE, uses theme text with alpha26/255,
+and stays1px independent of refined border. Triangle and join follow the pure
+source geometry; arrow corner inset uses theme radius. This slice does not claim
+pixel equivalence with GPUI's external PathBuilder stroke tessellator/AA.
+Portable outline uses two joined 1px slope strips, clamping miter displacement
+to2px; no base stroke. Triangle-vs-path raster/AA remains a documented gap. Any
+portable outline mesh topology difference must remain documented, and native GPU
+hardware evidence unavailable under Xvfb stays deferred.

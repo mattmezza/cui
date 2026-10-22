@@ -231,6 +231,7 @@ jobs:
         run: |
           uv run tests/web/test_resizable_drag.py --directory build/web
           uv run tests/web/test_resizable_repeated_drag.py --directory build/web
+          uv run tests/web/test_resizable_nested_gallery.py --directory build/web
       - name: Verify interaction guides design controls and composed app
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_site_extensions.py

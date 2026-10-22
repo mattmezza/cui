@@ -318,6 +318,12 @@ cui_calendar_result cui_calendar_with_behavior(cui_context *ui, cui_id id, const
     cui_picker_paint_calendar(ui, id, t, s, selection, o, presentation);
     return result;
 }
+/* Private action facade paint seam; never reduces or submits semantics. */
+void cui_picker_actions_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_calendar_state *s,
+                              cui_date_selection *value, cui_calendar_options o,
+                              cui_calendar_presentation_options presentation) {
+    cui_picker_paint_calendar(ui, id, t, s, value, o, presentation);
+}
 static bool cui_picker_date_picker_styled(cui_context *ui, cui_id id, const cui_theme *t,
                                           cui_str name, cui_date_picker_state *s,
                                           cui_date_selection *selection, cui_date_picker_options o,

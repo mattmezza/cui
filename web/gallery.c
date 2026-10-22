@@ -16,6 +16,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_regex.h"
 #endif
 #include "cui/cui_content.h"
+#include "cui/cui_date_picker_actions.h"
 #include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_description.h"
 #include "cui/cui_disclosure.h"
@@ -1453,6 +1454,10 @@ static bool calendar_month_menu, calendar_neighbors, calendar_mark_today;
 static int date_locale = -1;
 static cui_date_selection date_selection = {{2026, 10, 12}, {0}};
 static cui_date_picker_state date_picker;
+static bool date_actions_enabled, date_actions_clear;
+static cui_date_picker_actions_state date_actions;
+static cui_date_picker_value date_actions_value;
+
 static cui_time time_value = {9, 30, 0};
 static cui_time_state time_state;
 static bool multiple_mode, multi_selected[4];
@@ -2366,6 +2371,7 @@ int gallery_init(void) {
                                                           .max_history_steps = 16});
     cui_calendar_init(&calendar, date);
     cui_date_picker_init(&date_picker, cui_id_from(ui, "date-popup"), date);
+    cui_date_picker_actions_init(&date_actions, cui_id_from(ui, "date-actions-popup"), date);
     cui_overlay_init(&trap, cui_id_from(ui, "focus-trap"), true);
     cui_choice_popup_init(&select_popup, cui_id_from(ui, "select-popup"));
     query = cui_edit_create((cui_edit_config){.buffer = query_buffer,
@@ -2773,6 +2779,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_overlay_close(ui, &context_menu.overlay);
         cui_overlay_close(ui, &combo_popup.overlay);
         cui_overlay_close(ui, &date_picker.overlay);
+        cui_overlay_close(ui, &date_actions.picker.overlay);
         cui_overlay_close(ui, &trap);
         cui_overlay_close(ui, &dialog_surface.overlay);
         cui_overlay_close(ui, &nested_surface.overlay);
@@ -5589,7 +5596,52 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_label(ui, &t, cui_string(preview));
         break;
     }
-    case 40:
+    case 40: {
+        bool previous_actions = date_actions_enabled;
+        cui_checkbox(ui, cui_id_from(ui, "date-actions-mode"), &t, cui_string("Date-only actions"),
+                     &date_actions_enabled, disabled);
+        if (previous_actions != date_actions_enabled) {
+            cui_overlay_close(ui, &date_picker.overlay);
+            cui_date_picker_actions_init(&date_actions, cui_id_from(ui, "date-actions-popup"),
+                                         cui_date_valid(date_selection.start) ? date_selection.start
+                                                                              : date);
+            date_actions_value = (cui_date_picker_value){.dates = date_selection};
+        }
+        if (date_actions_enabled) {
+            cui_checkbox(ui, cui_id_from(ui, "date-actions-clear-mode"), &t,
+                         cui_string("Clear button and Delete"), &date_actions_clear, disabled);
+            const cui_date_picker_preset presets[] = {
+                {.id = cui_id_from(ui, "date-preset-launch"),
+                 .label = cui_string("Launch day"),
+                 .value = {.dates = {.start = {2026, 11, 5}}}},
+                {.id = cui_id_from(ui, "date-preset-review"),
+                 .label = cui_string("Review day"),
+                 .value = {.dates = {.start = {2026, 12, 18}}}},
+            };
+            cui_date_picker_actions(
+                ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_actions,
+                &date_actions_value,
+                (cui_date_picker_actions_options){
+                    .picker = {.calendar = {.first_weekday = 1,
+                                            .cell_size = 28,
+                                            .locale = cui_date_locale_builtin(
+                                                (cui_date_locale_kind)date_locale)},
+                               .viewport = {0, 0, width, height},
+                               .disabled = disabled,
+                               .width = width > 360 ? 280 : width - 48},
+                    .calendar = {.presentation = {.month_toggle = true,
+                                                  .neighboring_days = true,
+                                                  .today = calendar_today}},
+                    .presets = presets,
+                    .preset_count = 2,
+                    .clear_id = cui_id_from(ui, "date-actions-clear"),
+                    .clear_label = cui_string("Clear date"),
+                    .cleanable = date_actions_clear,
+                    .delete_policy = date_actions_clear ? CUI_DATE_PICKER_DELETE_SCOPE
+                                                        : CUI_DATE_PICKER_DELETE_OFF});
+            date_selection = date_actions_value.dates;
+            break;
+        }
         cui_date_picker_ex(
             ui, cui_id_from(ui, "date-picker"), &t, cui_string("Date"), &date_picker,
             &date_selection,
@@ -5604,6 +5656,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                                 .neighboring_days = true,
                                                                 .today = calendar_today}});
         break;
+    }
     case 41: {
         cui_time_field(ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_state,
                        &time_value, (cui_time_options){.seconds = true, .disabled = disabled});
@@ -6278,8 +6331,8 @@ int gallery_modal(void) {
         alert_dialog_surface.overlay.open || sheet_surface.overlay.open)
         return 1;
     return select_popup.overlay.open || menu_popup.overlay.open || combo_popup.overlay.open ||
-           trap.open || date_picker.overlay.open || menu_tree.overlay.open ||
-           context_menu.overlay.open;
+           trap.open || date_picker.overlay.open || date_actions.picker.overlay.open ||
+           menu_tree.overlay.open || context_menu.overlay.open;
 }
 
 int gallery_clipboard_request(void) {
@@ -6465,6 +6518,10 @@ double gallery_control_stats(unsigned field) {
         return toggle_group_values[1];
     case 6:
         return toggle_group_values[2];
+    case 7:
+        return date_actions_enabled;
+    case 8:
+        return date_actions_clear;
     default:
         return 0;
     }

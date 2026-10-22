@@ -271,6 +271,146 @@ static void check_dismissal(void) {
     assert(!s.overlay.open);
     cui_destroy(ui);
 }
+static void check_decoration_does_not_block_pointer(void) {
+    cui_context *ui = cui_create((cui_config){0});
+    assert(ui);
+    cui_theme t = cui_theme_light();
+    cui_surface_state s;
+    cui_surface_init(&s, 100, CUI_SURFACE_POPOVER);
+    cui_surface_open(ui, &s, 0);
+    cui_surface_options o = options();
+    o.no_outside_dismiss = true;
+    cui_popover_position p = {.mode = CUI_POPOVER_POSITION_ANCHOR, .arrow = true};
+    for (unsigned frame = 0; frame < 3; ++frame) {
+        assert(cui_queue_event(ui, (cui_event){.type = frame == 0   ? CUI_EVENT_POINTER_MOVE
+                                                       : frame == 1 ? CUI_EVENT_POINTER_DOWN
+                                                                    : CUI_EVENT_POINTER_UP,
+                                               .x = 30,
+                                               .y = 30,
+                                               .pointer_button = CUI_POINTER_PRIMARY}));
+        assert(cui_begin_frame(ui, 400, 320, .016f));
+        cui_begin_portal(ui, 900, (cui_box){.background = {0, 0, 255, 255}},
+                         (cui_rect){20, 20, 40, 30}, 90);
+        cui_interaction button =
+            cui_interact(ui, 900, CUI_ROLE_BUTTON, (cui_str){0}, false, false, 0);
+        cui_end_box(ui);
+        assert(button.activated == (frame == 2));
+        if (frame)
+            assert(button.hovered && cui_event_target(ui, 0) == 900);
+        assert(cui_popover_begin(ui, &t, &s, (cui_str){0}, (cui_str){0}, o, p));
+        cui_surface_end(ui);
+        cui_draw_list list = cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && mesh(list, 0) && mesh(list, 1));
+    }
+    cui_destroy(ui);
+}
+static void check_decoration_node_capacity(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 8});
+    assert(ui);
+    cui_theme t = cui_theme_light();
+    cui_surface_state s;
+    cui_surface_init(&s, 100, CUI_SURFACE_POPOVER);
+    cui_surface_open(ui, &s, 0);
+    cui_surface_options o = options();
+    cui_popover_position p = {.mode = CUI_POPOVER_POSITION_ANCHOR, .arrow = true};
+    assert(cui_begin_frame(ui, 400, 320, .016f));
+    for (unsigned i = 0; i < 7; ++i) {
+        cui_begin_box(ui, 1000 + i, (cui_box){.width = 1, .height = 1});
+        cui_end_box(ui);
+    }
+    /* Panel fits; its new decoration node does not. The failed begin must close
+     * both its suppressed node and panel/focus scope, without publishing mesh. */
+    assert(!cui_popover_begin(ui, &t, &s, (cui_str){0}, (cui_str){0}, o, p));
+    cui_draw_list partial = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY && !mesh(partial, 0));
+    cui_clear_error(ui);
+    assert(cui_begin_frame(ui, 400, 320, .016f));
+    assert(cui_popover_begin(ui, &t, &s, (cui_str){0}, (cui_str){0}, o, p));
+    cui_surface_end(ui);
+    cui_draw_list recovered = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK && mesh(recovered, 0) && mesh(recovered, 1));
+    cui_destroy(ui);
+}
+static void check_visuals_without_input(void) {
+    /* Inert and modal ownership affect input, not panel/arrow visibility. */
+    for (unsigned mode = 0; mode < 2; ++mode) {
+        cui_context *ui = cui_create((cui_config){0});
+        assert(ui);
+        cui_theme t = cui_theme_light();
+        t.popover = (cui_color){255, 0, 0, 255};
+        t.radius = 9;
+        cui_surface_options o = options();
+        o.popover_refinement.flags = CUI_POPOVER_REFINE_SHADOWS; /* isolate visible fill */
+        cui_popover_position p = {.mode = CUI_POPOVER_POSITION_ANCHOR, .arrow = true};
+        cui_surface_state s;
+        cui_surface_init(&s, 100, CUI_SURFACE_POPOVER);
+        cui_surface_open(ui, &s, 0);
+        for (unsigned frame = 0; frame < 3; ++frame) {
+            if (frame)
+                assert(cui_queue_event(ui, (cui_event){.type = frame == 1 ? CUI_EVENT_POINTER_DOWN
+                                                                          : CUI_EVENT_POINTER_UP,
+                                                       .x = 200,
+                                                       .y = 195,
+                                                       .pointer_button = CUI_POINTER_PRIMARY}));
+            assert(cui_begin_frame(ui, 400, 320, .016f));
+            cui_begin_box(ui, 990,
+                          (cui_box){.width = 400,
+                                    .height = 320,
+                                    .inert = mode == 0,
+                                    .custom_opacity = true,
+                                    .opacity = .5f});
+            assert(cui_popover_begin(ui, &t, &s, (cui_str){0}, (cui_str){0}, o, p));
+            cui_begin_box(ui, 850,
+                          (cui_box){.width = 40, .height = 30, .background = {0, 0, 255, 255}});
+            assert(
+                !cui_interact(ui, 850, CUI_ROLE_BUTTON, (cui_str){0}, false, false, 0).activated);
+            cui_end_box(ui);
+            cui_surface_end(ui);
+            cui_end_box(ui);
+            if (mode == 1) {
+                assert(cui_begin_focus_scope(ui, 700, true));
+                cui_begin_portal(ui, 701, (cui_box){.background = {0, 255, 0, 255}},
+                                 (cui_rect){350, 0, 10, 10}, 110);
+                cui_end_box(ui);
+                cui_end_focus_scope(ui);
+            }
+            cui_draw_list list = cui_end_frame(ui);
+            assert(cui_last_error(ui) == CUI_OK && s.overlay.open);
+            const cui_draw_command *fill = mesh(list, 0), *outline = mesh(list, 1);
+            assert(fill && outline && !mesh(list, 2));
+            assert(fabsf(fill->mesh.color.a - .5f) < .0001f);
+            assert(fabsf(outline->mesh.color.a - 13 / 255.0f) < .0001f);
+            bool panel = false;
+            for (size_t i = 0; i < list.count; ++i)
+                panel |= list.commands[i].type == CUI_DRAW_RECT &&
+                         list.commands[i].bounds.w == 120 && list.commands[i].color.r == 255 &&
+                         list.commands[i].color.a == 127;
+            assert(panel);
+            cui_software *soft = cui_software_create(400, 320, NULL);
+            assert(soft && cui_software_render(soft, &list, (cui_color){255, 255, 255, 255}));
+            unsigned width;
+            const unsigned char *pixels = cui_software_pixels(soft, &width, NULL);
+            const unsigned samples[2][2] = {{195, 167}, {250, 240}};
+            for (unsigned i = 0; i < 2; ++i) {
+                const unsigned char *pixel =
+                    pixels + ((size_t)samples[i][1] * width + samples[i][0]) * 4;
+                assert(pixel[0] > 240 && pixel[1] > 90 && pixel[1] < 200 && pixel[2] < 200);
+            }
+            cui_software_destroy(soft);
+            size_t count;
+            const cui_semantic *semantics = cui_semantics(ui, &count);
+            if (mode == 0)
+                assert(count == 0);
+            for (size_t i = 0; i < count; ++i)
+                assert(semantics[i].id != cui_surface_part_id(100, 8));
+            assert(cui_focused(ui) != 850 && cui_focused(ui) != cui_surface_part_id(100, 8));
+            if (frame)
+                assert(cui_event_target(ui, 0) != 850 &&
+                       cui_event_target(ui, 0) != cui_surface_part_id(100, 8));
+        }
+        cui_destroy(ui);
+    }
+}
 static void check_legacy(void) {
     cui_theme t = cui_theme_light();
     cui_surface_options o = options();
@@ -311,6 +451,9 @@ int main(void) {
     check_refinements_and_clip();
     check_lifetime_and_failure();
     check_dismissal();
+    check_decoration_does_not_block_pointer();
+    check_decoration_node_capacity();
+    check_visuals_without_input();
     check_legacy();
     return 0;
 }

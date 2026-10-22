@@ -122,20 +122,19 @@ static bool cui_popover_paint_build(cui_rect surface, cui_rect trigger, cui_rect
 static bool cui_popover_paint_callback(const cui_prepaint_info *info, const void *copied,
                                        cui_prepaint_writer *writer) {
     const cui_popover_paint *p = copied;
-    if (!info->modal_allowed || info->inert)
-        return true;
+    (void)info; /* Input eligibility does not suppress visual decoration. */
     if (p->fill_count) {
         cui_draw_command fill = {.type = CUI_DRAW_MESH,
                                  .mesh = {.vertices = p->fill,
                                           .vertex_count = p->fill_count,
                                           .scale = 1,
                                           .color = p->fill_color}};
-        if (!cui_prepaint_emit(writer, &fill, true))
+        if (!cui_prepaint_emit(writer, &fill, false))
             return false;
     }
     if (p->join.w > 0 && p->join.h > 0) {
         cui_draw_command join = {.type = CUI_DRAW_RECT, .bounds = p->join, .color = p->background};
-        if (!cui_prepaint_emit(writer, &join, true))
+        if (!cui_prepaint_emit(writer, &join, false))
             return false;
     }
     if (p->outline_count) {
@@ -144,7 +143,7 @@ static bool cui_popover_paint_callback(const cui_prepaint_info *info, const void
                                              .vertex_count = p->outline_count,
                                              .scale = 1,
                                              .color = p->outline_color}};
-        if (!cui_prepaint_emit(writer, &outline, true))
+        if (!cui_prepaint_emit(writer, &outline, false))
             return false;
     }
     return true;

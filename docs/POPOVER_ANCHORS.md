@@ -60,11 +60,16 @@ background refinement uses theme popover for the arrow. The 1px outline uses the
 text at alpha 26/255 and is absent for NONE. Arrow triangle and ring seam patch
 paint after panel contents at its layer, inherit panel opacity and clip to both
 the supplied viewport and host viewport. Decoration does not enlarge the panel
-hit/dismiss bounds, create semantics or receive focus.
+hit/dismiss bounds, create semantics or receive focus. It remains visible with
+an inert ancestor and while another modal owns input. A separate inert paint
+portal uses local prepaint so visual painting does not require input eligibility.
 
 Geometry and vertices are copied into context-owned frame storage; do not retain
-draw-list pointers across the next begin-frame. Capacity failure balances internal
-boxes and suppresses the final draw list; retry on a later adequately sized frame.
+draw-list pointers across the next begin-frame. Arrow payload/paint-command
+capacity failure balances internal boxes and
+suppresses the final draw list. Ordinary layout-node capacity follows Core
+semantics: failure remains balanced but ordinary paint may be partial. Retry on
+a later adequately sized frame.
 
 The portable outline uses a bounded 2px miter and triangle meshes. GPUI's external
 PathBuilder tessellation/raster AA is not reproduced exactly. Source fill, anchor,

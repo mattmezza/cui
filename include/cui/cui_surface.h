@@ -152,7 +152,8 @@ cui_surface_result cui_surface_take_result(cui_surface_state *);
 cui_rect cui_surface_geometry(cui_surface_kind, cui_surface_options);
 cui_rect cui_surface_current_geometry(const cui_surface_state *, cui_surface_options);
 cui_rect cui_surface_resize_bounds(const cui_surface_state *, cui_surface_options);
-/* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport, 7 body content. */
+/* Parts: 1 close, 2 confirm, 3 cancel, 4 title, 5 resize, 6 body viewport,
+ * 7 body content, 8 passive arrow paint portal (no semantics/input). */
 cui_id cui_surface_part_id(cui_id, unsigned part);
 /* Reduction precedes submission. Animated sheets retain their modal through exit. */
 bool cui_base_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
@@ -175,8 +176,10 @@ bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
  * inherits panel opacity, paints after panel contents at its layer. Logical
  * positioning retains fractions; no host pixel snapping. Portable bounded-miter
  * mesh raster/AA differs from GPUI PathBuilder; exact pixel parity is not claimed.
- * Capacity failure balances internal boxes, returns false, and empties frame
- * draw output; subsequent frames may retry. No legacy public struct ABI change. */
+ * Arrow payload/paint-command capacity failure balances internal boxes and
+ * suppresses frame draw output. Layout-node capacity follows the existing Core
+ * contract (balanced failure, potentially partial ordinary paint). Later frames
+ * may retry. No legacy public struct ABI change. */
 bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options, cui_popover_position);
 void cui_surface_end(cui_context *);

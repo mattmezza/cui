@@ -163,15 +163,23 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
                                .border = style.border,
                                .border_width = style.border_width},
                      bounds, (int16_t)(layer + 1));
-    if (arrow && !cui_set_prepaint(ui, (cui_prepaint_options){
+    if (arrow) {
+        /* A detached paint-only portal keeps the arrow outside the panel clip.
+         * Local prepaint remains visible when inert or behind another modal;
+         * deferred streams intentionally require modal input eligibility. */
+        cui_begin_portal(ui, cui_surface_part_id(s->overlay.id, 8), (cui_box){.inert = true},
+                         o.viewport, (int16_t)(layer + 1));
+        bool painted = cui_set_prepaint(ui, (cui_prepaint_options){
             .callback = cui_popover_paint_callback, .payload = arrow,
-            .payload_bytes = sizeof(*arrow), .command_budget = 5,
-            .deferred_layer = (int16_t)(layer + 1)})) {
+            .payload_bytes = sizeof(*arrow), .command_budget = 5});
         cui_end_box(ui);
-        cui_base_surface_end(ui);
-        if (stack)
-            stack->depth--;
-        return false;
+        if (!painted) {
+            cui_end_box(ui);
+            cui_base_surface_end(ui);
+            if (stack)
+                stack->depth--;
+            return false;
+        }
     }
     if (style.shadow_count)
         cui_set_box_shadows(

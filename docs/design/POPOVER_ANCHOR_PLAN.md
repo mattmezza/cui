@@ -202,3 +202,16 @@ Portable outline uses two joined 1px slope strips, clamping miter displacement
 to2px; no base stroke. Triangle-vs-path raster/AA remains a documented gap. Any
 portable outline mesh topology difference must remain documented, and native GPU
 hardware evidence unavailable under Xvfb stays deferred.
+
+## Input-independent visual paint correction
+
+The original deferred stream incorrectly conflated modal input eligibility with
+visual visibility. Core intentionally denies deferred emission outside the modal
+input scope; inert boxes explicitly retain painting. Arrow paint now owns a
+detached, inert decoration portal (surface part8) covering the supplied viewport
+at the panel layer. Local prepaint clips to that viewport and host bounds and
+remains visible when inert or behind another modal. The portal has no semantics,
+hover hitbox or input ownership. Floating-root order places its complete local
+stream after panel border/content and before higher layers. Copied payload and
+capacity rollback rules are unchanged. Existing order/clip/nested/failure tests
+plus inert/modal pixel and input-suppression regressions prove the correction.

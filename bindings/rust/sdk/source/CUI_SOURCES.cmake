@@ -13,6 +13,7 @@ set(CUI_SOURCES
  src/effects/cui_effects.c
  src/base/cui_questionnaire.c
  src/components/cui_questionnaire.c
+ src/components/cui_questionnaire_presentation.c
  src/base/cui_speech.c
  src/components/cui_speech.c
  src/base/cui_chart.c

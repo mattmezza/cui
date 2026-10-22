@@ -21,10 +21,10 @@ def generate(name,sources):
     if name == "cui_components":
         lines += ['#include "cui_button_styles.h"']
     if name == "cui_questionnaire":
-        lines += ['#include "cui_questionnaire_keyboard.h"', '#include "cui_questionnaire_observer.h"', '#include "cui_questionnaire_progress.h"']
+        lines += ['#include "cui_questionnaire_keyboard.h"', '#include "cui_questionnaire_observer.h"', '#include "cui_questionnaire_progress.h"', '#include "cui_questionnaire_presentation.h"']
         for dependency in ['cui_questionnaire_snapshots', 'cui_questionnaire_observer']:
             lines += [f'#ifndef {dependency.upper()}_IMPLEMENTATION', f'#define {dependency.upper()}_IMPLEMENTATION', '#endif', f'#include "{dependency}.h"']
-    if name in {"cui_questionnaire_keyboard", "cui_questionnaire_observer", "cui_questionnaire_progress"}:
+    if name in {"cui_questionnaire_keyboard", "cui_questionnaire_observer", "cui_questionnaire_progress", "cui_questionnaire_presentation"}:
         lines += ['#ifndef CUI_QUESTIONNAIRE_IMPLEMENTATION', '#define CUI_QUESTIONNAIRE_IMPLEMENTATION', '#endif', '#include "cui_questionnaire.h"']
     if name == "cui_picker":
         lines += ['#include "cui_components.h"', '#include "cui_calendar_presentation.h"', '#include "cui_calendar_behavior.h"', '#include "cui_date_picker_calendar.h"']
@@ -129,7 +129,7 @@ def generate(name,sources):
             code=code.replace(private_include, (ROOT/'src/base/cui_icon_layout.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_textarea_geometry.h"', '#include "../base/cui_textarea_geometry.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_textarea_geometry.h').read_text(encoding='utf-8'))
-        for private_path in ['src/base/cui_questionnaire_observer_internal.h', 'src/base/cui_questionnaire_snapshot_math.h', 'src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h']:
+        for private_path in ['src/components/cui_questionnaire_presentation_private.h', 'src/base/cui_questionnaire_observer_internal.h', 'src/base/cui_questionnaire_snapshot_math.h', 'src/base/cui_form_private.h', 'src/components/cui_input_private.h', 'src/base/cui_command_events_private.h', 'src/base/cui_color_entry_internal.h', 'src/base/cui_color_hsla_entry_internal.h']:
             private_name = private_path.rsplit("/", 1)[-1]
             for private_include in [f'#include "{private_name}"', f'#include "../base/{private_name}"', f'#include "../components/{private_name}"']:
                 code = code.replace(private_include, (ROOT/private_path).read_text(encoding='utf-8'))

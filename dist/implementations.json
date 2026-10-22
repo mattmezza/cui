@@ -66,7 +66,8 @@
       "macro": "CUI_QUESTIONNAIRE_IMPLEMENTATION",
       "sources": [
         "src/base/cui_questionnaire.c",
-        "src/components/cui_questionnaire.c"
+        "src/components/cui_questionnaire.c",
+        "src/components/cui_questionnaire_presentation.c"
       ]
     },
     {

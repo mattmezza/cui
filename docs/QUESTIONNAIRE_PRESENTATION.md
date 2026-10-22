@@ -68,3 +68,10 @@ not native font shaping. Token tables, first-line line boxes, long copy wrapping
 explicit empty/custom precedence, descriptor snapshots and passive routed
 pointer/key/AT behavior are covered. Native host screen-reader acceptance and
 browser presentation controls are not claimed by this slice.
+
+Canonical builds register this implementation with the existing Questionnaire
+module. Standalone `CUI_QUESTIONNAIRE_IMPLEMENTATION` includes the presentation
+implementation needed by legacy Error; the new
+`CUI_QUESTIONNAIRE_PRESENTATION_IMPLEMENTATION` entry redirects once to that same
+module. Both require matching generated headers. `CUI_IMPLEMENTATION_ALL` also
+includes it. Packaged C headers do not provide language-builder callbacks.

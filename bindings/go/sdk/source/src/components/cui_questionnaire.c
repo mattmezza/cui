@@ -2,7 +2,9 @@
 #include "../base/cui_design_metrics.h"
 #include "cui/cui_components.h"
 #include "cui/cui_questionnaire_keyboard.h"
+#include "cui/cui_questionnaire_presentation.h"
 #include "cui/cui_questionnaire_progress.h"
+#include "cui_questionnaire_presentation_private.h"
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -212,6 +214,21 @@ static cui_questionnaire_options cui_questionnaire_resolve_size(cui_context *ui,
                 break;
             }
     return o;
+}
+/* Private named-text seam: validate legacy descriptors before any submission.
+ * No pointer to the local validation snapshot escapes. */
+bool cui_questionnaire_text_prepare(cui_context *ui, const cui_questionnaire_state *s,
+                                    cui_questionnaire_options *o,
+                                    cui_questionnaire_text_metrics *out) {
+    cui_questionnaire_options_snapshot snapshot;
+    cui_questionnaire_options checked = *o;
+    if (!cui_questionnaire_snapshot(&checked, &snapshot))
+        return false;
+    if (s)
+        *o = cui_questionnaire_resolve_size(ui, s, *o);
+    cui_questionnaire_metrics m = cui_questionnaire_measure(*o);
+    *out = (cui_questionnaire_text_metrics){m.font, m.line, m.root_gap};
+    return true;
 }
 /* Context resources keep the previous submitted controls available to root capture.
  * Rebuild the list each frame so omitted controls cannot leave dangling bindings. */
@@ -851,34 +868,9 @@ void cui_questionnaire_heading(cui_context *ui, cui_id id, const cui_theme *t,
 void cui_questionnaire_error_control(cui_context *ui, cui_id id, const cui_theme *t,
                                      const cui_questionnaire_state *s, size_t item,
                                      cui_questionnaire_options o) {
-    cui_questionnaire_options_snapshot snapshot;
-    if (!cui_questionnaire_snapshot(&o, &snapshot))
-        return;
-    if (!ui || !id || !t || !s || !s->initialized || item >= s->count || item != s->current)
-        return;
-    o = cui_questionnaire_resolve_size(ui, s, o);
-    cui_questionnaire_error e = cui_questionnaire_item_error(s, item);
-    if (e.kind == CUI_QUESTIONNAIRE_VALID)
-        return;
-    cui_str message = e.kind == CUI_QUESTIONNAIRE_MESSAGE ? e.message
-                      : e.kind == CUI_QUESTIONNAIRE_REQUIRED
-                          ? cui_string("This question is required")
-                          : cui_string("Answer or skip this question");
-    if (o.labels && e.kind == CUI_QUESTIONNAIRE_REQUIRED &&
-        (o.labels->fields & CUI_QUESTIONNAIRE_LABEL_REQUIRED))
-        message = o.labels->required;
-    if (o.labels && e.kind == CUI_QUESTIONNAIRE_UNFILLED &&
-        (o.labels->fields & CUI_QUESTIONNAIRE_LABEL_UNFILLED))
-        message = o.labels->unfilled;
-    cui_interact(ui, id, CUI_ROLE_ALERT, message, false, false, 0);
-    cui_begin_box(ui, id, (cui_box){.width = -1});
-    cui_text(ui, message,
-             o.design_size                       ? cui_questionnaire_measure(o).font
-             : o.size == CUI_QUESTIONNAIRE_LARGE ? 16
-                                                 : 12,
-             t->danger);
-    cui_end_box(ui);
+    (void)cui_questionnaire_error_ex(ui, id, t, s, item, o, (cui_questionnaire_text_options){0});
 }
+
 bool cui_questionnaire_action_control(cui_context *ui, cui_id id, const cui_theme *t,
                                       cui_questionnaire_state *s, cui_questionnaire_action action,
                                       cui_str label, cui_questionnaire_options o) {

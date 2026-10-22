@@ -74,9 +74,14 @@ typedef enum {
 } cui_popover_position_mode;
 /* Names identify the popup's own anchor, matched to the opposite trigger edge. */
 typedef enum {
-    CUI_POPOVER_TOP_LEFT = 0, CUI_POPOVER_TOP_CENTER, CUI_POPOVER_TOP_RIGHT,
-    CUI_POPOVER_BOTTOM_LEFT, CUI_POPOVER_BOTTOM_CENTER, CUI_POPOVER_BOTTOM_RIGHT,
-    CUI_POPOVER_LEFT_CENTER, CUI_POPOVER_RIGHT_CENTER
+    CUI_POPOVER_TOP_LEFT = 0,
+    CUI_POPOVER_TOP_CENTER,
+    CUI_POPOVER_TOP_RIGHT,
+    CUI_POPOVER_BOTTOM_LEFT,
+    CUI_POPOVER_BOTTOM_CENTER,
+    CUI_POPOVER_BOTTOM_RIGHT,
+    CUI_POPOVER_LEFT_CENTER,
+    CUI_POPOVER_RIGHT_CENTER
 } cui_popover_anchor;
 typedef struct {
     cui_popover_position_mode mode;
@@ -87,11 +92,13 @@ typedef struct {
     float offset; /* Signed logical gap, active only with custom_offset. */
     bool custom_offset, arrow;
 } cui_popover_position;
-typedef struct { float x, y; } cui_popover_point;
+typedef struct {
+    float x, y;
+} cui_popover_point;
 typedef struct {
     cui_popover_point points[3]; /* Base start, tip, base end. */
-    cui_rect join;              /* 1px ring seam patch. */
-    cui_popup_side side;        /* Surface side relative to trigger. */
+    cui_rect join;               /* 1px ring seam patch. */
+    cui_popup_side side;         /* Surface side relative to trigger. */
 } cui_popover_arrow_geometry;
 /* Pure ANCHOR-mode placement: no flip, no shrink, preserves fractional geometry.
  * Source paint rounds displacement later; host pixel snapping is not performed.
@@ -103,14 +110,14 @@ typedef struct {
  * Rejects LEGACY (use existing surface geometry), invalid active fields, NULL
  * output and overflow. Failure leaves output untouched. Inactive offset is
  * ignored. Usable-client viewport/frame insets are supplied by the host. */
-bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport,
-                                  float margin, cui_popover_position, cui_rect *out);
+bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport, float margin,
+                                  cui_popover_position, cui_rect *out);
 /* Pure arrow math for final, already-clamped surface bounds. Positive surface
  * extents, nonnegative trigger extents, depth and radius; all finite. Depth=0
  * produces a degenerate triangle and a zero-width seam patch. Uses source theme
  * radius (not refined surface radius). Failure leaves output untouched. */
-bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_anchor,
-                               float depth, float radius, cui_popover_arrow_geometry *out);
+bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_anchor, float depth,
+                               float radius, cui_popover_arrow_geometry *out);
 /* Pure validators/resolver; invalid input leaves output untouched. Source p_3 is
  * 12 logical pixels at pinned 16px rem; customize padding for another host rem. */
 bool cui_popover_refinement_valid(cui_popover_appearance, cui_popover_refinement);

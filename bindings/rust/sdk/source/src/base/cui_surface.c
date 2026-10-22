@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_surface.h"
-#include <math.h>
 #include <float.h>
+#include <math.h>
 static bool cui_popover_float(double value) {
     return isfinite(value) && value >= -FLT_MAX && value <= FLT_MAX;
 }
@@ -16,26 +16,27 @@ static bool cui_popover_anchor_valid(cui_popover_anchor a) {
 static double cui_popover_clamp(double value, double minimum, double maximum) {
     return fmax(minimum, fmin(maximum, value));
 }
-bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport,
-                                  float margin, cui_popover_position p, cui_rect *out) {
+bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport, float margin,
+                                  cui_popover_position p, cui_rect *out) {
     if (!out || p.mode != CUI_POPOVER_POSITION_ANCHOR || !cui_popover_anchor_valid(p.anchor) ||
         !cui_popover_rect(trigger, false) || !cui_popover_rect(viewport, true) ||
-        !isfinite(popup.width) || !isfinite(popup.height) || popup.width <= 0 || popup.height <= 0 ||
-        !isfinite(margin) || margin < 0 || !isfinite(p.reference_rem) || p.reference_rem < 0 ||
-        (p.custom_offset && !isfinite(p.offset)))
+        !isfinite(popup.width) || !isfinite(popup.height) || popup.width <= 0 ||
+        popup.height <= 0 || !isfinite(margin) || margin < 0 || !isfinite(p.reference_rem) ||
+        p.reference_rem < 0 || (p.custom_offset && !isfinite(p.offset)))
         return false;
     double rem = p.reference_rem == 0 ? 16 : p.reference_rem;
     double gap = (p.custom_offset ? p.offset : rem * .25) + (p.arrow ? rem * .375 : 0);
     double x = trigger.x, y = trigger.y;
     if (p.anchor <= CUI_POPOVER_BOTTOM_RIGHT) {
         unsigned align = (unsigned)p.anchor % 3;
-        x += align == 0 ? 0 : align == 1 ? ((double)trigger.w - popup.width) / 2
-                                                    : (double)trigger.w - popup.width;
+        x += align == 0   ? 0
+             : align == 1 ? ((double)trigger.w - popup.width) / 2
+                          : (double)trigger.w - popup.width;
         y += p.anchor <= CUI_POPOVER_TOP_RIGHT ? (double)trigger.h + gap
-                                                       : -(double)popup.height - gap;
+                                               : -(double)popup.height - gap;
     } else {
         x += p.anchor == CUI_POPOVER_LEFT_CENTER ? (double)trigger.w + gap
-                                                        : -(double)popup.width - gap;
+                                                 : -(double)popup.width - gap;
         y += ((double)trigger.h - popup.height) / 2;
     }
     double min_x = (double)viewport.x + margin, min_y = (double)viewport.y + margin;
@@ -43,8 +44,8 @@ bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect vie
     double max_y = fmax(min_y, (double)viewport.y + viewport.h - margin);
     if (!cui_popover_float(gap) || !cui_popover_float(x) || !cui_popover_float(y) ||
         !cui_popover_float(x + popup.width) || !cui_popover_float(y + popup.height) ||
-        !cui_popover_float(min_x) || !cui_popover_float(min_y) ||
-        !cui_popover_float(max_x) || !cui_popover_float(max_y))
+        !cui_popover_float(min_x) || !cui_popover_float(min_y) || !cui_popover_float(max_x) ||
+        !cui_popover_float(max_y))
         return false;
     x = fmax(min_x, fmin(x, max_x - popup.width));
     y = fmax(min_y, fmin(y, max_y - popup.height));
@@ -57,8 +58,8 @@ bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect vie
 bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_anchor anchor,
                                float depth, float radius, cui_popover_arrow_geometry *out) {
     if (!out || !cui_popover_anchor_valid(anchor) || !cui_popover_rect(surface, true) ||
-        !cui_popover_rect(trigger, false) || !isfinite(depth) || depth < 0 ||
-        !isfinite(radius) || radius < 0)
+        !cui_popover_rect(trigger, false) || !isfinite(depth) || depth < 0 || !isfinite(radius) ||
+        radius < 0)
         return false;
     bool horizontal = anchor >= CUI_POPOVER_LEFT_CENTER;
     double start = horizontal ? surface.y : surface.x;
@@ -84,10 +85,16 @@ bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_a
     double join[4] = {center - half + seam, base - 1, 2 * (half - seam), 2};
     if (horizontal) {
         for (unsigned i = 0; i < 6; i += 2) {
-            double swap = coords[i]; coords[i] = coords[i + 1]; coords[i + 1] = swap;
+            double swap = coords[i];
+            coords[i] = coords[i + 1];
+            coords[i + 1] = swap;
         }
-        double swap = join[0]; join[0] = join[1]; join[1] = swap;
-        swap = join[2]; join[2] = join[3]; join[3] = swap;
+        double swap = join[0];
+        join[0] = join[1];
+        join[1] = swap;
+        swap = join[2];
+        join[2] = join[3];
+        join[3] = swap;
     }
     for (unsigned i = 0; i < 6; ++i)
         if (!cui_popover_float(coords[i]))
@@ -96,7 +103,8 @@ bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_a
         if (!cui_popover_float(join[i]))
             return false;
     cui_popover_arrow_geometry next = {
-        .points = {{(float)coords[0], (float)coords[1]}, {(float)coords[2], (float)coords[3]},
+        .points = {{(float)coords[0], (float)coords[1]},
+                   {(float)coords[2], (float)coords[3]},
                    {(float)coords[4], (float)coords[5]}},
         .join = {(float)join[0], (float)join[1], (float)join[2], (float)join[3]},
         .side = horizontal ? (far ? CUI_POPUP_LEFT : CUI_POPUP_RIGHT)
@@ -245,8 +253,8 @@ bool cui_popover_surface_geometry(cui_surface_options o, cui_popover_position p,
     }
     if (!isfinite(o.width) || !isfinite(o.height))
         return false;
-    return cui_popover_position_resolve(o.anchor,
-        (cui_size){o.width > 0 ? o.width : 420, o.height > 0 ? o.height : 260},
+    return cui_popover_position_resolve(
+        o.anchor, (cui_size){o.width > 0 ? o.width : 420, o.height > 0 ? o.height : 260},
         o.viewport, o.margin, p, out);
 }
 static bool cui_surface_vertical_sheet(cui_surface_options o) {

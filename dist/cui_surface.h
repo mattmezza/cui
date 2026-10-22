@@ -75,9 +75,14 @@ typedef enum {
 } cui_popover_position_mode;
 /* Names identify the popup's own anchor, matched to the opposite trigger edge. */
 typedef enum {
-    CUI_POPOVER_TOP_LEFT = 0, CUI_POPOVER_TOP_CENTER, CUI_POPOVER_TOP_RIGHT,
-    CUI_POPOVER_BOTTOM_LEFT, CUI_POPOVER_BOTTOM_CENTER, CUI_POPOVER_BOTTOM_RIGHT,
-    CUI_POPOVER_LEFT_CENTER, CUI_POPOVER_RIGHT_CENTER
+    CUI_POPOVER_TOP_LEFT = 0,
+    CUI_POPOVER_TOP_CENTER,
+    CUI_POPOVER_TOP_RIGHT,
+    CUI_POPOVER_BOTTOM_LEFT,
+    CUI_POPOVER_BOTTOM_CENTER,
+    CUI_POPOVER_BOTTOM_RIGHT,
+    CUI_POPOVER_LEFT_CENTER,
+    CUI_POPOVER_RIGHT_CENTER
 } cui_popover_anchor;
 typedef struct {
     cui_popover_position_mode mode;
@@ -88,11 +93,13 @@ typedef struct {
     float offset; /* Signed logical gap, active only with custom_offset. */
     bool custom_offset, arrow;
 } cui_popover_position;
-typedef struct { float x, y; } cui_popover_point;
+typedef struct {
+    float x, y;
+} cui_popover_point;
 typedef struct {
     cui_popover_point points[3]; /* Base start, tip, base end. */
-    cui_rect join;              /* 1px ring seam patch. */
-    cui_popup_side side;        /* Surface side relative to trigger. */
+    cui_rect join;               /* 1px ring seam patch. */
+    cui_popup_side side;         /* Surface side relative to trigger. */
 } cui_popover_arrow_geometry;
 /* Pure ANCHOR-mode placement: no flip, no shrink, preserves fractional geometry.
  * Source paint rounds displacement later; host pixel snapping is not performed.
@@ -104,14 +111,14 @@ typedef struct {
  * Rejects LEGACY (use existing surface geometry), invalid active fields, NULL
  * output and overflow. Failure leaves output untouched. Inactive offset is
  * ignored. Usable-client viewport/frame insets are supplied by the host. */
-bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport,
-                                  float margin, cui_popover_position, cui_rect *out);
+bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport, float margin,
+                                  cui_popover_position, cui_rect *out);
 /* Pure arrow math for final, already-clamped surface bounds. Positive surface
  * extents, nonnegative trigger extents, depth and radius; all finite. Depth=0
  * produces a degenerate triangle and a zero-width seam patch. Uses source theme
  * radius (not refined surface radius). Failure leaves output untouched. */
-bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_anchor,
-                               float depth, float radius, cui_popover_arrow_geometry *out);
+bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_anchor, float depth,
+                               float radius, cui_popover_arrow_geometry *out);
 /* Pure validators/resolver; invalid input leaves output untouched. Source p_3 is
  * 12 logical pixels at pinned 16px rem; customize padding for another host rem. */
 bool cui_popover_refinement_valid(cui_popover_appearance, cui_popover_refinement);
@@ -201,8 +208,8 @@ void cui_alert_dialog(cui_context *, const cui_theme *, cui_surface_state *, cui
 /* src/base/cui_surface.c */
 /* SPDX-License-Identifier: MIT */
 
-#include <math.h>
 #include <float.h>
+#include <math.h>
 static bool cui_popover_float(double value) {
     return isfinite(value) && value >= -FLT_MAX && value <= FLT_MAX;
 }
@@ -217,26 +224,27 @@ static bool cui_popover_anchor_valid(cui_popover_anchor a) {
 static double cui_popover_clamp(double value, double minimum, double maximum) {
     return fmax(minimum, fmin(maximum, value));
 }
-bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport,
-                                  float margin, cui_popover_position p, cui_rect *out) {
+bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect viewport, float margin,
+                                  cui_popover_position p, cui_rect *out) {
     if (!out || p.mode != CUI_POPOVER_POSITION_ANCHOR || !cui_popover_anchor_valid(p.anchor) ||
         !cui_popover_rect(trigger, false) || !cui_popover_rect(viewport, true) ||
-        !isfinite(popup.width) || !isfinite(popup.height) || popup.width <= 0 || popup.height <= 0 ||
-        !isfinite(margin) || margin < 0 || !isfinite(p.reference_rem) || p.reference_rem < 0 ||
-        (p.custom_offset && !isfinite(p.offset)))
+        !isfinite(popup.width) || !isfinite(popup.height) || popup.width <= 0 ||
+        popup.height <= 0 || !isfinite(margin) || margin < 0 || !isfinite(p.reference_rem) ||
+        p.reference_rem < 0 || (p.custom_offset && !isfinite(p.offset)))
         return false;
     double rem = p.reference_rem == 0 ? 16 : p.reference_rem;
     double gap = (p.custom_offset ? p.offset : rem * .25) + (p.arrow ? rem * .375 : 0);
     double x = trigger.x, y = trigger.y;
     if (p.anchor <= CUI_POPOVER_BOTTOM_RIGHT) {
         unsigned align = (unsigned)p.anchor % 3;
-        x += align == 0 ? 0 : align == 1 ? ((double)trigger.w - popup.width) / 2
-                                                    : (double)trigger.w - popup.width;
+        x += align == 0   ? 0
+             : align == 1 ? ((double)trigger.w - popup.width) / 2
+                          : (double)trigger.w - popup.width;
         y += p.anchor <= CUI_POPOVER_TOP_RIGHT ? (double)trigger.h + gap
-                                                       : -(double)popup.height - gap;
+                                               : -(double)popup.height - gap;
     } else {
         x += p.anchor == CUI_POPOVER_LEFT_CENTER ? (double)trigger.w + gap
-                                                        : -(double)popup.width - gap;
+                                                 : -(double)popup.width - gap;
         y += ((double)trigger.h - popup.height) / 2;
     }
     double min_x = (double)viewport.x + margin, min_y = (double)viewport.y + margin;
@@ -244,8 +252,8 @@ bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect vie
     double max_y = fmax(min_y, (double)viewport.y + viewport.h - margin);
     if (!cui_popover_float(gap) || !cui_popover_float(x) || !cui_popover_float(y) ||
         !cui_popover_float(x + popup.width) || !cui_popover_float(y + popup.height) ||
-        !cui_popover_float(min_x) || !cui_popover_float(min_y) ||
-        !cui_popover_float(max_x) || !cui_popover_float(max_y))
+        !cui_popover_float(min_x) || !cui_popover_float(min_y) || !cui_popover_float(max_x) ||
+        !cui_popover_float(max_y))
         return false;
     x = fmax(min_x, fmin(x, max_x - popup.width));
     y = fmax(min_y, fmin(y, max_y - popup.height));
@@ -258,8 +266,8 @@ bool cui_popover_position_resolve(cui_rect trigger, cui_size popup, cui_rect vie
 bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_anchor anchor,
                                float depth, float radius, cui_popover_arrow_geometry *out) {
     if (!out || !cui_popover_anchor_valid(anchor) || !cui_popover_rect(surface, true) ||
-        !cui_popover_rect(trigger, false) || !isfinite(depth) || depth < 0 ||
-        !isfinite(radius) || radius < 0)
+        !cui_popover_rect(trigger, false) || !isfinite(depth) || depth < 0 || !isfinite(radius) ||
+        radius < 0)
         return false;
     bool horizontal = anchor >= CUI_POPOVER_LEFT_CENTER;
     double start = horizontal ? surface.y : surface.x;
@@ -285,10 +293,16 @@ bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_a
     double join[4] = {center - half + seam, base - 1, 2 * (half - seam), 2};
     if (horizontal) {
         for (unsigned i = 0; i < 6; i += 2) {
-            double swap = coords[i]; coords[i] = coords[i + 1]; coords[i + 1] = swap;
+            double swap = coords[i];
+            coords[i] = coords[i + 1];
+            coords[i + 1] = swap;
         }
-        double swap = join[0]; join[0] = join[1]; join[1] = swap;
-        swap = join[2]; join[2] = join[3]; join[3] = swap;
+        double swap = join[0];
+        join[0] = join[1];
+        join[1] = swap;
+        swap = join[2];
+        join[2] = join[3];
+        join[3] = swap;
     }
     for (unsigned i = 0; i < 6; ++i)
         if (!cui_popover_float(coords[i]))
@@ -297,7 +311,8 @@ bool cui_popover_arrow_resolve(cui_rect surface, cui_rect trigger, cui_popover_a
         if (!cui_popover_float(join[i]))
             return false;
     cui_popover_arrow_geometry next = {
-        .points = {{(float)coords[0], (float)coords[1]}, {(float)coords[2], (float)coords[3]},
+        .points = {{(float)coords[0], (float)coords[1]},
+                   {(float)coords[2], (float)coords[3]},
                    {(float)coords[4], (float)coords[5]}},
         .join = {(float)join[0], (float)join[1], (float)join[2], (float)join[3]},
         .side = horizontal ? (far ? CUI_POPUP_LEFT : CUI_POPUP_RIGHT)
@@ -446,8 +461,8 @@ bool cui_popover_surface_geometry(cui_surface_options o, cui_popover_position p,
     }
     if (!isfinite(o.width) || !isfinite(o.height))
         return false;
-    return cui_popover_position_resolve(o.anchor,
-        (cui_size){o.width > 0 ? o.width : 420, o.height > 0 ? o.height : 260},
+    return cui_popover_position_resolve(
+        o.anchor, (cui_size){o.width > 0 ? o.width : 420, o.height > 0 ? o.height : 260},
         o.viewport, o.margin, p, out);
 }
 static bool cui_surface_vertical_sheet(cui_surface_options o) {
@@ -714,10 +729,10 @@ void cui_base_surface_submit_body(cui_context *ui, cui_surface_state *s) {
 
 
 
-#include <math.h>
-#include <string.h>
 /* SPDX-License-Identifier: MIT */
 /* Private fixed-size frame-copy payload. No contained borrowed pointers. */
+#include <math.h>
+#include <string.h>
 typedef struct {
     cui_mesh_vertex fill[15], outline[60];
     size_t fill_count, outline_count;
@@ -867,6 +882,8 @@ static bool cui_popover_paint_callback(const cui_prepaint_info *info, const void
     return true;
 }
 
+#include <math.h>
+#include <string.h>
 bool cui_popover_style_resolve(const cui_theme *t, cui_popover_appearance appearance,
                                cui_popover_refinement r, cui_popover_style *out) {
     if (!t || !out || !cui_popover_refinement_valid(appearance, r))
@@ -973,7 +990,9 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
 static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_surface_state *s,
                                        cui_str title, cui_str description, cui_surface_options o,
                                        const cui_rect *positioned, const cui_popover_paint *arrow) {
-    cui_rect bounds = positioned ? *positioned : s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
+    cui_rect bounds = positioned ? *positioned
+                      : s        ? cui_surface_geometry(s->kind, o)
+                                 : (cui_rect){0};
     if (!t || bounds.w <= 0 || bounds.h <= 0)
         return false;
     cui_popover_style style = {.background = t->surface,
@@ -1031,9 +1050,11 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
          * deferred streams intentionally require modal input eligibility. */
         cui_begin_portal(ui, cui_surface_part_id(s->overlay.id, 8), (cui_box){.inert = true},
                          o.viewport, (int16_t)(layer + 1));
-        bool painted = cui_set_prepaint(ui, (cui_prepaint_options){
-            .callback = cui_popover_paint_callback, .payload = arrow,
-            .payload_bytes = sizeof(*arrow), .command_budget = 5});
+        bool painted =
+            cui_set_prepaint(ui, (cui_prepaint_options){.callback = cui_popover_paint_callback,
+                                                        .payload = arrow,
+                                                        .payload_bytes = sizeof(*arrow),
+                                                        .command_budget = 5});
         cui_end_box(ui);
         if (!painted) {
             cui_end_box(ui);
@@ -1087,7 +1108,8 @@ bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_popover_paint paint;
     if (p.arrow && !cui_popover_paint_build(bounds, o.anchor, o.viewport, p, t, style, o, &paint))
         return false;
-    return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds, p.arrow ? &paint : NULL);
+    return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds,
+                                      p.arrow ? &paint : NULL);
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)

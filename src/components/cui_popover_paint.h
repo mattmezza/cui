@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Private fixed-size frame-copy payload. No contained borrowed pointers. */
+#include <math.h>
+#include <string.h>
 typedef struct {
     cui_mesh_vertex fill[15], outline[60];
     size_t fill_count, outline_count;

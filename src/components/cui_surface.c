@@ -2,9 +2,9 @@
 #include "cui/cui_surface.h"
 #include "cui/cui_components.h"
 #include "cui/cui_scroll.h"
+#include "cui_popover_paint.h"
 #include <math.h>
 #include <string.h>
-#include "cui_popover_paint.h"
 bool cui_popover_style_resolve(const cui_theme *t, cui_popover_appearance appearance,
                                cui_popover_refinement r, cui_popover_style *out) {
     if (!t || !out || !cui_popover_refinement_valid(appearance, r))
@@ -111,7 +111,9 @@ static void cui_surface_body_begin(cui_context *ui, const cui_theme *t, cui_surf
 static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_surface_state *s,
                                        cui_str title, cui_str description, cui_surface_options o,
                                        const cui_rect *positioned, const cui_popover_paint *arrow) {
-    cui_rect bounds = positioned ? *positioned : s ? cui_surface_geometry(s->kind, o) : (cui_rect){0};
+    cui_rect bounds = positioned ? *positioned
+                      : s        ? cui_surface_geometry(s->kind, o)
+                                 : (cui_rect){0};
     if (!t || bounds.w <= 0 || bounds.h <= 0)
         return false;
     cui_popover_style style = {.background = t->surface,
@@ -169,9 +171,11 @@ static bool cui_surface_begin_internal(cui_context *ui, const cui_theme *t, cui_
          * deferred streams intentionally require modal input eligibility. */
         cui_begin_portal(ui, cui_surface_part_id(s->overlay.id, 8), (cui_box){.inert = true},
                          o.viewport, (int16_t)(layer + 1));
-        bool painted = cui_set_prepaint(ui, (cui_prepaint_options){
-            .callback = cui_popover_paint_callback, .payload = arrow,
-            .payload_bytes = sizeof(*arrow), .command_budget = 5});
+        bool painted =
+            cui_set_prepaint(ui, (cui_prepaint_options){.callback = cui_popover_paint_callback,
+                                                        .payload = arrow,
+                                                        .payload_bytes = sizeof(*arrow),
+                                                        .command_budget = 5});
         cui_end_box(ui);
         if (!painted) {
             cui_end_box(ui);
@@ -225,7 +229,8 @@ bool cui_popover_begin(cui_context *ui, const cui_theme *t, cui_surface_state *s
     cui_popover_paint paint;
     if (p.arrow && !cui_popover_paint_build(bounds, o.anchor, o.viewport, p, t, style, o, &paint))
         return false;
-    return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds, p.arrow ? &paint : NULL);
+    return cui_surface_begin_internal(ui, t, s, title, description, o, &bounds,
+                                      p.arrow ? &paint : NULL);
 }
 void cui_surface_footer_begin(cui_context *ui, const cui_theme *t) {
     if (!ui || !t)

@@ -75,3 +75,13 @@ implementation needed by legacy Error; the new
 `CUI_QUESTIONNAIRE_PRESENTATION_IMPLEMENTATION` entry redirects once to that same
 module. Both require matching generated headers. `CUI_IMPLEMENTATION_ALL` also
 includes it. Packaged C headers do not provide language-builder callbacks.
+
+The gallery's independent named-text picker offers extracted legacy parts,
+localized token text, explicit 17px/26px refinement and decorative Error content.
+The default still uses the existing heading/Error helpers, and the progress
+picker remains independent. The long localized description is example content,
+not a translation service. Real WASM desktop/touch checks validate through Next,
+retain one localized Alert ID across mode changes, verify decorative paint and
+bounds, compile all selected C11 examples and navigate choices/back. Presentation
+mode changes emit no model events. This evidence does not cover the deferred
+container/card/input/action layout or a language-builder presentation facade.

@@ -4262,7 +4262,8 @@
         "tests/unit/test_questionnaire_progress.c",
         "tests/web/test_questionnaire_progress_gallery.py",
         "tests/unit/test_questionnaire_presentation.c",
-        "tests/unit/test_questionnaire_presentation_header.cpp"
+        "tests/unit/test_questionnaire_presentation_header.cpp",
+        "tests/web/test_questionnaire_presentation_gallery.py"
       ],
       "status": "implemented",
       "platforms": {
@@ -4275,7 +4276,7 @@
         "Optional persistent C typed observation has bounded copied names/answers and one frozen Completed/Submit pair, synchronous pre-legacy delivery and preserved callback mutations; see docs/QUESTIONNAIRE_OBSERVER.md. State layout changes require matching headers/library. Caller owns observer/handler/frame lifetimes; payload capacity/depth failures remain observable without suppressing legacy callbacks. Input origin is UNKNOWN, handlers are pure, and language builders expose no typed observer facade. This does not establish complete family styling, action content, localization or physical accessibility parity.",
         "Optional C progress presentation adds masked localized accessible/visible text, custom decorative children and bounded explicit font/style/color/linebox refinements, preserving legacy zero paint and numeric enabled-position semantics. Native/WASI/deterministic software coverage is scoped; complete family token mapping, root Form role, arbitrary Styled inheritance and language-builder presentation remain unfinished. See docs/QUESTIONNAIRE_PROGRESS.md.",
         "Actual WASM desktop/touch progress tests cover opt-in localized labels, short visible text, decorative children, explicit text metrics, compiled selected usage, numeric semantics and real choice navigation; default presentation remains unchanged. This is scoped browser evidence, not complete family styling/localization/accessibility parity.",
-        "Additive C named Title/Description/ChoiceDescription and decorative Error content have independent LEGACY/TOKENS policies, explicit text refinements and scoped native/WASI/software-pixel tests. Source four-size text tiers are opt-in; shared design-size proportional tiers are CUI extensions. Legacy zero text/Error paint and one localized Alert are retained. Named text parts do not gate inactive/disabled schema items themselves. Root/card/input refinements, minimum-height and trailing action layout, custom Button action content, arbitrary Styled, Form role and language-builder presentation remain unfinished. No browser proof of these named parts is claimed. See docs/QUESTIONNAIRE_PRESENTATION.md."
+        "Additive C named Title/Description/ChoiceDescription and decorative Error content have independent LEGACY/TOKENS policies, explicit text refinements and scoped native/WASI/software-pixel tests. Source four-size text tiers are opt-in; shared design-size proportional tiers are CUI extensions. Legacy zero text/Error paint and one localized Alert are retained. Named text parts do not gate inactive/disabled schema items themselves. Root/card/input refinements, minimum-height and trailing action layout, custom Button action content, arbitrary Styled, Form role and language-builder presentation remain unfinished. Actual WASM desktop/touch checks cover opt-in named text/token/refined/custom Error modes, one Alert identity, mode-change event silence, compiled C11 usage and routed validation/navigation; this remains scoped browser evidence. See docs/QUESTIONNAIRE_PRESENTATION.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

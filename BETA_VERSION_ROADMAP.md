@@ -57,7 +57,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | --- | --- |
 | Controls | Button state/style refinement, Slider ranges and themes; consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
-| Overlays | Dialog slots/sizing, Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
+| Overlays | Dialog independent header/title slots and separate Content/Body flex sizing; Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
 | App structure | Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services; verify composed apps. |
@@ -95,7 +95,8 @@ Candidate `b2a4db93` passed [full hosted CI](https://github.com/mattmezza/cui/ac
 and [native bindings](https://github.com/mattmezza/cui/actions/runs/41244554789).
 Newer Core integration `6fb1357d` passed a 157-step warnings-clean build, all 15
 focused layout/background/legacy-pixel tests and two Inter-font checks. Private
-software validation `0625580a` also passed against that rebuilt Core. Painting and
+software validation `0625580a` also passed against that rebuilt Core. The combined
+consumer skill passed 18/18 and pinned formatting checks passed. Painting and
 font/shadow resource preparation remain unfinished. Spinner passed four local
 viewport/DPI cases, but its hosted idle failure is unresolved. No clean **full**
 regression run or browser gate covers the complete newer integration yet.

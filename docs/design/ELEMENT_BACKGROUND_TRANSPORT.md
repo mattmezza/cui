@@ -191,3 +191,14 @@ resource/failure protocol before production. Require all-five adapter output,
 legacy ABI/pixel, old-consumer refusal, copy/version/resize/clip/budget recovery
 and headless browser/private-Xvfb tests. All78 coverage, theme brush ownership,
 source patterns, focus/text and foreign authoring remain separate pending slices.
+
+## Root decision: versioned commands, values first
+
+Review selected **B: explicit versioned draw/list contracts**. Preserve all V1
+structs and routes. A's context-bound lookup/copy restrictions and incomplete-list
+risk are rejected. No V2 record is approved yet: review its complete owned brush,
+serialization, capability and five-adapter contracts before implementation.
+The next independent slice is Core-owned fixed-two-stop background values and a
+pure allocation-free sampler only. It does not attach paint, emit commands, own
+targets or enable rendering. Common CPU preparation and all five adapters remain
+required follow-on work; this decision does not narrow the full background goal.

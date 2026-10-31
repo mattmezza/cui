@@ -1,7 +1,8 @@
 # Next software V2 shadow decision — proposal only
 
 The private shape/image/mesh/background painter rejects both shadow kinds before
-allocation. Full software/all-five support still requires them. This checkpoint
+allocation. The measured four-gather policy is NOT approved; see
+[quality report and per-axis proposal](SOFTWARE_V2_SHADOW_QUALITY.md). Full software/all-five support still requires them. This checkpoint
 needs review before shadow implementation; no approximation is silently enabled.
 
 Evidence: `src/effects/cui_effects.c:153-380` supplies allocation-free query,
@@ -43,10 +44,10 @@ allocation bound on a small clipped destination. Map the original source support
 then to each physical axis, intersect clip/viewport, and outward-cover cells.
 The current validator's uniform-max-density raster reservation must be replaced
 by this reviewed physical plan when shadows become supported. No Core/public API
-or legacy sampler behavior changes are required. Float source coordinates can
-collapse adjacent q-grid centers at large positions (q*1e6 can reach64e6); this
-quality limitation must be independently measured and explicitly accepted, not
-hidden as an exact anisotropic result.
+or legacy sampler behavior changes are required. The admitted Effects caster limit is16384, not1e6. Measured active source support
+at q<=64 preserves adjacent/half-integer centers; offscreen points can collapse
+without contributing coverage. The quality report corrects the original concern
+and measures real minification/support defects instead.
 
 This is a declared reconstruction/quality policy, not exact anisotropic Gaussian
 integration. It preserves the existing isotropic unit/integer-phase result when

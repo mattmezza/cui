@@ -1,0 +1,29 @@
+{
+  "kind": "test-only measurements, not golden or policy acceptance",
+  "source_base": "725c4e7540da909d701c766f9512223ec4672b85",
+  "sha256": {
+    "tests/unit/test_shadow_v2_quality.c": "3e75b87045923bf4d91863387b7ac3cbc6d7c717d5481c972b409e7c6d537f15",
+    "tests/unit/software_v2_original_reference.c": "16d62894939180c63f3372d9fec8c8588b3c3f18982475b82d3e8cd28919369e",
+    "src/effects/cui_effects.c": "998d811b9c977fd27ca106f3058b3be0e1e7a0dee363e5ebc14c724d41488f1b",
+    "src/core/cui_drop_shadow_bounds_internal.h": "96faf61d17f3d902a487e59eaea639105d3ec205b879b8fdb1ad55bb5ffd60c2",
+    "backends/software/cui_shadow.h": "cc4786f94d509d185639d680eb0d3023207d6b700821111d4faf8e12420207d8",
+    "tests/fixtures/text_prepare_v1/source/backends/software/cui_software.c": "f2975fc0873a6c100f47aea8c2e5da05b39f00ac850ed77cc938a33ec34b74cb",
+    "build-shadow/libcui.a": "96d40727c65d39de0accedf45edba34098a209ec41747bd05800d96362e1a137"
+  },
+  "compiler": "cc (GCC) 16.2.1 20260810",
+  "flags": "-std=c11 -O3 -DNDEBUG -UNDEBUG -Wall -Wextra -Wpedantic -Werror -Iinclude -Ibackends/software; existing libcui.a -lm",
+  "execution": "CPU0 nice19; python scripts/test_local.py --build-dir build-shadow -R ^shadow_v2_quality_focused$ -V; no other CUI heavy task",
+  "host": "Linux x86_64",
+  "timing": "per-case clock()/CLOCKS_PER_SEC; Linux process CPU includes candidate/reference/coarse-ref/legacy-unit check, not isolated renderer benchmark",
+  "reference": "2048-row midpoint vs 512-row; independent unsnapped per-axis Gaussian CENTER convolution at sigma>0, pixel-square area at sigma0; Gaussian integration tails +/-8sigma; inset=(1-hole)*element pixel area; convergence is estimate not proven bound",
+  "scenarios": 20,
+  "pixels_per_case": 64,
+  "kind_rows": 40,
+  "legacy_unit_pixels": 512,
+  "legacy_unit_rgba_mismatches": 0,
+  "active_gather_collapse": 0,
+  "candidate_gathers": 9728,
+  "reference_row_evaluations": 6348800,
+  "process_cpu_seconds": 0.334463,
+  "report_sha256": "da4b18595226de3ba8384c435cbe9c93f0eb8ecdf6c13277216bb9b0540d8829"
+}

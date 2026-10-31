@@ -31,7 +31,7 @@ typedef struct {
     bool relationship_applied;
 } cui_hover_card_extended_result;
 /* Zero retains policy.outside_tap and the original conservative contact rules.
- * RAW_PRIMARY_RELEASE is TAP_TOGGLE-only: any unconsumed primary POINTER_UP
+ * RAW_PRIMARY is TAP_TOGGLE-only: any unconsumed primary POINTER_UP
  * outside previous valid panel bounds may close, including over the trigger,
  * without a matching down or movement threshold. Existing modal permission is
  * required. CANCEL/SCROLL/GESTURE do not themselves dismiss or veto a later raw

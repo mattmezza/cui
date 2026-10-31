@@ -1407,7 +1407,7 @@
       },
       "limitations": [
         "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending.",
-        "Opt-in mobile tap policy and Core relationship snapshots are implemented, but strict outside taps do not establish full raw mouse-up-out parity, exclusive overlay ownership or explicit collapsed AccessKit state. See docs/HOVER_CARD_EXTENDED.md."
+        "Opt-in tap policy supports conservative outside taps and raw primary releases outside prior content bounds with CUI consumption/modal routing. Core controls/expanded snapshots are supported; exclusive overlay ownership, explicit collapsed AccessKit state, live AT and foreign wrappers remain unsupported. See docs/HOVER_CARD_EXTENDED.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1427,11 +1427,6 @@
           ]
         },
         {
-          "name": "dismissal and accessible relationship",
-          "status": "not_started",
-          "evidence": []
-        },
-        {
           "name": "explicit tap toggle, conservative outside taps and admitted-panel semantic relationship",
           "status": "tested",
           "evidence": [
@@ -1441,6 +1436,22 @@
             "docs/HOVER_CARD_EXTENDED.md"
           ],
           "scope": "Application supplies accepted trigger activation; separate bounded contact workspace requires matching primary outside down/up below8 logical pixels without consumption/cancellation/gesture takeover. Preserves legacy global Escape. Controls/expanded reflect actual admission in Core snapshots. Strict tap differs from raw upstream mouse-up-out; collapsed AccessKit state, live AT and foreign bindings remain unsupported."
+        },
+        {
+          "name": "raw primary release dismissal",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_hover_card_extended.c",
+            "tests/unit/test_hover_card_extended_header.cpp",
+            "examples/hover_card_extended/main.c"
+          ],
+          "scope": "Additive TAP_TOGGLE-only release policy; finite unconsumed primary up outside prior valid content bounds, no down/movement requirement. Accepted trigger activation uses entry-open; existing disabled/Escape/placement precedence and callback timing preserved. Actual-browser proof remains a separate fixture."
+        },
+        {
+          "name": "explicit collapsed native accessibility state",
+          "status": "not_started",
+          "evidence": [],
+          "scope": "Core expanded-presence representation and matching adapter handling require separate API review; current relationship snapshots do not establish native collapsed announcements."
         }
       ],
       "upstream_doc": {

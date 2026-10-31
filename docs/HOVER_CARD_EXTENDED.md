@@ -45,6 +45,19 @@ checks do not establish exclusive ownership among unrelated overlays. Call the
 helper after relevant leaf consumers; later consumption cannot undo an already
 applied decision.
 
+For raw release dismissal, call `cui_begin_hover_card_with_release` with the
+same arguments plus `CUI_HOVER_CARD_RELEASE_RAW_PRIMARY` before the handler.
+This requires TAP_TOGGLE and overrides `outside_tap`; no contact workspace is
+needed, and a supplied contact is cleared. Any finite, unconsumed primary
+POINTER_UP outside previous valid **content-only** bounds may close, including
+over the trigger. It needs no matching down or movement threshold. Accepted
+trigger activation then wins using frozen entry-open. Invalid enum/mode fails
+before mutation. Missing/invalid prior bounds and modal denial prevent release
+dismissal. CANCEL/SCROLL/GESTURE alone do not dismiss or veto a later release;
+the host must cancel or consume a suppressed release. Submit after leaf consumers.
+Multiple releases aggregate one final lifecycle transition. LEGACY=0 preserves
+the original conservative path and validation, including its contact requirement.
+
 Enable `relationship` only when this card owns the submitted trigger's
 `controls`/`expanded` fields. The extension copies all other semantic details.
 An admitted panel sets controls to its ID and expanded true; rejection/closed
@@ -68,8 +81,8 @@ maintenance but emits no callback or relationship patch.
 Core semantic snapshots can prove controls/expanded and preserved details. The
 current AccessKit adapter emits expanded false for TREEITEM, but not ordinary
 buttons, so explicit collapsed AT state remains unsupported by this slice.
-Live screen-reader announcements, arbitrary overlay ownership, raw outside
-mouse-up semantics and Python/Node/TypeScript/Go/Rust exposure remain separate.
+Live screen-reader announcements, arbitrary overlay ownership and
+Python/Node/TypeScript/Go/Rust exposure remain separate.
 
 The compiling headless example is
 [`examples/hover_card_extended/main.c`](../examples/hover_card_extended/main.c).

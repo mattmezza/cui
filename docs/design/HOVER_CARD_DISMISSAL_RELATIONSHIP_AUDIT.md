@@ -35,3 +35,34 @@ Replace the stale combined not_started feature with bounded tested evidence for 
 ## Approved final component contract
 
 The additive declaration is in the existing extended header: `cui_hover_card_release_policy` with `CUI_HOVER_CARD_RELEASE_LEGACY=0` and `CUI_HOVER_CARD_RELEASE_RAW_PRIMARY`, and `cui_begin_hover_card_with_release` (same original arguments plus release policy before handler). No old struct changes. LEGACY delegates the original path exactly, including validation of conservative outside_tap/contact. RAW requires TAP_TOGGLE, overrides outside_tap, needs no contact, and clears any supplied contact. Invalid enum/mode fails before mutation. Content-only prior bounds are authoritative, not trigger bounds or enclosing clip. Finite unconsumed primary release and existing pointer-scope permission are required; no raw down bookkeeping. Cancel/scroll/gesture alone do not dismiss or veto a later raw release (host must consume/cancel that release); this is intentionally not a new gesture dispatcher. Multiple releases aggregate one final transition callback. Accepted trigger assertion is applied after release against entry-open, followed by existing disabled/Escape/placement rules. Callback and relationship timing stay unchanged. Optional collapsed semantic presence remains deferred.
+
+## Implemented component slice and local evidence
+
+The approved additive release API is implemented with legacy delegation, raw
+content-only prior bounds, trigger entry-open precedence and unchanged observer
+ordering. No old descriptor layout, Core semantic layout or native AT adapter
+changed. The catalog retains all 78 entries and separates the remaining optional
+collapsed native accessibility feature from tested component dismissal.
+
+Fresh local validation on 2026-10-31 used one portable Release build tree,
+`CUI_BUILD_NATIVE=OFF`, strict warnings, and the final focused build at nice 19
+with one job. Eight selected CTest checks passed via
+
+```sh
+python scripts/test_local.py --build-dir /home/matteo/.cache/cui-hover-raw-build \
+  -R '^(hover_card_extended|example_hover_card_extended|hover_card_extended_header|content|hover_events|hover_styled_events|manifest|agent_skill_freshness)$'
+```
+
+The wrapper uses private Xvfb; no desktop windows were opened. The 17-test
+`tests/test_agent_skill.py` suite, generated distribution check, Go/Rust SDK
+freshness check and both gallery C snippets compiled with strict C11 warnings
+also passed. Generated skill resources and SDK/distribution copies were refreshed
+through their generators.
+
+`tests/web/test_hover_card_release.py` is ready for the integrator's single
+combined actual-WASM build. It drives browser mouse, keyboard and real CDP touch
+input, including the conservative/raw inside-down/far-outside-up distinction.
+It has only been syntax-checked in this worker; no fresh browser/WASI execution
+or GPU/native accessibility proof is claimed here. Run it headlessly with
+`uv run tests/web/test_hover_card_release.py --directory COMBINED_WEB_OUTPUT`.
+Native GPU hardware and live screen-reader observations remain deferred.

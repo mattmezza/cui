@@ -2,6 +2,7 @@
 #include "cui/cui_components.h"
 #include "cui/cui_hover_card_extended.h"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 #ifdef NDEBUG
 #error Assertions must be enabled
@@ -11,6 +12,8 @@ typedef struct {
     cui_hover_state state;
     cui_hover_card_contact contact;
     cui_hover_card_policy policy;
+    cui_hover_card_release_policy release;
+    bool with_release, mouse, no_contact;
     cui_hover_options options;
     cui_hover_card_extended_result result;
     cui_hover_lifecycle_event saved;
@@ -97,9 +100,14 @@ static void frame(fixture *f) {
                 f->ui, 42, &theme, &f->state, cui_string("Details"), f->options, handler);
         else {
             f->policy.accepted_trigger_activation = accepted;
-            f->result =
-                cui_begin_hover_card_extended(f->ui, 42, &theme, &f->state, cui_string("Details"),
-                                              f->options, &f->policy, &f->contact, handler);
+            if (f->with_release)
+                f->result = cui_begin_hover_card_with_release(
+                    f->ui, 42, &theme, &f->state, cui_string("Details"), f->options, &f->policy,
+                    f->no_contact ? NULL : &f->contact, f->release, handler);
+            else
+                f->result = cui_begin_hover_card_extended(f->ui, 42, &theme, &f->state,
+                                                          cui_string("Details"), f->options,
+                                                          &f->policy, &f->contact, handler);
             assert(f->result.lifecycle.valid);
         }
         if (f->result.lifecycle.control_result) {
@@ -114,12 +122,13 @@ static void frame(fixture *f) {
            (f->fill_resource && f->state.open ? CUI_ERROR_CAPACITY : CUI_OK));
 }
 static void event(fixture *f, cui_event_type type, float x, float y, uint64_t contact) {
-    assert(cui_queue_event(f->ui, (cui_event){.type = type,
-                                              .x = x,
-                                              .y = y,
-                                              .pointer_type = CUI_POINTER_TOUCH,
-                                              .pointer_id = contact,
-                                              .pointer_device = 2}));
+    assert(cui_queue_event(
+        f->ui, (cui_event){.type = type,
+                           .x = x,
+                           .y = y,
+                           .pointer_type = f->mouse ? CUI_POINTER_MOUSE : CUI_POINTER_TOUCH,
+                           .pointer_id = contact,
+                           .pointer_device = 2}));
 }
 static void tap(fixture *f, cui_id id) {
     cui_rect b = cui_bounds(f->ui, id);
@@ -352,7 +361,7 @@ static void independent_cards(void) {
     cui_theme theme = cui_theme_light();
     cui_hover_state state[2] = {{0}};
     cui_hover_card_contact contact[2] = {{0}};
-    for (unsigned step = 0; step < 3; ++step) {
+    for (unsigned step = 0; step < 4; ++step) {
         if (step == 1)
             for (unsigned i = 0; i < 2; ++i)
                 assert(cui_queue_event(
@@ -360,6 +369,9 @@ static void independent_cards(void) {
                                     .accessibility_target = 10 + 10 * i,
                                     .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
         if (step == 2)
+            assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                .pointer_button = CUI_POINTER_PRIMARY, .x = 490, .y = 290}));
+        if (step == 3)
             assert(cui_queue_event(ui,
                                    (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
         assert(cui_begin_frame(ui, 500, 300, .016f));
@@ -371,18 +383,21 @@ static void independent_cards(void) {
                                             .accepted_trigger_activation = accepted[i],
                                             .outside_tap = true,
                                             .relationship = true};
-            cui_hover_card_extended_result r = cui_begin_hover_card_extended(
+            cui_hover_card_extended_result r = cui_begin_hover_card_with_release(
                 ui, 11 + 10 * i, &theme, &state[i], cui_string("Details"),
                 (cui_hover_options){.trigger = 10 + 10 * i,
                                     .viewport = {0, 0, 500, 300},
                                     .width = 140,
                                     .height = 70},
-                &policy, &contact[i], (cui_hover_handler){0});
+                &policy, &contact[i], i ? CUI_HOVER_CARD_RELEASE_RAW_PRIMARY
+                                                   : CUI_HOVER_CARD_RELEASE_LEGACY,
+                (cui_hover_handler){0});
             assert(r.lifecycle.valid && r.relationship_applied);
-            assert(r.lifecycle.control_result == (step == 1));
+            const bool expected = step == 1 || (step == 2 && i == 0);
+            assert(r.lifecycle.control_result == expected);
             if (r.lifecycle.control_result)
                 cui_end_hover_card(ui);
-            assert(semantic(ui, 10 + 10 * i).details.controls == (step == 1 ? 11 + 10 * i : 0));
+            assert(semantic(ui, 10 + 10 * i).details.controls == (expected ? 11 + 10 * i : 0));
         }
         (void)cui_end_frame(ui);
         assert(cui_last_error(ui) == CUI_OK);
@@ -394,6 +409,7 @@ static void desktop_parity(void) {
     a.legacy = true;
     a.policy.relationship = false;
     b.policy = (cui_hover_card_policy){0};
+    b.with_release = true;
     for (unsigned step = 0; step < 6; ++step) {
         if (step == 1) {
             cui_focus(a.ui, 41);
@@ -434,7 +450,110 @@ static void desktop_parity(void) {
     cui_destroy(a.ui);
     cui_destroy(b.ui);
 }
+static void raw_release(void) {
+    /* An entry-open model without previous panel geometry cannot be dismissed. */
+    fixture fresh = create();
+    fresh.with_release = true;
+    fresh.no_contact = true;
+    fresh.release = CUI_HOVER_CARD_RELEASE_RAW_PRIMARY;
+    frame(&fresh); /* Establish trigger geometry, with no submitted panel. */
+    fresh.state.open = fresh.state.target = true;
+    event(&fresh, CUI_EVENT_POINTER_UP, 280, 200, 1);
+    frame(&fresh);
+    assert(fresh.state.open && !fresh.calls);
+    cui_destroy(fresh.ui);
+    for (unsigned mode = 0; mode < 18; ++mode) {
+        fixture f = create();
+        f.with_release = true;
+        f.mouse = true;
+        f.release = CUI_HOVER_CARD_RELEASE_RAW_PRIMARY;
+        opened(&f);
+        const unsigned before = f.calls;
+        cui_rect panel = cui_bounds(f.ui, 42), trigger = cui_bounds(f.ui, 41);
+        float x = 280, y = 200;
+        if (mode == 1) { /* Inside press, arbitrarily long drag, unmatched release. */
+            event(&f, CUI_EVENT_POINTER_DOWN, panel.x + 2, panel.y + 2, 1);
+            event(&f, CUI_EVENT_POINTER_MOVE, 299, 219, 1);
+        }
+        if (mode == 2) {
+            x = panel.x + 2;
+            y = panel.y + 2;
+        }
+        if (mode == 3)
+            f.consume_before = true;
+        if (mode == 4)
+            event(&f, CUI_EVENT_CANCEL, 0, 0, 1);
+        if (mode == 5)
+            event(&f, CUI_EVENT_GESTURE, 0, 0, 1);
+        if (mode == 6)
+            f.options.disabled = true;
+        if (mode == 7) { /* Trigger region is outside content, rejected activation closes. */
+            x = trigger.x + 2;
+            y = trigger.y + 2;
+            f.disabled_trigger = true;
+        }
+        if (mode == 8)
+            f.modal = true;
+        if (mode == 9) {
+            event(&f, CUI_EVENT_POINTER_UP, panel.x + 2, panel.y + 2, 1);
+            event(&f, CUI_EVENT_POINTER_UP, 280, 200, 2);
+        }
+        if (mode == 10) {
+            event(&f, CUI_EVENT_POINTER_UP, 280, 200, 2);
+            x = panel.x + 2;
+            y = panel.y + 2;
+        }
+        if (mode == 11)
+            x = NAN;
+        if (mode == 13)
+            f.no_contact = true;
+        if (mode == 14)
+            event(&f, CUI_EVENT_SCROLL, 0, 0, 1);
+        if (mode == 15 || mode == 16)
+            f.passive = mode - 14;
+        if (mode == 17)
+            f.policy.outside_tap = false; /* Raw policy overrides the legacy flag. */
+        assert(
+            cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
+                                              .x = x,
+                                              .y = y,
+                                              .pointer_type = CUI_POINTER_MOUSE,
+                                              .pointer_id = 99,
+                                              .pointer_button = mode == 12 ? CUI_POINTER_SECONDARY
+                                                                           : CUI_POINTER_PRIMARY}));
+        frame(&f);
+        bool remains = mode == 2 || mode == 3 || mode == 8 || mode == 11 || mode == 12 ||
+                       mode == 15 || mode == 16;
+        assert(f.state.open == remains && f.calls == before + !remains);
+        assert(!f.contact.context && !f.contact.active);
+        cui_destroy(f.ui);
+    }
+    fixture f = create();
+    f.with_release = true;
+    f.release = CUI_HOVER_CARD_RELEASE_RAW_PRIMARY;
+    frame(&f);
+    tap(&f, 41); /* Closed entry activation opens despite outside release. */
+    assert(f.state.open);
+    tap(&f, 41);
+    assert(!f.state.open && f.calls == 2);
+    cui_hover_state before = f.state;
+    f.contact.active = true;
+    cui_hover_card_contact saved_contact = f.contact;
+    cui_theme theme = cui_theme_light();
+    cui_hover_card_extended_result r = cui_begin_hover_card_with_release(
+        f.ui, 42, &theme, &f.state, cui_string("Details"), f.options, &f.policy, &f.contact,
+        (cui_hover_card_release_policy)99, (cui_hover_handler){changed, &f});
+    assert(!r.lifecycle.valid && !memcmp(&before, &f.state, sizeof(before)));
+    assert(!memcmp(&saved_contact, &f.contact, sizeof(saved_contact)));
+    f.policy.mode = CUI_HOVER_CARD_DESKTOP_HOVER;
+    r = cui_begin_hover_card_with_release(
+        f.ui, 42, &theme, &f.state, cui_string("Details"), f.options, &f.policy, NULL,
+        CUI_HOVER_CARD_RELEASE_RAW_PRIMARY, (cui_hover_handler){0});
+    assert(!r.lifecycle.valid && !memcmp(&before, &f.state, sizeof(before)));
+    cui_destroy(f.ui);
+}
 int main(void) {
+    raw_release();
     mobile();
     outside_cases();
     acceptance_and_escape();

@@ -8,5 +8,8 @@ static_assert(std::is_trivially_copyable<cui_button_paint_patch>::value, "copied
 int main() {
     const auto result =
         cui_begin_hover_card_extended(nullptr, 0, nullptr, nullptr, {}, {}, nullptr, nullptr, {});
-    return result.lifecycle.valid ? 1 : 0;
+    const auto raw =
+        cui_begin_hover_card_with_release(nullptr, 0, nullptr, nullptr, {}, {}, nullptr, nullptr,
+                                          CUI_HOVER_CARD_RELEASE_RAW_PRIMARY, {});
+    return result.lifecycle.valid || raw.lifecycle.valid ? 1 : 0;
 }

@@ -8,6 +8,7 @@ import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
 import {dropdownUsage} from "./modules/cui_dropdown_usage.js";
+import {hoverCardUsage} from "./modules/cui_hover_card_usage.js";
 let shadowRenderer;
 const meshRenderer=createCuiMeshRenderer();
 let iconCatalog=null,apiIndex=null;
@@ -259,6 +260,7 @@ for(const [value,label] of [['0','Default icon box'],['1','Padding 4px'],['2','P
 $('icon-size').after(iconLayoutControl);iconLayoutControl.addEventListener('change',requestFrame);
 
 for(const [id,label,choices] of [
+ ['hover-policy','HoverCard dismissal',[['0','Legacy hover/focus'],['1','Tap toggle · conservative outside tap'],['2','Tap toggle · outside release']]],
  ['spinner-size','Spinner size',[['12','Extra small · 12px'],['14','Small · 14px'],['16','Medium · 16px'],['24','Large · 24px'],['64','Custom · 64px']]],
  ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right']]],
  ['spinner-color','Spinner color',[['0','Theme foreground'],['1','Custom pink'],['2','Transparent']]],
@@ -898,6 +900,7 @@ function render(){
  wasm.gallery_progress_mode(Number($('progress-mode').value));
  wasm.gallery_progress_shape(Number($('progress-shape').value));
  wasm.gallery_spinner_contract_options(Number($('spinner-sizing').value),Number($('spinner-rem').value));
+ wasm.gallery_hover_policy(Number($('hover-policy').value));
  wasm.gallery_spinner_options(Number($('spinner-size').value),Number($('spinner-icon').value),Number($('spinner-color').value),Number($('spinner-easing').value));
  wasm.gallery_shimmer_mode(Number($('shimmer-mode').value));
  wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
@@ -978,6 +981,7 @@ function render(){
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
+ if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value))||snippets.HoverCard;
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='Stepper') {
   for(const k of ['density','icons','design'])$('stepper-'+k).parentElement.hidden=$('stepper-mode').value==='0';
@@ -1203,6 +1207,7 @@ function selectComponent(){
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
 
  stepperControls.hidden=selected.name!=='Stepper';resetStepperControls();
+ $('hover-policy').hidden=selected.name!=='HoverCard';
  for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing','spinner-sizing','spinner-rem'])$(id).hidden=selected.name!=='Spinner';
  $('icon-catalog-panel').hidden=selected.name!=='Icon';if(selected.name==='Icon')loadIconCatalog();
  loadComponentApi(selected);

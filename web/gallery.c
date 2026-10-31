@@ -26,6 +26,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_dock.h"
 #include "cui/cui_effects.h"
 #include "cui/cui_form.h"
+#include "cui/cui_hover_card_extended.h"
 #include "cui/cui_icon.h"
 #include "cui/cui_kbd.h"
 #include "cui/cui_media.h"
@@ -1594,6 +1595,24 @@ static void conversation_row(cui_context *context, cui_id id, size_t index, void
     cui_message(context, id, &current_theme, options);
 }
 static cui_hover_state tooltip_state, card_state;
+static cui_hover_card_contact card_contact;
+static int card_policy;
+static unsigned card_changes;
+static cui_hover_card_extended_result card_result;
+static void gallery_card_changed(void *user, const cui_hover_lifecycle_event *event) {
+    (void)user;
+    (void)event;
+    card_changes++;
+}
+void gallery_hover_policy(int policy) {
+    int next = policy >= 0 && policy <= 2 ? policy : 0;
+    if (next != card_policy) {
+        card_policy = next;
+        card_state = (cui_hover_state){0};
+        card_contact = (cui_hover_card_contact){0};
+        card_result = (cui_hover_card_extended_result){0};
+    }
+}
 static cui_virtual_list *virtual_list;
 static cui_virtual_list *virtual_horizontal;
 static cui_virtual_widget_state virtual_state;
@@ -4974,7 +4993,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 23:
     case 24: {
         cui_id trigger = cui_id_from(ui, "hover-trigger");
-        cui_button(ui, trigger, &t, cui_string("Hover or focus here"), disabled);
+        bool accepted = cui_button(ui, trigger, &t, cui_string("Hover or focus here"), disabled);
         cui_hover_options options = {.trigger = trigger,
                                      .viewport = {0, 0, width, height},
                                      .side = CUI_POPUP_BELOW,
@@ -4988,11 +5007,29 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         if (story == 23)
             cui_tooltip(ui, cui_id_from(ui, "tooltip"), &t, &tooltip_state,
                         cui_string("A real CUI floating tooltip"), options);
-        else if (cui_begin_hover_card(ui, cui_id_from(ui, "hover-card"), &t, &card_state,
-                                      cui_string("Profile details"), options)) {
-            cui_label(ui, &t, cui_string("Alex Morgan"));
-            cui_label(ui, &t, cui_string("A composable floating card."));
-            cui_end_hover_card(ui);
+        else {
+            bool admitted;
+            if (!card_policy)
+                admitted = cui_begin_hover_card(ui, cui_id_from(ui, "hover-card"), &t, &card_state,
+                                                cui_string("Profile details"), options);
+            else {
+                cui_hover_card_policy policy = {.mode = CUI_HOVER_CARD_TAP_TOGGLE,
+                                                .accepted_trigger_activation = accepted,
+                                                .relationship = true,
+                                                .outside_tap = true};
+                card_result = cui_begin_hover_card_with_release(
+                    ui, cui_id_from(ui, "hover-card"), &t, &card_state,
+                    cui_string("Profile details"), options, &policy, &card_contact,
+                    card_policy == 2 ? CUI_HOVER_CARD_RELEASE_RAW_PRIMARY
+                                     : CUI_HOVER_CARD_RELEASE_LEGACY,
+                    (cui_hover_handler){gallery_card_changed, NULL});
+                admitted = card_result.lifecycle.control_result;
+            }
+            if (admitted) {
+                cui_label(ui, &t, cui_string("Alex Morgan"));
+                cui_label(ui, &t, cui_string("A composable floating card."));
+                cui_end_hover_card(ui);
+            }
         }
         redraw = story == 23 ? tooltip_state.pending : card_state.pending;
         break;
@@ -6837,6 +6874,10 @@ float gallery_hover_state(unsigned field) {
         return card_state.elapsed;
     case 5:
         return host_dt;
+    case 6:
+        return card_changes;
+    case 7:
+        return card_result.relationship_applied;
     default:
         return 0;
     }

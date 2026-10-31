@@ -88,11 +88,10 @@ static bool cui_hover_card_ext_relationship(cui_context *ui, cui_id trigger, cui
     }
     return false;
 }
-cui_hover_card_extended_result
-cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme,
-                              cui_hover_state *state, cui_str name, cui_hover_options options,
-                              const cui_hover_card_policy *policy, cui_hover_card_contact *contact,
-                              cui_hover_handler handler) {
+cui_hover_card_extended_result cui_begin_hover_card_with_release(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_state *state, cui_str name,
+    cui_hover_options options, const cui_hover_card_policy *policy, cui_hover_card_contact *contact,
+    cui_hover_card_release_policy release, cui_hover_handler handler) {
     cui_hover_card_extended_result result;
     memset(&result, 0, sizeof(result));
     cui_hover_card_policy p = {0};
@@ -100,8 +99,14 @@ cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme
         p = *policy;
     if (!ui || !id || !theme || !state || (name.length && !name.data) ||
         p.mode < CUI_HOVER_CARD_DESKTOP_HOVER || p.mode > CUI_HOVER_CARD_TAP_TOGGLE ||
-        (p.outside_tap && (p.mode != CUI_HOVER_CARD_TAP_TOGGLE || !contact)))
+        (release != CUI_HOVER_CARD_RELEASE_LEGACY &&
+         release != CUI_HOVER_CARD_RELEASE_RAW_PRIMARY) ||
+        (release == CUI_HOVER_CARD_RELEASE_RAW_PRIMARY && p.mode != CUI_HOVER_CARD_TAP_TOGGLE) ||
+        (release == CUI_HOVER_CARD_RELEASE_LEGACY && p.outside_tap &&
+         (p.mode != CUI_HOVER_CARD_TAP_TOGGLE || !contact)))
         return result;
+    if (release == CUI_HOVER_CARD_RELEASE_RAW_PRIMARY && contact)
+        memset(contact, 0, sizeof(*contact));
     const cui_hover_handler observer = handler;
     const uint64_t frame = cui_frame_sequence(ui);
     const bool previous = state->open;
@@ -120,9 +125,22 @@ cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme
         for (size_t i = 0; i < n; ++i)
             if (events[i].type == CUI_EVENT_KEY_DOWN && events[i].key == CUI_KEY_ESCAPE)
                 escape = true;
-        if (frame && previous && p.outside_tap && !options.disabled)
-            outside =
-                cui_hover_card_ext_outside_release(ui, id, options.trigger, contact, events, n);
+        if (frame && previous && !options.disabled) {
+            if (release == CUI_HOVER_CARD_RELEASE_RAW_PRIMARY) {
+                const cui_rect panel = cui_bounds(ui, id);
+                if (cui_hover_card_ext_rect_valid(panel) && cui_pointer_scope_allowed(ui, id))
+                    for (size_t i = 0; i < n; ++i) {
+                        const cui_event e = events[i];
+                        if (e.type == CUI_EVENT_POINTER_UP &&
+                            e.pointer_button == CUI_POINTER_PRIMARY && !cui_event_consumed(ui, i) &&
+                            isfinite(e.x) && isfinite(e.y) &&
+                            !cui_hover_card_ext_contains(panel, e.x, e.y))
+                            outside = true;
+                    }
+            } else if (p.outside_tap)
+                outside =
+                    cui_hover_card_ext_outside_release(ui, id, options.trigger, contact, events, n);
+        }
         /* Protected work does not accept caller asserted input or outside taps. */
         bool open = previous;
         if (frame && outside)
@@ -134,11 +152,14 @@ cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme
         *state = (cui_hover_state){
             .open = open, .target = open, .suppressed = escape || (state->suppressed && !open)};
         if (contact) {
-            if (!open || options.disabled || escape || !p.outside_tap)
+            if (!open || options.disabled || escape || !p.outside_tap ||
+                release == CUI_HOVER_CARD_RELEASE_RAW_PRIMARY)
                 memset(contact, 0, sizeof(*contact));
-            contact->context = ui;
-            contact->card = id;
-            contact->frame = frame;
+            if (release == CUI_HOVER_CARD_RELEASE_LEGACY) {
+                contact->context = ui;
+                contact->card = id;
+                contact->frame = frame;
+            }
         }
         if (previous != open)
             cui_invalidate(ui);
@@ -165,4 +186,13 @@ cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme
         observer.on_change(observer.user, &event);
     }
     return result;
+}
+
+cui_hover_card_extended_result
+cui_begin_hover_card_extended(cui_context *ui, cui_id id, const cui_theme *theme,
+                              cui_hover_state *state, cui_str name, cui_hover_options options,
+                              const cui_hover_card_policy *policy, cui_hover_card_contact *contact,
+                              cui_hover_handler handler) {
+    return cui_begin_hover_card_with_release(ui, id, theme, state, name, options, policy, contact,
+                                             CUI_HOVER_CARD_RELEASE_LEGACY, handler);
 }

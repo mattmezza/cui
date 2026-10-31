@@ -157,3 +157,7 @@ keyed literals remain source compatible; unkeyed literals need the new field.
 ## Bounded typed root shadows
 
 See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementation, owned values, canonical CSS/preset factories and explicit clear/reset behavior. Focused portable runtime tests cover this subset; integration remains pending. This does not expose compound parts or portals.
+
+For bounded semantic ROOT/MAIN/indicator/track/thumb authoring, read
+[typed part shadows](BRIDGE_PART_SHADOWS.md). Slider has no thumb; owner topology,
+whole-group naming and separate reset are explicit parts of that contract.

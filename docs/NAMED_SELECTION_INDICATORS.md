@@ -69,6 +69,9 @@ their original anonymous identity/capacity behavior. Re-submit named parts each
 frame; omission creates no retained paint target. No pure getter invents a named
 indicator for an old anonymous facade.
 
-These entry points are C-only. Typed bridge/builder indicator-target mapping and
-remaining78-family part coverage remain pending; packaged C headers alone do not
-establish Python, Node, TypeScript, Go or Rust authoring support.
+These named entry points remain C composition APIs. The bounded
+[typed semantic target mapping](BRIDGE_PART_SHADOWS.md) now uses the bridge's
+existing bool convenience routes for Checkbox/individual Radio and its separate
+RadioGroup owner route. That is not exposure of every C source/ex/events facade.
+Broader78-family part coverage, portals and browser/GPU proof remain pending;
+packaged C headers alone do not establish additional language support.

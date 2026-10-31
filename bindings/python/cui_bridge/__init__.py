@@ -97,7 +97,7 @@ class _WindowOptions(C.Structure):
                 ("initially_hidden", C.c_uint32)]
 
 
-from .shadows import BoxShadow, ShadowStyle, ShadowKind, ShadowPreset, CornerRadii, CSSBoxShadow, PresetShadowStyle
+from .shadows import BoxShadow, ShadowStyle, ShadowKind, ShadowPreset, CornerRadii, CSSBoxShadow, PresetShadowStyle, ShadowPart, ShadowTargetInfo, canonical_part, target_value, _TargetInfo
 
 class _API:
     def __init__(self, path: str | os.PathLike[str] | None):
@@ -125,8 +125,9 @@ class _API:
             self.set_window_visible = bind("set_window_visible", C.c_int, C.c_void_p, C.c_uint32)
             self.get_window_visible = bind("get_window_visible", C.c_int, C.c_void_p, C.POINTER(C.c_uint32))
 
-        from .shadows import bind_shadow_api
+        from .shadows import bind_shadow_api, bind_part_api
         bind_shadow_api(self, bind, _Handle)
+        bind_part_api(self, bind, _Handle)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -384,6 +385,7 @@ class Widget:
         self._stepper_visual = None
         self._avatar_identity = None
         self._avatar_placeholder = None
+        self._part_shadow_styles = {}
         self._shadow_style = None
         self._rounding = "theme"
         self._radius = 0.0
@@ -455,6 +457,7 @@ class Widget:
             self._app._ensure_open()
             wire = style._wire(self._app._api)
             self._change("set_box_shadows_v1",224,C.byref(wire))
+        self._part_shadow_styles.pop(ShadowPart.ROOT,None)
         self._shadow_style = style
         return self
 
@@ -465,8 +468,38 @@ class Widget:
         if self.kind not in {"row","column","label","button","input","badge"}:
             raise ValueError("unsupported shadow root")
         self._change("reset_box_shadows")
+        self._part_shadow_styles.pop(ShadowPart.ROOT,None)
         self._shadow_style = None
         return self
+
+    def part_shadows(self, part, layers, radii=CornerRadii()) -> "Widget":
+        role=canonical_part(self.kind,part)
+        style=layers if isinstance(layers,(ShadowStyle,PresetShadowStyle)) else ShadowStyle(layers,radii)
+        if self._disposed:raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None:
+            self._app._ensure_open()
+            target=target_value(part);wire=style._wire(self._app._api)
+            self._change("set_target_box_shadows_v1",16,C.byref(target),224,C.byref(wire))
+        self._part_shadow_styles[role]=style
+        if role==ShadowPart.ROOT:self._shadow_style=None
+        return self
+
+    def part_shadow_preset(self,part,preset,radii=CornerRadii()) -> "Widget":
+        return self.part_shadows(part,ShadowStyle.preset(preset,radii))
+
+    def reset_part_shadows(self,part) -> "Widget":
+        role=canonical_part(self.kind,part);target=target_value(part)
+        self._change("reset_target_box_shadows_v1",16,C.byref(target))
+        self._part_shadow_styles.pop(role,None)
+        if role==ShadowPart.ROOT:self._shadow_style=None
+        return self
+
+    def shadow_target(self,part) -> ShadowTargetInfo:
+        target=target_value(part)
+        if self._app is None:raise RuntimeError("Capability query requires a mounted Widget")
+        out=_TargetInfo()
+        self._change("shadow_target_query_v1",16,C.byref(target),16,C.byref(out))
+        return ShadowTargetInfo(None if out.canonical_role==0xffffffff else ShadowPart(out.canonical_role),out.flags)
 
     def gap(self, px: float) -> "Widget":
         if self.kind not in ("row", "column"):
@@ -1507,6 +1540,9 @@ class App:
                 if node._shadow_style is not None:
                     wire = node._shadow_style._wire(self._api)
                     node._change("set_box_shadows_v1",224,C.byref(wire))
+                for part,style in node._part_shadow_styles.items():
+                    target=target_value(part);wire=style._wire(self._api)
+                    node._change("set_target_box_shadows_v1",16,C.byref(target),224,C.byref(wire))
                 if node._avatar_identity is not None:
                     enabled, hue = node._avatar_identity
                     node._change("set_avatar_identity", int(enabled), int(hue is not None), hue or 0)
@@ -1953,3 +1989,5 @@ __all__ += ["ValueNotificationV1", "ScalarChangeNotificationV1", "TextChangeNoti
 __all__ += ["DesignSize"]
 
 __all__ += ["BoxShadow", "CSSBoxShadow", "ShadowStyle", "PresetShadowStyle", "ShadowKind", "ShadowPreset", "CornerRadii"]
+
+__all__ += ["ShadowPart", "ShadowTargetInfo"]

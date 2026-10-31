@@ -2422,3 +2422,6 @@ impl<'a> Builder<'a> {
         self.node
     }
 }
+
+mod part_shadows;
+pub use part_shadows::{ShadowPart, ShadowTargetInfo};

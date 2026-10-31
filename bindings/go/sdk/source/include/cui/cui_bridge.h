@@ -41,6 +41,28 @@ typedef struct {
     float top_left, top_right, bottom_left, bottom_right;
     cui_bridge_box_shadow_v1 layers[8];
 } cui_bridge_box_shadows_v1;
+/* Additive semantic targets. Query reports declared capability, never presence.
+ * Record sizes16, schema1, reserved0. MAIN aliases one documented physical role.
+ * New operations require the reviewed Row/Column ancestry (RadioGroup owns ITEM).
+ * Old six-root setters and allowlist are unchanged. */
+enum {
+    CUI_BRIDGE_SHADOW_ROOT = 0,
+    CUI_BRIDGE_SHADOW_MAIN = 1,
+    CUI_BRIDGE_SHADOW_INDICATOR = 2,
+    CUI_BRIDGE_SHADOW_TRACK = 3,
+    CUI_BRIDGE_SHADOW_THUMB = 4
+};
+enum {
+    CUI_BRIDGE_SHADOW_SUPPORTED = 1,
+    CUI_BRIDGE_SHADOW_NAMED_INDICATOR = 2,
+    CUI_BRIDGE_SHADOW_CONDITIONAL_SUBMISSION = 4
+};
+typedef struct {
+    uint32_t struct_size, schema_version, role, reserved;
+} cui_bridge_shadow_target_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, canonical_role, flags;
+} cui_bridge_shadow_target_info_v1;
 typedef enum {
     CUI_BRIDGE_OK = 0,
     CUI_BRIDGE_EMPTY,
@@ -492,6 +514,25 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_shadow_preset_v1(uint32_t preset, fl
                                                              float bottom_right,
                                                              uint32_t struct_size,
                                                              cui_bridge_box_shadows_v1 *out);
+/* Handle/lifecycle, descriptor, capability, then style validation; invalid set
+ * preserves all old values. Nonroot storage is allocated on first set (even []),
+ * freed on last reset/removal; OUT_OF_MEMORY is atomic. No new options ABI.
+ * Group named route names every peer when any ITEM indicator is authored, with
+ * extra ID registration/capacity cost. Last indicator reset restores anonymity.
+ * ROOT and parts are independent; aliases share one slot. [] clears, reset unsets.
+ * Omitted/nonpainting owners retain values without lookup. Missing mandatory
+ * targets in actual paint remain frame errors; frame failure does not undo input.
+ * Slider has TRACK only, no THUMB. See docs/BRIDGE_SHADOWS.md for exact scope. */
+CUI_BRIDGE_API uint32_t cui_bridge_shadow_target_v1_size(void);
+CUI_BRIDGE_API uint32_t cui_bridge_shadow_target_info_v1_size(void);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_shadow_target_query_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_shadow_target_v1 *, uint32_t,
+    cui_bridge_shadow_target_info_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_target_box_shadows_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_shadow_target_v1 *, uint32_t,
+    const cui_bridge_box_shadows_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_reset_target_box_shadows_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_shadow_target_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node node,
                                                      const char *text_utf8);
 /* State setters apply to matching component kinds only. Boolean values must be 0 or 1.

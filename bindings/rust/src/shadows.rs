@@ -47,7 +47,7 @@ struct Layer {
 }
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-struct Style {
+pub(super) struct Style {
     size: u32,
     schema: u32,
     count: u32,
@@ -142,7 +142,7 @@ impl ShadowStyle {
     pub fn radii(&self) -> CornerRadii {
         self.radii
     }
-    fn wire(&self) -> Result<Style> {
+    pub(super) fn wire(&self) -> Result<Style> {
         if self.layers.len() > 8 {
             return Err(Error(3));
         }

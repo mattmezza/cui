@@ -1903,13 +1903,23 @@ static int shadow_numbers(napi_env env, napi_value array, double *values, uint32
     return 1;
 }
 static napi_value set_shadows(napi_env env, napi_callback_info info) {
-    napi_value v[3];
+    napi_value v[4];
+    size_t argc = 4;
+    void *data = NULL;
+    if (napi_get_cb_info(env, info, &argc, v, NULL, &data) != napi_ok)
+        return NULL;
+    bool part = data != NULL;
+    if (argc < (part ? 4u : 3u))
+        return fail(env, "missing shadow arguments");
+    uint32_t role = 0;
+    if (part && !uint_arg(env, v[2], &role))
+        return NULL;
     js_app *app;
     js_node *node;
     double fields[52];
     uint32_t count;
-    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
-        !shadow_numbers(env, v[2], fields, &count))
+    if (!app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !shadow_numbers(env, v[part ? 3 : 2], fields, &count))
         return NULL;
     if (count < 4 || (count - 4) % 6)
         return fail(env, "invalid shadow array length");
@@ -1928,8 +1938,11 @@ static napi_value set_shadows(napi_env env, napi_callback_info info) {
         style.layers[i] = (cui_bridge_box_shadow_v1){(float)f[0], (float)f[1],    (float)f[2],
                                                      (float)f[3], (uint32_t)f[4], (uint32_t)f[5]};
     }
+    cui_bridge_shadow_target_v1 target = {16, 1, role, 0};
     cui_bridge_status code =
-        cui_bridge_set_box_shadows_v1(app->bridge, node->node, sizeof(style), &style);
+        part ? cui_bridge_set_target_box_shadows_v1(app->bridge, node->node, 16, &target, 224,
+                                                    &style)
+             : cui_bridge_set_box_shadows_v1(app->bridge, node->node, sizeof(style), &style);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 static napi_value reset_shadows(napi_env env, napi_callback_info info) {
@@ -1940,6 +1953,35 @@ static napi_value reset_shadows(napi_env env, napi_callback_info info) {
         return NULL;
     cui_bridge_status code = cui_bridge_reset_box_shadows(app->bridge, node->node);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value part_action(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    size_t argc = 3;
+    void *data = NULL;
+    js_app *app;
+    js_node *node;
+    uint32_t role;
+    if (napi_get_cb_info(env, info, &argc, v, NULL, &data) != napi_ok || argc < 3 ||
+        !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !uint_arg(env, v[2], &role))
+        return NULL;
+    cui_bridge_shadow_target_v1 target = {16, 1, role, 0};
+    cui_bridge_shadow_target_info_v1 out;
+    cui_bridge_status code =
+        data ? cui_bridge_shadow_target_query_v1(app->bridge, node->node, 16, &target, 16, &out)
+             : cui_bridge_reset_target_box_shadows_v1(app->bridge, node->node, 16, &target);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
+    if (!data)
+        return undefined(env);
+    napi_value result, flags, canonical;
+    if (napi_create_object(env, &result) != napi_ok ||
+        napi_create_uint32(env, out.flags, &flags) != napi_ok ||
+        napi_create_uint32(env, out.canonical_role, &canonical) != napi_ok ||
+        napi_set_named_property(env, result, "flags", flags) != napi_ok ||
+        napi_set_named_property(env, result, "canonicalPart", canonical) != napi_ok)
+        return NULL;
+    return result;
 }
 static napi_value shadow_css(napi_env env, napi_callback_info info) {
     napi_value v[6];
@@ -1977,6 +2019,9 @@ static napi_value init(napi_env env, napi_value exports) {
     if (!export_fn(env, exports, name, fn, data))                                                  \
     return NULL
     EXPORT("setShadows", set_shadows, 0);
+    EXPORT("setPartShadows", set_shadows, 1);
+    EXPORT("resetPartShadows", part_action, 0);
+    EXPORT("shadowTarget", part_action, 1);
     EXPORT("resetShadows", reset_shadows, 0);
     EXPORT("shadowCSS", shadow_css, 0);
     EXPORT("shadowPreset", shadow_preset, 0);

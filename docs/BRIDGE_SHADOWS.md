@@ -159,3 +159,9 @@ built library, then registers temporary CTest entries inside the same directory.
 It uses the private display wrapper, Go's `cui_dynamic` tag, offline single-job
 Cargo and no dependency downloads. The regular Python/Node/Go/Rust CI suites also
 include these regression files; TypeScript uses its pinned compiler.
+
+
+The original root setter above keeps its six-kind allowlist. The separate
+[semantic target API](BRIDGE_PART_SHADOWS.md) adds bounded Checkbox/Radio
+indicators, Switch track/thumb, Slider track and explicit outer ROOT roles in a
+reviewed ordinary-tree topology. It does not infer every compound/portal part.

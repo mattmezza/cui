@@ -1001,7 +1001,66 @@
       "include/cui/cui_status.h",
       "include/cui/cui_media.h"
     ],
-    "language_builder_targets": "pending; MAIN/ROOT/subpart proposal is not an implemented binding facade",
+    "language_builder_targets": "Compound-specific builder targets remain pending; implemented control-part targets are listed separately in part_shadow_authoring_v1.",
     "guide": "docs/COMPOUND_SHADOW_PARTS.md"
+  },
+  "part_shadow_authoring_v1": {
+    "status": "tested_subset_pending_integration",
+    "roles": {
+      "existing_six_roots": [
+        "ROOT",
+        "MAIN=ROOT"
+      ],
+      "Checkbox/Radio": [
+        "ROOT",
+        "MAIN=INDICATOR",
+        "INDICATOR"
+      ],
+      "Switch": [
+        "ROOT",
+        "MAIN=TRACK",
+        "TRACK",
+        "THUMB"
+      ],
+      "Slider": [
+        "ROOT",
+        "MAIN=TRACK",
+        "TRACK"
+      ],
+      "RadioGroup": [
+        "ROOT"
+      ],
+      "RadioGroup ITEM": [
+        "ROOT",
+        "MAIN=INDICATOR",
+        "INDICATOR"
+      ]
+    },
+    "languages": [
+      "python",
+      "javascript",
+      "typescript",
+      "go",
+      "rust"
+    ],
+    "topology": "Only app root/direct dispatch through Row/Column ancestors; RadioGroup directly owns ITEM. Existing six-root API unchanged.",
+    "ownership": "Copied <=8 layers per independent physical target; MAIN aliases one slot. Empty suppresses, reset restores defaults. Whole group names every peer when any ITEM indicator is authored, even empty; last reset/removal restores legacy anonymity.",
+    "limits": [
+      "No Slider thumb/fill, Settings fields, other ITEM owners, panel callbacks, portals or all78 claim.",
+      "Capability query is not presence; actual paint missing a mandatory part remains an error.",
+      "Native software/facade checks only; static package closure and other platforms use CI; browser/GPU proof pending."
+    ],
+    "memory": "Measured Linux x86-64 idle pointer8 bytes/node, full node73136; active payload232/456 excluding allocator metadata.",
+    "docs": [
+      "docs/BRIDGE_PART_SHADOWS.md"
+    ],
+    "tests": [
+      "tests/unit/test_bridge_part_shadows.c",
+      "bindings/python/test_part_shadows.py",
+      "bindings/node/test/part-shadows.test.cjs",
+      "bindings/node/test/part-shadows.types.ts",
+      "bindings/go/cui/part_shadows_test.go",
+      "bindings/rust/tests/part_shadows.rs"
+    ]
   }
 }

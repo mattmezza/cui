@@ -491,6 +491,185 @@ cui_bridge_status cui_bridge_shadow_preset_v1(uint32_t preset, float tl, float t
     *out = value;
     return CUI_BRIDGE_OK;
 }
+/* Semantic roles resolve to one physical slot; old root setters retain their allowlist. */
+struct bridge_part_shadows {
+    uint32_t mask, reserved;
+    cui_bridge_box_shadows_v1 values[];
+};
+_Static_assert(sizeof(cui_bridge_shadow_target_v1) == 16, "target V1 size");
+_Static_assert(sizeof(cui_bridge_shadow_target_info_v1) == 16, "target info V1 size");
+_Static_assert(offsetof(cui_bridge_shadow_target_v1, role) == 8 &&
+                   offsetof(cui_bridge_shadow_target_v1, reserved) == 12,
+               "target offsets");
+_Static_assert(offsetof(cui_bridge_shadow_target_info_v1, canonical_role) == 8 &&
+                   offsetof(cui_bridge_shadow_target_info_v1, flags) == 12,
+               "target info offsets");
+uint32_t cui_bridge_shadow_target_v1_size(void) {
+    return sizeof(cui_bridge_shadow_target_v1);
+}
+uint32_t cui_bridge_shadow_target_info_v1_size(void) {
+    return sizeof(cui_bridge_shadow_target_info_v1);
+}
+static bool bridge_target_tree(cui_bridge_app *app, const cui_bridge_node_record *node) {
+    uint32_t parent = node->parent;
+    if (node->kind == CUI_BRIDGE_ITEM) {
+        if (!parent || app->nodes[parent].kind != CUI_BRIDGE_RADIO_GROUP)
+            return false;
+        parent = app->nodes[parent].parent;
+    }
+    for (; parent; parent = app->nodes[parent].parent)
+        if (app->nodes[parent].kind != CUI_BRIDGE_ROW &&
+            app->nodes[parent].kind != CUI_BRIDGE_COLUMN)
+            return false;
+    return true;
+}
+static uint32_t bridge_target_role(cui_bridge_app *app, const cui_bridge_node_record *node,
+                                   uint32_t role) {
+    if (!bridge_target_tree(app, node))
+        return UINT32_MAX;
+    bool indicator = node->kind == CUI_BRIDGE_CHECKBOX || node->kind == CUI_BRIDGE_RADIO ||
+                     node->kind == CUI_BRIDGE_ITEM;
+    bool track = node->kind == CUI_BRIDGE_SWITCH || node->kind == CUI_BRIDGE_SLIDER;
+    bool root = cui_bridge_box_shadows_supported_v1(node->kind) || indicator || track ||
+                node->kind == CUI_BRIDGE_RADIO_GROUP;
+    if (role == CUI_BRIDGE_SHADOW_MAIN)
+        role = indicator                                         ? CUI_BRIDGE_SHADOW_INDICATOR
+               : track                                           ? CUI_BRIDGE_SHADOW_TRACK
+               : cui_bridge_box_shadows_supported_v1(node->kind) ? CUI_BRIDGE_SHADOW_ROOT
+                                                                 : UINT32_MAX;
+    if ((role == CUI_BRIDGE_SHADOW_ROOT && root) ||
+        (role == CUI_BRIDGE_SHADOW_INDICATOR && indicator) ||
+        (role == CUI_BRIDGE_SHADOW_TRACK && track) ||
+        (role == CUI_BRIDGE_SHADOW_THUMB && node->kind == CUI_BRIDGE_SWITCH))
+        return role;
+    return UINT32_MAX;
+}
+static bool bridge_target_valid(uint32_t size, const cui_bridge_shadow_target_v1 *target) {
+    return target && size == sizeof(*target) && target->struct_size == sizeof(*target) &&
+           target->schema_version == 1 && !target->reserved &&
+           target->role <= CUI_BRIDGE_SHADOW_THUMB;
+}
+cui_bridge_status cui_bridge_shadow_target_query_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                    uint32_t size,
+                                                    const cui_bridge_shadow_target_v1 *target,
+                                                    uint32_t info_size,
+                                                    cui_bridge_shadow_target_info_v1 *out) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!bridge_target_valid(size, target) || !out || info_size != sizeof(*out))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    uint32_t role = bridge_target_role(app, node, target->role);
+    *out = (cui_bridge_shadow_target_info_v1){
+        sizeof(*out), 1, role,
+        role == UINT32_MAX
+            ? 0u
+            : CUI_BRIDGE_SHADOW_SUPPORTED |
+                  (role == CUI_BRIDGE_SHADOW_INDICATOR ? CUI_BRIDGE_SHADOW_NAMED_INDICATOR : 0u)};
+    return CUI_BRIDGE_OK;
+}
+static unsigned bridge_target_slot(uint32_t role) {
+    return role == CUI_BRIDGE_SHADOW_THUMB ? 1 : 0;
+}
+static const cui_bridge_box_shadows_v1 *bridge_target_style(const cui_bridge_node_record *node,
+                                                            uint32_t role) {
+    if (role == CUI_BRIDGE_SHADOW_ROOT)
+        return node->shadows.schema_version ? &node->shadows : NULL;
+    unsigned slot = bridge_target_slot(role);
+    return node->part_shadows && (node->part_shadows->mask & (1u << slot))
+               ? &node->part_shadows->values[slot]
+               : NULL;
+}
+cui_bridge_status cui_bridge_set_target_box_shadows_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                       uint32_t size,
+                                                       const cui_bridge_shadow_target_v1 *target,
+                                                       uint32_t style_size,
+                                                       const cui_bridge_box_shadows_v1 *style) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!bridge_target_valid(size, target))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    uint32_t role = bridge_target_role(app, node, target->role);
+    if (role == UINT32_MAX || style_size != sizeof(*style) || !bridge_shadows_valid(style))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (role == CUI_BRIDGE_SHADOW_ROOT) {
+        node->shadows = *style;
+        return CUI_BRIDGE_OK;
+    }
+    if (!node->part_shadows) {
+        unsigned count = node->kind == CUI_BRIDGE_SWITCH ? 2 : 1;
+        node->part_shadows = calloc(1, sizeof(*node->part_shadows) + count * sizeof(*style));
+        if (!node->part_shadows)
+            return CUI_BRIDGE_OUT_OF_MEMORY;
+    }
+    unsigned slot = bridge_target_slot(role);
+    node->part_shadows->values[slot] = *style;
+    node->part_shadows->mask |= 1u << slot;
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status
+cui_bridge_reset_target_box_shadows_v1(cui_bridge_app *app, cui_bridge_node handle, uint32_t size,
+                                       const cui_bridge_shadow_target_v1 *target) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!bridge_target_valid(size, target))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    uint32_t role = bridge_target_role(app, node, target->role);
+    if (role == UINT32_MAX)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (role == CUI_BRIDGE_SHADOW_ROOT)
+        memset(&node->shadows, 0, sizeof(node->shadows));
+    else if (node->part_shadows) {
+        unsigned slot = bridge_target_slot(role);
+        memset(&node->part_shadows->values[slot], 0, sizeof(node->part_shadows->values[slot]));
+        node->part_shadows->mask &= ~(1u << slot);
+        if (!node->part_shadows->mask) {
+            free(node->part_shadows);
+            node->part_shadows = NULL;
+        }
+    }
+    return CUI_BRIDGE_OK;
+}
+static cui_id bridge_indicator_id(const cui_bridge_node_record *node) {
+    char key[80];
+    int length = snprintf(key, sizeof(key), "cui.bridge.shadow.indicator.%llu",
+                          (unsigned long long)node->id);
+    if (length < 0 || (size_t)length >= sizeof(key))
+        return 0;
+    cui_id id = cui_id_from(NULL, key);
+    return id && id != node->id ? id : 0;
+}
+static void bridge_apply_target(cui_bridge_app *app, cui_id id,
+                                const cui_bridge_box_shadows_v1 *style) {
+    if (!style || !cui_frame_paint_enabled(app->ui) || app->frame_error != CUI_BRIDGE_OK)
+        return;
+    cui_box_shadow layers[8];
+    for (uint32_t i = 0; i < style->count; ++i)
+        layers[i] = bridge_shadow_layer(style->layers[i]);
+    if (!cui_element_set_box_shadows(app->ui, id, layers, style->count, bridge_shadow_radii(style)))
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+}
+static void bridge_apply_parts(cui_bridge_app *app, cui_bridge_node_record *node) {
+    bridge_apply_target(app, node->id, bridge_target_style(node, CUI_BRIDGE_SHADOW_ROOT));
+    if (node->kind == CUI_BRIDGE_SWITCH) {
+        bridge_apply_target(app, cui_switch_track_id(node->id),
+                            bridge_target_style(node, CUI_BRIDGE_SHADOW_TRACK));
+        bridge_apply_target(app, cui_switch_thumb_id(node->id),
+                            bridge_target_style(node, CUI_BRIDGE_SHADOW_THUMB));
+    } else if (node->kind == CUI_BRIDGE_SLIDER)
+        bridge_apply_target(app, cui_slider_track_id(node->id),
+                            bridge_target_style(node, CUI_BRIDGE_SHADOW_TRACK));
+    else if (node->kind == CUI_BRIDGE_CHECKBOX || node->kind == CUI_BRIDGE_RADIO ||
+             node->kind == CUI_BRIDGE_ITEM)
+        bridge_apply_target(app, bridge_indicator_id(node),
+                            bridge_target_style(node, CUI_BRIDGE_SHADOW_INDICATOR));
+}
+
 static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *node) {
     if (!node->shadows.schema_version || !cui_frame_paint_enabled(app->ui))
         return;
@@ -624,6 +803,7 @@ failed:
     return NULL;
 }
 static void bridge_free_node_resources(cui_bridge_node_record *node) {
+    free(node->part_shadows);
     free(node->key);
     free(node->text);
     free(node->detail);
@@ -666,6 +846,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
             free(node->settings->defaults[i]);
         free(node->settings);
     }
+    node->part_shadows = NULL;
     node->key = node->text = node->detail = NULL;
     node->avatar_placeholder = NULL;
     node->edit = NULL;
@@ -3370,10 +3551,28 @@ static void bridge_render_group(cui_bridge_app *app, uint32_t slot, cui_bridge_n
                 app->nodes[index].parent == slot)
                 selected = app->nodes[index].id;
         }
-        cui_radio_group_result result = cui_radio_group(
-            app->ui, node->id, &app->theme, scratch->radios, count, &selected,
-            &node->radio_group_state,
-            (cui_radio_group_options){.vertical = true, .disabled = node->disabled});
+        cui_selection_indicator_parts parts[64];
+        bool named = false, authored = node->shadows.schema_version != 0;
+        for (size_t i = 0; i < count; ++i) {
+            cui_bridge_node_record *item = &app->nodes[scratch->binding.slots[i]];
+            parts[i].indicator = bridge_indicator_id(item);
+            named |= bridge_target_style(item, CUI_BRIDGE_SHADOW_INDICATOR) != NULL;
+            authored |= item->shadows.schema_version != 0;
+        }
+        cui_radio_group_options options = {.vertical = true, .disabled = node->disabled};
+        cui_radio_group_result result =
+            named ? cui_radio_group_with_parts(app->ui, node->id, &app->theme, scratch->radios,
+                                               count, &selected, &node->radio_group_state, options,
+                                               parts, count)
+                  : cui_radio_group(app->ui, node->id, &app->theme, scratch->radios, count,
+                                    &selected, &node->radio_group_state, options);
+        if (!result.valid && (named || authored) && app->frame_error == CUI_BRIDGE_OK)
+            app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        if (result.valid) {
+            bridge_apply_parts(app, node);
+            for (size_t i = 0; i < count; ++i)
+                bridge_apply_parts(app, &app->nodes[scratch->binding.slots[i]]);
+        }
         if (result.changed) {
             for (size_t i = 0; i < count; i++)
                 if (scratch->radios[i].id == selected)
@@ -4818,15 +5017,27 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         cui_progress(app->ui, node->id, &app->theme, (float)node->value, 160);
     } else if (node->kind == CUI_BRIDGE_CHECKBOX) {
         bool value = node->checked;
-        if (cui_checkbox(app->ui, node->id, &app->theme, cui_string(node->text), &value,
-                         node->disabled)) {
+        bool changed =
+            bridge_target_style(node, CUI_BRIDGE_SHADOW_INDICATOR)
+                ? cui_checkbox_with_parts(
+                      app->ui, node->id, &app->theme, cui_string(node->text), &value,
+                      node->disabled, (cui_selection_indicator_parts){bridge_indicator_id(node)})
+                : cui_checkbox(app->ui, node->id, &app->theme, cui_string(node->text), &value,
+                               node->disabled);
+        if (changed) {
             node->checked = value;
             bridge_change(app, slot);
         }
     } else if (node->kind == CUI_BRIDGE_RADIO) {
         int value = node->checked ? 1 : 0;
-        if (cui_radio(app->ui, node->id, &app->theme, cui_string(node->text), &value, 1,
-                      node->disabled)) {
+        bool changed =
+            bridge_target_style(node, CUI_BRIDGE_SHADOW_INDICATOR)
+                ? cui_radio_with_parts(app->ui, node->id, &app->theme, cui_string(node->text),
+                                       &value, 1, node->disabled,
+                                       (cui_selection_indicator_parts){bridge_indicator_id(node)})
+                : cui_radio(app->ui, node->id, &app->theme, cui_string(node->text), &value, 1,
+                            node->disabled);
+        if (changed) {
             node->checked = value == 1;
             bridge_change(app, slot);
         }
@@ -4879,6 +5090,9 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     }
     if (cui_bridge_box_shadows_supported_v1(node->kind))
         bridge_apply_shadows(app, node);
+    if (node->kind == CUI_BRIDGE_CHECKBOX || node->kind == CUI_BRIDGE_RADIO ||
+        node->kind == CUI_BRIDGE_SWITCH || node->kind == CUI_BRIDGE_SLIDER)
+        bridge_apply_parts(app, node);
     node->disabled = previous_disabled;
 }
 /* Keep legal structural recursion away from component-specific stack locals. */

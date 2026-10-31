@@ -264,7 +264,8 @@ class AgentSkillTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             expected = ['bindings/python/cui_bridge/shadows.py',
-                        'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs']
+                        'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs',
+                        'bindings/go/cui/part_shadows.go', 'bindings/rust/src/part_shadows.rs']
             for name in expected + ['bindings/python/private.py',
                                     'bindings/rust/target/shadows.rs',
                                     'bindings/python/private/shadows.py']:
@@ -290,11 +291,11 @@ class AgentSkillTests(unittest.TestCase):
                                             cwd=directory, capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(result.stdout, exact + '\n')
-            result = subprocess.run([sys.executable, str(helper), 'api',
-                                     'cui_bridge_set_box_shadows_v1'],
-                                    cwd=directory, capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('include/cui/cui_bridge.h', result.stdout)
+            for symbol in ('cui_bridge_set_box_shadows_v1', 'cui_bridge_set_target_box_shadows_v1'):
+                result = subprocess.run([sys.executable, str(helper), 'api', symbol],
+                                        cwd=directory, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('include/cui/cui_bridge.h', result.stdout)
 
 
     def test_fingerprint_tracks_header_and_doc_changes(self):

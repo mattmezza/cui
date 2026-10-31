@@ -2,6 +2,8 @@
 module.exports = native => {
  const number=(v,min,max)=>{if(typeof v!=='number'||!Number.isFinite(v)||!Number.isFinite(Math.fround(v))||v<min||v>max)throw new TypeError('invalid shadow numeric domain');return Math.fround(v);};
  const uint=v=>{if(!Number.isInteger(v)||v<0||v>0xffffffff)throw new TypeError('shadow color must be uint32 RGBA');return v;};
+ const ShadowPart=Object.freeze({ROOT:0,MAIN:1,INDICATOR:2,TRACK:3,THUMB:4});
+ const canonicalPart=(kind,part)=>{if(!Number.isInteger(part)||part<0||part>4)throw new TypeError("ShadowPart required");let roles,main;if([1,2,3,4,11,12].includes(kind)){roles=[0,1];main=0;}else if([5,6,20].includes(kind)){roles=[0,1,2];main=2;}else if(kind===7){roles=[0,1,3,4];main=3;}else if(kind===9){roles=[0,1,3];main=3;}else if(kind===17){roles=[0];}else roles=[];if(!roles.includes(part))throw new TypeError("unsupported shadow part");return part===1?main:part;};
  const ShadowKind=Object.freeze({DROP:0,INSET:1});
  const ShadowPreset=Object.freeze({NONE:0,XXS:1,XS:2,SM:3,MD:4,LG:5,XL:6,XXL:7});
  class CornerRadii {
@@ -30,5 +32,5 @@ module.exports = native => {
    return new ShadowStyle(layers,radii);
   }
  }
- return {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii};
+ return {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,ShadowPart,canonicalPart};
 };

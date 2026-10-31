@@ -22,6 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', required=True, type=Path)
     parser.add_argument('--old-library', type=Path)
+    parser.add_argument('--parts', action='store_true', help='Check semantic part facades instead of legacy root slice')
     args = parser.parse_args()
     build = args.build_dir.resolve()
     library = build / 'libcui_bridge.so'
@@ -47,20 +48,20 @@ def main():
                        *[f'{k}={v}' for k, v in env.items()], *command])) + ')\n')
         entries.append(f'set_tests_properties({name} PROPERTIES WORKING_DIRECTORY {quote(cwd)})\n')
 
-    test('shadow_node', ['node', ROOT / 'bindings/node/test/shadows.test.cjs'], ROOT,
+    test('shadow_node', ['node', ROOT / ('bindings/node/test/part-shadows.test.cjs' if args.parts else 'bindings/node/test/shadows.test.cjs')], ROOT,
          {'CUI_NODE_ADDON': addon})
-    test('shadow_go', ['go', 'test', '-tags', 'cui_dynamic', '-p', '1', '-count=1', '-run', '^TestShadowAuthoring$', './cui'],
+    test('shadow_go', ['go', 'test', '-tags', 'cui_dynamic', '-p', '1', '-count=1', '-run', '^TestPartShadowAuthoring$' if args.parts else '^TestShadowAuthoring$', './cui'],
          ROOT / 'bindings/go', {'CUI_BRIDGE_LIBRARY': library, 'GOMAXPROCS': 1, 'GOPROXY': 'off'})
-    rust = ['cargo', 'test', '--offline', '--locked', '-j1', '--test', 'shadows']
+    rust = ['cargo', 'test', '--offline', '--locked', '-j1', '--test', 'part_shadows' if args.parts else 'shadows']
     rust_env = {'CUI_BRIDGE_LIB_DIR': build, 'CARGO_TARGET_DIR': checks / 'rust',
                 'LD_LIBRARY_PATH': build}
-    test('shadow_rust', [*rust, 'owned_root_shadows_clear_reset_geometry_and_input', '--', '--test-threads=1'],
+    test('shadow_rust', [*rust, 'semantic_parts' if args.parts else 'owned_root_shadows_clear_reset_geometry_and_input', '--', '--test-threads=1'],
          ROOT / 'bindings/rust', rust_env)
     if args.old_library:
         old = args.old_library.resolve()
         if not old.is_file():
             parser.error('old-library must exist')
-        test('shadow_go_old', ['go', 'test', '-tags', 'cui_dynamic', '-p', '1', '-count=1', '-run', '^TestShadowOldLibraryDefaults$', './cui'],
+        test('shadow_go_old', ['go', 'test', '-tags', 'cui_dynamic', '-p', '1', '-count=1', '-run', '^TestPartShadowOldLibraryDefaults$' if args.parts else '^TestShadowOldLibraryDefaults$', './cui'],
              ROOT / 'bindings/go', {'CUI_BRIDGE_LIBRARY': old, 'CUI_TEST_OLD_SHADOW_BRIDGE': 1,
                                     'GOMAXPROCS': 1, 'GOPROXY': 'off'})
         test('shadow_rust_old', [*rust, 'optional_old_library_defaults', '--', '--test-threads=1'],

@@ -146,3 +146,61 @@ def bind_shadow_api(api, bind, handle_type):
     api.reset_box_shadows = optional('reset_box_shadows',C.c_int,C.c_void_p,handle_type)
     api.shadow_css = optional('box_shadow_from_css_v1',C.c_int,C.c_float,C.c_float,C.c_float,C.c_float,C.c_uint32,C.c_uint32,C.c_uint32,C.POINTER(_Layer))
     api.shadow_preset = optional('shadow_preset_v1',C.c_int,C.c_uint32,C.c_float,C.c_float,C.c_float,C.c_float,C.c_uint32,C.POINTER(_Style))
+
+class ShadowPart(IntEnum):
+    ROOT = 0
+    MAIN = 1
+    INDICATOR = 2
+    TRACK = 3
+    THUMB = 4
+
+@dataclass(frozen=True)
+class ShadowTargetInfo:
+    canonical_part: ShadowPart | None
+    flags: int
+
+    @property
+    def supported(self):
+        return bool(self.flags & 1)
+
+class _Target(C.Structure):
+    _fields_ = [(n,C.c_uint32) for n in ('struct_size','schema_version','role','reserved')]
+
+class _TargetInfo(C.Structure):
+    _fields_ = [(n,C.c_uint32) for n in ('struct_size','schema_version','canonical_role','flags')]
+
+def target_value(part):
+    if not isinstance(part,ShadowPart):
+        raise TypeError('ShadowPart required')
+    return _Target(16,1,int(part),0)
+
+def canonical_part(kind,part):
+    target_value(part)
+    if kind in {'row','column','label','button','input','badge'}:
+        allowed={ShadowPart.ROOT,ShadowPart.MAIN};main=ShadowPart.ROOT
+    elif kind in {'checkbox','radio','item'}:
+        allowed={ShadowPart.ROOT,ShadowPart.MAIN,ShadowPart.INDICATOR};main=ShadowPart.INDICATOR
+    elif kind=='switch':
+        allowed={ShadowPart.ROOT,ShadowPart.MAIN,ShadowPart.TRACK,ShadowPart.THUMB};main=ShadowPart.TRACK
+    elif kind=='slider':
+        allowed={ShadowPart.ROOT,ShadowPart.MAIN,ShadowPart.TRACK};main=ShadowPart.TRACK
+    elif kind=='radio_group':
+        allowed={ShadowPart.ROOT};main=None
+    else:
+        allowed=set();main=None
+    if part not in allowed:raise ValueError('unsupported shadow part')
+    return main if part==ShadowPart.MAIN else part
+
+def bind_part_api(api,bind,handle_type):
+    def optional(name,*args):
+        try:fn=bind(name,C.c_int,*args)
+        except AttributeError:fn=None
+        def call(*values):
+            if fn is None:raise RuntimeError('bridge part shadows require a matching newer CUI library')
+            if C.sizeof(_Target)!=16 or C.sizeof(_TargetInfo)!=16 or _Target.role.offset!=8 or _TargetInfo.flags.offset!=12:
+                raise RuntimeError('bridge part target layout mismatch')
+            return fn(*values)
+        return call
+    api.set_target_box_shadows_v1=optional('set_target_box_shadows_v1',C.c_void_p,handle_type,C.c_uint32,C.POINTER(_Target),C.c_uint32,C.POINTER(_Style))
+    api.reset_target_box_shadows_v1=optional('reset_target_box_shadows_v1',C.c_void_p,handle_type,C.c_uint32,C.POINTER(_Target))
+    api.shadow_target_query_v1=optional('shadow_target_query_v1',C.c_void_p,handle_type,C.c_uint32,C.POINTER(_Target),C.c_uint32,C.POINTER(_TargetInfo))

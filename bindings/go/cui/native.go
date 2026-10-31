@@ -318,6 +318,28 @@ static cui_bridge_status go_shadow_preset(uint32_t p,float tl,float tr,float bl,
  shadow_preset_fn fn=NULL;SHADOW_RESOLVE(fn,shadow_preset_v1);
  return fn && go_shadow_ready()==CUI_BRIDGE_OK ? fn(p,tl,tr,bl,br,sizeof(*v),v) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
+_Static_assert(sizeof(cui_bridge_shadow_target_v1)==16 && offsetof(cui_bridge_shadow_target_v1,role)==8,"part target V1");
+_Static_assert(sizeof(cui_bridge_shadow_target_info_v1)==16 && offsetof(cui_bridge_shadow_target_info_v1,flags)==12,"part info V1");
+typedef cui_bridge_status (*part_set_fn)(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_shadow_target_v1 *,uint32_t,const cui_bridge_box_shadows_v1 *);
+typedef cui_bridge_status (*part_reset_fn)(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_shadow_target_v1 *);
+typedef cui_bridge_status (*part_query_fn)(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_shadow_target_v1 *,uint32_t,cui_bridge_shadow_target_info_v1 *);
+#if defined(CUI_GO_STATIC)
+extern cui_bridge_status cui_bridge_set_target_box_shadows_v1(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_shadow_target_v1 *,uint32_t,const cui_bridge_box_shadows_v1 *) __attribute__((weak));
+extern cui_bridge_status cui_bridge_reset_target_box_shadows_v1(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_shadow_target_v1 *) __attribute__((weak));
+extern cui_bridge_status cui_bridge_shadow_target_query_v1(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_shadow_target_v1 *,uint32_t,cui_bridge_shadow_target_info_v1 *) __attribute__((weak));
+#endif
+static cui_bridge_status go_part_set(cui_bridge_app *a,cui_bridge_node n,uint32_t role,const cui_bridge_box_shadows_v1 *style) {
+ part_set_fn fn=NULL;SHADOW_RESOLVE(fn,set_target_box_shadows_v1);cui_bridge_shadow_target_v1 target={16,1,role,0};
+ return fn?fn(a,n,16,&target,224,style):CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+static cui_bridge_status go_part_reset(cui_bridge_app *a,cui_bridge_node n,uint32_t role) {
+ part_reset_fn fn=NULL;SHADOW_RESOLVE(fn,reset_target_box_shadows_v1);cui_bridge_shadow_target_v1 target={16,1,role,0};
+ return fn?fn(a,n,16,&target):CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint32_t role,cui_bridge_shadow_target_info_v1 *out) {
+ part_query_fn fn=NULL;SHADOW_RESOLVE(fn,shadow_target_query_v1);cui_bridge_shadow_target_v1 target={16,1,role,0};
+ return fn?fn(a,n,16,&target,16,out):CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
 #undef SHADOW_RESOLVE
 #undef SHADOW_DYNAMIC
 #undef SHADOW_STATIC
@@ -479,6 +501,7 @@ type Node struct {
 	hasDesignSize                                      bool
 	avatarIdentity, avatarCustomHue, hasAvatarIdentity bool
 	shadowStyle                                        *ShadowStyle
+	partShadows                                        map[ShadowPart]ShadowStyle
 	avatarHue                                          uint8
 	avatarAnonymous, hasAvatarPlaceholder              bool
 	avatarPlaceholder                                  string
@@ -1685,6 +1708,11 @@ func (a *App) Mount(root *Node) error {
 				return e
 			}
 			if e := shadowResult(C.go_shadow_set(a.ptr, h, &wire)); e != nil {
+				return e
+			}
+		}
+		for part, style := range n.partShadows {
+			if e := n.setPartNative(part, style); e != nil {
 				return e
 			}
 		}
@@ -3521,6 +3549,7 @@ func (n *Node) BoxShadows(style ShadowStyle) *Node {
 	}
 	copied := style
 	copied.Layers = append([]BoxShadow(nil), style.Layers...)
+	delete(n.partShadows, ShadowRoot)
 	n.shadowStyle = &copied
 	return n
 }
@@ -3542,6 +3571,7 @@ func (n *Node) ResetBoxShadows() *Node {
 			return n
 		}
 	}
+	delete(n.partShadows, ShadowRoot)
 	n.shadowStyle = nil
 	return n
 }
@@ -3575,4 +3605,40 @@ func (a *App) ShadowPreset(preset ShadowPreset, radii CornerRadii) (ShadowStyle,
 		s.Layers = append(s.Layers, BoxShadow{float64(l.offset_x), float64(l.offset_y), float64(l.sigma), float64(l.spread), ShadowKind(l.kind), uint32(l.rgba)})
 	}
 	return s, nil
+}
+
+func (n *Node) setPartNative(part ShadowPart, style ShadowStyle) error {
+	wire, e := shadowWire(style)
+	if e != nil {
+		return e
+	}
+	if n.app == nil {
+		return nil
+	}
+	if e = n.app.check(); e != nil {
+		return e
+	}
+	return shadowResult(C.go_part_set(n.app.ptr, n.handle, C.uint32_t(part), &wire))
+}
+func (n *Node) resetPartNative(part ShadowPart) error {
+	if n.app == nil {
+		return nil
+	}
+	if e := n.app.check(); e != nil {
+		return e
+	}
+	return shadowResult(C.go_part_reset(n.app.ptr, n.handle, C.uint32_t(part)))
+}
+func (n *Node) ShadowTarget(part ShadowPart) (ShadowTargetInfo, error) {
+	if n.app == nil {
+		return ShadowTargetInfo{}, errors.New("capability query requires a mounted node")
+	}
+	if e := n.app.check(); e != nil {
+		return ShadowTargetInfo{}, e
+	}
+	var info C.cui_bridge_shadow_target_info_v1
+	if e := shadowResult(C.go_part_query(n.app.ptr, n.handle, C.uint32_t(part), &info)); e != nil {
+		return ShadowTargetInfo{}, e
+	}
+	return ShadowTargetInfo{ShadowPart(info.canonical_role), uint32(info.flags)}, nil
 }

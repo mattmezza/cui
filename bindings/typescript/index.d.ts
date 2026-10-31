@@ -21,10 +21,10 @@ export interface Button extends Node, DesignSized {
   disabled(value?: boolean): this; hover_color(value: string | [number, number, number, number]): this;
   on_click(callback: (event: ClickEvent) => void): this;
 }
-export function row(): Row & ShadowStyled;
-export function column(): Column & ShadowStyled;
-export function label(text?: string): Label & ShadowStyled;
-export function button(key?: string): Button & ShadowStyled;
+export function row(): Row & ShadowStyled & PartShadowStyled<0|1>;
+export function column(): Column & ShadowStyled & PartShadowStyled<0|1>;
+export function label(text?: string): Label & ShadowStyled & PartShadowStyled<0|1>;
+export function button(key?: string): Button & ShadowStyled & PartShadowStyled<0|1>;
 export class App {
   /** Submit without dispatch. Caller owns draining the shared queue. */
   step_only(dt?: number): this;
@@ -53,14 +53,14 @@ export interface NumericControl extends Node {value(value: number): this; curren
 export interface Slider extends NumericControl {range(minimum: number, maximum: number, step?: number): this; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface Input extends Label {current_text(): string; disabled(value?: boolean): this; on_change(callback: (event: ChangeEvent) => void): this}
 export interface NumberInput extends Input, Slider {}
-export function checkbox(key?: string, text?: string): BooleanControl;
-export function radio(key?: string, text?: string): BooleanControl;
-export function switch_control(key?: string, text?: string): BooleanControl;
+export function checkbox(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
+export function radio(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|2>;
+export function switch_control(key?: string, text?: string): BooleanControl & PartShadowStyled<0|1|3|4>;
 export function toggle(key?: string, text?: string): BooleanControl;
-export function slider(key?: string): Slider;
+export function slider(key?: string): Slider & PartShadowStyled<0|1|3>;
 export function progress(key?: string): NumericControl;
-export function badge(key?: string, text?: string): Label & ShadowStyled;
-export function input(key?: string, text?: string): Input & ShadowStyled;
+export function badge(key?: string, text?: string): Label & ShadowStyled & PartShadowStyled<0|1>;
+export function input(key?: string, text?: string): Input & ShadowStyled & PartShadowStyled<0|1>;
 export function textarea(key?: string, text?: string): Input;
 export function number_input(key?: string): NumberInput;
 
@@ -71,7 +71,7 @@ export interface Item extends Disclosure {}
 export interface Alert extends Label {detail(text: string): this}
 export function collapsible(key?: string, text?: string): Disclosure;
 export function alert(key?: string, text?: string): Alert;
-export function radio_group(key?: string): Group;
+export function radio_group(key?: string): Group & PartShadowStyled<0>;
 export function tabs(key?: string): Group;
 export function accordion(key?: string): Composite;
 export function item(key?: string, text?: string): Item;
@@ -276,3 +276,15 @@ export interface ShadowStyled {
  shadow_preset(preset:0|1|2|3|4|5|6|7,radii?:CornerRadii):this;
  reset_box_shadows():this;
 }
+
+export const ShadowPart:Readonly<{ROOT:0;MAIN:1;INDICATOR:2;TRACK:3;THUMB:4}>;
+export type ShadowPart=0|1|2|3|4;
+export interface ShadowTargetInfo {readonly canonicalPart:ShadowPart|null;readonly flags:number;readonly supported:boolean}
+export interface PartShadowStyled<P extends ShadowPart> {
+ part_shadows(part:P,layers:readonly BoxShadow[]|ShadowStyle,radii?:CornerRadii):this;
+ part_shadow_preset(part:P,preset:0|1|2|3|4|5|6|7,radii?:CornerRadii):this;
+ reset_part_shadows(part:P):this;
+ shadow_target(part:ShadowPart):ShadowTargetInfo;
+}
+/** ITEM authoring helper requiring a RadioGroup owner at mount; ordinary ITEM remains generic. */
+export function radio_item(key?:string,text?:string):Item&PartShadowStyled<0|1|2>;

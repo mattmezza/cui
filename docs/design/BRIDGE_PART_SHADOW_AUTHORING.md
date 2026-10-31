@@ -1,9 +1,12 @@
 # Semantic bridge part shadows: review checkpoint
 
-Status: proposal only, audited at b9c2f3d1. This checkpoint changes no public API,
-production source, generated resources, coverage status or beta completion claim.
-Implementation requires review of the target table, group opt-in boundary and
-storage choice below. The existing six-root V1 implementation remains unchanged.
+Status: approved design with bounded next-batch implementation evidence below.
+The original signed proposal was audited at b9c2f3d1 and changed no production or
+coverage. Review approved the target table, whole-group opt-in boundary and nullable
+extension choice. This decision record retains the proposal details; authoritative
+implemented declarations and consumer behavior are in `include/cui/cui_bridge.h`
+and [BRIDGE_PART_SHADOWS.md](../BRIDGE_PART_SHADOWS.md). The existing six-root V1
+allowlist/default behavior remains unchanged; broader beta completion is pending.
 
 Read with [element styling](ELEMENT_SHADOW_STYLING.md), the complete 78-family
 inventory there, [component ownership](SHADOW_COMPONENT_OWNERSHIP.md),
@@ -342,9 +345,9 @@ skill resource exports; no bulky binding-wide context dump is required.
 
 ## Acceptance gate after review
 
-No production or tests run for this document. Before implementing, approve the
-exact descriptor/info signatures, role table, context whitelist, whole-group
-naming boundary, pointer budget and failure semantics. Then require:
+The original design checkpoint ran no production or tests. Review subsequently
+approved the descriptor/info signatures, role table, context whitelist, whole-group
+naming boundary, pointer budget and failure semantics. The acceptance plan was:
 
 1. Portable real bridge capture for every table row and alias. Assert actual
    caster is square/circle/track/thumb rather than label row; independent ROOT
@@ -382,3 +385,20 @@ coverage, docs, examples, SDK/amalgamation and skill resources only when product
 is approved and actual tests pass. Keep all78 manifest entries and the broader
 beta shadow milestone pending. Portals, other compound parts, generic style
 inheritance, Core presence registries and input architecture remain separate work.
+
+
+## Approved implementation checkpoint
+
+Review approved the nullable per-node extension and whole-group naming choice.
+The next-batch implementation uses public `cui_id_from(NULL, bounded_key)` for
+private deterministic indicator identities, checks snprintf/zero/full-owner
+identity, and uses existing Switch/Slider public part getters. It copies no Core
+folded-ID algorithm and adds no identity allocator/reservation or input path.
+The measured Linux x86-64 node is73,136 bytes, extension pointer8 and payloads
+232/456 bytes. Deletion resets the freed pointer before later app cleanup.
+
+Focused portable/native and all five facade checks cover the bounded target
+mapping; the consumer contract and reproducible commands are in
+[BRIDGE_PART_SHADOWS.md](../BRIDGE_PART_SHADOWS.md). The original signed proposal
+is preserved above. This checkpoint does not extend panel/portal mappings or
+mark the broader beta/all78 shadow milestone complete.

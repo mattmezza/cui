@@ -147,8 +147,15 @@ Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`
 record contract. The exact SDK revision must also provide the typed modules
 `bindings/python/cui_bridge/shadows.py`, `bindings/node/shadows.cjs` and
 `bindings/rust/src/shadows.rs`; these are readable through this helper. Explicit
-empty lists suppress defaults; reset restores defaults. Compound parts and
-portals are outside this bridge mapping. Python deferred CSS/preset requests
+empty lists suppress defaults; reset restores defaults. The separate
+`docs/BRIDGE_PART_SHADOWS.md` target API supports only the documented ordinary-tree
+Checkbox/Radio indicators, Switch track/thumb, Slider track and explicit ROOT
+roles. ROOT and MAIN are distinct concepts; Slider has no thumb. A RadioGroup
+with any authored ITEM indicator names all peers until last reset/removal. Query
+reports capability, never current presence; unsupported owner paths reject.
+Read matching typed modules `bindings/go/cui/part_shadows.go` and
+`bindings/rust/src/part_shadows.rs` as well. Other compound/portal parts remain
+outside these bounded mappings. Python deferred CSS/preset requests
 normalize through the owning App's selected library at mount/update.
 
 ## Compose and verify

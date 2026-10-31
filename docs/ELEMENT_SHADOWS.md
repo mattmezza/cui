@@ -99,3 +99,7 @@ caller-supplied indicator IDs; see [NAMED_SELECTION_INDICATORS.md](NAMED_SELECTI
 for capture, early validation and late collision/capacity boundaries. Single Radio
 and RadioGroup remain separate paint owners. These C-only part contracts do not
 change legacy anonymous IDs or establish typed bridge/language support.
+
+For bounded semantic ROOT/MAIN/indicator/track/thumb authoring, read
+[typed part shadows](BRIDGE_PART_SHADOWS.md). Slider has no thumb; owner topology,
+whole-group naming and separate reset are explicit parts of that contract.

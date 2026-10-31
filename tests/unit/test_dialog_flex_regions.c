@@ -39,6 +39,8 @@ typedef struct {
     float outer_y, body_y, width;
     float expected[8];
     unsigned callbacks, prepaints, inner_parts;
+    bool placement;
+    float host_width, host_height, margin, preferred_top;
 } fixture;
 static float scene_width(const fixture *f) {
     return f->width > 0 ? f->width : 240;
@@ -93,6 +95,8 @@ static bool observe(const cui_prepaint_info *info, const void *payload,
     fixture *f = *(fixture *const *)payload;
     ++f->prepaints;
     equal(info->bounds.h, f->expected[7], "current prepaint viewport");
+    if (f->placement)
+        equal(info->bounds.y, f->expected[5], "current placement prepaint top");
     const cui_semantic *s = semantic(f->ui, BODY);
     assert(s);
     equal(s->details.scroll_max_y, fmaxf(0, f->c->body - f->expected[3]), "current prepaint range");
@@ -111,7 +115,19 @@ static cui_scroll_region_sizing_v1 policy(bool present, bool intrinsic, float mi
 }
 static cui_draw_list scene(fixture *f) {
     const test_case *c = f->c;
-    assert(cui_begin_frame(f->ui, scene_width(f), 600, .016f));
+    assert(cui_begin_frame(f->ui, f->placement ? f->host_width : scene_width(f),
+                           f->placement ? f->host_height : 600, .016f));
+    if (f->placement) {
+        cui_begin_portal(f->ui, 9000, (cui_box){.align_x = CUI_ALIGN_CENTER},
+                         (cui_rect){f->margin, f->margin, f->host_width - 2 * f->margin,
+                                    f->host_height - 2 * f->margin},
+                         20);
+        float cap = f->preferred_top - f->margin;
+        if (cap > 0) {
+            cui_begin_box(f->ui, 9001, (cui_box){.width = 1, .height = -1, .max_height = cap});
+            cui_end_box(f->ui);
+        }
+    }
     f->inner_parts = 0;
     cui_begin_box(f->ui, PANEL,
                   (cui_box){.width = scene_width(f),
@@ -230,6 +246,8 @@ static cui_draw_list scene(fixture *f) {
     cui_scrollbar_track_layout_v1 track = {48, 1, 3, 0, BODY, bar, THUMB, 6, 8};
     if (c->has_body)
         assert(cui_layout_scrollbar_track_v1(f->ui, &track));
+    if (f->placement)
+        cui_end_box(f->ui);
     cui_draw_list draw = cui_end_frame(f->ui);
     if (cui_last_error(f->ui) != CUI_OK)
         fprintf(stderr, "%s: error%d\n", c->name, cui_last_error(f->ui));
@@ -430,6 +448,64 @@ static void capacity_recovery(void) {
     equal(body[0], 690, "next frame recovery");
     cui_destroy(ui);
 }
+static void placement_proof(void) {
+    /* Source Positioner corner clamp, pinned positioner.rs:303. The expected
+     * values are frozen constants, not computed using the proposed spacer. */
+    static const struct {
+        float host_w, host_h, body, max_h, expected_h, expected_y, width, preferred;
+    } cases[] = {
+        {400, 600, 40, 568, 40, 60, 240, 60},   {400, 600, 550, 568, 550, 34, 240, 60},
+        {400, 600, 900, 568, 568, 16, 240, 60}, {180, 220, 900, 188, 188, 16, 148, 22},
+        {180, 220, 40, 188, 40, 22, 148, 22},   {800, 800, 80, 768, 80, 96, 420, 96},
+        {800, 800, 740, 768, 740, 44, 420, 96}, {400, 600, 40, 568, 40, 16, 240, 0},
+        {400, 600, 900, 568, 568, 16, 240, 60}, {400, 600, 40, 568, 40, 60, 240, 60},
+    };
+    fixture f = {.placement = true, .margin = 16};
+    f.ui = cui_create((cui_config){.width = 800, .height = 800});
+    assert(f.ui);
+    for (unsigned i = 0; i < sizeof cases / sizeof cases[0]; ++i) {
+        test_case c = {.name = "source placement",
+                       .has_body = true,
+                       .body = cases[i].body,
+                       .maximum = cases[i].max_h};
+        f.c = &c;
+        f.host_width = cases[i].host_w;
+        f.host_height = cases[i].host_h;
+        f.width = cases[i].width;
+        f.preferred_top = cases[i].preferred;
+        f.expected[3] = f.expected[7] = cases[i].expected_h;
+        f.expected[5] = cases[i].expected_y;
+        f.callbacks = f.prepaints = 0;
+        cui_draw_list draw = scene(&f);
+        assert(draw.count > 0);
+        equal(f.bounds[0].h, cases[i].expected_h, "placement current height");
+        equal(f.bounds[0].y, cases[i].expected_y, "placement current top");
+        equal(f.bounds[0].x, (f.host_width - f.width) / 2, "placement centered width");
+        equal(f.bounds[4].y, cases[i].expected_y, "placement current body");
+        assert(f.callbacks == 1 && f.prepaints == 1);
+        const cui_semantic *body = semantic(f.ui, BODY);
+        assert(body);
+        equal(body->bounds.y, cases[i].expected_y, "placement published body top");
+        equal(body->bounds.h, cases[i].expected_h, "placement published body height");
+        cui_software *sw =
+            cui_software_create((unsigned)f.host_width, (unsigned)f.host_height, NULL);
+        assert(sw && cui_software_render(sw, &draw, (cui_color){0}));
+        unsigned w, h;
+        const uint8_t *pixels = cui_software_pixels(sw, &w, &h);
+        unsigned x = (unsigned)f.bounds[0].x + 20;
+        unsigned top = (unsigned)cases[i].expected_y;
+        unsigned bottom = (unsigned)(cases[i].expected_y + cases[i].expected_h);
+        assert(w == (unsigned)f.host_width && h == (unsigned)f.host_height);
+        assert(pixels[((size_t)(top + 2) * w + x) * 4] == 130);
+        assert(top > 0 && pixels[((size_t)(top - 1) * w + x) * 4 + 3] == 0);
+        assert(bottom < h && pixels[((size_t)bottom * w + x) * 4 + 3] == 0);
+        cui_software_destroy(sw);
+        equal(body->details.scroll_max_y, fmaxf(0, c.body - cases[i].expected_h),
+              "placement current semantic range");
+    }
+    cui_destroy(f.ui);
+    puts("SOURCE_PLACEMENT first-open/current grow-shrink/width/layer10 PASS");
+}
 int main(int argc, char **argv) {
     assert(argc == 2);
     FILE *oracle = fopen(argv[1], "r");
@@ -570,6 +646,7 @@ int main(int argc, char **argv) {
     cui_destroy(v1.ui);
     assert(!fgets(line, sizeof line, oracle));
     fclose(oracle);
+    placement_proof();
     nested_v1_counterexample();
     capacity_recovery();
     test_scroll_regions_contract();

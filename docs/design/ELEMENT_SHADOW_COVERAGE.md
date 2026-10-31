@@ -2,6 +2,10 @@
 
 Audit baseline: `b553c8bb`; catalog authority [gpui-parity.json](../gpui-parity.json).
 This is a read-only ownership checkpoint, not 78-component acceptance evidence.
+Subsequent candidate slices add [six typed builder roots](../BRIDGE_SHADOWS.md)
+and [opt-in C selection indicators](../NAMED_SELECTION_INDICATORS.md); the matrix
+below deliberately preserves its stated baseline rather than counting those
+later slices as acceptance of every family.
 All 78 catalog families remain open for complete shadow coverage. Source references
 identify current paint sites; the linked public header on each family is the
 catalog authority. Additional additive headers are noted below.

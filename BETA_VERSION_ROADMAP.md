@@ -13,7 +13,7 @@ release date is asserted.
 | --- | --- |
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `ab8fddbbbca4b78e3b2cc1b14752dd0c4ac96b30`; public docs, catalog, headers and native archive checked on 2026-10-31. |
-| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3/bridge windows across five language paths; named-element C shadow setters and CSS blur conversion. Focused checks exist; combined validation/publication is still pending. |
+| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3/bridge windows across five language paths; named-element C shadow setters, six typed builder roots, and opt-in Checkbox/Radio indicator IDs. Focused checks exist; combined validation/publication is still pending. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -41,27 +41,30 @@ can lag implementation: inspect current code and evidence before scheduling work
   browser/native proof. CSS-like blur
   convenience must not reinterpret existing sigma-based APIs or presets.
   The six-kind owned bridge/facade override passes focused portable software and
-  all five facade checks; broader part/portal coverage, browser/GPU proof and
-  integration remain pending.
+  all five facade checks. Eight C-only Checkbox/Radio/group facades now accept
+  explicit indicator IDs while preserving legacy anonymous routes; their focused
+  tests pass against captured old-library fixtures. Broader part/portal coverage,
+  corresponding indicator bindings, browser/GPU proof and integration remain pending.
 - [ ] **Release the completed major batch.** Freeze one source revision; validate
   matching C, Python/npm, Go and Rust artifacts; publish release notes/checksums
   and matching website docs. `0.1.0-alpha.3` is prepared, **not yet released**.
 
 ## Latest validation evidence
 
-- Candidate production source `c52ce72f`: warning-clean WASM build; headless
-  HoverCard release, Stepper visual and Spinner contract probes passed. Native
-  hidden-window and shadow checks are recorded in their linked API guides.
-- Formatting, 17 consumer-skill tests and generated SDK/resource freshness passed.
-- CI found two binding jobs selecting new tests without building their executables.
-  Candidate `b553c8bb` fixes the build lists; eight workflow tests passed. Hosted
-  CI and publication are still pending. This is evidence for these slices only.
-- The hosted native binding gate passed at `b553c8bb`, including ten static/dynamic
-  callback cases and hidden-window checks in all five language paths. Broader CI
-  found a stale HoverCard usage paragraph; the corrected guide passes all six
-  documentation tests locally. Pages also exposed a missing Spinner probe artifact
-  argument (fixed locally) and a Chromium startup crash. Final integrated checks
-  remain pending.
+- Combined production source `6e75b603`: warning-enabled focused Release build and
+  **10/10** headless C/Python tests passed. JS/Go/Rust runtime and actual older-library
+  compatibility checks passed **5/5**; TypeScript strict checks passed.
+- **18/18** consumer-skill tests, formatting and generated SDK/resource freshness
+  passed; workflow regressions passed **9/9** (bindings) and **5/5** (Pages).
+- Earlier gallery source `c52ce72f` passed headless HoverCard, Stepper and Spinner
+  probes. The merged candidate still needs fresh browser and integrated CI checks.
+- Hosted native binding gate `b553c8bb` passed ten static/dynamic callback cases
+  and hidden-window checks in all five language paths. This predates the merged
+  shadow slices and does not replace their final integrated checks.
+- Earlier CI exposed stale HoverCard guide text and missing test-build/artifact
+  arguments; those are corrected. One Chromium startup crash also needs a fresh
+  run. Release and deployment remain pending; these results prove only their
+  stated subsets.
 
 ## Component parity: verify and close the gaps
 

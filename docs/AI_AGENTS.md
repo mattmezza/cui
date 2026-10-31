@@ -21,6 +21,9 @@ example setup and integrity-check commands. Python helpers need no pip packages.
 
 Maintainers regenerate resources with `python scripts/generate_agent_skill.py`;
 CI checks freshness and exercises an installed copy outside the repository.
+When editing `docs/component-usage.json`, synchronize `docs/COMPONENT_USAGE.md`
+and run `python tests/test_component_usage.py`; the website metadata and human
+guide must describe the same state, interaction and lifetime contracts.
 
 ## Consumer setup prompt
 

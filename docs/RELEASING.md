@@ -31,10 +31,12 @@ hidden SDL3 window creation with explicit visibility APIs. Hidden-window authori
 has focused Linux private-Xvfb tests in all five language paths; other native
 platforms, Wayland and physical GPU behavior remain separately unverified.
 Initial named-element shadow setters and CSS blur conversion reuse existing
-renderers. Named control-part selectors cover the documented first subset;
-anonymous Checkbox/Radio indicators and broader part/binding coverage remain
-open. Read `ELEMENT_SHADOWS.md` for current ownership and limitations. These
-candidate additions still require integrated CI, release and deployment checks.
+renderers. Six builder root kinds have typed overrides across Python, JS/TS,
+Go and Rust. Eight additive C Checkbox/Radio/group facades can name indicators;
+legacy routes preserve anonymous identities. Indicator bindings, compound parts
+and portals remain open. Read `ELEMENT_SHADOWS.md`, `BRIDGE_SHADOWS.md` and
+`NAMED_SELECTION_INDICATORS.md` for ownership and limitations. These candidate
+additions still require integrated CI, release and deployment checks.
 
 CI preparation reuses checksum-verified raw optional-regex downloads and shares a
 private umbrella implementation across feature distribution tests. Independent

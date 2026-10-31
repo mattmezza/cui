@@ -46,6 +46,8 @@ typedef struct {
     uint32_t size, abi_version, background_output;
     uint64_t features;
     size_t max_commands, max_backgrounds;
+    size_t max_pixels, max_pixels_per_background;
+    size_t cpu_bytes, texture_bytes, transfer_bytes, metadata_bytes;
 } cui_draw_v2_support;
 typedef struct {
     uint32_t size;
@@ -121,7 +123,7 @@ approximately88-byte owner/value records cost352KiB on a common64-bit ABI. Use
 actual sizeof/alignment, never those estimates, for budgeting. Large element
 configs may require larger explicit background_bytes or fail begin before input.
 Retained capacities are high-water marks bounded by those hard maxima (at most
-32MiB additional Core storage); lowering a later frame's logical budget does not
+32MiB additional Core payload storage); lowering a later frame's logical budget does not
 silently shrink retained storage or allocate another copy. V1 existing
 arrays/prepaint arrays/frame_bytes/resource_bytes remain separate;
 these ceilings are ADDITIONAL memory, not a claim of total context footprint.
@@ -248,7 +250,7 @@ adapter binding and no new input dispatch architecture.
 | Software `backends/software/cui_software.c` | Full V2 validation before clearing pixels; prepared center-masked bytes source-over at exact physical cells; wrap ordinary drawing without routing backgrounds through `cui_bitmap_key_make`. |
 | SDL_Renderer `backends/sdl3/cui_sdl3.c` | Query current target/DPI; stage RGBA textures and exact physical destination/source rectangle, neutral texture tint/opacity, preserve clip/order; explicit completion of queued SDL work before releasing prepared textures. |
 | SDL_GPU `backends/sdl_gpu/cui_sdl_gpu.c` | New V2 collector branch feeds existing textured quads, direct prepared physical upload; no logical reraster. Retain texture/transfer resources through fence completion, including failed submissions and safe cancellation. |
-| Sokol `backends/sokol/cui_sokol.c` | Direct `sg_make_image`/view preparation, exact physical quads/UVs, bounded ownership; prove driver-safe destruction/deferred release. See borrowed-runtime boundary below. |
+| Sokol `backends/sokol/cui_sokol.c` | Reserved-slot `sg_init_image`/view preparation, exact physical quads/UVs, bounded ownership and explicit GLCORE fence retirement. See borrowed-runtime boundary below. |
 | Canvas `web/gallery.c`, `web/gallery.js`, `scripts/build_web.py` | Negotiate V2 wire BEFORE compose; typed field exports and common C raster query/write exports; JS preflight all commands, owned ImageData/offscreen upload, strict tag/version checks and exact physical placement. Refresh views after WASM memory growth; no Canvas-gradient approximation. |
 
 Every V2 renderer first validates header/stride/features/count overflow, all active
@@ -272,29 +274,22 @@ must expose/reject needed capacity; incremental release may lower peak only with
 a proven lifetime ledger. Do not claim the earlier64MiB CPU+texture shorthand as
 a complete upload bound. No retention cache initially.
 
-One background frame may be in flight per adapter. Initial native V2 route waits
-for its submitted work before retiring owned background resources or accepting the
-next V2 render; fresh monotonically checked revisions/handles prevent pointer reuse
-from matching stale legacy bitmap caches. Never overwrite a live buffer on next
-begin. This blocking policy trades throughput for a bounded coherent first version;
-future fences/rings require separate explicit budgets. CPU source lifetime may end
-earlier only after the particular upload API has copied it. SDL_GPU's existing
-bitmap path copies into transfer storage, submits a copy pass, then releases its
-transfer handle; Sokol frees CPU bytes after `sg_make_image`. Those source seams
-are evidence to inspect, not a universal GPU-completion guarantee.
-
-Sokol's existing `borrow_runtime` host commits after render. V2 must not silently
-commit that host's runtime. Proposed explicit adapter-local completion hook
-`bool submit_and_wait(void *user)` is configured outside frames by that host;
-render invokes it after staging/drawing, before retiring V2 resources. It cannot reenter rendering or begin a new frame
-while borrowed inputs are still being consumed. Without it,
-borrowed-runtime configuration reports V2 backgrounds unsupported BEFORE begin.
-An owned-runtime adapter submits/waits itself. This hook/lifetime requirement needs
-review and real borrowed-runtime tests; full Sokol scope includes that mode, not
-just an owned-runtime demonstration. It is not a callback retained by Core.
-Canvas uses synchronous byte transfer/offscreen composition and drops per-render
-JS references after drawing; any asynchronous createImageBitmap route must await
-completion before reuse and fit the same in-flight/byte bounds.
+One application-owned background batch may be in flight per adapter. Render
+success means accepted/submitted, NOT GPU completion. Before returning, consume
+or copy every needed frame-owned CPU payload into accounted adapter staging;
+GPU retirement cannot extend the Core array/text/stop lifetime or leave a deferred
+raw Core pointer. This is not full snapshot ownership of a copied V2 list.
+Query must refuse another
+V2 frame while an unretired batch occupies its resource envelope. CPU input may
+be released only after its actual upload API has consumed/copied it; private
+textures/transfer resources remain owned until safe retirement. Fresh handles/
+revisions prevent pointer reuse from matching legacy caches; no cache tag tricks.
+The GLCORE-specific correction below replaces the unverified Sokol wait/hook
+proposal; other native consumers also need concrete API retirement proofs, not
+an assumption that render return or a flush means GPU completion. Canvas's
+synchronous byte/offscreen path may release C/JS staging after copying; any
+asynchronous createImageBitmap path must retain it until completion and fit the
+same one-batch/byte limits.
 
 Validation/allocation/preparation failures leave the previous target untouched and
 clean partial staging. After target mutation, unexpected provider errors, driver
@@ -328,7 +323,7 @@ they cannot receive an apparently successful incomplete V1 substitute.
 Independent implementation checkpoints, each reviewed/tested before the next:
 
 1. Freeze V1 ABI/command/software oracles and review these exact records, output
-   policy, budgets and Sokol host-completion contract; no renderer claimed yet.
+   policy, budgets and Sokol GLCORE retirement/pool-reservation contract; no renderer claimed yet.
 2. Core V2 mode/storage/emitter and setters with source metadata/distribution/skill
    updates. No-setter V2 normalized legacy commands/pixels equal V1; reject old
    consumers before composition. Test wrong ends with real queued actions exactly
@@ -344,7 +339,7 @@ Independent implementation checkpoints, each reviewed/tested before the next:
    target pixels under each declared encoded-UNORM policy with explicit readback
    tolerance, including alpha/background mixtures and independent text commands.
    Test resize/DPI/phase, target-loss, upload failure, frame completion and Sokol
-   host-owned runtime. Native automation ONLY private-Xvfb wrapper, browser headless;
+   host-owned runtime, delayed fences and shutdown/context loss. Native automation ONLY private-Xvfb wrapper, browser headless;
    hardware unavailable in virtual display is explicitly deferred, never marked PASS.
 5. Versioned bridge + all five language authoring paths and installed consumers;
    old library/old header/unknown version refusal, resource serialization, WASM
@@ -355,3 +350,154 @@ Independent implementation checkpoints, each reviewed/tested before the next:
 Run component-usage guide synchronization tests whenever usage metadata changes,
 plus exact generated SDK/amalgamation/skill freshness. This checkpoint changes
 only this design document; no public ABI, renderer or implementation is enabled.
+
+
+## Correction: pinned Sokol GLCORE retirement and honest support limits
+
+This section supersedes the earlier `submit_and_wait` hook and any claim that
+Sokol itself supplies a GPU completion wait. Scope is CUI's EXISTING GLCORE
+adapter, not Metal/D3D/Vulkan/WebGPU Sokol backends.
+
+Pinned evidence: `third_party/dependencies.json` pins Sokol commit
+`401f21f8b7039258c35fef75c11d9a8a0e616771`; checked header SHA256
+`e23802d543747b1d24b4ab76e52634fb8b0a4a30afdb9f1437f63814f6bc77d7`.
+Primary [pinned header](https://github.com/floooh/sokol/blob/401f21f8b7039258c35fef75c11d9a8a0e616771/sokol_gfx.h):
+
+- Public declarations near5898–5940 expose resource operations/commit, no GPU wait.
+- `sg_commit` near28267 calls backend commit, stats/listeners and increments frame
+  index. `_sg_gl_commit` near13230 clears cached bindings; neither waits for GPU.
+- GL draw near13214 issues `glDrawArrays` immediately; end-pass/commit is not an
+  external deferred command-list submission requirement for this GLCORE path.
+- `_sg_gl_discard_image` near11904 invalidates cache then deletes GL textures;
+  `_sg_gl_discard_view` near12382 deletes view textures. Deletion is not a measured
+  completion signal or a reason to stop counting uncertain in-flight allocations.
+- Public `sg_alloc_image/view`, `sg_init_*`, `sg_uninit_*`, `sg_dealloc_*` support
+  actual slot reservation. ALLOC slots are not initialized GPU images. Immutable
+  image `num_slots` is1; transient writes use SG_NUM_INFLIGHT_FRAMES (near9005).
+
+CUI `backends/sokol/cui_sokol.c` currently requires GL>=3.3, calls `sg_end_pass`,
+commits only if owns_runtime, and uses a commit listener only to reset rendered.
+The owned runtime configures image/view pools512 each. White1+glyph256+bitmap64
+can consume321 pairs:191 is merely an arithmetic upper bound, NOT available
+capacity. Borrowed runtime defaults can be128 images/256 views, or host-defined;
+host allocations and other adapters share those pools. The prior4096 blanket
+background count cannot be advertised by this implementation.
+
+### Concrete completion state machine; no generic host wait promise
+
+Resolve real `glFenceSync`, `glClientWaitSync`, `glDeleteSync` privately for this
+GLCORE adapter before advertising V2. GL3.3 includes the GL3.2 sync contract;
+pinned Sokol does not export those calls or include them in its Win32 loader.
+Use an adapter-private loader/platform GL linkage (including external-runtime
+builds), fail capability negotiation if unavailable; do not patch pinned Sokol or
+expose GL types through portable public records. No CPU-upload/commit shortcut.
+Khronos primary contracts: [fence](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glFenceSync.xhtml),
+[bounded wait](https://registry.khronos.org/OpenGL-Refpages/gl4/html/glClientWaitSync.xhtml).
+
+After all CUI GL commands and end_pass, owned runtime performs its ordinary
+sg_commit; borrowed runtime DOES NOT. Insert a real fence with
+GL_SYNC_GPU_COMMANDS_COMPLETE and flags0. Poll with glClientWaitSync and the flush
+flag, timeout0 by default; an optional wait budget must be finite and<=1ms per
+call, never an unbounded glFinish or busy-spin. Sync calls do not change GL texture,
+program/framebuffer bindings, so they do not invalidate Sokol's binding cache.
+If future upload code binds GL resources directly, restore state AND invalidate
+Sokol cache explicitly; current plan uses sg_init_* for upload instead.
+
+| State | Ownership and allowed next operations |
+| --- | --- |
+| IDLE | Reserved ALLOC slots, no background GPU payload. Query may advertise prepared capacity. |
+| IN_FLIGHT, valid fence | Render may return true (submission accepted); retain initialized views/images and any unconsumed CPU/transfer data. TIMEOUT_EXPIRED stays here; next query/render refuses a new frame until nonblocking polling signals completion. No fresh allocations/batches on timeout. |
+| RETIRED | ALREADY_SIGNALED/CONDITION_SATISFIED: delete fence, uninit views then images to ALLOC, release staging and return IDLE. No inference from sg_commit. |
+| QUARANTINED | Fence creation failure/WAIT_FAILED/unknown completion: render false, retain the ONE batch and refuse further renders/configuration. Explicit recovery may establish ONE replacement fence after the last use in the SAME still-valid GL context (at most two sync objects total); only observed signal retires the payload. No further replacement while one is pending/failed. Do not repeatedly allocate fences/batches on query. |
+| CONTEXT_LOST | Host notifies loss; stop GL calls and refuse reuse. Handles are not valid in a replacement context even if integer names match. Runtime/context owner coordinates teardown; never destroy uncertain resources merely to meet budget. |
+
+A borrowed host still calls its normal sg_commit to advance Sokol frame accounting;
+our fence neither calls that commit nor resets the listener/host frame index.
+Require BOTH GPU retirement and host commit before another render; a commit alone
+is insufficient. A signaled private fence permits resource release without an
+extra host commit. Keep host context/current-thread/lifetime requirements explicit;
+glGetString succeeding in another context does not prove the original survived.
+
+New opt-in V2 lifecycle needs a bool close/release operation preserving the caller's
+adapter pointer on BUSY/QUARANTINED. Poll boundedly; if uncertain, keep ownership
+and retry later. V1-only void destroy stays unchanged. For a V2-enabled pending
+adapter, old void destroy must fail closed/diagnose without freeing uncertain
+resources; applications must use the checked V2 release contract. Once GPU is
+retired, release reserved slots and normal adapter resources under the original
+valid context. If the host destroys that context, the driver owns final GPU
+reclamation; do not call sg_destroy_* in a replacement context. A dedicated
+lost-context teardown contract must discard CUI CPU metadata only AFTER the old
+Sokol runtime/pools are also torn down by their owner. In borrowed mode this is
+a host responsibility, not adapter sg_shutdown. Pinned Sokol has no established
+public abandon-without-GL operation: permanent loss of the original context has
+NO promised in-process cleanup/recovery here. A mere host bool acknowledgement
+cannot make sg_destroy_* safe. Fail closed with the one batch quarantined until
+original-context recovery permits verified cleanup, or owner/process teardown
+reclaims it; do not initialize a replacement runtime and accidentally delete its
+reused numeric objects. Any new context-abandon facility is a separate reviewed
+architecture decision. This limitation must be explicit before production.
+
+### Reserve counts, exact byte formulas and failures
+
+Add explicit adapter-local V2 prepare/configure outside Core composition, with
+requested limits and a completion budget. For Sokol it atomically reserves N
+image AND N view slots via sg_alloc_*; rollback only uninitialized ALLOC slots
+on failure. Reconfiguration reserves only a positive delta, never a duplicate
+full reservation; rollback that delta without losing prior limits. Shrink only
+while IDLE, deallocating unused ALLOC slots. Keep them reserved across frames so the borrowed host cannot steal
+advertised slots. Query reads successful reservation, not total-minus-cache or
+predicted eviction. A reasonable owned-runtime REQUEST is128 pairs (321+128<512),
+but even that must actually reserve or fail; do not silently enlarge V1 pools.
+Borrowed runtime must also actually reserve requested slots or refuse setup.
+Initialization/payload allocation occurs during frame preparation, within byte
+bounds; reservation itself is not proof that every later GPU allocation succeeds.
+After fence retirement, uninit returns those same objects to ALLOC for bounded
+reuse; checked close deallocates them. A quarantined batch still occupies these
+slots and all retained payload bytes: never advertise them as free.
+
+Support reports actual reserved N plus complete pixel/CPU/texture/transfer/metadata
+limits added to the record above. Values are minima of requested limits, shared
+hard ceilings and adapter capacities. Query fails BUSY for active pass, pending
+frame/host commit, lost target/context or quarantine; it cannot advertise support
+while secretly relying on the next render to evict an uncertain batch. Input
+max_commands is a bound on input records, not a guarantee that arbitrary text
+fits max_quads: full-list preparation separately counts expanded glyph/mesh draws.
+
+Core admission remains precise: C=min(config.max_commands,16384,support.max_commands,
+floor(command_bytes/sizeof(command_v2))); B=min(config.max_elements,4096,
+support.max_backgrounds). Background storage requires checked
+M=align_up(config.max_elements*sizeof(uint32_t),alignof(owner_record)), then
+M+B*sizeof(owner_record)<=background_bytes for one optional block; every multiply,
+alignment and sum is checked. Command storage C*sizeof(command_v2)<=command_bytes.
+Reject C0, and B0 when backgrounds requested, before input. A growth begin may
+invalidate/free old frame-only storage before allocating replacement (old borrowed
+lists already expire at begin); failed allocation leaves input queued/context
+usable. Do not allocate a duplicate high-water block and quietly exceed the32MiB
+Core payload cap during growth.
+Zero budgets select defaults; insufficient storage fails begin BEFORE input,
+never quietly shrinks B below the advertised admission bound. Node-map bytes
+are Core-owned; raster/handle reservations are adapter-owned. Copying support
+copies no reservation ownership and does not guarantee availability on a different
+consumer: compatible consumers revalidate their own capacity before painting.
+
+For owned N128/default4096 nodes, common64-bit estimates are16KiB node map +11KiB
+owner records, not4096 records. Use actual sizeof/alignment on every ABI. The
+97MiB staging ceiling remains a conservative additional upper bound, including
+ONE quarantined batch, not97MiB new memory allowed on top of that batch. Immutable
+Sokol images avoid transient multi-slot texture multiplication. Pool reservation
+metadata and up to two sync objects count in metadata_bytes; existing Sokol pools and
+legacy caches/target/driver storage remain separately documented overhead.
+
+Preparation failure BEFORE any GL upload can release CPU data and ALLOC slots
+safely. After any upload/draw has entered GL, even pre-clear failure must finish any
+CUI-owned pass if the context remains valid, then fence/retire or quarantine its
+issued resources; never close an unrelated host pass; preserve old target when failure was
+pre-clear. Timeout/target resize/unknown submission does not transfer ownership
+to Core or caller and never replays actions. Ordinary resize may re-query only
+AFTER retirement; context loss follows the explicit owner teardown above.
+Tests must mock/simulate delayed/failed fences, ALLOC versus initialized pools,
+host stealing unreserved slots, no extra borrowed commit, unchanged V1 pools,
+strict quota arithmetic/alignment, repeated failure without growth, release refusal,
+recoverable context loss versus permanently quarantined teardown, and next-frame
+recovery where completion was actually established. Real GLCORE fence/readback
+proof uses private-Xvfb where available; unsupported GPU checks remain deferred.

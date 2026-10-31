@@ -89,7 +89,9 @@ Latest reliable delivery evidence: [CI](https://github.com/mattmezza/cui/actions
 [browser/deployment](https://github.com/mattmezza/cui/actions/runs/41236071976)
 passed for the merged styling revision. New integration work has focused passes, including 18/18 combined skill tests,
 6/6 usage tests and generated freshness after background preparation integration
-(`2cfe490a`). Candidate `b2a4db93` passed hosted macOS native and native binding
+(`2cfe490a`). Fresh strict C11/headless background checks passed 107 grids and
+8,500 frozen-sampler comparisons; this establishes preparation, not renderer support.
+Candidate `b2a4db93` passed hosted macOS native and native binding
 checks. Spinner passed four local viewport/DPI cases, but its hosted idle failure
 is unresolved. The latest combined native run and browser gate are **not clean**.
 Older green results do not cover newer code.

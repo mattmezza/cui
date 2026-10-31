@@ -110,7 +110,13 @@ typedef enum {
     CUI_EVENT_POINTER_LEAVE
 } cui_event_type;
 /* Targeted semantic actions, independent of pointer or keyboard input. */
-typedef enum { CUI_ACCESSIBILITY_FOCUS, CUI_ACCESSIBILITY_ACTIVATE } cui_accessibility_action;
+typedef enum {
+    CUI_ACCESSIBILITY_FOCUS = 0,
+    CUI_ACCESSIBILITY_ACTIVATE = 1,
+    CUI_ACCESSIBILITY_INCREMENT = 2,
+    CUI_ACCESSIBILITY_DECREMENT = 3,
+    CUI_ACCESSIBILITY_SET_VALUE = 4
+} cui_accessibility_action;
 typedef enum {
     CUI_KEY_NONE,
     CUI_KEY_TAB,
@@ -657,6 +663,42 @@ bool cui_queue_event(cui_context *ui, cui_event event);
  * lifecycle/capacity failure leaves the queue and interaction state unchanged. */
 bool cui_accessibility_action_supported(const cui_context *, cui_id, cui_accessibility_action);
 bool cui_queue_accessibility_action(cui_context *, cui_id, cui_accessibility_action);
+/* Explicit numeric consumer opt-in, per current painted Slider semantic. Never
+ * inferred for legacy controls. Zero mask before opt-in allocates nothing; the
+ * first valid nonzero mask lazily allocates bounded context-owned storage.
+ * Unknown bits/missing ID/wrong role/lifecycle reject unchanged; allocation
+ * failure reports CAPACITY. Disabled/readonly/modal eligibility still gates it. */
+#define CUI_ACCESSIBILITY_NUMERIC_INCREMENT (1u << 0)
+#define CUI_ACCESSIBILITY_NUMERIC_DECREMENT (1u << 1)
+#define CUI_ACCESSIBILITY_NUMERIC_SET_VALUE (1u << 2)
+#define CUI_ACCESSIBILITY_NUMERIC_INPUT_V1 1u
+#define CUI_ACCESSIBILITY_NUMERIC_HAS_VALUE 1u
+typedef struct {
+    uint32_t version, reserved; /* exactly1,0 */
+    double value;               /* finite, published semantic numeric units; not domain inference */
+} cui_accessibility_set_value_v1;
+typedef struct {
+    uint32_t version, action, flags, reserved;
+    cui_id target;
+    double value; /* only HAS_VALUE; canonical0 for increment/decrement */
+} cui_accessibility_numeric_input_v1;
+bool cui_set_accessibility_numeric_actions(cui_context *, cui_id, uint32_t mask);
+/* Valid completed Core semantic snapshot, NOT renderer/physical-AT success.
+ * False before first successful end, in-frame, or after invalidating failure;
+ * error clear alone does not restore it. Does not allocate or grant capability. */
+bool cui_accessibility_numeric_snapshot_ready(const cui_context *);
+/* Exact v1 size/version/reserved required. Copies scalar before return; invalid,
+ * unsupported, lifecycle or capacity failure leaves queued input unchanged.
+ * Generic no-payload SET_VALUE enqueue is invalid (never guesses zero). */
+bool cui_queue_accessibility_set_value_v1(cui_context *, cui_id, uint32_t payload_size,
+                                          const cui_accessibility_set_value_v1 *);
+/* Painted current-semantic claim rechecks previous/current role, capability,
+ * scope, enabled/readonly and actual input. Success consumes once independently
+ * of owner acceptance; no focus/capture/activation/key fabricated. Failure leaves
+ * output/consumption unchanged. Copy survives callback/frame/context lifetime. */
+bool cui_claim_accessibility_numeric_input_v1(cui_context *, cui_id, size_t event_index,
+                                              uint32_t output_size,
+                                              cui_accessibility_numeric_input_v1 *out);
 
 bool cui_begin_frame(cui_context *ui, float width, float height, float dt);
 bool cui_frame_active(const cui_context *);

@@ -2291,5 +2291,19 @@
     ],
     "scope": "Opt-in C Core only: current intrinsic Y body allocation and standalone Y clamping with fixed current widths and hidden/overlay scrollbars. Existing Scrollable/Base/Dialog APIs and all five foreign builders remain unchanged; this is not full slot composition or general constraint closure.",
     "capacity": "32 body links and 64 total clamps, two per body; records copied and distinct application offset destinations borrowed through end_frame."
+  },
+  "core_numeric_accessibility": {
+    "public_header": "include/cui/cui.h",
+    "api_symbols": [
+      "cui_set_accessibility_numeric_actions",
+      "cui_accessibility_numeric_snapshot_ready",
+      "cui_queue_accessibility_set_value_v1",
+      "cui_claim_accessibility_numeric_input_v1"
+    ],
+    "docs": [
+      "docs/CORE_NUMERIC_ACCESSIBILITY.md"
+    ],
+    "scope": "Unreleased C Core-only explicit numeric consumer capability, owned typed SET_VALUE input and current-semantic claim. No host/model/bridge or five-language builder authoring; legacy controls never opt in automatically.",
+    "capacity": "Lazy allocation on first valid nonzero mask only: sizeof private state plus 8*max_elements bytes, including two EVENT_MAX=256 owned scalar sidecars; retained until context destroy."
   }
 }

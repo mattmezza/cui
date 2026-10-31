@@ -119,7 +119,19 @@ typedef struct {
     float size;
 } cui_core_text_source;
 typedef struct cui_core_scroll_layout_header cui_core_scroll_layout_header;
+typedef struct {
+    double value;
+    bool present;
+} cui_core_numeric_slot;
+typedef struct {
+    size_t frame_origin_count;
+    cui_core_numeric_slot queued[CUI_CORE_EVENT_MAX], frame[CUI_CORE_EVENT_MAX];
+    uint32_t masks[]; /* current[max_elements], previous[max_elements] */
+} cui_core_numeric_state;
+
 struct cui_context {
+    cui_core_numeric_state *numeric;
+    bool numeric_snapshot_ready, numeric_frame_invalid;
     const cui_core_scroll_layout_header *scroll_layout;
     int tab_path[32];
     size_t tab_depth;
@@ -269,6 +281,10 @@ void cui_report_diagnostic(cui_context *ui, const cui_diagnostic *source) {
     if (ui->error == CUI_OK) {
         ui->error = d.error;
         ui->first_diagnostic = d;
+    }
+    if (ui->in_frame && d.error != CUI_OK) {
+        ui->numeric_snapshot_ready = false;
+        ui->numeric_frame_invalid = true;
     }
     ui->latest_diagnostic = d;
     if (ui->diagnostic_callback) {
@@ -744,6 +760,7 @@ void cui_destroy(cui_context *ui) {
         free(ui->queued_text[i]);
         free(ui->frame_text[i]);
     }
+    free(ui->numeric);
     free(ui->scroll_gestures);
     free(ui->previous_scroll_gestures);
     free(ui->resources);
@@ -1268,15 +1285,133 @@ static bool cui_core_accessibility_activate(const cui_semantic *s) {
         return false;
     }
 }
+static uint32_t cui_core_numeric_bit(cui_accessibility_action action) {
+    switch (action) {
+    case CUI_ACCESSIBILITY_INCREMENT:
+        return CUI_ACCESSIBILITY_NUMERIC_INCREMENT;
+    case CUI_ACCESSIBILITY_DECREMENT:
+        return CUI_ACCESSIBILITY_NUMERIC_DECREMENT;
+    case CUI_ACCESSIBILITY_SET_VALUE:
+        return CUI_ACCESSIBILITY_NUMERIC_SET_VALUE;
+    default:
+        return 0;
+    }
+}
+static bool cui_core_numeric_eligible(const cui_semantic *s, uint32_t mask,
+                                      cui_accessibility_action action) {
+    return s->role == CUI_ROLE_SLIDER && !s->disabled && !s->details.readonly &&
+           (mask & cui_core_numeric_bit(action)) != 0;
+}
+bool cui_accessibility_numeric_snapshot_ready(const cui_context *ui) {
+    return ui && !ui->in_frame && ui->numeric_snapshot_ready && ui->error == CUI_OK;
+}
+bool cui_set_accessibility_numeric_actions(cui_context *ui, cui_id id, uint32_t mask) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui || !cui_frame_is_submitting(ui)) {
+        if (ui)
+            cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        return false;
+    }
+    if (cui_core_inert(ui) || cui_core_layout_only(ui))
+        return false;
+    if (ui->error != CUI_OK)
+        return false;
+    if (!id || (mask & ~UINT32_C(7))) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    for (size_t i = 0; i < ui->semantic_count; ++i) {
+        if (ui->semantics[i].id != id)
+            continue;
+        if (ui->semantics[i].role != CUI_ROLE_SLIDER)
+            break;
+        size_t node = ui->semantic_nodes[i];
+        if (node != SIZE_MAX && (ui->nodes[node].inert || ui->nodes[node].layout_only))
+            return false;
+        if (!ui->numeric && mask) {
+            size_t n = ui->config.max_elements;
+            if (n > (SIZE_MAX - sizeof(cui_core_numeric_state)) / (2 * sizeof(uint32_t))) {
+                cui_core_capacity(ui, "numeric accessibility", id, 0, n, 0);
+                return false;
+            }
+            cui_core_numeric_state *state = calloc(1, sizeof(*state) + 2 * n * sizeof(uint32_t));
+            if (!state) {
+                cui_core_capacity(ui, "numeric accessibility", id, 0, n, n);
+                return false;
+            }
+            ui->numeric = state;
+        }
+        if (ui->numeric)
+            ui->numeric->masks[i] = mask;
+        return true;
+    }
+    cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+    return false;
+}
+static bool cui_core_numeric_current(const cui_context *ui, cui_id id,
+                                     cui_accessibility_action action) {
+    if (!ui->numeric || !ui->numeric_snapshot_ready || ui->error != CUI_OK)
+        return false;
+    bool previous = false;
+    for (size_t p = 0; p < ui->previous_count; ++p)
+        if (ui->previous[p].id == id && cui_core_previous_allowed(ui, p) &&
+            cui_core_numeric_eligible(&ui->previous[p],
+                                      ui->numeric->masks[ui->config.max_elements + p], action))
+            previous = true;
+    if (!previous)
+        return false;
+    for (size_t n = 0; n < ui->semantic_count; ++n)
+        if (ui->semantics[n].id == id &&
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal) &&
+            cui_core_numeric_eligible(&ui->semantics[n], ui->numeric->masks[n], action))
+            return true;
+    return false;
+}
+bool cui_claim_accessibility_numeric_input_v1(cui_context *ui, cui_id id, size_t index,
+                                              uint32_t size,
+                                              cui_accessibility_numeric_input_v1 *out) {
+    if (!cui_core_mutation(ui) || !ui || !cui_frame_paint_enabled(ui) || cui_core_inert(ui) ||
+        !out || size != sizeof(*out) || index >= ui->event_count || ui->event_consumed[index])
+        return false;
+    cui_event e = ui->events[index];
+    if (e.type != CUI_EVENT_ACCESSIBILITY_ACTION || !cui_core_numeric_bit(e.accessibility_action) ||
+        !id || e.accessibility_target != id || ui->event_targets[index] != id ||
+        !cui_core_numeric_current(ui, id, e.accessibility_action))
+        return false;
+    cui_accessibility_numeric_input_v1 value = {
+        .version = 1, .action = (uint32_t)e.accessibility_action, .target = id};
+    if (e.accessibility_action == CUI_ACCESSIBILITY_SET_VALUE) {
+        size_t origin = ui->event_origin[index];
+        if (origin >= ui->numeric->frame_origin_count || !ui->numeric->frame[origin].present ||
+            !isfinite(ui->numeric->frame[origin].value))
+            return false;
+        value.flags = CUI_ACCESSIBILITY_NUMERIC_HAS_VALUE;
+        value.value = ui->numeric->frame[origin].value;
+    }
+    if (!cui_consume_event(ui, index))
+        return false;
+    *out = value;
+    return true;
+}
 static bool cui_core_accessibility_supported(const cui_context *ui, cui_id id,
                                              cui_accessibility_action action) {
-    if (!ui || !id || (action != CUI_ACCESSIBILITY_FOCUS && action != CUI_ACCESSIBILITY_ACTIVATE))
+    if (!ui || !id)
+        return false;
+    uint32_t numeric = cui_core_numeric_bit(action);
+    if (!numeric && action != CUI_ACCESSIBILITY_FOCUS && action != CUI_ACCESSIBILITY_ACTIVATE)
+        return false;
+    if (numeric && (!ui->numeric || !ui->numeric_snapshot_ready || ui->error != CUI_OK))
         return false;
     for (size_t i = 0; i < ui->previous_count; i++)
-        if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i))
+        if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i)) {
+            if (numeric)
+                return cui_core_numeric_eligible(
+                    &ui->previous[i], ui->numeric->masks[ui->config.max_elements + i], action);
             return action == CUI_ACCESSIBILITY_FOCUS
                        ? cui_core_focusable(&ui->previous[i])
                        : cui_core_accessibility_activate(&ui->previous[i]);
+        }
     return false;
 }
 bool cui_accessibility_action_supported(const cui_context *ui, cui_id id,
@@ -1290,7 +1425,7 @@ bool cui_queue_accessibility_action(cui_context *ui, cui_id id, cui_accessibilit
                                            .accessibility_target = id,
                                            .accessibility_action = action});
 }
-bool cui_queue_event(cui_context *ui, cui_event e) {
+static bool cui_core_queue_event(cui_context *ui, cui_event e, const double *numeric_value) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui)
@@ -1302,7 +1437,8 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
     if (e.type == CUI_EVENT_POINTER_ENTER || e.type == CUI_EVENT_POINTER_LEAVE)
         e = (cui_event){.type = e.type};
     if (e.type == CUI_EVENT_ACCESSIBILITY_ACTION) {
-        if (!cui_core_accessibility_supported(ui, e.accessibility_target, e.accessibility_action)) {
+        if ((e.accessibility_action == CUI_ACCESSIBILITY_SET_VALUE && !numeric_value) ||
+            !cui_core_accessibility_supported(ui, e.accessibility_target, e.accessibility_action)) {
             cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
             return false;
         }
@@ -1332,10 +1468,31 @@ bool cui_queue_event(cui_context *ui, cui_event e) {
         e.text_data = copy;
         ui->queued_text_bytes += e.text_length;
     }
+    if (ui->numeric)
+        ui->numeric->queued[ui->queued_count] =
+            (cui_core_numeric_slot){numeric_value ? *numeric_value : 0, numeric_value != NULL};
     ui->queued_text[ui->queued_count] = copy;
     ui->queued[ui->queued_count++] = e;
     ui->dirty = true;
     return true;
+}
+bool cui_queue_event(cui_context *ui, cui_event e) {
+    return cui_core_queue_event(ui, e, NULL);
+}
+bool cui_queue_accessibility_set_value_v1(cui_context *ui, cui_id id, uint32_t size,
+                                          const cui_accessibility_set_value_v1 *value) {
+    if (!cui_core_mutation(ui) || !ui)
+        return false;
+    if (!value || size != sizeof(*value) || value->version != 1 || value->reserved ||
+        !isfinite(value->value)) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    return cui_core_queue_event(ui,
+                                (cui_event){.type = CUI_EVENT_ACCESSIBILITY_ACTION,
+                                            .accessibility_target = id,
+                                            .accessibility_action = CUI_ACCESSIBILITY_SET_VALUE},
+                                &value->value);
 }
 static void cui_core_finalize_text_input(cui_context *ui) {
     cui_text_input_state next = {0};
@@ -1385,10 +1542,12 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         return false;
     }
     if (!isfinite(w) || !isfinite(h) || w < 0 || h < 0 || !isfinite(dt) || dt < 0) {
+        ui->numeric_snapshot_ready = false;
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
     }
-    ui->scroll_layout = NULL; /* Drop cached resource before collection/destruction. */
+    ui->numeric_frame_invalid = false; /* A fresh admitted frame alone resets invalidity. */
+    ui->scroll_layout = NULL;          /* Drop cached resource before collection/destruction. */
     for (size_t i = 0; i < ui->config.max_resources; ++i) {
         cui_core_resource *r = &ui->resources[i];
         if (!r->payload)
@@ -1429,6 +1588,13 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         ui->queued_text[i] = NULL;
     }
     ui->queued_text_bytes = 0;
+    if (ui->numeric) {
+        memset(ui->numeric->frame, 0, sizeof(ui->numeric->frame));
+        memcpy(ui->numeric->frame, ui->numeric->queued,
+               ui->queued_count * sizeof(ui->numeric->queued[0]));
+        memset(ui->numeric->queued, 0, sizeof(ui->numeric->queued));
+        ui->numeric->frame_origin_count = ui->queued_count;
+    }
     ui->event_count = ui->queued_count;
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     for (size_t i = 0; i < ui->event_count; i++)
@@ -1513,7 +1679,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
             if (e.accessibility_action == CUI_ACCESSIBILITY_FOCUS) {
                 cui_core_set_focus(ui, e.accessibility_target);
                 ui->focus_visible = true;
-            } else {
+            } else if (e.accessibility_action == CUI_ACCESSIBILITY_ACTIVATE) {
                 cui_core_activate(ui, e.accessibility_target);
                 ui->event_activations[i] = e.accessibility_target;
                 ui->event_activation_slots[i] = ui->activation_count - 1;
@@ -3241,6 +3407,8 @@ cui_interaction cui_interact(cui_context *ui, cui_id id, cui_role role, cui_str 
         ui->focus_depth ? ui->focus_stack[ui->focus_depth - 1] : SIZE_MAX;
     ui->semantic_nodes[ui->semantic_count] =
         ui->depth && ui->opened[ui->depth - 1] ? ui->node_stack[ui->depth - 1] : SIZE_MAX;
+    if (ui->numeric)
+        ui->numeric->masks[ui->semantic_count] = 0;
     ui->semantics[ui->semantic_count++] = (cui_semantic){.id = id,
                                                          .role = role,
                                                          .bounds = bounds,
@@ -4209,6 +4377,8 @@ cui_core_commands_done:
         }
         if (node != SIZE_MAX && (ui->nodes[node].inert || ui->nodes[node].layout_only))
             continue;
+        if (ui->numeric)
+            ui->numeric->masks[visible] = ui->numeric->masks[i];
         ui->semantics[visible] = ui->semantics[i];
         ui->semantic_scopes[visible] = ui->semantic_scopes[i];
         ui->semantic_nodes[visible++] = node;
@@ -4226,9 +4396,13 @@ cui_core_commands_done:
                 for (size_t p = 0; p < ui->previous_count; p++)
                     if (ui->previous[p].id == ui->semantics[n].id &&
                         ui->previous[p].role == ui->semantics[n].role)
-                        allowed = ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS
-                                      ? cui_core_focusable(&ui->semantics[n])
-                                      : cui_core_accessibility_activate(&ui->semantics[n]);
+                        allowed =
+                            ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS
+                                ? cui_core_focusable(&ui->semantics[n])
+                            : ui->events[e].accessibility_action == CUI_ACCESSIBILITY_ACTIVATE
+                                ? cui_core_accessibility_activate(&ui->semantics[n])
+                                : cui_core_numeric_current(ui, ui->semantics[n].id,
+                                                           ui->events[e].accessibility_action);
         if (!allowed) {
             if (ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS &&
                 ui->focus == ui->events[e].accessibility_target)
@@ -4345,6 +4519,17 @@ cui_core_commands_done:
     memcpy(ui->previous_scroll_gestures, ui->scroll_gestures,
            ui->semantic_count * sizeof(*ui->scroll_gestures));
     memcpy(ui->previous, ui->semantics, ui->semantic_count * sizeof(*ui->previous));
+    if (ui->numeric) {
+        if (ui->error == CUI_OK && !ui->numeric_frame_invalid)
+            memcpy(ui->numeric->masks + ui->config.max_elements, ui->numeric->masks,
+                   ui->semantic_count * sizeof(uint32_t));
+        else {
+            memset(ui->numeric->masks, 0, 2 * ui->config.max_elements * sizeof(uint32_t));
+            memset(ui->numeric->frame, 0, sizeof(ui->numeric->frame));
+            ui->numeric->frame_origin_count = 0;
+        }
+    }
+    ui->numeric_snapshot_ready = ui->error == CUI_OK && !ui->numeric_frame_invalid;
     ui->previous_count = ui->semantic_count;
     if (ui->composition_owner != ui->focus)
         ui->composition_owner = 0;
@@ -5089,6 +5274,8 @@ bool cui_dismiss_focus_scope(cui_context *ui, cui_id scope, cui_id trigger) {
     for (size_t i = 0; i < ui->semantic_count; i++) {
         if (cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], dismissed))
             continue;
+        if (ui->numeric)
+            ui->numeric->masks[retained] = ui->numeric->masks[i];
         ui->semantics[retained] = ui->semantics[i];
         ui->semantic_scopes[retained] = ui->semantic_scopes[i];
         ui->semantic_nodes[retained] = ui->semantic_nodes[i];

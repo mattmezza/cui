@@ -316,3 +316,11 @@ Aurora Light two-stop gradient. Custom themes never acquire a named identity.
 These values do not change Slider rendering: there is no palette setter, brush
 sampler or Python/JS/TS/Go/Rust builder API. Disabled/theme presentation remains
 partial; do not claim complete Slider parity from these values.
+
+## Core numeric accessibility input
+
+Read `docs/CORE_NUMERIC_ACCESSIBILITY.md` and exact `include/cui/cui.h` before
+using explicit numeric capabilities, typed SET_VALUE queueing or claims. Legacy
+Slider roles do not opt in automatically. Snapshot readiness certifies completed
+Core semantics only; not rendering, native numeric AT delivery or owner acceptance.
+No new host/model/bridge/Python/JS/TS/Go/Rust numeric authoring is implied.

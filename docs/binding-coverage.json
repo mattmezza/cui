@@ -992,5 +992,16 @@
       "bindings/go/cui/shadows_test.go",
       "bindings/rust/tests/shadows.rs"
     ]
+  },
+  "compound_paint_id_getters": {
+    "scope": "C-only additive identity getters for Bubble, Message, MessageScroller, Notification and Attachment; pure identity does not establish current-frame presence.",
+    "public_headers": [
+      "include/cui/cui_content.h",
+      "include/cui/cui_message.h",
+      "include/cui/cui_status.h",
+      "include/cui/cui_media.h"
+    ],
+    "language_builder_targets": "pending; MAIN/ROOT/subpart proposal is not an implemented binding facade",
+    "guide": "docs/COMPOUND_SHADOW_PARTS.md"
   }
 }

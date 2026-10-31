@@ -158,6 +158,20 @@ bool cui_shimmer_text(cui_context *, cui_id, const cui_theme *, cui_shimmer_stat
 typedef struct {
     uint64_t type, key;
 } cui_notification_id;
+/* Pure in-app paint identity: scope is passed to cui_notifications(), whereas
+ * logical_id is the model's {type,key}. Neither scope nor logical key alone is
+ * a card paint ID. Zero scope/{0,0}/invalid part returns 0; no state lookup or
+ * presence/visibility guarantee. System-only/omitted/layout-only cards reject
+ * element styling; custom action callbacks need not submit their namespace box.
+ * Existing hash/folding collisions and architecture conversions are preserved. */
+typedef enum {
+    CUI_NOTIFICATION_PART_CARD = 0,
+    CUI_NOTIFICATION_PART_CONTENT = 1,
+    CUI_NOTIFICATION_PART_ACTION = 2,
+    CUI_NOTIFICATION_PART_CLOSE = 3
+} cui_notification_part;
+cui_id cui_notification_part_id(cui_id scope, cui_notification_id logical_id,
+                                cui_notification_part part);
 typedef enum {
     CUI_NOTIFICATION_UNTYPED,
     CUI_NOTIFICATION_INFO,

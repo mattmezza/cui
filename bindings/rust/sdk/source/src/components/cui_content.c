@@ -23,6 +23,18 @@ static void cui_content_semantic(cui_context *ui, cui_id id, cui_role role, cui_
 static cui_id cui_content_child(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x874e65fa19c80721) + UINT64_C(0x9e3779b97f4a7c15) * index);
 }
+cui_id cui_bubble_part_id(cui_id id, cui_bubble_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_BUBBLE_PART_SURFACE:
+        return cui_content_child(id, 3);
+    case CUI_BUBBLE_PART_REACTIONS:
+        return cui_content_child(id, 5);
+    default:
+        return 0;
+    }
+}
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options o) {
     if (!ui || !t || o.kind < CUI_ALERT_INFO || o.kind > CUI_ALERT_DEFAULT ||
         (o.visible && !*o.visible))

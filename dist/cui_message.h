@@ -53,6 +53,17 @@ cui_message_options cui_message_options_default(void);
 /* Pure composition validation/geometry. No theme implementation dependency. */
 bool cui_base_message(cui_message_options, cui_message_plan *);
 bool cui_message(cui_context *, cui_id, const cui_theme *, cui_message_options);
+/* Pure slot identities, not presence queries. Zero root/invalid part/index
+ * returns 0. Metadata slots may be omitted; custom renderers own descendants.
+ * A body ID names the actual surface only for typed_bubble; otherwise a slot row.
+ * Positional body indices do not retain application identity after reordering. */
+typedef enum {
+    CUI_MESSAGE_PART_AVATAR = 0,
+    CUI_MESSAGE_PART_HEADER = 1,
+    CUI_MESSAGE_PART_FOOTER = 2
+} cui_message_part;
+cui_id cui_message_part_id(cui_id message, cui_message_part part);
+cui_id cui_message_body_id(cui_id message, size_t body_index); /* < 256 */
 void cui_begin_message_group(cui_context *, cui_id, float width, float gap);
 void cui_end_message_group(cui_context *);
 /* Retains only layout/scroll bookkeeping, never application message records. */
@@ -112,6 +123,19 @@ typedef struct {
 cui_message_scroller_options cui_message_scroller_options_default(void);
 bool cui_message_scroller_validate_options(cui_message_scroller_options);
 cui_id cui_message_scroller_jump_id(cui_id);
+/* Identity only: no painting/layout/model mutation or current-frame presence
+ * check. Zero owner/invalid part/null state/out-of-range index returns 0.
+ * Row identity follows existing retained keys across splice; index is only a
+ * lookup coordinate. Reset/new rows use new keys. State must still be alive.
+ * Offscreen rows and disabled/fully faded jump buttons may have no paint box. */
+typedef enum {
+    CUI_MESSAGE_SCROLLER_PART_VIEWPORT = 0,
+    CUI_MESSAGE_SCROLLER_PART_JUMP = 1
+} cui_message_scroller_part;
+cui_id cui_message_scroller_part_id(cui_id scroller, cui_message_scroller_part part);
+cui_id cui_message_scroller_row_id(cui_id scroller, const cui_message_scroller_state *,
+                                   size_t index);
+
 cui_message_scroller_result cui_base_message_scroller(cui_context *, cui_id,
                                                       cui_message_scroller_state *,
                                                       cui_message_scroller_options);
@@ -138,6 +162,41 @@ cui_message_scroller_result cui_message_scroller(cui_context *, cui_id, const cu
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+cui_id cui_message_private_paint_id(cui_id id, size_t i) {
+    uint64_t x = id + UINT64_C(0x9e3779b97f4a7c15) * (i + 1);
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return x ^ (x >> 31);
+}
+cui_id cui_message_part_id(cui_id id, cui_message_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_MESSAGE_PART_AVATAR:
+        return cui_message_private_paint_id(id, 1);
+    case CUI_MESSAGE_PART_HEADER:
+        return cui_message_private_paint_id(id, 3);
+    case CUI_MESSAGE_PART_FOOTER:
+        return cui_message_private_paint_id(id, 7);
+    default:
+        return 0;
+    }
+}
+cui_id cui_message_body_id(cui_id id, size_t index) {
+    return id && index < 256 ? cui_message_private_paint_id(id, 20 + index) : 0;
+}
+cui_id cui_message_scroller_part_id(cui_id id, cui_message_scroller_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_MESSAGE_SCROLLER_PART_VIEWPORT:
+        return cui_message_private_paint_id(id, 100);
+    case CUI_MESSAGE_SCROLLER_PART_JUMP:
+        return cui_message_scroller_jump_id(id);
+    default:
+        return 0;
+    }
+}
 static bool cui_message_private_slot_present(cui_message_slot s) {
     return s.present || s.text.length || s.render;
 }
@@ -206,6 +265,11 @@ struct cui_message_scroller_state {
     float previous_width;
 };
 #endif
+cui_id cui_message_scroller_row_id(cui_id id, const cui_message_scroller_state *s, size_t index) {
+    return id && s && index < s->count
+               ? cui_message_private_paint_id(id, (size_t)s->rows[index].key + 200)
+               : 0;
+}
 static double cui_message_private_total(cui_message_scroller_state *s) {
     return s->metrics.padding_top + cui_virtual_total(s->list) + s->metrics.padding_bottom;
 }
@@ -698,12 +762,8 @@ struct cui_message_scroller_state {
     float previous_width;
 };
 #endif
-static cui_id cui_message_component_child(cui_id id, size_t i) {
-    uint64_t x = id + UINT64_C(0x9e3779b97f4a7c15) * (i + 1);
-    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
-    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
-    return x ^ (x >> 31);
-}
+/* Shared private Base derivation; no state copy or independent hash recipe. */
+cui_id cui_message_private_paint_id(cui_id, size_t);
 static void cui_message_component_space(cui_context *ui, cui_id id, float width, float height) {
     cui_begin_box(
         ui, id,
@@ -724,9 +784,9 @@ static void cui_message_component_render_slot(cui_context *ui, cui_id id, cui_me
                             .gap = 0,
                             .align_y = CUI_ALIGN_CENTER});
     if (inset)
-        cui_message_component_space(ui, cui_message_component_child(id, 0), inset, 0);
+        cui_message_component_space(ui, cui_message_private_paint_id(id, 0), inset, 0);
     cui_begin_box(
-        ui, cui_message_component_child(id, 1),
+        ui, cui_message_private_paint_id(id, 1),
         (cui_box){.row = true,
                   .width = fmaxf(0, width - 2 * inset),
                   .gap = gap,
@@ -734,12 +794,12 @@ static void cui_message_component_render_slot(cui_context *ui, cui_id id, cui_me
                   .align_x = style.alignment == CUI_MESSAGE_END ? CUI_ALIGN_END : CUI_ALIGN_START});
     style.width = fmaxf(0, width - 2 * inset);
     if (slot.render)
-        slot.render(ui, cui_message_component_child(id, 2), slot.user, style);
+        slot.render(ui, cui_message_private_paint_id(id, 2), slot.user, style);
     else if (slot.text.length)
         cui_text(ui, slot.text, style.font_size, style.color);
     cui_end_box(ui);
     if (inset)
-        cui_message_component_space(ui, cui_message_component_child(id, 3), inset, 0);
+        cui_message_component_space(ui, cui_message_private_paint_id(id, 3), inset, 0);
     cui_end_box(ui);
 }
 static void cui_message_component_avatar(cui_context *ui, cui_id id, const cui_theme *t,
@@ -756,7 +816,7 @@ static void cui_message_component_avatar(cui_context *ui, cui_id id, const cui_t
                             .background = t->surface});
     cui_message_style style = {width, t->font_size, t->text, alignment};
     if (slot.render)
-        slot.render(ui, cui_message_component_child(id, 0), slot.user, style);
+        slot.render(ui, cui_message_private_paint_id(id, 0), slot.user, style);
     else if (slot.text.length)
         cui_text(ui, slot.text, t->font_size, t->text);
     cui_end_box(ui);
@@ -771,27 +831,27 @@ bool cui_message(cui_context *ui, cui_id id, const cui_theme *t, cui_message_opt
         cui_interact(ui, id, o.role, o.name, false, false, 0);
         cui_set_tab_stop(ui, id, false);
     }
-    cui_begin_box(ui, cui_message_component_child(id, 0),
+    cui_begin_box(ui, cui_message_private_paint_id(id, 0),
                   (cui_box){.width = o.width,
                             .row = true,
                             .gap = o.row_gap,
                             .align_y = CUI_ALIGN_END,
                             .align_x = align});
     if (p.avatar && o.alignment == CUI_MESSAGE_START)
-        cui_message_component_avatar(ui, cui_message_component_child(id, 1), t, o.avatar,
+        cui_message_component_avatar(ui, cui_message_private_paint_id(id, 1), t, o.avatar,
                                      o.alignment);
-    cui_begin_box(ui, cui_message_component_child(id, 2),
+    cui_begin_box(ui, cui_message_private_paint_id(id, 2),
                   (cui_box){.width = p.column_width, .gap = o.stack_gap, .align_x = align});
     cui_message_style metadata = {p.column_width, t->font_size * (12.0f / 14), t->muted,
                                   o.alignment};
     if (p.header)
-        cui_message_component_render_slot(ui, cui_message_component_child(id, 3), o.header,
+        cui_message_component_render_slot(ui, cui_message_private_paint_id(id, 3), o.header,
                                           metadata, p.header_inset ? 12 : 0, o.metadata_gap);
-    cui_begin_box(ui, cui_message_component_child(id, 4),
+    cui_begin_box(ui, cui_message_private_paint_id(id, 4),
                   (cui_box){.width = p.column_width, .gap = o.stack_gap, .align_x = align});
     for (size_t i = 0; i < o.body_count; i++) {
         const cui_message_body *body = &o.body[i];
-        cui_id child = cui_message_component_child(id, i + 20);
+        cui_id child = cui_message_private_paint_id(id, i + 20);
         cui_message_style style = {p.column_width, t->font_size, t->text, o.alignment};
         if (body->typed_bubble) {
             float width = body->slot.width > 0 ? fminf(body->slot.width, p.column_width)
@@ -804,7 +864,7 @@ bool cui_message(cui_context *ui, cui_id id, const cui_theme *t, cui_message_opt
             style.width = fmaxf(0, width - (body->bubble == CUI_BUBBLE_GHOST ? 0 : 2 * t->padding));
             style.color = body->bubble == CUI_BUBBLE_FILLED ? t->on_primary : t->text;
             if (body->slot.render)
-                body->slot.render(ui, cui_message_component_child(child, 0), body->slot.user,
+                body->slot.render(ui, cui_message_private_paint_id(child, 0), body->slot.user,
                                   style);
             else if (body->slot.text.length)
                 cui_text(ui, body->slot.text, style.font_size, style.color);
@@ -815,18 +875,20 @@ bool cui_message(cui_context *ui, cui_id id, const cui_theme *t, cui_message_opt
     cui_end_box(ui);
     cui_end_box(ui);
     if (p.avatar && o.alignment == CUI_MESSAGE_END)
-        cui_message_component_avatar(ui, cui_message_component_child(id, 1), t, o.avatar,
+        cui_message_component_avatar(ui, cui_message_private_paint_id(id, 1), t, o.avatar,
                                      o.alignment);
     cui_end_box(ui);
     if (p.footer) {
-        cui_begin_box(ui, cui_message_component_child(id, 5),
+        cui_begin_box(ui, cui_message_private_paint_id(id, 5),
                       (cui_box){.width = o.width, .row = true, .align_x = align});
         if (p.avatar && o.alignment == CUI_MESSAGE_START)
-            cui_message_component_space(ui, cui_message_component_child(id, 6), p.footer_offset, 0);
-        cui_message_component_render_slot(ui, cui_message_component_child(id, 7), o.footer,
+            cui_message_component_space(ui, cui_message_private_paint_id(id, 6), p.footer_offset,
+                                        0);
+        cui_message_component_render_slot(ui, cui_message_private_paint_id(id, 7), o.footer,
                                           metadata, p.footer_inset ? 12 : 0, o.metadata_gap);
         if (p.avatar && o.alignment == CUI_MESSAGE_END)
-            cui_message_component_space(ui, cui_message_component_child(id, 6), p.footer_offset, 0);
+            cui_message_component_space(ui, cui_message_private_paint_id(id, 6), p.footer_offset,
+                                        0);
         cui_end_box(ui);
     }
     cui_end_box(ui);
@@ -891,27 +953,27 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
                             .fixed_height = true,
                             .row = true,
                             .clip = true});
-    cui_begin_box(ui, cui_message_component_child(id, 100),
+    cui_begin_box(ui, cui_message_private_paint_id(id, 100),
                   (cui_box){.width = width,
                             .height = o.height,
                             .clip = true,
                             .offset_y = (float)(r.view.before - r.view.scroll)});
     for (size_t i = r.view.begin; i < r.view.end; i++) {
-        cui_id row = cui_message_component_child(id, (size_t)s->rows[i].key + 200);
+        cui_id row = cui_message_private_paint_id(id, (size_t)s->rows[i].key + 200);
         cui_begin_box(ui, row, (cui_box){.width = width});
         cui_track_bounds(ui, row, &s->rows[i].bounds);
-        cui_begin_box(ui, cui_message_component_child(row, 0),
+        cui_begin_box(ui, cui_message_private_paint_id(row, 0),
                       (cui_box){.row = true, .width = width});
-        cui_message_component_space(ui, cui_message_component_child(row, 1), o.inset_left, 0);
+        cui_message_component_space(ui, cui_message_private_paint_id(row, 1), o.inset_left, 0);
         float available = fmaxf(0, width - o.inset_left - o.inset_right);
-        cui_begin_box(ui, cui_message_component_child(row, 2), (cui_box){.width = available});
-        render(ui, cui_message_component_child(row, 3), i, user, available);
+        cui_begin_box(ui, cui_message_private_paint_id(row, 2), (cui_box){.width = available});
+        render(ui, cui_message_private_paint_id(row, 3), i, user, available);
         cui_end_box(ui);
-        cui_message_component_space(ui, cui_message_component_child(row, 4), o.inset_right, 0);
+        cui_message_component_space(ui, cui_message_private_paint_id(row, 4), o.inset_right, 0);
         cui_end_box(ui);
         s->rows[i].render_gap = i + 1 < s->count ? o.row_gap : 0;
         if (s->rows[i].render_gap)
-            cui_message_component_space(ui, cui_message_component_child(row, 5), 0,
+            cui_message_component_space(ui, cui_message_private_paint_id(row, 5), 0,
                                         s->rows[i].render_gap);
         cui_end_box(ui);
     }
@@ -939,7 +1001,7 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
                 cui_color color = o.fade_color;
                 color.a = (uint8_t)(color.a * s->fade_opacity * ((float)strip + .5f) / 32);
                 cui_begin_portal(
-                    ui, cui_message_component_child(id, strip + 500),
+                    ui, cui_message_private_paint_id(id, strip + 500),
                     (cui_box){
                         .width = width, .height = next - y, .background = color, .inert = true},
                     (cui_rect){s->viewport.x, s->viewport.y + o.height - height + y, width,
@@ -951,7 +1013,7 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
         if (o.jump_button && s->jump_opacity > 0) {
             float jump_width = fminf(o.jump_width, width),
                   jump_height = fminf(o.jump_height, o.height), bottom = 8 + 8 * s->jump_opacity;
-            cui_begin_portal(ui, cui_message_component_child(id, 600),
+            cui_begin_portal(ui, cui_message_private_paint_id(id, 600),
                              (cui_box){.width = jump_width, .height = jump_height},
                              (cui_rect){s->viewport.x + (width - jump_width) / 2,
                                         s->viewport.y + o.height - bottom - jump_height, jump_width,
@@ -968,7 +1030,7 @@ cui_message_scroller_result cui_message_scroller(cui_context *ui, cui_id id, con
                 .slot = o.jump_content,
                 .theme = &theme,
                 .style = {jump_width, t->font_size, theme.text, CUI_MESSAGE_START},
-                .id = cui_message_component_child(id, 601)};
+                .id = cui_message_private_paint_id(id, 601)};
             cui_begin_box(ui, cui_message_scroller_jump_id(id),
                           (cui_box){.width = jump_width,
                                     .height = jump_height,

@@ -477,6 +477,24 @@ static cui_id cui_status_notification_element(cui_id id, cui_notification_id n) 
     return cui_status_child_id(id, (size_t)(n.type ^ (n.key + UINT64_C(0x9e3779b97f4a7c15) +
                                                       (n.type << 6) + (n.type >> 2))));
 }
+cui_id cui_notification_part_id(cui_id id, cui_notification_id logical,
+                                cui_notification_part part) {
+    if (!id || (!logical.type && !logical.key))
+        return 0;
+    cui_id card = cui_status_notification_element(id, logical);
+    switch (part) {
+    case CUI_NOTIFICATION_PART_CARD:
+        return card;
+    case CUI_NOTIFICATION_PART_CONTENT:
+        return cui_status_child_id(card, 302);
+    case CUI_NOTIFICATION_PART_ACTION:
+        return cui_status_child_id(card, 301);
+    case CUI_NOTIFICATION_PART_CLOSE:
+        return cui_status_child_id(card, 300);
+    default:
+        return 0;
+    }
+}
 static bool cui_status_notification_bottom(cui_notification_anchor a) {
     return a >= CUI_NOTIFICATION_BOTTOM_LEFT && a <= CUI_NOTIFICATION_BOTTOM_RIGHT;
 }

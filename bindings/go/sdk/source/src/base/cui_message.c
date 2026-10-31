@@ -6,6 +6,41 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+cui_id cui_message_private_paint_id(cui_id id, size_t i) {
+    uint64_t x = id + UINT64_C(0x9e3779b97f4a7c15) * (i + 1);
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return x ^ (x >> 31);
+}
+cui_id cui_message_part_id(cui_id id, cui_message_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_MESSAGE_PART_AVATAR:
+        return cui_message_private_paint_id(id, 1);
+    case CUI_MESSAGE_PART_HEADER:
+        return cui_message_private_paint_id(id, 3);
+    case CUI_MESSAGE_PART_FOOTER:
+        return cui_message_private_paint_id(id, 7);
+    default:
+        return 0;
+    }
+}
+cui_id cui_message_body_id(cui_id id, size_t index) {
+    return id && index < 256 ? cui_message_private_paint_id(id, 20 + index) : 0;
+}
+cui_id cui_message_scroller_part_id(cui_id id, cui_message_scroller_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_MESSAGE_SCROLLER_PART_VIEWPORT:
+        return cui_message_private_paint_id(id, 100);
+    case CUI_MESSAGE_SCROLLER_PART_JUMP:
+        return cui_message_scroller_jump_id(id);
+    default:
+        return 0;
+    }
+}
 static bool cui_message_private_slot_present(cui_message_slot s) {
     return s.present || s.text.length || s.render;
 }
@@ -74,6 +109,11 @@ struct cui_message_scroller_state {
     float previous_width;
 };
 #endif
+cui_id cui_message_scroller_row_id(cui_id id, const cui_message_scroller_state *s, size_t index) {
+    return id && s && index < s->count
+               ? cui_message_private_paint_id(id, (size_t)s->rows[index].key + 200)
+               : 0;
+}
 static double cui_message_private_total(cui_message_scroller_state *s) {
     return s->metrics.padding_top + cui_virtual_total(s->list) + s->metrics.padding_bottom;
 }

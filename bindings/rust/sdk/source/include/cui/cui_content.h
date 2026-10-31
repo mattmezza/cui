@@ -161,6 +161,11 @@ typedef struct {
     uint64_t content_revision; /* Increment when custom slot geometry changes. */
 } cui_bubble_options;
 /* Synchronous borrowed slots. Reaction controls retain their base button semantics. */
+/* Pure identities for composed cui_bubble(), not direct cui_begin_bubble().
+ * Zero root/invalid part returns 0. Does not imply current-frame presence;
+ * reactions may be absent. Style after submission, before end_frame. */
+typedef enum { CUI_BUBBLE_PART_SURFACE = 0, CUI_BUBBLE_PART_REACTIONS = 1 } cui_bubble_part;
+cui_id cui_bubble_part_id(cui_id bubble, cui_bubble_part part);
 void cui_bubble(cui_context *, cui_id, const cui_theme *, cui_bubble_options);
 /* Source-composed Empty. Borrowed pointers and callbacks live through this call.
  * Obtain defaults, then change desired fields for independent style refinements.

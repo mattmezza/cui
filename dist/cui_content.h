@@ -162,6 +162,11 @@ typedef struct {
     uint64_t content_revision; /* Increment when custom slot geometry changes. */
 } cui_bubble_options;
 /* Synchronous borrowed slots. Reaction controls retain their base button semantics. */
+/* Pure identities for composed cui_bubble(), not direct cui_begin_bubble().
+ * Zero root/invalid part returns 0. Does not imply current-frame presence;
+ * reactions may be absent. Style after submission, before end_frame. */
+typedef enum { CUI_BUBBLE_PART_SURFACE = 0, CUI_BUBBLE_PART_REACTIONS = 1 } cui_bubble_part;
+cui_id cui_bubble_part_id(cui_id bubble, cui_bubble_part part);
 void cui_bubble(cui_context *, cui_id, const cui_theme *, cui_bubble_options);
 /* Source-composed Empty. Borrowed pointers and callbacks live through this call.
  * Obtain defaults, then change desired fields for independent style refinements.
@@ -538,6 +543,18 @@ static void cui_content_semantic(cui_context *ui, cui_id id, cui_role role, cui_
 }
 static cui_id cui_content_child(cui_id id, unsigned index) {
     return id ^ (UINT64_C(0x874e65fa19c80721) + UINT64_C(0x9e3779b97f4a7c15) * index);
+}
+cui_id cui_bubble_part_id(cui_id id, cui_bubble_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_BUBBLE_PART_SURFACE:
+        return cui_content_child(id, 3);
+    case CUI_BUBBLE_PART_REACTIONS:
+        return cui_content_child(id, 5);
+    default:
+        return 0;
+    }
 }
 bool cui_alert(cui_context *ui, cui_id id, const cui_theme *t, cui_alert_options o) {
     if (!ui || !t || o.kind < CUI_ALERT_INFO || o.kind > CUI_ALERT_DEFAULT ||

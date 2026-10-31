@@ -92,7 +92,9 @@
     {
       "api_symbols": [
         "cui_attachment",
-        "cui_attachment_events"
+        "cui_attachment_events",
+        "cui_attachment_part_id",
+        "cui_attachment_child_part_id"
       ],
       "state_types": [
         "cui_attachment_model",
@@ -103,7 +105,8 @@
       "usage": "Submit transfer status and progress; perform removal/retry in action callbacks, not render callbacks.",
       "docs": [
         "docs/MEDIA.md",
-        "docs/ATTACHMENT_EVENTS.md"
+        "docs/ATTACHMENT_EVENTS.md",
+        "docs/COMPOUND_SHADOW_PARTS.md"
       ],
       "callback_symbols": [
         "cui_attachment_action_fn",
@@ -192,14 +195,17 @@
     {
       "api_symbols": [
         "cui_begin_bubble",
-        "cui_end_bubble"
+        "cui_end_bubble",
+        "cui_bubble",
+        "cui_bubble_part_id"
       ],
       "state_types": [],
       "state_ownership": "Caller owns child data; no separate bubble model.",
       "interaction": "Child controls handle their own events.",
       "usage": "Begin the surface, compose child controls, then end it in the same frame.",
       "docs": [
-        "docs/CONTENT.md"
+        "docs/CONTENT.md",
+        "docs/COMPOUND_SHADOW_PARTS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -565,7 +571,9 @@
     },
     {
       "api_symbols": [
-        "cui_message"
+        "cui_message",
+        "cui_message_part_id",
+        "cui_message_body_id"
       ],
       "state_types": [
         "cui_message_options"
@@ -575,7 +583,8 @@
       "usage": "Submit body and slot options each frame; compose application actions in designated slots.",
       "docs": [
         "docs/MESSAGE.md",
-        "docs/AVATAR_MESSAGE_EXAMPLES.md"
+        "docs/AVATAR_MESSAGE_EXAMPLES.md",
+        "docs/COMPOUND_SHADOW_PARTS.md"
       ],
       "callback_symbols": [
         "cui_message_render_fn"
@@ -591,7 +600,9 @@
         "cui_message_scroller_destroy",
         "cui_message_scroller",
         "cui_base_message_scroller_events",
-        "cui_message_scroller_events"
+        "cui_message_scroller_events",
+        "cui_message_scroller_part_id",
+        "cui_message_scroller_row_id"
       ],
       "state_types": [
         "cui_message_scroller_state",
@@ -603,7 +614,8 @@
       "docs": [
         "docs/MESSAGE.md",
         "docs/AVATAR_MESSAGE_EXAMPLES.md",
-        "docs/MESSAGE_EVENTS.md"
+        "docs/MESSAGE_EVENTS.md",
+        "docs/COMPOUND_SHADOW_PARTS.md"
       ],
       "callback_symbols": [
         "cui_message_row_render_fn"
@@ -623,7 +635,8 @@
       "api_symbols": [
         "cui_notification_init",
         "cui_notification_push",
-        "cui_notifications"
+        "cui_notifications",
+        "cui_notification_part_id"
       ],
       "state_types": [
         "cui_notification_state",
@@ -633,7 +646,8 @@
       "interaction": "cui_notification_callback handles click/close/action; cui_notification_send_fn delegates system delivery to host.",
       "usage": "Push on an application event, render the stack once after content each frame, and honor returned scheduling deadlines.",
       "docs": [
-        "docs/STATUS_COMPONENTS.md"
+        "docs/STATUS_COMPONENTS.md",
+        "docs/COMPOUND_SHADOW_PARTS.md"
       ],
       "callback_symbols": [
         "cui_notification_callback",

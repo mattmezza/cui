@@ -272,7 +272,9 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_media.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_compound_shadow_parts.c",
+        "tests/unit/test_compound_shadow_legacy.c"
       ],
       "status": "tested",
       "platforms": {
@@ -315,6 +317,17 @@
           "evidence": [
             "tests/unit/test_media.c"
           ]
+        },
+        {
+          "name": "typed C compound paint identities",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_compound_shadow_parts.c",
+            "tests/unit/test_compound_shadow_legacy.c",
+            "docs/COMPOUND_SHADOW_PARTS.md",
+            "tests/distribution/compound_shadow_parts.c"
+          ],
+          "scope": "Pure getters preserve existing IDs; current-frame shadow application is conditional. Language-builder MAIN/ROOT/subpart targets and broader rendering proof remain pending."
         }
       ],
       "upstream_doc": {
@@ -531,7 +544,9 @@
       "tests": [
         "tests/unit/test_content.c",
         "tests/unit/test_alert_bubble_slots.c",
-        "tests/web/test_alert_bubble_slots.py"
+        "tests/web/test_alert_bubble_slots.py",
+        "tests/unit/test_compound_shadow_parts.c",
+        "tests/unit/test_compound_shadow_legacy.c"
       ],
       "status": "tested",
       "platforms": {
@@ -566,6 +581,17 @@
           "evidence": [
             "tests/unit/test_content.c"
           ]
+        },
+        {
+          "name": "typed C compound paint identities",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_compound_shadow_parts.c",
+            "tests/unit/test_compound_shadow_legacy.c",
+            "docs/COMPOUND_SHADOW_PARTS.md",
+            "tests/distribution/compound_shadow_parts.c"
+          ],
+          "scope": "Pure getters preserve existing IDs; current-frame shadow application is conditional. Language-builder MAIN/ROOT/subpart targets and broader rendering proof remain pending."
         }
       ],
       "upstream_doc": {
@@ -1936,7 +1962,9 @@
       "public_header": "include/cui/cui_message.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_message.c"
+        "tests/unit/test_message.c",
+        "tests/unit/test_compound_shadow_parts.c",
+        "tests/unit/test_compound_shadow_legacy.c"
       ],
       "status": "tested",
       "platforms": {
@@ -1977,6 +2005,17 @@
             "tests/web/test_avatar_message.py",
             "docs/AVATAR_MESSAGE_EXAMPLES.md"
           ]
+        },
+        {
+          "name": "typed C compound paint identities",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_compound_shadow_parts.c",
+            "tests/unit/test_compound_shadow_legacy.c",
+            "docs/COMPOUND_SHADOW_PARTS.md",
+            "tests/distribution/compound_shadow_parts.c"
+          ],
+          "scope": "Pure getters preserve existing IDs; current-frame shadow application is conditional. Language-builder MAIN/ROOT/subpart targets and broader rendering proof remain pending."
         }
       ],
       "upstream_doc": {
@@ -2019,7 +2058,9 @@
       "public_header": "include/cui/cui_message.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_message.c"
+        "tests/unit/test_message.c",
+        "tests/unit/test_compound_shadow_parts.c",
+        "tests/unit/test_compound_shadow_legacy.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2062,6 +2103,17 @@
             "tests/unit/test_message.c",
             "docs/MESSAGE.md"
           ]
+        },
+        {
+          "name": "typed C compound paint identities",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_compound_shadow_parts.c",
+            "tests/unit/test_compound_shadow_legacy.c",
+            "docs/COMPOUND_SHADOW_PARTS.md",
+            "tests/distribution/compound_shadow_parts.c"
+          ],
+          "scope": "Pure getters preserve existing IDs; current-frame shadow application is conditional. Language-builder MAIN/ROOT/subpart targets and broader rendering proof remain pending."
         }
       ],
       "upstream_doc": {
@@ -2101,7 +2153,9 @@
         "tests/unit/test_notification_shadows.c",
         "tests/integration/test_notification_shadow_adapters.c",
         "tests/web/test_notification_shadows.py",
-        "tests/web/test_surface_shadow_gallery.py"
+        "tests/web/test_surface_shadow_gallery.py",
+        "tests/unit/test_compound_shadow_parts.c",
+        "tests/unit/test_compound_shadow_legacy.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2156,6 +2210,17 @@
             "tests/web/test_surface_shadow_gallery.py"
           ],
           "scope": "Final card caster copied for two source-derived layers; transition alpha is raised to fourth power and stack visibility multiplies independently, with Core ancestor opacity applied once. Existing16px motion remains separate from Source96px motion."
+        },
+        {
+          "name": "typed C compound paint identities",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_compound_shadow_parts.c",
+            "tests/unit/test_compound_shadow_legacy.c",
+            "docs/COMPOUND_SHADOW_PARTS.md",
+            "tests/distribution/compound_shadow_parts.c"
+          ],
+          "scope": "Pure getters preserve existing IDs; current-frame shadow application is conditional. Language-builder MAIN/ROOT/subpart targets and broader rendering proof remain pending."
         }
       ],
       "upstream_doc": {

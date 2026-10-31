@@ -52,6 +52,17 @@ cui_message_options cui_message_options_default(void);
 /* Pure composition validation/geometry. No theme implementation dependency. */
 bool cui_base_message(cui_message_options, cui_message_plan *);
 bool cui_message(cui_context *, cui_id, const cui_theme *, cui_message_options);
+/* Pure slot identities, not presence queries. Zero root/invalid part/index
+ * returns 0. Metadata slots may be omitted; custom renderers own descendants.
+ * A body ID names the actual surface only for typed_bubble; otherwise a slot row.
+ * Positional body indices do not retain application identity after reordering. */
+typedef enum {
+    CUI_MESSAGE_PART_AVATAR = 0,
+    CUI_MESSAGE_PART_HEADER = 1,
+    CUI_MESSAGE_PART_FOOTER = 2
+} cui_message_part;
+cui_id cui_message_part_id(cui_id message, cui_message_part part);
+cui_id cui_message_body_id(cui_id message, size_t body_index); /* < 256 */
 void cui_begin_message_group(cui_context *, cui_id, float width, float gap);
 void cui_end_message_group(cui_context *);
 /* Retains only layout/scroll bookkeeping, never application message records. */
@@ -111,6 +122,19 @@ typedef struct {
 cui_message_scroller_options cui_message_scroller_options_default(void);
 bool cui_message_scroller_validate_options(cui_message_scroller_options);
 cui_id cui_message_scroller_jump_id(cui_id);
+/* Identity only: no painting/layout/model mutation or current-frame presence
+ * check. Zero owner/invalid part/null state/out-of-range index returns 0.
+ * Row identity follows existing retained keys across splice; index is only a
+ * lookup coordinate. Reset/new rows use new keys. State must still be alive.
+ * Offscreen rows and disabled/fully faded jump buttons may have no paint box. */
+typedef enum {
+    CUI_MESSAGE_SCROLLER_PART_VIEWPORT = 0,
+    CUI_MESSAGE_SCROLLER_PART_JUMP = 1
+} cui_message_scroller_part;
+cui_id cui_message_scroller_part_id(cui_id scroller, cui_message_scroller_part part);
+cui_id cui_message_scroller_row_id(cui_id scroller, const cui_message_scroller_state *,
+                                   size_t index);
+
 cui_message_scroller_result cui_base_message_scroller(cui_context *, cui_id,
                                                       cui_message_scroller_state *,
                                                       cui_message_scroller_options);

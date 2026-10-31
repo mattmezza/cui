@@ -19,6 +19,41 @@ cui_id cui_attachment_remove_id(cui_id id) {
 cui_id cui_attachment_retry_id(cui_id id) {
     return cui_media_id(id, 1002);
 }
+cui_id cui_attachment_part_id(cui_id id, cui_attachment_part part) {
+    if (!id)
+        return 0;
+    switch (part) {
+    case CUI_ATTACHMENT_PART_CARD:
+        return id;
+    case CUI_ATTACHMENT_PART_MEDIA:
+        return cui_media_id(id, 3);
+    case CUI_ATTACHMENT_PART_MEDIA_OVERLAY:
+        return cui_media_id(cui_media_id(id, 3), 5);
+    case CUI_ATTACHMENT_PART_METADATA:
+        return cui_media_id(id, 4);
+    case CUI_ATTACHMENT_PART_ACTIONS:
+        return cui_media_id(id, 5);
+    case CUI_ATTACHMENT_PART_REMOVE:
+        return cui_attachment_remove_id(id);
+    case CUI_ATTACHMENT_PART_MEDIA_RETRY:
+        return cui_attachment_retry_id(id);
+    default:
+        return 0;
+    }
+}
+cui_id cui_attachment_child_part_id(cui_id id, size_t index, cui_attachment_child_part part) {
+    if (!id || index >= CUI_ATTACHMENT_MAX_CHILDREN)
+        return 0;
+    cui_id metadata = cui_media_id(id, 4);
+    switch (part) {
+    case CUI_ATTACHMENT_CHILD_PART_ROW:
+        return cui_media_id(metadata, index + 1);
+    case CUI_ATTACHMENT_CHILD_PART_RETRY:
+        return cui_media_id(cui_attachment_retry_id(metadata), index + 1);
+    default:
+        return 0;
+    }
+}
 cui_image_result cui_image(cui_context *ui, cui_id id, cui_image_state *state,
                            cui_image_source source, cui_image_loader_fn loader, void *user,
                            cui_image_options o) {

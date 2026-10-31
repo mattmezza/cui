@@ -264,3 +264,11 @@ belong on the owning UI thread outside active Core stepping; native after-frame
 callbacks are supported. Headless hidden/control requests fail unavailable.
 Sokol/SDL_GPU renderer hosts own creation policy. Linux private-Xvfb proof covers
 all five runtimes (TS compiled/executed), not other OS/window systems or hardware.
+
+For compound C shadow targeting, read `docs/COMPOUND_SHADOW_PARTS.md` and the
+component's authoritative header. Bubble, Message/MessageScroller, Notification
+and Attachment have typed part-ID getters. A valid identity is not a presence
+check: submit first, then check the current-frame shadow setter before end_frame.
+Notification logical keys and stack scopes are not card paint IDs; custom callback
+namespaces may have no box. Scroller row IDs follow retained keys, not stable
+indices. Language-builder MAIN/ROOT/subpart targets remain pending.

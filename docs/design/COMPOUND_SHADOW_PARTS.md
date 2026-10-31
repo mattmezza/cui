@@ -212,3 +212,30 @@ Follow-on bridge work must specify authoring validation, retained style ownershi
 when absent targets retry or remain unavailable, and atomic frame failure before
 shipping MAIN/ROOT or typed subparts. It must keep existing facade APIs/default
 paint unchanged and preserve the six-kind worker's independently owned contract.
+
+## Implemented C slice
+
+The additive typed getters described above are implemented without public struct
+layout changes. Existing painters keep their raw zero-owner derivations; the new
+getters reject zero owners. Message's private derivation now lives in Base and is
+shared by its painter and getters; the row getter uses the existing Base state,
+with no additional private layout copy.
+
+Focused warning-enabled tests pass through the private-Xvfb wrapper:
+`compound_shadow_parts`, `compound_shadow_legacy` and `element_shadows`.
+The independent legacy fixture was captured/replayed before rebuild from the
+preserved pre-change library; its provenance and 64-bit little-endian scope are
+in [the consumer guide](../COMPOUND_SHADOW_PARTS.md). It verifies unchanged
+IDs, commands, semantics and callback ordering for nonzero and zero-owner scenes.
+The getter fixture checks current-frame owners, closed/conditional/custom parts,
+retained-row identity, capacity boundaries, Notification collision/layout-only
+behavior and Attachment flow/portal identity. SDK/amalgamation freshness and the
+18 offline agent-skill tests also pass. The expanded 12-test headless slice
+includes existing family/Base-only regressions and selective/umbrella generated-
+header C11 declaration/link checks against the rebuilt library. These checks do not establish browser/GPU
+rendering or language-builder target parity. The future bridge table remains a
+proposal only.
+
+Implementation sign-off: `/root/hidden_windows`, 2026-10-31. Additive C getters
+only; legacy fixture unchanged; no public struct/ABI layout change, no bridge or
+Core input-architecture changes. Root integrator owns merge/publication.

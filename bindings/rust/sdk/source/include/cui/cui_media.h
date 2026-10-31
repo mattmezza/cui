@@ -180,6 +180,30 @@ typedef struct {
 cui_attachment_options cui_attachment_options_default(void);
 cui_id cui_attachment_remove_id(cui_id);
 cui_id cui_attachment_retry_id(cui_id);
+/* Pure rectangular-owner identities. Zero root/invalid part/index returns 0;
+ * no presence query. Media/overlay/actions/metadata/remove/retry are conditional.
+ * MEDIA_RETRY aliases the existing media retry button, not metadata retry links.
+ * CUSTOM metadata/action renderers own their descendants and may submit no box. */
+typedef enum {
+    CUI_ATTACHMENT_PART_CARD = 0,
+    CUI_ATTACHMENT_PART_MEDIA = 1,
+    CUI_ATTACHMENT_PART_MEDIA_OVERLAY = 2,
+    CUI_ATTACHMENT_PART_METADATA = 3,
+    CUI_ATTACHMENT_PART_ACTIONS = 4,
+    CUI_ATTACHMENT_PART_REMOVE = 5,
+    CUI_ATTACHMENT_PART_MEDIA_RETRY = 6
+} cui_attachment_part;
+cui_id cui_attachment_part_id(cui_id attachment, cui_attachment_part part);
+typedef enum {
+    CUI_ATTACHMENT_CHILD_PART_ROW = 0,
+    CUI_ATTACHMENT_CHILD_PART_RETRY = 1
+} cui_attachment_child_part;
+/* Original child-array index, not visual/filtered order; < MAX_CHILDREN.
+ * ROW is automatic only for built-in title/description; retry is the first
+ * eligible failed-description link. Neither getter creates missing content. */
+cui_id cui_attachment_child_part_id(cui_id attachment, size_t child_index,
+                                    cui_attachment_child_part part);
+
 cui_attachment_result cui_attachment(cui_context *, cui_id, const cui_theme *,
                                      cui_attachment_state *, cui_attachment_options);
 typedef struct {

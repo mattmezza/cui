@@ -99,7 +99,7 @@ These are **unreleased slices**, not completed beta areas:
 | --- | --- |
 | Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
-| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; hosted confirmation remains open. |
+| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
 | Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
 | Portability fixes | Packaged-source configuration fix passes focused checks; Windows alignment and WASM32 fixes need combined integration/hosted confirmation. |
 

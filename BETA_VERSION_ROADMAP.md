@@ -167,6 +167,9 @@ behavior families need justified exceptions rather than invented paint roots.
 - [ ] **Build/CI cost:** reuse equivalent test compilation where safe and keep
   dependency caches and browser shards efficient. Preserve independent
   distribution/backend checks; measure improvements before claiming speedups.
+  Package-consumer tests now default to one compiler job and honor
+  `CMAKE_BUILD_PARALLEL_LEVEL`; five focused offline checks passed (`d83469b4`).
+  Broader CI optimization remains open.
 - [ ] **Events and asynchronous UX:** finish the coverage/exception audit for the
   shared event contract, legacy timing/mutation compatibility and binding support.
   Validate the worker-fetch example's cancellation, stale responses, wakeup,

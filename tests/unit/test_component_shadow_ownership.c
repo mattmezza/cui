@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
-#include "cui/cui_surface.h"
 #include "cui/cui_software.h"
+#include "cui/cui_surface.h"
 #include <assert.h>
 #include <string.h>
 
@@ -11,8 +11,8 @@ static cui_size measure(void *user, cui_str text, float font) {
     return (cui_size){(float)text.length * font * .5f, font};
 }
 static cui_context *create(void) {
-    cui_context *ui = cui_create((cui_config){.max_elements = 256, .max_commands = 1024,
-                                            .measure = measure});
+    cui_context *ui =
+        cui_create((cui_config){.max_elements = 256, .max_commands = 1024, .measure = measure});
     assert(ui);
     return ui;
 }
@@ -42,20 +42,33 @@ static uint64_t pixels(cui_software *r, cui_draw_list list) {
 }
 static void style(cui_context *ui, cui_id id, bool enabled) {
     cui_box_shadow layers[] = {
-        {.layer = {.offset_x = 3, .offset_y = 3, .spread = 1,
-                    .color = {19, 41, 83, 220}}, .kind = CUI_BOX_SHADOW_DROP},
+        {.layer = {.offset_x = 3, .offset_y = 3, .spread = 1, .color = {19, 41, 83, 220}},
+         .kind = CUI_BOX_SHADOW_DROP},
         {.layer = {.spread = 2, .color = {131, 17, 219, 180}}, .kind = CUI_BOX_SHADOW_INSET}};
-    assert(cui_element_set_box_shadows(ui, id, enabled ? layers : NULL,
-                                       enabled ? 2 : 0, (cui_corner_radii){3, 3, 3, 3}));
+    assert(cui_element_set_box_shadows(ui, id, enabled ? layers : NULL, enabled ? 2 : 0,
+                                       (cui_corner_radii){3, 3, 3, 3}));
 }
 static void child(cui_context *ui, void *user) {
     (void)user;
-    cui_begin_box(ui, 901, (cui_box){.width = 70, .height = 24,
-                                    .background = {180, 190, 200, 255}});
+    cui_begin_box(ui, 901,
+                  (cui_box){.width = 70, .height = 24, .background = {180, 190, 200, 255}});
     cui_end_box(ui);
 }
-enum { BUTTON, INPUT, BARE_INPUT, AVATAR, PHOTO, BADGE, SWITCH_TRACK, SWITCH_THUMB,
-       SLIDER_TRACK, BADGE_COUNT, BADGE_DOT, BADGE_ICON, CASE_COUNT };
+enum {
+    BUTTON,
+    INPUT,
+    BARE_INPUT,
+    AVATAR,
+    PHOTO,
+    BADGE,
+    SWITCH_TRACK,
+    SWITCH_THUMB,
+    SLIDER_TRACK,
+    BADGE_COUNT,
+    BADGE_DOT,
+    BADGE_ICON,
+    CASE_COUNT
+};
 static void controls(void) {
     static const unsigned char image[] = {255, 255, 255, 255};
     for (unsigned kind = 0; kind < CASE_COUNT; kind++) {
@@ -63,7 +76,8 @@ static void controls(void) {
         cui_software *r = cui_software_create(400, 200, NULL);
         cui_theme t = cui_theme_light();
         char buffer[32] = "value";
-        cui_edit *edit = cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
+        cui_edit *edit =
+            cui_edit_create((cui_edit_config){.buffer = buffer, .capacity = sizeof buffer});
         cui_input_state input = {0};
         cui_avatar_image photo;
         unsigned char image_storage[4];
@@ -77,28 +91,37 @@ static void controls(void) {
             float pad = frame == 2 ? 15 : 8;
             float width = frame == 2 ? 170 : 140;
             assert(cui_begin_frame(ui, 400, 200, .016f));
-            cui_begin_box(ui, 1, (cui_box){.width = 360, .height = 150, .padding = pad,
-                                            .clip = true, .custom_opacity = true, .opacity = .75f});
+            cui_begin_box(ui, 1,
+                          (cui_box){.width = 360,
+                                    .height = 150,
+                                    .padding = pad,
+                                    .clip = true,
+                                    .custom_opacity = true,
+                                    .opacity = .75f});
             cui_id target = 101;
             bool on = true;
             float value = .5f;
             if (kind == BUTTON)
                 (void)cui_button_ex(ui, 101, &t, cui_string("Button"),
-                    (cui_button_options){.width = width, .rounding = CUI_BUTTON_ROUNDED_CUSTOM,
-                                          .radius = 11});
+                                    (cui_button_options){.width = width,
+                                                         .rounding = CUI_BUTTON_ROUNDED_CUSTOM,
+                                                         .radius = 11});
             else if (kind == INPUT || kind == BARE_INPUT)
-                (void)cui_input_ex(ui, 101, &t, cui_string("Input"), edit, &input,
+                (void)cui_input_ex(
+                    ui, 101, &t, cui_string("Input"), edit, &input,
                     (cui_input_options){.width = width, .no_appearance = kind == BARE_INPUT});
             else if (kind == AVATAR || kind == PHOTO)
-                (void)cui_avatar_ex(ui, 101, &t, cui_string("Avatar"),
+                (void)cui_avatar_ex(
+                    ui, 101, &t, cui_string("Avatar"),
                     (cui_avatar_options){.size = frame == 2 ? 56 : 40,
-                       .image_state = kind == PHOTO ? &photo : NULL,
-                       .image = {image, 1, 1, 4, 1}, .ring_width = 2});
+                                         .image_state = kind == PHOTO ? &photo : NULL,
+                                         .image = {image, 1, 1, 4, 1},
+                                         .ring_width = 2});
             else if (kind == BADGE)
                 cui_badge(ui, 101, &t, cui_string("Badge"));
             else if (kind == SWITCH_TRACK || kind == SWITCH_THUMB) {
                 (void)cui_switch_ex(ui, 101, &t, cui_string("Switch"), &on, NULL,
-                                     (cui_switch_options){.width = width});
+                                    (cui_switch_options){.width = width});
                 target = kind == SWITCH_TRACK ? cui_switch_track_id(101) : cui_switch_thumb_id(101);
             } else if (kind == SLIDER_TRACK) {
                 (void)cui_slider(ui, 101, &t, cui_string("Slider"), &value, 0, 1, .1f, false);
@@ -106,7 +129,8 @@ static void controls(void) {
             } else {
                 cui_badge_options o = cui_badge_defaults();
                 o.variant = kind == BADGE_COUNT ? CUI_BADGE_COUNT
-                            : kind == BADGE_DOT ? CUI_BADGE_DOT : CUI_BADGE_ICON;
+                            : kind == BADGE_DOT ? CUI_BADGE_DOT
+                                                : CUI_BADGE_ICON;
                 o.count = 2;
                 o.icon = cui_string("!");
                 assert(cui_badge_ex(ui, 101, &t, o, child, NULL));
@@ -141,7 +165,8 @@ static void controls(void) {
                         const cui_draw_command *c = &list.commands[i];
                         if (c->type == CUI_DRAW_DROP_SHADOW || c->type == CUI_DRAW_INSET_SHADOW) {
                             assert(memcmp(&c->shadow.caster, &retained, sizeof retained) == 0);
-                            assert(c->shadow.layer.color.a == (c->type == CUI_DRAW_DROP_SHADOW ? 165 : 135));
+                            assert(c->shadow.layer.color.a ==
+                                   (c->type == CUI_DRAW_DROP_SHADOW ? 165 : 135));
                             found++;
                         }
                     }
@@ -152,7 +177,8 @@ static void controls(void) {
                     assert(shadows(list) == 0 && hash == baseline && list.count == old_count);
                     for (size_t i = 0; i < old_count; i++) {
                         assert(list.commands[i].type == old[i].type);
-                        assert(memcmp(&list.commands[i].bounds, &old[i].bounds, sizeof(cui_rect)) == 0);
+                        assert(memcmp(&list.commands[i].bounds, &old[i].bounds, sizeof(cui_rect)) ==
+                               0);
                     }
                 }
             }
@@ -229,22 +255,31 @@ static void panels(void) {
             (void)cui_button(ui, 101, &t, cui_string("Trigger"), false);
             if (kind < 2) {
                 cui_surface_options o = {.viewport = {0, 0, 400, 200},
-                    .width = frame == 2 ? 190 : 170, .height = 140,
-                    .anchor = {10, 10, 80, 20}, .no_outside_dismiss = true,
-                    .no_escape_dismiss = true};
-                bool opened = kind == 0
-                    ? cui_popover_begin(ui, &t, &surface, cui_string("Panel"), cui_string("Description"), o,
-                        (cui_popover_position){.mode = CUI_POPOVER_POSITION_ANCHOR,
-                                               .anchor = CUI_POPOVER_TOP_LEFT, .arrow = true})
-                    : cui_surface_begin(ui, &t, &surface, cui_string("Panel"), cui_string("Description"), o);
+                                         .width = frame == 2 ? 190 : 170,
+                                         .height = 140,
+                                         .anchor = {10, 10, 80, 20},
+                                         .no_outside_dismiss = true,
+                                         .no_escape_dismiss = true};
+                bool opened =
+                    kind == 0
+                        ? cui_popover_begin(
+                              ui, &t, &surface, cui_string("Panel"), cui_string("Description"), o,
+                              (cui_popover_position){.mode = CUI_POPOVER_POSITION_ANCHOR,
+                                                     .anchor = CUI_POPOVER_TOP_LEFT,
+                                                     .arrow = true})
+                        : cui_surface_begin(ui, &t, &surface, cui_string("Panel"),
+                                            cui_string("Description"), o);
                 assert(opened);
                 cui_text(ui, cui_string("Body"), 14, t.text);
                 cui_surface_end(ui);
             } else {
                 bool opened = cui_tooltip(ui, 200, &t, &hover, cui_string("Tooltip"),
-                    (cui_hover_options){.trigger = 101, .viewport = {0, 0, 400, 200},
-                       .width = frame == 2 ? 150 : 130, .height = 40,
-                       .side = CUI_POPUP_BELOW, .dt = .1f});
+                                          (cui_hover_options){.trigger = 101,
+                                                              .viewport = {0, 0, 400, 200},
+                                                              .width = frame == 2 ? 150 : 130,
+                                                              .height = 40,
+                                                              .side = CUI_POPUP_BELOW,
+                                                              .dt = .1f});
                 assert(opened);
             }
             cui_rect panel = {0}, trigger = {0};
@@ -304,8 +339,10 @@ static void panels(void) {
                                 break;
                         }
                         assert(current[a].type == baseline[b].type);
-                        assert(memcmp(&current[a].bounds, &baseline[b].bounds, sizeof(cui_rect)) == 0);
-                        assert(memcmp(&current[a].color, &baseline[b].color, sizeof(cui_color)) == 0);
+                        assert(memcmp(&current[a].bounds, &baseline[b].bounds, sizeof(cui_rect)) ==
+                               0);
+                        assert(memcmp(&current[a].color, &baseline[b].color, sizeof(cui_color)) ==
+                               0);
                         a++;
                         b++;
                     }
@@ -325,7 +362,7 @@ static void panels(void) {
             assert(cui_begin_frame(ui, 400, 200, .016f));
             (void)cui_button(ui, 101, &t, cui_string("Trigger"), false);
             assert(!cui_tooltip(ui, 200, &t, &hover, cui_string("Tooltip"),
-                                 (cui_hover_options){.trigger = 101, .disabled = true}));
+                                (cui_hover_options){.trigger = 101, .disabled = true}));
             assert(!cui_element_set_shadow_preset(ui, 200, CUI_SHADOW_MD, (cui_corner_radii){0}));
             assert(shadows(cui_end_frame(ui)) == 0);
         }
@@ -342,12 +379,14 @@ static void root_activation(void) {
         for (unsigned frame = 0; frame < 2; frame++) {
             if (frame) {
                 float x = track.x + track.w / 2, y = track.y + track.h / 2;
-                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y}));
-                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y}));
+                assert(cui_queue_event(
+                    ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y}));
+                assert(
+                    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = y}));
             }
             assert(cui_begin_frame(ui, 400, 200, .016f));
             bool changed = cui_switch_ex(ui, 101, &t, cui_string("Switch"), &checked, NULL,
-                                          (cui_switch_options){0});
+                                         (cui_switch_options){0});
             assert(changed == (frame != 0) && checked == (frame != 0));
             assert(cui_track_bounds(ui, cui_switch_track_id(101), &track));
             if (decorated)

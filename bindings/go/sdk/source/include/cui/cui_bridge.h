@@ -433,8 +433,9 @@ typedef struct {
     uint32_t struct_size, version, initially_hidden;
 } cui_bridge_window_options;
 CUI_BRIDGE_API uint32_t cui_bridge_window_options_size(void);
-CUI_BRIDGE_API cui_bridge_app *cui_bridge_create_with_window_options(
-    const cui_bridge_options *, const cui_bridge_window_options *, cui_bridge_status *);
+CUI_BRIDGE_API cui_bridge_app *
+cui_bridge_create_with_window_options(const cui_bridge_options *, const cui_bridge_window_options *,
+                                      cui_bridge_status *);
 /* Owning native UI thread only, outside active Core stepping. After-frame run
  * callbacks are allowed. Headless returns BACKEND_UNAVAILABLE; closed returns
  * CLOSED. Flags must be 0/1; query output is unchanged on every error. Query

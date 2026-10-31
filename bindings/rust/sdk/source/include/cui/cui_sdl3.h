@@ -22,7 +22,7 @@ typedef struct {
 /* initially_hidden is applied at window creation, avoiding a show/hide flash.
  * font remains borrowed. Failure returns NULL; main thread only. */
 cui_sdl3 *cui_sdl3_create_with_options(const char *title, int width, int height, cui_font *font,
-                                      cui_sdl3_window_options options);
+                                       cui_sdl3_window_options options);
 /* Explicit visibility control; OS mapping may be asynchronous. Query reports the
  * SDL hidden flag, not occlusion/minimization. Null backends return false. */
 bool cui_sdl3_set_visible(cui_sdl3 *backend, bool visible);

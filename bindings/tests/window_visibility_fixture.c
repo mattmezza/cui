@@ -23,8 +23,12 @@ static void actual_os_state(bool hidden) {
     assert(xlib);
     int (*sync)(Display *, Bool) = NULL;
     Status (*attributes)(Display *, Window, XWindowAttributes *) = NULL;
-    void *symbol = dlsym(xlib, "XSync"); assert(symbol); memcpy(&sync, &symbol, sizeof(sync));
-    symbol = dlsym(xlib, "XGetWindowAttributes"); assert(symbol); memcpy(&attributes, &symbol, sizeof(attributes));
+    void *symbol = dlsym(xlib, "XSync");
+    assert(symbol);
+    memcpy(&sync, &symbol, sizeof(sync));
+    symbol = dlsym(xlib, "XGetWindowAttributes");
+    assert(symbol);
+    memcpy(&attributes, &symbol, sizeof(attributes));
     XWindowAttributes value;
     sync(display, False);
     assert(attributes(display, window, &value));
@@ -34,8 +38,10 @@ static void actual_os_state(bool hidden) {
 SDL_Window *SDL_CreateWindow(const char *title, int width, int height, SDL_WindowFlags flags) {
     SDL_Window *(*real_create)(const char *, int, int, SDL_WindowFlags) = NULL;
     void *symbol = dlsym(RTLD_NEXT, "SDL_CreateWindow");
-    assert(symbol); memcpy(&real_create, &symbol, sizeof(real_create));
-    assert(getenv("CUI_TEST_VIRTUAL_DISPLAY") && strcmp(getenv("CUI_TEST_VIRTUAL_DISPLAY"), "1") == 0);
+    assert(symbol);
+    memcpy(&real_create, &symbol, sizeof(real_create));
+    assert(getenv("CUI_TEST_VIRTUAL_DISPLAY") &&
+           strcmp(getenv("CUI_TEST_VIRTUAL_DISPLAY"), "1") == 0);
     expected_hidden = creations == 0;
     assert(creations < 2);
     assert(((flags & SDL_WINDOW_HIDDEN) != 0) == expected_hidden);
@@ -43,17 +49,20 @@ SDL_Window *SDL_CreateWindow(const char *title, int width, int height, SDL_Windo
     assert(current);
     assert(((SDL_GetWindowFlags(current) & SDL_WINDOW_HIDDEN) != 0) == expected_hidden);
     actual_os_state(expected_hidden);
-    creations++; first_present = true;
+    creations++;
+    first_present = true;
     return current;
 }
 bool SDL_RenderPresent(SDL_Renderer *renderer) {
     bool (*real_present)(SDL_Renderer *) = NULL;
     void *symbol = dlsym(RTLD_NEXT, "SDL_RenderPresent");
-    assert(symbol); memcpy(&real_present, &symbol, sizeof(real_present));
+    assert(symbol);
+    memcpy(&real_present, &symbol, sizeof(real_present));
     if (first_present) {
         assert(((SDL_GetWindowFlags(current) & SDL_WINDOW_HIDDEN) != 0) == expected_hidden);
         actual_os_state(expected_hidden);
-        first_frames++; first_present = false;
+        first_frames++;
+        first_present = false;
     }
     return real_present(renderer);
 }

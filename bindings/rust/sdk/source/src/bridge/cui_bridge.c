@@ -228,7 +228,8 @@ cui_bridge_status cui_bridge_native_run(cui_bridge_app *app, cui_bridge_run_call
     return CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *app, const char *title,
-                                           const char *font_path, cui_config *config, bool initially_hidden) {
+                                           const char *font_path, cui_config *config,
+                                           bool initially_hidden) {
     (void)app;
     (void)title;
     (void)font_path;
@@ -269,11 +270,13 @@ cui_bridge_status cui_bridge_native_clipboard_get(cui_bridge_app *app, char *out
     return CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 cui_bridge_status cui_bridge_native_set_window_visible(cui_bridge_app *app, uint32_t visible) {
-    (void)app; (void)visible;
+    (void)app;
+    (void)visible;
     return CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 cui_bridge_status cui_bridge_native_get_window_visible(cui_bridge_app *app, uint32_t *visible) {
-    (void)app; (void)visible;
+    (void)app;
+    (void)visible;
     return CUI_BRIDGE_BACKEND_UNAVAILABLE;
 }
 #endif
@@ -405,7 +408,8 @@ uint32_t cui_bridge_window_options_size(void) {
     return (uint32_t)sizeof(cui_bridge_window_options);
 }
 cui_bridge_app *cui_bridge_create_with_window_options(const cui_bridge_options *options,
-    const cui_bridge_window_options *window, cui_bridge_status *out_status) {
+                                                      const cui_bridge_window_options *window,
+                                                      cui_bridge_status *out_status) {
     cui_bridge_status status = CUI_BRIDGE_INVALID_ARGUMENT;
     if (out_status)
         *out_status = status;
@@ -420,7 +424,8 @@ cui_bridge_app *cui_bridge_create_with_window_options(const cui_bridge_options *
                    window->initially_hidden > 1))
         return NULL;
     if (window && window->initially_hidden && options->backend == CUI_BRIDGE_BACKEND_NONE) {
-        if (out_status) *out_status = CUI_BRIDGE_BACKEND_UNAVAILABLE;
+        if (out_status)
+            *out_status = CUI_BRIDGE_BACKEND_UNAVAILABLE;
         return NULL;
     }
     size_t text_length = 0;
@@ -464,9 +469,8 @@ cui_bridge_app *cui_bridge_create_with_window_options(const cui_bridge_options *
     }
     cui_config config = {.width = app->width, .height = app->height, .measure = bridge_measure};
     if (app->backend == CUI_BRIDGE_BACKEND_SDL) {
-        status =
-            cui_bridge_native_create(app, options->title_utf8, options->font_path_utf8, &config,
-                                     window && window->initially_hidden);
+        status = cui_bridge_native_create(app, options->title_utf8, options->font_path_utf8,
+                                          &config, window && window->initially_hidden);
         if (status != CUI_BRIDGE_OK)
             goto failed;
     }
@@ -596,16 +600,22 @@ cui_bridge_status cui_bridge_get_theme_preset(const cui_bridge_app *app, uint32_
 }
 cui_bridge_status cui_bridge_set_window_visible(cui_bridge_app *app, uint32_t visible) {
     cui_bridge_status status = bridge_ready(app);
-    if (status != CUI_BRIDGE_OK) return status;
-    if (visible > 1) return CUI_BRIDGE_INVALID_ARGUMENT;
-    if (app->backend != CUI_BRIDGE_BACKEND_SDL) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (visible > 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (app->backend != CUI_BRIDGE_BACKEND_SDL)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     return cui_bridge_native_set_window_visible(app, visible);
 }
 cui_bridge_status cui_bridge_get_window_visible(cui_bridge_app *app, uint32_t *visible) {
     cui_bridge_status status = bridge_ready(app);
-    if (status != CUI_BRIDGE_OK) return status;
-    if (!visible) return CUI_BRIDGE_INVALID_ARGUMENT;
-    if (app->backend != CUI_BRIDGE_BACKEND_SDL) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!visible)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (app->backend != CUI_BRIDGE_BACKEND_SDL)
+        return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     return cui_bridge_native_get_window_visible(app, visible);
 }
 cui_bridge_status cui_bridge_clipboard_set(cui_bridge_app *app, const char *text_utf8) {

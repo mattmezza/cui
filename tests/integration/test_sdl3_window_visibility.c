@@ -6,9 +6,9 @@ int main(void) {
     assert(!cui_sdl3_set_visible(NULL, true));
     assert(!cui_sdl3_set_visible(NULL, false));
     assert(!cui_sdl3_is_visible(NULL));
-    cui_sdl3 *host = cui_sdl3_create_with_options(
-        "hidden creation proof", 120, 80, NULL,
-        (cui_sdl3_window_options){.initially_hidden = true});
+    cui_sdl3 *host =
+        cui_sdl3_create_with_options("hidden creation proof", 120, 80, NULL,
+                                     (cui_sdl3_window_options){.initially_hidden = true});
     assert(host);
     assert(!cui_sdl3_is_visible(host));
     /* SDL's actual window flag corroborates the public query. */
@@ -25,8 +25,8 @@ int main(void) {
     assert(cui_sdl3_set_visible(host, false));
     assert(!cui_sdl3_is_visible(host));
     cui_sdl3_destroy(host);
-    host = cui_sdl3_create_with_options("zero visible", 120, 80, NULL,
-                                         (cui_sdl3_window_options){0});
+    host =
+        cui_sdl3_create_with_options("zero visible", 120, 80, NULL, (cui_sdl3_window_options){0});
     assert(host && cui_sdl3_is_visible(host));
     cui_sdl3_destroy(host);
     host = cui_sdl3_create("legacy visible", 120, 80, NULL);

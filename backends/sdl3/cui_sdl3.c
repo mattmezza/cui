@@ -71,7 +71,7 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     return cui_sdl3_create_with_options(title, w, h, font, (cui_sdl3_window_options){0});
 }
 cui_sdl3 *cui_sdl3_create_with_options(const char *title, int w, int h, cui_font *font,
-                                      cui_sdl3_window_options options) {
+                                       cui_sdl3_window_options options) {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
         return NULL;
     cui_sdl3 *s = calloc(1, sizeof(*s));

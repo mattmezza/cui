@@ -2,8 +2,10 @@
 #include "../../../src/bridge/cui_bridge_internal.h"
 #include <assert.h>
 int main(void) {
-    cui_bridge_options o = {.struct_size = sizeof(o), .abi_version = CUI_BRIDGE_ABI_VERSION,
-                            .width = 120, .height = 80};
+    cui_bridge_options o = {.struct_size = sizeof(o),
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .width = 120,
+                            .height = 80};
     cui_bridge_window_options w = {sizeof(w), 1, 1};
     cui_bridge_status status;
     assert(cui_bridge_window_options_size() == sizeof(w));
@@ -12,10 +14,12 @@ int main(void) {
     w.initially_hidden = 2;
     assert(!cui_bridge_create_with_window_options(&o, &w, &status));
     assert(status == CUI_BRIDGE_INVALID_ARGUMENT);
-    w.initially_hidden = 0; w.version = 2;
+    w.initially_hidden = 0;
+    w.version = 2;
     assert(!cui_bridge_create_with_window_options(&o, &w, &status));
     assert(status == CUI_BRIDGE_INVALID_ARGUMENT);
-    w.version = 1; w.struct_size--;
+    w.version = 1;
+    w.struct_size--;
     assert(!cui_bridge_create_with_window_options(&o, &w, &status));
     assert(status == CUI_BRIDGE_INVALID_ARGUMENT);
     w.struct_size = sizeof(w);
@@ -32,7 +36,8 @@ int main(void) {
     assert(cui_bridge_set_window_visible(app, 1) == CUI_BRIDGE_INVALID_STATE);
     assert(cui_bridge_get_window_visible(app, &visible) == CUI_BRIDGE_INVALID_STATE);
     assert(visible == 99);
-    app->stepping = false; app->closed = true;
+    app->stepping = false;
+    app->closed = true;
     assert(cui_bridge_get_window_visible(app, &visible) == CUI_BRIDGE_CLOSED);
     assert(cui_bridge_set_window_visible(app, 1) == CUI_BRIDGE_CLOSED);
     assert(visible == 99);

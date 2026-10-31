@@ -186,8 +186,12 @@ static napi_value create(napi_env env, napi_callback_info info) {
     uint32_t hidden = 0;
     bool has_hidden = false;
     if (napi_has_named_property(env, v[0], "initiallyHidden", &has_hidden) != napi_ok ||
-        (has_hidden && (!field(env, v[0], "initiallyHidden", &value) || !uint_arg(env, value, &hidden)))) {
-        free(title); free(font); free(app); return NULL;
+        (has_hidden &&
+         (!field(env, v[0], "initiallyHidden", &value) || !uint_arg(env, value, &hidden)))) {
+        free(title);
+        free(font);
+        free(app);
+        return NULL;
     }
     cui_bridge_window_options window = {sizeof(window), 1, hidden};
     app->bridge = cui_bridge_create_with_window_options(&options, &window, &code);
@@ -1542,16 +1546,23 @@ static napi_value set_root_padding(napi_env env, napi_callback_info info) {
 }
 
 static napi_value set_window_visible(napi_env env, napi_callback_info info) {
-    napi_value v[2]; js_app *app; uint32_t visible;
-    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !uint_arg(env, v[1], &visible)) return NULL;
+    napi_value v[2];
+    js_app *app;
+    uint32_t visible;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !uint_arg(env, v[1], &visible))
+        return NULL;
     cui_bridge_status code = cui_bridge_set_window_visible(app->bridge, visible);
     return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
 }
 static napi_value get_window_visible(napi_env env, napi_callback_info info) {
-    napi_value v[1], result; js_app *app; uint32_t visible;
-    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app)) return NULL;
+    napi_value v[1], result;
+    js_app *app;
+    uint32_t visible;
+    if (!args(env, info, 1, v) || !app_arg(env, v[0], &app))
+        return NULL;
     cui_bridge_status code = cui_bridge_get_window_visible(app->bridge, &visible);
-    if (code != CUI_BRIDGE_OK) return status(env, code);
+    if (code != CUI_BRIDGE_OK)
+        return status(env, code);
     return napi_get_boolean(env, visible != 0, &result) == napi_ok ? result : NULL;
 }
 static napi_value set_clipboard(napi_env env, napi_callback_info info) {

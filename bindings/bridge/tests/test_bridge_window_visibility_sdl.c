@@ -23,10 +23,14 @@ static cui_bridge_status after_frame(void *user) {
     return CUI_BRIDGE_CLOSED;
 }
 int main(void) {
-    assert(getenv("CUI_TEST_VIRTUAL_DISPLAY") && strcmp(getenv("CUI_TEST_VIRTUAL_DISPLAY"), "1") == 0);
-    cui_bridge_options o = {.struct_size=sizeof(o), .abi_version=CUI_BRIDGE_ABI_VERSION,
-        .backend=CUI_BRIDGE_BACKEND_SDL, .width=120, .height=80,
-        .font_path_utf8=getenv("CUI_TEST_FONT")};
+    assert(getenv("CUI_TEST_VIRTUAL_DISPLAY") &&
+           strcmp(getenv("CUI_TEST_VIRTUAL_DISPLAY"), "1") == 0);
+    cui_bridge_options o = {.struct_size = sizeof(o),
+                            .abi_version = CUI_BRIDGE_ABI_VERSION,
+                            .backend = CUI_BRIDGE_BACKEND_SDL,
+                            .width = 120,
+                            .height = 80,
+                            .font_path_utf8 = getenv("CUI_TEST_FONT")};
     cui_bridge_window_options w = {sizeof(w), 1, 1};
     cui_bridge_status status;
     cui_bridge_app *app = cui_bridge_create_with_window_options(&o, &w, &status);
@@ -42,8 +46,12 @@ int main(void) {
     cui_bridge_destroy(app);
     w.initially_hidden = 0;
     app = cui_bridge_create_with_window_options(&o, &w, &status);
-    assert(app && status == CUI_BRIDGE_OK); actual(false); cui_bridge_destroy(app);
+    assert(app && status == CUI_BRIDGE_OK);
+    actual(false);
+    cui_bridge_destroy(app);
     app = cui_bridge_create(&o, &status);
-    assert(app && status == CUI_BRIDGE_OK); actual(false); cui_bridge_destroy(app);
+    assert(app && status == CUI_BRIDGE_OK);
+    actual(false);
+    cui_bridge_destroy(app);
     return 0;
 }

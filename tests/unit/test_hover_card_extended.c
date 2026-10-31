@@ -370,7 +370,9 @@ static void independent_cards(void) {
                                     .accessibility_action = CUI_ACCESSIBILITY_ACTIVATE}));
         if (step == 2)
             assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
-                .pointer_button = CUI_POINTER_PRIMARY, .x = 490, .y = 290}));
+                                                   .pointer_button = CUI_POINTER_PRIMARY,
+                                                   .x = 490,
+                                                   .y = 290}));
         if (step == 3)
             assert(cui_queue_event(ui,
                                    (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
@@ -389,8 +391,8 @@ static void independent_cards(void) {
                                     .viewport = {0, 0, 500, 300},
                                     .width = 140,
                                     .height = 70},
-                &policy, &contact[i], i ? CUI_HOVER_CARD_RELEASE_RAW_PRIMARY
-                                                   : CUI_HOVER_CARD_RELEASE_LEGACY,
+                &policy, &contact[i],
+                i ? CUI_HOVER_CARD_RELEASE_RAW_PRIMARY : CUI_HOVER_CARD_RELEASE_LEGACY,
                 (cui_hover_handler){0});
             assert(r.lifecycle.valid && r.relationship_applied);
             const bool expected = step == 1 || (step == 2 && i == 0);

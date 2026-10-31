@@ -2134,23 +2134,26 @@ bool cui_set_box_shadows(cui_context *ui, const cui_box_shadow *layers, size_t c
     Clay__GetOpenLayoutElement()->config.custom.customData = node;
     return true;
 }
-bool cui_box_shadow_from_css(float x, float y, float blur_radius, float spread,
-                              cui_color color, cui_box_shadow_kind kind, cui_box_shadow *out) {
+bool cui_box_shadow_from_css(float x, float y, float blur_radius, float spread, cui_color color,
+                             cui_box_shadow_kind kind, cui_box_shadow *out) {
     if (!out || !isfinite(blur_radius) || blur_radius < 0 || blur_radius > 512 ||
         (kind != CUI_BOX_SHADOW_DROP && kind != CUI_BOX_SHADOW_INSET))
         return false;
-    cui_box_shadow value = {.layer = {.offset_x = x, .offset_y = y,
-                                      .sigma = blur_radius / 2, .spread = spread, .color = color},
+    cui_box_shadow value = {.layer = {.offset_x = x,
+                                      .offset_y = y,
+                                      .sigma = blur_radius / 2,
+                                      .spread = spread,
+                                      .color = color},
                             .kind = kind};
     cui_rect ignored;
-    if (!cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
-                                                       .layer = value.layer}, &ignored))
+    if (!cui_drop_shadow_bounds(
+            (cui_drop_shadow_paint){.caster = {0, 0, 1, 1}, .layer = value.layer}, &ignored))
         return false;
     *out = value;
     return true;
 }
 bool cui_element_set_box_shadows(cui_context *ui, cui_id id, const cui_box_shadow *layers,
-                                   size_t count, cui_corner_radii radii) {
+                                 size_t count, cui_corner_radii radii) {
     if (!cui_core_mutation(ui))
         return false;
     if (!ui || !ui->in_frame || ui->ambiguous_box_ids || cui_core_layout_only(ui) ||
@@ -2176,8 +2179,9 @@ bool cui_element_set_box_shadows(cui_context *ui, cui_id id, const cui_box_shado
     for (size_t i = 0; i < count; ++i)
         if ((layers[i].kind != CUI_BOX_SHADOW_DROP && layers[i].kind != CUI_BOX_SHADOW_INSET) ||
             !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
-                                                          .radii = radii,
-                                                          .layer = layers[i].layer}, &ignored))
+                                                            .radii = radii,
+                                                            .layer = layers[i].layer},
+                                    &ignored))
             return false;
     cui_core_select_context(ui);
     Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(node->clay_id);
@@ -2196,7 +2200,7 @@ bool cui_element_set_box_shadows(cui_context *ui, cui_id id, const cui_box_shado
     return true;
 }
 bool cui_element_set_shadow_preset(cui_context *ui, cui_id id, cui_shadow_preset preset,
-                                     cui_corner_radii radii) {
+                                   cui_corner_radii radii) {
     cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX];
     size_t count;
     if (!cui_shadow_preset_layers(preset, layers, CUI_SHADOW_PRESET_MAX, &count))

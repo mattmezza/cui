@@ -18,22 +18,23 @@ int main(void) {
         }
         if (frame == 2)
             assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
-                .pointer_button = CUI_POINTER_PRIMARY, .x = 310, .y = 230}));
+                                                   .pointer_button = CUI_POINTER_PRIMARY,
+                                                   .x = 310,
+                                                   .y = 230}));
         assert(cui_begin_frame(ui, 320, 240, .016f));
         bool accepted = cui_button(ui, 10, &theme, cui_string("Details"), false);
         cui_hover_card_policy policy = {.mode = CUI_HOVER_CARD_TAP_TOGGLE,
                                         .accepted_trigger_activation = accepted,
                                         .outside_tap = true,
                                         .relationship = true};
-        cui_hover_card_extended_result result =
-            cui_begin_hover_card_with_release(ui, 11, &theme, &state, cui_string("Profile details"),
-                                          (cui_hover_options){.trigger = 10,
-                                                              .viewport = {0, 0, 320, 240},
-                                                              .side = CUI_POPUP_BELOW,
-                                                              .width = 200,
-                                                              .height = 80},
-                                          &policy, &contact, CUI_HOVER_CARD_RELEASE_RAW_PRIMARY,
-                                          (cui_hover_handler){0});
+        cui_hover_card_extended_result result = cui_begin_hover_card_with_release(
+            ui, 11, &theme, &state, cui_string("Profile details"),
+            (cui_hover_options){.trigger = 10,
+                                .viewport = {0, 0, 320, 240},
+                                .side = CUI_POPUP_BELOW,
+                                .width = 200,
+                                .height = 80},
+            &policy, &contact, CUI_HOVER_CARD_RELEASE_RAW_PRIMARY, (cui_hover_handler){0});
         assert(result.lifecycle.valid && result.relationship_applied);
         if (result.lifecycle.control_result) {
             cui_text(ui, cui_string("Application-owned content"), theme.font_size, theme.text);

@@ -7,17 +7,19 @@
 
 static const cui_corner_radii square = {0};
 static const cui_box_shadow drop = {
-    .layer = {.offset_x = 3, .offset_y = 2, .color = {0, 0, 0, 255}},
-    .kind = CUI_BOX_SHADOW_DROP};
+    .layer = {.offset_x = 3, .offset_y = 2, .color = {0, 0, 0, 255}}, .kind = CUI_BOX_SHADOW_DROP};
 static cui_context *create(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 64, .max_commands = 256});
     assert(ui);
     return ui;
 }
 static void box(cui_context *ui, cui_id id, float size) {
-    cui_begin_box(ui, id, (cui_box){.width = size, .height = size,
-                                   .fixed_width = true, .fixed_height = true,
-                                   .background = {200, 80, 40, 128}});
+    cui_begin_box(ui, id,
+                  (cui_box){.width = size,
+                            .height = size,
+                            .fixed_width = true,
+                            .fixed_height = true,
+                            .background = {200, 80, 40, 128}});
 }
 static unsigned count(cui_draw_list list, cui_draw_type type) {
     unsigned n = 0;
@@ -34,15 +36,15 @@ static const cui_draw_command *first(cui_draw_list list, cui_draw_type type) {
 static void factory(void) {
     cui_box_shadow out = drop;
     assert(cui_box_shadow_from_css(-4096, 4096, 512, -4096, (cui_color){1, 2, 3, 4},
-                                    CUI_BOX_SHADOW_INSET, &out));
+                                   CUI_BOX_SHADOW_INSET, &out));
     assert(out.layer.sigma == 256 && out.layer.spread == -4096 &&
            out.kind == CUI_BOX_SHADOW_INSET && out.layer.color.a == 4);
     assert(cui_box_shadow_from_css(0, 0, 0, 4096, (cui_color){0}, CUI_BOX_SHADOW_DROP, &out));
     cui_box_shadow before = out;
     const float invalid[] = {-1, 513, NAN, INFINITY};
     for (size_t i = 0; i < sizeof invalid / sizeof *invalid; i++) {
-        assert(!cui_box_shadow_from_css(0, 0, invalid[i], 0, (cui_color){0},
-                                         CUI_BOX_SHADOW_DROP, &out));
+        assert(!cui_box_shadow_from_css(0, 0, invalid[i], 0, (cui_color){0}, CUI_BOX_SHADOW_DROP,
+                                        &out));
         assert(memcmp(&out, &before, sizeof out) == 0);
     }
     assert(!cui_box_shadow_from_css(NAN, 0, 1, 0, (cui_color){0}, CUI_BOX_SHADOW_DROP, &out));
@@ -65,7 +67,7 @@ static void closed_open_portal(void) {
             assert(cui_element_set_box_shadows(ui, 2, &drop, 1, square));
         cui_end_box(ui);
         cui_begin_portal(ui, 3, (cui_box){.background = {30, 40, 50, 255}},
-                          (cui_rect){50, 45, 12, 13}, 10);
+                         (cui_rect){50, 45, 12, 13}, 10);
         cui_end_box(ui);
         assert(cui_element_set_shadow_preset(ui, 3, CUI_SHADOW_2XS, square));
         cui_draw_list list = cui_end_frame(ui);
@@ -112,8 +114,7 @@ static void invalid_and_copied(void) {
     layers[0] = drop;
     layers[0].kind = (cui_box_shadow_kind)8;
     assert(!cui_element_set_box_shadows(ui, 1, layers, 8, square));
-    assert(!cui_element_set_box_shadows(ui, 1, &drop, 1,
-                                         (cui_corner_radii){.top_left = NAN}));
+    assert(!cui_element_set_box_shadows(ui, 1, &drop, 1, (cui_corner_radii){.top_left = NAN}));
     assert(!cui_element_set_shadow_preset(ui, 1, (cui_shadow_preset)99, square));
     memset(layers, 0, sizeof layers);
     cui_draw_list list = cui_end_frame(ui);
@@ -147,8 +148,8 @@ static void rejected_targets(void) {
                 assert(!cui_element_set_shadow_preset(ui, 999, CUI_SHADOW_NONE, square));
             box(ui, collision, 10);
             cui_end_box(ui);
-            assert(cui_last_error(ui) == (mode == 2 ? CUI_ERROR_DUPLICATE_ID
-                                                              : CUI_ERROR_INVALID_ACTION));
+            assert(cui_last_error(ui) ==
+                   (mode == 2 ? CUI_ERROR_DUPLICATE_ID : CUI_ERROR_INVALID_ACTION));
             assert(!cui_element_set_shadow_preset(ui, owner, CUI_SHADOW_NONE, square));
         }
         if (mode == 4)
@@ -167,8 +168,13 @@ static void legacy_clear_and_order(void) {
     size_t baseline_count = 0;
     for (unsigned mode = 0; mode < 4; mode++) {
         assert(cui_begin_frame(ui, 96, 96, .016f));
-        cui_begin_box(ui, 1, (cui_box){.padding = 10, .width = 40, .height = 40,
-                                       .clip = true, .custom_opacity = true, .opacity = .5f});
+        cui_begin_box(ui, 1,
+                      (cui_box){.padding = 10,
+                                .width = 40,
+                                .height = 40,
+                                .clip = true,
+                                .custom_opacity = true,
+                                .opacity = .5f});
         box(ui, 2, 20);
         assert(cui_set_underlay(ui, (cui_rect){2, 2, 4, 4}, (cui_color){1, 2, 3, 255}, square));
         assert(cui_set_outline(ui, 1, (cui_color){90, 80, 70, 255}, square));
@@ -176,8 +182,9 @@ static void legacy_clear_and_order(void) {
         if (mode == 1)
             assert(cui_element_set_shadow_preset(ui, 2, CUI_SHADOW_NONE, square));
         if (mode >= 2) {
-            cui_box_shadow mixed[] = {drop, {.kind = CUI_BOX_SHADOW_INSET,
-                                             .layer = {.spread = 2, .color = {0, 0, 255, 255}}}};
+            cui_box_shadow mixed[] = {
+                drop,
+                {.kind = CUI_BOX_SHADOW_INSET, .layer = {.spread = 2, .color = {0, 0, 255, 255}}}};
             assert(cui_element_set_box_shadows(ui, 2, mixed, 2, square));
             if (mode == 2)
                 assert(cui_element_set_box_shadows(ui, 2, NULL, 0, square));
@@ -196,10 +203,9 @@ static void legacy_clear_and_order(void) {
             assert(list.count == baseline_count && memcmp(baseline, pixels, sizeof baseline) == 0);
             for (size_t i = 0; i < list.count; i++) {
                 assert(list.commands[i].type == commands[i].type);
-                assert(memcmp(&list.commands[i].bounds, &commands[i].bounds,
-                              sizeof(cui_rect)) == 0);
-                assert(memcmp(&list.commands[i].color, &commands[i].color,
-                              sizeof(cui_color)) == 0);
+                assert(memcmp(&list.commands[i].bounds, &commands[i].bounds, sizeof(cui_rect)) ==
+                       0);
+                assert(memcmp(&list.commands[i].color, &commands[i].color, sizeof(cui_color)) == 0);
             }
         } else {
             assert(count(list, CUI_DRAW_DROP_SHADOW) == 1 &&
@@ -238,8 +244,8 @@ static void untouched_clear(void) {
     for (unsigned mode = 0; mode < 2; mode++) {
         assert(cui_begin_frame(ui, 96, 96, .016f));
         box(ui, 1, 20);
-        cui_interaction interaction = cui_interact(ui, 1, CUI_ROLE_BUTTON,
-                                                   cui_string("same owner"), false, false, 0);
+        cui_interaction interaction =
+            cui_interact(ui, 1, CUI_ROLE_BUTTON, cui_string("same owner"), false, false, 0);
         assert(!interaction.activated);
         cui_end_box(ui);
         if (mode)
@@ -260,7 +266,11 @@ static void untouched_clear(void) {
     }
     cui_destroy(ui);
 }
-typedef struct { cui_context *ui; unsigned calls; bool rejected; } guard_state;
+typedef struct {
+    cui_context *ui;
+    unsigned calls;
+    bool rejected;
+} guard_state;
 static bool prepaint(const cui_prepaint_info *info, const void *payload,
                      cui_prepaint_writer *writer) {
     (void)info;
@@ -286,14 +296,18 @@ static void diagnostic(void *user, const cui_diagnostic *detail) {
 static void mutation_guards(void) {
     for (unsigned mode = 0; mode < 3; mode++) {
         guard_state s = {0};
-        s.ui = cui_create((cui_config){.max_elements = 32, .max_commands = 64,
-                                       .measure = mode == 1 ? measure : NULL, .measure_user = &s});
+        s.ui = cui_create((cui_config){.max_elements = 32,
+                                       .max_commands = 64,
+                                       .measure = mode == 1 ? measure : NULL,
+                                       .measure_user = &s});
         assert(s.ui && cui_begin_frame(s.ui, 96, 96, .016f));
         box(s.ui, 1, 20);
         if (mode == 0) {
             guard_state *ptr = &s;
             assert(cui_set_prepaint(s.ui, (cui_prepaint_options){.callback = prepaint,
-                       .payload = &ptr, .payload_bytes = sizeof ptr, .command_budget = 1}));
+                                                                 .payload = &ptr,
+                                                                 .payload_bytes = sizeof ptr,
+                                                                 .command_budget = 1}));
         }
         if (mode == 1)
             cui_text(s.ui, cui_string("measure"), 12, (cui_color){0, 0, 0, 255});
@@ -313,15 +327,15 @@ static void accepted_input(void) {
         cui_context *ui = create();
         for (unsigned frame = 0; frame < 2; frame++) {
             if (frame) {
-                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
-                                                      .x = 5, .y = 5}));
-                assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP,
-                                                      .x = 5, .y = 5}));
+                assert(cui_queue_event(
+                    ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = 5, .y = 5}));
+                assert(
+                    cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = 5, .y = 5}));
             }
             assert(cui_begin_frame(ui, 96, 96, .016f));
             box(ui, 1, 20);
-            cui_interaction action = cui_interact(ui, 1, CUI_ROLE_BUTTON,
-                                                    cui_string("owner"), false, false, 0);
+            cui_interaction action =
+                cui_interact(ui, 1, CUI_ROLE_BUTTON, cui_string("owner"), false, false, 0);
             assert(action.activated == (frame != 0));
             cui_end_box(ui);
             if (styled)

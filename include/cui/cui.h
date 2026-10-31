@@ -408,9 +408,8 @@ bool cui_box_shadow_init(float offset_x, float offset_y, cui_color, cui_box_shad
 /* Explicit CSS-inspired blur radius: sigma=blur_radius/2, radius in [0,512].
  * Other limits match box shadows. Invalid input leaves output unchanged.
  * This conversion does not promise browser box-shadow pixel equivalence. */
-bool cui_box_shadow_from_css(float offset_x, float offset_y, float blur_radius,
-                              float spread, cui_color, cui_box_shadow_kind,
-                              cui_box_shadow *out);
+bool cui_box_shadow_from_css(float offset_x, float offset_y, float blur_radius, float spread,
+                             cui_color, cui_box_shadow_kind, cui_box_shadow *out);
 /* Copy ordered layers (black alpha13/26/64). Output count must not overlap the
  * written layer span. Invalid enum, capacity/overflow or pointers leave all outputs
  * untouched. NONE writes count0 only; its layer buffer may be NULL. */
@@ -684,10 +683,9 @@ bool cui_set_shadow_preset(cui_context *, cui_shadow_preset, cui_corner_radii);
  * No layout, input or semantic change. Existing paint/clip/opacity rules apply.
  * Missing/zero/layout-only targets report INVALID_ACTION; duplicate-ID frames
  * reject. This addresses box paint IDs, not every component or its nested parts. */
-bool cui_element_set_box_shadows(cui_context *, cui_id, const cui_box_shadow *,
-                                   size_t count, cui_corner_radii);
-bool cui_element_set_shadow_preset(cui_context *, cui_id, cui_shadow_preset,
-                                     cui_corner_radii);
+bool cui_element_set_box_shadows(cui_context *, cui_id, const cui_box_shadow *, size_t count,
+                                 cui_corner_radii);
+bool cui_element_set_shadow_preset(cui_context *, cui_id, cui_shadow_preset, cui_corner_radii);
 
 typedef struct {
     cui_rect bounds;

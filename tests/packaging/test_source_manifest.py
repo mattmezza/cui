@@ -220,6 +220,7 @@ class SourceManifest(unittest.TestCase):
             # Reproduce the actual wheel's docless CMake configuration. Consumer
             # guide compilation must not become a package build dependency.
             self.assertFalse((source / 'docs').exists())
+            self.assertFalse((source / 'dist').exists())
             if shutil.which('cmake'):
                 configured = subprocess.run(
                     [shutil.which('cmake'), '-S', str(source / 'bindings/bridge'),

@@ -26,7 +26,7 @@ feature test does not establish complete component parity.
 | 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; 15 focused regressions and two Inter-font checks pass. Finish Dialog composition/input and wider acceptance. |
 | 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Spinner scheduling fix passes local browser/repeated-transition checks; confirm in hosted CI and obtain a clean full integration run. |
+| 1 | Resolve current validation failures | Fix hosted source-package configuration, Windows alignment and WASM32 warning failures; confirm Spinner scheduling in hosted CI and obtain a clean full run. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -106,6 +106,13 @@ four local viewport/DPI cases and 24 instrumented preference transitions with ze
 extra frames; hosted confirmation remains pending. No clean **full**
 regression run or browser gate covers the complete newer integration yet.
 Older green results do not cover newer code.
+
+Current candidate `c66c6f5f` exposed three hosted integration gaps: source-package
+configuration incorrectly required generated `dist` headers; Windows lacks the
+private validator’s `max_align_t`; a Slider event-count guard warns on WASM32.
+The package configuration fix passes actual staged-source configuration and all
+five full-tree import fixtures locally. Portability fixes and hosted confirmation
+remain pending; there is no new public deployment.
 
 ## Deferred or lower priority
 

@@ -1,0 +1,21 @@
+/* SPDX-License-Identifier: MIT */
+/* Exact independent pre-extraction source; explicit symbol renaming only. */
+#define cui_popover_position_resolve legacy_cui_popover_position_resolve
+#define cui_popover_arrow_resolve legacy_cui_popover_arrow_resolve
+#define cui_popover_refinement_valid legacy_cui_popover_refinement_valid
+#define cui_surface_init legacy_cui_surface_init
+#define cui_surface_open legacy_cui_surface_open
+#define cui_surface_close legacy_cui_surface_close
+#define cui_surface_request_close legacy_cui_surface_request_close
+#define cui_surface_take_result legacy_cui_surface_take_result
+#define cui_surface_part_id legacy_cui_surface_part_id
+#define cui_surface_geometry legacy_cui_surface_geometry
+#define cui_popover_surface_geometry legacy_cui_popover_surface_geometry
+#define cui_surface_current_geometry legacy_cui_surface_current_geometry
+#define cui_surface_resize_bounds legacy_cui_surface_resize_bounds
+#define cui_base_surface_update legacy_cui_base_surface_update
+#define cui_base_surface_begin legacy_cui_base_surface_begin
+#define cui_base_surface_end legacy_cui_base_surface_end
+#define cui_base_surface_submit_resize legacy_cui_base_surface_submit_resize
+#define cui_base_surface_submit_body legacy_cui_base_surface_submit_body
+#include "../reference/dialog_surface/legacy_surface.c"

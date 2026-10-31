@@ -1,0 +1,6 @@
+{
+  "source_revision": "d4a1d8479a5af5a81265e37eba1cbb3b465609cc",
+  "source_path": "src/base/cui_surface.c",
+  "sha256": "b1d8b3b02385edf6f2b5d394b3727de4ae1adbb381f5fe54881b5dc7a97381c5",
+  "method": "Exact unmodified source; explicit symbol renaming in separate TU. Capture before reducer extraction."
+}

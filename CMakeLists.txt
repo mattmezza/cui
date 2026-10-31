@@ -1548,6 +1548,19 @@ cui_warnings(test_scroll_base)
 add_test(NAME scroll_base_only COMMAND test_scroll_base)
 set_tests_properties(scroll_base_only PROPERTIES TIMEOUT 60)
 
+# Independent frozen pre-extraction Dialog/Surface reducer trace.
+add_executable(test_dialog_surface_legacy tests/unit/test_dialog_surface_legacy.c
+ tests/unit/dialog_surface_legacy_probe.c src/core/cui.c src/base/cui_models.c
+ src/base/cui_overlay.c src/base/cui_surface.c)
+target_include_directories(test_dialog_surface_legacy PRIVATE include third_party/clay)
+if(NOT MSVC)
+ target_link_libraries(test_dialog_surface_legacy PRIVATE m)
+endif()
+cui_warnings(test_dialog_surface_legacy)
+add_test(NAME dialog_surface_legacy_trace COMMAND test_dialog_surface_legacy)
+set_tests_properties(dialog_surface_legacy_trace PROPERTIES TIMEOUT 60)
+add_test(NAME dialog_surface_reference_authority COMMAND ${Python3_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_dialog_surface_reference.py)
 add_executable(test_surface_base tests/unit/test_surface.c src/core/cui.c src/base/cui_models.c src/base/cui_overlay.c src/base/cui_surface.c)
 target_include_directories(test_surface_base PRIVATE include third_party/clay)
 target_compile_definitions(test_surface_base PRIVATE CUI_SURFACE_BASE_ONLY=1)

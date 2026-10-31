@@ -118,7 +118,9 @@ typedef struct {
     cui_text_style style;
     float size;
 } cui_core_text_source;
+typedef struct cui_core_scroll_layout_header cui_core_scroll_layout_header;
 struct cui_context {
+    const cui_core_scroll_layout_header *scroll_layout;
     int tab_path[32];
     size_t tab_depth;
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
@@ -1386,6 +1388,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
     }
+    ui->scroll_layout = NULL; /* Drop cached resource before collection/destruction. */
     for (size_t i = 0; i < ui->config.max_resources; ++i) {
         cui_core_resource *r = &ui->resources[i];
         if (!r->payload)
@@ -3767,6 +3770,8 @@ static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray 
     }
     return INT32_MAX;
 }
+#include "cui_scroll_layout_internal.h"
+
 cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
@@ -3791,7 +3796,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     ui->overflow_depth = 0;
     while (ui->depth)
         cui_end_box(ui);
-    Clay_RenderCommandArray a = Clay_EndLayout(ui->dt);
+    Clay_RenderCommandArray a = cui_core_scroll_layout_end(ui);
     if (!ui->prepaint_capacity)
         cui_core_prepaint_prepare(ui, a);
     ui->layout_debug_ready = ui->layout_debug && !ui->prepaint_capacity;
@@ -4165,7 +4170,8 @@ cui_draw_list cui_end_frame(cui_context *ui) {
     if (!cui_core_prepaint_defer(ui, INT32_MAX))
         goto cui_core_commands_done;
 cui_core_commands_done:
-    for (size_t i = 0; i < ui->bounds_track_count; i++) {
+    for (size_t i = 0; i < ui->bounds_track_count && !(ui->scroll_layout && ui->error != CUI_OK);
+         i++) {
         cui_core_bounds_track track = ui->bounds_tracks[i];
         uint32_t folded = cui_core_folded(track.id);
         cui_rect bounds = {0};
@@ -4345,6 +4351,8 @@ cui_core_commands_done:
     cui_core_finalize_text_input(ui);
     ui->in_frame = false;
     ui->resolving_layout = false;
+    if (ui->scroll_layout && ui->error != CUI_OK)
+        ui->count = 0;
     return (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
 }
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {

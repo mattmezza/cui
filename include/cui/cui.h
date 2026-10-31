@@ -906,6 +906,38 @@ const cui_semantic *cui_semantics(cui_context *ui, size_t *count);
  * layout ancestor. Zero for roots, unknown IDs, or while a frame is open. */
 cui_id cui_semantic_parent(cui_context *ui, cui_id id);
 cui_rect cui_bounds(cui_context *ui, cui_id id);
+/* Opt-in, frame-only intrinsic scroll-body allocation. Records are copied; offset
+ * destinations remain writable/stable through end_frame. Heights/offsets must be
+ * finite. Version/size/reserved fields must exactly match V1. See SCROLL_LAYOUT.md
+ * for the admitted fixed-width/overlay topology, errors and transactional limits.
+ * User composition/input dispatch do not repeat; text measurement may repeat.
+ * No registration preserves legacy layout/error behavior. Failed opt-in frames
+ * have no valid draw/prepaint/geometry promise; clear error and rebuild next frame. */
+#define CUI_SCROLL_LAYOUT_VERSION_1 1u
+#define CUI_SCROLL_BODY_LAYOUT_V1_BYTES 80u
+#define CUI_SCROLL_CLAMP_V1_BYTES 32u
+typedef enum { CUI_SCROLL_BODY_AUTO = 0, CUI_SCROLL_BODY_EXPLICIT = 1 } cui_scroll_body_mode;
+typedef struct {
+    uint32_t struct_size, version, mode, reserved;
+    cui_id panel, outer_viewport, column, body_frame, viewport, content;
+    float requested_height, min_height, max_height;
+    uint32_t reserved2;
+} cui_scroll_body_layout_v1;
+typedef struct {
+    uint32_t struct_size, version, axes, reserved;
+    cui_id viewport, content;
+} cui_scroll_clamp_v1;
+#define CUI_SCROLL_CLAMP_Y 2u
+/* Call after all referenced boxes close. Each body reserves two of 64 clamp slots;
+ * at most 32 bodies. AUTO requested_height=0; EXPLICIT min<=requested<=max, >0.
+ * All offsets/destinations are distinct, including across standalone clamps and
+ * retained bounds tracks. Failed registration cannot be salvaged by clear_error
+ * in the same frame. Inert/layout-only geometry clamps without model writes. */
+bool cui_layout_scroll_body_v1(cui_context *, const cui_scroll_body_layout_v1 *, float *outer_y,
+                               float *body_y);
+/* V1 supports only Y. Standalone viewport height is fixed and positive; content
+ * cannot contain a registered body. No registration deduplication/replacement. */
+bool cui_layout_scroll_clamp_v1(cui_context *, const cui_scroll_clamp_v1 *, float *y);
 /* Update a current-frame clipped box before end_frame computes layout. Useful
  * for scroll events deferred by children after their parent's begin call. */
 bool cui_set_box_scroll_offset(cui_context *, cui_id, float x, float y);

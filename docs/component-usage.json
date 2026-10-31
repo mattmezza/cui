@@ -2279,5 +2279,17 @@
       "public_header": "include/cui/cui_text_view.h",
       "composition": "application model + frame composition"
     }
-  ]
+  ],
+  "core_layout_constraints": {
+    "public_header": "include/cui/cui.h",
+    "api_symbols": [
+      "cui_layout_scroll_body_v1",
+      "cui_layout_scroll_clamp_v1"
+    ],
+    "docs": [
+      "docs/SCROLL_LAYOUT.md"
+    ],
+    "scope": "Opt-in C Core only: current intrinsic Y body allocation and standalone Y clamping with fixed current widths and hidden/overlay scrollbars. Existing Scrollable/Base/Dialog APIs and all five foreign builders remain unchanged; this is not full slot composition or general constraint closure.",
+    "capacity": "32 body links and 64 total clamps, two per body; records copied and distinct application offset destinations borrowed through end_frame."
+  }
 }

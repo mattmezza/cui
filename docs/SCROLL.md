@@ -25,3 +25,8 @@ when only vertical measurement is enabled, so wrapped text contributes its laid-
 height. Enable horizontal measurement for content that should fit its natural
 width. Out-of-flow absolute boxes and portals do not enlarge the FIT extent.
 The drawing-free base API continues to require explicit content dimensions.
+
+For low-level C compositions that need intrinsic first-frame sizing and current
+clamping, see [Core scroll-layout constraints](SCROLL_LAYOUT.md). Those opt-in
+Core APIs leave this container and its previous-frame auto-measurement behavior
+unchanged; they are not new Dialog/Base/foreign-builder composition facades.

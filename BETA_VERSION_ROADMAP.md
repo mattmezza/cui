@@ -14,7 +14,7 @@ release date is asserted.
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `04911c7fe81cafbe9d0e2937e1827fac4a3ead08`; public docs, catalog, headers and native archive checked on 2026-10-31. |
 | Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
-| Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows pass combined local native, facade and browser checks; hosted integration is still pending. |
+| Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows pass combined local checks; all hosted browser shards and native binding checks passed. A Windows Debug fixture crash still blocks integration. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -60,6 +60,9 @@ can lag implementation: inspect current code and evidence before scheduling work
   **5/5** part facade/older-library checks, strict TypeScript and **18/18** skill
   tests passed. Five fixtures pass the 1 MB stack guard. The WASM gallery passed
   ten desktop/narrow-DPR cases with actual paint/input checks and copied C usage.
+  All three hosted browser shards and the native binding gate also passed.
+  Full CI remains unpassed: Windows Debug crashed in `bridge_part_shadows`;
+  investigation and an actual Windows rerun are required before merging.
   These additions remain unreleased and are absent from alpha.3 packages.
 - Exact release source `a7dee360`: [full CI](https://github.com/mattmezza/cui/actions/runs/41226410425)
   and [native binding gate](https://github.com/mattmezza/cui/actions/runs/41226410434)
@@ -89,7 +92,7 @@ features already have partial implementations or tests. The linked guides and
 
 | Area | Work still required |
 | --- | --- |
-| Controls | Finish Button state/style refinement; remaining Slider/theme behavior; consistent sizes, typography, rounding, shadows and state styling across controls. |
+| Controls | Finish Button state/style refinement; remaining Slider/theme behavior; consistent sizes, typography, rounding, shadows and state styling across controls. A locally tested C-only resolver preserves all 38 named palettes, including gradient data; it does not add Slider brush rendering or foreign authoring. |
 | Date/time and color | Complete remaining parsing, formatting, bounds, keyboard, localization and accessibility contracts for DatePicker/TimeField/ColorPicker. Preserve existing locale/year navigation and civil-time work. |
 | Overlays | Finish Dialog slots, Popover focus/relationship and remaining source placement behavior; verify HoverCard lifecycle/dismissal. Native explicit collapsed state needs a separate reviewed semantic-presence contract. |
 | Tables | Complete Table selection/sorting/resizing, themed cells and keyboard behavior; DataTable virtualization/remote callbacks and header/footer/table semantics. Preserve consistent scrolling and existing styling. |

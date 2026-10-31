@@ -22,6 +22,20 @@ release date is asserted.
 feature or gallery example does not verify an entire family. Older ledger rows
 can lag implementation: inspect current code and evidence before scheduling work.
 
+## What still blocks beta
+
+- **Component completeness:** reconcile every one of the 78 families with the
+  frozen source; finish outstanding behavior, styling and interaction gaps.
+- **Shared capabilities:** complete responsive layout, shadows, gradients,
+  typography, events, touch and accessibility coverage without breaking old APIs.
+- **Language delivery:** finish Python, JS/TS, Go and Rust authoring coverage and
+  verify package-manager installation paths.
+- **Acceptance and delivery:** finish applicable platform tests, matching human/
+  agent docs, examples, release artifacts and exact-revision website validation.
+
+These are scope checkpoints, not equal-sized tasks. Detailed remaining work and
+exceptions are listed below; worker-only evidence does not close a delivery item.
+
 ## Current priorities
 
 1. **Finish the active layout and styling slices:** same-frame scroll constraints,
@@ -33,9 +47,9 @@ can lag implementation: inspect current code and evidence before scheduling work
 
 | Active slice | Current checkpoint | What remains |
 | --- | --- | --- |
-| Scroll layout / Dialog sizing | Core implementation has focused headless evidence in a worker branch; not merged. | Finish admission, failure/lifetime and nested-layout tests; integrate Core, then component-level sizing and scrolling. |
-| Slider palettes and ranges | Palette values have focused worker tests; range/orientation and numeric accessibility contracts are proposals. | Integrate palette values, implement reviewed range/orientation behavior, then verify typed events, accessibility and bindings. |
-| Backgrounds and gradients | Owned color/gradient values have focused worker tests; versioned drawing records are under review. | Integrate values; implement and verify rendering, authoring APIs and binding support per advertised backend. No cross-backend completion claim yet. |
+| Scroll layout / Dialog sizing | Core is in the next integration branch with focused headless evidence; combined regression build is running. Dialog slots and scrollbar geometry remain design/test-only work. | Finish combined Core validation, then implement and verify component-level sizing, scrolling and input. |
+| Slider palettes and ranges | Palette values, numeric accessibility Core support and pure range/value math have focused tests in worker/integration branches. Interactive range controls are not shipped. | Integrate and validate these foundations; implement reviewed control behavior, typed events, host accessibility and bindings. |
+| Backgrounds and gradients | Owned values have focused tests; the versioned drawing contract is reviewed. Frozen legacy rendering fixtures and new Core transport have focused worker evidence. | Integrate and validate Core; implement authoring and rendering support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas, then bindings. No renderer support is established by Core-only tests. |
 | Styling release | Styling batch merged and deployed; exact-main CI/native/browser gates and public-site verification passed. | Include these development APIs in a later verified library release; alpha.3 packages do not contain them. |
 
 Worker checkpoints are **not shipped APIs**. Their designs may change during
@@ -150,6 +164,9 @@ behavior families need justified exceptions rather than invented paint roots.
   reduced-motion observation and component integration. Verify touch cancellation,
   nested scrolling, optional scrollbar styles, pan/pinch opt-ins, cursors and
   focus/hover/pressed states across applicable components.
+- [ ] **Build/CI cost:** reuse equivalent test compilation where safe and keep
+  dependency caches and browser shards efficient. Preserve independent
+  distribution/backend checks; measure improvements before claiming speedups.
 - [ ] **Events and asynchronous UX:** finish the coverage/exception audit for the
   shared event contract, legacy timing/mutation compatibility and binding support.
   Validate the worker-fetch example's cancellation, stale responses, wakeup,

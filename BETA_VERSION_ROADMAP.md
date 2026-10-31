@@ -14,13 +14,32 @@ release date is asserted.
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `04911c7fe81cafbe9d0e2937e1827fac4a3ead08`; public docs, catalog, headers and native archive checked on 2026-10-31. |
 | Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
-| Latest verified batch | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows passed local and hosted checks. Deployment is pending; these APIs are absent from alpha.3 packages. |
+| Latest verified batch | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows passed local and hosted checks. Merged on main (`c8e222bb`); exact-main CI and deployment are running. These APIs are absent from alpha.3 packages. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
 **Status rule:** implemented ≠ tested ≠ merged ≠ released ≠ deployed. A tested
 feature or gallery example does not verify an entire family. Older ledger rows
 can lag implementation: inspect current code and evidence before scheduling work.
+
+## Current priorities
+
+1. **Finish the active layout and styling slices:** same-frame scroll constraints,
+   component shadows, Slider behavior and background/gradient support.
+2. **Close component and binding gaps:** verify the 78-family ledger, complete
+   shared interaction contracts and expose supported APIs across all five facades.
+3. **Prepare beta delivery:** platform acceptance, installed packages, matching
+   documentation and exact-revision website/release checks.
+
+| Active slice | Current checkpoint | What remains |
+| --- | --- | --- |
+| Scroll layout / Dialog sizing | Core implementation has focused headless evidence in a worker branch; not merged. | Finish admission, failure/lifetime and nested-layout tests; integrate Core, then component-level sizing and scrolling. |
+| Slider palettes and ranges | Palette values have focused worker tests; range/orientation and numeric accessibility contracts are proposals. | Integrate palette values, implement reviewed range/orientation behavior, then verify typed events, accessibility and bindings. |
+| Backgrounds and gradients | Owned color/gradient values have focused worker tests; versioned drawing records are under review. | Integrate values; implement and verify rendering, authoring APIs and binding support per advertised backend. No cross-backend completion claim yet. |
+| Styling deployment | Styling batch merged on main; previous candidate CI/native/browser gates passed. | Finish exact-main gates, independently verify the deployed revision, then include the APIs in a later release. |
+
+Worker checkpoints are **not shipped APIs**. Their designs may change during
+review; main headers and released documentation remain the consumer authority.
 
 ## Next deliveries
 

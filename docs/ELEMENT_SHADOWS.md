@@ -63,7 +63,10 @@ The generic setter is C-only. Language builders and bridge do not yet expose thi
 style contract; bundled C headers alone do not establish typed language support.
 Popup/trigger/backdrop and anonymous or repeated component parts need explicit
 owner-specific public addressing and tests. Full 78-family component-part and
-binding coverage remains planned in `design/ELEMENT_SHADOW_STYLING.md`.
+binding coverage remains planned in `design/ELEMENT_SHADOW_STYLING.md`. The
+[78-family ownership audit](design/ELEMENT_SHADOW_COVERAGE.md) identifies actual
+paint targets and remaining addressing gaps; source eligibility is not per-family
+test or binding acceptance.
 
 ## Component paint ownership
 

@@ -35,8 +35,10 @@ can lag implementation: inspect current code and evidence before scheduling work
 - [ ] **Consistent shadows.** Ship a clear typed API for presets and custom
   offset/blur/spread/color, mixed drop/inset layers and clearing. Existing shadow
   renderers must be reused. Initial named-box C setters have focused tests; full
-  component coverage is still pending. Finish component-root, nested-part and popup ownership,
-  language bindings, copyable examples and browser/native proof. CSS-like blur
+  component coverage is still pending. The [78-family ownership audit](docs/design/ELEMENT_SHADOW_COVERAGE.md)
+  records public, private, anonymous and nonvisual targets. Finish component-root,
+  nested-part and popup ownership, language bindings, copyable examples and
+  browser/native proof. CSS-like blur
   convenience must not reinterpret existing sigma-based APIs or presets.
 - [ ] **Release the completed major batch.** Freeze one source revision; validate
   matching C, Python/npm, Go and Rust artifacts; publish release notes/checksums
@@ -51,6 +53,12 @@ can lag implementation: inspect current code and evidence before scheduling work
 - CI found two binding jobs selecting new tests without building their executables.
   Candidate `b553c8bb` fixes the build lists; eight workflow tests passed. Hosted
   CI and publication are still pending. This is evidence for these slices only.
+- The hosted native binding gate passed at `b553c8bb`, including ten static/dynamic
+  callback cases and hidden-window checks in all five language paths. Broader CI
+  found a stale HoverCard usage paragraph; the corrected guide passes all six
+  documentation tests locally. Pages also exposed a missing Spinner probe artifact
+  argument (fixed locally) and a Chromium startup crash. Final integrated checks
+  remain pending.
 
 ## Component parity: verify and close the gaps
 

@@ -83,6 +83,10 @@ def validate(text):
                      'contents: read', 'python tests/test_pages_tool_cache.py'):
         if required not in text:
             errors.append('missing existing gate or cache contract: '+required)
+    for probe in ('spinner_contract_gallery', 'stepper_visual_gallery', 'hover_card_release'):
+        invocation = 'uv run tests/web/test_' + probe + '.py --directory build/web'
+        if invocation not in browser:
+            errors.append('gallery probe requires the shared built directory: '+probe)
     return errors
 
 
@@ -113,6 +117,13 @@ class CacheTests(unittest.TestCase):
         ):
             with self.subTest(after=after):
                 self.assertTrue(validate(source.replace(before, after)))
+
+    def test_gallery_probes_require_the_shared_artifact(self):
+        source = WORKFLOW.read_text()
+        for probe in ('spinner_contract_gallery', 'stepper_visual_gallery', 'hover_card_release'):
+            invocation = 'tests/web/test_' + probe + '.py --directory build/web'
+            with self.subTest(probe=probe):
+                self.assertTrue(validate(source.replace(invocation, invocation.split(' --directory')[0])))
 
     def test_literal_shell_blocks_parse(self):
         lines = WORKFLOW.read_text().splitlines()

@@ -357,7 +357,7 @@ jobs:
           uv run tests/web/test_text_gradient.py
           uv run tests/web/test_gradient_gallery.py
           uv run tests/web/test_spinner_gallery.py
-          uv run tests/web/test_spinner_contract_gallery.py
+          uv run tests/web/test_spinner_contract_gallery.py --directory build/web
       - name: Verify independent Plot and Chart motion policies
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_plot_chart_owner_motion.py

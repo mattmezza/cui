@@ -58,7 +58,8 @@ can lag implementation: inspect current code and evidence before scheduling work
   passed; workflow regressions passed **9/9** (bindings) and **5/5** (Pages).
 - Earlier gallery source `c52ce72f` passed headless HoverCard, Stepper and Spinner
   probes. The combined candidate passed all three hosted Pages browser shards at
-  `b9c2f3d1`; final sanitizer/Windows checks remain pending after test-fixture fixes.
+  `b9c2f3d1`; the subsequent test-fixture fixes passed the full CI matrix at
+  `a6c7e5af`, including GCC sanitizers and Windows Debug/Release.
 - Hosted native binding gate `a6c7e5af` passed ten static/dynamic callback cases
   and hidden-window checks in all five language paths on the combined candidate.
 - Release metadata agrees with `v0.1.0-alpha.3`; this checks local version
@@ -67,10 +68,9 @@ can lag implementation: inspect current code and evidence before scheduling work
   caught temporary bounds storage in the new indicator test; its lifetime is now
   fixed, and a focused instrumented Core/test reproduction plus ordinary regression
   pass locally. Windows also exposed oversized shadow-test stack workspaces;
-  bounded heap oracles and a passing 1 MB stack regression address that pressure,
-  pending Windows confirmation. All three Pages browser shards passed at `b9c2f3d1`.
-  Final sanitizer/Windows gates, release and deployment remain pending; results
-  prove only their stated subsets.
+  bounded heap oracles and a passing 1 MB stack regression address that pressure.
+  The final sanitizer and both Windows gates now pass at `a6c7e5af`. Release and
+  deployment remain pending; results prove only their stated subsets.
 
 ## Component parity: verify and close the gaps
 

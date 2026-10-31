@@ -8,8 +8,9 @@ owned values and allocation-free math. They do not apply paint to elements or
 provide gradient rendering. All existing V1 commands, boxes and renderers retain
 their behavior. Full background rendering across software, SDL_Renderer, SDL_GPU,
 Sokol and Canvas, all78 component coverage and foreign authoring remain pending.
-The approved transport direction is an explicit versioned draw/list contract;
-its records and adapters still require review.
+The approved transport is an explicit versioned draw/list contract. Unreleased
+[Core V2 transport](CORE_DRAW_V2.md) adds mode/storage/setters/emission; all five
+consumer implementations and the shared CPU preparation remain pending.
 
 A value is either a solid straight-linear sRGB color or a fixed two-stop linear
 gradient. There are no pointers, borrowed arrays, caches, contexts or resources.

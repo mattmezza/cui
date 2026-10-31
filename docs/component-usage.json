@@ -1985,11 +1985,12 @@
       ],
       "state_ownership": "Caller retains cui_theme value and any icon-loader user/backing storage.",
       "interaction": "cui_theme_icon_loader_fn resolves icon SVG; theme selection is an application event.",
-      "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math; they do not apply backgrounds or enable any renderer.",
+      "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math; they do not apply backgrounds or enable any renderer. Unreleased V2 Core transport adds opt-in Core background storage/emission only; all five renderer paths and foreign authoring remain pending.",
       "docs": [
         "docs/THEME_GUIDE.md",
         "docs/TYPOGRAPHY.md",
-        "docs/BACKGROUND_VALUES.md"
+        "docs/BACKGROUND_VALUES.md",
+        "docs/CORE_DRAW_V2.md"
       ],
       "callback_symbols": [
         "cui_theme_icon_loader_fn"
@@ -1999,7 +2000,8 @@
       "public_header": "include/cui/cui_theme.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_background.h"
+        "include/cui/cui_background.h",
+        "include/cui/cui_draw_v2.h"
       ]
     },
     {

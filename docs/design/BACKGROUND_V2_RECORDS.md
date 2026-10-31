@@ -2,8 +2,8 @@
 
 Proposed records/contracts only, following approved transport B. Values/math are
 implemented by `2a435a5f` + `cf72b10e`. The integrator reviewed and approved
-the contract through `638fc225`; the V2 APIs below remain unimplemented proposals.
-Only frozen V1 compatibility fixtures are authorized as the next implementation slice.
+the contract through `638fc225`; checkpoint2 now implements Core mode/storage/emission/setters only.
+Adapter queries/renderers/preparation and bridge/wire records below remain proposals.
 V1 `cui_draw_command`, `cui_draw_list`, `cui_config`, `cui_renderer`, their enums,
 functions and default output remain unchanged; V1-only contexts allocate no V2
 buffers. No context lookup,

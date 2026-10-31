@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_background.h"
+#include "cui_background_valid_internal.h"
 #include <math.h>
 
 static double bg_clamp(double x) {
@@ -7,9 +8,6 @@ static double bg_clamp(double x) {
 }
 static bool bg_unit(float x) {
     return isfinite(x) && x >= 0 && x <= 1;
-}
-static bool bg_color_valid(cui_background_color c) {
-    return bg_unit(c.r) && bg_unit(c.g) && bg_unit(c.b) && bg_unit(c.a);
 }
 static double bg_decode(double x) {
     return x <= .04045 ? x / 12.92 : pow((x + .055) / 1.055, 2.4);
@@ -54,17 +52,7 @@ bool cui_background_color_from_source_038_hsla(float h, float s, float l, float 
     return true;
 }
 bool cui_background_valid(const cui_background *bg) {
-    if (!bg)
-        return false;
-    if (bg->kind == CUI_BACKGROUND_SOLID)
-        return bg_color_valid(bg->solid);
-    return bg->kind == CUI_BACKGROUND_LINEAR &&
-           (bg->model == CUI_BACKGROUND_CSS || bg->model == CUI_BACKGROUND_SOURCE_038) &&
-           (bg->space == CUI_BACKGROUND_SRGB || bg->space == CUI_BACKGROUND_OKLAB) &&
-           isfinite(bg->angle_degrees) && bg->angle_degrees >= 0 && bg->angle_degrees <= 360 &&
-           bg_color_valid(bg->stops[0].color) && bg_color_valid(bg->stops[1].color) &&
-           bg_unit(bg->stops[0].position) && bg_unit(bg->stops[1].position) &&
-           (bg->model != CUI_BACKGROUND_CSS || bg->stops[0].position <= bg->stops[1].position);
+    return cui_background_value_valid_internal(bg);
 }
 bool cui_background_make_solid(cui_background_color color, cui_background *out) {
     cui_background value = {.kind = CUI_BACKGROUND_SOLID, .solid = color};

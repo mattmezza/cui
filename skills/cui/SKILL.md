@@ -14,8 +14,9 @@ examples; it does not include the CUI implementation or compiler toolchain.
 For unreleased owned background colors/two-stop values and pure sampling, read
 `docs/BACKGROUND_VALUES.md` and `include/cui/cui_background.h`. CSS and SOURCE_038
 have different alpha/geometry semantics. This C-only math API does not apply paint
-or enable gradient rendering; V2 commands, all five adapters and bindings remain
-pending. Existing Plot/effects/text gradient contracts remain distinct.
+or enable gradient rendering. For unreleased opt-in Core V2 mode/setters/emission,
+read `docs/CORE_DRAW_V2.md` and `include/cui/cui_draw_v2.h`; no adapter currently
+consumes that list. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.
 
 ## Start with the project's actual integration
 

@@ -1072,8 +1072,191 @@ void cui_set_reduced_motion(cui_context *, bool);
 
 #if defined(CUI_IMPLEMENTATION) && defined(CUI_DECLARATIONS_READY) && !defined(CUI_IMPLEMENTATION_ONCE)
 #define CUI_IMPLEMENTATION_ONCE
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_BACKGROUND_H
+#define CUI_BACKGROUND_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* Unreleased, allocation-free owned values only: no element setter, draw command,
+ * renderer support or background rendering is implied by this header. */
+typedef struct {
+    float r, g, b, a; /* Straight LINEAR sRGB, finite [0,1], including RGB at a=0. */
+} cui_background_color;
+typedef enum { CUI_BACKGROUND_SOLID, CUI_BACKGROUND_LINEAR } cui_background_kind;
+typedef enum { CUI_BACKGROUND_CSS, CUI_BACKGROUND_SOURCE_038 } cui_background_model;
+typedef enum { CUI_BACKGROUND_SRGB, CUI_BACKGROUND_OKLAB } cui_background_space;
+typedef struct {
+    cui_background_color color;
+    float position; /* [0,1]; CSS ordered, SOURCE_038 may reverse. */
+} cui_background_stop;
+typedef struct {
+    cui_background_kind kind;
+    cui_background_color solid;
+    cui_background_model model;
+    cui_background_space space;
+    float angle_degrees; /* [0,360]: 0 up, 90 right; 360 equals 0. */
+    cui_background_stop stops[2];
+} cui_background;
+/* Float sampler output is premultiplied LINEAR sRGB. Oklab out-of-gamut RGB
+ * remains unclamped (may be negative or exceed alpha); alpha stays [0,1]. */
+typedef struct {
+    float r, g, b, a;
+} cui_background_pixel;
+/* Encoded sRGBA8 is explicitly decoded, without premultiplication/quantization. */
+cui_background_color cui_background_color_from_srgba8(cui_color color);
+/* Normalized source HSLA uses the SOURCE_038 shader conversion: resulting RGB
+ * is treated as linear, with NO additional sRGB decode. Inputs finite [0,1].
+ * Uses stable equivalent chroma and clips unit-gamut conversion roundoff only. */
+bool cui_background_color_from_source_038_hsla(float h, float s, float l, float a,
+                                               cui_background_color *out);
+/* Checked constructors copy all active values; inactive fields are canonical zero.
+ * Validation ignores inactive fields: SOLID ignores model/space/angle/stops,
+ * LINEAR ignores solid. All bool functions preserve output on invalid input;
+ * Constructors accept input values drawn from their output object.
+ * No context/error state, allocation or borrowing. */
+bool cui_background_make_solid(cui_background_color color, cui_background *out);
+bool cui_background_make_linear(cui_background_model model, cui_background_space space,
+                                float angle_degrees, cui_background_stop first,
+                                cui_background_stop second, cui_background *out);
+bool cui_background_valid(const cui_background *background);
+/* Frame finite x/y in [-1e6,1e6], positive w/h <=1e6, finite point x/y in
+ * [-1e6,1e6]. Coordinates are logical; no pixel-center offset, clipping, radius,
+ * opacity or target ownership. Outer stop colors extend beyond their interval.
+ * CSS uses full diagonal projection and alpha-premultiplied interpolation in the
+ * selected space; SOURCE_038 uses short-axis/dominant-axis projection and straight
+ * selected-space interpolation with independent alpha. Equal stops switch to the
+ * second at/after their position, including reversed SOURCE_038 intervals. */
+bool cui_background_sample(const cui_background *background, cui_rect frame, float x, float y,
+                           cui_background_pixel *out);
+/* Same sample, converted to straight encoded sRGBA8: unpremultiply linear RGB,
+ * clip each channel to [0,1], encode sRGB, round half upward to nearest byte;
+ * alpha rounds independently. Exact zero alpha returns transparent black. */
+bool cui_background_sample_srgba8(const cui_background *background, cui_rect frame, float x,
+                                  float y, cui_color *out);
+#ifdef __cplusplus
+}
+#endif
+#define CUI_BACKGROUND_DECLARATIONS_READY
+#endif
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_DRAW_V2_H
+#define CUI_DRAW_V2_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+/* Unreleased Core transport only. No adapter or foreign-language binding yet
+ * supports this list. V1 structs, enums, config and renderer routes are unchanged.
+ * Query an actual future V2 consumer BEFORE composition; fabricated capability
+ * values are a caller contract, not evidence of renderer support. */
+#define CUI_DRAW_ABI_V2 2u
+#define CUI_DRAW_V2_BACKGROUND 9u
+#define CUI_DRAW_V2_FEATURE_BACKGROUNDS UINT64_C(1)
+#define CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1 1u
+#define CUI_DRAW_V2_DEFAULT_COMMAND_BYTES ((size_t)16 * 1024 * 1024)
+#define CUI_DRAW_V2_DEFAULT_BACKGROUND_BYTES ((size_t)512 * 1024)
+#define CUI_DRAW_V2_MAX_BYTES ((size_t)16 * 1024 * 1024)
+typedef struct {
+    cui_rect bounds;
+    cui_corner_radii radii;
+    cui_background brush; /* Owned; legacy resources below retain V1 borrowing. */
+    float opacity;        /* Ancestor product, applied ONCE by future preparer. */
+} cui_background_draw_v2;
+typedef struct {
+    uint32_t kind; /* 0..8 equal V1 tags; payload.legacy.type must equal kind. */
+    union {
+        cui_draw_command legacy;
+        cui_background_draw_v2 background;
+    } payload;
+} cui_draw_command_v2;
+typedef struct {
+    uint32_t header_size, abi_version;
+    size_t command_stride;
+    const cui_draw_command_v2 *commands;
+    size_t count;
+    float width, height;
+    uint64_t required_features;
+    uint32_t background_output;
+    cui_error error; /* Non-OK lists MUST NOT render or clear. */
+} cui_draw_list_v2;
+typedef struct {
+    uint32_t size, abi_version, background_output;
+    uint64_t features;
+    size_t max_commands, max_backgrounds;
+    size_t max_pixels, max_pixels_per_background;
+    size_t cpu_bytes, texture_bytes, transfer_bytes, metadata_bytes;
+} cui_draw_v2_support;
+typedef struct {
+    uint32_t size;
+    cui_draw_v2_support support;
+    uint64_t required_features;
+    size_t command_bytes, background_bytes; /* Zero selects defaults above. */
+} cui_frame_v2_options;
+/* Optional retained storage reserved BEFORE opening/consuming input. Exact size,
+ * ABI and output policy required; unknown bits fail INVALID_ACTION; insufficient
+ * budgets CAPACITY. Command cap=min(config.max_commands,16384,support.max_commands,
+ * command_bytes/sizeof(command)); backgrounds=min(config.max_elements,4096,
+ * support.max_backgrounds), including an aligned max_elements*sizeof(uint32_t) owner map in one
+ * block. Additional retained and transient payload <=32MiB; no raster allocation.
+ * V1 allocates none. Growth frees expired frame blocks before replacement; failed
+ * growth leaves input queued/context usable, but expires the previous list.
+ * Array lasts until next begin attempt/destroy; borrowed V1 resources still obey V1 lifetime.
+ * Copying this array does NOT deep-copy text/image/mesh backing. */
+bool cui_begin_frame_v2(cui_context *, float w, float h, float dt, const cui_frame_v2_options *);
+/* Wrong end (including V1 end on V2) leaves the frame open, consumes no callbacks
+ * and reports LIFECYCLE. Clear diagnostics, then call matching end exactly once.
+ * Null out rejects before closing. Matching end closes even on failure, returns
+ * false and an empty ABI2 error list. Never returns an incomplete V1 list. */
+bool cui_end_frame_v2(cui_context *, cui_draw_list_v2 *out);
+/* Current open box (anonymous supported), or already submitted named box only.
+ * Require requested background feature in active V2 frame. No measurement,
+ * prepaint, diagnostic reentrancy, layout-only/suppressed/missing/colliding target.
+ * NULL clears. Transparent SOLID overrides. Copy all active fields atomically;
+ * inactive fields ignored/canonicalized; last valid call wins. Clear preserves
+ * shadows/outline/underlay/prepaint. Distinct touched owners consume slots until
+ * next admitted begin, even after clear; repeat/clear never allocate. */
+bool cui_set_background(cui_context *, const cui_background *);
+bool cui_element_set_background(cui_context *, cui_id, const cui_background *);
+#ifdef __cplusplus
+}
+#endif
+#define CUI_DRAW_V2_DECLARATIONS_READY
+#endif
+
 /* src/core/cui.c */
 /* SPDX-License-Identifier: MIT */
+
+
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_BACKGROUND_VALID_INTERNAL_H
+#define CUI_BACKGROUND_VALID_INTERNAL_H
+#include <math.h>
+static inline bool cui_background_unit_internal(float x) {
+    return isfinite(x) && x >= 0 && x <= 1;
+}
+static inline bool cui_background_color_valid_internal(cui_background_color c) {
+    return cui_background_unit_internal(c.r) && cui_background_unit_internal(c.g) &&
+           cui_background_unit_internal(c.b) && cui_background_unit_internal(c.a);
+}
+static inline bool cui_background_value_valid_internal(const cui_background *bg) {
+    if (!bg)
+        return false;
+    if (bg->kind == CUI_BACKGROUND_SOLID)
+        return cui_background_color_valid_internal(bg->solid);
+    return bg->kind == CUI_BACKGROUND_LINEAR &&
+           (bg->model == CUI_BACKGROUND_CSS || bg->model == CUI_BACKGROUND_SOURCE_038) &&
+           (bg->space == CUI_BACKGROUND_SRGB || bg->space == CUI_BACKGROUND_OKLAB) &&
+           isfinite(bg->angle_degrees) && bg->angle_degrees >= 0 && bg->angle_degrees <= 360 &&
+           cui_background_color_valid_internal(bg->stops[0].color) &&
+           cui_background_color_valid_internal(bg->stops[1].color) &&
+           cui_background_unit_internal(bg->stops[0].position) &&
+           cui_background_unit_internal(bg->stops[1].position) &&
+           (bg->model != CUI_BACKGROUND_CSS || bg->stops[0].position <= bg->stops[1].position);
+}
+#endif
 
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_DROP_SHADOW_BOUNDS_INTERNAL_H
@@ -8190,7 +8373,22 @@ typedef struct {
     uint32_t masks[]; /* current[max_elements], previous[max_elements] */
 } cui_core_numeric_state;
 
+typedef struct {
+    cui_background brush;
+    bool active;
+} cui_core_background_owner;
+typedef struct {
+    cui_draw_command_v2 *commands;
+    cui_core_background_owner *owners;
+    uint32_t *map;
+    void *background_storage;
+    size_t command_capacity, owner_capacity, owner_count;
+    size_t command_limit, owner_limit;
+    uint64_t features;
+} cui_core_v2;
 struct cui_context {
+    cui_core_v2 *v2;
+    bool frame_v2, v2_failed;
     cui_core_numeric_state *numeric;
     bool numeric_snapshot_ready, numeric_frame_invalid;
     const cui_core_scroll_layout_header *scroll_layout;
@@ -8820,6 +9018,11 @@ void cui_destroy(cui_context *ui) {
     for (size_t i = 0; i < CUI_CORE_EVENT_MAX; i++) {
         free(ui->queued_text[i]);
         free(ui->frame_text[i]);
+    }
+    if (ui->v2) {
+        free(ui->v2->commands);
+        free(ui->v2->background_storage);
+        free(ui->v2);
     }
     free(ui->numeric);
     free(ui->scroll_gestures);
@@ -9593,19 +9796,270 @@ static void cui_core_finalize_text_input(cui_context *ui) {
         next.owner = 0;
     ui->text_input_state = next;
 }
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_DRAW_V2_INTERNAL_H
+#define CUI_DRAW_V2_INTERNAL_H
+static bool cui_core_begin_frame(cui_context *, float, float, float, bool);
+static size_t cui_core_command_limit(const cui_context *ui) {
+    return ui->frame_v2 ? ui->v2->command_limit : ui->config.max_commands;
+}
+static void cui_core_emit(cui_context *ui, cui_draw_command command) {
+    if (ui->frame_v2) {
+        if (ui->v2_failed)
+            return;
+        if (ui->count >= ui->v2->command_limit) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            ui->v2_failed = true;
+            ui->count = 0;
+            return;
+        }
+        ui->v2->commands[ui->count++] =
+            (cui_draw_command_v2){.kind = (uint32_t)command.type, .payload.legacy = command};
+    } else
+        ui->commands[ui->count++] = command;
+}
+static size_t cui_core_v2_min(size_t a, size_t b) {
+    return a < b ? a : b;
+}
 bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
-    if (!cui_core_mutation(ui))
-        return false;
-    if (!ui)
+    return cui_core_begin_frame(ui, w, h, dt, false);
+}
+bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
+                        const cui_frame_v2_options *options) {
+    if (!cui_core_mutation(ui) || !ui)
         return false;
     if (ui->in_frame) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
         return false;
     }
     if (!isfinite(w) || !isfinite(h) || w < 0 || h < 0 || !isfinite(dt) || dt < 0) {
-        ui->numeric_snapshot_ready = false;
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
         return false;
+    }
+    if (!options || options->size != sizeof(*options) ||
+        options->support.size != sizeof(options->support) ||
+        options->support.abi_version != CUI_DRAW_ABI_V2 ||
+        options->support.background_output != CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1 ||
+        (options->support.features & ~CUI_DRAW_V2_FEATURE_BACKGROUNDS) ||
+        (options->required_features & ~options->support.features)) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    cui_frame_v2_options value = *options;
+    size_t cb = value.command_bytes ? value.command_bytes : CUI_DRAW_V2_DEFAULT_COMMAND_BYTES;
+    size_t bb =
+        value.background_bytes ? value.background_bytes : CUI_DRAW_V2_DEFAULT_BACKGROUND_BYTES;
+    if (cb > CUI_DRAW_V2_MAX_BYTES || bb > CUI_DRAW_V2_MAX_BYTES || cb > PTRDIFF_MAX ||
+        bb > PTRDIFF_MAX) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    size_t commands = cui_core_v2_min(ui->config.max_commands, 16384);
+    commands = cui_core_v2_min(commands, value.support.max_commands);
+    commands = cui_core_v2_min(commands, cb / sizeof(cui_draw_command_v2));
+    bool backgrounds = (value.required_features & CUI_DRAW_V2_FEATURE_BACKGROUNDS) != 0;
+    size_t owners = backgrounds ? cui_core_v2_min(ui->config.max_elements, 4096) : 0;
+    owners = cui_core_v2_min(owners, value.support.max_backgrounds);
+    size_t map_bytes = 0;
+    if (backgrounds) {
+        if (ui->config.max_elements > bb / sizeof(uint32_t)) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            return false;
+        }
+        map_bytes = ui->config.max_elements * sizeof(uint32_t);
+        size_t alignment = _Alignof(cui_core_background_owner);
+        size_t padding = (alignment - map_bytes % alignment) % alignment;
+        if (padding > bb - map_bytes) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            return false;
+        }
+        map_bytes += padding;
+    }
+    if (!commands ||
+        (backgrounds &&
+         (!owners || !value.support.max_pixels || !value.support.max_pixels_per_background ||
+          !value.support.cpu_bytes || !value.support.texture_bytes ||
+          !value.support.transfer_bytes || !value.support.metadata_bytes ||
+          owners > (bb - map_bytes) / sizeof(cui_core_background_owner)))) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    cui_core_v2 *state = ui->v2;
+    bool fresh = !state;
+    if (fresh)
+        state = calloc(1, sizeof(*state));
+    if (!state) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        return false;
+    }
+    /* Prior V2 lists expire at begin attempt. Free replaced frame-only blocks
+     * BEFORE allocating successors: even transient payload stays <=16MiB+16MiB.
+     * Failure publishes no mode/frame/input; remaining capacities remain usable. */
+    if (commands > state->command_capacity) {
+        free(state->commands);
+        state->commands = NULL;
+        state->command_capacity = 0;
+        state->commands = malloc(commands * sizeof(*state->commands));
+        if (state->commands)
+            state->command_capacity = commands;
+    }
+    if (!state->commands)
+        goto capacity;
+    if (owners > state->owner_capacity) {
+        free(state->background_storage);
+        state->background_storage = NULL;
+        state->owners = NULL;
+        state->map = NULL;
+        state->owner_capacity = state->owner_count = 0;
+        state->background_storage = malloc(map_bytes + owners * sizeof(*state->owners));
+        if (!state->background_storage)
+            goto capacity;
+        state->map = state->background_storage;
+        state->owners =
+            (cui_core_background_owner *)((char *)state->background_storage + map_bytes);
+        state->owner_capacity = owners;
+    }
+    state->command_limit = commands;
+    state->owner_limit = owners;
+    state->features = value.required_features;
+    ui->v2 = state;
+    return cui_core_begin_frame(ui, w, h, dt, true);
+capacity:
+    if (fresh) {
+        free(state->commands);
+        free(state->background_storage);
+        free(state);
+    }
+    cui_core_fail(ui, CUI_ERROR_CAPACITY);
+    return false;
+}
+static bool cui_core_background_mode(cui_context *ui) {
+    if (!cui_core_active(ui))
+        return false;
+    if (!ui->frame_v2 || !(ui->v2->features & CUI_DRAW_V2_FEATURE_BACKGROUNDS)) {
+        cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        return false;
+    }
+    return true;
+}
+static bool cui_core_background_set(cui_context *ui, size_t index, Clay_LayoutElement *element,
+                                    const cui_background *background) {
+    if (background && !cui_background_value_valid_internal(background)) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    cui_core_v2 *v = ui->v2;
+    uint32_t slot = v->map[index];
+    if (!slot && !background)
+        return true;
+    if (!slot) {
+        if (v->owner_count == v->owner_limit) {
+            cui_core_fail(ui, CUI_ERROR_CAPACITY);
+            return false;
+        }
+        slot = (uint32_t)++v->owner_count;
+        v->map[index] = slot;
+    }
+    cui_background canonical = {0};
+    if (background) {
+        canonical.kind = background->kind;
+        if (background->kind == CUI_BACKGROUND_SOLID)
+            canonical.solid = background->solid;
+        else {
+            canonical.model = background->model;
+            canonical.space = background->space;
+            canonical.angle_degrees = background->angle_degrees;
+            canonical.stops[0] = background->stops[0];
+            canonical.stops[1] = background->stops[1];
+        }
+    }
+    v->owners[slot - 1] = (cui_core_background_owner){canonical, background != NULL};
+    if (background)
+        element->config.custom.customData = &ui->nodes[index];
+    return true;
+}
+bool cui_set_background(cui_context *ui, const cui_background *background) {
+    if (!cui_core_background_mode(ui))
+        return false;
+    if (!ui->depth || ui->overflow_depth || !ui->opened[ui->depth - 1] ||
+        cui_core_layout_only(ui) || ui->ambiguous_box_ids) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    return cui_core_background_set(ui, ui->node_stack[ui->depth - 1], Clay__GetOpenLayoutElement(),
+                                   background);
+}
+bool cui_element_set_background(cui_context *ui, cui_id id, const cui_background *background) {
+    if (!cui_core_background_mode(ui))
+        return false;
+    if (!id || ui->ambiguous_box_ids || cui_core_layout_only(ui) || ui->overflow_depth ||
+        (ui->depth && !ui->opened[ui->depth - 1])) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    size_t index = 0;
+    while (index < ui->node_count && ui->nodes[index].id != id)
+        index++;
+    if (index == ui->node_count || ui->nodes[index].layout_only) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    cui_core_box_node *node = &ui->nodes[index];
+    Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(node->clay_id);
+    Clay_LayoutElement *element = item->layoutElement;
+    if (!element || element->id != node->clay_id || element->isTextElement || element->exiting ||
+        element->config.userData != node) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    return cui_core_background_set(ui, index, element, background);
+}
+static const cui_background *cui_core_background_for(cui_context *ui,
+                                                     const cui_core_box_node *node) {
+    if (!ui->frame_v2 || !ui->v2->map)
+        return NULL;
+    uint32_t slot = ui->v2->map[(size_t)(node - ui->nodes)];
+    return slot && ui->v2->owners[slot - 1].active ? &ui->v2->owners[slot - 1].brush : NULL;
+}
+static void cui_core_background_emit(cui_context *ui, cui_rect bounds, Clay_CornerRadius radius,
+                                     const cui_background *brush, float opacity) {
+    if (ui->v2_failed)
+        return;
+    if (ui->count >= ui->v2->command_limit) {
+        cui_core_fail(ui, CUI_ERROR_CAPACITY);
+        ui->v2_failed = true;
+        ui->count = 0;
+        return;
+    }
+    float limit = fmaxf(0, fminf(bounds.w, bounds.h) / 2);
+    cui_corner_radii radii = {fminf(radius.topLeft, limit), fminf(radius.topRight, limit),
+                              fminf(radius.bottomLeft, limit), fminf(radius.bottomRight, limit)};
+    ui->v2->commands[ui->count++] = (cui_draw_command_v2){
+        .kind = CUI_DRAW_V2_BACKGROUND, .payload.background = {bounds, radii, *brush, opacity}};
+}
+#endif
+
+
+static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bool v2) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui)
+        return false;
+    if (ui->in_frame) {
+        cui_core_fail_at(ui, CUI_ERROR_LIFECYCLE, v2 ? "cui_begin_frame_v2" : "cui_begin_frame");
+        return false;
+    }
+    if (!isfinite(w) || !isfinite(h) || w < 0 || h < 0 || !isfinite(dt) || dt < 0) {
+        ui->numeric_snapshot_ready = false;
+        cui_core_fail_at(ui, CUI_ERROR_LAYOUT, v2 ? "cui_begin_frame_v2" : "cui_begin_frame");
+        return false;
+    }
+    ui->frame_v2 = v2;
+    ui->v2_failed = false;
+    if (ui->v2) {
+        ui->v2->owner_count = 0;
+        if (ui->v2->map)
+            memset(ui->v2->map, 0, ui->config.max_elements * sizeof(uint32_t));
     }
     ui->numeric_frame_invalid = false; /* A fresh admitted frame alone resets invalidity. */
     ui->scroll_layout = NULL;          /* Drop cached resource before collection/destruction. */
@@ -9714,8 +10168,9 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
                 touch_cancellations[next] = before_capture;
                 ui->event_count++;
             } else {
-                cui_core_capacity(ui, "event dispatch", 0, ui->event_count, 1,
-                                  CUI_CORE_DISPATCH_MAX);
+                cui_core_capacity_at(ui, "event dispatch",
+                                     v2 ? "cui_begin_frame_v2" : "cui_begin_frame", 0,
+                                     ui->event_count, 1, CUI_CORE_DISPATCH_MAX);
             }
         }
         if (suppressed) {
@@ -11933,17 +12388,17 @@ static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool
         count += ui->prepaint_deferred[p->offset + i] == deferred;
     if (!count)
         return true;
-    if (count + 2 > ui->config.max_commands - ui->count) {
+    if (count + 2 > cui_core_command_limit(ui) - ui->count) {
         cui_core_capacity(ui, "prepaint output commands", 0, ui->count, count + 2,
-                          ui->config.max_commands);
+                          cui_core_command_limit(ui));
         ui->count = 0;
         ui->prepaint_capacity = true;
         return false;
     }
-    ui->commands[ui->count++] = (cui_draw_command){
-        .type = CUI_DRAW_CLIP_PUSH,
-        .bounds = deferred ? (cui_rect){0, 0, ui->config.width, ui->config.height}
-                           : p->info.visible_bounds};
+    cui_core_emit(ui, (cui_draw_command){
+                          .type = CUI_DRAW_CLIP_PUSH,
+                          .bounds = deferred ? (cui_rect){0, 0, ui->config.width, ui->config.height}
+                                             : p->info.visible_bounds});
     for (size_t i = 0; i < p->count; i++)
         if (ui->prepaint_deferred[p->offset + i] == deferred) {
             cui_draw_command c = ui->prepaint_commands[p->offset + i];
@@ -11958,9 +12413,9 @@ static bool cui_core_prepaint_output(cui_context *ui, cui_core_prepaint *p, bool
                 c.mesh.color.a *= p->info.opacity;
             } else
                 c.color.a = (uint8_t)(c.color.a * p->info.opacity);
-            ui->commands[ui->count++] = c;
+            cui_core_emit(ui, c);
         }
-    ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
+    cui_core_emit(ui, (cui_draw_command){.type = CUI_DRAW_CLIP_POP});
     return true;
 }
 static bool cui_core_prepaint_defer(cui_context *ui, int32_t next_layer) {
@@ -12576,7 +13031,7 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
 }
 
 
-cui_draw_list cui_end_frame(cui_context *ui) {
+static cui_draw_list cui_core_end_frame(cui_context *ui) {
     if (!cui_core_active(ui))
         return (cui_draw_list){0};
     ui->layout_debug_ready = false;
@@ -12592,7 +13047,8 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                             .used = unbalanced_counts[i]};
         if (i == 2)
             d.id = ui->focus_scopes[ui->focus_stack[ui->focus_depth - 1]].id;
-        snprintf(d.operation, sizeof d.operation, "%s", __func__);
+        snprintf(d.operation, sizeof d.operation, "%s",
+                 ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame");
         snprintf(d.subsystem, sizeof d.subsystem, "%s", unbalanced_names[i]);
         snprintf(d.message, sizeof d.message, "Unclosed %s at end_frame", unbalanced_names[i]);
         cui_report_diagnostic(ui, &d);
@@ -12680,12 +13136,14 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             const cui_core_box_node *node = c->renderData.custom.customData;
             cui_color background = cui_core_color(c->renderData.custom.backgroundColor);
             background.a = (uint8_t)(background.a * opacity);
-            size_t needed = (node->has_underlay ? 3 : 0) + (background.a ? 1 : 0) +
+            const cui_background *brush = cui_core_background_for(ui, node);
+            size_t needed = (node->has_underlay ? 3 : 0) + ((brush || background.a) ? 1 : 0) +
                             (node->outline_width > 0 ? 1 : 0) + (node->has_mesh ? 1 : 0) +
                             node->shadow_count;
-            if (needed > ui->config.max_commands - ui->count) {
-                cui_core_capacity(ui, "box paint commands", node->id, ui->count, needed,
-                                  ui->config.max_commands);
+            if (needed > cui_core_command_limit(ui) - ui->count) {
+                cui_core_capacity_at(ui, "box paint commands",
+                                     ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame", node->id,
+                                     ui->count, needed, cui_core_command_limit(ui));
                 ui->count = 0;
                 goto cui_core_commands_done;
             }
@@ -12698,36 +13156,40 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                                        .layer = node->shadows[shadow].layer}};
                 command.shadow.layer.color.a = (uint8_t)(command.shadow.layer.color.a * opacity);
                 if (!cui_drop_shadow_bounds(command.shadow, &command.bounds)) {
-                    cui_core_fail(ui, CUI_ERROR_LAYOUT);
+                    cui_core_fail_at(ui, CUI_ERROR_LAYOUT,
+                                     ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame");
                     ui->count = 0;
                     goto cui_core_commands_done;
                 }
-                ui->commands[ui->count++] = command;
+                cui_core_emit(ui, command);
             }
             if (node->outline_width > 0) {
                 float w = node->outline_width;
                 cui_color color = node->outline_color;
                 color.a = (uint8_t)(color.a * opacity);
                 cui_corner_radii r = node->outline_radii;
-                ui->commands[ui->count++] =
-                    (cui_draw_command){.type = CUI_DRAW_BORDER,
-                                       .bounds = {d.bounds.x - w, d.bounds.y - w,
-                                                  d.bounds.w + 2 * w, d.bounds.h + 2 * w},
-                                       .color = color,
-                                       .stroke = w,
-                                       .custom_corners = true,
-                                       .corner_radii = {r.top_left + w, r.top_right + w,
-                                                        r.bottom_left + w, r.bottom_right + w}};
+                cui_core_emit(ui, (cui_draw_command){
+                                      .type = CUI_DRAW_BORDER,
+                                      .bounds = {d.bounds.x - w, d.bounds.y - w, d.bounds.w + 2 * w,
+                                                 d.bounds.h + 2 * w},
+                                      .color = color,
+                                      .stroke = w,
+                                      .custom_corners = true,
+                                      .corner_radii = {r.top_left + w, r.top_right + w,
+                                                       r.bottom_left + w, r.bottom_right + w}});
             }
-            if (background.a) {
+            if (brush) {
+                cui_core_background_emit(ui, d.bounds, c->renderData.custom.cornerRadius, brush,
+                                         opacity);
+            } else if (background.a) {
                 Clay_CornerRadius radius = c->renderData.custom.cornerRadius;
-                ui->commands[ui->count++] =
-                    (cui_draw_command){.type = CUI_DRAW_RECT,
-                                       .bounds = d.bounds,
-                                       .color = background,
-                                       .custom_corners = true,
-                                       .corner_radii = {radius.topLeft, radius.topRight,
-                                                        radius.bottomLeft, radius.bottomRight}};
+                cui_core_emit(ui, (cui_draw_command){
+                                      .type = CUI_DRAW_RECT,
+                                      .bounds = d.bounds,
+                                      .color = background,
+                                      .custom_corners = true,
+                                      .corner_radii = {radius.topLeft, radius.topRight,
+                                                       radius.bottomLeft, radius.bottomRight}});
             }
             for (size_t shadow = 0; shadow < node->shadow_count; shadow++) {
                 if (node->shadows[shadow].kind != CUI_BOX_SHADOW_INSET)
@@ -12738,11 +13200,12 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                                                        .layer = node->shadows[shadow].layer}};
                 command.shadow.layer.color.a = (uint8_t)(command.shadow.layer.color.a * opacity);
                 if (!cui_inset_shadow_bounds_checked(command.shadow, &command.bounds)) {
-                    cui_core_fail(ui, CUI_ERROR_LAYOUT);
+                    cui_core_fail_at(ui, CUI_ERROR_LAYOUT,
+                                     ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame");
                     ui->count = 0;
                     goto cui_core_commands_done;
                 }
-                ui->commands[ui->count++] = command;
+                cui_core_emit(ui, command);
             }
             if (node->has_mesh) {
                 cui_mesh_paint mesh = node->mesh;
@@ -12754,16 +13217,18 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 mesh.color.a *= opacity;
                 cui_rect mesh_bounds;
                 if (!cui_core_mesh_bounds(mesh, &mesh_bounds)) {
-                    cui_core_capacity(ui, "mesh bounds", node->id, 0, 0, 0);
+                    cui_core_capacity_at(ui, "mesh bounds",
+                                         ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame",
+                                         node->id, 0, 0, 0);
                     ui->count = 0;
                     goto cui_core_commands_done;
                 }
-                ui->commands[ui->count++] =
-                    (cui_draw_command){.type = CUI_DRAW_MESH, .bounds = mesh_bounds, .mesh = mesh};
+                cui_core_emit(ui, (cui_draw_command){
+                                      .type = CUI_DRAW_MESH, .bounds = mesh_bounds, .mesh = mesh});
             }
             if (node->has_underlay) {
-                ui->commands[ui->count++] =
-                    (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds};
+                cui_core_emit(ui,
+                              (cui_draw_command){.type = CUI_DRAW_CLIP_PUSH, .bounds = d.bounds});
                 cui_underlay_layout layout = node->underlay_layout;
                 cui_rect underlay = node->underlay_bounds;
                 if (layout.grow_width)
@@ -12782,14 +13247,14 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                 underlay_color.a = (uint8_t)(underlay_color.a * opacity);
                 cui_bitmap_paint bitmap = node->bitmap;
                 bitmap.opacity *= opacity;
-                ui->commands[ui->count++] = (cui_draw_command){
-                    .type = node->bitmap_underlay ? CUI_DRAW_IMAGE : CUI_DRAW_RECT,
-                    .bitmap = bitmap,
-                    .bounds = underlay,
-                    .color = underlay_color,
-                    .corner_radii = node->underlay_radii,
-                    .custom_corners = true};
-                ui->commands[ui->count++] = (cui_draw_command){.type = CUI_DRAW_CLIP_POP};
+                cui_core_emit(ui, (cui_draw_command){.type = node->bitmap_underlay ? CUI_DRAW_IMAGE
+                                                                                   : CUI_DRAW_RECT,
+                                                     .bitmap = bitmap,
+                                                     .bounds = underlay,
+                                                     .color = underlay_color,
+                                                     .corner_radii = node->underlay_radii,
+                                                     .custom_corners = true});
+                cui_core_emit(ui, (cui_draw_command){.type = CUI_DRAW_CLIP_POP});
             }
             if (node->prepaint != SIZE_MAX &&
                 !cui_core_prepaint_output(ui, &ui->prepaints[node->prepaint], false))
@@ -12911,9 +13376,12 @@ cui_draw_list cui_end_frame(cui_context *ui) {
                         size_t available = ui->config.frame_bytes - ui->string_used;
                         if (padding > available ||
                             intersections > (available - padding) / sizeof(cui_text_color_span)) {
-                            cui_core_capacity(ui, "resolved text colors", 0, ui->string_used,
-                                              intersections * sizeof(cui_text_color_span) + padding,
-                                              ui->config.frame_bytes);
+                            cui_core_capacity_at(
+                                ui, "resolved text colors",
+                                ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame", 0,
+                                ui->string_used,
+                                intersections * sizeof(cui_text_color_span) + padding,
+                                ui->config.frame_bytes);
                             ui->count = 0;
                             goto cui_core_commands_done;
                         }
@@ -12960,8 +13428,10 @@ cui_draw_list cui_end_frame(cui_context *ui) {
         default:
             continue;
         }
-        if (ui->count == ui->config.max_commands) {
-            cui_core_capacity(ui, "draw commands", 0, ui->count, 1, ui->config.max_commands);
+        if (ui->count == cui_core_command_limit(ui)) {
+            cui_core_capacity_at(ui, "draw commands",
+                                 ui->frame_v2 ? "cui_end_frame_v2" : "cui_end_frame", 0, ui->count,
+                                 1, cui_core_command_limit(ui));
             ui->count = 0;
             break;
         }
@@ -12969,7 +13439,7 @@ cui_draw_list cui_end_frame(cui_context *ui) {
             d.bitmap.opacity *= opacity;
         else if (d.type == CUI_DRAW_RECT || d.type == CUI_DRAW_BORDER || d.type == CUI_DRAW_TEXT)
             d.color.a = (uint8_t)(d.color.a * opacity);
-        ui->commands[ui->count++] = d;
+        cui_core_emit(ui, d);
     }
     if (!cui_core_prepaint_defer(ui, INT32_MAX))
         goto cui_core_commands_done;
@@ -13174,7 +13644,48 @@ cui_core_commands_done:
     ui->resolving_layout = false;
     if (ui->scroll_layout && ui->error != CUI_OK)
         ui->count = 0;
-    return (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
+    return ui->frame_v2
+               ? (cui_draw_list){0}
+               : (cui_draw_list){ui->commands, ui->count, ui->config.width, ui->config.height};
+}
+cui_draw_list cui_end_frame(cui_context *ui) {
+    if (!cui_core_active(ui))
+        return (cui_draw_list){0};
+    if (ui->frame_v2) {
+        cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        return (cui_draw_list){0};
+    }
+    return cui_core_end_frame(ui);
+}
+bool cui_end_frame_v2(cui_context *ui, cui_draw_list_v2 *out) {
+    if (!cui_core_mutation(ui) || !ui)
+        return false;
+    if (!out) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    *out = (cui_draw_list_v2){.header_size = sizeof(*out),
+                              .abi_version = CUI_DRAW_ABI_V2,
+                              .command_stride = sizeof(cui_draw_command_v2),
+                              .background_output = CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1};
+    if (!ui->in_frame || !ui->frame_v2) {
+        cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
+        out->error = CUI_ERROR_LIFECYCLE;
+        return false;
+    }
+    (void)cui_core_end_frame(ui);
+    out->width = ui->config.width;
+    out->height = ui->config.height;
+    out->required_features = ui->v2->features;
+    out->error = ui->error;
+    if (out->error != CUI_OK || ui->v2_failed || ui->ambiguous_box_ids) {
+        if (out->error == CUI_OK)
+            out->error = CUI_ERROR_LAYOUT;
+        return false;
+    }
+    out->commands = ui->v2->commands;
+    out->count = ui->count;
+    return true;
 }
 const cui_semantic *cui_semantics(cui_context *ui, size_t *count) {
     if (count)

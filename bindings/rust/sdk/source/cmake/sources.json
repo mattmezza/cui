@@ -26,6 +26,7 @@
       "src/base/cui_virtual_scroll.c",
       "src/components/cui_virtual.c"
     ],
+    "cui_draw_v2": [],
     "cui_background": [
       "src/core/cui_background.c"
     ],

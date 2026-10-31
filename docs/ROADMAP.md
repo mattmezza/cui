@@ -10,3 +10,9 @@ Every one of the 78 baseline families remains in gpui-parity.json with feature-l
 6. Cross-platform runtime evidence, source vendoring, docs website, optional capability-based extension host.
 
 See COMPONENTS.md for the full family breakdown and MAINTAINER_ACTIONS.md for manual setup. Advanced editors, dock/table/chart widgets will not be counted from placeholder rectangles.
+
+Shared backgrounds have owned pure values/sampling and an unreleased
+[Core V2 transport](CORE_DRAW_V2.md) slice. Shared CPU preparation and V2 consumers
+for software, SDL_Renderer, SDL_GPU, Sokol and Canvas, foreign authoring, and
+component-part coverage across all78 remain pending. No family status is upgraded
+by generic setters or Core transport alone.

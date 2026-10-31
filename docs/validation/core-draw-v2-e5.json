@@ -1,0 +1,60 @@
+{
+  "base_commit": "e5b64e4ef847047a028abf47766171976ce593d1",
+  "baseline_before_production": {
+    "core_source_sha256": "9158c449b119430836fdc309c2bd089f2b8fdb98d2261ec213bee3d77ba40329",
+    "compile": "taskset -c 0 nice -n 19 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude -Ithird_party/clay -c src/core/cui.c -o build-shadow/background_numeric_baseline_core.o",
+    "oracle_binary_sha256": "0d0f87e256ec5e29beb7508744d27e421c5082dd469afd27454ad922a6f5e05f",
+    "result": "1/1 private-Xvfb background_v1_numeric_baseline PASS before V2 source edits; original pre-V2 frozen expected unchanged."
+  },
+  "compiler": "/usr/bin/cc GCC16.2.1 20260810; strict portable C11 -Wall -Wextra -Wpedantic -Werror; -O2 and assertions enabled. Standalone generated Core scroll fixture uses -O0.",
+  "build_scope": "Reused build-shadow only,62MiB. Focused Core object and test TUs only; no full engine/native adapter/package build, no new dependency. Serial compiler processes CPU0/nice19. Companions from independently built /home/matteo/.cache/cui-current-validation/native: libcui_software.a libcui_text.a libcui.a libcui_bidi.a plus /usr/lib/libharfbuzz.so /usr/lib/libfreetype.so and -lm. Focused new Core object precedes archive, so old Core object is not selected.",
+  "compile_examples": [
+    "taskset -c 0 nice -n 19 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude -Ithird_party/clay -c src/core/cui.c -o build-shadow/background_v2_core.o",
+    "Same flags: tests/unit/test_background_v2.c (includes current real Core, malloc/calloc fault injection); links existing software/text/Core/bidi companions. Final O2 fixture runs both V1 and V2 wrapping against original golden.",
+    "Same flags: old test_background_v1_oracle.c/test_accessibility_numeric.c/test_element_shadows.c/test_prepaint.c/test_background_values.c linked focused current Core/value objects and existing companions.",
+    "Same flags -Idist: frozen V1 ABI selective and umbrella, and typed background_v2 distribution consumer. Standalone Core scroll uses -O0 -DCUI_SCROLL_LAYOUT_DISTRIBUTION=1 -Idist and -lm.",
+    "taskset -c 0 nice -n 19 c++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -Idist -x c++ -fsyntax-only - (cui_draw_v2.h + cui_renderer.h declarations only)"
+  ],
+  "test_command": "taskset -c 0 nice -n 19 python scripts/test_local.py --build-dir build-shadow -R '^background_v2_(focused|regression_.*|frozen_integrity|single_header_contract)$' -V",
+  "registration": "Disposable existing build-shadow/CTestTestfile.cmake entries for manually linked focused binaries; normal new-target wiring committed in source CMakeLists. No library reconfigure/rebuild needed.",
+  "result": "14/14 PASS, final strict O2 focused fixture includes all24 V1 scenes twice (V1 and V2 wrapping), fresh allocation cleanup and growth failure recovery, current owner identity/anonymous/portal move+resize, canonical owned two-stop values/both models/spaces, budget/clear/shadow/underlay order, opacity/radius, wrong ends/no replay, prepaint/measurement/diagnostic rejection and typed numeric invalidity/recovery. Separate legacy oracle/numeric/shadows/prepaint/value/ABI tests and standalone generated Core scroll PASS. Isolated copied Core-only header (no supplemental files or include paths) and Core+value implementation same-TU compile/runtime PASS. Exact aligned owner-map budget one-byte-short rejection/exact-size admission PASS. Typed brush copy remains valid after context destruction; no borrowed-resource full snapshot claim.",
+  "static_checks": "Consumer usage6/6, frozen integrity4/4, skill18/18, manifest78, format and amalgamation/SDK/skill freshness PASS.",
+  "limitations": "Core-only unreleased API. Actual software/SDL_Renderer/SDL_GPU/Sokol/Canvas V2 consumers/shared preparation/wire/bridge/foreign authoring pending. No GPU/browser/glyph/full78-parts parity claim. No V1 renderer was passed V2 records.",
+  "sha256": {
+    "src/core/cui.c": "79dbc93201c2a0a64c819d64170a3008bdd629401dd1610de4551c3c8a13e51e",
+    "src/core/cui_background.c": "db559ede7ba2d645b2a73cf4bd4020949192913b6e83ccef955b7b4e2de81ab3",
+    "src/core/cui_draw_v2_internal.h": "c5f067d96af5c3ae6c85ff59fde436baec210cf9e1e6bb10eb2c73f69686ea07",
+    "src/core/cui_background_valid_internal.h": "7939b5754eb0c1f75196447ff6a02c5e290331115f16b5c20963707bf09dd50b",
+    "include/cui/cui_draw_v2.h": "0e665c5a91bbf6fffebe9ac552e324375c616c7c1dfbff77855e0dc41826769b",
+    "tests/unit/test_background_v2.c": "10a16cd191d3eeb3540084f99f918ce8aa8a17542db00263f448a8c38b07ea57",
+    "tests/distribution/background_v2.c": "1d4bab4de569be5827c8f593b7518f1252f419cb58c8ed34d5e2d5b86163ebf2",
+    "tests/fixtures/background_v1/commands_pixels.golden": "d4da7fde509898fd9b803aef1dd3a811f504e825791ab8226dab51bfe47e288e",
+    "build-shadow/background_numeric_baseline_core.o": "899fd7defbf3868643c048dc078f979cdda12f80739c7df562605633329a611b",
+    "build-shadow/background_v2_core.o": "7ce260bab42d77dae99e7aa21b981cb17cb2cb630b62464b950ecdcf5ff40087",
+    "build-shadow/test_background_v2_focused": "adcdb0f3e024c55e48838af536616fbf7756ce77999af101ccfaca3d8502b899",
+    "scripts/amalgamate.py": "08dc10632244a16e64679c4e92b69cb6cb6289ed1aee32f5645ce8f8448de97f",
+    "dist/cui.h": "54999cb77694da36d55e58125fc70c5e0c99774045743686a9fe019acb044044",
+    "dist/cui_draw_v2.h": "faecb1cd9a11e34ad9176c5bdd29c0b08ce9a0d2c545d66c640f6da1842c772a",
+    "tests/test_core_single_header.py": "18d2f5a3377046de57f9c70b0f06abbb37e546f555abd9f6e67f07fcb0f96ef2"
+  },
+  "growth_contract": "Previous V2 borrowed lists expire at next begin attempt, including allocation-failed growth. Replaced command/background blocks freed before allocating successors; no new active frame/mode or input consumption on failure. A failed growth can change retained capacity, remains usable on retry, and never resets numeric-frame invalidity; only admitted begin does.",
+  "storage_accounting": {
+    "formula": "C=min(config.max_commands,16384,support.max_commands,command_bytes/sizeof(command_v2)); B=min(config.max_elements,4096,support.max_backgrounds); M=align_up(max_elements*sizeof(uint32_t),alignof(owner)); one background block M+B*sizeof(owner)<=background_bytes. Checked division before products and padding before sums. Both payload blocks <=16MiB each, freed before growth replacement; peak extra payload <=32MiB plus fixed control record/allocator overhead, not process RSS.",
+    "observed_64_bit_sizes": {
+      "command_v2": 384,
+      "owner": 76,
+      "owner_alignment": 4,
+      "control": 80
+    },
+    "observed_64_bit_source_upper_bounds": {
+      "max_commands": 16384,
+      "max_elements": 1000000,
+      "max_backgrounds": 4096,
+      "command_payload_bytes": 6291456,
+      "background_payload_bytes": 4311296,
+      "combined_payload_bytes": 10602752
+    },
+    "default4096_node_example_B128": "M16384 +128*76 =26112 bytes, command storage separate; support.max_backgrounds limits record count rather than always allocating4096 records.",
+    "scope": "Measured sizes from final O2 real-Core focused fixture. Source max_elements<=1000000 and V2 max_commands<=16384 give tighter host-specific ceiling; portable hard ceiling remains32MiB, actual sizeof/alignment always used."
+  }
+}

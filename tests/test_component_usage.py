@@ -39,6 +39,12 @@ class ComponentUsageTests(unittest.TestCase):
         cls.headers = {repository_key(p): p.read_text(encoding='utf-8') for p in (ROOT / 'include/cui').glob('*.h')}
         cls.all_headers = '\n'.join(cls.headers.values())
 
+    def assert_public_regex(self, text, pattern):
+        # Keep failed include-authority checks useful without dumping whole headers.
+        self.assertIsNotNone(re.search(pattern, text),
+                             f'Missing public declaration matching {pattern!r}; '
+                             'inspect the documented public include closure.')
+
     def test_callback_visibility_follows_public_includes(self):
         headers = {'include/cui/top.h': '#include "nested.h"',
                    'include/cui/nested.h': '#include "cui/top.h"\ntypedef bool (*visible)(void);',
@@ -70,27 +76,27 @@ class ComponentUsageTests(unittest.TestCase):
                     header += '\n' + public_header_closure(self.headers, extra)
                 self.assertTrue(entry['api_symbols'])
                 for api in entry['api_symbols']:
-                    self.assertRegex(header, r'\b' + re.escape(api) + r'\s*\(')
+                    self.assert_public_regex(header, r'\b' + re.escape(api) + r'\s*\(')
                 for typename in entry['state_types']:
                     # A real typedef or named struct, not a guessed component name.
-                    self.assertRegex(self.all_headers, r'(?:}\s*|\bstruct\s+)' + re.escape(typename) + r'\b')
+                    self.assert_public_regex(self.all_headers, r'(?:}\s*|\bstruct\s+)' + re.escape(typename) + r'\b')
                 callback_header = header
                 for handler in entry.get('handler_types', []):
-                    self.assertRegex(callback_header, r'}\s*' + re.escape(handler) + r'\b')
+                    self.assert_public_regex(callback_header, r'}\s*' + re.escape(handler) + r'\b')
                 for extra in entry.get('additional_public_headers', []):
                     self.assertIn(extra, self.headers)
                     header += '\n' + public_header_closure(self.headers, extra)
                 for callback in entry['callback_symbols']:
-                    self.assertRegex(callback_header, r'\b' + re.escape(callback) + r'\b')
+                    self.assert_public_regex(callback_header, r'\b' + re.escape(callback) + r'\b')
                     if callback.startswith('cui_'):
-                        self.assertRegex(callback_header, r'\(\*' + re.escape(callback) + r'\)')
+                        self.assert_public_regex(callback_header, r'\(\*' + re.escape(callback) + r'\)')
                     else:
-                        self.assertRegex(callback_header, r'\(\*' + re.escape(callback) + r'\)')
+                        self.assert_public_regex(callback_header, r'\(\*' + re.escape(callback) + r'\)')
                 for doc in entry['docs']:
                     self.assertTrue((ROOT / doc).is_file(), doc)
                 # Every C identifier cited in prose must exist in a public header.
                 for symbol in re.findall(r'\bcui_[a-z0-9_]+\b', ' '.join(entry[k] for k in ['state_ownership','interaction','usage'])):
-                    self.assertRegex(self.all_headers, r'\b' + re.escape(symbol) + r'\b')
+                    self.assert_public_regex(self.all_headers, r'\b' + re.escape(symbol) + r'\b')
                 for field in ['state_ownership', 'interaction', 'usage', 'scope']:
                     self.assertGreater(len(entry[field]), 20)
 
@@ -109,7 +115,9 @@ class ComponentUsageTests(unittest.TestCase):
         for entry in self.entries:
             self.assertIn('\n## ' + entry['name'] + '\n', guide)
             for field in ['state_ownership','interaction','usage']:
-                self.assertIn(entry[field], guide)
+                self.assertTrue(entry[field] in guide,
+                                f'{entry["name"]}.{field} is missing from COMPONENT_USAGE.md; '
+                                'synchronize the guide with component-usage.json.')
         for phrase in ['synchronously', 'cui_end_frame', 'copying', 'paint-only', 'save_document(app)', 'persist_preferences(app)']:
             self.assertIn(phrase, guide)
 

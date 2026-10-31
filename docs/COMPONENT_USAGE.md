@@ -1003,9 +1003,14 @@ Event API includes: `cui/cui_tabs_events.h`.
 
 **Interaction:** cui_theme_icon_loader_fn resolves icon SVG; theme selection is an application event.
 
-**Usage:** Choose/copy a preset and pass its address to styled controls; invalidate after changing it.
+**Usage:** Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math; they do not apply backgrounds or enable any renderer.
 
 API: `cui_theme_light`, `cui_theme_preset_get`. [Public header](../include/cui/cui_theme.h); [guide](THEME_GUIDE.md).
+
+Pure background values: explicitly include [`cui/cui_background.h`](../include/cui/cui_background.h)
+and read [background sampling and ownership](BACKGROUND_VALUES.md). These
+development APIs sample colors; element setters, rendering and foreign authoring
+are not implemented by this slice.
 
 ## TitleBar
 

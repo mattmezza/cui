@@ -119,6 +119,11 @@ behavior families need justified exceptions rather than invented paint roots.
   numeric weights/stretch/variable axes, tracking, line height, wrapping and
   alignment. Preserve existing typography tokens and gradient text; document
   Canvas/GPU/binding limitations and complete the promised coverage.
+- [ ] **Element backgrounds:** add owned element fills/linear gradients and
+  matching renderer/binding support. The next local batch has tested C-only
+  [values and samplers](docs/BACKGROUND_VALUES.md); it has no element setter or
+  renderer integration. Preserve legacy paint behavior and make memory, clipping,
+  opacity, physical-scale and failure limits explicit.
 - [ ] **Themes, motion and input:** complete native system preference/contrast/
   reduced-motion observation and component integration. Verify touch cancellation,
   nested scrolling, optional scrollbar styles, pan/pinch opt-ins, cursors and

@@ -49,7 +49,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests now default to one compiler job. Keep laptop load and build artifacts bounded. |
+| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 
@@ -89,8 +89,10 @@ The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actio
 [Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
 Integration candidate `3636bfbc` now passes [all browser shards](https://github.com/mattmezza/cui/actions/runs/41249695672)
 and [native binding runners](https://github.com/mattmezza/cui/actions/runs/41249695759).
-Windows Release remains the last main CI job; integration-branch deployment was
-intentionally skipped. Newer text and Slider proof slices have focused local passes,
+Main CI finished with one Windows Release test failure out of 391: a raw struct-padding
+comparison in the shadow test. The fieldwise correction passes locally; hosted
+confirmation remains open. All other jobs passed; integration-branch deployment
+was intentionally skipped. Newer text and Slider proof slices have focused local passes,
 not full hosted acceptance. Older green results do not cover newer code.
 
 ### Current integration evidence

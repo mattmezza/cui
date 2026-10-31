@@ -94,6 +94,7 @@ typedef struct {
 /* Invalid/missing image/cache falls back to initials (or opt-in anonymous icon).
  * Returns activation
  * only when interactive; image name remains the supplied accessible name. */
+/* Avatar caller id is the outer circular surface/ring, not its image child. */
 bool cui_avatar_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_avatar_options);
 typedef struct {
     uint64_t key; /* Stable unique application key; zero uses the index. */
@@ -309,6 +310,8 @@ typedef struct {
 } cui_hover_options;
 /* Trigger must already have been submitted. State is persistent/application-owned.
  * Explicit dimensions clip content, flip at viewport edges, and bound placement. */
+/* On true, caller id names the emitted tooltip panel portal, independent of
+ * options.trigger. On false no panel is guaranteed in the current frame. */
 bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_state *state,
                  cui_str text, cui_hover_options options);
 /* Pair end only when begin returns true; accepts arbitrary children without a

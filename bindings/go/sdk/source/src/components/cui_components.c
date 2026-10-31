@@ -1915,6 +1915,9 @@ void cui_badge(cui_context *ui, cui_id id, const cui_theme *t, cui_str label) {
     cui_text(ui, label, t->font_size * .8f, t->on_primary);
     cui_end_box(ui);
 }
+cui_id cui_badge_indicator_id(cui_id id) {
+    return id ? id ^ UINT64_C(0x2780a7c4f39251db) : 0;
+}
 cui_badge_options cui_badge_defaults(void) {
     return (cui_badge_options){.maximum = 99, .size = CUI_CONTROL_MEDIUM};
 }
@@ -1951,7 +1954,7 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
                   : o.size == CUI_CONTROL_MEDIUM ? -3
                                                  : -4;
         cui_id overlay = id ^ UINT64_C(0x35d9258f62be9a0c);
-        cui_id indicator = id ^ UINT64_C(0x2780a7c4f39251db);
+        cui_id indicator = cui_badge_indicator_id(id);
         cui_begin_absolute_box(
             ui, overlay,
             (cui_box){.align_x = CUI_ALIGN_END,
@@ -2069,6 +2072,9 @@ bool cui_progress_ex(cui_context *ui, cui_id id, const cui_theme *t, float fract
 void cui_progress(cui_context *ui, cui_id id, const cui_theme *t, float fraction, float width) {
     cui_progress_ex(ui, id, t, fraction, width, (cui_progress_options){0});
 }
+cui_id cui_slider_track_id(cui_id id) {
+    return id ? id ^ UINT64_C(0x39c1a2170384edaa) : 0;
+}
 bool cui_slider(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, float *value,
                 float min, float max, float step, bool disabled) {
     cui_box b = cui_components_control(t, disabled, false);
@@ -2082,7 +2088,7 @@ bool cui_slider(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, fl
     float ratio = value && isfinite(*value) && max > min ? (*value - min) / (max - min) : 0;
     cui_color track = t->primary;
     track.a = (uint8_t)lroundf(track.a * .2f);
-    cui_begin_box(ui, id ^ UINT64_C(0x39c1a2170384edaa),
+    cui_begin_box(ui, id ? cui_slider_track_id(id) : UINT64_C(0x39c1a2170384edaa),
                   (cui_box){.width = 240,
                             .height = 8,
                             .fixed_height = true,

@@ -170,7 +170,10 @@ void cui_base_surface_end(cui_context *);
 /* Submit inside a box/portal with resize part ID, after base begin. */
 void cui_base_surface_submit_resize(cui_context *, const cui_surface_state *, cui_surface_options);
 void cui_base_surface_submit_body(cui_context *, cui_surface_state *);
-/* Caller composes arbitrary children, then ends the surface. */
+/* Caller composes arbitrary children, then ends the surface. The painted panel
+ * portal uses state.overlay.id; body/title/resize/arrow/backdrop are separate.
+ * Begin opens nested body content: to style panel use its named ID, not the
+ * current-open-box setter. Apply after submission, e.g. after surface_end. */
 bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options);
 /* Opt-in source anchor/offset/arrow consumption; requires POPOVER state. LEGACY

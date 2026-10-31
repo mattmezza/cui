@@ -64,3 +64,33 @@ style contract; bundled C headers alone do not establish typed language support.
 Popup/trigger/backdrop and anonymous or repeated component parts need explicit
 owner-specific public addressing and tests. Full 78-family component-part and
 binding coverage remains planned in `design/ELEMENT_SHADOW_STYLING.md`.
+
+## Component paint ownership
+
+Apply styling after the component submits its boxes. These C entry points have
+specific paint targets; IDs do not imply that every nested part is addressable.
+
+| Component | Surface ID | Notes |
+| --- | --- | --- |
+| Button | caller ID | Includes custom/styled content; use resolved corner radii. |
+| Input | caller ID | Framed root; `cui_input_viewport_id` is the inner text viewport. |
+| Avatar | caller ID | Outer circular surface/ring, including the photo variant. |
+| Legacy `cui_badge` | caller ID | Standalone pill. |
+| `cui_badge_ex` | `cui_badge_indicator_id(owner)` | Caller ID wraps content; count0 omits the indicator, dot/icon still show. |
+| Switch | `cui_switch_track_id(owner)`, `cui_switch_thumb_id(owner)` | Caller ID includes label; thumb shadow remains clipped by track. |
+| Slider | `cui_slider_track_id(owner)` | Caller ID includes label/framing. This entry has no separate thumb. |
+| Popover / Dialog | `state.overlay.id` | Panel portal, independent of body, arrow, backdrop and trigger. |
+| Tooltip | caller tooltip ID | Only after tooltip submission returns true; separate from trigger ID. |
+
+Badge/Slider getters expose the IDs already used by their painters. They return0
+for owner0 or a derived zero ID; zero cannot name an element style target. They
+perform no presence check. A hidden count badge or inactive tooltip has no panel
+to style that frame. Do not reconstruct internal ID salts or treat another part's
+semantic ID as the surface.
+
+Checkbox and Radio caller IDs denote whole rows including labels. Their anonymous
+indicator boxes remain unexposed. Single Radio and RadioGroup are separate paint
+owners. Their future named-parts route needs explicit opt-in and capacity/collision
+contracts; this slice does not change legacy anonymous IDs or claim indicator
+coverage. These part contracts remain C-only until matching bridge and typed
+language authoring is implemented.

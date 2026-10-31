@@ -163,6 +163,7 @@ bool cui_button_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_b
  * lifetimes and no-destruction-during-dispatch preconditions remain in force. */
 cui_component_action_result cui_button_events(cui_context *, cui_id, const cui_theme *, cui_str,
                                               cui_button_options, cui_component_activation_handler);
+/* Button paint root uses caller id, including custom/styled content. */
 bool cui_button(cui_context *, cui_id, const cui_theme *, cui_str, bool disabled);
 #include "cui_button_group.h"
 typedef struct {
@@ -246,6 +247,7 @@ typedef struct {
     void *indicator_user;
     bool source_behavior; /* Styled no-pointer-focus; use cui_checkbox_source. */
 } cui_checkbox_options;
+/* Checkbox root id includes its label/content row; indicator is anonymous. */
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
 bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
@@ -284,6 +286,8 @@ typedef struct {
     cui_design_size design_size; /* INHERIT keeps the frozen .size metrics. */
 } cui_switch_options;
 cui_switch_options cui_switch_options_default(void);
+/* Root id includes label; these existing paint boxes are independently named.
+ * Thumb shadows remain clipped by the track. Identity does not prove presence. */
 cui_id cui_switch_track_id(cui_id);
 cui_id cui_switch_thumb_id(cui_id);
 /* Callback is a controlled request; without it, activation writes *value.
@@ -351,10 +355,15 @@ bool cui_toggle_group_ex(cui_context *, cui_id, const cui_theme *, const cui_tog
                          bool *values, size_t count, cui_toggle_group_style_options);
 bool cui_toggle(cui_context *, cui_id, const cui_theme *, cui_str, bool *, bool disabled);
 typedef cui_checkbox_options cui_radio_options;
+/* Radio root id includes its label/content row; indicator is anonymous. */
 bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                   cui_radio_options);
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
+/* Existing Slider track identity. Root id also includes label/framing; this
+ * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity
+ * only; the element must be submitted this frame before applying paint style. */
+cui_id cui_slider_track_id(cui_id);
 bool cui_slider(cui_context *, cui_id, const cui_theme *, cui_str, float *, float minimum,
                 float maximum, float step, bool disabled);
 /* Optional three disjoint caller-owned staging buffers; capacities include NUL.
@@ -415,6 +424,8 @@ typedef struct {
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
 /* Paint only: compose with a reducer without applying the event stream twice. */
+/* Input's framed/clipped paint root uses caller id. The public viewport ID
+ * addresses inner text layout and is not an alias for that surface. */
 void cui_input_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_edit *,
                      cui_input_state *, cui_input_options);
 cui_input_result cui_input_ex(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
@@ -427,6 +438,7 @@ cui_input_event_result cui_input_events(cui_context *, cui_id, const cui_theme *
 cui_input_result cui_input(cui_context *, cui_id, const cui_theme *, cui_str name, cui_edit *,
                            bool disabled);
 void cui_label(cui_context *, const cui_theme *, cui_str);
+/* Legacy Badge caller id is its standalone pill; badge_ex id wraps content. */
 void cui_badge(cui_context *, cui_id, const cui_theme *, cui_str);
 typedef enum { CUI_BADGE_COUNT, CUI_BADGE_DOT, CUI_BADGE_ICON } cui_badge_variant;
 typedef struct {
@@ -439,6 +451,10 @@ typedef struct {
     cui_design_size design_size; /* INHERIT preserves legacy metrics. */
 } cui_badge_options;
 cui_badge_options cui_badge_defaults(void);
+/* Existing badge_ex indicator identity, not its content wrapper or overlay.
+ * Count0 omits this box; dot/icon still show. Returns0 for owner0 or a derived
+ * zero ID; zero cannot be addressed by element setters. No presence check. */
+cui_id cui_badge_indicator_id(cui_id);
 /* Compose arbitrary content with a zero-flow corner indicator. Count zero hides
  * only the indicator; count overflow reads maximum+. Dot/icon always show.
  * INHERIT uses source offsets and fixed10px text, dots6px, icon10/16/24px.

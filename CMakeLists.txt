@@ -1998,3 +1998,8 @@ foreach(mode standalone umbrella)
  cui_warnings(dist_element_shadows_${mode})
  add_test(NAME element_shadows_distribution_${mode} COMMAND dist_element_shadows_${mode})
 endforeach()
+
+add_executable(test_component_shadow_ownership tests/unit/test_component_shadow_ownership.c)
+target_link_libraries(test_component_shadow_ownership PRIVATE cui cui_software)
+cui_warnings(test_component_shadow_ownership)
+add_test(NAME component_shadow_ownership COMMAND test_component_shadow_ownership)

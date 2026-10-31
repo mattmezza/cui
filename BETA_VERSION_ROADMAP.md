@@ -12,7 +12,7 @@ release date is asserted.
 | State | What it means today |
 | --- | --- |
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
-| Verified deployment | Website revision `a7dee36090cbe9c1ca1db1c7bed0cd804c69985f`; public docs, catalog, headers and native archive checked on 2026-10-31. |
+| Verified deployment | Website revision `04911c7fe81cafbe9d0e2937e1827fac4a3ead08`; public docs, catalog, headers and native archive checked on 2026-10-31. |
 | Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
 | Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows pass combined local native, facade and browser checks; hosted integration is still pending. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
@@ -44,9 +44,12 @@ can lag implementation: inspect current code and evidence before scheduling work
   The six-kind owned bridge/facade override passes focused portable software and
   all five facade checks. Eight C-only Checkbox/Radio/group facades now accept
   explicit indicator IDs while preserving legacy anonymous routes; their focused
-  tests pass against captured old-library fixtures. Broader part/portal coverage,
-  corresponding indicator bindings and browser/GPU proof remain pending. The initial
-  six-root/C-indicator slice is released; broader parts are not yet integrated.
+  tests pass against captured old-library fixtures. The next batch adds typed
+  indicator/track/thumb binding targets where supported,
+  compound paint-part IDs, Button state-specific shadows and opt-in gallery examples;
+  combined local native, five-language and browser checks passed. Hosted integration,
+  broader component/portal coverage and GPU proof remain pending. Only the initial
+  six-root/C-indicator slice is released in alpha.3.
 - [x] **Release the completed alpha.3 batch.** Matching source/C install, Python
   wheel, npm tarball, Go source proxy and Rust crate published after installed
   consumer checks and draft download verification. Registry publication is separate.

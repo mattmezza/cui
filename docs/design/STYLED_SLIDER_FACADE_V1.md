@@ -60,6 +60,9 @@ enum {
     CUI_STYLED_SLIDER_POINTER_RING = 1,
     CUI_STYLED_SLIDER_FOCUS_RING = 2
 };
+bool cui_styled_slider_model_options_from_theme_v1(
+    const cui_theme *, float rem, uint32_t orientation,
+    cui_styled_slider_model_options_v1 *out);
 bool cui_styled_slider_model_state_init_v1(
     uint32_t state_size, cui_styled_slider_model_state_v1 *out);
 cui_id cui_styled_slider_model_part_id_v1(
@@ -80,6 +83,18 @@ matches the pinned source `Theme::radius_full` zero-radius rule and avoids a
 second theme radius competing with the existing style value's full radius.
 Custom authored full radius remains possible. No theme pointer survives or is
 reread during callbacks. Changing this decision requires review before code.
+
+The optional pure options constructor borrows theme only for the constructor
+call, validates finite nonnegative theme radius and valid spring_control plus
+positive finite rem/known axis, and copies the custom-theme palette using the
+existing from_theme rule (no preset inference). It writes complete canonical v1
+records, SOLID_V1, no flags, zero inactive support/overrides, spring_control from
+theme and full radius0 for square or `cui_radius(CUI_RADIUS_FULL,1)` otherwise.
+Horizontal defaults PARENT, vertical FIXED120px, matching source defaults. Axis
+selects defaults only; the resulting options contain no competing stored axis.
+Users can then choose a named owned palette or explicit dimensions/corners. The
+constructor is context/allocation-free; invalid/null input preserves all output
+bytes. It never stores the borrowed theme or changes a legacy theme struct.
 
 The facade's nested `style.flags` must be zero: logical own drag and Base disabled
 state derive ACTIVE/DISABLED after reduction. Rejecting authored nonzero flags

@@ -1440,17 +1440,24 @@
       "api_symbols": [
         "cui_slider",
         "cui_slider_events",
-        "cui_slider_track_id"
+        "cui_slider_track_id",
+        "cui_slider_palette_from_theme",
+        "cui_slider_palette_builtin_get",
+        "cui_slider_palette_preset_get",
+        "cui_slider_palette_valid"
       ],
-      "state_types": [],
-      "state_ownership": "Caller retains float value and supplies min/max/step.",
+      "state_types": [
+        "cui_slider_palette"
+      ],
+      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage.",
       "interaction": "Returns true when the value changes.",
       "usage": "Pass a volume value by pointer; apply audio settings only in the change branch.",
       "docs": [
         "docs/CONTROLS.md",
         "docs/STYLED_SLIDER_EVENTS.md",
         "docs/ELEMENT_SHADOWS.md",
-        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md",
+        "docs/SLIDER_PALETTE.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -1458,7 +1465,8 @@
       "public_header": "include/cui/cui_components.h",
       "composition": "immediate frame submission",
       "additional_public_headers": [
-        "include/cui/cui_styled_slider_events.h"
+        "include/cui/cui_styled_slider_events.h",
+        "include/cui/cui_slider_palette.h"
       ]
     },
     {

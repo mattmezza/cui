@@ -71,6 +71,7 @@
 #include "cui_questionnaire_observer.h"
 #include "cui_stepper_visual.h"
 #include "cui_stepper_presentation.h"
+#include "cui_slider_palette.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -354,4 +355,8 @@
 #define CUI_STEPPER_PRESENTATION_IMPLEMENTATION
 #endif
 #include "cui_stepper_presentation.h"
+#ifndef CUI_SLIDER_PALETTE_IMPLEMENTATION
+#define CUI_SLIDER_PALETTE_IMPLEMENTATION
+#endif
+#include "cui_slider_palette.h"
 #endif

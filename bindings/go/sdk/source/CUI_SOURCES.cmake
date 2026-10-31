@@ -114,4 +114,5 @@ set(CUI_SOURCES
  src/base/cui_questionnaire_observer.c
  src/components/cui_stepper_visual.c
  src/components/cui_stepper_presentation.c
+ src/theme/cui_slider_palette.c
 )

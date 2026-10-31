@@ -24,7 +24,7 @@ typedef enum {
 typedef enum {
     CUI_SLIDER_BRUSH_SRGB = 0, CUI_SLIDER_BRUSH_OKLAB = 1
 } cui_slider_brush_space;
-typedef enum { CUI_SLIDER_BRUSH_GPUI_038 = 0 } cui_slider_brush_projection;
+typedef enum { CUI_SLIDER_BRUSH_SOURCE_038 = 0 } cui_slider_brush_projection;
 typedef struct {
     cui_slider_brush_kind kind;
     cui_slider_palette_color solid;
@@ -157,3 +157,26 @@ through scripts/test_local.py after the integrator grants a compiler slot.
 Signed: `/root/hidden_windows`, 2026-10-31. Contract review requested before
 production commit. Shared brush ABI/transport remains the separate Stepper/root
 approval gate. No merge/push, no compiler used at this checkpoint.
+
+Implementation clarification: the public projection identifier is
+`CUI_SLIDER_BRUSH_SOURCE_038`; upstream names remain provenance only. The
+source-HSLA constructor bounds floating roundoff at mathematical unit-gamut
+edges, without quantization/transfer conversion; GPU-f32 bit identity is not
+claimed. Focused pure C, independent all38 runtime oracle, generation freshness
+and selective/umbrella distribution checks passed through the private-display
+wrapper on 2026-10-31. Rendering, presenter integration and bindings remain out
+of scope and whole Slider disabled/theme coverage remains incomplete.
+
+Additional implementation evidence (cached primary sources only, no dependency
+installation):
+
+- [Pinned source color parser](https://raw.githubusercontent.com/longbridge/gpui-kit/87d10ae5e1299d1be18670a37570c5402f952e34/crates/component/src/theme/color.rs),
+  SHA256 `d3c81fb0fdca3fce797c312addc5afd9767d5985dc56bbf73afecdd0019c4e01`: representative
+  color chooses first stop; background parser owns exactly two stops.
+- [GPUI0.3.8 WGPU shader](https://docs.rs/crate/gpui-pre-wgpu/0.3.8/source/src/shaders.wgsl),
+  extracted raw source SHA256 `1d91f2c8a1958a241f1b659a4137c160592c8076b9be09049db4c9fb9a344529`;
+  crate checksum `439c5421cafe1a7cf68d0c0ae5cc82b26fad6b0e6345ac98d20acaf1f2463914`.
+  `prepare_gradient_color` (404) and `gradient_color` (430) establish source
+  HSLA-as-linear values, SRGB encode/mix/decode, Oklab mixing and projection.
+  Raw shader source is retained externally under the shared bounded reference
+  cache, not copied into the production library.

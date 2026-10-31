@@ -4632,7 +4632,8 @@
         "headless": "tested_partial"
       },
       "limitations": [
-        "Capture drag, keyboard step/clamp and disabled tests pass; tick/handle geometry and touch pending."
+        "Capture drag, keyboard step/clamp and disabled tests pass; tick/handle geometry and touch pending.",
+        "The C-only owned palette resolver exposes 4 CUI builtin adaptations and 38 pinned source palettes, including the Aurora Light gradient thumb. It does not apply these values to Slider painting or bindings; disabled/theme presentation remains incomplete. See docs/SLIDER_PALETTE.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4665,6 +4666,18 @@
           "name": "disabled/theme variants",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "owned source palette values",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_slider_palette.h",
+            "tests/unit/test_slider_palette.c",
+            "tests/test_slider_palette_oracle.py"
+          ],
+          "limitations": [
+            "Pure C values only; no renderer, sampler, presenter setter or language binding authoring."
+          ]
         }
       ],
       "upstream_doc": {

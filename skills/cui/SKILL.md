@@ -293,3 +293,12 @@ explicitly clear for disabled if that is the intended result. Named selection
 indicators do not add semantics; Switch thumb shadows remain track-clipped, and
 legacy Slider exposes only its track. These gallery routes do not establish all78
 shadow coverage or foreign-builder callback parity. Check the guide's proof status.
+## Slider palette values
+
+Read `docs/SLIDER_PALETTE.md` and `include/cui/cui_slider_palette.h` for the
+C-only owned value resolver. Four CUI builtin adaptations decode encoded theme
+bytes; 38 named source palettes preserve pinned source color semantics and the
+Aurora Light two-stop gradient. Custom themes never acquire a named identity.
+These values do not change Slider rendering: there is no palette setter, brush
+sampler or Python/JS/TS/Go/Rust builder API. Disabled/theme presentation remains
+partial; do not claim complete Slider parity from these values.

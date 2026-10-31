@@ -33,7 +33,7 @@ can lag implementation: inspect current code and evidence before scheduling work
 
 | Active slice | Current checkpoint | What remains |
 | --- | --- | --- |
-| Scroll layout / Dialog sizing | Core implementation has focused headless evidence in a worker branch; not merged. | Finish admission, failure/lifetime and nested-layout tests; integrate Core, then component-level sizing and scrolling. |
+| Scroll layout / Dialog sizing | Core implementation is in the next integration branch with focused headless evidence; combined regression build is running. | Finish admission, failure/lifetime and nested-layout tests; integrate Core, then component-level sizing and scrolling. |
 | Slider palettes and ranges | Palette values have focused worker tests; range/orientation and numeric accessibility contracts are proposals. | Integrate palette values, implement reviewed range/orientation behavior, then verify typed events, accessibility and bindings. |
 | Backgrounds and gradients | Owned color/gradient values have focused worker tests; the versioned rendering contract is reviewed; compatibility fixtures come next. | Integrate values; implement and verify rendering, authoring APIs and binding support per advertised backend. No cross-backend completion claim yet. |
 | Styling release | Styling batch merged and deployed; exact-main CI/native/browser gates and public-site verification passed. | Include these development APIs in a later verified library release; alpha.3 packages do not contain them. |

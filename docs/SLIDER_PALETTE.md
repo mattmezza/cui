@@ -1,5 +1,8 @@
 # Owned Slider palette values
 
+Development source only: these APIs were added after v0.1.0-alpha.3 and are
+absent from its published packages. Use matching headers and implementation.
+
 `include/cui/cui_slider_palette.h` supplies context-free C values. It does not
 change existing Slider rendering, input, state, semantics or theme ABI. There is
 no presenter setter, brush sampler, renderer transport or Python/JS/TS/Go/Rust

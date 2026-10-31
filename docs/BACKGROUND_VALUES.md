@@ -1,5 +1,8 @@
 # Owned background values and pure sampling
 
+Development source only: these APIs were added after v0.1.0-alpha.3 and are
+absent from its published packages. Use matching headers and implementation.
+
 Unreleased C-only API in `include/cui/cui_background.h`. These are independent
 owned values and allocation-free math. They do not apply paint to elements or
 provide gradient rendering. All existing V1 commands, boxes and renderers retain

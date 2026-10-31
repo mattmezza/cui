@@ -1,5 +1,8 @@
 # Core intrinsic scroll-body layout
 
+Development source only: these APIs were added after v0.1.0-alpha.3 and are
+absent from its published packages. Use matching headers and implementation.
+
 `cui_layout_scroll_body_v1` and `cui_layout_scroll_clamp_v1` are opt-in C Core
 constraints. Read their exact declarations in `include/cui/cui.h`. They do not
 change the existing Scrollable/Base/Dialog APIs or expose foreign-builder slots.

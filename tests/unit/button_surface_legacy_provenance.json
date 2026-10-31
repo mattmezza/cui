@@ -1,0 +1,20 @@
+{
+  "baseline_source_commit": "97c317f0",
+  "baseline_scope": "Existing build-shadow libraries from completed named-indicator implementation build, before Button surface refactor. Logs /tmp/cui-named-selection-build.log and /tmp/cui-named-selection-tests.log survive. Baseline library is older than integration headers; no baseline library rebuild. Public old Button ABI unchanged.",
+  "compiler": "cc (GCC) 16.2.1 20260810",
+  "sha256": {
+    "build-shadow/libcui.a": "0aa8f16118344b230f2d7a8a005a487772ba3f61a420556b31518876927f5d0a",
+    "build-shadow/libcui_software.a": "d4ecd272fd27945a3e89527550c00a4982078de076d169064ea39d26f651619e",
+    "tests/unit/test_button_surface_legacy.c": "8a1c76a0c2a0e9066e60d76e35f2d5c1d0041edeafd94f4b3d71c0818c81e19e",
+    "tests/unit/button_surface_test_helpers.h": "60bb5b93663ed89b98440188d04a15ac7943f1ab3b37bb082828a83ccc45d1c6"
+  },
+  "flags": "Library CMake Release -O3 -DNDEBUG, portable C11 warnings-as-errors; capture harness -O2 -Wall -Wextra -Wpedantic -Werror; assertions explicitly active.",
+  "capture_scope": "60 route/stage triples: normalized owned command semantics, text-omitted software RGBA, accepted-event/consumption/semantics/bounds/callback order. Deterministic stub font, reduced motion.",
+  "symbol_check": "Old cui_button_styled_ex and cui_checkbox_ex_with_parts present; new cui_button_surface_ex absent.",
+  "capture_command": "taskset -c 0 nice -n 19 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -DCUI_CAPTURE_LEGACY=1 -Iinclude tests/unit/test_button_surface_legacy.c build-shadow/libcui_software.a build-shadow/libcui.a -lm -o build-shadow/test_button_surface_legacy_capture",
+  "capture_test_command": "taskset -c 0 nice -n 19 python scripts/test_local.py --build-dir build-shadow -- -R '^button_surface_legacy_capture$'",
+  "capture_registration": "Disposable build-shadow/CTestTestfile.cmake entry added without configuring/rebuilding library; normal reconfiguration removes it.",
+  "capture_binary_sha256": "eec6714133de2c00c0ef8c02e27f06f979e8804107ed0db097072dc36dffcc81",
+  "golden_sha256": "11be0263f00e655444b7c71545657519819d51f13f9c6778df8c101fd89cf15a",
+  "capture_result": "1/1 passed under private Xvfb; 60 frozen command/software/state triples, captured from old library before any production rebuild."
+}

@@ -1,0 +1,6 @@
+{
+  "source_commit": "e5b64e4ef847047a028abf47766171976ce593d1",
+  "source_path": "src/core/cui_background.c",
+  "sha256": "be8f09b0538565dabaaa512d0f189b0813d41cdc2d0f924296507c4d3a9a111a",
+  "scope": "Frozen CUI sampler before output-conversion/preparation refactor. Test-only independently compiled original implementation with renamed symbols. Do not refresh from candidate; existing independent source/CSS goldens remain additional authority."
+}

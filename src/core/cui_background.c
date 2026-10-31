@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_background.h"
+#include "cui_background_output_internal.h"
 #include "cui_background_valid_internal.h"
 #include <math.h>
 
@@ -13,7 +14,7 @@ static double bg_decode(double x) {
     return x <= .04045 ? x / 12.92 : pow((x + .055) / 1.055, 2.4);
 }
 static double bg_encode(double x) {
-    return x <= .0031308 ? x * 12.92 : 1.055 * pow(x, 1. / 2.4) - .055;
+    return cui_background_encode_internal(x);
 }
 cui_background_color cui_background_color_from_srgba8(cui_color c) {
     return (cui_background_color){(float)bg_decode(c.r / 255.), (float)bg_decode(c.g / 255.),
@@ -167,13 +168,5 @@ bool cui_background_sample_srgba8(const cui_background *bg, cui_rect frame, floa
     cui_background_pixel p;
     if (!out || !cui_background_sample(bg, frame, x, y, &p))
         return false;
-    cui_color value = {0};
-    if (p.a > 0) {
-        value.r = (uint8_t)floor(bg_clamp(bg_encode(bg_clamp((double)p.r / p.a))) * 255 + .5);
-        value.g = (uint8_t)floor(bg_clamp(bg_encode(bg_clamp((double)p.g / p.a))) * 255 + .5);
-        value.b = (uint8_t)floor(bg_clamp(bg_encode(bg_clamp((double)p.b / p.a))) * 255 + .5);
-        value.a = (uint8_t)floor(p.a * 255. + .5);
-    }
-    *out = value;
-    return true;
+    return cui_background_output_srgba8_internal(p, 1, out);
 }

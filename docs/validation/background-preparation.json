@@ -1,0 +1,42 @@
+{
+  "checkpoint": "3: allocation-free CPU background query/raster only",
+  "base": "0493fa7f (Core V2 3e18bbba; import-order fix separately reviewed)",
+  "compiler": "cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror; taskset -c 0 nice -n 19",
+  "compile_command": "cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/unit/test_background_prepare.c tests/unit/background_sampler_v1_reference.c src/core/cui_background.c -lm -o build-shadow/test_background_prepare",
+  "test_command": "python scripts/test_local.py --build-dir build-shadow -R background_prepare_focused --output-on-failure",
+  "result": "PASS 1/1; strict compilation emitted no diagnostics",
+  "reference": {
+    "source_commit": "e5b64e4ef847047a028abf47766171976ce593d1",
+    "source_path": "src/core/cui_background.c",
+    "sha256": "be8f09b0538565dabaaa512d0f189b0813d41cdc2d0f924296507c4d3a9a111a",
+    "scope": "Frozen CUI sampler before output-conversion/preparation refactor. Test-only independently compiled original implementation with renamed symbols. Do not refresh from candidate; existing independent source/CSS goldens remain additional authority."
+  },
+  "coverage": [
+    "8500 exact old/new sampler RGBA8 comparisons; independently compiled frozen old source",
+    "independent long-double corner/color pixel reference across both models and interpolation spaces",
+    "transparent interpolation, opacity once, radii, fractional and unequal physical density, preserved offscreen phase",
+    "canonical empty, rectangular sample-domain boundaries, quota/overflow/capacity checks",
+    "padded supplied stride/span reporting, untouched padding, alias and transactional failures, retry"
+  ],
+  "bounds": {
+    "side_pixels": 16384,
+    "pixels_per_background": 4194304,
+    "pixels_per_frame_option_ceiling": 8388608,
+    "each_byte_budget_ceiling": 33554432,
+    "metadata_budget_ceiling": 1048576
+  },
+  "ownership": "No allocation/cache/context/target/upload ownership; caller owns disjoint options/query/buffer. Query packed minimum versus raster actual stride/span. Per-background accounting only.",
+  "not_validated": [
+    "No adapter implementation or support advertised: software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain pending",
+    "No native GPU lifecycle, target-loss, whole-list aggregate/in-flight budgets or foreign bindings in this slice",
+    "No V1 Core emitter or renderer changes; frozen V1 fixtures are not regenerated"
+  ],
+  "maintenance_checks": [
+    "agent skill 18/18 PASS",
+    "component usage 6/6 PASS",
+    "frozen sampler checksum/source 1/1 PASS",
+    "clang-format 23.1.2 full source check PASS",
+    "amalgamation, Go/Rust SDK and agent skill freshness PASS",
+    "git diff --check PASS"
+  ]
+}

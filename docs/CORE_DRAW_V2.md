@@ -3,7 +3,9 @@
 Explicit C-only opt-in in `include/cui/cui_draw_v2.h`. Core mode/storage/setters and
 emission are implemented; **no renderer, Canvas wire, bridge or foreign binding
 supports this list yet**. Software, SDL_Renderer, SDL_GPU, Sokol GLCORE and Canvas
-V2 consumption/preparation remain mandatory follow-ups, not completed parity.
+V2 consumption remains mandatory follow-up, not completed parity. A private
+[CPU preparation helper](BACKGROUND_PREPARATION.md) now supplies allocation-free
+query/raster building blocks; it does not consume lists or own target resources.
 Do not pass a V2 list to a V1 renderer, cast command arrays or fabricate adapter
 support in an application. There is currently no usable end-to-end background
 rendering example. The test consumer descriptor is deliberately synthetic.
@@ -43,7 +45,7 @@ an owner slot; clear preserves other custom paint and the owner's slot until the
 next admitted begin. Distinct touched owners consume capacity even if cleared.
 
 Final-layout bounds and clamped box corner radii accompany the brush by value;
-ancestor opacity is separate and applied once by future preparation. Replace ONLY
+ancestor opacity is separate and applied once by shared preparation. Replace ONLY
 box fill: DROP, outside outline, fill, INSET, mesh, locally clipped underlay,
 prepaint, children retain their order; deferred layers/portals retain their route.
 A no-setter V2 frame wraps ordinary V1 commands exactly. Legacy strings, bitmap

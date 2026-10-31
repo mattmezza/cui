@@ -77,6 +77,49 @@ bool cui_background_sample_srgba8(const cui_background *background, cui_rect fra
 /* SPDX-License-Identifier: MIT */
 
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_BACKGROUND_OUTPUT_INTERNAL_H
+#define CUI_BACKGROUND_OUTPUT_INTERNAL_H
+#include <math.h>
+static inline double cui_background_output_clamp_internal(double x) {
+    return fmax(0, fmin(1, x));
+}
+static inline double cui_background_encode_internal(double x) {
+    return x <= .0031308 ? x * 12.92 : 1.055 * pow(x, 1. / 2.4) - .055;
+}
+/* One output policy shared by pure sampling and future preparation consumers.
+ * Keep RGB/base alpha separate from ancestor opacity: multiplying premultiplied
+ * floats and dividing again would introduce avoidable RGB rounding drift. */
+static inline bool cui_background_output_srgba8_internal(cui_background_pixel p, float opacity,
+                                                         cui_color *out) {
+    if (!out || !isfinite(p.r) || !isfinite(p.g) || !isfinite(p.b) || !isfinite(p.a) || p.a < 0 ||
+        p.a > 1 || !isfinite(opacity) || opacity < 0 || opacity > 1)
+        return false;
+    double alpha = (double)p.a * opacity;
+    cui_color value = {0};
+    if (alpha > 0) {
+        value.r =
+            (uint8_t)floor(cui_background_output_clamp_internal(cui_background_encode_internal(
+                               cui_background_output_clamp_internal((double)p.r / p.a))) *
+                               255 +
+                           .5);
+        value.g =
+            (uint8_t)floor(cui_background_output_clamp_internal(cui_background_encode_internal(
+                               cui_background_output_clamp_internal((double)p.g / p.a))) *
+                               255 +
+                           .5);
+        value.b =
+            (uint8_t)floor(cui_background_output_clamp_internal(cui_background_encode_internal(
+                               cui_background_output_clamp_internal((double)p.b / p.a))) *
+                               255 +
+                           .5);
+        value.a = (uint8_t)floor(alpha * 255 + .5);
+    }
+    *out = value;
+    return true;
+}
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_BACKGROUND_VALID_INTERNAL_H
 #define CUI_BACKGROUND_VALID_INTERNAL_H
 #include <math.h>
@@ -116,7 +159,7 @@ static double bg_decode(double x) {
     return x <= .04045 ? x / 12.92 : pow((x + .055) / 1.055, 2.4);
 }
 static double bg_encode(double x) {
-    return x <= .0031308 ? x * 12.92 : 1.055 * pow(x, 1. / 2.4) - .055;
+    return cui_background_encode_internal(x);
 }
 cui_background_color cui_background_color_from_srgba8(cui_color c) {
     return (cui_background_color){(float)bg_decode(c.r / 255.), (float)bg_decode(c.g / 255.),
@@ -270,15 +313,7 @@ bool cui_background_sample_srgba8(const cui_background *bg, cui_rect frame, floa
     cui_background_pixel p;
     if (!out || !cui_background_sample(bg, frame, x, y, &p))
         return false;
-    cui_color value = {0};
-    if (p.a > 0) {
-        value.r = (uint8_t)floor(bg_clamp(bg_encode(bg_clamp((double)p.r / p.a))) * 255 + .5);
-        value.g = (uint8_t)floor(bg_clamp(bg_encode(bg_clamp((double)p.g / p.a))) * 255 + .5);
-        value.b = (uint8_t)floor(bg_clamp(bg_encode(bg_clamp((double)p.b / p.a))) * 255 + .5);
-        value.a = (uint8_t)floor(p.a * 255. + .5);
-    }
-    *out = value;
-    return true;
+    return cui_background_output_srgba8_internal(p, 1, out);
 }
 
 #endif

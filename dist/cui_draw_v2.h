@@ -53,6 +53,18 @@ typedef struct {
     uint64_t required_features;
     size_t command_bytes, background_bytes; /* Zero selects defaults above. */
 } cui_frame_v2_options;
+/* Unreleased shared preparation options, not an adapter support query. Exact size
+ * and CENTER_V1 tag required. Scales [1/65536,64], origins [-1e6,1e6], viewport
+ * sides <=16384 (zero yields empty work). Explicit nonzero resource ceilings:
+ * <=8M pixels/frame, <=4M/background; <=32MiB each CPU/texture/transfer and
+ * <=1MiB metadata. Actual adapters must also preflight aggregate/inflight usage. */
+typedef struct {
+    uint32_t size, background_output;
+    unsigned viewport_width, viewport_height;
+    float scale_x, scale_y, origin_x, origin_y;
+    size_t cpu_bytes, texture_bytes, transfer_bytes, metadata_bytes;
+    size_t max_pixels, max_pixels_per_background;
+} cui_render_v2_options;
 /* Optional retained storage reserved BEFORE opening/consuming input. Exact size,
  * ABI and output policy required; unknown bits fail INVALID_ACTION; insufficient
  * budgets CAPACITY. Command cap=min(config.max_commands,16384,support.max_commands,

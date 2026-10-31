@@ -1,7 +1,7 @@
 # Software V2 counted text session — architectural checkpoint
 
-Design only, following `SOFTWARE_BACKGROUND_V2.md`, approved glyph policy
-`bd97374e` and validator `f4e07861`. No text implementation/build/dependency change.
+Originally a design checkpoint, following `SOFTWARE_BACKGROUND_V2.md`, approved glyph policy
+`bd97374e` and validator `f4e07861`. The private counted recording seam now exists; see [TEXT_PREPARATION.md](../TEXT_PREPARATION.md). No renderer support or dependency-stack replacement.
 Recommendation: bound adapter-owned transactions and CUI text temporaries exactly;
 explicitly separate the existing font/dependency runtime. Do not claim a joint
 32MiB text-process limit. This changes the proposed budget wording and needs review.
@@ -137,4 +137,4 @@ and successful retry; no partial publication/leaks/double release. Instrument
 cache misses to prove no V2 CUI cache growth and unchanged V1 behavior. Counters
 must separately report class2 exact peaks and class3 unknown bytes, not a fake
 joint32MiB figure. Actual bundled-font dependency runs supplement stubs. All five
-adapters remain required; no text/renderer production is implemented here.
+adapters remain required; the private recorder does not implement adapter text painting or renderer support.

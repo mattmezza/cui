@@ -18,7 +18,9 @@ or enable gradient rendering. For unreleased opt-in Core V2 mode/setters/emissio
 read `docs/CORE_DRAW_V2.md` and `include/cui/cui_draw_v2.h`; no adapter currently
 consumes that list. Private `docs/BACKGROUND_PREPARATION.md` describes an allocation-free maintainer
 building block and a private software validation/workspace slice, not a public renderer.
-Validation success does not mean font/shadow resources are prepared. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.
+Validation success does not mean adapter font/shadow resources are prepared.
+`docs/TEXT_PREPARATION.md` describes private counted recording only; opaque new
+font/dependency temporaries are outside the transaction CPU byte envelope. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.
 
 ## Start with the project's actual integration
 

@@ -94,6 +94,10 @@ The next software building block, `backends/software/cui_software_v2_internal.h`
 validates full V2 list structure and active borrowed resources, clip nesting and
 aggregate known workspace reservations before any target access. Its counted
 transaction arena is optional and has no V1 call site. A successful private
-validation plan is NOT a prepared/renderable frame: explicit text/shadow resource
+validation plan is NOT a prepared/renderable frame: explicit adapter text/shadow resource
 preparation remains pending, as do transform painters and every public adapter
 support query/render entry. See [software checkpoint](design/SOFTWARE_BACKGROUND_V2.md).
+
+A private [counted text recorder](TEXT_PREPARATION.md) supplies source-grid glyph
+coverage and explicit CUI ownership, but is not integrated into an adapter. Opaque
+new font/dependency temporaries remain outside the transaction byte envelope.

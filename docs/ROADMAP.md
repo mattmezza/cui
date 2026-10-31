@@ -12,7 +12,7 @@ Every one of the 78 baseline families remains in gpui-parity.json with feature-l
 See COMPONENTS.md for the full family breakdown and MAINTAINER_ACTIONS.md for manual setup. Advanced editors, dock/table/chart widgets will not be counted from placeholder rectangles.
 
 Shared backgrounds have owned pure values/sampling and an unreleased
-[Core V2 transport](CORE_DRAW_V2.md) slice plus private allocation-free [CPU preparation](BACKGROUND_PREPARATION.md). V2 consumers
+[Core V2 transport](CORE_DRAW_V2.md) slice plus private allocation-free [CPU preparation](BACKGROUND_PREPARATION.md) and [counted text recording](TEXT_PREPARATION.md). V2 consumers
 for software, SDL_Renderer, SDL_GPU, Sokol and Canvas, foreign authoring, and
 component-part coverage across all78 remain pending. No family status is upgraded
 by generic setters or Core transport alone.

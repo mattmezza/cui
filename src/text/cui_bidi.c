@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_bidi.h"
+#include "cui_bidi_owned_internal.h"
 #include <SheenBidi/SheenBidi.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,21 +116,25 @@ struct cui_bidi_paragraph {
     SBAlgorithmRef algorithm;
     SBParagraphRef paragraph;
 };
+_Static_assert(_Alignof(cui_bidi_paragraph) <= _Alignof(cui_fundamental_alignment_internal),
+               "Bidi paragraph exceeds allocation-prefix alignment");
 
-void cui_bidi_paragraph_destroy(cui_bidi_paragraph *p) {
+void cui_bidi_paragraph_destroy_owned_internal(cui_bidi_paragraph *p,
+                                               cui_text_owner_internal *owner) {
     if (!p)
         return;
     if (p->paragraph)
         SBParagraphRelease(p->paragraph);
     if (p->algorithm)
         SBAlgorithmRelease(p->algorithm);
-    free(p->scalars);
-    free(p);
+    cui_text_free_internal(owner, p->scalars);
+    cui_text_free_internal(owner, p);
 }
 
-cui_bidi_status cui_bidi_paragraph_create(const char *utf8, size_t n, cui_bidi_direction direction,
-                                          uint32_t *workspace, size_t workspace_capacity,
-                                          cui_bidi_paragraph **out) {
+cui_bidi_status
+cui_bidi_paragraph_create_owned_internal(const char *utf8, size_t n, cui_bidi_direction direction,
+                                         uint32_t *workspace, size_t workspace_capacity,
+                                         cui_bidi_paragraph **out, cui_text_owner_internal *owner) {
     static const SBLevel bases[] = {SBLevelDefaultLTR, SBLevelDefaultRTL, 0, 1};
     cui_bidi_paragraph *p;
     SBCodepointSequence sequence;
@@ -141,7 +146,7 @@ cui_bidi_status cui_bidi_paragraph_create(const char *utf8, size_t n, cui_bidi_d
         return CUI_BIDI_CAPACITY;
     if (n && !decode((const unsigned char *)utf8, n, workspace, &count))
         return CUI_BIDI_INVALID;
-    p = calloc(1, sizeof *p);
+    p = cui_text_alloc_internal(owner, 1, sizeof *p, true, false);
     if (!p)
         return CUI_BIDI_MEMORY;
     p->count = count;
@@ -150,29 +155,39 @@ cui_bidi_status cui_bidi_paragraph_create(const char *utf8, size_t n, cui_bidi_d
         *out = p;
         return CUI_BIDI_OK;
     }
-    p->scalars = malloc(count * sizeof *p->scalars);
+    p->scalars = cui_text_alloc_internal(owner, count, sizeof *p->scalars, false, false);
     if (!p->scalars) {
-        cui_bidi_paragraph_destroy(p);
+        cui_bidi_paragraph_destroy_owned_internal(p, owner);
         return CUI_BIDI_MEMORY;
     }
     memcpy(p->scalars, workspace, count * sizeof *p->scalars);
     sequence.stringEncoding = SBStringEncodingUTF32;
     sequence.stringBuffer = p->scalars;
     sequence.stringLength = count;
-    p->algorithm = SBAlgorithmCreate(&sequence);
-    if (p->algorithm)
+    p->algorithm = cui_text_dependency_internal(owner) ? SBAlgorithmCreate(&sequence) : NULL;
+    if (p->algorithm && cui_text_dependency_internal(owner))
         p->paragraph = SBAlgorithmCreateParagraph(p->algorithm, 0, count, bases[direction]);
     if (!p->paragraph) {
-        cui_bidi_paragraph_destroy(p);
+        cui_bidi_paragraph_destroy_owned_internal(p, owner);
         return CUI_BIDI_MEMORY;
     }
     if (SBParagraphGetLength(p->paragraph) != count) {
-        cui_bidi_paragraph_destroy(p);
+        cui_bidi_paragraph_destroy_owned_internal(p, owner);
         return CUI_BIDI_INVALID;
     }
     p->base = SBParagraphGetBaseLevel(p->paragraph);
     *out = p;
     return CUI_BIDI_OK;
+}
+
+void cui_bidi_paragraph_destroy(cui_bidi_paragraph *p) {
+    cui_bidi_paragraph_destroy_owned_internal(p, NULL);
+}
+cui_bidi_status cui_bidi_paragraph_create(const char *utf8, size_t n, cui_bidi_direction direction,
+                                          uint32_t *workspace, size_t capacity,
+                                          cui_bidi_paragraph **out) {
+    return cui_bidi_paragraph_create_owned_internal(utf8, n, direction, workspace, capacity, out,
+                                                    NULL);
 }
 
 cui_bidi_status cui_bidi_paragraph_levels(const cui_bidi_paragraph *p, uint8_t *levels,

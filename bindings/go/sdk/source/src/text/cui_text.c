@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_text.h"
+#include "../core/cui_text_paint_internal.h"
+#include "cui_bidi_owned_internal.h"
+#include "cui_text_prepare_internal.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <float.h>
@@ -41,16 +44,20 @@ struct cui_font {
     size_t fallback_count;
     bool owns_fallbacks;
 };
-static FT_GlyphSlot raster_glyph(cui_font *font, FT_UInt glyph, float size) {
+static FT_GlyphSlot raster_glyph_owned(cui_font *font, FT_UInt glyph, float size,
+                                       cui_text_owner_internal *owner) {
     FT_F26Dot6 raster_size = (FT_F26Dot6)lroundf(size * 64);
     size_t index = ((size_t)glyph * 33u + (size_t)raster_size) % GLYPH_CACHE_SLOTS;
     glyph_cache_entry *entry = font->glyph_cache ? &font->glyph_cache[index] : NULL;
     if (entry && entry->valid && entry->glyph == glyph && entry->size == raster_size)
         return &entry->slot;
-    if (FT_Load_Glyph(font->face, glyph, FT_LOAD_DEFAULT) ||
+    if (!cui_text_dependency_internal(owner) || FT_Load_Glyph(font->face, glyph, FT_LOAD_DEFAULT) ||
+        !cui_text_dependency_internal(owner) ||
         FT_Render_Glyph(font->face->glyph, FT_RENDER_MODE_NORMAL))
         return NULL;
     FT_GlyphSlot slot = font->face->glyph;
+    if (owner)
+        return slot; /* V2 cold raster never inserts into the caller-owned cache. */
     /* FreeType's negative-pitch layout is left untouched on the uncached path. */
     if (slot->bitmap.pitch < 0 ||
         (slot->bitmap.rows &&
@@ -80,6 +87,9 @@ static FT_GlyphSlot raster_glyph(cui_font *font, FT_UInt glyph, float size) {
     entry->slot.bitmap.buffer = pixels;
     entry->valid = true;
     return &entry->slot;
+}
+static FT_GlyphSlot raster_glyph(cui_font *font, FT_UInt glyph, float size) {
+    return raster_glyph_owned(font, glyph, size, NULL);
 }
 static bool valid_style(cui_text_style style) {
     return style.weight >= CUI_TEXT_WEIGHT_NORMAL && style.weight <= CUI_TEXT_WEIGHT_BOLD &&
@@ -425,16 +435,21 @@ struct cui_text_layout {
     cui_text_cluster *clusters;
     float size;
 };
-void cui_text_layout_destroy(cui_text_layout *layout) {
+_Static_assert(_Alignof(cui_text_layout) <= _Alignof(cui_fundamental_alignment_internal),
+               "text layout exceeds allocation-prefix alignment");
+static void text_layout_destroy_owned(cui_text_layout *layout, cui_text_owner_internal *owner) {
     if (!layout)
         return;
-    free(layout->glyphs);
-    free(layout->runs);
-    free(layout->clusters);
+    cui_text_free_internal(owner, layout->glyphs);
+    cui_text_free_internal(owner, layout->runs);
+    cui_text_free_internal(owner, layout->clusters);
     for (size_t i = 0; i < layout->view.face_count; ++i)
         cui_font_close(layout->faces[i]);
-    free(layout->faces);
-    free(layout);
+    cui_text_free_internal(owner, layout->faces);
+    cui_text_free_internal(owner, layout);
+}
+void cui_text_layout_destroy(cui_text_layout *layout) {
+    text_layout_destroy_owned(layout, NULL);
 }
 bool cui_text_layout_get(const cui_text_layout *layout, cui_text_layout_view *out) {
     if (!layout || !out)
@@ -452,6 +467,8 @@ typedef struct {
     hb_buffer_t *buffer;
     size_t face_index;
 } layout_segment;
+_Static_assert(_Alignof(layout_segment) <= _Alignof(cui_fundamental_alignment_internal),
+               "layout segment exceeds allocation-prefix alignment");
 static int cluster_order(const void *a, const void *b) {
     const cui_text_cluster *x = a, *y = b;
     if (x->left != y->left)
@@ -469,10 +486,12 @@ static bool weak_script(hb_script_t script) {
            script == HB_SCRIPT_UNKNOWN;
 }
 
-cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float size,
-                                            cui_text_style style, cui_bidi_direction direction,
-                                            size_t start, size_t length, const char *language,
-                                            cui_text_layout **out) {
+static cui_text_layout_status font_layout_line_owned(cui_font *font, cui_str text, float size,
+                                                     cui_text_style style,
+                                                     cui_bidi_direction direction, size_t start,
+                                                     size_t length, const char *language,
+                                                     cui_text_layout **out,
+                                                     cui_text_owner_internal *owner) {
     cui_font *face = selected(font, style);
     cui_bidi_paragraph *paragraph = NULL;
     cui_bidi_result analysis;
@@ -493,22 +512,22 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     size_t capacity = text.length ? text.length : 1;
     if (capacity > SIZE_MAX / sizeof(layout_segment) || capacity == SIZE_MAX)
         return CUI_TEXT_LAYOUT_INVALID;
-    scalars = malloc(capacity * sizeof *scalars);
+    scalars = cui_text_alloc_internal(owner, capacity, sizeof *scalars, false, false);
     if (!scalars)
         goto done;
-    cui_bidi_status bidi =
-        cui_bidi_paragraph_create(text.data, text.length, direction, scalars, capacity, &paragraph);
+    cui_bidi_status bidi = cui_bidi_paragraph_create_owned_internal(
+        text.data, text.length, direction, scalars, capacity, &paragraph, owner);
     if (bidi != CUI_BIDI_OK) {
         status = bidi == CUI_BIDI_MEMORY ? CUI_TEXT_LAYOUT_MEMORY : CUI_TEXT_LAYOUT_INVALID;
         goto done;
     }
-    levels = malloc(capacity * sizeof *levels);
-    bytes = malloc((capacity + 1) * sizeof *bytes);
-    mapping = malloc(capacity * sizeof *mapping);
-    mirrors = malloc(capacity * sizeof *mirrors);
-    scripts = malloc(capacity * sizeof *scripts);
-    bidi_runs = malloc(capacity * sizeof *bidi_runs);
-    segments = calloc(capacity, sizeof *segments);
+    levels = cui_text_alloc_internal(owner, capacity, sizeof *levels, false, false);
+    bytes = cui_text_alloc_internal(owner, (capacity + 1), sizeof *bytes, false, false);
+    mapping = cui_text_alloc_internal(owner, capacity, sizeof *mapping, false, false);
+    mirrors = cui_text_alloc_internal(owner, capacity, sizeof *mirrors, false, false);
+    scripts = cui_text_alloc_internal(owner, capacity, sizeof *scripts, false, false);
+    bidi_runs = cui_text_alloc_internal(owner, capacity, sizeof *bidi_runs, false, false);
+    segments = cui_text_alloc_internal(owner, capacity, sizeof *segments, true, false);
     if (!levels || !bytes || !mapping || !mirrors || !scripts || !bidi_runs || !segments)
         goto done;
     if (cui_bidi_paragraph_levels(paragraph, levels, capacity, &analysis) != CUI_BIDI_OK)
@@ -528,11 +547,12 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
         if (((unsigned char)text.data[b] & 0xc0) != 0x80)
             bytes[scalar++] = b;
     bytes[scalar] = text.length;
-    layout = calloc(1, sizeof *layout);
+    layout = cui_text_alloc_internal(owner, 1, sizeof *layout, true, false);
     if (!layout)
         goto done;
     layout->size = size;
-    layout->faces = calloc(font->fallback_count + 1, sizeof *layout->faces);
+    layout->faces = cui_text_alloc_internal(owner, font->fallback_count + 1, sizeof *layout->faces,
+                                            true, false);
     if (!layout->faces)
         goto done;
     layout->faces[0] = face;
@@ -550,7 +570,11 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
         }
     }
     layout->view.faces = layout->faces;
-    if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72)) {
+    for (size_t i = 0; owner && i < layout->view.face_count; ++i)
+        if (!cui_text_face_internal(owner, layout->faces[i]))
+            goto done;
+    if (!cui_text_face_internal(owner, face) || !cui_text_dependency_internal(owner) ||
+        FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72)) {
         status = CUI_TEXT_LAYOUT_INVALID;
         goto done;
     }
@@ -567,6 +591,8 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
         status = CUI_TEXT_LAYOUT_OK;
         goto done;
     }
+    if (!cui_text_dependency_internal(owner))
+        goto done;
     bidi = cui_bidi_paragraph_line(paragraph, start, length, levels, mapping, mirrors, bidi_runs,
                                    capacity, &analysis);
     if (bidi != CUI_BIDI_OK) {
@@ -596,6 +622,12 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
             size_t limit = i + 1;
             while (limit < end && scripts[limit] == scripts[i])
                 ++limit;
+            if (owner && owner->segments >= 4096) {
+                owner->error = CUI_ERROR_CAPACITY;
+                goto done;
+            }
+            if (owner)
+                ++owner->segments;
             segments[segment_count++] =
                 (layout_segment){i, limit, scripts[i], bidi_runs[r].level, NULL, 0};
             i = limit;
@@ -617,13 +649,22 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
          * whose shaping substitutions still produce missing glyphs. */
         for (size_t f = 0; f < layout->view.face_count; ++f) {
             cui_font *candidate = layout->faces[f];
-            if (FT_Set_Char_Size(candidate->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72)) {
+            if (owner && owner->attempts >= 8192) {
+                owner->error = CUI_ERROR_CAPACITY;
+                goto done;
+            }
+            if (owner)
+                ++owner->attempts;
+            if (!cui_text_face_internal(owner, candidate) || !cui_text_dependency_internal(owner) ||
+                FT_Set_Char_Size(candidate->face, 0, (FT_F26Dot6)lroundf(size * 64), 72, 72)) {
                 status = CUI_TEXT_LAYOUT_INVALID;
                 goto done;
             }
             hb_ft_font_changed(candidate->shaper);
-            hb_buffer_t *attempt = hb_buffer_create();
+            hb_buffer_t *attempt = cui_text_dependency_internal(owner) ? hb_buffer_create() : NULL;
             seg->buffer = attempt;
+            if (owner && (!attempt || !hb_buffer_allocation_successful(attempt)))
+                goto done;
             hb_buffer_set_direction(attempt,
                                     (seg->level & 1) ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
             hb_buffer_set_script(attempt, seg->script);
@@ -640,6 +681,8 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
                                (int)(bytes[start + length] - bytes[start]),
                                (unsigned)(bytes[seg->start] - bytes[start]),
                                (int)(bytes[seg->end] - bytes[seg->start]));
+            if (!cui_text_dependency_internal(owner))
+                goto done;
             hb_shape(candidate->shaper, attempt, NULL, 0);
             if (!hb_buffer_allocation_successful(attempt))
                 goto done;
@@ -683,14 +726,22 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float 
     }
     if (glyph_count > SIZE_MAX / sizeof *layout->glyphs)
         goto done;
-    layout->glyphs = calloc(glyph_count ? glyph_count : 1, sizeof *layout->glyphs);
-    layout->runs = calloc(segment_count, sizeof *layout->runs);
+    if (owner && (owner->glyphs > 65536 || glyph_count > 65536 - owner->glyphs)) {
+        owner->error = CUI_ERROR_CAPACITY;
+        goto done;
+    }
+    if (owner)
+        owner->glyphs += glyph_count;
+    layout->glyphs = cui_text_alloc_internal(owner, glyph_count ? glyph_count : 1,
+                                             sizeof *layout->glyphs, true, false);
+    layout->runs = cui_text_alloc_internal(owner, segment_count, sizeof *layout->runs, true, false);
     if (!layout->glyphs || !layout->runs)
         goto done;
     if (segment_count > SIZE_MAX - glyph_count ||
         glyph_count + segment_count > SIZE_MAX / sizeof *layout->clusters)
         goto done;
-    layout->clusters = calloc(glyph_count + segment_count, sizeof *layout->clusters);
+    layout->clusters = cui_text_alloc_internal(owner, glyph_count + segment_count,
+                                               sizeof *layout->clusters, true, false);
     if (!layout->clusters)
         goto done;
     size_t glyph = 0;
@@ -798,23 +849,25 @@ done:
     for (size_t i = 0; i < segment_count; ++i)
         if (segments[i].buffer)
             hb_buffer_destroy(segments[i].buffer);
-    cui_text_layout_destroy(layout);
-    cui_bidi_paragraph_destroy(paragraph);
-    free(scalars);
-    free(mirrors);
-    free(bytes);
-    free(mapping);
-    free(levels);
-    free(scripts);
-    free(bidi_runs);
-    free(segments);
+    text_layout_destroy_owned(layout, owner);
+    cui_bidi_paragraph_destroy_owned_internal(paragraph, owner);
+    cui_text_free_internal(owner, scalars);
+    cui_text_free_internal(owner, mirrors);
+    cui_text_free_internal(owner, bytes);
+    cui_text_free_internal(owner, mapping);
+    cui_text_free_internal(owner, levels);
+    cui_text_free_internal(owner, scripts);
+    cui_text_free_internal(owner, bidi_runs);
+    cui_text_free_internal(owner, segments);
     return status;
 }
 #else
-cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str paragraph, float size,
-                                            cui_text_style style, cui_bidi_direction direction,
-                                            size_t start, size_t length, const char *language,
-                                            cui_text_layout **out) {
+static cui_text_layout_status font_layout_line_owned(cui_font *font, cui_str paragraph, float size,
+                                                     cui_text_style style,
+                                                     cui_bidi_direction direction, size_t start,
+                                                     size_t length, const char *language,
+                                                     cui_text_layout **out,
+                                                     cui_text_owner_internal *owner) {
     (void)font;
     (void)paragraph;
     (void)size;
@@ -824,14 +877,23 @@ cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str paragraph, f
     (void)length;
     (void)language;
     (void)out;
+    (void)owner;
     return CUI_TEXT_LAYOUT_UNAVAILABLE;
 }
 #endif
 
+cui_text_layout_status cui_font_layout_line(cui_font *font, cui_str text, float size,
+                                            cui_text_style style, cui_bidi_direction direction,
+                                            size_t start, size_t length, const char *language,
+                                            cui_text_layout **out) {
+    return font_layout_line_owned(font, text, size, style, direction, start, length, language, out,
+                                  NULL);
+}
+
 static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_fn emit,
                              cui_color_glyph_fn colored, cui_color color,
                              const cui_text_color_span *spans, size_t count, float scale,
-                             void *user) {
+                             void *user, cui_text_owner_internal *owner) {
     if (!isfinite(scale) || scale <= 0 || scale > 16)
         return false;
     if (!layout || (!emit && !colored) || !isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f ||
@@ -841,13 +903,16 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
     size_t run = 0;
     cui_font *face = NULL;
     for (size_t i = 0; i < layout->view.glyph_count; ++i) {
+        if (owner && owner->error != CUI_OK)
+            return false;
         while (run + 1 < layout->view.run_count &&
                i >= layout->runs[run].glyph_start + layout->runs[run].glyph_count)
             ++run;
         cui_font *selected_face = layout->faces[layout->runs[run].face_index];
         if (selected_face != face) {
             face = selected_face;
-            if (FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * scale * 64), 72,
+            if (!cui_text_face_internal(owner, face) || !cui_text_dependency_internal(owner) ||
+                FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * scale * 64), 72,
                                  72))
                 return false;
         }
@@ -855,10 +920,21 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
         float px = x + g->x, py = y + layout->view.ascent + g->y;
         if (!isfinite(px) || !isfinite(py) || fabsf(px) > 1e7f || fabsf(py) > 1e7f)
             return false;
-        FT_GlyphSlot slot = raster_glyph(face, g->glyph_id, layout->size * scale);
+        FT_GlyphSlot slot =
+            (owner ? raster_glyph_owned(face, g->glyph_id, layout->size * scale, owner)
+                   : raster_glyph(face, g->glyph_id, layout->size * scale));
         if (!slot) {
             ok = false;
             continue;
+        }
+        if (owner) {
+            double dx = (double)lroundf(px * scale) + slot->bitmap_left;
+            double dy = (double)lroundf(py * scale) - slot->bitmap_top;
+            if (dx < INT_MIN || dx > INT_MAX || dy < INT_MIN || dy > INT_MAX ||
+                slot->bitmap.width > INT_MAX || slot->bitmap.rows > INT_MAX) {
+                owner->error = CUI_ERROR_CAPACITY;
+                return false;
+            }
         }
         if (colored) {
             cui_color ink = color;
@@ -883,11 +959,11 @@ bool cui_text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyph_f
                           void *user) {
     if (!layout || !emit || !isfinite(x) || !isfinite(y))
         return false;
-    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, 1, user);
+    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, 1, user, NULL);
 }
 bool cui_text_layout_draw_scaled(cui_text_layout *layout, float x, float y, float scale,
                                  cui_glyph_fn emit, void *user) {
-    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, scale, user);
+    return text_layout_draw(layout, x, y, emit, NULL, (cui_color){0}, NULL, 0, scale, user, NULL);
 }
 
 #ifdef CUI_TEXT_BIDI
@@ -1330,8 +1406,8 @@ bool cui_font_draw_context_line_colored_scaled(cui_font *font, cui_text_line_sou
     cui_text_geometry geometry = {0};
     if (cui_font_text_geometry_line(font, source, size, style, &geometry) != CUI_TEXT_LAYOUT_OK)
         return false;
-    bool result =
-        text_layout_draw(geometry.session, x, y, NULL, emit, color, spans, count, scale, user);
+    bool result = text_layout_draw(geometry.session, x, y, NULL, emit, color, spans, count, scale,
+                                   user, NULL);
     cui_release_text_geometry(&geometry);
     return result;
 }
@@ -1342,4 +1418,349 @@ bool cui_font_draw_context_line_colored(cui_font *font, cui_text_line_source sou
                                         cui_color_glyph_fn emit, void *user) {
     return cui_font_draw_context_line_colored_scaled(font, source, size, style, x, y, color, spans,
                                                      count, 1, emit, user);
+}
+
+/* Private V2 text recording. No public renderer/capability entry calls this yet. */
+typedef struct {
+    cui_text_prepare_session records;
+    const cui_draw_command *command;
+    float density;
+} text_recording;
+static void text_records_clear(cui_text_prepare_session *s) {
+    cui_text_recorded_glyph_internal *p = s->first;
+    while (p) {
+        cui_text_recorded_glyph_internal *next = p->next;
+        cui_text_free_internal(s->owner, p->coverage);
+        cui_text_free_internal(s->owner, p);
+        p = next;
+    }
+    s->first = s->last = NULL;
+}
+void cui_text_prepare_session_end(cui_text_prepare_session *s) {
+    if (!s || s->busy || !s->owner || s->owner->callback_active)
+        return;
+    s->busy = true;
+    text_records_clear(s);
+    *s = (cui_text_prepare_session){0};
+}
+static void text_record_coverage(text_recording *r, int x, int y, int width, int height, int pitch,
+                                 const unsigned char *pixels, cui_color color, bool colored) {
+    cui_text_owner_internal *o = r->records.owner;
+    if (o->error != CUI_OK)
+        return;
+    if (width < 0 || height < 0 || width > 4096 || height > 4096 ||
+        (size_t)width * (size_t)height > (size_t)4 * 1024 * 1024) {
+        o->error = CUI_ERROR_CAPACITY;
+        return;
+    }
+    size_t n = (size_t)width * (size_t)height;
+    if (!n)
+        return;
+    size_t step = pitch < 0 ? (size_t)(-(int64_t)pitch) : (size_t)pitch;
+    if (!pixels || step < (size_t)width || (size_t)(height - 1) > (size_t)PTRDIFF_MAX / step ||
+        o->coverage_pixels > (size_t)8 * 1024 * 1024 ||
+        n > (size_t)8 * 1024 * 1024 - o->coverage_pixels) {
+        o->error = CUI_ERROR_CAPACITY;
+        return;
+    }
+    cui_text_recorded_glyph_internal *g = cui_text_alloc_internal(o, 1, sizeof(*g), true, true);
+    if (!g)
+        return;
+    g->coverage = cui_text_alloc_internal(o, n, 1, false, false);
+    if (!g->coverage) {
+        cui_text_free_internal(o, g);
+        return;
+    }
+    for (int row = 0; row < height; ++row)
+        memcpy(g->coverage + (size_t)row * (size_t)width, pixels + (ptrdiff_t)row * pitch,
+               (size_t)width);
+    g->x = x;
+    g->y = y;
+    g->width = (unsigned)width;
+    g->height = (unsigned)height;
+    g->color = color;
+    g->colored = colored;
+    g->source_density = r->density;
+    g->paint = r->command->text_paint;
+    if (r->records.last)
+        r->records.last->next = g;
+    else
+        r->records.first = g;
+    r->records.last = g;
+    o->coverage_pixels += n;
+}
+static void text_record_plain(void *user, int x, int y, int w, int h, int pitch,
+                              const unsigned char *pixels) {
+    text_recording *r = user;
+    text_record_coverage(r, x, y, w, h, pitch, pixels, r->command->color, false);
+}
+#ifdef CUI_TEXT_BIDI
+static void text_record_colored(void *user, int x, int y, int w, int h, int pitch,
+                                const unsigned char *pixels, cui_color color) {
+    text_record_coverage(user, x, y, w, h, pitch, pixels, color, true);
+}
+static bool text_record_range(cui_font *font, cui_str paragraph, size_t start, size_t length,
+                              float *top, text_recording *recording) {
+    const cui_draw_command *c = recording->command;
+    cui_text_owner_internal *o = recording->records.owner;
+    cui_text_layout *layout = NULL;
+    if (!length) {
+        /* Empty lines still perform metrics/dependency work; consume one segment
+         * so a paragraph of separators cannot evade the frame work envelope. */
+        if (o->segments >= 4096) {
+            o->error = CUI_ERROR_CAPACITY;
+            return false;
+        }
+        ++o->segments;
+    }
+    if (font_layout_line_owned(font, paragraph, c->font_size, c->text_style, CUI_BIDI_AUTO_LTR,
+                               start, length, NULL, &layout, o) != CUI_TEXT_LAYOUT_OK)
+        return false;
+    bool ok =
+        text_layout_draw(layout, c->bounds.x, *top, c->text_color_count ? NULL : text_record_plain,
+                         c->text_color_count ? text_record_colored : NULL, c->color, c->text_colors,
+                         c->text_color_count, recording->density, recording, o);
+    *top += layout->view.height;
+    text_layout_destroy_owned(layout, o);
+    return ok && o->error == CUI_OK;
+}
+static bool text_record_paragraph(cui_font *font, cui_str paragraph, size_t first_byte,
+                                  size_t last_byte, float *top, text_recording *r) {
+    size_t offset = 0, scalar = 0, first = 0, end = 0, start = 0;
+    while (offset < paragraph.length) {
+        size_t before = offset;
+        uint32_t cp;
+        if (!text_next(paragraph, &offset, &cp))
+            return false;
+        if (before == first_byte)
+            first = start = scalar;
+        if (before == last_byte)
+            end = scalar;
+        if (cp == 0x2028 && before >= first_byte && before < last_byte) {
+            if (r->command->text_color_count ||
+                !text_record_range(font, paragraph, start, scalar - start, top, r))
+                return false;
+            start = scalar + 1;
+        }
+        ++scalar;
+    }
+    if (first_byte == offset)
+        first = start = scalar;
+    if (last_byte == offset)
+        end = scalar;
+    (void)first;
+    return text_record_range(font, paragraph, start, end - start, top, r);
+}
+#endif
+/* Validate UTF8 and compute repeated full-paragraph admission BEFORE shaping. */
+static bool text_record_admit(cui_text_owner_internal *o, const cui_draw_command *c) {
+#ifdef CUI_TEXT_BIDI
+    cui_str text = c->text_source.paragraph.data ? c->text_source.paragraph : c->text;
+#else
+    cui_str text = c->text;
+#endif
+    if ((text.length && !text.data) || text.length > (size_t)256 * 1024)
+        return false;
+#ifdef CUI_TEXT_BIDI
+    size_t offset = 0, start = 0, lines = 1, bytes = 0;
+    while (offset < text.length) {
+        size_t before = offset;
+        uint32_t cp;
+        if (!text_next(text, &offset, &cp))
+            return false;
+        if (cp == 0x2028 &&
+            (!c->text_source.paragraph.data ||
+             (before >= c->text_source.byte_start && before < c->text_source.byte_end)))
+            ++lines;
+        if (!c->text_source.paragraph.data && paragraph_separator(cp)) {
+            size_t n = before - start;
+            if (n > 65536 || (n && lines > ((size_t)256 * 1024 - bytes) / n))
+                return false;
+            bytes += n * lines;
+            if (cp == 0xd && offset < text.length && text.data[offset] == '\n')
+                ++offset;
+            start = offset;
+            lines = 1;
+        }
+    }
+    size_t n = text.length - start;
+    if (n > 65536 || (n && lines > ((size_t)256 * 1024 - bytes) / n))
+        return false;
+    bytes += n * lines;
+#else
+    if (text.length > 65536)
+        return false;
+    size_t bytes = text.length;
+#endif
+    if (o->input_bytes > (size_t)256 * 1024 || bytes > (size_t)256 * 1024 - o->input_bytes)
+        return false;
+    o->input_bytes += bytes;
+    return true;
+}
+#ifndef CUI_TEXT_BIDI
+static bool text_record_simple(cui_font *font, text_recording *r) {
+    const cui_draw_command *c = r->command;
+    cui_text_owner_internal *o = r->records.owner;
+    cui_font *f = selected(font, c->text_style);
+    if (!f || c->text_color_count || c->text_style.letter_spacing != 0 ||
+        !cui_text_face_internal(o, f) || o->attempts >= 8192 || o->segments >= 4096 ||
+        !cui_text_dependency_internal(o) ||
+        FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)lroundf(c->font_size * 64), 72, 72))
+        return false;
+    ++o->attempts;
+    ++o->segments;
+    hb_ft_font_changed(f->shaper);
+    hb_buffer_t *b = cui_text_dependency_internal(o) ? hb_buffer_create() : NULL;
+    if (!b)
+        return false;
+    cui_str text = c->text;
+    hb_buffer_add_utf8(b, text.data, (int)text.length, 0, (int)text.length);
+    hb_buffer_guess_segment_properties(b);
+    bool ok = cui_text_dependency_internal(o);
+    if (ok)
+        hb_shape(f->shaper, b, NULL, 0);
+    if (!ok || !hb_buffer_allocation_successful(b)) {
+        hb_buffer_destroy(b);
+        return false;
+    }
+    unsigned n;
+    hb_glyph_position_t *positions = hb_buffer_get_glyph_positions(b, &n);
+    hb_glyph_info_t *glyphs = hb_buffer_get_glyph_infos(b, NULL);
+    if (!hb_buffer_allocation_successful(b) || (n && (!positions || !glyphs))) {
+        hb_buffer_destroy(b);
+        return false;
+    }
+    if (o->glyphs > 65536 || n > 65536 - o->glyphs) {
+        o->error = CUI_ERROR_CAPACITY;
+        hb_buffer_destroy(b);
+        return false;
+    }
+    o->glyphs += n;
+    float x = c->bounds.x, baseline = c->bounds.y + (float)f->face->size->metrics.ascender / 64;
+    ok = cui_text_dependency_internal(o) &&
+         !FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)lroundf(c->font_size * r->density * 64), 72, 72);
+    for (unsigned i = 0; ok && i < n; ++i) {
+        if (fabsf(x) > 1e7f || fabsf(baseline) > 1e7f) {
+            ok = false;
+            break;
+        }
+        FT_GlyphSlot slot =
+            raster_glyph_owned(f, glyphs[i].codepoint, c->font_size * r->density, o);
+        if (!slot) {
+            ok = false;
+            break;
+        }
+        double gx = (double)lroundf((x + (float)positions[i].x_offset / 64) * r->density) +
+                    slot->bitmap_left;
+        double gy = (double)lroundf((baseline - (float)positions[i].y_offset / 64) * r->density) -
+                    slot->bitmap_top;
+        if (gx < INT_MIN || gx > INT_MAX || gy < INT_MIN || gy > INT_MAX ||
+            slot->bitmap.width > INT_MAX || slot->bitmap.rows > INT_MAX) {
+            ok = false;
+            break;
+        }
+        text_record_plain(r, (int)gx, (int)gy, (int)slot->bitmap.width, (int)slot->bitmap.rows,
+                          slot->bitmap.pitch, slot->bitmap.buffer);
+        x += (float)positions[i].x_advance / 64;
+        baseline -= (float)positions[i].y_advance / 64;
+        ok = o->error == CUI_OK;
+    }
+    hb_buffer_destroy(b);
+    return ok;
+}
+#endif
+bool cui_text_prepare_line(cui_text_prepare_session *s, cui_font *font, const cui_draw_command *c,
+                           float density) {
+    if (!s || !s->owner || s->busy || s->owner->callback_active || !font || !c ||
+        c->type != CUI_DRAW_TEXT || s->owner->error != CUI_OK)
+        return false;
+    cui_draw_command owned_command = *c;
+    c = &owned_command;
+    cui_text_owner_internal *o = s->owner;
+    s->busy = true;
+    bool ok = isfinite(density) && density >= 1 && density <= 16 && isfinite(c->bounds.x) &&
+              isfinite(c->bounds.y) && isfinite(c->font_size) && c->font_size > 0 &&
+              c->font_size <= 4096 && valid_style(c->text_style) &&
+              cui_text_paint_valid(c->text_paint, true) &&
+              !(c->text_paint.kind == CUI_TEXT_PAINT_LINEAR && c->text_color_count) &&
+              c->text_color_count <= CUI_TEXT_COLOR_SPAN_MAX &&
+              (!c->text_color_count || c->text_colors);
+#ifndef CUI_TEXT_BIDI
+    if (ok && (c->text.length > 65536 || (c->text.length && !c->text.data))) {
+        o->error = CUI_ERROR_CAPACITY;
+        ok = false;
+    }
+#endif
+    if (ok && (c->text_source.paragraph.length > 65536 ||
+               (!c->text_source.paragraph.data && c->text.length > (size_t)256 * 1024))) {
+        o->error = CUI_ERROR_CAPACITY;
+        ok = false;
+    }
+    if (ok && c->text_source.paragraph.data) {
+        ok = cui_text_line_source_valid(c->text_source);
+        size_t previous = c->text_source.byte_start;
+        for (size_t i = 0; ok && i < c->text_color_count; ++i) {
+            cui_text_line_source range = {c->text_source.paragraph, c->text_colors[i].byte_start,
+                                          c->text_colors[i].byte_end};
+            ok = range.byte_start >= previous && range.byte_start <= range.byte_end &&
+                 range.byte_end <= c->text_source.byte_end &&
+                 (range.byte_start == range.paragraph.length ||
+                  ((unsigned char)range.paragraph.data[range.byte_start] & 0xc0) != 0x80) &&
+                 (range.byte_end == range.paragraph.length ||
+                  ((unsigned char)range.paragraph.data[range.byte_end] & 0xc0) != 0x80);
+            previous = range.byte_end;
+        }
+    } else if (ok) {
+        ok = !c->text_source.paragraph.length && !c->text_source.byte_start &&
+             !c->text_source.byte_end && !c->text_color_count;
+    }
+    if (ok && !text_record_admit(o, c)) {
+        o->error = CUI_ERROR_CAPACITY;
+        ok = false;
+    }
+    text_recording r = {.records = {.owner = o}, .command = c, .density = density};
+#ifdef CUI_TEXT_BIDI
+    float top = c->bounds.y;
+    if (ok && c->text_source.paragraph.data)
+        ok = text_record_paragraph(font, c->text_source.paragraph, c->text_source.byte_start,
+                                   c->text_source.byte_end, &top, &r);
+    else if (ok) {
+        size_t offset = 0, start = 0;
+        while (ok && offset < c->text.length) {
+            size_t before = offset;
+            uint32_t cp;
+            ok = text_next(c->text, &offset, &cp);
+            if (ok && paragraph_separator(cp)) {
+                cui_str paragraph = {c->text.data + start, before - start};
+                ok = text_record_paragraph(font, paragraph, 0, paragraph.length, &top, &r);
+                if (cp == 0xd && offset < c->text.length && c->text.data[offset] == '\n')
+                    ++offset;
+                start = offset;
+            }
+        }
+        if (ok) {
+            cui_str paragraph = {c->text.data ? c->text.data + start : NULL,
+                                 c->text.length - start};
+            ok = text_record_paragraph(font, paragraph, 0, paragraph.length, &top, &r);
+        }
+    }
+#else
+    if (ok)
+        ok = text_record_simple(font, &r);
+#endif
+    ok = ok && o->error == CUI_OK;
+    if (ok) {
+        if (s->last)
+            s->last->next = r.records.first;
+        else
+            s->first = r.records.first;
+        if (r.records.last)
+            s->last = r.records.last;
+    } else {
+        if (o->error == CUI_OK)
+            o->error = CUI_ERROR_INVALID_ACTION;
+        text_records_clear(&r.records);
+    }
+    s->busy = false;
+    return ok;
 }

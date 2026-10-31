@@ -1,0 +1,32 @@
+{
+  "source_revision": "b1847b4d2e14261d1705051a2e4f3591d93970e3",
+  "source_sha256": {
+    "src/text/cui_text.c": "bf43eec9ee29ebd10ccf74d7d16915359d902601009c2b41972b51585261ea6a",
+    "src/text/cui_bidi.c": "d62f97bd643d95c6925fb9ef7b9d40717e8d8f0b8ca0706a764d2001b29e19be"
+  },
+  "archives": {
+    "build-shadow/baseline-font-libcui_text.a": "1514639af1ee590c46e9e864d0afa24f040f4575ce99cca507cfb8e76a4a5cab",
+    "build-shadow/baseline-font-libcui_bidi.a": "16a954b2d66dca8352acc4e4d346a5022bb1499b4a11bfb1350d609c4a171274",
+    "build-shadow/baseline-font-libcui_software.a": "ca9d5af1e8963d6b1a3e7fec94564b76dac1e0b97fd656db0bc058366ecef941",
+    "build-shadow/libcui.a": "96d40727c65d39de0accedf45edba34098a209ec41747bd05800d96362e1a137"
+  },
+  "archive_flags": "Release -O3 -DNDEBUG -std=c11 -fPIC -Wall -Wextra -Wpedantic -Werror; text -DCUI_TEXT_BIDI -pthread",
+  "fonts": {
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+    "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d"
+  },
+  "golden_sha256": "79e4c013dc2bc3ecb57f9f3801e6163dc241b0370ad22cadcebd690fd964caf8",
+  "scope": "Immutable pre-refactor real bundled Inter glyph coverage and96x72 software RGBA pixels,8cases. Explicit little-endian integers/tight glyph rows/RGBA bytes, no pointers/padding; zero-coverage callbacks canonicalized away. Never regenerate from candidate.",
+  "capture": "CUI_TEXT_BASELINE_CAPTURE harness linked preserved old archives only; test_local private Xvfb passed before any candidate text/Bidi compilation.",
+  "original_sources": {
+    "src/text/cui_text.c": "bf43eec9ee29ebd10ccf74d7d16915359d902601009c2b41972b51585261ea6a",
+    "src/text/cui_bidi.c": "d62f97bd643d95c6925fb9ef7b9d40717e8d8f0b8ca0706a764d2001b29e19be",
+    "backends/software/cui_software.c": "f2975fc0873a6c100f47aea8c2e5da05b39f00ac850ed77cc938a33ec34b74cb",
+    "src/core/cui_text_paint_internal.h": "ce3847af20b8afe6b88121c966f63dfc58193717cfc80acf0011ee6c195a31c1"
+  },
+  "reference_source_commit": "f4e078610264674ed9b7e8bbb86f3a27d315e857",
+  "source_equivalence": "text/Bidi hashes equal independently rebuilt b1847 source; reference software/math frozen at f4e unchanged",
+  "nobidi_source_compile": "Immutable original f4e text compiled strictC11/O2 without CUI_TEXT_BIDI, same host deps; captured before candidate noBidi compilation",
+  "nobidi_golden_sha256": "3cf4d175e42746a2519f44fd658ff3c2fa4c41536635df73b564e159f0f1b15c",
+  "runtime": "HarfBuzz15.0.0; FreeType2.15.0; exact old-byte gate additionally requires matching native dependency build/hinting, not version alone"
+}

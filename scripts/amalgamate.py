@@ -45,7 +45,7 @@ def generate(name,sources):
         lines += ['#ifndef CUI_COMPONENTS_IMPLEMENTATION', '#define CUI_COMPONENTS_IMPLEMENTATION', '#endif', '#include "cui_components.h"']
     if name == "cui_stepper_navigation":
         lines += ['#ifndef CUI_NUMERIC_IMPLEMENTATION', '#define CUI_NUMERIC_IMPLEMENTATION', '#endif', '#include "cui_numeric.h"']
-    if name == "cui_stepper_visual":
+    if name in {"cui_stepper_visual", "cui_stepper_presentation"}:
         lines += ['#ifndef CUI_STEPPER_NAVIGATION_IMPLEMENTATION', '#define CUI_STEPPER_NAVIGATION_IMPLEMENTATION', '#endif', '#include "cui_stepper_navigation.h"']
     if name == "cui_base":
         lines += ['#include "cui_slider_events.h"', '#include "cui_text_input_events.h"']

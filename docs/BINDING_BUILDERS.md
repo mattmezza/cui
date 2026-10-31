@@ -422,3 +422,8 @@ controlled REQUEST callback surface. Legacy mode preserves its prior behavior.
 Use matching bridge/addon/SDK revisions for the additive methods. See
 [Stepper navigation](STEPPER_NAVIGATION.md) and the
 [binding design contract](STEPPER_BINDING_VISUAL_DESIGN.md).
+
+The C-only `cui_stepper_presentation.h` facade adds non-centered fill, indicator
+interaction and a typed custom palette. Its layout/palette/options types and
+`cui_stepper_present` entry are omitted from every language builder/bridge; source
+SDK inclusion does not imply authoring support.

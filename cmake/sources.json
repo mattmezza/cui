@@ -288,6 +288,9 @@
     "cui_dropdown_button_metadata": [],
     "cui_stepper_visual": [
       "src/components/cui_stepper_visual.c"
+    ],
+    "cui_stepper_presentation": [
+      "src/components/cui_stepper_presentation.c"
     ]
   },
   "native": {

@@ -113,9 +113,9 @@ icons/count/density fail before semantic registration or callbacks. `valid` is
 argument preflight, not completed layout/resource-capacity or visibility proof.
 The returned request count and callback restrictions match the existing API.
 
-Centered text/separators, responsive flex growth, arbitrary child content/style,
+In this original visual entry, centered text/separators, responsive flex growth, arbitrary child content/style,
 exact source density and language builders remain unfinished. Follow-up slices
-should add independently tested centered/flexible geometry and then theme/style
+should add independently tested centered geometry and then further theme/style
 controls without changing the request reducer. Native software tests cover this
 bounded composition and actual pointer/touch/keyboard requests. The WASM gallery
 fixture additionally covers desktop DPR1/2 and touch390 DPR2 for the bounded
@@ -170,3 +170,49 @@ bridge groups remain bounded at 64 Items. Examples are
 [`stepper_visual.ts`](../bindings/typescript/examples/stepper_visual.ts),
 [Go](../bindings/go/examples/stepper_visual/main.go) and
 [Rust](../bindings/rust/examples/stepper_visual.rs).
+
+## Opt-in fill and indicator interaction
+
+Include `cui/cui_stepper_presentation.h` and call `cui_stepper_present` for
+non-centered fill layout and source-like indicator feedback. Existing navigation
+and visual APIs retain their pixels and ABI. For example, inside a growing parent:
+
+```c
+cui_stepper_navigation_result result = cui_stepper_present(
+    ui, id, theme, steps, count, selected,
+    (cui_stepper_visual_options){.design_size = CUI_DESIGN_LG},
+    (cui_stepper_presentation_options){.layout = CUI_STEPPER_LAYOUT_FILL},
+    handler);
+```
+
+Width0 grows to parent available width; a positive width fixes that extent.
+Height0 stays intrinsic, including vertical layout; a positive height supplies an
+explicit vertical extent. The first non-last items grow; the last stays intrinsic.
+Horizontal fill centers unequal-height items on the root cross axis. Trigger
+buttons themselves stay intrinsic. Connectors are decorative zero-flow
+underlays inside their own items, clamped empty when space is insufficient.
+`CUI_STEPPER_LAYOUT_CONTENT` retains fixed spacer geometry and requires zero extents.
+Neither mode offers centered crossing connectors. All shared XS..9XL design sizes
+remain available; density selects source proportions. Intrinsic labels can still
+overflow an insufficient parent: no wrapping/compression parity is claimed.
+
+Calling the new entry opts into secondary/secondary_hover/secondary_foreground
+unchecked indicators and theme-radius behavior (zero radius makes square
+indicators). The pressed default is CUI's secondary **button** active color;
+GPUI's global secondary_active can differ. Set `custom_palette=true` and all four
+palette fields to supply an exact application palette. Checked primary/on_primary
+wins even when disabled. No focus ring is added. Exact source typography and
+implicit engine active-state behavior remain partial.
+
+Only the indicator's currently visible, clipped, unoccluded area shows hover.
+Pressed feedback observes accepted trigger capture: pointer capture while visibly
+over the indicator, or Space capture regardless of pointer position. Label-origin
+press dragged onto the indicator follows that CUI policy too; this does not claim
+GPUI drag/keyboard equivalence. Disabled/inert/occluded indicators suppress pointer
+feedback; decoration creates no new focusable targets or activation callbacks.
+Existing request ordering and owner-validation rules still apply, exactly once.
+Callback owner updates affect the next submission; selection/configuration used
+for painting are captured by value. Do not mutate borrowed steps/theme/icon arrays
+inside callbacks. Arrays are borrowed through return, bitmap bytes through renderer
+completion. No new retained application state is required. Language builders do
+not expose this typed presentation API; use a C-authored UI for these options.

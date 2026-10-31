@@ -1,7 +1,7 @@
 # Remaining Stepper presentation checkpoint
 
-Read-only audit; CUI base `2929aa04`, frozen GPUI source
-`87d10ae5e1299d1be18670a37570c5402f952e34`. No implementation or parity promotion.
+Source audit and approved first-slice contract; CUI base `2929aa04`, frozen GPUI source
+`87d10ae5e1299d1be18670a37570c5402f952e34`. No full parity promotion.
 
 ## Exact source requirements
 
@@ -37,7 +37,7 @@ it would not be source parity. Unequal slots likewise require source evidence.
 
 Preserve all existing functions and the published `cui_stepper_visual_options`
 layout. A new extended visual entry may take copied typed presentation settings;
-zero/absent settings forward to the current painter. No new input reducer,
+the new entry explicitly opts in; existing entries retain the current painter. No new input reducer,
 retained application callback or Core dispatch is needed. Existing request
 ownership/order, genuine prior target eligibility and captured selected painting
 remain unchanged. Descriptor bytes/theme stay stable through submission, bitmap
@@ -50,12 +50,9 @@ design sizing. Unchecked default normal/hover can use `theme.secondary` and
 standalone `secondary_active` field; `buttons[SECONDARY].active` is a possible
 explicitly documented CUI fallback, **not** proof of the source global token
 (button-specific overrides can differ). A custom pressed color can express that
-source token without resizing the shared Theme ABI. Obtain approval for that
-fallback policy before publishing the new declaration. Checked colors override
-hover/pressed/disabled exactly as source. An optional keyboard focus-visible ring
-uses `cui_interaction_state` and theme.focus as a **CUI extension**, off in the
-source-style default; pointer focus alone must not turn it on. An unclipped outer
-indicator wrapper can own the ring while an inner box clips bitmap corners.
+source token without resizing the shared Theme ABI. That fallback policy was approved for this slice. Checked colors override
+hover/pressed/disabled exactly as source. No focus-ring extension is included in this slice.
+
 
 Indicator hover is narrower than the trigger's clickable label/description area.
 Do not just use whole-item `cui_hovered`. Use current-layout passive indicator
@@ -174,3 +171,39 @@ their item and clamp negative lengths to empty; centered crossing connectors and
 exact source typography remain deferred. Tests must cover legacy command/pixel
 stability, independent fill geometry, indicator-only hover, accepted capture,
 Space, cancel/disabled, occlusion, callbacks, shared sizing and invalid preflight.
+
+
+## First-slice implementation evidence
+
+The optional `cui_stepper_presentation.h` module implements the contract above.
+Existing public Stepper layouts, implementation files and dispatch are unchanged.
+`test_stepper_presentation.c` uses only public headers and genuine queued input:
+independent both-axis density/resize connector rectangles; unequal-height
+horizontal root cross-axis centering with intrinsic and explicit root heights; intrinsic trigger
+bounds; content geometry against the existing visual entry; all shared design
+sizes; theme square corners; bitmap alpha/tint/metadata lifetime; custom/default
+palettes; pointer/touch/Space, label-only hover and label-origin capture; passive
+and modal occlusion; partial ancestor clipping including actual composed software
+pixels; inert/disabled/cancel/omission; multi-request captured semantics/painting;
+preflight rejection and command-capacity failure/recovery. No focusable decoration
+is added. Font-free software fixtures omit text commands rather than fake glyphs.
+
+Before interruption, strict Release targeted native checks passed5/5 through the private Xvfb wrapper;
+ASan/UBSan passed3/3; WASI passed3/3 on pinned Zig0.16/wasmtime49. Final strengthened
+presentation assertions were rerun natively, under sanitizers and WASI. Standalone
+and independent same-TU CUI_ALL module fixtures passed2/2; public C++ header compile
+passed. Offline source-package checks passed3/3 and installed-skill checks17/17.
+Generated SDK/distribution/skill files come from canonical generators.
+
+Recovery verification (2026-10-31): a focused portable Release build with GCC16
+and strict warnings passed six Stepper CTest checks through the private Xvfb
+wrapper: navigation, legacy visual, presentation, standalone and CUI_ALL
+distribution fixtures, and the C++ public header. Installed-skill checks passed
+17/17; manifest, SDK checksums, amalgamation and generated skill freshness passed.
+Sanitizer/WASI/browser results above were not rerun during recovery.
+
+This slice does not add a gallery mode or new browser evidence for this entry.
+Existing visual-gallery browser evidence remains limited to that older facade.
+Centered crossing geometry, frozen engine active subtleties, source typography,
+insufficient-width intrinsic-content behavior and typed binding exposure remain
+separate follow-ups; no Core seam, focus-ring extension or Editor work is included.

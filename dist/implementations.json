@@ -528,6 +528,13 @@
       "sources": [
         "src/components/cui_stepper_visual.c"
       ]
+    },
+    {
+      "header": "cui_stepper_presentation.h",
+      "macro": "CUI_STEPPER_PRESENTATION_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_stepper_presentation.c"
+      ]
     }
   ]
 }

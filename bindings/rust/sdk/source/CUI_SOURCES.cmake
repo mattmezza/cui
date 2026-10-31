@@ -113,4 +113,5 @@ set(CUI_SOURCES
  src/components/cui_date_picker_actions.c
  src/base/cui_questionnaire_observer.c
  src/components/cui_stepper_visual.c
+ src/components/cui_stepper_presentation.c
 )

@@ -417,6 +417,25 @@
             "cui_stepper_visual_navigation"
           ],
           "note": "Python/JS/TS/Go/Rust expose opt-in visual composition, density, orientation, shared design size and owned RGBA Item icons through the bridge. They retain bridge-owned selection and aggregate CHANGE; direct borrowed C descriptor arrays and per-activation controlled REQUEST handlers are not foreign builder APIs. Bridge cap remains 64 items versus C 100."
+        },
+        {
+          "header": "include/cui/cui_stepper_presentation.h",
+          "languages": [
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust"
+          ],
+          "types": [
+            "cui_stepper_layout",
+            "cui_stepper_indicator_palette",
+            "cui_stepper_presentation_options"
+          ],
+          "symbols": [
+            "cui_stepper_present"
+          ],
+          "note": "C-only presentation facade; source SDK availability does not expose fill layout or indicator interaction/custom palettes through language builders/bridge."
         }
       ]
     },

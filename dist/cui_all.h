@@ -70,6 +70,7 @@
 #include "cui_date_picker_actions.h"
 #include "cui_questionnaire_observer.h"
 #include "cui_stepper_visual.h"
+#include "cui_stepper_presentation.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -349,4 +350,8 @@
 #define CUI_STEPPER_VISUAL_IMPLEMENTATION
 #endif
 #include "cui_stepper_visual.h"
+#ifndef CUI_STEPPER_PRESENTATION_IMPLEMENTATION
+#define CUI_STEPPER_PRESENTATION_IMPLEMENTATION
+#endif
+#include "cui_stepper_presentation.h"
 #endif

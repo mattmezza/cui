@@ -2752,7 +2752,8 @@
         "tests/web/test_browser.py",
         "tests/unit/test_stepper_navigation.c",
         "tests/unit/test_stepper_visual.c",
-        "tests/web/test_stepper_visual_gallery.py"
+        "tests/web/test_stepper_visual_gallery.py",
+        "tests/unit/test_stepper_presentation.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2760,7 +2761,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled per-activation navigation requests and application-owned validation tested; legacy aggregate CHANGE timing/rendering remains unchanged. Opt-in non-centered connectors and bitmap custom icons are tested in native software and actual WASM gallery Canvas at desktop DPR1/2 and touch390 DPR2. Centered/responsive source composition, arbitrary children/style and exact density fidelity remain incomplete; live AT is untested. See docs/STEPPER_NAVIGATION.md."
+        "Controlled per-activation requests preserve owner validation and legacy timing/pixels. Opt-in visual connectors/icons have native software and WASM gallery desktop DPR1/2 +touch390 DPR2 evidence. New C presentation facade adds non-centered fill, indicator-local hover/accepted-capture feedback and theme-radius behavior with native/WASI tests; it is not yet exposed by the gallery or language builders. Pressed default uses CUI secondary button active, not exact GPUI global token parity; engine drag/keyboard subtleties remain unverified. Centered crossing geometry, narrow intrinsic-content compression, arbitrary children/style, exact typography/density and live AT remain incomplete. See docs/STEPPER_NAVIGATION.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2813,6 +2814,15 @@
           ],
           "limitations": [
             "Bridge retains 64 Items and aggregate CHANGE, not C controlled REQUEST callbacks. Icons are copied host RGBA; connector composition has no independent toggle. Legacy mode is default."
+          ]
+        },
+        {
+          "name": "opt-in non-centered fill and indicator interaction/theme radius",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_stepper_presentation.h",
+            "tests/unit/test_stepper_presentation.c",
+            "docs/STEPPER_NAVIGATION.md"
           ]
         }
       ],

@@ -259,6 +259,9 @@ jobs:
       - name: Verify toolbar title bar and hover card examples
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_example_polish.py
+      - name: Verify opt-in HoverCard primary-release dismissal
+        if: ${{ matrix.shard == 2 }}
+        run: uv run tests/web/test_hover_card_release.py --directory build/web
       - name: Verify Plot mouse and touch viewport interactions
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_plot_interactions.py

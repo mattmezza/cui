@@ -13,8 +13,8 @@ release date is asserted.
 | --- | --- |
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `ab8fddbbbca4b78e3b2cc1b14752dd0c4ac96b30`; public docs, catalog, headers and native archive checked on 2026-10-31. |
-| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3 windows. Focused checks exist; combined validation/publication is still pending. |
-| In progress | Consistent element-shadow API and coverage; completion of remaining component and cross-platform gaps. |
+| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3 windows; named-element C shadow setters and CSS blur conversion. Focused checks exist; combined validation/publication is still pending. |
+| In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
 **Status rule:** implemented ≠ tested ≠ merged ≠ released ≠ deployed. A tested
@@ -33,7 +33,8 @@ can lag implementation: inspect current code and evidence before scheduling work
   own policy.
 - [ ] **Consistent shadows.** Ship a clear typed API for presets and custom
   offset/blur/spread/color, mixed drop/inset layers and clearing. Existing shadow
-  renderers must be reused. Finish component-root, nested-part and popup ownership,
+  renderers must be reused. Initial named-box C setters have focused tests; full
+  component coverage is still pending. Finish component-root, nested-part and popup ownership,
   language bindings, copyable examples and browser/native proof. CSS-like blur
   convenience must not reinterpret existing sigma-based APIs or presets.
 - [ ] **Release the completed major batch.** Freeze one source revision; validate

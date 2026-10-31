@@ -343,11 +343,12 @@ function questionnaire(key,text=""){return new Node(78,text).key(key);}
 function dock(key,text=""){return new Node(79,text).key(key);}
 class App {
   constructor(options = {}) {
+    if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
     this.disposed = false; this.closed = false; this.nodes = new Map(); this.root = null; this.timer = null;
     this.handle = native.create({width: positive(options.width ?? 640, 'width'), height: positive(options.height ?? 480, 'height'),
       backend: options.backend === 'sdl' ? 1 : options.backend === undefined || options.backend === 'headless' ? 0 : NaN,
       maxNodes: options.maxNodes ?? 1024, maxEvents: options.maxEvents ?? 1024,
-      title: options.title, fontPath: options.fontPath});
+      title: options.title, fontPath: options.fontPath, initiallyHidden: options.initiallyHidden ? 1 : 0});
   }
   _alive() { if (this.disposed) throw new Error('app is disposed'); }
   font_fallbacks(paths) {
@@ -520,6 +521,8 @@ class App {
     } }, interval);
     return this;
   }
+  set_window_visible(visible) {this._alive();if(typeof visible!=="boolean")throw new TypeError("visible must be boolean");native.setWindowVisible(this.handle,visible?1:0);return this;}
+  window_visible() {this._alive();return native.getWindowVisible(this.handle);}
   clipboard_set(text) {this._alive();if(typeof text!=="string"||text.includes("\0")||Buffer.byteLength(text)>65536)throw new TypeError("clipboard accepts UTF-8 text up to 65536 bytes without NUL");native.setClipboard(this.handle,text);return this;}
   clipboard_get() {this._alive();return native.getClipboard(this.handle);}
   theme_presets() {this._alive();return native.themePresets();}

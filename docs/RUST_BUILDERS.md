@@ -105,3 +105,15 @@ For a Rust SDL clipboard round trip under an invisible Linux display, use an exp
 ```sh
 CUI_BRIDGE_LIB_DIR="$PWD/build-bridge" CUI_TEST_FONT=/path/to/font.ttf env -u DISPLAY -u WAYLAND_DISPLAY xvfb-run -a env CUI_TEST_VIRTUAL_DISPLAY=1 cargo run --manifest-path bindings/rust/Cargo.toml --example clipboard_smoke
 ```
+
+## Hidden native windows
+
+`App::sdl_with_window_options(width, height, title, font,
+WindowOptions { initially_hidden: true })` requests hidden creation before the
+first frame. `App::sdl` remains visible; `WindowOptions::default()` also stays
+visible. Use `app.set_window_visible(true)` and `app.window_visible()` (Results)
+on the owning UI thread, outside Core stepping; `run_with` after-frame callbacks
+may use them. Headless visibility queries return unavailable. This is an additive
+Rust API and independent C window-options record, preserving the old C options
+ABI. Rebuild with matching native exports for the new methods. See the [shared
+contract and Linux proof](BINDING_BUILDERS.md#native-window-visibility).

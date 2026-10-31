@@ -141,3 +141,15 @@ Explicit `Options.Library` or `CUI_BRIDGE_LIBRARY` still selects a shared bridge
 The optional `cui_dynamic` build tag uses packaged shared-library discovery and
 its verified cache. See [local artifact install commands](PACKAGING.md) for
 source-only module ZIPs, optional prebuilt modules, and release/tag limitations.
+
+## Hidden native windows
+
+`New(Options{Native:true, FontPath:font, InitiallyHidden:true})` passes hidden
+creation to SDL before the first frame. The zero option stays visible. Use
+`app.SetWindowVisible(true)` and `app.WindowVisible() (bool, error)` on the owning
+UI thread, outside Core stepping; handlers dispatched after a native callback
+frame may use them. Headless hidden requests/control return unavailable. The Go
+loader resolves the new symbols optionally: default apps still load older ABI1
+libraries; feature calls fail explicitly if unavailable. See the [shared contract
+and Linux proof](BINDING_BUILDERS.md#native-window-visibility). Existing Go Options
+keyed literals remain source compatible; unkeyed literals need the new field.

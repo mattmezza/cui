@@ -53,6 +53,17 @@ pub struct PlotPoint {
     pub x: f64,
     pub y: f64,
 }
+/// Native initial visibility. Default preserves visible creation.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct WindowOptions {
+    pub initially_hidden: bool,
+}
+#[repr(C)]
+struct RawWindowOptions {
+    struct_size: u32,
+    version: u32,
+    initially_hidden: u32,
+}
 #[repr(C)]
 struct Options {
     struct_size: u32,
@@ -234,7 +245,7 @@ type ValueNotificationPollV1 = unsafe extern "C" fn(
 #[cfg(cui_bridge_static)]
 fn notification_functions_v1(
 ) -> Option<(NotificationQueryV1, NotificationQueryV1, NotificationPollV1)> {
-extern "C" {
+    extern "C" {
         fn cui_bridge_notification_v1_size() -> u32;
         fn cui_bridge_notification_versions() -> u32;
         fn cui_bridge_poll_notification_v1(
@@ -437,7 +448,12 @@ impl ChangeEvent {
 /// Source Stepper visual density; shared DesignSize is an independent scale.
 #[repr(u32)]
 #[derive(Clone, Copy, Debug)]
-pub enum StepperDensity { Md = 0, Xs = 1, Sm = 2, Lg = 3 }
+pub enum StepperDensity {
+    Md = 0,
+    Xs = 1,
+    Sm = 2,
+    Lg = 3,
+}
 #[cfg_attr(not(cui_bridge_static), link(name = "cui_bridge"))]
 extern "C" {
     fn cui_bridge_abi_version() -> u32;
@@ -533,6 +549,13 @@ extern "C" {
     ) -> u32;
     fn cui_bridge_options_size() -> u32;
     fn cui_bridge_create(o: *const Options, status: *mut u32) -> *mut c_void;
+    fn cui_bridge_create_with_window_options(
+        o: *const Options,
+        w: *const RawWindowOptions,
+        status: *mut u32,
+    ) -> *mut c_void;
+    fn cui_bridge_set_window_visible(a: *mut c_void, visible: u32) -> u32;
+    fn cui_bridge_get_window_visible(a: *mut c_void, visible: *mut u32) -> u32;
     fn cui_bridge_destroy(a: *mut c_void);
     fn cui_bridge_node_create(
         a: *mut c_void,
@@ -545,10 +568,27 @@ extern "C" {
     fn cui_bridge_set_text(a: *mut c_void, n: RawNode, t: *const c_char) -> u32;
     fn cui_bridge_set_gap(a: *mut c_void, n: RawNode, g: f32) -> u32;
     fn cui_bridge_set_button_variant(a: *mut c_void, n: RawNode, v: u32) -> u32;
-    fn cui_bridge_set_stepper_visual(a: *mut c_void, n: RawNode, enabled: u32, vertical: u32, density: u32) -> u32;
+    fn cui_bridge_set_stepper_visual(
+        a: *mut c_void,
+        n: RawNode,
+        enabled: u32,
+        vertical: u32,
+        density: u32,
+    ) -> u32;
     fn cui_bridge_set_design_size(a: *mut c_void, n: RawNode, v: u32) -> u32;
-    fn cui_bridge_set_avatar_identity(a: *mut c_void, n: RawNode, enabled: u32, custom_hue: u32, hue: u32) -> u32;
-    fn cui_bridge_set_avatar_placeholder(a: *mut c_void, n: RawNode, enabled: u32, name: *const c_char) -> u32;
+    fn cui_bridge_set_avatar_identity(
+        a: *mut c_void,
+        n: RawNode,
+        enabled: u32,
+        custom_hue: u32,
+        hue: u32,
+    ) -> u32;
+    fn cui_bridge_set_avatar_placeholder(
+        a: *mut c_void,
+        n: RawNode,
+        enabled: u32,
+        name: *const c_char,
+    ) -> u32;
     fn cui_bridge_set_button_size(a: *mut c_void, n: RawNode, v: u32) -> u32;
     fn cui_bridge_set_button_rounding(a: *mut c_void, n: RawNode, v: u32, r: f32) -> u32;
     fn cui_bridge_set_button_disabled(a: *mut c_void, n: RawNode, v: u32) -> u32;
@@ -979,6 +1019,16 @@ impl App {
         check(status)?;
         Ok(Some(index))
     }
+    /// Owning UI thread, outside active stepping; after-frame callbacks are allowed.
+    pub fn set_window_visible(&mut self, visible: bool) -> Result<&mut Self> {
+        check(unsafe { cui_bridge_set_window_visible(self.raw, visible as u32) })?;
+        Ok(self)
+    }
+    pub fn window_visible(&self) -> Result<bool> {
+        let mut visible = 0;
+        check(unsafe { cui_bridge_get_window_visible(self.raw, &mut visible) })?;
+        Ok(visible != 0)
+    }
     pub fn clipboard_set(&mut self, text: &str) -> Result<&mut Self> {
         if text.len() > 65536 {
             return Err(Error(3));
@@ -1006,7 +1056,25 @@ impl App {
     pub fn sdl(width: f32, height: f32, title: &str, font: &str) -> Result<Self> {
         Self::new(width, height, Some(title), Some(font))
     }
+    pub fn sdl_with_window_options(
+        width: f32,
+        height: f32,
+        title: &str,
+        font: &str,
+        options: WindowOptions,
+    ) -> Result<Self> {
+        Self::new_window(width, height, Some(title), Some(font), options)
+    }
     fn new(width: f32, height: f32, title: Option<&str>, font: Option<&str>) -> Result<Self> {
+        Self::new_window(width, height, title, font, WindowOptions::default())
+    }
+    fn new_window(
+        width: f32,
+        height: f32,
+        title: Option<&str>,
+        font: Option<&str>,
+        window: WindowOptions,
+    ) -> Result<Self> {
         unsafe {
             if cui_bridge_abi_version() != 1
                 || cui_bridge_options_size() != std::mem::size_of::<Options>() as u32
@@ -1028,7 +1096,16 @@ impl App {
             font: font.as_ref().map_or(std::ptr::null(), |x| x.as_ptr()),
         };
         let mut status = 0;
-        let raw = unsafe { cui_bridge_create(&o, &mut status) };
+        let raw = if window.initially_hidden {
+            let w = RawWindowOptions {
+                struct_size: std::mem::size_of::<RawWindowOptions>() as u32,
+                version: 1,
+                initially_hidden: 1,
+            };
+            unsafe { cui_bridge_create_with_window_options(&o, &w, &mut status) }
+        } else {
+            unsafe { cui_bridge_create(&o, &mut status) }
+        };
         if raw.is_null() {
             return Err(Error(status));
         }
@@ -1098,9 +1175,23 @@ impl App {
         Ok(self)
     }
     /// Shared scale for Button, Avatar and Stepper; other kinds return an error.
-    pub fn stepper_visual(&mut self, n: Node, enabled: bool, vertical: bool, density: StepperDensity) -> Result<&mut Self> {
+    pub fn stepper_visual(
+        &mut self,
+        n: Node,
+        enabled: bool,
+        vertical: bool,
+        density: StepperDensity,
+    ) -> Result<&mut Self> {
         let n = self.valid(n)?;
-        check(unsafe { cui_bridge_set_stepper_visual(self.raw, n, enabled as u32, vertical as u32, density as u32) })?;
+        check(unsafe {
+            cui_bridge_set_stepper_visual(
+                self.raw,
+                n,
+                enabled as u32,
+                vertical as u32,
+                density as u32,
+            )
+        })?;
         Ok(self)
     }
     pub fn design_size(&mut self, n: Node, v: DesignSize) -> Result<&mut Self> {
@@ -1108,17 +1199,33 @@ impl App {
         check(unsafe { cui_bridge_set_design_size(self.raw, n, v as u32) })?;
         Ok(self)
     }
-    pub fn identity_colors(&mut self, n: Node, enabled: bool, hue: Option<u8>) -> Result<&mut Self> {
+    pub fn identity_colors(
+        &mut self,
+        n: Node,
+        enabled: bool,
+        hue: Option<u8>,
+    ) -> Result<&mut Self> {
         let n = self.valid(n)?;
-        if hue.is_some_and(|h| h > 11) { return Err(Error(3)); }
-        check(unsafe { cui_bridge_set_avatar_identity(self.raw, n, enabled as u32,
-            hue.is_some() as u32, hue.unwrap_or(0) as u32) })?;
+        if hue.is_some_and(|h| h > 11) {
+            return Err(Error(3));
+        }
+        check(unsafe {
+            cui_bridge_set_avatar_identity(
+                self.raw,
+                n,
+                enabled as u32,
+                hue.is_some() as u32,
+                hue.unwrap_or(0) as u32,
+            )
+        })?;
         Ok(self)
     }
     pub fn anonymous_icon(&mut self, n: Node, enabled: bool, name: &str) -> Result<&mut Self> {
         let n = self.valid(n)?;
         let name = string(name)?;
-        check(unsafe { cui_bridge_set_avatar_placeholder(self.raw, n, enabled as u32, name.as_ptr()) })?;
+        check(unsafe {
+            cui_bridge_set_avatar_placeholder(self.raw, n, enabled as u32, name.as_ptr())
+        })?;
         Ok(self)
     }
     pub fn rounding(&mut self, n: Node, v: Rounding) -> Result<&mut Self> {
@@ -2161,8 +2268,14 @@ impl<'a> Builder<'a> {
         self.app.size(self.node, v)?;
         Ok(self)
     }
-    pub fn stepper_visual(self, enabled: bool, vertical: bool, density: StepperDensity) -> Result<Self> {
-        self.app.stepper_visual(self.node, enabled, vertical, density)?;
+    pub fn stepper_visual(
+        self,
+        enabled: bool,
+        vertical: bool,
+        density: StepperDensity,
+    ) -> Result<Self> {
+        self.app
+            .stepper_visual(self.node, enabled, vertical, density)?;
         Ok(self)
     }
     pub fn design_size(self, v: DesignSize) -> Result<Self> {

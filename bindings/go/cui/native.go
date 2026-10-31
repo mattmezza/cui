@@ -128,6 +128,50 @@ static char bridge_error_buf[80];
 #define DECL_VOID(name, ret, params, args) static void (*fp_##name) params; static void go_##name params { fp_##name args; }
 API(DECL, DECL_VOID)
 #undef DECL
+typedef cui_bridge_app *(*window_create_fn)(const cui_bridge_options *, const cui_bridge_window_options *, cui_bridge_status *);
+typedef cui_bridge_status (*window_set_fn)(cui_bridge_app *, uint32_t);
+typedef cui_bridge_status (*window_get_fn)(cui_bridge_app *, uint32_t *);
+#if defined(CUI_GO_STATIC)
+extern cui_bridge_app *cui_bridge_create_with_window_options(const cui_bridge_options *, const cui_bridge_window_options *, cui_bridge_status *) __attribute__((weak));
+extern cui_bridge_status cui_bridge_set_window_visible(cui_bridge_app *, uint32_t) __attribute__((weak));
+extern cui_bridge_status cui_bridge_get_window_visible(cui_bridge_app *, uint32_t *) __attribute__((weak));
+#endif
+static cui_bridge_app *go_create_window(const cui_bridge_options *o, uint32_t hidden, cui_bridge_status *status) {
+ window_create_fn fn = NULL;
+#if defined(CUI_GO_STATIC)
+ if (!bridge_lib) fn = cui_bridge_create_with_window_options;
+#endif
+ if (bridge_lib) {
+#if defined(_WIN32)
+  FARPROC sym = GetProcAddress((HMODULE)bridge_lib, "cui_bridge_create_with_window_options");
+#else
+  void *sym = dlsym(bridge_lib, "cui_bridge_create_with_window_options");
+#endif
+  if (sym) memcpy(&fn, &sym, sizeof fn);
+ }
+ if (!fn) { *status = CUI_BRIDGE_BACKEND_UNAVAILABLE; return NULL; }
+ cui_bridge_window_options w = {sizeof(w), 1, hidden};
+ return fn(o, &w, status);
+}
+static cui_bridge_status go_window_visible(cui_bridge_app *app, uint32_t value, uint32_t *out) {
+ window_set_fn set = NULL; window_get_fn get = NULL;
+#if defined(CUI_GO_STATIC)
+ if (!bridge_lib) { set = cui_bridge_set_window_visible; get = cui_bridge_get_window_visible; }
+#endif
+ if (bridge_lib) {
+#if defined(_WIN32)
+  FARPROC ss = GetProcAddress((HMODULE)bridge_lib, "cui_bridge_set_window_visible");
+  FARPROC gs = GetProcAddress((HMODULE)bridge_lib, "cui_bridge_get_window_visible");
+#else
+  void *ss = dlsym(bridge_lib, "cui_bridge_set_window_visible");
+  void *gs = dlsym(bridge_lib, "cui_bridge_get_window_visible");
+#endif
+  if (ss) memcpy(&set, &ss, sizeof set);
+  if (gs) memcpy(&get, &gs, sizeof get);
+ }
+ if (out) return get ? get(app, out) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+ return set ? set(app, value) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
 typedef cui_bridge_status (*run_after_fn)(void *);
 typedef cui_bridge_status (*run_fn)(cui_bridge_app *, run_after_fn, void *);
 extern int goBridgeAfterFrame(uintptr_t user);
@@ -310,6 +354,7 @@ type App struct {
 	running bool
 }
 type Options struct {
+	InitiallyHidden          bool
 	Native                   bool
 	Width, Height            float32
 	Title, FontPath, Library string
@@ -567,7 +612,12 @@ func New(o Options) (*App, error) {
 	options := C.cui_bridge_options{struct_size: C.uint32_t(C.sizeof_cui_bridge_options), abi_version: C.CUI_BRIDGE_ABI_VERSION, backend: C.cui_bridge_backend(backend), max_nodes: C.uint32_t(o.MaxNodes), max_events: C.uint32_t(o.MaxEvents), width: C.float(o.Width), height: C.float(o.Height), title_utf8: title, font_path_utf8: font}
 	runtime.LockOSThread()
 	var code C.cui_bridge_status
-	ptr := C.go_create(&options, &code)
+	var ptr *C.cui_bridge_app
+	if o.InitiallyHidden {
+		ptr = C.go_create_window(&options, 1, &code)
+	} else {
+		ptr = C.go_create(&options, &code)
+	}
 	if ptr == nil {
 		runtime.UnlockOSThread()
 		return nil, result(code)
@@ -633,6 +683,29 @@ func (a *App) ThemePreset() (uint32, bool, error) {
 	}
 	return uint32(index), true, nil
 }
+
+// SetWindowVisible changes the native window on its owning UI thread, outside stepping.
+func (a *App) SetWindowVisible(visible bool) error {
+	if err := a.check(); err != nil {
+		return err
+	}
+	var value C.uint32_t
+	if visible {
+		value = 1
+	}
+	return result(C.go_window_visible(a.ptr, value, nil))
+}
+func (a *App) WindowVisible() (bool, error) {
+	if err := a.check(); err != nil {
+		return false, err
+	}
+	var value C.uint32_t
+	if err := result(C.go_window_visible(a.ptr, 0, &value)); err != nil {
+		return false, err
+	}
+	return value != 0, nil
+}
+
 func (a *App) SetClipboard(text string) error {
 	if err := a.check(); err != nil {
 		return err

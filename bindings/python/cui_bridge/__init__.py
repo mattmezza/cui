@@ -92,6 +92,11 @@ class _Options(C.Structure):
                 ("font_path_utf8", C.c_char_p)]
 
 
+class _WindowOptions(C.Structure):
+    _fields_ = [("struct_size", C.c_uint32), ("version", C.c_uint32),
+                ("initially_hidden", C.c_uint32)]
+
+
 class _API:
     def __init__(self, path: str | os.PathLike[str] | None):
         if path is None:
@@ -110,6 +115,13 @@ class _API:
             fn.restype = restype
             fn.argtypes = list(argtypes)
             return fn
+        self.create_window = self.set_window_visible = self.get_window_visible = None
+        if all(hasattr(lib, "cui_bridge_" + name) for name in
+               ("create_with_window_options", "set_window_visible", "get_window_visible")):
+            self.create_window = bind("create_with_window_options", C.c_void_p,
+                                      C.POINTER(_Options), C.POINTER(_WindowOptions), C.POINTER(C.c_int))
+            self.set_window_visible = bind("set_window_visible", C.c_int, C.c_void_p, C.c_uint32)
+            self.get_window_visible = bind("get_window_visible", C.c_int, C.c_void_p, C.POINTER(C.c_uint32))
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -1336,7 +1348,7 @@ class App:
     def __init__(self, *, backend: str = "none", width: float = 480, height: float = 240,
                  title: str = "CUI Bridge", font_path: str | None = None,
                  library: str | os.PathLike[str] | None = None,
-                 max_nodes: int = 256, max_events: int = 256):
+                 max_nodes: int = 256, max_events: int = 256, initially_hidden: bool = False):
         if backend not in ("none", "sdl"):
             raise ValueError("backend must be 'none' or 'sdl'")
         if backend == "sdl" and not font_path:
@@ -1345,12 +1357,20 @@ class App:
             raise ValueError("max_nodes must be an integer in 1..1024")
         if type(max_events) is not int or not 1 <= max_events <= 4096:
             raise ValueError("max_events must be an integer in 1..4096")
+        if type(initially_hidden) is not bool:
+            raise TypeError("initially_hidden must be bool")
         self._api = _API(library)
         options = _Options(C.sizeof(_Options), 1, 0 if backend == "none" else 1,
                            max_nodes, max_events, width, height,
                            _utf8(title), _utf8(font_path) if font_path else None)
         status = C.c_int()
-        self._ptr = self._api.create(C.byref(options), C.byref(status))
+        if initially_hidden:
+            if self._api.create_window is None:
+                raise RuntimeError("bridge hidden-window API unavailable")
+            window = _WindowOptions(C.sizeof(_WindowOptions), 1, 1)
+            self._ptr = self._api.create_window(C.byref(options), C.byref(window), C.byref(status))
+        else:
+            self._ptr = self._api.create(C.byref(options), C.byref(status))
         if not self._ptr:
             self._api.check(status.value)
             raise RuntimeError("bridge create failed")
@@ -1562,6 +1582,20 @@ class App:
         rect = _Rect()
         self._api.check(self._api.day_bounds(self._ptr,node._handle,_Date(year,month,day),C.byref(rect)))
         return rect.x,rect.y,rect.width,rect.height
+
+    def set_window_visible(self, visible: bool) -> "App":
+        self._ensure_open()
+        if type(visible) is not bool: raise TypeError("visible must be bool")
+        if self._api.set_window_visible is None: raise RuntimeError("bridge visibility API unavailable")
+        self._api.check(self._api.set_window_visible(self._ptr, int(visible)))
+        return self
+
+    def window_visible(self) -> bool:
+        self._ensure_open()
+        if self._api.get_window_visible is None: raise RuntimeError("bridge visibility API unavailable")
+        visible = C.c_uint32()
+        self._api.check(self._api.get_window_visible(self._ptr, C.byref(visible)))
+        return bool(visible.value)
 
     def clipboard_set(self, text: str) -> "App":
         self._ensure_open();encoded=_utf8(text,65536);self._api.check(self._api.clipboard_set(self._ptr,encoded));return self

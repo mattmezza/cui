@@ -243,3 +243,14 @@ reduced motion evaluates ease(0), while nonfinite output rejects without committ
 motion/result or painting. Schedule only successful results; do not reuse a stale
 deadline after failure. Gallery selectors and copied C examples cover this subset;
 inherited Icon style/lifecycle and a source-style binding facade remain gaps.
+
+For hidden native windows, read `docs/BINDING_BUILDERS.md` section `Native window
+visibility` and the chosen Go/Rust guide. C SDL3 uses
+`cui_sdl3_create_with_options` with `initially_hidden`; Python uses
+`initially_hidden=True`, JS/TS `initiallyHidden:true`, Go `Options.InitiallyHidden`,
+Rust `sdl_with_window_options`/`WindowOptions`. Defaults stay visible. Hidden is
+passed to the constructor; never substitute show-then-hide. Visibility controls
+belong on the owning UI thread outside active Core stepping; native after-frame
+callbacks are supported. Headless hidden/control requests fail unavailable.
+Sokol/SDL_GPU renderer hosts own creation policy. Linux private-Xvfb proof covers
+all five runtimes (TS compiled/executed), not other OS/window systems or hardware.

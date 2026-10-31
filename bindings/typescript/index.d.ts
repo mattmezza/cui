@@ -1,6 +1,6 @@
 /** Native CUI bindings. Build bindings/node first; no npm dependencies. */
 export type Backend = 'headless' | 'sdl';
-export interface AppOptions { width?: number; height?: number; backend?: Backend; title?: string; fontPath?: string; maxNodes?: number; maxEvents?: number }
+export interface AppOptions { initiallyHidden?: boolean; width?: number; height?: number; backend?: Backend; title?: string; fontPath?: string; maxNodes?: number; maxEvents?: number }
 export interface Bounds { x: number; y: number; width: number; height: number }
 export type Key = 'tab' | 'enter' | 'space' | 'escape' | 'left' | 'right' | 'up' | 'down';
 export type KeyPhase = 'down' | 'up';
@@ -32,6 +32,8 @@ export class App {
   poll_value_notification_v1(): ValueNotificationV1 | undefined;
 
   constructor(options?: AppOptions);
+  set_window_visible(visible: boolean): this;
+  window_visible(): boolean;
   mount(root: Row | Column): this;
   pointer(phase: PointerPhase, x: number, y: number): this;
   key(phase: KeyPhase, key: Key, modifiers?: number, repeat?: boolean): this;

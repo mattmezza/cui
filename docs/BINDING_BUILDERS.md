@@ -6,9 +6,9 @@ checkout; registry publication and other platform packages remain pending.
 
 The component builders let you author a UI tree in your language. CUI performs
 layout and input handling in C; the optional SDL adapter draws a native window.
-Native builder windows currently start visible. The additive C SDL3 host
-`cui_sdl3_create_with_options(..., (cui_sdl3_window_options){.initially_hidden = true})`
-option and visibility controls are not exposed by the bridge or these builders.
+Native builder windows default to visible creation. Python `initially_hidden=True`
+and JavaScript/TypeScript `initiallyHidden: true` request hidden creation directly
+in SDL's constructor, before the first frame. See [native visibility](#native-window-visibility).
 
 The bridge exposes tested API subsets for all 78 catalog families through native CUI renderers and app services,
 plus rows, columns, radio groups and composite items. Python, JavaScript,
@@ -431,3 +431,50 @@ The C-only `cui_stepper_presentation.h` facade adds non-centered fill, indicator
 interaction and a typed custom palette. Its layout/palette/options types and
 `cui_stepper_present` entry are omitted from every language builder/bridge; source
 SDK inclusion does not imply authoring support.
+
+## Native window visibility
+
+```python
+with App(backend="sdl", font_path=font, initially_hidden=True) as app:
+    app.mount(row())
+    app.step()                 # stays hidden
+    app.set_window_visible(True)
+    assert app.window_visible()
+```
+
+```javascript
+const app = new App({backend:'sdl', fontPath:font, initiallyHidden:true});
+app.mount(row()); app.step(); // stays hidden
+app.set_window_visible(true);
+console.assert(app.window_visible());
+```
+
+The same JavaScript methods are declared for TypeScript. Defaults remain visible;
+there is no show-then-hide fallback. The bridge uses independent version-1
+`cui_bridge_window_options` through `cui_bridge_create_with_window_options`;
+`cui_bridge_options`, its exact-size check, ABI version and old constructor stay
+unchanged. Query returns SDL's hidden flag, not occlusion/minimization. OS mapping
+may be asynchronous. Headless hidden requests and visibility operations return
+backend unavailable; default headless creation is unchanged. Calls belong on the
+native window's owning UI thread, outside an active Core frame. Application event
+handlers dispatched after a completed frame by the native callback loop may
+show/hide/query; `step` and `run` themselves never show the window. Closed apps
+reject visibility operations. Python resolves the new window symbols optionally; default apps do not require
+these exports. Hidden creation/control fails explicitly if they are absent.
+Missing-export fixtures verify this feature boundary, not compatibility with
+every historical ABI1 build. Node addon and native library must match.
+
+Focused Linux private-Xvfb tests cover C, Python, JavaScript, compiled/executed
+TypeScript, Go and Rust, including the actual SDL constructor flag and first
+presentation flag, explicit show/hide, default visible creation and after-frame
+callbacks. This is not Wayland/Windows/macOS or physical GPU validation. Run with
+an existing native bridge build, installed tooling and an explicit font:
+
+```sh
+python scripts/test_window_visibility_bindings.py --build-dir build --font /absolute/font.ttf
+# --tsc /existing/typescript/lib/tsc.js accepts an already installed compiler.
+```
+
+The helper downloads nothing, builds only focused dynamic tests/addon and a Linux
+test-only SDL interposer, then uses `scripts/test_local.py` for private Xvfb.
+Sokol and SDL_GPU renderer-only hosts retain ownership of their own windows.

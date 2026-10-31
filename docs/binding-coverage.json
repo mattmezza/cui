@@ -938,5 +938,24 @@
         "rust": "tested_subset"
       }
     }
-  ]
+  ],
+  "native_window_visibility": {
+    "languages": [
+      "python",
+      "javascript",
+      "typescript",
+      "go",
+      "rust"
+    ],
+    "status": "tested_subset",
+    "backend": "SDL3 bridge only",
+    "initially_hidden": "passed to constructor; default visible",
+    "headless": "hidden request and visibility controls unavailable",
+    "validation": "Linux private-Xvfb actual SDL constructor and first-present flags, show/hide, after-frame callbacks; TypeScript compiled and executed",
+    "limitations": [
+      "Wayland, Windows and macOS runtime validation pending",
+      "Sokol and SDL_GPU hosts own window creation",
+      "Python/Go new symbols optional; hidden feature unavailable on older libraries"
+    ]
+  }
 }

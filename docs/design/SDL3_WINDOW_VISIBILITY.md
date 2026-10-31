@@ -28,3 +28,6 @@ CTest passed `sdl3_window_visibility`, `sdl3_system_appearance`, and
 any explicit show, show/hide transitions, null controls, zero options and the
 legacy visible constructor. The constructor source passes SDL_WINDOW_HIDDEN
 at creation. Other native window systems and GPU hardware are not validated.
+
+The subsequent bridge/builder implementation supersedes the original deferral
+above; see [its independent ABI contract](BRIDGE_WINDOW_VISIBILITY.md).

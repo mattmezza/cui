@@ -245,6 +245,6 @@ whether a window is occluded or minimized. Visibility operations are main-thread
 only and the OS may map/unmap asynchronously. The old constructor ABI is
 unchanged; the new options type does not extend any existing by-value structure.
 Sokol and SDL_GPU adapters do not own windows: their host must request hidden
-creation. Bridge and language builder native runners still create visible
-windows and do not expose this option. Linux X11/private-Xvfb validation does not
+creation. Bridge and language builder native runners expose opt-in hidden creation
+through independent window options; see [binding builders](BINDING_BUILDERS.md). Linux X11/private-Xvfb validation does not
 establish Wayland, Windows or macOS behavior.

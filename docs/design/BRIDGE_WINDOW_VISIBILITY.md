@@ -23,3 +23,18 @@ libraries; feature requests return unavailable without a show-then-hide fallback
 Native proof checks actual SDL hidden flags before and after the first frame,
 explicit visibility transitions, lifecycle guards and all five language runtimes,
 including separately compiled and executed TypeScript, only under private Xvfb.
+
+Validation completed on Linux X11/private Xvfb: portable bridge argument/lifecycle
+checks, native C actual-SDL before/after-first-frame checks, and Python native
+callback test passed (3/3). Focused authoring runner passed all five runtimes plus
+Python/Go missing-export compatibility tests (7/7). The shared Linux test-only
+interposer checks constructor flags, actual SDL flags and independent X11 server
+map state at creation and first presentation. Explicit visibility controls run
+inside application handlers dispatched after the completed Core frame in the
+native callback; Rust uses run_with and C uses after_frame directly. Closed
+queries preserve C outputs/reject in builders. TypeScript 5.8.3 was compiled and
+executed. No dependencies downloaded; one existing focused bridge build, nice19,
+single CPU, Go -p1/GOMAXPROCS1 and Cargo -j1. Sokol/SDL_GPU caller-owned windows,
+Wayland/Windows/macOS runtime, physical GPU and published packages remain outside
+this proof. Missing-export fixtures model old ABI1 dynamic symbol surfaces; they
+are not historical release binaries.

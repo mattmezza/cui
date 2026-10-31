@@ -10,7 +10,7 @@ typedef struct {
 } bridge_native;
 
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *app, const char *title,
-                                           const char *font_path, cui_config *config) {
+                                           const char *font_path, cui_config *config, bool initially_hidden) {
     if (!font_path || !font_path[0])
         return CUI_BRIDGE_INVALID_ARGUMENT;
     bridge_native *native = calloc(1, sizeof(*native));
@@ -20,8 +20,9 @@ cui_bridge_status cui_bridge_native_create(cui_bridge_app *app, const char *titl
     native->font = cui_font_open(font_path);
     if (!native->font)
         return CUI_BRIDGE_BACKEND_UNAVAILABLE;
-    native->host = cui_sdl3_create(title && title[0] ? title : "CUI Bridge", (int)app->width,
-                                   (int)app->height, native->font);
+    native->host = cui_sdl3_create_with_options(title && title[0] ? title : "CUI Bridge", (int)app->width,
+                                   (int)app->height, native->font,
+                                   (cui_sdl3_window_options){.initially_hidden = initially_hidden});
     if (!native->host)
         return CUI_BRIDGE_BACKEND_UNAVAILABLE;
     config->measure = cui_font_measure;
@@ -142,4 +143,16 @@ cui_bridge_status cui_bridge_native_run(cui_bridge_app *app, cui_bridge_run_call
     int result = cui_sdl3_run(
         0, NULL, (cui_sdl3_app){&run, bridge_run_init, bridge_run_frame, bridge_run_quit});
     return result && run.status == CUI_BRIDGE_OK ? CUI_BRIDGE_CORE_ERROR : run.status;
+}
+
+cui_bridge_status cui_bridge_native_set_window_visible(cui_bridge_app *app, uint32_t visible) {
+    bridge_native *native = app->native;
+    if (!native || !native->host) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    return cui_sdl3_set_visible(native->host, visible != 0) ? CUI_BRIDGE_OK : CUI_BRIDGE_CORE_ERROR;
+}
+cui_bridge_status cui_bridge_native_get_window_visible(cui_bridge_app *app, uint32_t *visible) {
+    bridge_native *native = app->native;
+    if (!native || !native->host) return CUI_BRIDGE_BACKEND_UNAVAILABLE;
+    *visible = cui_sdl3_is_visible(native->host) ? 1u : 0u;
+    return CUI_BRIDGE_OK;
 }

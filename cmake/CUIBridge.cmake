@@ -92,3 +92,19 @@ add_test(NAME bridge_python_notifications_v1 COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_value_notifications COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_value_notifications_v1.py)
+
+add_executable(test_bridge_window_visibility ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_window_visibility.c)
+target_link_libraries(test_bridge_window_visibility PRIVATE cui_bridge)
+cui_warnings(test_bridge_window_visibility)
+add_test(NAME bridge_window_visibility COMMAND test_bridge_window_visibility)
+if(TARGET cui_sdl3)
+ add_executable(test_bridge_window_visibility_sdl ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_window_visibility_sdl.c)
+ target_link_libraries(test_bridge_window_visibility_sdl PRIVATE cui_bridge ${CUI_SDL_TARGET})
+ cui_warnings(test_bridge_window_visibility_sdl)
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  add_test(NAME bridge_window_visibility_sdl COMMAND ${CMAKE_COMMAND} -E env CUI_TEST_FONT=${CUI_TEST_FONT} $<TARGET_FILE:test_bridge_window_visibility_sdl>)
+  add_test(NAME bridge_python_window_visibility COMMAND ${CMAKE_COMMAND} -E env
+   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+   CUI_TEST_FONT=${CUI_TEST_FONT} ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_window_visibility_native_virtual.py)
+ endif()
+endif()

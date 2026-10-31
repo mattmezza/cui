@@ -158,7 +158,7 @@ struct cui_bridge_app {
 };
 /* Native functions are implemented only in the optional SDL bridge target. */
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *, const char *, const char *,
-                                           cui_config *);
+                                           cui_config *, bool);
 void cui_bridge_native_destroy(cui_bridge_app *);
 cui_bridge_status cui_bridge_native_run(cui_bridge_app *, cui_bridge_run_callback, void *);
 cui_bridge_status cui_bridge_native_poll(cui_bridge_app *);
@@ -167,4 +167,6 @@ cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *, const c
                                                        uint32_t);
 cui_bridge_status cui_bridge_native_clipboard_set(cui_bridge_app *, cui_str);
 cui_bridge_status cui_bridge_native_clipboard_get(cui_bridge_app *, char *, uint32_t, uint32_t *);
+cui_bridge_status cui_bridge_native_set_window_visible(cui_bridge_app *, uint32_t);
+cui_bridge_status cui_bridge_native_get_window_visible(cui_bridge_app *, uint32_t *);
 #endif

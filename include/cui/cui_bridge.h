@@ -426,6 +426,21 @@ CUI_BRIDGE_API uint32_t cui_bridge_options_size(void);
 CUI_BRIDGE_API const char *cui_bridge_status_message(cui_bridge_status status);
 CUI_BRIDGE_API cui_bridge_app *cui_bridge_create(const cui_bridge_options *options,
                                                  cui_bridge_status *out_status);
+/* Independent v1 record: exact size/version, initially_hidden must be 0 or 1.
+ * NULL window options mean visible defaults. Headless hidden requests return
+ * BACKEND_UNAVAILABLE. Existing options layout and create ABI are unchanged. */
+typedef struct {
+    uint32_t struct_size, version, initially_hidden;
+} cui_bridge_window_options;
+CUI_BRIDGE_API uint32_t cui_bridge_window_options_size(void);
+CUI_BRIDGE_API cui_bridge_app *cui_bridge_create_with_window_options(
+    const cui_bridge_options *, const cui_bridge_window_options *, cui_bridge_status *);
+/* Owning native UI thread only, outside active Core stepping. After-frame run
+ * callbacks are allowed. Headless returns BACKEND_UNAVAILABLE; closed returns
+ * CLOSED. Flags must be 0/1; query output is unchanged on every error. Query
+ * reports SDL's hidden flag, not occlusion/minimization or synchronous OS mapping. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_window_visible(cui_bridge_app *, uint32_t);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_get_window_visible(cui_bridge_app *, uint32_t *);
 CUI_BRIDGE_API void cui_bridge_destroy(cui_bridge_app *app);
 /* Zero parent creates the single root. Keys are copied, unique among live nodes;
  * stale handles never alias a replacement node within an app. Handle provenance

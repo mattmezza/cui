@@ -24,9 +24,9 @@ feature test does not establish complete component parity.
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
 | 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; 15 focused regressions and two Inter-font checks pass. Finish Dialog composition/input and wider acceptance. |
-| 1 | Finish Slider behavior | Integrate numeric accessibility and range math; implement the reviewed interactive model, typed events and bindings. |
+| 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Diagnose the hosted-only Spinner reduced-motion idle failure; obtain a clean full integration run. The font-sensitive fixture fix passed hosted macOS native CI. |
+| 1 | Resolve current validation failures | Spinner scheduling fix passes local browser/repeated-transition checks; confirm in hosted CI and obtain a clean full integration run. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -55,7 +55,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Button state/style refinement, Slider ranges and themes; consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Button state/style refinement, Styled Slider ranges/themes, native numeric delivery and five builders (the typed C Base model is integrated); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
 | Overlays | Dialog independent header/title slots and separate Content/Body flex sizing; Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
@@ -91,14 +91,19 @@ passed for the merged styling revision. New integration work has focused passes,
 6/6 usage tests and generated freshness after background preparation integration
 (`2cfe490a`). Fresh strict C11/headless background checks passed 107 grids and
 8,500 frozen-sampler comparisons; this establishes preparation, not renderer support.
+Typed Base Slider `5afc739f` passed a warnings-clean combined build and 4/4
+headless source, selective/umbrella distribution and legacy-event checks. Updated
+consumer skill tests passed 18/18. Styled and foreign authoring remain pending.
+
 Candidate `b2a4db93` passed [full hosted CI](https://github.com/mattmezza/cui/actions/runs/41244554704)
 and [native bindings](https://github.com/mattmezza/cui/actions/runs/41244554789).
 Newer Core integration `6fb1357d` passed a 157-step warnings-clean build, all 15
 focused layout/background/legacy-pixel tests and two Inter-font checks. Private
 software validation `0625580a` also passed against that rebuilt Core. The combined
 consumer skill passed 18/18 and pinned formatting checks passed. Painting and
-font/shadow resource preparation remain unfinished. Spinner passed four local
-viewport/DPI cases, but its hosted idle failure is unresolved. No clean **full**
+font/shadow resource preparation remain unfinished. Spinner fix `638d9d13` passed
+four local viewport/DPI cases and 24 instrumented preference transitions with zero
+extra frames; hosted confirmation remains pending. No clean **full**
 regression run or browser gate covers the complete newer integration yet.
 Older green results do not cover newer code.
 

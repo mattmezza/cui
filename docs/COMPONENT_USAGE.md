@@ -304,7 +304,7 @@ API: `cui_begin_group_box`, `cui_end_group_box`. [Public header](../include/cui/
 
 **Interaction:** Hover, focus and escape update the open model. Optional synchronous observers report aggregate open-state transitions, independently of composition admission or actual visibility.
 
-**Usage:** Submit the trigger first. With event facades, inspect changed separately from control_result; end HoverCard only when control_result is true. Handlers are borrowed for the call and are not retained across delay or omission.
+**Usage:** Submit the trigger first. With event facades, inspect changed separately from control_result; end HoverCard only when control_result is true. Handlers are borrowed for the call and are not retained across delay or omission. Explicit TAP_TOGGLE accepts the submitted trigger result. LEGACY uses conservative outside taps and a retained contact workspace; RAW_PRIMARY uses unconsumed primary releases outside previous valid content bounds, with no matching down or movement threshold. Raw mode needs no contact. Accepted activation uses entry-open after release; disabled/Escape/placement retain precedence.
 
 API: `cui_begin_hover_card`, `cui_end_hover_card`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md); [event header](../include/cui/cui_hover_events.h); [event guide](HOVER_EVENTS.md).
 

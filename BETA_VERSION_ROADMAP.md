@@ -64,8 +64,11 @@ can lag implementation: inspect current code and evidence before scheduling work
 - Earlier guide/build/artifact invocation errors are corrected. GCC sanitizer CI
   caught temporary bounds storage in the new indicator test; its lifetime is now
   fixed, and a focused instrumented Core/test reproduction plus ordinary regression
-  pass locally. Full sanitizer CI and the full browser gate remain pending.
-  Release and deployment remain pending; results prove only their stated subsets.
+  pass locally. Windows also exposed oversized shadow-test stack workspaces;
+  bounded heap oracles and a passing 1 MB stack regression address that pressure,
+  pending Windows confirmation. All three Pages browser shards passed at `b9c2f3d1`.
+  Final sanitizer/Windows gates, release and deployment remain pending; results
+  prove only their stated subsets.
 
 ## Component parity: verify and close the gaps
 

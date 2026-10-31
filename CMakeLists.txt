@@ -2013,3 +2013,11 @@ target_link_libraries(test_named_selection_indicators PRIVATE cui cui_software)
 cui_warnings(test_named_selection_indicators)
 add_test(NAME named_selection_indicators COMMAND test_named_selection_indicators
  ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/named_selection_legacy.golden)
+
+# Exercise the shadow fixtures with Windows' default stack budget. Instrumented
+# tests retain their separate ASan stack budget, as bridge_small_stack does.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CUI_SANITIZE)
+ add_test(NAME shadow_fixture_small_stack COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/bindings/bridge/tests/test_small_stack.py
+  $<TARGET_FILE:test_bridge_shadows> $<TARGET_FILE:test_component_shadow_ownership>)
+endif()

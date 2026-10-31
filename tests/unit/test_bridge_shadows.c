@@ -74,7 +74,9 @@ static bool render_paint(cui_software *renderer, const cui_draw_list *source) {
 static void kinds_and_pixels(void) {
     const cui_bridge_kind kinds[] = {CUI_BRIDGE_ROW,    CUI_BRIDGE_COLUMN, CUI_BRIDGE_LABEL,
                                      CUI_BRIDGE_BUTTON, CUI_BRIDGE_INPUT,  CUI_BRIDGE_BADGE};
-    unsigned char baseline[360 * 240 * 4];
+    const size_t baseline_bytes = 360 * 240 * 4;
+    unsigned char *baseline = malloc(baseline_bytes);
+    assert(baseline);
     for (unsigned k = 0; k < 6; ++k) {
         cui_bridge_node handle;
         cui_bridge_app *app = create(kinds[k], &handle);
@@ -98,7 +100,7 @@ static void kinds_and_pixels(void) {
         cui_rect before = cui_bounds(app->ui, app->nodes[handle.slot].id);
         assert(before.w > 0 && before.h > 0);
         assert(render_paint(renderer, &list));
-        memcpy(baseline, cui_software_pixels(renderer, NULL, NULL), sizeof baseline);
+        memcpy(baseline, cui_software_pixels(renderer, NULL, NULL), baseline_bytes);
         cui_bridge_box_shadows_v1 value = mixed();
         assert(cui_bridge_set_box_shadows_v1(app, handle, 224, &value) == 0);
         memset(&value, 0, sizeof value); /* Caller storage no longer belongs to C. */
@@ -125,7 +127,7 @@ static void kinds_and_pixels(void) {
         (void)cui_semantics(app->ui, &after_semantics);
         assert(!memcmp(&before, &after, sizeof before) && semantics == after_semantics);
         assert(render_paint(renderer, &list));
-        assert(memcmp(baseline, cui_software_pixels(renderer, NULL, NULL), sizeof baseline));
+        assert(memcmp(baseline, cui_software_pixels(renderer, NULL, NULL), baseline_bytes));
         list = render(app, 1); /* Inert ancestry still paints the override. */
         assert(shadows(list, CUI_DRAW_DROP_SHADOW) == 1 &&
                shadows(list, CUI_DRAW_INSET_SHADOW) == 1);
@@ -156,10 +158,11 @@ static void kinds_and_pixels(void) {
         list = render(app, 0);
         assert(!app->nodes[handle.slot].shadows.schema_version && list.count == commands);
         assert(render_paint(renderer, &list));
-        assert(!memcmp(baseline, cui_software_pixels(renderer, NULL, NULL), sizeof baseline));
+        assert(!memcmp(baseline, cui_software_pixels(renderer, NULL, NULL), baseline_bytes));
         cui_software_destroy(renderer);
         cui_bridge_destroy(app);
     }
+    free(baseline);
 }
 static void validation_and_lifetime(void) {
     cui_bridge_node target;

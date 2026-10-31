@@ -4,6 +4,7 @@
 #include "cui/cui_software.h"
 #include "cui/cui_surface.h"
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 
 static cui_size measure(void *user, cui_str text, float font) {
@@ -25,13 +26,16 @@ static unsigned shadows(cui_draw_list list) {
 }
 /* Font-free software oracle retains every nontext command and actual clipping. */
 static uint64_t pixels(cui_software *r, cui_draw_list list) {
-    cui_draw_command filtered[1024];
+    assert(list.count <= 1024);
+    cui_draw_command *filtered = malloc(list.count * sizeof *filtered);
+    assert(filtered || !list.count);
     size_t n = 0;
     for (size_t i = 0; i < list.count; i++)
         if (list.commands[i].type != CUI_DRAW_TEXT)
             filtered[n++] = list.commands[i];
     cui_draw_list paint = {filtered, n, list.width, list.height};
     assert(cui_software_render(r, &paint, (cui_color){255, 255, 255, 255}));
+    free(filtered);
     const unsigned char *rgba = cui_software_pixels(r, NULL, NULL);
     uint64_t hash = UINT64_C(14695981039346656037);
     for (size_t i = 0; i < 400 * 200 * 4; i++) {
@@ -244,12 +248,17 @@ static void panels(void) {
         cui_focus(ui, 101);
         if (kind < 2)
             cui_surface_open(ui, &surface, 101);
-        cui_draw_command baseline[1024], current[1024];
+        /* Keep pixel/command oracles off Windows' default 1 MB thread stack. */
+        cui_draw_command *baseline = malloc(1024 * sizeof *baseline);
+        cui_draw_command *current = malloc(1024 * sizeof *current);
+        assert(baseline && current);
         size_t baseline_count = 0, baseline_semantic_count = 0;
         cui_id semantic_ids[64];
         cui_role semantic_roles[64];
         uint64_t baseline_pixels = 0;
-        unsigned char baseline_rgba[400 * 200 * 4];
+        const size_t baseline_bytes = 400 * 200 * 4;
+        unsigned char *baseline_rgba = malloc(baseline_bytes);
+        assert(baseline_rgba);
         for (int frame = -1; frame < 4; frame++) {
             assert(cui_begin_frame(ui, 400, 200, .016f));
             (void)cui_button(ui, 101, &t, cui_string("Trigger"), false);
@@ -304,7 +313,7 @@ static void panels(void) {
                 }
                 memcpy(baseline, current, n * sizeof *baseline);
                 baseline_pixels = hash;
-                memcpy(baseline_rgba, cui_software_pixels(r, NULL, NULL), sizeof baseline_rgba);
+                memcpy(baseline_rgba, cui_software_pixels(r, NULL, NULL), baseline_bytes);
             } else {
                 assert(semantic_count == baseline_semantic_count);
                 for (size_t i = 0; i < semantic_count; i++) {
@@ -353,7 +362,7 @@ static void panels(void) {
                      * must match without any shadow commands in the oracle. */
                     (void)pixels(r, (cui_draw_list){current, n, list.width, list.height});
                     assert(memcmp(baseline_rgba, cui_software_pixels(r, NULL, NULL),
-                                  sizeof baseline_rgba) == 0);
+                                  baseline_bytes) == 0);
                 }
             }
             assert(kind == 2 ? hover.open : surface.overlay.open);
@@ -366,6 +375,9 @@ static void panels(void) {
             assert(!cui_element_set_shadow_preset(ui, 200, CUI_SHADOW_MD, (cui_corner_radii){0}));
             assert(shadows(cui_end_frame(ui)) == 0);
         }
+        free(baseline_rgba);
+        free(current);
+        free(baseline);
         cui_software_destroy(r);
         cui_destroy(ui);
     }

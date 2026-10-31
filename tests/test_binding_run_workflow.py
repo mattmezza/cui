@@ -100,9 +100,17 @@ class WorkflowTests(unittest.TestCase):
             section = re.split(r'\n  [a-zA-Z][\w-]*:', section, maxsplit=1)[0]
             build = re.search(r'cmake --build [^\n]+--target ([^\n]+)', section)
             self.assertIsNotNone(build)
-            for target in ('test_bridge_window_visibility', 'test_bridge_stepper_visual'):
+            for target in ('test_bridge_window_visibility', 'test_bridge_stepper_visual', 'test_bridge_shadows'):
                 with self.subTest(job=job, target=target):
                     self.assertIn(target, build.group(1).split())
+
+    def test_shadow_types_are_checked_in_node_job(self):
+        source = (ROOT / '.github/workflows/ci.yml').read_text()
+        section = source.split('  node-builders:', 1)[1]
+        section = re.split(r'\n  [a-zA-Z][\w-]*:', section, maxsplit=1)[0]
+        command = next(line for line in section.splitlines() if 'bindings/node/test/shadows.types.ts' in line)
+        self.assertIn('typescript@5.8.3', command)
+        self.assertIn('--noEmit --strict', command)
 
     def test_every_literal_run_block_is_valid_bash(self):
         # This workflow deliberately uses only multiline literal shell blocks.

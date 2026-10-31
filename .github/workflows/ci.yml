@@ -152,7 +152,7 @@ jobs:
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless
       - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 bindings/typescript/components.typecheck.ts
-      - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext bindings/node/test/notifications-v1.types.ts bindings/node/test/value-notifications-v1.types.ts
+      - run: npm exec --yes --package typescript@5.8.3 -- tsc --noEmit --strict --target ES2022 --module NodeNext --moduleResolution NodeNext bindings/node/test/notifications-v1.types.ts bindings/node/test/value-notifications-v1.types.ts bindings/node/test/shadows.types.ts
       - run: node bindings/typescript/examples/save.ts --headless
 
   installed-binding-packages:

@@ -60,8 +60,9 @@ semantics or input behavior. See [DROP_SHADOW.md](DROP_SHADOW.md),
 renderer limits, masks, owned cache budgets and failure boundaries.
 
 The generic setter is a C API. The additive [bridge V1 authoring slice](BRIDGE_SHADOWS.md)
-implements six explicitly listed builder roots and is pending focused runtime
-validation; bundled C headers alone do not establish other typed language support.
+implements six explicitly listed builder roots with focused C/Python/JS/Go/Rust
+runtime and strict TypeScript checks. Combined release validation remains pending;
+bundled C headers alone do not establish other typed language support.
 Popup/trigger/backdrop and anonymous or repeated component parts need explicit
 owner-specific public addressing and tests. Full 78-family component-part and
 binding coverage remains planned in `design/ELEMENT_SHADOW_STYLING.md`. The

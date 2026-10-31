@@ -139,3 +139,24 @@ paint parts and bindings. The generic C API is an enabling slice, not completion
 of that target. Host/behavior-only families still need an explicit not-applicable
 caster decision rather than fabricated rectangular surfaces. No compilation,
 renderer work or generated consumer resources are changed by this proposal.
+
+## Approved first ownership contract
+
+The first implementation centralizes Badge_ex's existing visible indicator ID and
+cui_slider's existing track ID behind checked pure getters. Each returns0 for
+owner0; nonzero owners retain exactly their current derived IDs. The functions
+report identity only. No anonymous boxes receive IDs, no component nodes are
+added, and old behavior/pixels/semantics remain unchanged absent explicit styling.
+
+Authoritative header comments identify actual surfaces: Button, Input, Avatar and
+legacy Badge use caller ID; Checkbox/Radio caller IDs denote whole rows; Switch
+has existing track/thumb getters; Slider exposes track but no thumb; Badge_ex's
+caller ID wraps content and its indicator can be absent. Popover/Dialog panels
+use state.overlay.id and Tooltip's emitted popup uses its caller ID. Tests style
+these current-frame paint targets after their owner submits them. Corner radii
+remain explicit caller style values, not inferred from a semantic record.
+
+New getter validation does not change old zero-ID submission behavior: composition
+uses the existing internal derivation while public getter0 returns0. Collisions
+must still be rejected by existing Core identity validation. No all-family or
+foreign-language style support is implied by this additive C-only contract.

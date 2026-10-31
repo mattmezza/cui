@@ -25,7 +25,9 @@ bool cui_background_color_from_source_038_hsla(float h, float s, float l, float 
                                                cui_background_color *out) {
     if (!out || !bg_unit(h) || !bg_unit(s) || !bg_unit(l) || !bg_unit(a))
         return false;
-    double hue = h * 6., chroma = (1 - fabs(2. * l - 1)) * s;
+    /* Equivalent HSLA chroma without cancellation near black. Clamp only this
+     * mathematically unit-gamut conversion, never sampler Oklab excursions. */
+    double hue = h * 6., chroma = 2. * fmin(l, 1. - l) * s;
     double x = chroma * (1 - fabs(fmod(hue, 2) - 1)), m = l - chroma / 2;
     double r = 0, g = 0, b = 0;
     if (hue < 1) {
@@ -47,7 +49,8 @@ bool cui_background_color_from_source_038_hsla(float h, float s, float l, float 
         r = chroma;
         b = x;
     }
-    *out = (cui_background_color){(float)(r + m), (float)(g + m), (float)(b + m), a};
+    *out = (cui_background_color){(float)bg_clamp(r + m), (float)bg_clamp(g + m),
+                                  (float)bg_clamp(b + m), a};
     return true;
 }
 bool cui_background_valid(const cui_background *bg) {

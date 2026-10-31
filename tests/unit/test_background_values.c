@@ -122,6 +122,46 @@ static void gamut_and_roundtrip(void) {
     bg.solid.r = 0;
     assert(copy.solid.r > 0); /* independent owned copy */
 }
+static void hsla_unit_gamut(void) {
+    const float lightness[] = {0,        0x1p-149f, 0x1p-126f, 3e-17f,         1e-10f,
+                               .000001f, .5f,       .999999f,  0x1.fffffep-1f, 1};
+    const float saturation[] = {0, .25f, .5f, 0x1.fffffep-1f, 1};
+    for (unsigned hue = 0; hue <= 360; ++hue)
+        for (size_t l = 0; l < sizeof lightness / sizeof lightness[0]; ++l)
+            for (size_t s = 0; s < sizeof saturation / sizeof saturation[0]; ++s) {
+                cui_background_color color;
+                cui_background solid;
+                assert(cui_background_color_from_source_038_hsla(hue / 360.f, saturation[s],
+                                                                 lightness[l], .5f, &color));
+                assert(cui_background_make_solid(color, &solid));
+                assert(cui_background_valid(&solid));
+            }
+    cui_background_color tiny;
+    assert(cui_background_color_from_source_038_hsla(0, 1, 3e-17f, 1, &tiny));
+    assert(tiny.r == 2 * 3e-17f && tiny.g == 0 && tiny.b == 0 && tiny.a == 1);
+    cui_background_color color = {.1f, .2f, .3f, .4f}, before = color;
+    const float bad[] = {NAN, INFINITY, -INFINITY, -.000001f, 1.000001f};
+    for (unsigned channel = 0; channel < 4; ++channel)
+        for (size_t i = 0; i < sizeof bad / sizeof bad[0]; ++i) {
+            float h = .25f, s = 1, l = 3e-17f, a = .5f;
+            switch (channel) {
+            case 0:
+                h = bad[i];
+                break;
+            case 1:
+                s = bad[i];
+                break;
+            case 2:
+                l = bad[i];
+                break;
+            default:
+                a = bad[i];
+                break;
+            }
+            assert(!cui_background_color_from_source_038_hsla(h, s, l, a, &color));
+            assert(memcmp(&color, &before, sizeof color) == 0);
+        }
+}
 static void endpoints(void) {
     cui_background bg =
         gradient(CUI_BACKGROUND_CSS, CUI_BACKGROUND_SRGB, 90, (cui_background_color){1, 0, 0, 1},
@@ -282,6 +322,7 @@ int main(void) {
     goldens();
     alpha_and_color();
     endpoints();
+    hsla_unit_gamut();
     gamut_and_roundtrip();
     rejection();
     plot_source_oracle();

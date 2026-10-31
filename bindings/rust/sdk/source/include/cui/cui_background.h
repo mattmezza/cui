@@ -33,7 +33,8 @@ typedef struct {
 /* Encoded sRGBA8 is explicitly decoded, without premultiplication/quantization. */
 cui_background_color cui_background_color_from_srgba8(cui_color color);
 /* Normalized source HSLA uses the SOURCE_038 shader conversion: resulting RGB
- * is treated as linear, with NO additional sRGB decode. Inputs finite [0,1]. */
+ * is treated as linear, with NO additional sRGB decode. Inputs finite [0,1].
+ * Uses stable equivalent chroma and clips unit-gamut conversion roundoff only. */
 bool cui_background_color_from_source_038_hsla(float h, float s, float l, float a,
                                                cui_background_color *out);
 /* Checked constructors copy all active values; inactive fields are canonical zero.

@@ -22,6 +22,9 @@ encoded byte channels. `cui_background_color_from_source_038_hsla` accepts norma
 HSLA and matches the source shader's conversion convention: its resulting RGB is
 treated as linear, without an extra sRGB decode. These conversions intentionally
 differ for gray. Neither quantizes to bytes or premultiplies the stored color.
+The HSLA conversion uses cancellation-free equivalent chroma near black and clips
+unit-gamut roundoff to [0,1], so every successful result is a valid owned color.
+This correction does not clamp the sampler's Oklab out-of-gamut output.
 
 ```c
 #include <cui/cui_background.h>

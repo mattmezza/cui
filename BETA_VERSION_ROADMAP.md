@@ -84,35 +84,14 @@ omission/removal and resource lifetime. Record justified nonvisual/host exceptio
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
 
-Latest reliable delivery evidence: [CI](https://github.com/mattmezza/cui/actions/runs/41236071825),
+The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actions/runs/41236071825),
 [native bindings](https://github.com/mattmezza/cui/actions/runs/41236071845) and
-[browser/deployment](https://github.com/mattmezza/cui/actions/runs/41236071976)
-passed for the merged styling revision. New integration work has focused passes, including 18/18 combined skill tests,
-6/6 usage tests and generated freshness after background preparation integration
-(`2cfe490a`). Fresh strict C11/headless background checks passed 107 grids and
-8,500 frozen-sampler comparisons; this establishes preparation, not renderer support.
-Typed Base Slider `5afc739f` passed a warnings-clean combined build and 4/4
-headless source, selective/umbrella distribution and legacy-event checks. Updated
-consumer skill tests passed 18/18. Styled and foreign authoring remain pending.
-
-Candidate `b2a4db93` passed [full hosted CI](https://github.com/mattmezza/cui/actions/runs/41244554704)
-and [native bindings](https://github.com/mattmezza/cui/actions/runs/41244554789).
-Newer Core integration `6fb1357d` passed a 157-step warnings-clean build, all 15
-focused layout/background/legacy-pixel tests and two Inter-font checks. Private
-software validation `0625580a` also passed against that rebuilt Core. The combined
-consumer skill passed 18/18 and pinned formatting checks passed. Painting and
-font/shadow resource preparation remain unfinished. Spinner fix `638d9d13` passed
-four local viewport/DPI cases and 24 instrumented preference transitions with zero
-extra frames; hosted confirmation remains pending. No clean **full**
-regression run or browser gate covers the complete newer integration yet.
-Older green results do not cover newer code.
-
-Current candidate `c66c6f5f` exposed three hosted integration gaps: source-package
-configuration incorrectly required generated `dist` headers; Windows lacks the
-private validator’s `max_align_t`; a Slider event-count guard warns on WASM32.
-The package configuration fix passes actual staged-source configuration and all
-five full-tree import fixtures locally. Portability fixes and hosted confirmation
-remain pending; there is no new public deployment.
+[Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
+Integration candidate `3636bfbc` now passes [all browser shards](https://github.com/mattmezza/cui/actions/runs/41249695672)
+and [native binding runners](https://github.com/mattmezza/cui/actions/runs/41249695759).
+Windows Release remains the last main CI job; integration-branch deployment was
+intentionally skipped. Newer text and Slider proof slices have focused local passes,
+not full hosted acceptance. Older green results do not cover newer code.
 
 ### Current integration evidence
 

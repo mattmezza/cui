@@ -14,7 +14,7 @@ release date is asserted.
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `04911c7fe81cafbe9d0e2937e1827fac4a3ead08`; public docs, catalog, headers and native archive checked on 2026-10-31. |
 | Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
-| Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows pass combined local native, facade and browser checks; hosted integration is still pending. |
+| Latest verified batch | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows passed local and hosted checks. Deployment is pending; these APIs are absent from alpha.3 packages. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -44,11 +44,11 @@ can lag implementation: inspect current code and evidence before scheduling work
   The six-kind owned bridge/facade override passes focused portable software and
   all five facade checks. Eight C-only Checkbox/Radio/group facades now accept
   explicit indicator IDs while preserving legacy anonymous routes; their focused
-  tests pass against captured old-library fixtures. The next batch adds typed
+  tests pass against captured old-library fixtures. The latest source batch adds typed
   indicator/track/thumb binding targets where supported,
   compound paint-part IDs, Button state-specific shadows and opt-in gallery examples;
-  combined local native, five-language and browser checks passed. Hosted integration,
-  broader component/portal coverage and GPU proof remain pending. Only the initial
+  combined local native, five-language, full hosted CI and three browser shards
+  passed. Broader component/portal coverage and GPU proof remain pending. Only the initial
   six-root/C-indicator slice is released in alpha.3.
 - [x] **Release the completed alpha.3 batch.** Matching source/C install, Python
   wheel, npm tarball, Go source proxy and Rust crate published after installed
@@ -56,11 +56,17 @@ can lag implementation: inspect current code and evidence before scheduling work
 
 ## Latest validation evidence
 
-- Pending styling branch: **22/22** native/Python regressions, **5/5** root and
+- Latest styling batch: **22/22** native/Python regressions, **5/5** root and
   **5/5** part facade/older-library checks, strict TypeScript and **18/18** skill
   tests passed. Five fixtures pass the 1 MB stack guard. The WASM gallery passed
   ten desktop/narrow-DPR cases with actual paint/input checks and copied C usage.
-  These additions remain unreleased and are absent from alpha.3 packages.
+  [Full CI](https://github.com/mattmezza/cui/actions/runs/41234625024) and
+  [native bindings](https://github.com/mattmezza/cui/actions/runs/41234625049)
+  passed at `efc31958`, including Windows Debug/Release and GCC sanitizers.
+  [All three browser shards](https://github.com/mattmezza/cui/actions/runs/41232346901)
+  passed; subsequent changes only corrected docs/metadata and hardened fixtures.
+  The full pixel oracle now passes a 256 KiB stack guard. These additions remain
+  unreleased and are absent from alpha.3 packages.
 - Exact release source `a7dee360`: [full CI](https://github.com/mattmezza/cui/actions/runs/41226410425)
   and [native binding gate](https://github.com/mattmezza/cui/actions/runs/41226410434)
   passed, including GCC sanitizers, Windows Debug/Release and five hidden-window

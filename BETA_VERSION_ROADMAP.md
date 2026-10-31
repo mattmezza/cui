@@ -182,6 +182,9 @@ behavior families need justified exceptions rather than invented paint roots.
   flags, callbacks/state ownership, immediate/retained distinctions, language
   examples and professional composed-app recipes. Keep search, copyable snippets,
   themes, media/README capture and sharing/OG metadata accurate as APIs change.
+- [ ] **Build/CI cost:** reuse equivalent test compilation where safe and keep
+  pinned caches/browser shards effective. Preserve independent distribution and
+  backend checks; speedups need measured evidence rather than fewer validations.
 - [ ] **Agent guidance:** update source metadata, generated consumer skill and
   agent-readable docs together; keep discovery concise and revision-aware.
   Distinguish shipped declarations from proposals/pseudocode.

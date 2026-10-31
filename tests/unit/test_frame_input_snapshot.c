@@ -43,14 +43,21 @@ static void good(cui_context *ui) {
 static cui_frame_v2_options options(size_t commands) {
     return (cui_frame_v2_options){
         .size = sizeof(cui_frame_v2_options),
-        .support = {.size = sizeof(cui_draw_v2_support), .abi_version = CUI_DRAW_ABI_V2,
+        .support = {.size = sizeof(cui_draw_v2_support),
+                    .abi_version = CUI_DRAW_ABI_V2,
                     .background_output = CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1,
-                    .features = CUI_DRAW_V2_FEATURE_BACKGROUNDS, .max_commands = commands,
-                    .max_backgrounds = 1, .max_pixels = 1024, .max_pixels_per_background = 1024,
-                    .cpu_bytes = 8192, .texture_bytes = 8192, .transfer_bytes = 8192,
+                    .features = CUI_DRAW_V2_FEATURE_BACKGROUNDS,
+                    .max_commands = commands,
+                    .max_backgrounds = 1,
+                    .max_pixels = 1024,
+                    .max_pixels_per_background = 1024,
+                    .cpu_bytes = 8192,
+                    .texture_bytes = 8192,
+                    .transfer_bytes = 8192,
                     .metadata_bytes = 8192},
         .required_features = CUI_DRAW_V2_FEATURE_BACKGROUNDS,
-        .command_bytes = commands * sizeof(cui_draw_command_v2), .background_bytes = 8192};
+        .command_bytes = commands * sizeof(cui_draw_command_v2),
+        .background_bytes = 8192};
 }
 static void lifecycle(cui_context *ui) {
     assert(!cui_frame_input_snapshot_ready(NULL));
@@ -116,7 +123,8 @@ static void v2(cui_context *ui) {
     assert(cui_set_background(ui, &brush));
     cui_end_box(ui);
     cui_draw_list_v2 list;
-    assert(cui_end_frame_v2(ui, &list) && list.count && list.commands[0].kind == CUI_DRAW_V2_BACKGROUND);
+    assert(cui_end_frame_v2(ui, &list) && list.count &&
+           list.commands[0].kind == CUI_DRAW_V2_BACKGROUND);
     assert(cui_accessibility_numeric_snapshot_ready(ui));
     for (unsigned failure = 0; failure < 3; ++failure) {
         good(ui);
@@ -194,13 +202,14 @@ static void v2(cui_context *ui) {
     assert(!ui->numeric);
 }
 int main(void) {
-    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100,
-                                              .max_elements = 32, .max_commands = 32});
+    cui_context *ui = cui_create(
+        (cui_config){.width = 200, .height = 100, .max_elements = 32, .max_commands = 32});
     assert(ui);
     lifecycle(ui);
     v2(ui);
     printf("context=%zu numeric_block=%zu observer_extra_context=0 numeric_fixed=%zu N32=%zu\n",
-           sizeof(cui_context), offsetof(cui_context, scroll_layout) - offsetof(cui_context, numeric),
+           sizeof(cui_context),
+           offsetof(cui_context, scroll_layout) - offsetof(cui_context, numeric),
            sizeof(cui_core_numeric_state), sizeof(cui_core_numeric_state) + 64 * sizeof(uint32_t));
     cui_destroy(ui);
     return 0;

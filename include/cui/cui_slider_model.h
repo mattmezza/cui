@@ -37,7 +37,7 @@ typedef struct {
  * inside domain. These validators neither snap nor alter caller storage. */
 bool cui_slider_model_domain_valid_v1(cui_slider_model_domain_v1 domain);
 bool cui_slider_model_value_valid_v1(cui_slider_model_domain_v1 domain,
-                                      cui_slider_model_value_v1 value);
+                                     cui_slider_model_value_v1 value);
 /* Propose one endpoint: finite request clamps to domain, snaps to min-origin
  * nearest step (halfway toward larger value), then clamps to its neighbor.
  * Exact domain endpoints remain reachable; off-grid neighbor may win. SINGLE
@@ -45,16 +45,15 @@ bool cui_slider_model_value_valid_v1(cui_slider_model_domain_v1 domain,
  * Invalid argument/null output leaves ALL output bytes unchanged; out may alias
  * caller value storage because inputs are passed by value. */
 bool cui_slider_model_value_constrain_v1(cui_slider_model_domain_v1 domain,
-                                          cui_slider_model_value_v1 current, uint32_t thumb,
-                                          double requested, cui_slider_model_value_v1 *out);
+                                         cui_slider_model_value_v1 current, uint32_t thumb,
+                                         double requested, cui_slider_model_value_v1 *out);
 /* Increasing min->max visual fraction, independent of axis/reverse-fill. Input
  * must lie in domain/[0,1]; no extrapolation. Linear zero span maps to0 and its
  * sole value; log uses stable close-ratio and extreme-ratio math. Endpoints are
  * exact. Invalid/null output leaves output unchanged. No step snapping here. */
-bool cui_slider_model_to_fraction_v1(cui_slider_model_domain_v1 domain, double value,
-                                      double *out);
+bool cui_slider_model_to_fraction_v1(cui_slider_model_domain_v1 domain, double value, double *out);
 bool cui_slider_model_from_fraction_v1(cui_slider_model_domain_v1 domain, double fraction,
-                                        double *out);
+                                       double *out);
 /* Exact sizeof(v1), non-null output; invalid leaves output unchanged. Initializes
  * every byte, version/size, SINGLE zero values, END thumb, no owner/gesture.
  * Copies need no context/lifetime. No reducer/events/host API in this slice. */

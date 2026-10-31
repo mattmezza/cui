@@ -33,10 +33,9 @@ static void validity(void) {
     single.kind = 2;
     assert(!cui_slider_model_value_valid_v1(d, single));
     const cui_slider_model_domain_v1 bad[] = {
-        {NAN, 1, 0, 0, 0}, {0, INFINITY, 0, 0, 0}, {1, 0, 0, 0, 0},
-        {0, 1, -1, 0, 0}, {0, 1, NAN, 0, 0}, {0, 1, 0, 2, 0},
-        {0, 1, 0, 0, 1}, {-DBL_MAX, DBL_MAX, 0, 0, 0},
-        {0, 1, 0, 1, 0}, {1, 1, 0, 1, 0}};
+        {NAN, 1, 0, 0, 0}, {0, INFINITY, 0, 0, 0}, {1, 0, 0, 0, 0}, {0, 1, -1, 0, 0},
+        {0, 1, NAN, 0, 0}, {0, 1, 0, 2, 0},        {0, 1, 0, 0, 1}, {-DBL_MAX, DBL_MAX, 0, 0, 0},
+        {0, 1, 0, 1, 0},   {1, 1, 0, 1, 0}};
     for (size_t i = 0; i < sizeof bad / sizeof *bad; ++i)
         assert(!cui_slider_model_domain_valid_v1(bad[i]));
     assert(cui_slider_model_domain_valid_v1(linear(-0., 0, 0)));
@@ -125,10 +124,12 @@ static void neighbors(void) {
         }
 }
 static void mappings(void) {
-    const cui_slider_model_domain_v1 domains[] = {
-        {0, 1, 0, 0, 0}, {-DBL_MAX / 2, DBL_MAX / 2, 0, 0, 0},
-        {DBL_TRUE_MIN, DBL_MAX, 0, 1, 0}, {1e308, 1.5e308, 0, 1, 0},
-        {1e308, 0, 0, 1, 0}, {DBL_TRUE_MIN, DBL_TRUE_MIN * 7, 0, 1, 0}};
+    const cui_slider_model_domain_v1 domains[] = {{0, 1, 0, 0, 0},
+                                                  {-DBL_MAX / 2, DBL_MAX / 2, 0, 0, 0},
+                                                  {DBL_TRUE_MIN, DBL_MAX, 0, 1, 0},
+                                                  {1e308, 1.5e308, 0, 1, 0},
+                                                  {1e308, 0, 0, 1, 0},
+                                                  {DBL_TRUE_MIN, DBL_TRUE_MIN * 7, 0, 1, 0}};
     for (size_t k = 0; k < sizeof domains / sizeof *domains; ++k) {
         cui_slider_model_domain_v1 d = domains[k];
         if (k == 4)
@@ -154,8 +155,8 @@ static void mappings(void) {
 static int probe(void) {
     unsigned op, scale, kind, thumb;
     double min, max, step, start, end, x;
-    while (scanf("%u %la %la %la %u %u %la %la %u %la", &op, &min, &max, &step,
-                 &scale, &kind, &start, &end, &thumb, &x) == 10) {
+    while (scanf("%u %la %la %la %u %u %la %la %u %la", &op, &min, &max, &step, &scale, &kind,
+                 &start, &end, &thumb, &x) == 10) {
         cui_slider_model_domain_v1 d = {min, max, step, scale, 0};
         cui_slider_model_value_v1 v = {kind, 0, start, end}, out;
         double result = 0;
@@ -164,8 +165,8 @@ static int probe(void) {
             ok = cui_slider_model_value_constrain_v1(d, v, thumb, x, &out);
             printf("%u %a %a\n", ok, ok ? out.start : 0, ok ? out.end : 0);
         } else {
-            ok = op == 2 ? cui_slider_model_to_fraction_v1(d, x, &result) :
-                           cui_slider_model_from_fraction_v1(d, x, &result);
+            ok = op == 2 ? cui_slider_model_to_fraction_v1(d, x, &result)
+                         : cui_slider_model_from_fraction_v1(d, x, &result);
             printf("%u %a\n", ok, result);
         }
     }

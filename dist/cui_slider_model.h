@@ -38,7 +38,7 @@ typedef struct {
  * inside domain. These validators neither snap nor alter caller storage. */
 bool cui_slider_model_domain_valid_v1(cui_slider_model_domain_v1 domain);
 bool cui_slider_model_value_valid_v1(cui_slider_model_domain_v1 domain,
-                                      cui_slider_model_value_v1 value);
+                                     cui_slider_model_value_v1 value);
 /* Propose one endpoint: finite request clamps to domain, snaps to min-origin
  * nearest step (halfway toward larger value), then clamps to its neighbor.
  * Exact domain endpoints remain reachable; off-grid neighbor may win. SINGLE
@@ -46,16 +46,15 @@ bool cui_slider_model_value_valid_v1(cui_slider_model_domain_v1 domain,
  * Invalid argument/null output leaves ALL output bytes unchanged; out may alias
  * caller value storage because inputs are passed by value. */
 bool cui_slider_model_value_constrain_v1(cui_slider_model_domain_v1 domain,
-                                          cui_slider_model_value_v1 current, uint32_t thumb,
-                                          double requested, cui_slider_model_value_v1 *out);
+                                         cui_slider_model_value_v1 current, uint32_t thumb,
+                                         double requested, cui_slider_model_value_v1 *out);
 /* Increasing min->max visual fraction, independent of axis/reverse-fill. Input
  * must lie in domain/[0,1]; no extrapolation. Linear zero span maps to0 and its
  * sole value; log uses stable close-ratio and extreme-ratio math. Endpoints are
  * exact. Invalid/null output leaves output unchanged. No step snapping here. */
-bool cui_slider_model_to_fraction_v1(cui_slider_model_domain_v1 domain, double value,
-                                      double *out);
+bool cui_slider_model_to_fraction_v1(cui_slider_model_domain_v1 domain, double value, double *out);
 bool cui_slider_model_from_fraction_v1(cui_slider_model_domain_v1 domain, double fraction,
-                                        double *out);
+                                       double *out);
 /* Exact sizeof(v1), non-null output; invalid leaves output unchanged. Initializes
  * every byte, version/size, SINGLE zero values, END thumb, no owner/gesture.
  * Copies need no context/lifetime. No reducer/events/host API in this slice. */
@@ -71,28 +70,27 @@ bool cui_slider_model_state_init_v1(uint32_t state_size, cui_slider_model_state_
 /* src/base/cui_slider_model.c */
 /* SPDX-License-Identifier: MIT */
 
-#include <math.h>
 #include <float.h>
+#include <math.h>
 #include <string.h>
 bool cui_slider_model_domain_valid_v1(cui_slider_model_domain_v1 d) {
-    return !d.reserved && d.scale <= CUI_SLIDER_MODEL_LOGARITHMIC &&
-           isfinite(d.minimum) && isfinite(d.maximum) && isfinite(d.step) &&
-           d.minimum <= d.maximum && isfinite(d.maximum - d.minimum) && d.step >= 0 &&
-           (d.scale != CUI_SLIDER_MODEL_LOGARITHMIC ||
-            (d.minimum > 0 && d.maximum > d.minimum));
+    return !d.reserved && d.scale <= CUI_SLIDER_MODEL_LOGARITHMIC && isfinite(d.minimum) &&
+           isfinite(d.maximum) && isfinite(d.step) && d.minimum <= d.maximum &&
+           isfinite(d.maximum - d.minimum) && d.step >= 0 &&
+           (d.scale != CUI_SLIDER_MODEL_LOGARITHMIC || (d.minimum > 0 && d.maximum > d.minimum));
 }
-bool cui_slider_model_value_valid_v1(cui_slider_model_domain_v1 d,
-                                      cui_slider_model_value_v1 v) {
-    if (!cui_slider_model_domain_valid_v1(d) || v.reserved ||
-        v.kind > CUI_SLIDER_MODEL_RANGE || !isfinite(v.end) ||
-        v.end < d.minimum || v.end > d.maximum)
+bool cui_slider_model_value_valid_v1(cui_slider_model_domain_v1 d, cui_slider_model_value_v1 v) {
+    if (!cui_slider_model_domain_valid_v1(d) || v.reserved || v.kind > CUI_SLIDER_MODEL_RANGE ||
+        !isfinite(v.end) || v.end < d.minimum || v.end > d.maximum)
         return false;
     return v.kind == CUI_SLIDER_MODEL_SINGLE ||
            (isfinite(v.start) && v.start >= d.minimum && v.start <= v.end);
 }
 /* Error-free sum/difference retains tiny origin offsets at an exact midpoint.
  * No dependence on long double having more precision than double. */
-typedef struct { double high, low; } cui_slider_model_pair;
+typedef struct {
+    double high, low;
+} cui_slider_model_pair;
 static cui_slider_model_pair cui_slider_model_sum(double a, double b) {
     double high = a + b, z = high - a;
     return (cui_slider_model_pair){high, (a - (high - z)) + (b - z)};
@@ -135,8 +133,8 @@ static double cui_slider_model_snap(cui_slider_model_domain_v1 d, double value) 
         return value;
     /* Separate remainders avoid overflowing (value-min)/step and preserve the
      * lattice phase when subtracting a large minimum would erase value. */
-    cui_slider_model_pair phase = cui_slider_model_sum(fmod(value, d.step),
-                                                       -fmod(d.minimum, d.step));
+    cui_slider_model_pair phase =
+        cui_slider_model_sum(fmod(value, d.step), -fmod(d.minimum, d.step));
     cui_slider_model_pair compare = phase;
     double step = d.step;
     if (step < 2 * DBL_MIN) {
@@ -148,8 +146,8 @@ static double cui_slider_model_snap(cui_slider_model_domain_v1 d, double value) 
     int multiple;
     if (cui_slider_model_compare(compare, half) >= 0) {
         cui_slider_model_pair reduced = cui_slider_model_sum(compare.high, -step);
-        multiple = cui_slider_model_sign(reduced.high, reduced.low, compare.low, -half) >= 0
-                       ? 2 : 1;
+        multiple =
+            cui_slider_model_sign(reduced.high, reduced.low, compare.low, -half) >= 0 ? 2 : 1;
     } else
         multiple = cui_slider_model_compare(compare, -half) < 0 ? -1 : 0;
     cui_slider_model_pair correction;
@@ -162,25 +160,26 @@ static double cui_slider_model_snap(cui_slider_model_domain_v1 d, double value) 
         correction = cui_slider_model_add(correction, -phase.low);
     }
     cui_slider_model_pair room = cui_slider_model_sum(d.maximum, -value);
-    if (correction.high >= 0 && cui_slider_model_sign(correction.high, correction.low,
-                                                      -room.high, -room.low) > 0)
+    if (correction.high >= 0 &&
+        cui_slider_model_sign(correction.high, correction.low, -room.high, -room.low) > 0)
         return d.maximum;
     room = cui_slider_model_sum(value, -d.minimum);
-    if (correction.high <= 0 && cui_slider_model_sign(-correction.high, -correction.low,
-                                                      -room.high, -room.low) > 0)
+    if (correction.high <= 0 &&
+        cui_slider_model_sign(-correction.high, -correction.low, -room.high, -room.low) > 0)
         return d.minimum;
     cui_slider_model_pair result = cui_slider_model_add(correction, value);
     return result.high + result.low;
 }
-bool cui_slider_model_value_constrain_v1(cui_slider_model_domain_v1 d,
-                                          cui_slider_model_value_v1 v, uint32_t thumb,
-                                          double requested, cui_slider_model_value_v1 *out) {
+bool cui_slider_model_value_constrain_v1(cui_slider_model_domain_v1 d, cui_slider_model_value_v1 v,
+                                         uint32_t thumb, double requested,
+                                         cui_slider_model_value_v1 *out) {
     if (!out || !cui_slider_model_value_valid_v1(d, v) || !isfinite(requested) ||
         thumb > CUI_SLIDER_MODEL_END ||
         (v.kind == CUI_SLIDER_MODEL_SINGLE && thumb != CUI_SLIDER_MODEL_END))
         return false;
-    double value = requested < d.minimum ? d.minimum :
-                   requested > d.maximum ? d.maximum : requested;
+    double value = requested < d.minimum   ? d.minimum
+                   : requested > d.maximum ? d.maximum
+                                           : requested;
     value = cui_slider_model_snap(d, value);
     if (v.kind == CUI_SLIDER_MODEL_SINGLE) {
         v.start = 0;
@@ -197,8 +196,8 @@ static double cui_slider_model_log_ratio(double low, double high) {
     return isfinite(ratio) ? log1p(ratio) : log(high) - log(low);
 }
 bool cui_slider_model_to_fraction_v1(cui_slider_model_domain_v1 d, double value, double *out) {
-    if (!out || !cui_slider_model_domain_valid_v1(d) || !isfinite(value) ||
-        value < d.minimum || value > d.maximum)
+    if (!out || !cui_slider_model_domain_valid_v1(d) || !isfinite(value) || value < d.minimum ||
+        value > d.maximum)
         return false;
     double fraction = 0;
     if (value != d.minimum) {
@@ -215,10 +214,9 @@ bool cui_slider_model_to_fraction_v1(cui_slider_model_domain_v1 d, double value,
     *out = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
     return true;
 }
-bool cui_slider_model_from_fraction_v1(cui_slider_model_domain_v1 d, double fraction,
-                                        double *out) {
-    if (!out || !cui_slider_model_domain_valid_v1(d) || !isfinite(fraction) ||
-        fraction < 0 || fraction > 1)
+bool cui_slider_model_from_fraction_v1(cui_slider_model_domain_v1 d, double fraction, double *out) {
+    if (!out || !cui_slider_model_domain_valid_v1(d) || !isfinite(fraction) || fraction < 0 ||
+        fraction > 1)
         return false;
     double value;
     if (fraction == 0 || d.minimum == d.maximum)

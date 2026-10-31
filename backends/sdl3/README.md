@@ -65,3 +65,24 @@ submitting frames while `cui_needs_redraw()` is true, including animation demand
 The examples cap idle waits at 250 ms; applications with external timers should
 choose their nearest deadline and explicitly invalidate Core when their model
 changes. Threaded producers can arrange an SDL event wakeup on the main thread.
+
+
+For a daemon-style native host, create the window hidden from its first instant:
+
+```c
+cui_sdl3 *host = cui_sdl3_create_with_options("Notifications", 480, 320, font,
+    (cui_sdl3_window_options){.initially_hidden = true});
+/* Later, on the main thread: */
+if (host) cui_sdl3_set_visible(host, true);
+```
+
+The option sets SDL's hidden flag in the window constructor; no visible window
+is created and then hidden. Zero options and `cui_sdl3_create()` preserve visible
+creation. `cui_sdl3_is_visible()` queries SDL's hidden flag; it does not establish
+whether a window is occluded or minimized. Visibility operations are main-thread
+only and the OS may map/unmap asynchronously. The old constructor ABI is
+unchanged; the new options type does not extend any existing by-value structure.
+Sokol and SDL_GPU adapters do not own windows: their host must request hidden
+creation. Bridge and language builder native runners still create visible
+windows and do not expose this option. Linux X11/private-Xvfb validation does not
+establish Wayland, Windows or macOS behavior.

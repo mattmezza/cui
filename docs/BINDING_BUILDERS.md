@@ -6,6 +6,10 @@ checkout; registry publication and other platform packages remain pending.
 
 The component builders let you author a UI tree in your language. CUI performs
 layout and input handling in C; the optional SDL adapter draws a native window.
+Native builder windows currently start visible. The additive C SDL3 host
+`cui_sdl3_create_with_options(..., (cui_sdl3_window_options){.initially_hidden = true})`
+option and visibility controls are not exposed by the bridge or these builders.
+
 The bridge exposes tested API subsets for all 78 catalog families through native CUI renderers and app services,
 plus rows, columns, radio groups and composite items. Python, JavaScript,
 TypeScript, [Go](GO_BUILDERS.md) and [Rust](RUST_BUILDERS.md) construct these

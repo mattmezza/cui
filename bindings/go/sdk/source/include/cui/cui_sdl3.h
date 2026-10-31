@@ -15,6 +15,18 @@ typedef struct {
 } cui_sdl3_cache_stats;
 /* Optional SDL3 adapter; all operations must run on the main thread. */
 cui_sdl3 *cui_sdl3_create(const char *title, int width, int height, cui_font *font);
+/* Zero options preserve visible creation. No existing constructor ABI changes. */
+typedef struct {
+    bool initially_hidden;
+} cui_sdl3_window_options;
+/* initially_hidden is applied at window creation, avoiding a show/hide flash.
+ * font remains borrowed. Failure returns NULL; main thread only. */
+cui_sdl3 *cui_sdl3_create_with_options(const char *title, int width, int height, cui_font *font,
+                                      cui_sdl3_window_options options);
+/* Explicit visibility control; OS mapping may be asynchronous. Query reports the
+ * SDL hidden flag, not occlusion/minimization. Null backends return false. */
+bool cui_sdl3_set_visible(cui_sdl3 *backend, bool visible);
+bool cui_sdl3_is_visible(cui_sdl3 *backend);
 void cui_sdl3_destroy(cui_sdl3 *backend);
 /* Main-thread copied system-theme snapshot. Initial query revision is 1; poll
  * observes SDL notifications and invalidates Core. Revision saturates at UINT64_MAX.

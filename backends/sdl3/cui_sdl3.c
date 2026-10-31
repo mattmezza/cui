@@ -68,6 +68,10 @@ bool cui_sdl3_appearance(cui_sdl3 *s, cui_platform_appearance *out) {
     return true;
 }
 cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
+    return cui_sdl3_create_with_options(title, w, h, font, (cui_sdl3_window_options){0});
+}
+cui_sdl3 *cui_sdl3_create_with_options(const char *title, int w, int h, cui_font *font,
+                                      cui_sdl3_window_options options) {
     if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
         return NULL;
     cui_sdl3 *s = calloc(1, sizeof(*s));
@@ -76,7 +80,10 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
         return NULL;
     }
     s->font = font;
-    s->window = SDL_CreateWindow(title, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+    if (options.initially_hidden)
+        flags |= SDL_WINDOW_HIDDEN;
+    s->window = SDL_CreateWindow(title, w, h, flags);
     if (s->window)
         s->renderer = SDL_CreateRenderer(s->window, NULL);
     if (!s->renderer) {
@@ -88,6 +95,14 @@ cui_sdl3 *cui_sdl3_create(const char *title, int w, int h, cui_font *font) {
     s->appearance = (cui_platform_appearance){system_appearance(), CUI_APPEARANCE_SYSTEM_THEME, 1};
     SDL_StopTextInput(s->window);
     return s;
+}
+bool cui_sdl3_set_visible(cui_sdl3 *s, bool visible) {
+    if (!s || !s->window)
+        return false;
+    return visible ? SDL_ShowWindow(s->window) : SDL_HideWindow(s->window);
+}
+bool cui_sdl3_is_visible(cui_sdl3 *s) {
+    return s && s->window && !(SDL_GetWindowFlags(s->window) & SDL_WINDOW_HIDDEN);
 }
 void cui_sdl3_destroy(cui_sdl3 *s) {
     if (!s)

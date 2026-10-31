@@ -406,6 +406,12 @@ enum { CUI_SHADOW_PRESET_MAX = 2 };
 /* Checked source constructor: DROP, sigma/spread zero, explicit color.
  * Finite offsets must lie in [-4096,4096]; invalid input leaves output untouched. */
 bool cui_box_shadow_init(float offset_x, float offset_y, cui_color, cui_box_shadow *out);
+/* Explicit CSS-inspired blur radius: sigma=blur_radius/2, radius in [0,512].
+ * Other limits match box shadows. Invalid input leaves output unchanged.
+ * This conversion does not promise browser box-shadow pixel equivalence. */
+bool cui_box_shadow_from_css(float offset_x, float offset_y, float blur_radius,
+                              float spread, cui_color, cui_box_shadow_kind,
+                              cui_box_shadow *out);
 /* Copy ordered layers (black alpha13/26/64). Output count must not overlap the
  * written layer span. Invalid enum, capacity/overflow or pointers leave all outputs
  * untouched. NONE writes count0 only; its layer buffer may be NULL. */
@@ -672,6 +678,17 @@ bool cui_set_box_shadows(cui_context *, const cui_box_shadow *, size_t count, cu
 bool cui_set_drop_shadows(cui_context *, const cui_drop_shadow *, size_t count, cui_corner_radii);
 /* Replaces the whole mixed list. NONE clears DROP and INSET; no buffer is retained. */
 bool cui_set_shadow_preset(cui_context *, cui_shadow_preset, cui_corner_radii);
+/* Style an already submitted named box in this frame, open or closed, including
+ * portals. Does not resolve previous-frame/anonymous/layout-only targets. Copies
+ * <=8 layers; replaces both phases; zero count clears. Invalid calls preserve
+ * decoration. Call before end_frame, outside measurement/prepaint/diagnostics.
+ * No layout, input or semantic change. Existing paint/clip/opacity rules apply.
+ * Missing/zero/layout-only targets report INVALID_ACTION; duplicate-ID frames
+ * reject. This addresses box paint IDs, not every component or its nested parts. */
+bool cui_element_set_box_shadows(cui_context *, cui_id, const cui_box_shadow *,
+                                   size_t count, cui_corner_radii);
+bool cui_element_set_shadow_preset(cui_context *, cui_id, cui_shadow_preset,
+                                     cui_corner_radii);
 
 typedef struct {
     cui_rect bounds;
@@ -8122,6 +8139,7 @@ struct cui_context {
     size_t bounds_track_count;
     size_t *semantic_nodes, *previous_parents;
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
+    bool ambiguous_box_ids;
     cui_rect *previous_hits;
     int16_t *previous_layers;
     uint64_t *previous_order;
@@ -9711,6 +9729,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->text_source_count = 0;
     ui->wrap_failed = false;
     ui->node_count = 0;
+    ui->ambiguous_box_ids = false;
     ui->paint_root_count = 0;
     ui->bounds_track_count = 0;
     ui->prepaint_count = ui->prepaint_reserved = 0;
@@ -9802,6 +9821,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     if (id)
         for (size_t i = 0; i < ui->id_count; i++)
             if (ui->ids[i] == id || cui_core_folded(ui->ids[i]) == cui_core_folded(id)) {
+                ui->ambiguous_box_ids = true;
                 cui_core_detail(ui, CUI_ERROR_DUPLICATE_ID, CUI_DIAGNOSTIC_DUPLICATE_ID, __func__,
                                 id, 0, 0, 0);
                 ok = false;
@@ -10102,6 +10122,78 @@ bool cui_set_box_shadows(cui_context *ui, const cui_box_shadow *layers, size_t c
     node->shadow_radii = radii;
     Clay__GetOpenLayoutElement()->config.custom.customData = node;
     return true;
+}
+bool cui_box_shadow_from_css(float x, float y, float blur_radius, float spread,
+                              cui_color color, cui_box_shadow_kind kind, cui_box_shadow *out) {
+    if (!out || !isfinite(blur_radius) || blur_radius < 0 || blur_radius > 512 ||
+        (kind != CUI_BOX_SHADOW_DROP && kind != CUI_BOX_SHADOW_INSET))
+        return false;
+    cui_box_shadow value = {.layer = {.offset_x = x, .offset_y = y,
+                                      .sigma = blur_radius / 2, .spread = spread, .color = color},
+                            .kind = kind};
+    cui_rect ignored;
+    if (!cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                       .layer = value.layer}, &ignored))
+        return false;
+    *out = value;
+    return true;
+}
+bool cui_element_set_box_shadows(cui_context *ui, cui_id id, const cui_box_shadow *layers,
+                                   size_t count, cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui || !ui->in_frame || ui->ambiguous_box_ids || cui_core_layout_only(ui) ||
+        ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
+        return false;
+    if (!id) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    cui_core_box_node *node = NULL;
+    for (size_t i = 0; i < ui->node_count; ++i)
+        if (ui->nodes[i].id == id) {
+            node = &ui->nodes[i];
+            break;
+        }
+    if (!node || node->layout_only) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    if (count > CUI_BOX_SHADOW_MAX || (count && !layers))
+        return false;
+    cui_rect ignored;
+    for (size_t i = 0; i < count; ++i)
+        if ((layers[i].kind != CUI_BOX_SHADOW_DROP && layers[i].kind != CUI_BOX_SHADOW_INSET) ||
+            !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                          .radii = radii,
+                                                          .layer = layers[i].layer}, &ignored))
+            return false;
+    cui_core_select_context(ui);
+    Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(node->clay_id);
+    Clay_LayoutElement *element = item->layoutElement;
+    if (!element || element->id != node->clay_id || element->isTextElement || element->exiting ||
+        element->config.userData != node) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    if (count)
+        memcpy(node->shadows, layers, count * sizeof(*layers));
+    node->shadow_count = count;
+    node->shadow_radii = radii;
+    if (count)
+        element->config.custom.customData = node;
+    return true;
+}
+bool cui_element_set_shadow_preset(cui_context *ui, cui_id id, cui_shadow_preset preset,
+                                     cui_corner_radii radii) {
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX];
+    size_t count;
+    if (!cui_shadow_preset_layers(preset, layers, CUI_SHADOW_PRESET_MAX, &count))
+        return false;
+    cui_box_shadow copied[CUI_SHADOW_PRESET_MAX];
+    for (size_t i = 0; i < count; ++i)
+        copied[i] = (cui_box_shadow){.layer = layers[i], .kind = CUI_BOX_SHADOW_DROP};
+    return cui_element_set_box_shadows(ui, id, copied, count, radii);
 }
 bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t count,
                           cui_corner_radii radii) {

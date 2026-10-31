@@ -150,6 +150,7 @@ struct cui_context {
     size_t bounds_track_count;
     size_t *semantic_nodes, *previous_parents;
     size_t node_count, node_stack[CUI_CORE_STACK_MAX];
+    bool ambiguous_box_ids;
     cui_rect *previous_hits;
     int16_t *previous_layers;
     uint64_t *previous_order;
@@ -1739,6 +1740,7 @@ bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     ui->text_source_count = 0;
     ui->wrap_failed = false;
     ui->node_count = 0;
+    ui->ambiguous_box_ids = false;
     ui->paint_root_count = 0;
     ui->bounds_track_count = 0;
     ui->prepaint_count = ui->prepaint_reserved = 0;
@@ -1830,6 +1832,7 @@ static void cui_core_begin_box(cui_context *ui, cui_id id, cui_box b, const cui_
     if (id)
         for (size_t i = 0; i < ui->id_count; i++)
             if (ui->ids[i] == id || cui_core_folded(ui->ids[i]) == cui_core_folded(id)) {
+                ui->ambiguous_box_ids = true;
                 cui_core_detail(ui, CUI_ERROR_DUPLICATE_ID, CUI_DIAGNOSTIC_DUPLICATE_ID, __func__,
                                 id, 0, 0, 0);
                 ok = false;
@@ -2130,6 +2133,78 @@ bool cui_set_box_shadows(cui_context *ui, const cui_box_shadow *layers, size_t c
     node->shadow_radii = radii;
     Clay__GetOpenLayoutElement()->config.custom.customData = node;
     return true;
+}
+bool cui_box_shadow_from_css(float x, float y, float blur_radius, float spread,
+                              cui_color color, cui_box_shadow_kind kind, cui_box_shadow *out) {
+    if (!out || !isfinite(blur_radius) || blur_radius < 0 || blur_radius > 512 ||
+        (kind != CUI_BOX_SHADOW_DROP && kind != CUI_BOX_SHADOW_INSET))
+        return false;
+    cui_box_shadow value = {.layer = {.offset_x = x, .offset_y = y,
+                                      .sigma = blur_radius / 2, .spread = spread, .color = color},
+                            .kind = kind};
+    cui_rect ignored;
+    if (!cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                       .layer = value.layer}, &ignored))
+        return false;
+    *out = value;
+    return true;
+}
+bool cui_element_set_box_shadows(cui_context *ui, cui_id id, const cui_box_shadow *layers,
+                                   size_t count, cui_corner_radii radii) {
+    if (!cui_core_mutation(ui))
+        return false;
+    if (!ui || !ui->in_frame || ui->ambiguous_box_ids || cui_core_layout_only(ui) ||
+        ui->overflow_depth || (ui->depth && !ui->opened[ui->depth - 1]))
+        return false;
+    if (!id) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    cui_core_box_node *node = NULL;
+    for (size_t i = 0; i < ui->node_count; ++i)
+        if (ui->nodes[i].id == id) {
+            node = &ui->nodes[i];
+            break;
+        }
+    if (!node || node->layout_only) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    if (count > CUI_BOX_SHADOW_MAX || (count && !layers))
+        return false;
+    cui_rect ignored;
+    for (size_t i = 0; i < count; ++i)
+        if ((layers[i].kind != CUI_BOX_SHADOW_DROP && layers[i].kind != CUI_BOX_SHADOW_INSET) ||
+            !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                          .radii = radii,
+                                                          .layer = layers[i].layer}, &ignored))
+            return false;
+    cui_core_select_context(ui);
+    Clay_LayoutElementHashMapItem *item = Clay__GetHashMapItem(node->clay_id);
+    Clay_LayoutElement *element = item->layoutElement;
+    if (!element || element->id != node->clay_id || element->isTextElement || element->exiting ||
+        element->config.userData != node) {
+        cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
+        return false;
+    }
+    if (count)
+        memcpy(node->shadows, layers, count * sizeof(*layers));
+    node->shadow_count = count;
+    node->shadow_radii = radii;
+    if (count)
+        element->config.custom.customData = node;
+    return true;
+}
+bool cui_element_set_shadow_preset(cui_context *ui, cui_id id, cui_shadow_preset preset,
+                                     cui_corner_radii radii) {
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX];
+    size_t count;
+    if (!cui_shadow_preset_layers(preset, layers, CUI_SHADOW_PRESET_MAX, &count))
+        return false;
+    cui_box_shadow copied[CUI_SHADOW_PRESET_MAX];
+    for (size_t i = 0; i < count; ++i)
+        copied[i] = (cui_box_shadow){.layer = layers[i], .kind = CUI_BOX_SHADOW_DROP};
+    return cui_element_set_box_shadows(ui, id, copied, count, radii);
 }
 bool cui_set_drop_shadows(cui_context *ui, const cui_drop_shadow *layers, size_t count,
                           cui_corner_radii radii) {

@@ -405,6 +405,12 @@ enum { CUI_SHADOW_PRESET_MAX = 2 };
 /* Checked source constructor: DROP, sigma/spread zero, explicit color.
  * Finite offsets must lie in [-4096,4096]; invalid input leaves output untouched. */
 bool cui_box_shadow_init(float offset_x, float offset_y, cui_color, cui_box_shadow *out);
+/* Explicit CSS-inspired blur radius: sigma=blur_radius/2, radius in [0,512].
+ * Other limits match box shadows. Invalid input leaves output unchanged.
+ * This conversion does not promise browser box-shadow pixel equivalence. */
+bool cui_box_shadow_from_css(float offset_x, float offset_y, float blur_radius,
+                              float spread, cui_color, cui_box_shadow_kind,
+                              cui_box_shadow *out);
 /* Copy ordered layers (black alpha13/26/64). Output count must not overlap the
  * written layer span. Invalid enum, capacity/overflow or pointers leave all outputs
  * untouched. NONE writes count0 only; its layer buffer may be NULL. */
@@ -671,6 +677,17 @@ bool cui_set_box_shadows(cui_context *, const cui_box_shadow *, size_t count, cu
 bool cui_set_drop_shadows(cui_context *, const cui_drop_shadow *, size_t count, cui_corner_radii);
 /* Replaces the whole mixed list. NONE clears DROP and INSET; no buffer is retained. */
 bool cui_set_shadow_preset(cui_context *, cui_shadow_preset, cui_corner_radii);
+/* Style an already submitted named box in this frame, open or closed, including
+ * portals. Does not resolve previous-frame/anonymous/layout-only targets. Copies
+ * <=8 layers; replaces both phases; zero count clears. Invalid calls preserve
+ * decoration. Call before end_frame, outside measurement/prepaint/diagnostics.
+ * No layout, input or semantic change. Existing paint/clip/opacity rules apply.
+ * Missing/zero/layout-only targets report INVALID_ACTION; duplicate-ID frames
+ * reject. This addresses box paint IDs, not every component or its nested parts. */
+bool cui_element_set_box_shadows(cui_context *, cui_id, const cui_box_shadow *,
+                                   size_t count, cui_corner_radii);
+bool cui_element_set_shadow_preset(cui_context *, cui_id, cui_shadow_preset,
+                                     cui_corner_radii);
 
 typedef struct {
     cui_rect bounds;

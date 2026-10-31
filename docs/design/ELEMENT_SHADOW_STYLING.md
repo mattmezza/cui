@@ -1,6 +1,7 @@
 # Unified element shadows: proposed architecture
 
-Status: design for review, no new API implemented. Audit base: fb3be922.
+Status: named-box addressing and CSS factory implemented as the first slice;
+component-part and binding rollout remains a proposal. Audit base: fb3be922.
 This proposal covers the 78 catalog families as an implementation plan, not a
 claim that all roots or nested parts already expose shadow styling.
 
@@ -33,7 +34,7 @@ to whichever internal box happens to be emitted next. Do not change existing
 public structure layouts, defaults, preset tuples or sigma meanings. A by-ID
 setter alone does not cover anonymous parts or conceptual components.
 
-Proposed names/signatures (not declarations available to consumers):
+First-slice signatures (see authoritative `include/cui/cui.h` contracts):
 
 ```c
 bool cui_element_set_box_shadows(cui_context *, cui_id,
@@ -218,8 +219,8 @@ nice19, and avoid package tests that silently build unrelated targets.
 When implementing public contracts, update canonical header/docs, binding coverage,
 source manifests, SDK/amalgamation generators and consumer skill resources. Run
 generate_agent_skill.py and test_agent_skill.py under the agreed resource budget.
-This design-only file changes no consumer contract, generated data or manifest
-entry. No compilation or heavyweight test was run for this proposal.
+The original design commits changed no consumer contract, generated data or
+manifest entry and ran no compilation. First-slice evidence is recorded below.
 
 ## Core seam checkpoint before implementation
 
@@ -265,3 +266,33 @@ private Clay hash-map/config mechanism already used by scroll-offset mutation;
 focused closed/open/portal tests must lock down that dependency. If those checks
 cannot find the current owned element, reject rather than guess or scan stale
 arena memory. Component part IDs and language authoring remain separate work.
+
+
+## First implementation slice and evidence
+
+The three additive APIs above now implement only current-frame named rectangular
+box styling and explicit CSS blur conversion. No component-part getter, retained
+builder integration or renderer change is included. The private duplicate-box flag
+is reset per frame and catches ambiguous identity even when an earlier unrelated
+diagnostic is sticky. Failed begin/layout-only scopes cannot style another node.
+Old entry points and unstyled element configuration are unchanged.
+
+Strict portable Release compilation used GCC16 with -Wall/-Wextra/-Wpedantic/
+-Werror, nice19, CPU0 affinity and -j1 in one focused build directory. CTest through
+private Xvfb passed6/6: element_shadows, legacy drop_shadow/inset_shadow/
+shadow_presets, and standalone/umbrella distribution fixtures. The umbrella fixture
+includes cui_all.h declarations with only the Core implementation, deliberately
+avoiding unrelated full-umbrella implementations. No new browser/GPU/sanitizer or
+binding evidence is claimed.
+
+The unit fixture covers open/closed/portal current-layout move/resize, omission,
+full-ID/folded collision rejection (including a preceding different diagnostic),
+layout-only and failed submission scopes, copied eight-layer records, invalid
+transactions, preset replacement and clear, preserved underlay/outline, legacy
+commands/software pixels, DROP/background/INSET/local-content order, ancestor
+clip/opacity, ordinary pointer activation, measurement/prepaint/diagnostic guards,
+command-capacity rollback and explicit-error-clear recovery. CSS constructor
+bounds and unchanged-output rejection are independent assertions. Required SDK,
+amalgamation and skill resources are generated from canonical sources. Offline
+installed-skill tests passed17/17; SDK checksums, distribution and skill freshness
+checks passed.

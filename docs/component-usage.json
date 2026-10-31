@@ -1444,12 +1444,21 @@
         "cui_slider_palette_from_theme",
         "cui_slider_palette_builtin_get",
         "cui_slider_palette_preset_get",
-        "cui_slider_palette_valid"
+        "cui_slider_palette_valid",
+        "cui_slider_model_domain_valid_v1",
+        "cui_slider_model_value_valid_v1",
+        "cui_slider_model_value_constrain_v1",
+        "cui_slider_model_to_fraction_v1",
+        "cui_slider_model_from_fraction_v1",
+        "cui_slider_model_state_init_v1"
       ],
       "state_types": [
-        "cui_slider_palette"
+        "cui_slider_palette",
+        "cui_slider_model_value_v1",
+        "cui_slider_model_domain_v1",
+        "cui_slider_model_state_v1"
       ],
-      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage.",
+      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state are owned pointer-free doubles; pure helpers and initialization do not submit UI or accept proposals.",
       "interaction": "Returns true when the value changes.",
       "usage": "Pass a volume value by pointer; apply audio settings only in the change branch.",
       "docs": [
@@ -1457,7 +1466,8 @@
         "docs/STYLED_SLIDER_EVENTS.md",
         "docs/ELEMENT_SHADOWS.md",
         "docs/CONTROL_SURFACE_SHADOW_GALLERY.md",
-        "docs/SLIDER_PALETTE.md"
+        "docs/SLIDER_PALETTE.md",
+        "docs/SLIDER_MODEL_VALUES.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -1466,7 +1476,8 @@
       "composition": "immediate frame submission",
       "additional_public_headers": [
         "include/cui/cui_styled_slider_events.h",
-        "include/cui/cui_slider_palette.h"
+        "include/cui/cui_slider_palette.h",
+        "include/cui/cui_slider_model.h"
       ]
     },
     {

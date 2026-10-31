@@ -746,7 +746,7 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage.
+**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state are owned pointer-free doubles; pure helpers and initialization do not submit UI or accept proposals.
 
 **Interaction:** Returns true when the value changes.
 
@@ -762,6 +762,13 @@ The unreleased C-only palette value API is declared in
 `cui_slider_palette_preset_get` copies an owned value for inspection; it does
 not apply a palette to Slider rendering. There is no presenter setter, sampler
 or language builder API in this slice. Disabled/theme presentation remains partial.
+
+The unreleased independent typed value/math API is declared in
+[`cui_slider_model.h`](../include/cui/cui_slider_model.h); include
+`<cui/cui_slider_model.h>` and follow the [owned value/math guide](SLIDER_MODEL_VALUES.md).
+It validates and constrains double Single/Range values, maps linear/log fractions
+and initializes owned state. It does not submit UI, emit requests, bind an owner,
+render typed Sliders or add language builder APIs.
 
 ## Speech
 

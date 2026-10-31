@@ -297,6 +297,9 @@
     ],
     "cui_slider_palette": [
       "src/theme/cui_slider_palette.c"
+    ],
+    "cui_slider_model": [
+      "src/base/cui_slider_model.c"
     ]
   },
   "native": {

@@ -324,3 +324,10 @@ using explicit numeric capabilities, typed SET_VALUE queueing or claims. Legacy
 Slider roles do not opt in automatically. Snapshot readiness certifies completed
 Core semantics only; not rendering, native numeric AT delivery or owner acceptance.
 No new host/model/bridge/Python/JS/TS/Go/Rust numeric authoring is implied.
+
+For the unreleased C-only typed Slider value/domain/math helpers, read
+`docs/SLIDER_MODEL_VALUES.md` and `include/cui/cui_slider_model.h`. Single/Range
+records and initialized state own their data; proposals require explicit owner
+acceptance. This slice has no typed UI reducer, presentation, request/receipt,
+host mapping or language builder API. Preserve legacy scalar routes and keep
+whole-family completion separate from pure numerical helper proof.

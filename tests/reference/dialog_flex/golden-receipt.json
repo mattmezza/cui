@@ -1,0 +1,50 @@
+{
+  "source_pin": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "features": [
+    "std",
+    "flexbox",
+    "taffy_tree",
+    "content_size"
+  ],
+  "crates": {
+    "taffy": {
+      "version": "0.13.0",
+      "archive_sha256": "c034e05f6ee85a12daa63863c2245797715075c70649947aa0da54f3f2ab1d0f",
+      "rust_source_sha256": "48ea8f31443f0c70b7a976e18e26a1af900d98c8560a90d6203c5b8e238efc55",
+      "manifest_delta_sha256": "c146ad95fa44c177e2992afe83148bf17474a2df77cbd37c5384eeaa0337ee63"
+    },
+    "arrayvec": {
+      "version": "0.7.8",
+      "archive_sha256": "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56",
+      "rust_source_sha256": "cb2ed8a1e22fb428943de0f2154394b1e6e09f2626f8eee3c2023132826fa5c9",
+      "manifest_delta_sha256": "47814ca63b6d7f4317b2a6c605e403a7c4ed234196bca1e596bf991d6b1b61cf"
+    },
+    "slotmap": {
+      "version": "1.1.1",
+      "archive_sha256": "bdd58c3c93c3d278ca835519292445cb4b0d4dc59ccfdf7ceadaab3f8aeb4038",
+      "rust_source_sha256": "8f58cfdce377cbdbf02d51fa94f0b507756a8aa95bf8ea09ab74163f303f0eae",
+      "manifest_delta_sha256": "b73bbfb3c698e5cf5f79b3dd58a46a815b306737609b8fad76e8b4b7163f60bd"
+    },
+    "version_check": {
+      "version": "0.9.5",
+      "archive_sha256": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a",
+      "rust_source_sha256": "f4329592595ec444e21cd156c30ddac5149013324b1ac562c35783f326c3d7e8",
+      "manifest_delta_sha256": "4eaeebb1e4235b3a565734e6b79ebace894048d19b1d2d75c50509d290db83de"
+    }
+  },
+  "driver_sha256": "0bd56ecd91da2f829cd37615f86f58bd23a5bd44fc25163227a24ec791558e23",
+  "helper_sha256": "c537c8c606d4ab30bbf580e25700fbab096e62a5cee1e85c3e93862a95c10b5a",
+  "source_bytes": 1564076,
+  "output_sha256": "477e1574d376a8e2338d49e32c84693fce140e161e5d6dd9f1c2d12691042c5a",
+  "compiled_artifact_bytes": 7879576,
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)",
+  "binary_sha256": "385bcd643ced6439e2bf421c8e017f1b0bfa92cc1301db6ea9f234e20b5163fe",
+  "execution": "private-Xvfb via scripts/test_local.py; Taffy-only driver, no GPUI or CUI execution",
+  "profile": {
+    "optimization": 1,
+    "debug": 0,
+    "incremental": false,
+    "codegen_units": 1,
+    "jobs": 1
+  }
+}

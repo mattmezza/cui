@@ -434,6 +434,31 @@ foreach(target test_accessibility_numeric test_accessibility_numeric_internals t
  add_test(NAME ${target} COMMAND ${target})
 endforeach()
 
+# Core V2 source-oracle geometry; production source and generated distribution.
+foreach(mode native distribution)
+ if(mode STREQUAL "native")
+  set(regions_target test_dialog_flex_regions)
+ else()
+  set(regions_target test_dialog_flex_regions_distribution)
+ endif()
+ add_executable(${regions_target} tests/unit/test_dialog_flex_regions.c
+  tests/unit/test_scroll_regions_contract.c tests/unit/dialog_flex_probe.c src/base/cui_scroll.c
+  backends/software/cui_software.c src/effects/cui_effects.c)
+ target_include_directories(${regions_target} PRIVATE include third_party/clay src/core tests/unit)
+ if(mode STREQUAL "distribution")
+  target_include_directories(${regions_target} BEFORE PRIVATE dist)
+  target_compile_definitions(${regions_target} PRIVATE CUI_DIALOG_REGIONS_DISTRIBUTION=1)
+ endif()
+ if(NOT MSVC)
+  target_link_libraries(${regions_target} PRIVATE m)
+ endif()
+ cui_warnings(${regions_target})
+ add_test(NAME dialog_flex_regions_${mode} COMMAND ${regions_target}
+  ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference/dialog_flex/golden.csv)
+endforeach()
+add_test(NAME dialog_flex_reference_authority COMMAND ${Python3_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_dialog_flex_reference.py)
+
 # Bounded Core scrollbar geometry; no full component library or window host.
 foreach(mode native distribution)
  add_executable(test_scrollbar_track_${mode} tests/unit/test_scrollbar_track_geometry.c
@@ -1093,6 +1118,11 @@ if(CUI_BUILD_CPP_EXAMPLE)
  check_language(CXX)
  if(CMAKE_CXX_COMPILER)
   enable_language(CXX)
+  add_executable(test_scroll_regions_header tests/unit/test_scroll_regions_header.cpp)
+  target_include_directories(test_scroll_regions_header PRIVATE include)
+  set_property(TARGET test_scroll_regions_header PROPERTY CXX_STANDARD 11)
+  cui_warnings(test_scroll_regions_header)
+  add_test(NAME scroll_regions_header_cpp COMMAND test_scroll_regions_header)
   add_library(dropdown_button_styles_header OBJECT tests/unit/test_dropdown_button_styles_header.cpp)
   target_link_libraries(dropdown_button_styles_header PRIVATE cui)
   cui_warnings(dropdown_button_styles_header)

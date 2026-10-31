@@ -199,3 +199,81 @@ record copying, aliases, resource/capacity failure and next-frame recovery.
 These are software/headless C oracles, not GPU, text raster or full component
 parity claims. Base page/key/CANCEL and full Dialog/Root/all-five facade composition
 remain separate followups.
+
+## V2 source-style Content/Body peers and separate Footer
+
+`cui_layout_scroll_body_v2` is additive C Core, not Dialog/Base/facade composition.
+Its layout-record version2 is independent of draw ABI2/background negotiation.
+It works in ordinary `cui_begin_frame`/`cui_end_frame` frames with V1 draw lists,
+as the source/software oracles exercise. It requires no new renderer support
+and does not claim that a renderer supports draw ABI2.
+Read the144-byte `cui_scroll_body_layout_v2` and24-byte
+`cui_scroll_region_sizing_v1` in the same authoritative public header. The embedded
+base header is size144/version2; its height fields are the sole Panel sizing
+authority. Passing that record to the old V1 function is invalid. Existing V1
+geometry, input, callbacks, memory allocation and resource slot budget remain.
+
+```text
+Panel (fixed positive width; optional vertical padding/gap)
+  Outer (clip, zero padding)
+    Column (vertical, automatic gap0)
+      fixed authored siblings / conditional fixed spacers
+      Content region (optional, ordinary direct Column child)
+      conditional fixed spacer only when Body is authored present
+      BodyFrame -> attached clipped BodyViewport -> intrinsic BodyContent
+  Footer (optional ordinary direct Panel child after Outer, fixed/FIT height)
+```
+
+All six internal base boxes remain, even for Body OMIT, and all referenced boxes
+must close before registration. Content ID0 iff its policy is OMIT. Footer0
+means absent. Content must precede Frame; ordinary parent links, full/folded ID
+distinctness, inherited-clip floating rules and independent width restrictions
+remain. No row/root/portal fallback is inferred. Footer is the only optional
+second flow child of Panel. Column automatic gap must be0: explicit fixed spacer
+boxes between authored present regions preserve conditional omission exactly.
+Horizontal padding belongs in the content subtree; viewport zero-padding remains.
+
+FLEX1 has zero basis and shares available Y with the other FLEX1 peer, freezing
+against explicit/intrinsic minimum and maximum. It is not always equal halves.
+FIT takes clamped current intrinsic demand. FIXED takes finite positive requested
+height within min/max; FLEX1/FIT requested_height0. Non-OMIT min finite>=0,
+max finite>0, min<=max; use FLT_MAX for uncapped. Reserved0. OMIT is all-zero policy
+and receives0 allocation. For source Body omission, author an empty zero-height
+internal content subtree and no Body callback/semantic/input owner. An explicit
+empty FLEX1 Body remains a participating region and can receive positive height.
+Core does not infer omission from callback effects or remove caller semantics.
+
+AUTO is current intrinsic Panel demand, subject to its min/max; EXPLICIT is its
+validated height. Footer demand includes its actual children and retains that
+height outside Inner. Content minimum overflow is clipped by Inner; Outer range
+stays0. Oversized Footer can extend beyond Panel and is subject to ordinary
+ancestor/window clips, not a promise of full visibility or wheel reachability.
+There is no automatic whole-Outer scrolling exception. For example, the pinned
+independent engine/CUI software fixture with Panel260, padding16, gap16 and
+Footer400 gives Inner0 and FooterY32/bottom432. AUTO max600 with the short-body
+fixture fits Panel562 instead. This is geometry/software evidence, not GPUI GPU
+raster or full Dialog input parity. Existing V1 reachable-Outer policy is unchanged.
+
+Public record/policies copy on registration; no caller record pointer is kept.
+Distinct aligned writable offsets and tracked bounds storage remain stable
+through end_frame. All shared32 bodies/64 clamps/64 tracks, late-alias checks,
+no-partial-commit and failed-frame recovery rules above apply. No third layout,
+application callback replay or new dispatcher. Text measurement may repeat.
+
+V1-only uses the EXACT existing base resource size/callback/key and one slot
+(LP6412856 bytes). V2 adds one2560-byte sidecar and one slot, shared across all
+V2 registrations: LP6415416 total, below16KiB. Other pointer-size targets retain
+their existing V1 base size plus the same2560 sidecar. No new opaque-context field,
+zero-opt-in allocation or resource scan. Cached slot access is checked and O(1);
+wrong/stale/missing V2 cache fails the opt-in frame, never falls back to V1.
+Sidecar/base collect independently at next begin. After V2 omission the sidecar
+retains the ordinary one-complete-frame resource history before destruction;
+this is explicit V2 history cost. Exact V1 byte/one-slot budgets still admit V1.
+V2 with one slot or one byte short fails ordinary CAPACITY, retains models, and
+can recover to V1 next frame after clearing the error. No public config grows.
+
+The28-row pinned Taffy reference is test-only/offline, not a CUI dependency.
+`dialog_flex_regions_native` and `_distribution` exercise public production APIs,
+software clip/overflow pixels, current prepaint/semantic/caret geometry, same-UI
+resize/omission and resource/alias/failure controls. Core V2 is a foundation;
+full Dialog slots/actions, Root/native-host and all five builders remain open.

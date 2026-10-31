@@ -983,6 +983,50 @@ typedef struct {
  * in the same frame. Inert/layout-only geometry clamps without model writes. */
 bool cui_layout_scroll_body_v1(cui_context *, const cui_scroll_body_layout_v1 *, float *outer_y,
                                float *body_y);
+/* Additive two-region source-layout constraint; V1 records/routes remain V1.
+ * Public records are pointer-free and copied. Body OMIT is a zero allocation;
+ * callers own logical omission (no Body semantics/input and empty content).
+ * Column automatic gap must be zero; submit conditional fixed spacers between
+ * authored present regions, so internal omitted-Body boxes add no phantom gap.
+ * Footer is an optional direct Panel child after Outer; it retains intrinsic
+ * height and can overflow a bounded Panel. Outer clips, never expands to make
+ * fixed regions reachable. See SCROLL_LAYOUT.md; no Dialog API is implied. */
+#define CUI_SCROLL_LAYOUT_VERSION_2 2u
+#define CUI_SCROLL_BODY_LAYOUT_V2_BYTES 144u
+#define CUI_SCROLL_REGION_SIZING_V1_BYTES 24u
+typedef enum {
+    CUI_SCROLL_REGION_OMIT = 0,
+    CUI_SCROLL_REGION_FLEX1 = 1,
+    CUI_SCROLL_REGION_FIT = 2,
+    CUI_SCROLL_REGION_FIXED = 3
+} cui_scroll_region_mode;
+typedef enum {
+    CUI_SCROLL_REGION_MIN_ZERO = 0,
+    CUI_SCROLL_REGION_MIN_INTRINSIC = 1
+} cui_scroll_region_minimum;
+typedef struct {
+    uint32_t mode, minimum_policy;
+    float requested_height, min_height, max_height;
+    uint32_t reserved;
+} cui_scroll_region_sizing_v1;
+typedef struct {
+    cui_scroll_body_layout_v1 base; /* struct_size144/version2; Panel height authority. */
+    cui_id content_region, footer;  /* optional IDs; absent0. Six base IDs remain required. */
+    cui_scroll_region_sizing_v1 content_sizing, body_sizing;
+} cui_scroll_body_layout_v2;
+/* Region OMIT has all-zero fields; Content ID0 iff Content OMIT. Present-empty
+ * FLEX1 participates. FLEX1/FIT requested0; FIXED finite positive/in min-max.
+ * Non-OMIT min finite>=0, max finite>0, min<=max (FLT_MAX is uncapped), reserved0.
+ * Shared32 bodies/64 clamps/64 tracks; V1-only resource bytes/slots unchanged.
+ * V2 adds one2560-byte sidecar/one slot: LP64 base12856+2560=15416 bytes/2 slots.
+ * Resource history retains an omitted sidecar for one complete frame as usual.
+ * Distinct aligned writable offset floats and bounds storage remain borrowed
+ * through end_frame; all existing alias/lifetime/failure rules apply. Records
+ * copy on registration; composition/input/prepaint once, measurement may repeat.
+ * Failed opt-in frame has no valid draw/prepaint/geometry publication, including
+ * clear_error before end_frame. Clear and rebuild a later frame to recover. */
+bool cui_layout_scroll_body_v2(cui_context *, const cui_scroll_body_layout_v2 *, float *outer_y,
+                               float *body_y);
 /* V1 supports only Y. Standalone viewport height is fixed and positive; content
  * cannot contain a registered body. No registration deduplication/replacement. */
 bool cui_layout_scroll_clamp_v1(cui_context *, const cui_scroll_clamp_v1 *, float *y);

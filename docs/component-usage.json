@@ -2312,6 +2312,7 @@
     "public_header": "include/cui/cui.h",
     "api_symbols": [
       "cui_layout_scroll_body_v1",
+      "cui_layout_scroll_body_v2",
       "cui_layout_scroll_clamp_v1",
       "cui_layout_scrollbar_track_v1",
       "cui_scrollbar_thumb_geometry"
@@ -2319,8 +2320,8 @@
     "docs": [
       "docs/SCROLL_LAYOUT.md"
     ],
-    "scope": "Opt-in C Core only: current intrinsic Y body allocation, standalone Y clamping and fixed real overlay track/thumb boxes with independent visibility/interactivity and current final paint/hit geometry. Widths remain independent of allocated Y. Existing Scrollable/Base/Dialog composition APIs and all five foreign builders remain unchanged; this is not full slot composition or general constraint closure.",
-    "capacity": "32 body links, 64 total clamps (two per body) and 64 optional tracks, one per clamp; copied 80/32/48-byte records and distinct application offset destinations borrowed through end_frame. LP64 lazy payload 12856 bytes, bounded by 16 KiB; zero-opt-in legacy frames allocate none."
+    "scope": "Opt-in C Core only: current intrinsic Y allocation with V1 single-body or additive V2 Content/Body peers and a separate intrinsic Footer, standalone Y clamping and real overlay track/thumb geometry. Widths remain independent of allocated Y. Existing Scrollable/Base/Dialog APIs and all five foreign builders remain unchanged; this is not full slot composition or general constraint closure.",
+    "capacity": "Shared32 body links,64 clamps and64 optional tracks; copied80/144/24/32/48-byte records and distinct offset/bounds destinations borrowed through end_frame. V1-only LP64 base12856 bytes/one resource slot unchanged; V2-only sidecar2560 bytes/one extra slot, combined15416 bytes<=16KiB. Zero-opt-in frames allocate none; omitted resources retain the normal one-frame history."
   },
   "core_numeric_accessibility": {
     "public_header": "include/cui/cui.h",

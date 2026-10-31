@@ -154,7 +154,7 @@ layout constraints. Test narrow and wide viewports, long content and overflow;
 do not transplant CSS/browser assumptions into the C layout model.
 
 For current-frame intrinsic scroll-body allocation in C Core, read
-`docs/SCROLL_LAYOUT.md` and `include/cui/cui.h`. The opt-in V1 APIs require widths
+`docs/SCROLL_LAYOUT.md` and `include/cui/cui.h`. The opt-in APIs require widths
 independent of allocated Y, support ordinary GROW descendants and hidden/overlay
 bars, and borrow distinct offset floats through end_frame. Optional 48-byte
 track records stage actual fixed track/thumb boxes with independent visibility
@@ -162,7 +162,14 @@ and interactivity; INTERACTIVE owns bar enabled policy even when its submitted
 semantic is a disabled placeholder, so clear it to author a disabled bar. Compose
 positive fixed-height placeholders and register against
 a current Y clamp. The lazy LP64 layout payload is 12856 bytes (16 KiB bound),
-including for body-only opt-in users. Read exact topology and input-policy limits;
+including for V1 body-only users, with one resource slot unchanged. Additive V2
+layout-record version is independent of draw ABI2/background negotiation: it
+works in ordinary V1 draw frames and requires no new renderer support. V2 uses
+a144-byte copied record/24-byte region policies for Content/Body peers and
+a separate intrinsic Footer; it adds only a2560-byte sidecar/one slot (15416
+combined). Compose conditional spacers with Column gap0, distinguish OMIT from
+present-empty, and retain source inner clipping/possible oversized Footer overflow.
+No implicit whole-Outer fallback. Read exact topology and input-policy limits;
 this does not install a dispatcher or Base reducers. Failed opt-in frames
 have no valid geometry/prepaint snapshot; clear the error and rebuild next frame.
 Existing Scrollable/Base/Dialog behavior and five foreign builder APIs do not

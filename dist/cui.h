@@ -984,6 +984,50 @@ typedef struct {
  * in the same frame. Inert/layout-only geometry clamps without model writes. */
 bool cui_layout_scroll_body_v1(cui_context *, const cui_scroll_body_layout_v1 *, float *outer_y,
                                float *body_y);
+/* Additive two-region source-layout constraint; V1 records/routes remain V1.
+ * Public records are pointer-free and copied. Body OMIT is a zero allocation;
+ * callers own logical omission (no Body semantics/input and empty content).
+ * Column automatic gap must be zero; submit conditional fixed spacers between
+ * authored present regions, so internal omitted-Body boxes add no phantom gap.
+ * Footer is an optional direct Panel child after Outer; it retains intrinsic
+ * height and can overflow a bounded Panel. Outer clips, never expands to make
+ * fixed regions reachable. See SCROLL_LAYOUT.md; no Dialog API is implied. */
+#define CUI_SCROLL_LAYOUT_VERSION_2 2u
+#define CUI_SCROLL_BODY_LAYOUT_V2_BYTES 144u
+#define CUI_SCROLL_REGION_SIZING_V1_BYTES 24u
+typedef enum {
+    CUI_SCROLL_REGION_OMIT = 0,
+    CUI_SCROLL_REGION_FLEX1 = 1,
+    CUI_SCROLL_REGION_FIT = 2,
+    CUI_SCROLL_REGION_FIXED = 3
+} cui_scroll_region_mode;
+typedef enum {
+    CUI_SCROLL_REGION_MIN_ZERO = 0,
+    CUI_SCROLL_REGION_MIN_INTRINSIC = 1
+} cui_scroll_region_minimum;
+typedef struct {
+    uint32_t mode, minimum_policy;
+    float requested_height, min_height, max_height;
+    uint32_t reserved;
+} cui_scroll_region_sizing_v1;
+typedef struct {
+    cui_scroll_body_layout_v1 base; /* struct_size144/version2; Panel height authority. */
+    cui_id content_region, footer;  /* optional IDs; absent0. Six base IDs remain required. */
+    cui_scroll_region_sizing_v1 content_sizing, body_sizing;
+} cui_scroll_body_layout_v2;
+/* Region OMIT has all-zero fields; Content ID0 iff Content OMIT. Present-empty
+ * FLEX1 participates. FLEX1/FIT requested0; FIXED finite positive/in min-max.
+ * Non-OMIT min finite>=0, max finite>0, min<=max (FLT_MAX is uncapped), reserved0.
+ * Shared32 bodies/64 clamps/64 tracks; V1-only resource bytes/slots unchanged.
+ * V2 adds one2560-byte sidecar/one slot: LP64 base12856+2560=15416 bytes/2 slots.
+ * Resource history retains an omitted sidecar for one complete frame as usual.
+ * Distinct aligned writable offset floats and bounds storage remain borrowed
+ * through end_frame; all existing alias/lifetime/failure rules apply. Records
+ * copy on registration; composition/input/prepaint once, measurement may repeat.
+ * Failed opt-in frame has no valid draw/prepaint/geometry publication, including
+ * clear_error before end_frame. Clear and rebuild a later frame to recover. */
+bool cui_layout_scroll_body_v2(cui_context *, const cui_scroll_body_layout_v2 *, float *outer_y,
+                               float *body_y);
 /* V1 supports only Y. Standalone viewport height is fixed and positive; content
  * cannot contain a registered body. No registration deduplication/replacement. */
 bool cui_layout_scroll_clamp_v1(cui_context *, const cui_scroll_clamp_v1 *, float *y);
@@ -12560,8 +12604,9 @@ static int32_t cui_core_prepaint_layer(cui_context *ui, Clay_RenderCommandArray 
 #define CUI_CORE_SL_CLAMP_MAX 64u
 #define CUI_CORE_SL_FAILED 1u
 #define CUI_CORE_SL_READY 2u
+#define CUI_CORE_SL_REGIONS 4u
 struct cui_core_scroll_layout_header {
-    uint32_t bodies, clamps, flags, reserved;
+    uint32_t bodies, clamps, flags, regions_slot;
 };
 typedef struct {
     cui_scroll_body_layout_v1 record;
@@ -12588,6 +12633,22 @@ typedef struct {
     uint32_t tracks, track_reserved;
     cui_core_sl_track track[64];
 } cui_core_sl_state;
+/* V2-only sidecar: never enlarge the existing V1 base resource. */
+typedef struct {
+    cui_id content, footer;
+    cui_scroll_region_sizing_v1 content_sizing, body_sizing;
+    float content_h, content_natural, footer_h;
+    uint32_t version;
+} cui_core_sl_region;
+typedef struct {
+    cui_core_sl_region body[CUI_CORE_SL_BODY_MAX];
+} cui_core_sl_regions;
+#define CUI_CORE_SL_OWNER UINT64_C(0x729a60df47b12e51)
+#define CUI_CORE_SL_REGIONS_NAMESPACE UINT64_C(0xc63157e218ad049b)
+_Static_assert(sizeof(cui_core_sl_region) == 80, "bounded V2 region entry");
+_Static_assert(sizeof(cui_core_sl_regions) == 2560, "bounded V2-only sidecar");
+_Static_assert(sizeof(cui_core_sl_state) + sizeof(cui_core_sl_regions) <= 16384,
+               "combined shared32/64/64 payload budget");
 static const cui_core_scroll_layout_header cui_core_sl_failed = {0, 0, CUI_CORE_SL_FAILED, 0};
 _Static_assert(sizeof(cui_scroll_body_layout_v1) == 80, "scroll body V1 ABI");
 _Static_assert(offsetof(cui_scroll_body_layout_v1, panel) == 16, "scroll body V1 IDs");
@@ -12605,6 +12666,53 @@ static bool cui_core_sl_fail(cui_context *ui, cui_error error) {
     ui->scroll_layout = &cui_core_sl_failed;
     cui_core_fail(ui, error);
     return false;
+}
+static void cui_core_sl_regions_collect(void *payload) {
+    memset(payload, 0, sizeof(cui_core_sl_regions));
+}
+/* True+NULL means V1-only. False never downgrades corrupted V2 state to V1. */
+static bool cui_core_sl_regions_read(cui_context *ui, const cui_core_sl_state *state,
+                                     cui_core_sl_regions **out) {
+    *out = NULL;
+    if (!state->header.regions_slot)
+        return (state->header.flags & CUI_CORE_SL_REGIONS) ? cui_core_sl_fail(ui, CUI_ERROR_LAYOUT)
+                                                           : true;
+    if (!(state->header.flags & CUI_CORE_SL_REGIONS))
+        return cui_core_sl_fail(ui, CUI_ERROR_LAYOUT);
+    size_t slot = (size_t)state->header.regions_slot - 1;
+    if (slot >= ui->config.max_resources)
+        return cui_core_sl_fail(ui, CUI_ERROR_LAYOUT);
+    cui_core_resource *r = &ui->resources[slot];
+    if (!r->payload || r->owner != CUI_CORE_SL_OWNER ||
+        r->namespace_id != CUI_CORE_SL_REGIONS_NAMESPACE ||
+        r->bytes != sizeof(cui_core_sl_regions) || r->collect != cui_core_sl_regions_collect ||
+        r->destroy || !r->touched)
+        return cui_core_sl_fail(ui, CUI_ERROR_LAYOUT);
+    *out = r->payload;
+    return true;
+}
+static cui_core_sl_regions *cui_core_sl_regions_acquire(cui_context *ui, cui_core_sl_state *state) {
+    cui_core_sl_regions *regions;
+    if (!cui_core_sl_regions_read(ui, state, &regions))
+        return NULL;
+    if (regions)
+        return regions;
+    regions = cui_resource_get(ui, CUI_CORE_SL_OWNER, CUI_CORE_SL_REGIONS_NAMESPACE,
+                               sizeof(*regions), cui_core_sl_regions_collect, NULL);
+    if (!regions) {
+        cui_core_sl_fail(ui, ui->error != CUI_OK ? ui->error : CUI_ERROR_CAPACITY);
+        return NULL;
+    }
+    for (size_t i = 0; i < ui->config.max_resources; ++i)
+        if (ui->resources[i].payload == regions && ui->resources[i].owner == CUI_CORE_SL_OWNER &&
+            ui->resources[i].namespace_id == CUI_CORE_SL_REGIONS_NAMESPACE) {
+            /* cui_create caps max_resources at1,000,000. Stable until next begin. */
+            state->header.regions_slot = (uint32_t)i + 1;
+            state->header.flags |= CUI_CORE_SL_REGIONS;
+            return regions;
+        }
+    cui_core_sl_fail(ui, CUI_ERROR_LAYOUT);
+    return NULL;
 }
 static bool cui_core_sl_begin(cui_context *ui) {
     if (!cui_core_mutation(ui))
@@ -12683,6 +12791,11 @@ static bool cui_core_sl_destination(cui_context *ui, const cui_core_sl_state *st
                                 sizeof(cui_rect)))
             return false;
     if (state) {
+        cui_core_sl_regions *regions;
+        if (!cui_core_sl_regions_read(ui, state, &regions) ||
+            (regions &&
+             cui_core_sl_overlap(address, sizeof(float), (uintptr_t)regions, sizeof(*regions))))
+            return false;
         if (cui_core_sl_overlap(address, sizeof(float), (uintptr_t)state, sizeof *state))
             return false;
         for (size_t i = 0; i < state->header.clamps; ++i)
@@ -12726,11 +12839,17 @@ static bool cui_core_sl_conflicts(cui_context *ui, cui_core_sl_state *state,
         ids[1] = clamp->content;
     }
     for (size_t i = 0; i < state->header.bodies; ++i) {
-        cui_id old[6];
+        cui_id old[8];
+        cui_core_sl_regions *regions;
+        if (!cui_core_sl_regions_read(ui, state, &regions))
+            return true;
         cui_core_sl_ids(&state->bodies[i].record, old);
+        old[6] = regions ? regions->body[i].content : 0;
+        old[7] = regions ? regions->body[i].footer : 0;
         for (size_t a = 0; a < count; ++a)
-            for (size_t b = 0; b < 6; ++b)
-                if (ids[a] == old[b])
+            for (size_t b = 0; b < 8; ++b)
+                if (ids[a] && old[b] &&
+                    (ids[a] == old[b] || cui_core_folded(ids[a]) == cui_core_folded(old[b])))
                     return true;
         if (clamp && cui_core_sl_descendant(ui, cui_core_sl_node(ui, old[0]),
                                             cui_core_sl_node(ui, clamp->content)))
@@ -12759,21 +12878,25 @@ static cui_core_sl_clamp cui_core_sl_make_clamp(cui_id viewport, cui_id content,
                                .destination = y,
                                .owner = owner};
 }
+static bool cui_core_sl_body_valid(cui_context *ui, const cui_scroll_body_layout_v1 *r,
+                                   float *outer_y, float *body_y) {
+    return !(!r || r->struct_size != 80 || r->version != 1 || r->reserved || r->reserved2 ||
+             r->mode > CUI_SCROLL_BODY_EXPLICIT || !isfinite(r->requested_height) ||
+             !isfinite(r->min_height) || !isfinite(r->max_height) || r->min_height < 0 ||
+             r->max_height <= 0 || r->min_height > r->max_height ||
+             (r->mode == CUI_SCROLL_BODY_AUTO
+                  ? r->requested_height != 0
+                  : r->requested_height <= 0 || r->requested_height < r->min_height ||
+                        r->requested_height > r->max_height) ||
+             !cui_core_sl_body_topology(ui, r, true) ||
+             !cui_core_sl_destination(ui, NULL, outer_y, SIZE_MAX) ||
+             !cui_core_sl_destination(ui, NULL, body_y, SIZE_MAX) || outer_y == body_y);
+}
 bool cui_layout_scroll_body_v1(cui_context *ui, const cui_scroll_body_layout_v1 *r, float *outer_y,
                                float *body_y) {
     if (!cui_core_sl_begin(ui))
         return false;
-    if (!r || r->struct_size != 80 || r->version != 1 || r->reserved || r->reserved2 ||
-        r->mode > CUI_SCROLL_BODY_EXPLICIT || !isfinite(r->requested_height) ||
-        !isfinite(r->min_height) || !isfinite(r->max_height) || r->min_height < 0 ||
-        r->max_height <= 0 || r->min_height > r->max_height ||
-        (r->mode == CUI_SCROLL_BODY_AUTO
-             ? r->requested_height != 0
-             : r->requested_height <= 0 || r->requested_height < r->min_height ||
-                   r->requested_height > r->max_height) ||
-        !cui_core_sl_body_topology(ui, r, true) ||
-        !cui_core_sl_destination(ui, NULL, outer_y, SIZE_MAX) ||
-        !cui_core_sl_destination(ui, NULL, body_y, SIZE_MAX) || outer_y == body_y)
+    if (!cui_core_sl_body_valid(ui, r, outer_y, body_y))
         return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
     cui_core_sl_state *state = cui_core_sl_state_get(ui);
     if (!state)
@@ -12973,6 +13096,230 @@ static uint64_t cui_core_sl_widths(Clay_Context *context) {
     }
     return hash;
 }
+/* SPDX-License-Identifier: MIT */
+/* V2 current intrinsic peer allocation; Core-only, no input or composition replay. */
+_Static_assert(sizeof(cui_scroll_region_sizing_v1) == 24, "region sizing V1 ABI");
+_Static_assert(sizeof(cui_scroll_body_layout_v2) == 144, "body layout V2 ABI");
+_Static_assert(offsetof(cui_scroll_body_layout_v2, content_region) == 80, "V2 Content ID");
+_Static_assert(offsetof(cui_scroll_body_layout_v2, footer) == 88, "V2 Footer ID");
+_Static_assert(offsetof(cui_scroll_body_layout_v2, content_sizing) == 96, "V2 Content sizing");
+_Static_assert(offsetof(cui_scroll_body_layout_v2, body_sizing) == 120, "V2 Body sizing");
+static bool cui_core_sl_region_policy_valid(cui_scroll_region_sizing_v1 p, bool absent) {
+    if (p.reserved || p.mode > CUI_SCROLL_REGION_FIXED || p.minimum_policy > 1)
+        return false;
+    if (p.mode == CUI_SCROLL_REGION_OMIT)
+        return absent && p.minimum_policy == 0 && p.requested_height == 0 && p.min_height == 0 &&
+               p.max_height == 0;
+    return !absent && isfinite(p.requested_height) && isfinite(p.min_height) &&
+           isfinite(p.max_height) && p.min_height >= 0 && p.max_height > 0 &&
+           p.min_height <= p.max_height &&
+           (p.mode == CUI_SCROLL_REGION_FIXED
+                ? p.requested_height > 0 && p.requested_height >= p.min_height &&
+                      p.requested_height <= p.max_height
+                : p.requested_height == 0);
+}
+static bool cui_core_sl_region_panel(cui_context *ui, const cui_core_sl_body *p,
+                                     const cui_core_sl_region *v) {
+    Clay_Context *context = Clay_GetCurrentContext();
+    Clay_LayoutElement *panel = cui_core_sl_element(ui, p->record.panel),
+                       *outer = cui_core_sl_element(ui, p->record.outer_viewport),
+                       *column = cui_core_sl_element(ui, p->record.column),
+                       *footer = v->footer ? cui_core_sl_element(ui, v->footer) : NULL,
+                       *content = v->content ? cui_core_sl_element(ui, v->content) : NULL;
+    if (!panel || !outer || !column || column->config.layout.childGap ||
+        panel->children.length != (footer ? 2 : 1) ||
+        Clay_LayoutElementArray_Get(&context->layoutElements, panel->children.elements[0]) != outer)
+        return false;
+    if (v->footer && (!footer || !cui_core_sl_closed(ui, cui_core_sl_node(ui, v->footer)) ||
+                      ui->nodes[cui_core_sl_node(ui, v->footer)].parent !=
+                          cui_core_sl_node(ui, p->record.panel) ||
+                      Clay_LayoutElementArray_Get(&context->layoutElements,
+                                                  panel->children.elements[1]) != footer ||
+                      footer->config.floating.attachTo != CLAY_ATTACH_TO_NONE ||
+                      footer->config.layout.sizing.height.type == CLAY__SIZING_TYPE_GROW))
+        return false;
+    if (v->content && (!content || !cui_core_sl_closed(ui, cui_core_sl_node(ui, v->content)) ||
+                       ui->nodes[cui_core_sl_node(ui, v->content)].parent !=
+                           cui_core_sl_node(ui, p->record.column) ||
+                       content->config.floating.attachTo != CLAY_ATTACH_TO_NONE))
+        return false;
+    bool found_content = !content, found_frame = false;
+    for (int32_t i = 0; i < column->children.length; ++i) {
+        int32_t child = column->children.elements[i];
+        if (child < 0 || child >= context->layoutElements.length)
+            return false;
+        Clay_LayoutElement *e = Clay_LayoutElementArray_Get(&context->layoutElements, child);
+        if (e == content) {
+            if (found_frame || found_content)
+                return false;
+            found_content = true;
+        }
+        if (e == cui_core_sl_element(ui, p->record.body_frame))
+            found_frame = true;
+    }
+    return found_content && found_frame;
+}
+static float cui_core_sl_region_clamp(float value, float minimum, float maximum) {
+    return fminf(maximum, fmaxf(minimum, value));
+}
+static float cui_core_sl_region_demand(cui_scroll_region_sizing_v1 p, float natural) {
+    return p.mode == CUI_SCROLL_REGION_OMIT ? 0
+           : p.mode == CUI_SCROLL_REGION_FIXED
+               ? p.requested_height
+               : cui_core_sl_region_clamp(natural, p.min_height, p.max_height);
+}
+static bool cui_core_sl_region_solve(cui_context *ui, cui_core_sl_body *p, cui_core_sl_region *v,
+                                     float natural_body, float fixed, float padding, bool *valid) {
+    Clay_LayoutElement *panel = cui_core_sl_element(ui, p->record.panel),
+                       *content = v->content ? cui_core_sl_element(ui, v->content) : NULL,
+                       *footer = v->footer ? cui_core_sl_element(ui, v->footer) : NULL;
+    float natural[2] = {content ? cui_core_sl_intrinsic(content, 0, valid) : 0, natural_body};
+    v->content_natural = natural[0];
+    v->footer_h = footer ? cui_core_sl_intrinsic(footer, 0, valid) : 0;
+    float footer_total = v->footer_h + (footer ? panel->config.layout.childGap : 0);
+    cui_scroll_region_sizing_v1 policy[2] = {v->content_sizing, v->body_sizing};
+    float demand = cui_core_sl_region_demand(policy[0], natural[0]) +
+                   cui_core_sl_region_demand(policy[1], natural[1]);
+    if (!*valid || !isfinite(footer_total) || !isfinite(demand) ||
+        !isfinite(padding + fixed + footer_total + demand))
+        return false;
+    p->panel_h = p->record.mode == CUI_SCROLL_BODY_AUTO
+                     ? cui_core_sl_region_clamp(padding + fixed + footer_total + demand,
+                                                p->record.min_height, p->record.max_height)
+                     : p->record.requested_height;
+    p->inner_h = fmaxf(0, p->panel_h - padding - footer_total);
+    float remaining = p->inner_h - fixed, heights[2] = {0}, minimum[2] = {0}, maximum[2] = {0};
+    bool active[2] = {false};
+    unsigned count = 0;
+    for (unsigned i = 0; i < 2; ++i) {
+        if (policy[i].mode == CUI_SCROLL_REGION_FLEX1) {
+            minimum[i] = fmaxf(policy[i].min_height,
+                               policy[i].minimum_policy == CUI_SCROLL_REGION_MIN_INTRINSIC
+                                   ? fminf(natural[i], policy[i].max_height)
+                                   : 0);
+            maximum[i] = policy[i].max_height;
+            active[i] = true;
+            ++count;
+        } else {
+            heights[i] = cui_core_sl_region_demand(policy[i], natural[i]);
+            remaining -= heights[i];
+        }
+    }
+    for (unsigned pass = 0; count && pass < 3; ++pass) {
+        float trial = fmaxf(0, remaining) / (float)count, violation = 0, proposed[2] = {0};
+        for (unsigned i = 0; i < 2; ++i)
+            if (active[i]) {
+                proposed[i] = cui_core_sl_region_clamp(trial, minimum[i], maximum[i]);
+                violation += proposed[i] - trial;
+            }
+        unsigned frozen = 0;
+        for (unsigned i = 0; i < 2; ++i)
+            if (active[i] && (violation == 0 || (violation > 0 && proposed[i] > trial) ||
+                              (violation < 0 && proposed[i] < trial))) {
+                heights[i] = proposed[i];
+                remaining -= proposed[i];
+                active[i] = false;
+                --count;
+                ++frozen;
+            }
+        if (!frozen)
+            return false;
+    }
+    if (count || !*valid || !isfinite(p->panel_h) || !isfinite(p->inner_h) ||
+        !isfinite(heights[0]) || !isfinite(heights[1]))
+        return false;
+    v->content_h = heights[0];
+    p->body_h = heights[1];
+    p->column_h = p->inner_h; /* Source inner clip; Footer is outside this group. */
+    if (content)
+        cui_core_sl_fixed_height(content, heights[0]);
+    if (footer)
+        cui_core_sl_fixed_height(footer, v->footer_h);
+    return true;
+}
+static bool cui_core_sl_region_final(cui_context *ui, const cui_core_sl_region *v) {
+    return (!v->content || cui_core_sl_near(cui_core_sl_element(ui, v->content)->dimensions.height,
+                                            v->content_h)) &&
+           (!v->footer ||
+            cui_core_sl_near(cui_core_sl_element(ui, v->footer)->dimensions.height, v->footer_h));
+}
+
+static bool cui_core_sl_region_alias(cui_id a, cui_id b) {
+    return a && b && (a == b || cui_core_folded(a) == cui_core_folded(b));
+}
+bool cui_layout_scroll_body_v2(cui_context *ui, const cui_scroll_body_layout_v2 *r, float *outer_y,
+                               float *body_y) {
+    if (!cui_core_sl_begin(ui))
+        return false;
+    if (!r || r->base.struct_size != 144 || r->base.version != 2 ||
+        !cui_core_sl_region_policy_valid(r->content_sizing, !r->content_region) ||
+        !cui_core_sl_region_policy_valid(r->body_sizing,
+                                         r->body_sizing.mode == CUI_SCROLL_REGION_OMIT))
+        return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+    cui_scroll_body_layout_v1 base = r->base;
+    base.struct_size = 80;
+    base.version = 1;
+    if (!cui_core_sl_body_valid(ui, &base, outer_y, body_y))
+        return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+    cui_core_sl_region value = {.content = r->content_region,
+                                .footer = r->footer,
+                                .content_sizing = r->content_sizing,
+                                .body_sizing = r->body_sizing,
+                                .version = 2};
+    cui_core_sl_body trial = {.record = base};
+    cui_id ids[8];
+    cui_core_sl_ids(&base, ids);
+    ids[6] = value.content;
+    ids[7] = value.footer;
+    for (size_t i = 0; i < 8; ++i) {
+        if (!ids[i])
+            continue;
+        if (!cui_core_folded(ids[i]) || !cui_core_sl_closed(ui, cui_core_sl_node(ui, ids[i])))
+            return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+        for (size_t j = 0; j < i; ++j)
+            if (cui_core_sl_region_alias(ids[i], ids[j]))
+                return cui_core_sl_fail(ui, CUI_ERROR_DUPLICATE_ID);
+    }
+    if (!cui_core_sl_region_panel(ui, &trial, &value))
+        return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+    cui_core_sl_state *state = cui_core_sl_state_get(ui);
+    if (!state)
+        return false;
+    cui_core_sl_regions *regions;
+    if (!cui_core_sl_regions_read(ui, state, &regions))
+        return false;
+    for (size_t i = 0; i < state->header.bodies; ++i) {
+        cui_id old[8];
+        cui_core_sl_ids(&state->bodies[i].record, old);
+        old[6] = regions ? regions->body[i].content : 0;
+        old[7] = regions ? regions->body[i].footer : 0;
+        for (size_t a = 0; a < 8; ++a)
+            for (size_t b = 0; b < 8; ++b)
+                if (cui_core_sl_region_alias(ids[a], old[b]))
+                    return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+    }
+    for (size_t i = 0; i < state->header.clamps; ++i)
+        for (size_t a = 0; a < 8; ++a)
+            if (cui_core_sl_region_alias(ids[a], state->clamps[i].record.viewport) ||
+                cui_core_sl_region_alias(ids[a], state->clamps[i].record.content))
+                return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+    for (size_t i = 0; i < state->tracks; ++i)
+        for (size_t a = 0; a < 8; ++a)
+            if (cui_core_sl_region_alias(ids[a], state->track[i].record.bar) ||
+                cui_core_sl_region_alias(ids[a], state->track[i].record.thumb))
+                return cui_core_sl_fail(ui, CUI_ERROR_INVALID_ACTION);
+    if (state->header.bodies == CUI_CORE_SL_BODY_MAX ||
+        state->header.clamps > CUI_CORE_SL_CLAMP_MAX - 2)
+        return cui_core_sl_fail(ui, CUI_ERROR_CAPACITY);
+    regions = cui_core_sl_regions_acquire(ui, state);
+    if (!regions || !cui_layout_scroll_body_v1(ui, &base, outer_y, body_y))
+        return false;
+    size_t index = state->header.bodies - 1;
+    state->bodies[index].record.version = 2; /* Independent marker prevents V1 downgrade. */
+    regions->body[index] = value;
+    return true;
+}
+
 /* SPDX-License-Identifier: MIT */
 /* Private leaf geometry for already registered Y clamps; no input dispatch. */
 _Static_assert(sizeof(cui_scrollbar_track_layout_v1) == 48, "scrollbar track V1 ABI");
@@ -13192,6 +13539,16 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
     if (ui->scroll_layout == &cui_core_sl_failed || ui->error != CUI_OK || ui->ambiguous_box_ids)
         return cui_core_sl_abort(ui);
     cui_core_sl_state *state = (cui_core_sl_state *)(void *)ui->scroll_layout;
+    cui_core_sl_regions *regions;
+    if (!cui_core_sl_regions_read(ui, state, &regions))
+        return cui_core_sl_abort(ui);
+    for (size_t i = 0; i < state->header.bodies; ++i) {
+        uint32_t version = state->bodies[i].record.version;
+        if ((version != 1 && version != 2) ||
+            (version == 2 && (!regions || regions->body[i].version != 2)) ||
+            (version == 1 && regions && regions->body[i].version != 0))
+            return cui_core_sl_abort(ui);
+    }
     Clay_Context *context = Clay_GetCurrentContext();
     if (context != ui->clay || context->debugModeEnabled || context->transitionDatas.length)
         return cui_core_sl_abort(ui);
@@ -13217,6 +13574,7 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
     for (size_t i = 0; i < state->header.bodies; ++i) {
         cui_core_sl_body *p = &state->bodies[state->order[i]];
         const cui_scroll_body_layout_v1 *r = &p->record;
+        cui_core_sl_region *v = r->version == 2 ? &regions->body[state->order[i]] : NULL;
         Clay_LayoutElement *panel = cui_core_sl_element(ui, r->panel);
         Clay_LayoutElement *outer = cui_core_sl_element(ui, r->outer_viewport);
         Clay_LayoutElement *column = cui_core_sl_element(ui, r->column);
@@ -13240,7 +13598,8 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
             viewport->config.floating.offset.x != 0 || viewport->config.floating.offset.y != 0 ||
             !cui_core_sl_no_padding(outer) || !cui_core_sl_no_padding(frame) ||
             !cui_core_sl_no_padding(viewport) || frame->children.length != 0 ||
-            !cui_core_sl_only_child(context, panel, outer) ||
+            (!v && !cui_core_sl_only_child(context, panel, outer)) ||
+            (v && !cui_core_sl_region_panel(ui, p, v)) ||
             !cui_core_sl_only_child(context, outer, column) ||
             !cui_core_sl_only_child(context, viewport, content) ||
             !cui_core_sl_floating(ui, state, cui_core_sl_node(ui, r->panel)) ||
@@ -13254,18 +13613,23 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
                 Clay_LayoutElementArray_Get(&context->layoutElements, column->children.elements[j]);
             if (child == frame)
                 found_frame = true;
-            else
+            else if (!v || child != cui_core_sl_element(ui, v->content))
                 fixed += cui_core_sl_intrinsic(child, 0, &valid);
         }
         fixed += (float)(column->children.length ? column->children.length - 1 : 0) *
                  column->config.layout.childGap;
         float padding = panel->config.layout.padding.top + panel->config.layout.padding.bottom;
-        p->panel_h = r->mode == CUI_SCROLL_BODY_AUTO
-                         ? fminf(r->max_height, fmaxf(r->min_height, padding + fixed + natural))
-                         : r->requested_height;
-        p->inner_h = fmaxf(0, p->panel_h - padding);
-        p->body_h = fixed > p->inner_h ? natural : fmaxf(0, p->inner_h - fixed);
-        p->column_h = fmaxf(p->inner_h, fixed + p->body_h);
+        if (v) {
+            if (!cui_core_sl_region_solve(ui, p, v, natural, fixed, padding, &valid))
+                return cui_core_sl_abort(ui);
+        } else {
+            p->panel_h = r->mode == CUI_SCROLL_BODY_AUTO
+                             ? fminf(r->max_height, fmaxf(r->min_height, padding + fixed + natural))
+                             : r->requested_height;
+            p->inner_h = fmaxf(0, p->panel_h - padding);
+            p->body_h = fixed > p->inner_h ? natural : fmaxf(0, p->inner_h - fixed);
+            p->column_h = fmaxf(p->inner_h, fixed + p->body_h);
+        }
         cui_core_sl_clamp *a = &state->clamps[p->outer_clamp], *b = &state->clamps[p->body_clamp];
         a->maximum = fmaxf(0, p->column_h - p->inner_h);
         b->maximum = fmaxf(0, natural - p->body_h);
@@ -13310,6 +13674,9 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
     int32_t dynamic_strings = context->dynamicStringData.length;
     context->wrappedTextLines.length = 0;
     Clay__CalculateFinalLayout(0, false, true);
+    cui_core_sl_regions *verified_regions;
+    if (!cui_core_sl_regions_read(ui, state, &verified_regions) || verified_regions != regions)
+        return cui_core_sl_abort(ui);
     if (!cui_core_sl_tracks_validate(ui, state))
         return cui_core_sl_abort(ui);
     if (ui->error != CUI_OK || ui->wrap_failed || widths != cui_core_sl_widths(context) ||
@@ -13320,6 +13687,9 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
         return cui_core_sl_abort(ui);
     for (size_t i = 0; i < state->header.bodies; ++i) {
         cui_core_sl_body *p = &state->bodies[i];
+        if (p->record.version == 2 && (!regions || regions->body[i].version != 2 ||
+                                       !cui_core_sl_region_final(ui, &regions->body[i])))
+            return cui_core_sl_abort(ui);
         if (!cui_core_sl_near(cui_core_sl_element(ui, p->record.panel)->dimensions.height,
                               p->panel_h) ||
             !cui_core_sl_near(cui_core_sl_element(ui, p->record.outer_viewport)->dimensions.height,
@@ -13354,7 +13724,7 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
             }
     }
     cui_core_sl_tracks_publish(ui, state);
-    state->header.flags = CUI_CORE_SL_READY;
+    state->header.flags = CUI_CORE_SL_READY | (state->header.flags & CUI_CORE_SL_REGIONS);
     return context->renderCommands;
 }
 

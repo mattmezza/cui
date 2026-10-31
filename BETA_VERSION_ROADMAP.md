@@ -13,8 +13,8 @@ release date is asserted.
 | --- | --- |
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `ab8fddbbbca4b78e3b2cc1b14752dd0c4ac96b30`; public docs, catalog, headers and native archive checked on 2026-10-31. |
-| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3 windows. Focused checks exist; combined validation/publication is still pending. |
-| In progress | Consistent element-shadow API and coverage; completion of remaining component and cross-platform gaps. |
+| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3/bridge windows across five language paths; named-element C shadow setters, six typed builder roots, and opt-in Checkbox/Radio indicator IDs. Focused checks exist; combined validation/publication is still pending. |
+| In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
 **Status rule:** implemented ≠ tested ≠ merged ≠ released ≠ deployed. A tested
@@ -28,17 +28,47 @@ can lag implementation: inspect current code and evidence before scheduling work
   Preserve existing callbacks, defaults, Retina fixes and static-linking support.
 - [ ] **Initially hidden windows.** Ship creation with the native hidden flag,
   avoiding show-then-hide flashing; document explicit show/hide and daemon usage.
-  Complete foreign-language authoring separately: the current SDL3 slice does not
-  make bridge/builders create hidden windows. Caller-owned window hosts need their
-  own policy.
+  SDL3 and Python/JS/TS/Go/Rust bridge paths have focused Linux private-Xvfb
+  evidence for actual hidden creation and first presentation. Integration,
+  publication and broader native-platform acceptance remain pending. Caller-owned
+  window hosts need their own policy.
 - [ ] **Consistent shadows.** Ship a clear typed API for presets and custom
   offset/blur/spread/color, mixed drop/inset layers and clearing. Existing shadow
-  renderers must be reused. Finish component-root, nested-part and popup ownership,
-  language bindings, copyable examples and browser/native proof. CSS-like blur
+  renderers must be reused. Initial named-box C setters have focused tests; full
+  component coverage is still pending. The [78-family ownership audit](docs/design/ELEMENT_SHADOW_COVERAGE.md)
+  records public, private, anonymous and nonvisual targets. Finish component-root,
+  nested-part and popup ownership, language bindings, copyable examples and
+  browser/native proof. CSS-like blur
   convenience must not reinterpret existing sigma-based APIs or presets.
+  The six-kind owned bridge/facade override passes focused portable software and
+  all five facade checks. Eight C-only Checkbox/Radio/group facades now accept
+  explicit indicator IDs while preserving legacy anonymous routes; their focused
+  tests pass against captured old-library fixtures. Broader part/portal coverage,
+  corresponding indicator bindings, browser/GPU proof and integration remain pending.
 - [ ] **Release the completed major batch.** Freeze one source revision; validate
   matching C, Python/npm, Go and Rust artifacts; publish release notes/checksums
   and matching website docs. `0.1.0-alpha.3` is prepared, **not yet released**.
+
+## Latest validation evidence
+
+- Combined production source `6e75b603`: warning-enabled focused Release build and
+  **10/10** headless C/Python tests passed. JS/Go/Rust runtime and actual older-library
+  compatibility checks passed **5/5**; TypeScript strict checks passed.
+- **18/18** consumer-skill tests, formatting and generated SDK/resource freshness
+  passed; workflow regressions passed **9/9** (bindings) and **5/5** (Pages).
+- Earlier gallery source `c52ce72f` passed headless HoverCard, Stepper and Spinner
+  probes. The combined candidate passed all three hosted Pages browser shards at
+  `b9c2f3d1`; final sanitizer/Windows checks remain pending after test-fixture fixes.
+- Hosted native binding gate `b9c2f3d1` passed ten static/dynamic callback cases
+  and hidden-window checks in all five language paths on the combined candidate.
+- Earlier guide/build/artifact invocation errors are corrected. GCC sanitizer CI
+  caught temporary bounds storage in the new indicator test; its lifetime is now
+  fixed, and a focused instrumented Core/test reproduction plus ordinary regression
+  pass locally. Windows also exposed oversized shadow-test stack workspaces;
+  bounded heap oracles and a passing 1 MB stack regression address that pressure,
+  pending Windows confirmation. All three Pages browser shards passed at `b9c2f3d1`.
+  Final sanitizer/Windows gates, release and deployment remain pending; results
+  prove only their stated subsets.
 
 ## Component parity: verify and close the gaps
 

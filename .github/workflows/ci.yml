@@ -7,6 +7,10 @@ concurrency:
   cancel-in-progress: true
 jobs:
   portable:
+    # Bound nested consumer builds as well as the main build. Portable tests use
+    # process-local state and temporary consumer trees; native jobs stay serial.
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: '2'
     strategy:
       fail-fast: false
       matrix:
@@ -20,7 +24,7 @@ jobs:
           python-version: '3.12'
       - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
       - run: cmake --build build --config ${{ matrix.build_type }} --parallel 2
-      - run: ctest --test-dir build -C ${{ matrix.build_type }} --output-on-failure
+      - run: ctest --test-dir build -C ${{ matrix.build_type }} --output-on-failure --parallel 2
   linux-native:
     runs-on: ubuntu-latest
     strategy:

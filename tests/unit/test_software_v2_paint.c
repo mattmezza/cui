@@ -550,9 +550,135 @@ static void failures(void) {
     a = (allocator){0};
     assert(paint(&t, &l, &o, (cui_color){80, 90, 100, 0}, &a) == CUI_OK && a.calls == 1);
 }
-int main(void) {
+/* Hand-enumerated absolute-edge pixels, independent of any span/UV helper. */
+static bool giant_edges(void) {
+    static const unsigned char square[16] = {1, 1, 0, 0, 1, 1, 0, 0};
+    static const unsigned char rounded[16] = {1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0};
+    static const unsigned char asymmetric[16] = {0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    static const unsigned char texels[8] = {201, 17, 31, 255, 5, 229, 111, 255};
+    cui_color ink = {201, 17, 31, 255}, clear = {9, 17, 25, 70};
+    for (unsigned i = 0; i < 8; ++i) {
+        cui_draw_command_v2 c = legacy(CUI_DRAW_RECT, (cui_rect){-100000000, 0, 100000000, 2}, ink);
+        cui_render_v2_options o = options();
+        o.viewport_width = 4;
+        o.viewport_height = i == 1 || i == 2 ? 4 : 2;
+        o.origin_x = 2;
+        const unsigned char *mask = square;
+        if (i == 1) {
+            c.payload.legacy.bounds.h = 4;
+            c.payload.legacy.radius = 2;
+            mask = rounded;
+        } else if (i == 2) {
+            c.kind = CUI_DRAW_BORDER;
+            c.payload.legacy.type = CUI_DRAW_BORDER;
+            c.payload.legacy.bounds = (cui_rect){-100000000, -100000000, 100000000, 100000000};
+            c.payload.legacy.custom_corners = true;
+            c.payload.legacy.corner_radii = (cui_corner_radii){.25f, .75f, 1.5f, 2};
+            c.payload.legacy.custom_border_edges = true;
+            c.payload.legacy.border_edges = (cui_border_edges){.125f, .75f, .5f, 1.25f};
+            o.origin_y = 2;
+            mask = asymmetric;
+        } else if (i == 3) {
+            c.payload.legacy.bounds = (cui_rect){0, -100000000, 2, 100000000};
+            o.origin_x = 0;
+            o.origin_y = 2;
+        } else if (i >= 4) {
+            c.payload.legacy.bounds = (cui_rect){-1e30f, 0, 1e30f, 2};
+            if (i >= 5) {
+                c.kind = CUI_DRAW_IMAGE;
+                c.payload.legacy.type = CUI_DRAW_IMAGE;
+                c.payload.legacy.bitmap = (cui_bitmap_paint){
+                    .bitmap = {.pixels = texels, .width = 2, .height = 1, .stride = 8},
+                    .source = {0, 0, 1, 1},
+                    .opacity = 1};
+                if (i == 6)
+                    c.payload.legacy.bitmap.source.x = 1e-30f;
+                if (i == 7)
+                    c.payload.legacy.bitmap.source = (cui_rect){1, 0, 1e-30f, 1};
+            }
+        }
+        cui_draw_list_v2 l = list(&c, 1);
+        unsigned char actual[CAPACITY];
+        memset(actual, 0xa7, sizeof actual);
+        cui_software_v2_target t = {actual, 4, o.viewport_height, STRIDE, CAPACITY, false};
+        allocator a = {0};
+        assert(paint(&t, &l, &o, clear, &a) == CUI_OK);
+        assert(a.requested[0] < 2048 && a.requested[1] < 2048);
+        for (unsigned y = 0; y < o.viewport_height; ++y)
+            for (unsigned x = 0; x < 4; ++x) {
+                /* case6 straddles source integer1: offset1e-30 minus
+                 * 1.5/width is negative; minus .5/width is positive. */
+                cui_color source_ink =
+                    i >= 6 && !(i == 6 && x == 0) ? (cui_color){5, 229, 111, 255} : ink;
+                cui_color e = mask[y * 4 + x] ? source_ink : clear;
+                unsigned char expected[4] = {e.r, e.g, e.b, e.a};
+                if (memcmp(actual + y * STRIDE + x * 4, expected, 4)) {
+                    fprintf(stderr, "giant absolute-edge mismatch case=%u x=%u y=%u\n", i, x, y);
+                    return false;
+                }
+            }
+        for (size_t n = 0; n < CAPACITY; ++n)
+            if (n / STRIDE >= o.viewport_height || n % STRIDE >= 16)
+                assert(actual[n] == 0xa7);
+    }
+    return true;
+}
+static void ordinary_boundaries(void) {
+    unsigned char actual[CAPACITY];
+    cui_color ink = {201, 17, 31, 255}, clear = {9, 17, 25, 70};
+    for (unsigned i = 0; i < 4; ++i) {
+        cui_draw_command_v2 c = legacy(CUI_DRAW_RECT, (cui_rect){.5f, 0, 1, 2}, ink);
+        if (i == 1)
+            c.payload.legacy.bounds.x = nextafterf(.5f, INFINITY);
+        if (i == 2)
+            c.payload.legacy.bounds.w = nextafterf(1.f, 0);
+        if (i == 3) {
+            c.kind = CUI_DRAW_BORDER;
+            c.payload.legacy.type = CUI_DRAW_BORDER;
+            c.payload.legacy.bounds = (cui_rect){-.5f, 0, 2, 2};
+            c.payload.legacy.stroke = .5f;
+        }
+        cui_render_v2_options o = options();
+        o.viewport_width = 4;
+        o.viewport_height = 2;
+        cui_draw_list_v2 l = list(&c, 1);
+        memset(actual, 0xa7, sizeof actual);
+        cui_software_v2_target t = {actual, 4, 2, STRIDE, CAPACITY, false};
+        allocator a = {0};
+        assert(paint(&t, &l, &o, clear, &a) == CUI_OK);
+        for (unsigned y = 0; y < 2; ++y)
+            for (unsigned x = 0; x < 4; ++x) {
+                bool covered = i == 1 ? x == 1 : i == 3 ? x == 0 && y == 1 : x == 0;
+                cui_color e = covered ? ink : clear;
+                unsigned char expected[4] = {e.r, e.g, e.b, e.a};
+                assert(memcmp(actual + y * STRIDE + x * 4, expected, 4) == 0);
+            }
+    }
+    /* Exact circle boundary follows horizontal-span left-inclusive/right-open. */
+    cui_draw_command_v2 c = legacy(CUI_DRAW_RECT, (cui_rect){.5f, .5f, 10, 10}, ink);
+    c.payload.legacy.radius = 5;
+    cui_render_v2_options o = options();
+    cui_draw_list_v2 l = list(&c, 1);
+    memset(actual, 0xa7, sizeof actual);
+    cui_software_v2_target t = {actual, WIDTH, HEIGHT, STRIDE, CAPACITY, false};
+    allocator a = {0};
+    assert(paint(&t, &l, &o, clear, &a) == CUI_OK);
+    const unsigned samples[][3] = {{2, 9, 1},  {8, 9, 0}, {5, 0, 0},
+                                   {5, 10, 0}, {0, 5, 1}, {10, 5, 0}};
+    for (unsigned i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
+        cui_color e = samples[i][2] ? ink : clear;
+        unsigned char expected[4] = {e.r, e.g, e.b, e.a};
+        assert(memcmp(actual + samples[i][1] * STRIDE + samples[i][0] * 4, expected, 4) == 0);
+    }
+}
+int main(int argc, char **argv) {
+    if (argc == 2 && strcmp(argv[1], "--giant-probe") == 0)
+        return giant_edges() ? 0 : 2;
+    assert(argc == 1);
     pixels();
     edge_pixels();
     failures();
+    assert(giant_edges());
+    ordinary_boundaries();
     return 0;
 }

@@ -105,6 +105,61 @@ static inline bool cui_software_v2_cover(cui_rect bounds, cui_software_v2_surfac
     *y1 = (int)ceil(bottom);
     return true;
 }
+/* Original absolute edges stay separate from distances to the near edge.
+ * In particular (x+w)-right_inset preserves a small far-edge inset when x+w
+ * cancels to a small value; x+(w-right_inset) would lose it. */
+static inline double cui_software_v2_arc(double rx, double ry, double distance) {
+    if (rx <= 0 || ry <= 0 || distance >= ry)
+        return 0;
+    double delta = ry - distance;
+    /* Rationalized circular/elliptical arc avoids losing a small edge inset
+     * to 1-sqrt(...), and preserves exact 3-4-5 circle boundary cases. */
+    double root = sqrt(fmax(0, ry * ry - delta * delta));
+    return fmin(rx, (rx / ry) * (delta * delta) / (ry + root));
+}
+static inline bool cui_software_v2_span(const cui_draw_command *c, const float r[4],
+                                        const float e[4], bool inner, double y, double *left,
+                                        double *right) {
+    double l = inner ? e[0] : 0, rr = inner ? e[1] : 0;
+    double t = inner ? e[2] : 0, b = inner ? e[3] : 0;
+    double near_x = (double)c->bounds.x + l;
+    double far_x = ((double)c->bounds.x + c->bounds.w) - rr;
+    double near_y = (double)c->bounds.y + t;
+    double far_y = ((double)c->bounds.y + c->bounds.h) - b;
+    if (near_x >= far_x || near_y >= far_y || y < near_y || y >= far_y)
+        return false;
+    double lt = cui_software_v2_arc(fmax(0, r[0] - l), fmax(0, r[0] - t), y - near_y);
+    double lb = cui_software_v2_arc(fmax(0, r[2] - l), fmax(0, r[2] - b), far_y - y);
+    double rt = cui_software_v2_arc(fmax(0, r[1] - rr), fmax(0, r[1] - t), y - near_y);
+    double rb = cui_software_v2_arc(fmax(0, r[3] - rr), fmax(0, r[3] - b), far_y - y);
+    *left = near_x + fmax(lt, lb);
+    *right = far_x - fmax(rt, rb);
+    return *left < *right;
+}
+/* Error-free addition retains which side of an integer a small endpoint
+ * residual occupies. Never round an inside source coordinate to its open end. */
+static inline double cui_software_v2_floor_sum(double a, double b) {
+    double sum = a + b, z = sum - a;
+    double error = (a - (sum - z)) + (b - z);
+    double index = floor(sum);
+    return error < 0 && sum == index ? index - 1 : index;
+}
+/* Compute UV from the closer absolute edge; compensate the far source sum so
+ * tiny source offsets/widths are not mistaken for an open integer endpoint. */
+static inline unsigned cui_software_v2_texel(double point, double near, double far, double source,
+                                             double extent, unsigned size) {
+    double distance_near = point - near, distance_far = far - point;
+    double index;
+    if (distance_near <= distance_far)
+        index = cui_software_v2_floor_sum(source, distance_near / (far - near) * extent);
+    else {
+        double end = source + extent, z = end - source;
+        double residual = (source - (end - z)) + (extent - z);
+        double delta = distance_far / (far - near) * extent;
+        index = cui_software_v2_floor_sum(end, residual - delta);
+    }
+    return (unsigned)fmax(0, fmin((double)size - 1, index));
+}
 static inline void cui_software_v2_shape_paint(cui_software_v2_surface *s,
                                                const cui_draw_command *c) {
     int x0, y0, x1, y1;
@@ -115,24 +170,24 @@ static inline void cui_software_v2_shape_paint(cui_software_v2_surface *s,
     const cui_render_v2_options *o = s->options;
     for (int y = y0; y < y1; ++y) {
         double ly = (y + .5 - o->origin_y) / o->scale_y;
-        float left, right, il = 0, ir = 0;
-        float yy = (float)(ly - c->bounds.y);
-        if (!cui_shape_span(c, radii, edges, false, yy, &left, &right))
+        double left, right, il = 0, ir = 0;
+        if (!cui_software_v2_span(c, radii, edges, false, ly, &left, &right))
             continue;
         bool inner =
-            c->type == CUI_DRAW_BORDER && cui_shape_span(c, radii, edges, true, yy, &il, &ir);
+            c->type == CUI_DRAW_BORDER && cui_software_v2_span(c, radii, edges, true, ly, &il, &ir);
         for (int x = x0; x < x1; ++x) {
             double lx = (x + .5 - o->origin_x) / o->scale_x;
-            float xx = (float)(lx - c->bounds.x);
-            if (xx < left || xx >= right || (inner && xx >= il && xx < ir))
+            if (lx < left || lx >= right || (inner && lx >= il && lx < ir))
                 continue;
             cui_color color = c->color;
             if (c->type == CUI_DRAW_IMAGE) {
                 const cui_bitmap_paint *p = &c->bitmap;
-                unsigned sx = (unsigned)fminf(p->bitmap.width - 1,
-                                              floorf(p->source.x + xx / c->bounds.w * p->source.w));
-                unsigned sy = (unsigned)fminf(p->bitmap.height - 1,
-                                              floorf(p->source.y + yy / c->bounds.h * p->source.h));
+                unsigned sx =
+                    cui_software_v2_texel(lx, c->bounds.x, (double)c->bounds.x + c->bounds.w,
+                                          p->source.x, p->source.w, p->bitmap.width);
+                unsigned sy =
+                    cui_software_v2_texel(ly, c->bounds.y, (double)c->bounds.y + c->bounds.h,
+                                          p->source.y, p->source.h, p->bitmap.height);
                 const unsigned char *pixel =
                     p->bitmap.pixels + (size_t)sy * p->bitmap.stride + sx * 4;
                 color = (cui_color){pixel[0], pixel[1], pixel[2],

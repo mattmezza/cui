@@ -33,12 +33,19 @@ stack (64 clips plus validator stack and scalar locals) is separate from these
 heap-allocation quotas; there is no total-stack/process/time guarantee.
 
 All background resources are prepared before clearing scratch. Shapes/images
-map each physical center back to logical coordinates, then use the existing float
-shape/UV rules: circular logical corners become elliptical on unequal axes;
-border inner radii/edges retain V1 semantics. Mesh XY projects in double per axis,
+map each physical center back to logical coordinates, retaining original absolute
+binary64 near/far edges. Border far insets evaluate `(x+w)-right_edge` and
+`(y+h)-bottom_edge`; they never subtract a small inset from a huge float width.
+Clamped radius/edge values retain CUI rules, with double rationalized elliptical
+row arcs and left-inclusive/right-open horizontal spans. Logical circular corners
+become elliptical on unequal axes. Nearest image UVs use the closer absolute
+edge and compensated source-end addition before integer selection, preserving
+open source endpoints even for giant bounds or tiny source offsets/widths. Mesh XY projects in double per axis,
 while source ST stays unchanged; the existing top-left/curve-coverage triangle
-raster evaluates derivatives in physical space. Image nearest UV sampling,
-grayscale/tint/opacity and straight-byte source-over retain V1 arithmetic.
+raster evaluates derivatives in physical space. Grayscale/tint/opacity and straight-byte source-over retain V1 byte arithmetic.
+V2 corrects admitted relative-float cancellation and uses the stated binary64
+coverage/UV policy, so boundary pixels can intentionally differ from legacy float
+roundoff; this is not universal unit-scale pixel identity. V1 remains unchanged.
 The painter never groups/reorders commands or goes through logical-ceil images.
 
 Background covered cells blend their prepared CENTER_V1 bytes once, with no
@@ -75,3 +82,21 @@ Xvfb checks passed4/4: new painter, existing validator, pure background preparat
 and frozen V1 current comparison. Installed-skill tests passed18/18; reference
 hashes2/2, clang-format23.1.2 and generated freshness passed. Integrator actual
 current-library CMake execution remains an independent gate; no native GPU proof.
+
+Precision regression receipt: the original075a60d4 helper SHA256 was
+`bb8c1d8c3b777207cff95cfa7f4cfcc5b73293092a5d10c974504bb598d9e55d`.
+Before modifying it, a strict O3 probe linked that helper and returned normal
+exit2 at the first hand-enumerated4x2 square case (x0,y0). The corrected helper
+passes eight tiny-target cases: negative1e8 X/Y, rounded corners, asymmetric
+right/bottom border insets, negative1e30 X and three source-cutout endpoint cases.
+Each case requests<2KiB per allocation; no giant raster is created. Additional
+nextafter left/right edges, inner-border endpoints and exact3-4-5 circle points
+verify horizontal half-open semantics. The expanded fixture, old-negative probe,
+validator, pure background preparation and preserved V1 compare passed5/5 under
+private Xvfb. All prior40 physical frames and frozen ordinary-unit fixture bytes
+still pass; an added tiny-offset UV expectation was corrected analytically to
+red at distance1.5/width and blue at .5/width around source integer1.
+The preserved old-negative executable SHA256 is
+`4fc87c0ba822e7d841295a7ca1dc51eea1c7cbfdeadc7a6e6387c60b0ef4dc5b`.
+Precision followup installed-skill tests passed18/18 in38.344s; final source format
+and canonical SDK/amalgamation/skill freshness checks passed.

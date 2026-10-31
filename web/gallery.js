@@ -8,6 +8,7 @@ import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
 import {dropdownUsage} from "./modules/cui_dropdown_usage.js";
+import {controlShadowUsage} from "./modules/cui_control_shadow_usage.js";
 import {hoverCardUsage} from "./modules/cui_hover_card_usage.js";
 let shadowRenderer;
 const meshRenderer=createCuiMeshRenderer();
@@ -17,6 +18,14 @@ const $ = id => document.getElementById(id);
 const siteAssetRoot=new URL('.',document.baseURI);
 const siteBaseElement=document.querySelector('base')||document.head.appendChild(document.createElement('base'));
 siteBaseElement.href=siteAssetRoot.href;
+const controlShadowLabel=document.createElement('label');
+controlShadowLabel.id='control-shadow-control';controlShadowLabel.hidden=true;
+const controlShadowInput=document.createElement('input');
+controlShadowInput.id='control-shadows';controlShadowInput.type='checkbox';
+controlShadowInput.addEventListener('change',requestFrame);
+controlShadowLabel.append(controlShadowInput,' Surface shadows');
+$('control-size').after(controlShadowLabel);
+function controlShadowsEnabled(){return controlShadowInput.checked&&!(selected.name==='Button'&&$('button-collection').value!=='0');}
 const stepperControls=document.createElement('span');
 stepperControls.id='stepper-controls';stepperControls.hidden=true;
 function stepperControl(id,label,options,value){
@@ -889,7 +898,7 @@ function render(){
  wasm.gallery_plot_mode(Number($('plot-mode').value));
  wasm.gallery_virtual_mode(Number($('virtual-axis').value));
  wasm.gallery_design_options(($('design-size').hidden?0:Number($('design-size').value)),Number($('design-radius').value),Number($('design-spacing').value));
- wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value));
+ wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value),Number(controlShadowsEnabled()));
  wasm.gallery_avatar_options(Number($('avatar-source').value),Number($('avatar-palette').checked),Number($('avatar-hue').value),Number($('avatar-placeholder').value),Number($('avatar-rem').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
  $('dropdown-shadow').disabled=$('dropdown-paint').value==='0'||$('dropdown-variant').value!=='11';
@@ -980,6 +989,8 @@ function render(){
   const mode=Number($(selected.name==='Button'?'button-collection':'input-mode').value);
   $('snippet').textContent=selectedUsage(selected.name,mode,Number($('design-size').value),$('disabled').checked)||snippets[selected.name];
  }
+ if(controlShadowsEnabled()&&['Button','Checkbox','Radio','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
+ controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
  if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value))||snippets.HoverCard;
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
@@ -1299,6 +1310,7 @@ function selectComponent(){
  $('group-mode').hidden=selected.name!=='Input Group';$('group-mode').value='0';
  $('form-mode').hidden=selected.name!=='Form';$('form-mode').value='0';
  $('button-collection').hidden=selected.name!=='Button';$('button-collection').value='0';
+ controlShadowLabel.hidden=!['Button','Checkbox','Radio','Switch','Slider'].includes(selected.name);controlShadowInput.checked=false;
  $('input-mode').hidden=selected.name!=='Input';$('input-mode').value='0';
  $('menu-kind').hidden=selected.name!=='Menu';$('menu-kind').value='0';
  $('selection-mode').hidden=!['List','Select','Combobox','DataTable'].includes(selected.name);$('selection-mode').value='0';

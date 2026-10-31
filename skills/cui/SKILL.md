@@ -286,3 +286,10 @@ check: submit first, then check the current-frame shadow setter before end_frame
 Notification logical keys and stack scopes are not card paint IDs; custom callback
 namespaces may have no box. Scroller row IDs follow retained keys, not stable
 indices. Language-builder MAIN/ROOT/subpart targets remain pending.
+
+For opt-in C control shadow examples, read `docs/CONTROL_SURFACE_SHADOW_GALLERY.md`.
+Button's captured instance patch replays after disabled; an instance shadow must
+explicitly clear for disabled if that is the intended result. Named selection
+indicators do not add semantics; Switch thumb shadows remain track-clipped, and
+legacy Slider exposes only its track. These gallery routes do not establish all78
+shadow coverage or foreign-builder callback parity. Check the guide's proof status.

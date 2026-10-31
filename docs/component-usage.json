@@ -237,7 +237,8 @@
         "docs/BUTTON_GROUP.md",
         "docs/CONTROL_EVENTS.md",
         "docs/ELEMENT_SHADOWS.md",
-        "docs/BUTTON_STYLES.md"
+        "docs/BUTTON_STYLES.md",
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
       ],
       "callback_symbols": [
         "cui_button_content_fn",
@@ -268,7 +269,8 @@
       "docs": [
         "docs/CONTROLS.md",
         "docs/CONTROL_EVENTS.md",
-        "docs/NAMED_SELECTION_INDICATORS.md"
+        "docs/NAMED_SELECTION_INDICATORS.md",
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -736,7 +738,8 @@
         "docs/RADIO_GROUP.md",
         "docs/CONTROLS.md",
         "docs/SELECTION_EVENTS.md",
-        "docs/NAMED_SELECTION_INDICATORS.md"
+        "docs/NAMED_SELECTION_INDICATORS.md",
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -879,7 +882,8 @@
       "docs": [
         "docs/CONTROLS.md",
         "docs/BOOLEAN_EVENTS.md",
-        "docs/ELEMENT_SHADOWS.md"
+        "docs/ELEMENT_SHADOWS.md",
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
       ],
       "callback_symbols": [
         "cui_boolean_change_fn"
@@ -1442,7 +1446,8 @@
       "docs": [
         "docs/CONTROLS.md",
         "docs/STYLED_SLIDER_EVENTS.md",
-        "docs/ELEMENT_SHADOWS.md"
+        "docs/ELEMENT_SHADOWS.md",
+        "docs/CONTROL_SURFACE_SHADOW_GALLERY.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",

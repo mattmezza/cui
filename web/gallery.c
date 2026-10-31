@@ -4,6 +4,7 @@
 #include "touch_page_host.h"
 static cui_touch_page_host page_touch_host;
 static unsigned page_touch_cancels;
+#include "cui/cui_button_styles.h"
 #include "cui/cui_calendar_presentation.h"
 #include "cui/cui_carousel.h"
 #include "cui/cui_chart.h"
@@ -1431,6 +1432,49 @@ void gallery_button_collection(int mode) {
 }
 unsigned gallery_button_collection_stat(unsigned field) {
     return field < 3 ? button_collection_selected[field] : button_collection_requests;
+}
+
+static bool control_surface_shadows;
+static unsigned control_shadow_rejections;
+static void gallery_button_shadow(void *user, const cui_button_style_info *info,
+                                  const cui_button_surface_paint *current,
+                                  cui_button_surface_patch *out) {
+    (void)user;
+    (void)current;
+    out->fields = CUI_BUTTON_SURFACE_SHADOWS;
+    if (info->disabled)
+        return; /* Explicit empty list clears both DROP and INSET. */
+    bool pressed = info->phase == CUI_BUTTON_STYLE_ACTIVE;
+    bool hovered = info->phase == CUI_BUTTON_STYLE_HOVER;
+    out->value.shadow_count = 1;
+    out->value.shadows[0] =
+        (cui_box_shadow){.kind = pressed ? CUI_BOX_SHADOW_INSET : CUI_BOX_SHADOW_DROP,
+                         .layer = {.offset_y = pressed   ? 2
+                                               : hovered ? 6
+                                                         : 3,
+                                   .sigma = pressed   ? 1
+                                            : hovered ? 3
+                                                      : 2,
+                                   .color = {20, 40, 80, 150}}};
+}
+static float gallery_shadow_indicator_size(const cui_theme *theme) {
+    cui_design_metrics metrics;
+    if (design_size != CUI_DESIGN_INHERIT &&
+        cui_design_measure(design_size, theme->font_size / 16, &metrics))
+        return metrics.indicator_size;
+    float size = control_size == CUI_CONTROL_XSMALL  ? 12
+                 : control_size == CUI_CONTROL_SMALL ? 14
+                 : control_size == CUI_CONTROL_LARGE ? 18
+                                                     : 16;
+    return size * theme->font_size / 16;
+}
+static void gallery_control_shadow(cui_context *context, cui_id id, float radius, bool inset) {
+    cui_box_shadow layer = {
+        .kind = inset ? CUI_BOX_SHADOW_INSET : CUI_BOX_SHADOW_DROP,
+        .layer = {.offset_y = inset ? 1 : 2, .sigma = 1, .color = {20, 40, 80, 150}}};
+    if (!cui_element_set_box_shadows(context, id, &layer, 1,
+                                     (cui_corner_radii){radius, radius, radius, radius}))
+        control_shadow_rejections++;
 }
 
 static void gallery_button_action(void *user) {
@@ -3952,14 +3996,27 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             cui_label(ui, &t, cui_string(label));
             break;
         }
-        cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
-                      (cui_button_options){.size = (cui_control_size)control_size,
-                                           .design_size = design_size,
-                                           .disabled = disabled,
-                                           .on_click = gallery_button_action,
-                                           .prevent_pointer_focus = true,
-                                           .custom_cursor = true,
-                                           .cursor = CUI_CURSOR_POINTER});
+        cui_button_options action_options =
+            (cui_button_options){.size = (cui_control_size)control_size,
+                                 .design_size = design_size,
+                                 .disabled = disabled,
+                                 .on_click = gallery_button_action,
+                                 .prevent_pointer_focus = true,
+                                 .custom_cursor = true,
+                                 .cursor = CUI_CURSOR_POINTER};
+        if (control_surface_shadows) {
+            cui_button_surface_status status;
+            cui_button_surface_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                                  action_options,
+                                  (cui_button_surface_styles){.instance = gallery_button_shadow,
+                                                              .hovered = gallery_button_shadow,
+                                                              .active = gallery_button_shadow,
+                                                              .disabled = gallery_button_shadow},
+                                  &status);
+            control_shadow_rejections += status.rejected_phases != 0;
+        } else
+            cui_button_ex(ui, cui_id_from(ui, "button"), &t, cui_string("Run action"),
+                          action_options);
         snprintf(label, sizeof(label), "Clicked %d times", clicks);
         cui_label(ui, &t, cui_string(label));
         int columns = design_size == CUI_DESIGN_INHERIT ? 3 : width < 600 ? 1 : 2;
@@ -4024,8 +4081,7 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                      .horizontal = true,
                                      .hide_scrollbars = true};
         bool began = cui_scrollable_begin(ui, owner, &t, &checkbox_scroll, scroll);
-        cui_checkbox_ex(
-            ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"), &check_state,
+        cui_checkbox_options check_options =
             (cui_checkbox_options){.size = (cui_control_size)control_size,
                                    .design_size = design_size,
                                    .disabled = disabled,
@@ -4042,7 +4098,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                        .height = 80,
                                                        .open_delay = .2f,
                                                        .close_delay = .1f},
-                                   .reduced_motion = reduced_motion});
+                                   .reduced_motion = reduced_motion};
+        if (control_surface_shadows) {
+            cui_id indicator = cui_id_from(ui, "gallery-check-indicator");
+            cui_checkbox_ex_with_parts(ui, cui_id_from(ui, "check"), &t,
+                                       cui_string("Receive updates"), &check_state, check_options,
+                                       (cui_selection_indicator_parts){indicator});
+            gallery_control_shadow(ui, indicator, fminf(t.radius, 4 * t.font_size / 16),
+                                   check_state != CUI_CHECK_UNCHECKED);
+        } else
+            cui_checkbox_ex(ui, cui_id_from(ui, "check"), &t, cui_string("Receive updates"),
+                            &check_state, check_options);
         if (began)
             cui_scrollable_end_ex(ui, owner, &t, &checkbox_scroll, scroll);
         next_wake =
@@ -4063,6 +4129,17 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         options.reduced_motion = reduced_motion;
         cui_switch_ex(ui, cui_id_from(ui, "switch"), &t, cui_string("Notifications"), &enabled,
                       &gallery_switch_state, options);
+        if (control_surface_shadows) {
+            cui_id id = cui_id_from(ui, "switch");
+            float track_height =
+                options.design_size != CUI_DESIGN_INHERIT ? gallery_shadow_indicator_size(&t) + 4
+                : options.size == CUI_CONTROL_SMALL || options.size == CUI_CONTROL_XSMALL ? 16
+                : options.size == CUI_CONTROL_LARGE                                       ? 24
+                                                                                          : 20;
+            float radius = t.radius >= 4 ? track_height : t.radius;
+            gallery_control_shadow(ui, cui_switch_track_id(id), radius, enabled);
+            gallery_control_shadow(ui, cui_switch_thumb_id(id), radius, false);
+        }
         next_wake = gallery_switch_state.next_wake_seconds;
         break;
     }
@@ -4100,22 +4177,39 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {cui_id_from(ui, "radio-c"), cui_string("Express unavailable"), true}};
         if (!radio_selected)
             radio_selected = items[0].id;
-        cui_radio_group(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
-                        &radio_group_state,
-                        (cui_radio_group_options){.name = cui_string("Delivery options"),
-                                                  .vertical = true,
-                                                  .size = (cui_control_size)control_size,
-                                                  .design_size = design_size,
-                                                  .disabled = disabled,
-                                                  .required = choice_required != 0,
-                                                  .invalid = choice_invalid != 0,
-                                                  .skip_tab = choice_skip_tab != 0,
-                                                  .on_change = gallery_radio_change});
+        cui_radio_group_options radio_options =
+            (cui_radio_group_options){.name = cui_string("Delivery options"),
+                                      .vertical = true,
+                                      .size = (cui_control_size)control_size,
+                                      .design_size = design_size,
+                                      .disabled = disabled,
+                                      .required = choice_required != 0,
+                                      .invalid = choice_invalid != 0,
+                                      .skip_tab = choice_skip_tab != 0,
+                                      .on_change = gallery_radio_change};
+        if (control_surface_shadows) {
+            cui_selection_indicator_parts parts[3] = {
+                {cui_id_from(ui, "gallery-radio-indicator-a")},
+                {cui_id_from(ui, "gallery-radio-indicator-b")},
+                {cui_id_from(ui, "gallery-radio-indicator-c")}};
+            cui_radio_group_with_parts(ui, cui_id_from(ui, "radio-group"), &t, items, 3,
+                                       &radio_selected, &radio_group_state, radio_options, parts,
+                                       3);
+            for (size_t i = 0; i < 3; i++)
+                gallery_control_shadow(ui, parts[i].indicator,
+                                       gallery_shadow_indicator_size(&t) / 2,
+                                       radio_selected == items[i].id);
+        } else
+            cui_radio_group(ui, cui_id_from(ui, "radio-group"), &t, items, 3, &radio_selected,
+                            &radio_group_state, radio_options);
         break;
     }
     case 5:
         cui_slider(ui, cui_id_from(ui, "slider"), &t, cui_string("Volume"), &slider, 0, 100, 1,
                    disabled);
+        if (control_surface_shadows)
+            gallery_control_shadow(ui, cui_slider_track_id(cui_id_from(ui, "slider")),
+                                   t.radius == 0 ? 0 : 4, true);
         break;
     case 6: {
         cui_input_result result = cui_input_ex(
@@ -7058,9 +7152,12 @@ void gallery_design_options(int size, int radius, float spacing) {
     design_spacing = isfinite(spacing) && spacing >= 0 && spacing <= 16 ? spacing : -1;
 }
 void gallery_control_options(int size, int required, int invalid, int skip_tab, int label_left,
-                             int custom_color, int variant, int segmented, int multiple) {
+                             int custom_color, int variant, int segmented, int multiple,
+                             int shadows) {
     control_size =
         size >= CUI_CONTROL_MEDIUM && size <= CUI_CONTROL_XSMALL ? size : CUI_CONTROL_MEDIUM;
+    control_surface_shadows = shadows != 0;
+    control_shadow_rejections = 0;
     choice_required = required;
     choice_invalid = invalid;
     choice_skip_tab = skip_tab;
@@ -7109,6 +7206,10 @@ double gallery_control_stats(unsigned field) {
                date_time_value.time.second;
     case 13:
         return date_time_clear;
+    case 14:
+        return control_shadow_rejections;
+    case 15:
+        return slider;
     default:
         return 0;
     }

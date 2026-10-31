@@ -262,3 +262,41 @@ consumes draw lists before the next begin and owns renderer support negotiation.
 
 Signed design checkpoint: `/root/hidden_windows`, 2026-10-31. Production requires
 root review; full Styled/renderer/native/allfive family closure remains pending.
+
+## Test-only ordinary-flow evidence and remaining limits
+
+`tests/unit/test_slider_styled_flow.c` now exercises the candidate independently
+of any production hook/facade. Strict C11 warnings passed; private-Xvfb CTest1/1
+passed. One small test TU links the already-built actual Core fixture; no engine,
+Core object, renderer or dependency was rebuilt. Logs outside the repository:
+`cui-current-validation/styled-slider-flow-{configure,build,tests}.log`.
+
+- 216 ordinary frames cover both axes, fixed/GROW main extent, rem12/16/24,
+  parent sizes80/300/120 and resize+37 between input dispatch and composition,
+  Range/Single/reverse. Independent source formulas match actual current track,
+  fill, outer thumb, inner surface and outward ring bounds; actual RECT/BORDER
+  colors/bounds are asserted. Real next-frame down/up resolve to End's last
+  completed region while this frame paints its new resized position.
+- Endpoint0/1 and parent clipping pass, as do matching V2 ordinary frames on both
+  axes. These are Core geometry/command/hit proofs, not V2 renderer pixels.
+- Real registered scroll clamp admits horizontal GROW/percent-width flow and
+  fixed absolute descendants. Vertical still rejects under a fixed positive
+  root because percentage-height descendants fail existing admission: LAYOUT,
+  empty draw, readinessfalse. Error clear alone staysfalse; fresh successful
+  geometry restores readiness. No validator broadening/exception is approved.
+
+The fixture forces a fully grown pointer ring; it does not prove motion, hover,
+source active-selector propagation, disabled/source palette state painting or
+any renderer. One additional static limit must be handled before animated-ring
+production: ordinary `cui_box.border_width` goes through Core's uint16 scalar
+conversion, so fractional3*progress cannot silently be represented by that field.
+Existing `cui_set_prepaint` copies an owned payload and permits a float-stroke
+`CUI_DRAW_BORDER` via `cui_prepaint_emit`; a named decorative ring box plus that
+paint-only callback is a candidate, without layout/input/semantic mutation or a
+new Core API. Its local stream inherits real clipping/opacity, requires explicit
+command budget and must be proved at progress0/.25/.5/.75/1, including rounded
+edges, before claiming continuous source rings. Do not silently quantize width
+and label the spring/source appearance complete.
+
+Signed test-only evidence: `/root/hidden_windows`, 2026-10-31. Production hook,
+public Styled ABI and full-feature completion remain gated on root review.

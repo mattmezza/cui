@@ -2350,3 +2350,13 @@ foreach(target test_base_slider_model_source test_base_slider_model_selective
  cui_warnings(${target})
  add_test(NAME ${target} COMMAND ${target})
 endforeach()
+
+# Test-only responsive Styled Slider candidate; no new presenter/Core behavior.
+add_executable(test_slider_styled_flow tests/unit/test_slider_styled_flow.c
+ $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_slider_styled_flow PRIVATE include)
+if(NOT MSVC)
+ target_link_libraries(test_slider_styled_flow PRIVATE m)
+endif()
+cui_warnings(test_slider_styled_flow)
+add_test(NAME test_slider_styled_flow COMMAND test_slider_styled_flow)

@@ -123,7 +123,7 @@ These are **unreleased slices**, not completed beta areas:
 | Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
 | Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check also passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
-| Background rendering | Transport, preparation and private validator checks pass. Counted text recording is integrated locally; its CMake/runtime integration gate remains open. This does **not** establish renderer painting support. |
+| Background rendering | Transport, preparation and private validator checks pass. Counted text recording is integrated locally; Release O3 integration exposed a negative-fixture warning and a no-Bidi contextual admission gap. Corrections and runtime confirmation remain open. This does **not** establish renderer painting support. |
 | Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. New hosted Linux/macOS/Windows/browser confirmation remains open. |
 
 Keep detailed receipts with their implementation changes; refresh this summary

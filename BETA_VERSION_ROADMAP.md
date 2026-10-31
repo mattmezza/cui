@@ -23,10 +23,10 @@ feature test does not establish complete component parity.
 
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; 15 focused regressions and two Inter-font checks pass. Finish Dialog composition/input and wider acceptance. |
+| 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; additive region-sizing work has passed worker checks and awaits integration. Finish Dialog composition/input and wider acceptance. |
 | 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Fix hosted source-package configuration, Windows alignment and WASM32 warning failures; Spinner scheduling now passes its hosted check; obtain a clean full run. |
+| 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Confirm the final Windows fieldwise-test correction and obtain a clean full run of the latest candidate. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -69,6 +69,30 @@ For each family, verify applicable state ownership, callbacks/results,
 keyboard/pointer/touch, focus/accessibility, visual states, responsive bounds,
 omission/removal and resource lifetime. Record justified nonvisual/host exceptions.
 
+### Reported regressions: closure checklist
+
+These groups remain open until existing fixes are reconciled with regression
+coverage and the deployed gallery. This is an acceptance checklist, not a claim
+that every listed defect still reproduces.
+
+- [ ] **Alignment and sizing:** button/control text, Accordion caret, Avatar initials,
+  Pagination counter, Select label, Tooltip, DatePicker, AlertDialog and HoverCard
+  content sizing; all applicable size tokens, including Attachment layout.
+- [ ] **Images and presentation:** real Attachment/Image previews, avatar stack,
+  semantic Alert/Bubble variants, reusable Message demo, Notification action/close
+  spacing and Markdown code blocks.
+- [ ] **Input and selection:** Radio exclusivity, Rating stars, Stepper behavior,
+  Calendar icons, locale/year selection, full-width Select/Combobox/Command,
+  InputGroup wrapping and text navigation/scrolling regressions.
+- [ ] **Layout and navigation:** working Resizable/Dock/VirtualList demos, Sidebar
+  clipping, bounded Tabs scrolling/overflow button, meaningful Toolbar find and
+  Theme demos, native TitleBar capability/fallback, gallery scroll preservation.
+- [ ] **Data and motion:** Table/DataTable sorting and consistent scrolling,
+  alternate/header backgrounds, Chart line quality, Plot pan/zoom/pinch,
+  Progress and Sheet animation, optional scrollbar appearance only where useful.
+- [ ] **Media:** reusable player plus base video surface; visible seek controls,
+  video-only fullscreen, audible playback and documented host support.
+
 ## Validation and delivery gates
 
 - [ ] All 78 families reconciled with [the feature ledger](docs/gpui-parity.json),
@@ -87,13 +111,14 @@ omission/removal and resource lifetime. Record justified nonvisual/host exceptio
 The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actions/runs/41236071825),
 [native bindings](https://github.com/mattmezza/cui/actions/runs/41236071845) and
 [Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
-Integration candidate `3636bfbc` now passes [all browser shards](https://github.com/mattmezza/cui/actions/runs/41249695672)
-and [native binding runners](https://github.com/mattmezza/cui/actions/runs/41249695759).
-Main CI finished with one Windows Release test failure out of 391: a raw struct-padding
-comparison in the shadow test. The fieldwise correction passes locally; hosted
-confirmation remains open. All other jobs passed; integration-branch deployment
-was intentionally skipped. Newer text and Slider proof slices have focused local passes,
-not full hosted acceptance. Older green results do not cover newer code.
+Integration candidate `3636bfbc` passed all browser shards and native binding
+runners; its only CI failure was a Windows Release struct-padding comparison.
+The fieldwise correction passes locally. Latest submitted candidate: `00aa1f99`;
+[CI](https://github.com/mattmezza/cui/actions/runs/41251863047),
+[native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050) and
+[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) require terminal
+confirmation. Branch checks do not deploy the public website. Older green results
+do not cover newer code.
 
 ### Current integration evidence
 
@@ -103,8 +128,9 @@ These are **unreleased slices**, not completed beta areas:
 | --- | --- |
 | Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). The controlled example, responsive/ring pixel proofs and pure C style resolver pass. Styled facade/motion and other languages remain open. |
-| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check also passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
+| Reduced-motion scheduling | Local viewport/DPI and repeated preference-change checks pass; all browser shards passed for candidate `3636bfbc`. Confirm the newest candidate separately. |
 | Background rendering | Transport, preparation and private validator checks pass. Counted text recording passes the repository Release O3 build, seven runtime checks, mutation rejection and skill18. The negative-fixture warning and no-Bidi admission gap are fixed. Wider suite/platform acceptance remains open. This does **not** establish renderer painting support. |
+| Worker handoffs awaiting integration | Core scroll-region sizing: source/distribution/legacy/header checks 6/6 and skill checks 18/18 pass. Private software painter: focused checks 5/5 and skill checks 18/18 pass, including a reproduced and corrected large-coordinate regression. These are not integrated or public renderer support. |
 | Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. New hosted Linux/macOS/Windows/browser confirmation remains open. |
 
 Keep detailed receipts with their implementation changes; refresh this summary

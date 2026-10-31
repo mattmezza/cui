@@ -2,9 +2,12 @@
 /* Test-only ordinary-flow candidate. No production presenter/hook/API. */
 #include "cui/cui.h"
 #include "cui/cui_draw_v2.h"
+#include "cui/cui_software.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 enum { ROOT = 100, TRACK = 103, FILL = 104, START = 101, END = 102, SURFACE = 200, RING = 300 };
 typedef struct {
     bool vertical, grow, range, reverse;
@@ -15,15 +18,46 @@ static void box(cui_context *ui, cui_id id, cui_box b) {
     cui_begin_box(ui, id, b);
     cui_end_box(ui);
 }
+/* Test-only presentation inputs; no production spring or Styled API. */
+static float ring_progress = 1, parent_opacity = 1;
+static cui_color ring_source_color = {90, 43, 177, 7};
+static bool ring_square;
+typedef struct {
+    float stroke, radius;
+    cui_color color;
+} ring_payload;
+static bool paint_ring(const cui_prepaint_info *info, const void *copied,
+                       cui_prepaint_writer *writer) {
+    const ring_payload *p = copied;
+    return cui_prepaint_emit(writer,
+                             &(cui_draw_command){.type = CUI_DRAW_BORDER,
+                                                 .bounds = info->bounds,
+                                                 .color = p->color,
+                                                 .stroke = p->stroke,
+                                                 .radius = p->radius},
+                             false);
+}
 static void decoration(cui_context *ui, cui_id id, float rem) {
-    cui_begin_absolute_box(ui, id + RING,
-                           (cui_box){.border = {90, 0, 0, 255}, .border_width = 3, .radius = 1000},
-                           (cui_rect){-3, -3, rem + 6, rem + 6});
-    cui_end_box(ui);
+    float width = 3 * ring_progress;
+    if (width > 0) {
+        cui_begin_absolute_box(ui, id + RING, (cui_box){0},
+                               (cui_rect){-width, -width, rem + 2 * width, rem + 2 * width});
+        ring_payload payload = {.stroke = width,
+                                .radius = ring_square ? 0 : rem * .5f + width,
+                                .color = ring_source_color};
+        payload.color.a = (unsigned char)lroundf(.5f * ring_progress * 255); /* REPLACE alpha. */
+        assert(cui_set_prepaint(ui, (cui_prepaint_options){.callback = paint_ring,
+                                                           .payload = &payload,
+                                                           .payload_bytes = sizeof payload,
+                                                           .command_budget = 3}));
+        memset(&payload, 0xdd, sizeof payload); /* Core must own its copied bytes. */
+        cui_end_box(ui);
+    }
     float inside = fmaxf(0, rem - 2);
-    cui_begin_absolute_box(ui, id + SURFACE,
-                           (cui_box){.background = {80, 0, 0, 255}, .radius = 1000},
-                           (cui_rect){1, 1, inside, inside});
+    cui_begin_absolute_box(
+        ui, id + SURFACE,
+        (cui_box){.background = {80, 0, 0, 255}, .radius = ring_square ? 0 : 1000},
+        (cui_rect){1, 1, inside, inside});
     cui_end_box(ui);
 }
 static void thumb(cui_context *ui, plan p, cui_id id, double fraction) {
@@ -46,8 +80,9 @@ static void thumb(cui_context *ui, plan p, cui_id id, double fraction) {
                   (cui_box){.width = 0, .height = 0, .fixed_width = true, .fixed_height = true});
     cui_rect relative = p.vertical ? (cui_rect){-track - 5, 8 - p.rem, p.rem, p.rem}
                                    : (cui_rect){-8, -track - 5, p.rem, p.rem};
-    cui_begin_absolute_box(ui, id, (cui_box){.background = {70, 0, 0, 255}, .radius = 1000},
-                           relative);
+    cui_begin_absolute_box(
+        ui, id, (cui_box){.background = {70, 0, 0, 255}, .radius = ring_square ? 0 : 1000},
+        relative);
     decoration(ui, id, p.rem);
     cui_end_box(ui);
     cui_end_box(ui);
@@ -122,7 +157,9 @@ static void parent(cui_context *ui, plan p, bool clip) {
                             .fixed_width = true,
                             .fixed_height = true,
                             .padding = p.padding,
-                            .clip = clip});
+                            .clip = clip,
+                            .custom_opacity = true,
+                            .opacity = parent_opacity});
     compose(ui, p);
     cui_end_box(ui);
 }
@@ -267,6 +304,140 @@ static void ordinary(void) {
     printf("PASS %u ordinary first/current-layout frames plus endpoints/clip/V2\n", frames);
     cui_destroy(ui);
 }
+static bool annulus(double x, double y, cui_rect thumb, double width, bool square) {
+    if (width <= 0)
+        return false;
+    if (square)
+        return x >= thumb.x - width && x < thumb.x + thumb.w + width && y >= thumb.y - width &&
+               y < thumb.y + thumb.h + width &&
+               !(x >= thumb.x && x < thumb.x + thumb.w && y >= thumb.y && y < thumb.y + thumb.h);
+    double dx = x - (thumb.x + thumb.w * .5), dy = y - (thumb.y + thumb.h * .5);
+    double inner = thumb.w * .5, outer = inner + width, r2 = dx * dx + dy * dy;
+    /* Half-open horizontal coverage: exact left edge is inside, right edge
+     * outside. rem24/progress.5 has a pixel center exactly on that boundary. */
+    bool in_outer = r2 < outer * outer || (r2 == outer * outer && dx < 0);
+    bool in_inner = r2 < inner * inner || (r2 == inner * inner && dx < 0);
+    return in_outer && !in_inner;
+}
+/* Independent point-in-annulus + double source-over oracle. Do not call the
+ * backend's scanline/shape/span helpers or use its rendered image as expected. */
+static void software_ring(void) {
+    enum { WIDTH = 200, HEIGHT = 100, BYTES = WIDTH * HEIGHT * 4 };
+    cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 128});
+    assert(ui);
+    cui_software *r = cui_software_create(WIDTH, HEIGHT, NULL);
+    assert(r);
+    unsigned char *baseline = malloc(BYTES);
+    assert(baseline);
+    unsigned cases = 0;
+    for (unsigned rem = 0; rem < 2; ++rem)
+        for (unsigned square = 0; square < 2; ++square)
+            for (unsigned clipping = 0; clipping < 2; ++clipping)
+                for (unsigned opacity = 0; opacity < 2; ++opacity)
+                    for (unsigned alpha = 0; alpha < 3; ++alpha)
+                        for (unsigned progress = 0; progress < 5; ++progress) {
+                            const unsigned char source_alpha[] = {0, 37, 255};
+                            ring_progress = progress * .25f;
+                            ring_square = square != 0;
+                            parent_opacity = opacity ? .5f : 1;
+                            ring_source_color.a = source_alpha[alpha];
+                            plan p = {false,
+                                      true,
+                                      false,
+                                      false,
+                                      128,
+                                      rem ? 24 : 16,
+                                      clipping ? 0 : 16,
+                                      0,
+                                      clipping ? 1 : .5};
+                            assert(cui_begin_frame(ui, WIDTH, HEIGHT, 0));
+                            parent(ui, p, clipping != 0);
+                            cui_draw_list list = cui_end_frame(ui);
+                            assert(cui_last_error(ui) == CUI_OK);
+                            cui_draw_command *without = malloc(list.count * sizeof *without);
+                            assert(without);
+                            size_t n = 0;
+                            unsigned rings = 0;
+                            cui_rect thumb = expected_thumb(p, p.end);
+                            double stroke = 3 * ring_progress;
+                            unsigned char raw = (unsigned char)lround(.5 * ring_progress * 255);
+                            unsigned char effective = (unsigned char)(raw * parent_opacity);
+                            for (size_t k = 0; k < list.count; ++k) {
+                                const cui_draw_command *c = &list.commands[k];
+                                if (c->type == CUI_DRAW_BORDER &&
+                                    c->color.r == ring_source_color.r &&
+                                    c->color.g == ring_source_color.g &&
+                                    c->color.b == ring_source_color.b) {
+                                    ++rings;
+                                    rectangle(c->bounds, (cui_rect){thumb.x - (float)stroke,
+                                                                    thumb.y - (float)stroke,
+                                                                    p.rem + 2 * (float)stroke,
+                                                                    p.rem + 2 * (float)stroke});
+                                    assert(c->stroke == (float)stroke && c->color.a == effective);
+                                    assert(c->radius == (square ? 0 : p.rem * .5f + (float)stroke));
+                                } else
+                                    without[n++] = *c;
+                            }
+                            assert(rings == (progress ? 1u : 0u));
+                            cui_draw_list background = {without, n, WIDTH, HEIGHT};
+                            assert(cui_software_render(r, &background, (cui_color){0}));
+                            memcpy(baseline, cui_software_pixels(r, NULL, NULL), BYTES);
+                            assert(cui_software_render(r, &list, (cui_color){0}));
+                            const unsigned char *actual = cui_software_pixels(r, NULL, NULL);
+                            unsigned changed = 0;
+                            for (unsigned y = 0; y < HEIGHT; ++y)
+                                for (unsigned x = 0; x < WIDTH; ++x) {
+                                    size_t index = ((size_t)y * WIDTH + x) * 4;
+                                    bool in_clip = !clipping || (x < p.length && y < 1.5f * p.rem);
+                                    bool ink = in_clip &&
+                                               annulus(x + .5, y + .5, thumb, stroke, square != 0);
+                                    if (!ink) {
+                                        if (memcmp(actual + index, baseline + index, 4))
+                                            fprintf(stderr,
+                                                    "outside ring rem%g square%u clip%u opacity%g "
+                                                    "sourcealpha%u progress%g pixel%u,%u "
+                                                    "thumb%g,%g,%g: actual%u,%u,%u,%u "
+                                                    "baseline%u,%u,%u,%u\n",
+                                                    p.rem, square, clipping, parent_opacity,
+                                                    source_alpha[alpha], ring_progress, x, y,
+                                                    thumb.x, thumb.y, thumb.w, actual[index],
+                                                    actual[index + 1], actual[index + 2],
+                                                    actual[index + 3], baseline[index],
+                                                    baseline[index + 1], baseline[index + 2],
+                                                    baseline[index + 3]);
+                                        assert(!memcmp(actual + index, baseline + index, 4));
+                                        continue;
+                                    }
+                                    double sa = effective / 255., ba = baseline[index + 3] / 255.,
+                                           a = sa + ba * (1 - sa);
+                                    const unsigned char source[] = {ring_source_color.r,
+                                                                    ring_source_color.g,
+                                                                    ring_source_color.b};
+                                    for (unsigned c = 0; c < 4; ++c) {
+                                        double value =
+                                            c == 3 ? a * 255
+                                            : a    ? ((source[c] * sa +
+                                                       baseline[index + c] * ba * (1 - sa)) /
+                                                      a)
+                                                   : 0;
+                                        int expected = (int)lround(value);
+                                        assert(abs((int)actual[index + c] - expected) <= 1);
+                                    }
+                                    changed += memcmp(actual + index, baseline + index, 4) != 0;
+                                }
+                            assert(progress ? changed > 0 : changed == 0);
+                            free(without);
+                            ++cases;
+                        }
+    printf("PASS %u real software ring images: fractional stroke/source alpha "
+           "replacement/clip/opacity/rounded and square\n",
+           cases);
+    ring_progress = parent_opacity = 1;
+    ring_square = false;
+    free(baseline);
+    cui_software_destroy(r);
+    cui_destroy(ui);
+}
 static void registered_scroll(void) {
     for (unsigned axis = 0; axis < 2; ++axis) {
         cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 128});
@@ -307,6 +478,7 @@ static void registered_scroll(void) {
 }
 int main(void) {
     ordinary();
+    software_ring();
     registered_scroll();
     return 0;
 }

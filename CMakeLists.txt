@@ -2355,8 +2355,19 @@ endforeach()
 add_executable(test_slider_styled_flow tests/unit/test_slider_styled_flow.c
  $<TARGET_OBJECTS:slider_model_core_fixture>)
 target_include_directories(test_slider_styled_flow PRIVATE include)
+target_link_libraries(test_slider_styled_flow PRIVATE cui_software)
 if(NOT MSVC)
  target_link_libraries(test_slider_styled_flow PRIVATE m)
 endif()
 cui_warnings(test_slider_styled_flow)
 add_test(NAME test_slider_styled_flow COMMAND test_slider_styled_flow)
+
+# Independently runnable complete controlled Base example; cached/shared Core.
+add_executable(test_slider_model_example examples/slider_model_controlled.c
+ src/base/cui_base_slider_model.c src/base/cui_slider_model.c $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_slider_model_example PRIVATE include)
+if(NOT MSVC)
+ target_link_libraries(test_slider_model_example PRIVATE m)
+endif()
+cui_warnings(test_slider_model_example)
+add_test(NAME test_slider_model_example COMMAND test_slider_model_example)

@@ -356,3 +356,9 @@ Read `docs/CORE_NUMERIC_ACCESSIBILITY.md`: readiness does not imply current
 modal/target eligibility, renderer/host success or numeric capability; inert and
 layout-only calls still require their ordinary frame eligibility checks. Failed
 V2 admission invalidates new readiness without changing legacy input routing.
+
+For a complete C-only controlled Base Slider program, read
+`examples/slider_model_controlled.c` and `docs/BASE_SLIDER_MODEL.md`. It defines
+persistent state, callback, composition and a windowless driver; owner acceptance
+is explicit on UPDATE. CANCEL may carry an old kind/domain and must not be blindly
+accepted. This example does not add Styled rendering or foreign builders.

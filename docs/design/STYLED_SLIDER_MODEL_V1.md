@@ -300,3 +300,57 @@ and label the spring/source appearance complete.
 
 Signed test-only evidence: `/root/hidden_windows`, 2026-10-31. Production hook,
 public Styled ABI and full-feature completion remain gated on root review.
+
+## Followup: complete example and named float-stroke software proof
+
+The complete [Base controlled companion](../../examples/slider_model_controlled.c)
+now defines application state, callback, composition, windowless driver, explicit
+UPDATE acceptance and checked initialization/error paths (not assert side effects).
+Its independent strict-C11 target runs through the private wrapper and prints
+`Selection [0.250, 0.500]; accepted 2 requests`. Both queued Left requests retain
+current=.75; requested intent progresses .625 then.5. The guide links this actual
+source and does not leave on_request/application undefined. No Styled symbol is
+invented by the example.
+
+The existing responsive test-only fixture now attaches a named, unpainted ring
+box inside the actual thumb and registers a copied prepaint payload. The payload
+is overwritten locally after registration to check frame ownership. The callback
+emits existing `CUI_DRAW_BORDER` with float stroke/radius; Core supplies real
+current bounds and applies ancestor opacity once. It does no layout, semantics,
+input, dispatch or reduction. Zero progress emits no ring box/paint; names remain
+identities rather than presence promises.
+
+Actual V1 software renders240 independent images across progress0/.25/.5/.75/1,
+rem16/24, square/round, source alpha0/37/255, parent opacity1/.5, and clipped/normal
+parents. Strokes are exactly0/.75/1.5/2.25/3, not box-border uint16 values. Tests
+assert outward current bounds, rounded radius, raw source-alpha replacement
+(round(.5*progress*255)) and exactly-once inherited opacity in emitted commands.
+Every actual image pixel is compared against an independent analytic annulus
+(circle or rectangle) and double-precision source-over, not the backend's
+scanline/shape helpers. Outside coverage equals a separately rendered ring-free
+baseline exactly; covered channels allow at most1 byte for compositing rounding.
+Positive progress must change real pixels; zero must change none. Parent clipping
+is checked at pixel centers, including an endpoint whose ring extends outside.
+
+The initial oracle failed at rem24/progress.5/round/opacity1/no clip: thumb
+{72,24.5,24}, center(84,36.5), outer radius13.5, pixel center(70.5,36.5) exactly on
+the left boundary. Existing software spans are left-inclusive/right-exclusive;
+the initial strict radial predicate excluded both. The corrected independent
+oracle explicitly adopts that half-open edge tie for outer and inner circles,
+without widening geometry tolerance or reducing checks to command counts. The
+original failure log is preserved externally as `slider-ring-debug.log`.
+This is existing pixel-center software coverage, not proof of source GPU AA.
+
+Private-Xvfb focused2/2 passed: full example plus responsive216-frame/240-image
+fixture, including the previous registered-scroll negative/recovery cases.
+Strict C11 compilation is warning-clean. Local validation compiled only the
+example's tiny source/Base/math objects and fixture TU, then used CMake's exact
+link command against cached actual Core/software/text archives; no Core, full
+engine or software renderer was rebuilt. Ordinary CI keeps a real cui_software
+link dependency. No font stubs or simulated rasterizer replace the renderer.
+Production Core/Base/renderer sources and public APIs remain unchanged.
+
+Spring behavior, actual hover/active propagation, the private production hook,
+Styled ABI, source gradient consumers/native hosts/allfive bindings and vertical
+registered-scroll admission still require their separate reviews and proofs.
+Signed evidence: `/root/hidden_windows`, 2026-10-31.

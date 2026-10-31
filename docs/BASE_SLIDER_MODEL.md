@@ -8,29 +8,21 @@ Styled presenter: palette brushes, source themes/disabled styling, animation,
 focus rings, native numeric host delivery and all five language builders remain
 pending. The whole Slider family remains partial.
 
-```c
-/* Retain state and confirmed in application-owned storage. */
-cui_slider_model_state_v1 state;
-cui_slider_model_state_init_v1(sizeof state, &state);
-cui_slider_model_value_v1 confirmed = {CUI_SLIDER_MODEL_RANGE, 0, .25, .75};
-/* During ordinary composition, once per owner/state per frame: */
-cui_slider_model_options_v1 options = {
-    .version = CUI_SLIDER_MODEL_V1, .struct_size = sizeof options,
-    .domain = {0, 1, .125, CUI_SLIDER_MODEL_LINEAR, 0},
-    .name = cui_string("Selection")};
-cui_base_slider_model_layout_v1 layout = {
-    .version = CUI_SLIDER_MODEL_V1, .struct_size = sizeof layout,
-    .length = 240, .cross_extent = 24, .track_extent = 6,
-    .thumb_extent = 16, .axis_inset = 8,
-    .track = {.background = {80, 80, 80, 255}},
-    .fill = {.background = {60, 120, 240, 255}},
-    .start_thumb = {.background = {240, 240, 240, 255}, .radius = 8},
-    .end_thumb = {.background = {240, 240, 240, 255}, .radius = 8}};
-/* on_request copies/accepts selected proposals into external owner storage. */
-cui_slider_model_result_v1 result = cui_base_slider_model_events_v1(
-    ui, slider_id, confirmed, &state, &options, &layout,
-    (cui_slider_model_handler_v1){on_request, application});
-```
+The complete, independently runnable C11 example is
+[`examples/slider_model_controlled.c`](../examples/slider_model_controlled.c).
+It defines persistent application/reducer state, the actual `on_request`
+callback, `compose`, and a headless `main`; there are no undefined callback or
+userdata placeholders. Initialize once, then call the same compose function from
+your host's frame loop. The example renders no native window and needs no font.
+Its two queued Left keys explicitly accept .625 then .5 while both requests keep
+current=.75. Expected output: `Selection [0.250, 0.500]; accepted 2 requests`.
+A GUI host consumes the real draw list before the next begin. Use the private
+Xvfb wrapper for automated Linux execution, including this windowless example.
+
+The callback accepts UPDATE into external `confirmed` storage only; it never
+mutates the active reducer/options/UI. It deliberately does not accept CANCEL:
+that request can contain the captured pair from an old domain or kind.
+
 
 Initialize state once, not inside each frame. Exact v1 sizes/tags and zero
 reserved fields are required. The domain and value rules are in

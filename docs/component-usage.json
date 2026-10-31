@@ -1472,7 +1472,8 @@
         "docs/CONTROL_SURFACE_SHADOW_GALLERY.md",
         "docs/SLIDER_PALETTE.md",
         "docs/SLIDER_MODEL_VALUES.md",
-        "docs/BASE_SLIDER_MODEL.md"
+        "docs/BASE_SLIDER_MODEL.md",
+        "examples/slider_model_controlled.c"
       ],
       "callback_symbols": [
         "cui_slider_model_request_fn_v1"

@@ -47,7 +47,7 @@ exceptions are listed below; worker-only evidence does not close a delivery item
 
 | Active slice | Current checkpoint | What remains |
 | --- | --- | --- |
-| Scroll layout / Dialog sizing | Core is in the next integration branch with focused headless evidence; the combined build passed. The full test run exposed an Xvfb reset failure; the runner fix passed 30 visibility repetitions and awaits a clean full rerun. Dialog slots and scrollbar geometry remain design/test-only work. | Finish combined Core validation, then implement and verify component-level sizing, scrolling and input. |
+| Scroll layout / Dialog sizing | Core is in the next integration branch with focused headless evidence; the combined build passed. Full regression runs found test-runner reset/timeout problems; focused recovery checks passed. Integration and hosted checks remain pending. Dialog slots and scrollbar geometry remain design/test-only work. | Finish combined Core validation, then implement and verify component-level sizing, scrolling and input. |
 | Slider palettes and ranges | Palette values, numeric accessibility Core support and pure range/value math have focused tests in worker/integration branches. Interactive range controls are not shipped. | Integrate and validate these foundations; implement reviewed control behavior, typed events, host accessibility and bindings. |
 | Backgrounds and gradients | Owned values have focused tests; the versioned drawing contract is reviewed. Frozen legacy rendering fixtures and new Core transport have focused worker evidence. | Integrate and validate Core; implement authoring and rendering support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas, then bindings. No renderer support is established by Core-only tests. |
 | Styling release | Styling batch merged and deployed; exact-main CI/native/browser gates and public-site verification passed. | Include these development APIs in a later verified library release; alpha.3 packages do not contain them. |
@@ -89,6 +89,15 @@ review; main headers and released documentation remain the consumer authority.
 
 ## Latest validation evidence
 
+- Next integration candidate: the **971-step build passed**. The final full native
+  run recorded **399 passed, one timeout and three skips**. The native bundle
+  consumer's intended 240-second limit had been overwritten by a blanket
+  60-second default; the corrected configuration and focused consumer rerun
+  passed. Five runner tests verify isolation and timeout preservation. An earlier
+  Xvfb reset failure was corrected and passed 30 repeated visibility checks.
+  This is full-run evidence plus focused recovery, **not a clean full rerun**.
+  The skipped checks are `text_density`, `typography_example_native` and
+  `theme_registry_source`; no physical GPU/platform acceptance is implied.
 - Exact merged styling revision `c8e222bb`: [full CI](https://github.com/mattmezza/cui/actions/runs/41236071825)
   and [native bindings](https://github.com/mattmezza/cui/actions/runs/41236071845)
   passed. [All three browser shards and deployment](https://github.com/mattmezza/cui/actions/runs/41236071976)

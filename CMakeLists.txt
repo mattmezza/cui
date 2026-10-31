@@ -1537,7 +1537,12 @@ add_test(NAME speech_base_only COMMAND test_speech_base)
 
 # Bound failed assertions/driver initialization, including late Base-only targets.
 get_property(CUI_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)
-set_tests_properties(${CUI_REGISTERED_TESTS} PROPERTIES TIMEOUT 60)
+foreach(CUI_REGISTERED_TEST IN LISTS CUI_REGISTERED_TESTS)
+ get_property(CUI_TEST_HAS_TIMEOUT TEST ${CUI_REGISTERED_TEST} PROPERTY TIMEOUT SET)
+ if(NOT CUI_TEST_HAS_TIMEOUT)
+  set_tests_properties(${CUI_REGISTERED_TEST} PROPERTIES TIMEOUT 60)
+ endif()
+endforeach()
 # This offline integration check stages/hashes the full source twice and packs
 # an actual npm archive. Windows filesystem work can exceed the unit-test bound.
 set_tests_properties(binding_package_source_manifest PROPERTIES TIMEOUT 300)

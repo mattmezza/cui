@@ -2,6 +2,8 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import shutil
+import subprocess
 import unittest
 
 spec = importlib.util.spec_from_file_location('local_runner', Path(__file__).resolve().parents[1] / 'scripts/test_local.py')
@@ -21,6 +23,34 @@ class IsolatedRunner(unittest.TestCase):
         self.assertEqual(env['XDG_RUNTIME_DIR'], '/private/runtime')
         self.assertEqual(env['KEEP'], 'value')
         self.assertEqual(original['DISPLAY'], ':0')
+
+    def test_cmake_default_preserves_explicit_timeout_limits(self):
+        cmake = shutil.which('cmake')
+        if not cmake:
+            self.skipTest('CMake is unavailable')
+        source = (Path(__file__).resolve().parents[1] / 'CMakeLists.txt').read_text()
+        start = source.index('get_property(CUI_REGISTERED_TESTS DIRECTORY PROPERTY TESTS)')
+        end = source.index('# This offline integration check', start)
+        defaults = source[start:end]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'CMakeLists.txt').write_text(
+                'cmake_minimum_required(VERSION 3.16)\nproject(timeout_check NONE)\n'
+                'enable_testing()\n'
+                'add_test(NAME default_limit COMMAND unused)\n'
+                'add_test(NAME explicit_limit COMMAND unused)\n'
+                'add_test(NAME unlimited COMMAND unused)\n'
+                'set_tests_properties(explicit_limit PROPERTIES TIMEOUT 240)\n'
+                'set_tests_properties(unlimited PROPERTIES TIMEOUT 0)\n' + defaults +
+                'get_test_property(default_limit TIMEOUT default_value)\n'
+                'get_test_property(explicit_limit TIMEOUT explicit_value)\n'
+                'get_test_property(unlimited TIMEOUT unlimited_value)\n'
+                'if(NOT default_value EQUAL 60 OR NOT explicit_value EQUAL 240 '
+                'OR NOT unlimited_value EQUAL 0)\n'
+                ' message(FATAL_ERROR "Incorrect timeout defaults")\nendif()\n')
+            result = subprocess.run([cmake, '-S', str(root), '-B', str(root / 'build')],
+                                    capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_missing_virtual_display_fails_closed(self):
         with self.assertRaisesRegex(RuntimeError, 'no desktop fallback'):

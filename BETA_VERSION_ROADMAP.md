@@ -1,6 +1,6 @@
 # CUI beta roadmap
 
-Updated: **2026-10-31** · Status: **working alpha; beta scope unfinished**.
+Updated: **2026-11-01** · Status: **working alpha; beta scope unfinished**.
 
 **Goal:** complete and verify all **78 frozen component families**, plus the
 requested native, language-binding, documentation and website capabilities.

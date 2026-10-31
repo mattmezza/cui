@@ -62,15 +62,13 @@ supported/claim/publish eligibility always gates them off using actual details.
 New component sets details first, then registers, then claims input. A legacy
 component never calls registration and therefore remains unsupported.
 
-Add two private uint32 arrays indexed alongside current/previous semantic arrays,
-each bounded by existing `config.max_elements`. Allocate at create with checked
-size arithmetic; fail create and clean up on allocation failure. No per-frame
-allocation or new public capacity knob. Every new semantic starts mask0, even
-when same ID/role appeared before; beginning a frame does not inherit previous
-capabilities. Move masks in visible semantic compaction and dismissed-scope
-compaction; copy to previous only with final completed semantics. Clear/recycle
-slots deterministically so capacity reuse cannot grant an unrelated ID actions.
-At default bounds this costs8 bytes per semantic slot, not an unbounded registry.
+Store numeric capabilities/payloads in a **lazy owned numeric-state allocation**
+behind one private context pointer, initiallyNULL. Allocate only on the first
+otherwise-valid nonzero capability registration; mask0 before opt-in allocates
+nothing. Existing `cui_create` performs no new allocation and gains no new OOM
+branch for legacy users. Arrays remain bounded by existing max_elements/event
+limits and live until context destroy. The exact layout/failure/publication
+contract in the revision below supersedes the earlier eager allocation idea.
 
 ## Eligibility, delivery and independent acceptance
 
@@ -341,13 +339,10 @@ Freeze record into new component callback payload before invoking owner code.
 Clear frame presence for every new frame, and on context destruction/recovery;
 no values replay after overflow, omission or rejected lifecycle call.
 
-Storage cost is bounded by two scalar sidecars: typically32*CUI_CORE_EVENT_MAX
-bytes if each slot is16 bytes, exact `sizeof` recorded in implementation evidence.
-Private semantic capability arrays still cost8*max_elements bytes. Both bounds
-already exist; no public config/layout changes or unbounded receipt registry.
-Allocation/size failure follows existing create cleanup; a static private-context
-array is also viable within the same fixed bound, subject to root review of
-context size. The design does not require global input-dispatch replacement.
+The arrays live in the lazy numeric state described below, never inline in every
+context and never allocated by legacy cui_create. Their opted-in allocation is
+bounded by existing event/semantic limits; no public config/layout changes or
+unbounded registry.
 
 ### Semantic units, domain conversion, range and precision
 
@@ -401,13 +396,14 @@ Snapshot publishes AccessKit SET_VALUE only if completed Core query says true
 and the native platform route is implemented. One pinned-platform nuance must be handled honestly: common NodeWrapper
 `supports_value`:490 depends only on a numeric current value, so the AT-SPI Value
 interface (including its setter method) exists even when AccessKit SET_VALUE is
-not advertised. Do not claim its presence proves writability. For Slider nodes
-without SET capability, derive native read-only state in the adapter snapshot
+not advertised. Do not claim its presence proves writability. Only under the explicit numeric-enabled backend mode below, for Slider nodes
+without SET capability derive native read-only state in the adapter snapshot
 while retaining numeric query values and existing Focus/Click action policy;
 Core legacy semantic/input behavior is unchanged. A caller ignoring native
 read-only can still invoke the method, but mailbox/Core capability rejection
-prevents a request or owner mutation. This small truthful native-state change
-needs explicit legacy snapshot regression review, not hidden role-wide opt-in.
+prevents a request or owner mutation. This observable native-state policy is NOT applied by the existing constructor;
+default Focus/Click snapshots remain unchanged. New mode requires explicit opt-in
+and regression review, not hidden role-wide policy changes.
 The retained `accesskit_consumer`0.39.0 `src/node.rs` SHA256
 `79686e8c6867cff462dd7920bba8774dc01163829f1cfb75d46af07cbf2ec6a2`
 (`is_read_only`:469, `is_read_only_supported`:861) confirms Slider supports
@@ -466,3 +462,226 @@ increment/decrement slice remains partial and does not close Linux host delivery
 
 Signed addendum: `/root/hidden_windows`, 2026-10-31. Design only; no production,
 generation, compiler or dependency mutation.
+
+## Revised allocation, native compatibility and failed-frame contract
+
+This root-reviewed revision supersedes eager storage or unconditional native
+read-only policy in earlier discussion. Design only; no production approval yet.
+
+### Lazy per-context owned numeric state and exact cost
+
+Add only `cui_core_numeric_state *numeric` to private context, initializedNULL.
+**Idle context cost is exactly one pointer (`sizeof(void *)`, ordinarily8 bytes
+on64-bit /4 on32-bit), subject only to normal containing-struct alignment.**
+No inline event arrays, capability arrays or numeric allocation in `cui_create`.
+Legacy create failure cases and old Focus/Activate allocation path do not change.
+
+Proposed private C11 allocation layout:
+
+```c
+typedef struct { double value; bool present; } cui_core_numeric_slot;
+typedef struct {
+    size_t frame_origin_count;
+    bool published_valid;
+    cui_core_numeric_slot queued[CUI_CORE_EVENT_MAX];
+    cui_core_numeric_slot frame[CUI_CORE_EVENT_MAX];
+    uint32_t masks[]; /* current[N] followed by previous[N], N=config.max_elements */
+} cui_core_numeric_state;
+```
+
+One zeroed allocation of exactly
+`sizeof(cui_core_numeric_state) + 2*N*sizeof(uint32_t)` bytes; implementation
+checks `N <= (SIZE_MAX-sizeof(state))/(2*sizeof(uint32_t))` before arithmetic.
+`sizeof(state)` includes its fixed arrays/header/alignment, so this is the exact
+allocation formula, not an assumed unpadded byte sum. On ordinary64-bit ABI with
+16-byte slot the sidecars contribute32*EVENT_MAX bytes, header/alignment ordinarily
+16 bytes, plus8*N capability bytes; actual sizeof values belong in test evidence.
+Any implementation layout change must retain explicit formula and bounded cost.
+
+Allocate on first **otherwise-valid nonzero** numeric registration, after all
+lifecycle/ID/role/mask/error checks. Publish pointer and requested current mask
+only after calloc succeeds. `mask0` on a valid current Slider with pointerNULL
+returns true and allocates nothing. Failed validation or allocation leaves pointer,
+previous/current masks, event queues/payloads, focus/capture and callback delivery
+unchanged. OOM/size overflow reports existing CUI_ERROR_CAPACITY; no invented
+allocation error enum. Root must approve meaningful allocator-failure test hook;
+no public allocator/config expansion is needed. Once allocated, retain until
+context destroy (including if all masks later0), free exactly once; clear/revoke
+never reallocates or loses pending input. Queue/claim never allocate: without
+numeric state no numeric action is supported, regardless of role.
+
+This bounded allocation may happen during the first opt-in painted submission;
+it is an explicit cost of enabling the new feature, not a hidden legacy setup
+change. If Core policy later requires pre-reservation, that is a separate additive
+opt-in contract rather than returning to eager allocation for every context.
+
+### Explicit native backend mode; old constructor stays old
+
+Add new owned options record/constructor; do not grow existing
+`cui_accessibility_config`, window, stats, events or semantics:
+
+```c
+#define CUI_ACCESSIBILITY_OPTIONS_V1 1u
+#define CUI_ACCESSIBILITY_ENABLE_NUMERIC 1u
+typedef struct {
+    uint32_t version; /* exactly1 */
+    uint32_t flags;   /* known ENABLE_NUMERIC only */
+    uint32_t reserved[2]; /* both0 */
+} cui_accessibility_options_v1;
+cui_accessibility *cui_accessibility_create_with_options_v1(
+    cui_accessibility_config config, uint32_t options_size,
+    const cui_accessibility_options_v1 *options);
+```
+
+Exact size/version/known flags/reserved validated before allocation; null or
+malformed options fail (constructor returnsNULL). flags0 explicitly selects the
+same policy as legacy `cui_accessibility_create(config)`; old constructor keeps
+Focus/Click only, identical action masks/read-only projection/token snapshots,
+threading and native callback policy. It never derives native read-only because
+SET_VALUE is absent. Numeric APIs on a default-mode backend report unsupported
+without creating a hidden new mode. Existing symbol loading/binaries unchanged.
+
+ENABLE_NUMERIC explicitly opts that backend into completed Core numeric queries,
+implemented host action mapping, typed mailbox payloads and native Slider
+read-only derivation when SET unsupported. It does not grant capability to any
+Core semantic. An application choosing new mode may therefore see a legacy
+Slider read-only in native AT projection; that is a documented new-mode policy,
+not a global legacy snapshot change. Focus/Click remain independently derived.
+Do not equate new-mode backend creation with native-active or working AT delivery.
+
+Keep default-mode private mailbox payload cost unchanged where practical: owned
+numeric mailbox slots can be a separate `max_actions`-bounded scalar sidecar
+allocated only by numeric-enabled constructor, with checked `count*sizeof(slot)`
+and normal create cleanup. Old token/action mailbox ordering remains authoritative;
+sidecar clears/moves with head/tail reuse. No per-request allocation, borrowed
+native pointer or public capacity growth. Exact additional allocation formula is
+`max_actions*sizeof(cui_core_numeric_slot)` (or backend-local equivalent same
+owned scalar+presence record); report real sizeof. New-mode allocation failure
+may fail the new constructor; it must not add a new failure path to old creation.
+
+All five future binding host opt-ins must choose this constructor/policy explicitly
+through a separately reviewed versioned host integration API; no new flag stuffed
+into existing bridge/run options. Without it, old backend snapshots stay old,
+new Core helpers can still be tested, but installed native numeric delivery is
+unsupported. No typed Slider/binding production is approved by this addendum.
+
+### Failed opt-in layout frames cannot certify numeric snapshots
+
+Coordinated with the Core scroll-layout worker: opting into new layout constraint
+calculation and failing it yields empty draw and **no valid geometry/prepaint/
+semantic snapshot promise**. Trial calculations publish nothing. Successful
+calculation commits borrowed scalar offsets together before the normal single
+semantic pipeline; later errors do not roll back committed offsets/application
+or input effects. Legacy zero-opt-in frame failure behavior remains unchanged.
+
+Existing `cui_last_error` is sufficient to detect the failed constraint case:
+completed failure has non-OK error, including restoring CUI_ERROR_LAYOUT at end
+if a caller cleared an error inside the failed frame. No dependency on another
+worker's private marker names and no public semantic-commit observer is proposed.
+Numeric publication integrates at Core's ordinary completed semantic commit:
+
+- Only successful painted semantic commit with `cui_last_error==CUI_OK` can copy
+  current masks alongside final semantics and set `published_valid=true`.
+- Any non-OK completed frame while numeric state exists marks numeric snapshot
+  invalid, zeroes current/previous authorization and frame payload presence, and
+  discards unclaimed numeric input. It does not publish partial registration or
+  infer valid geometry from retained nonempty semantic arrays. Old Focus/Activate
+  behavior remains unchanged; this fail-closed rule is for new numeric actions.
+- During a frame, numeric registration/claim rejects once current error is non-OK;
+  no new numeric request is delivered after known invalidity. A request already
+  claimed before a later layout/error failure is not rolled back. This is the
+  same explicit non-transactional callback boundary as the main design.
+- Outside-frame numeric support/queue also requires `published_valid` AND OK
+  current error. Clearing sticky error alone does not restore validity; recovery
+  requires a later successful completed painted semantic commit with fresh
+  explicit registrations. No stale request/payload/gesture intent is replayed.
+- Current registration only is not completed authority. First successful nonzero
+  registration allocates storage but no enqueue is authorized until successful
+  end-frame publication. Failed initial opt-in keeps storage owned/reusable while
+  granting no actions. mask0 still allocates nothing before any opt-in.
+
+Native snapshot update must not read/certify failed Core semantic snapshots.
+Non-OK Core frame causes numeric-enabled update to reject/retain its last good
+published tree and suspend numeric mailbox admission/drain until a later valid
+completed snapshot (query/commit rules above). Requests already queued against a
+previous native token are rejected at drain when Core numeric support is invalid;
+never retried as capacity-only work. A retained OS tree may temporarily display
+old capabilities after update failure; no consumer intent is delivered from that
+stale display. Document this stale-publication limitation rather than pretending
+an invalid Core frame produced a valid replacement tree. Default backend policy
+and legacy snapshot error semantics remain unchanged.
+
+### Mandatory normalization/reset/compaction audit before implementation
+
+Implementation must enumerate and test every following lifecycle path; a single
+successful queue test is insufficient:
+
+| Path in current Core | Numeric obligation |
+| --- | --- |
+| Create/destroy (`cui_create/cui_destroy`) | Initialize/free only lazy pointer; allocator-failure ownership, no legacy allocation/calloc-count changes. |
+| `cui_interact` append / per-frame semantic reset | Current mask starts0 for each newly appended semantic; no inheritance from previous/reused slot. Layout-only/inert does not register. |
+| Normal generic enqueue / typed enqueue normalization | Ordinary event clears payload slot; typed SET validates/copies atomically; no-payload SET rejected; invalid/capacity/lifecycle leaves all preexisting payloads intact. |
+| Begin-frame queued→dispatch copy/origin initialization | Copy only original queued payloads and original count; reset queued presence safely; clear old frame slots every frame. Failed begin admission must not discard a previously valid queued value. |
+| Touch cancellation insert/memmove and later origin swap | Origin lookup stays attached to original SET event; synthetic SIZE_MAX has no value; no dispatch-offset alias. Check every reorder site, not only first memmove. |
+| Normalization / suppression / event consumption | Payload cannot authorize wrong type/action/target; consumed/withdrawn numeric events cannot be claimed twice or from stale frame. Ordinary Focus/Activate normalization/evidence unchanged. |
+| Semantic visible compaction / focus-scope dismissal | Copy masks with IDs/nodes/scopes at every retained index; cleared tail cannot grant capacity-reused semantics. |
+| Details mutation / role / readonly / disabled / modal changes | Claim checks current AND previous authorization; later changes revoke final publication/remaining input, no rollback already delivered request. |
+| Successful final snapshot copy | Caps commit with final completed semantics exactly once, valid flag true only OK painted publication. |
+| Error/failed new-layout frame / sticky clear/rebuild | Invalidate numeric authority and discard unclaimed payloads; no intent after known error, no recovery from mere error clear, no replay. Preserve old zero-opt-in behavior. |
+| Adapter snapshot failure / mailbox retry / close | Retain last good tree but suspend new numeric intent while Core invalid; capacity-only retry preserves exact scalar once, unsupported invalid work discarded, payload slots cleared on head/tail reuse and close. |
+
+Add allocation instrumentation proof for untouched legacy scene and mask0 scene
+(no numeric allocation), first nonzero successful registration (one exact bounded
+allocation), failed first allocation (atomic), repeated registrations/revoke/recovery
+(no reallocation), context destruction (one free). Add numeric-enabled vs old
+backend snapshot goldens proving read-only/action changes are opt-in only. New
+layout constraint failure tests include initial registration failure and previously
+valid numeric snapshot→failed frame→error clear→good-frame recovery, plus a claim
+made before later failure to prove no dishonest rollback/replay promise.
+
+Signed revised contract: `/root/hidden_windows`, 2026-10-31. No production,
+compiler, dependencies, generated files, merge or push; pending root review.
+
+### Remaining adapter enforcement decision (explicit review gate)
+
+Core's private persistent `published_valid` makes numeric query/queue/claim fail
+closed even if the caller clears sticky error after a failed completed frame.
+The separately compiled native adapter cannot inspect that flag through current
+public APIs. Therefore `cui_last_error==OK` alone must not be advertised as proof
+of a new valid snapshot after an outside-frame error clear.
+
+The minimal caller-only contract is: invoke numeric-enabled update only after a
+known successful end_frame, never merely after clearing an error. This requires
+host lifecycle tests and honest precondition documentation; it does not add a
+Core validity API. Core independently prevents numeric intent if a caller violates
+that publication precondition, but adapter snapshot validation cannot independently
+certify it. Native production approval must explicitly choose that responsibility.
+
+If independent adapter enforcement is required, a **separately reviewed narrow
+numeric-state query** is sufficient; no general layout observer is necessary:
+
+```c
+#define CUI_ACCESSIBILITY_NUMERIC_NONE 0u
+#define CUI_ACCESSIBILITY_NUMERIC_READY 1u
+#define CUI_ACCESSIBILITY_NUMERIC_INVALID 2u
+uint32_t cui_accessibility_numeric_snapshot_state(const cui_context *);
+```
+
+Outside frame, pointerNULL→NONE, owned state with valid successful publication
+and OK error→READY, otherwise INVALID; null/active-frame→INVALID with no mutation.
+This allocates nothing and exposes no geometry, scalar offsets, semantic pointer
+or general frame-commit guarantee. READY with mask0 is distinct from failure;
+NONE authorizes no numeric action and permits only existing nonnumeric snapshot
+contract. Numeric-enabled adapter can reject/suspend on INVALID before reading
+new semantics and resume only READY; NONE remains nonnumeric/default snapshot
+policy with caller's existing successful-frame publication precondition. The new
+mode may project read-only for unsupported numeric roles as documented, but may
+not certify numeric intent from NONE. No retained old value is a new capability.
+
+This query is an explicit proposal, **not approved production scope**. Core-only
+capability/payload slices can be reviewed independently; do not implement native
+snapshot enforcement by reaching into private context, inferring validity from
+nonempty arrays or silently treating error-clear as publication. Resolve the
+caller-precondition versus narrow-query choice before native host production.
+
+Signed boundary note: `/root/hidden_windows`, 2026-10-31. No code/build changes.

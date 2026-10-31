@@ -93,7 +93,10 @@ static void part_roots(void) {
         cui_set_layout_debug(app->ui, true);
         cui_software *renderer = cui_software_create(360, 240, NULL);
         assert(renderer);
-        unsigned char baseline_pixels[360 * 240 * 4];
+        /* Keep the full 345600-byte pixel oracle off the stack across Debug render calls. */
+        const size_t baseline_bytes = 360u * 240u * 4u;
+        unsigned char *baseline_pixels = malloc(baseline_bytes);
+        assert(baseline_pixels);
         cui_draw_list original = render(app, 0);
         part_text_snapshot text[16];
         size_t text_count = capture_part_text(original, text);
@@ -103,7 +106,7 @@ static void part_roots(void) {
         (void)cui_semantics(app->ui, &semantics);
         assert(!node->part_shadows);
         assert(render_paint(renderer, &original));
-        memcpy(baseline_pixels, cui_software_pixels(renderer, NULL, NULL), sizeof baseline_pixels);
+        memcpy(baseline_pixels, cui_software_pixels(renderer, NULL, NULL), baseline_bytes);
         if (k < 2)
             assert(!current_id(app->ui, bridge_indicator_id(node)));
         unsigned baseline = shadows(original, CUI_DRAW_DROP_SHADOW);
@@ -127,16 +130,14 @@ static void part_roots(void) {
         check_part_text(part_only, text, text_count);
         assert(shadows(part_only, CUI_DRAW_DROP_SHADOW) == baseline + 1);
         assert(render_paint(renderer, &part_only));
-        assert(memcmp(baseline_pixels, cui_software_pixels(renderer, NULL, NULL),
-                      sizeof baseline_pixels));
+        assert(memcmp(baseline_pixels, cui_software_pixels(renderer, NULL, NULL), baseline_bytes));
         assert(set_part(app, n, CUI_BRIDGE_SHADOW_ROOT, &style) == 0);
         assert(cui_bridge_set_box_shadows_v1(app, n, 224, &style) == CUI_BRIDGE_INVALID_ARGUMENT);
         cui_draw_list list = render(app, 0);
         check_part_text(list, text, text_count);
         assert(shadows(list, CUI_DRAW_DROP_SHADOW) == baseline + 2);
         assert(render_paint(renderer, &list));
-        assert(memcmp(baseline_pixels, cui_software_pixels(renderer, NULL, NULL),
-                      sizeof baseline_pixels));
+        assert(memcmp(baseline_pixels, cui_software_pixels(renderer, NULL, NULL), baseline_bytes));
         cui_rect after = cui_bounds(app->ui, node->id);
         assert(!memcmp(&row, &after, sizeof row));
         size_t after_semantics;
@@ -173,10 +174,10 @@ static void part_roots(void) {
         list = render(app, 0);
         assert(shadows(list, CUI_DRAW_DROP_SHADOW) == baseline);
         assert(render_paint(renderer, &list));
-        assert(!memcmp(baseline_pixels, cui_software_pixels(renderer, NULL, NULL),
-                       sizeof baseline_pixels));
+        assert(!memcmp(baseline_pixels, cui_software_pixels(renderer, NULL, NULL), baseline_bytes));
         if (k < 2)
             assert(!current_id(app->ui, bridge_indicator_id(node)));
+        free(baseline_pixels);
         cui_software_destroy(renderer);
         assert(set_part(app, n, physical, &style) == 0);
         assert(cui_bridge_node_remove(app, n) == 0);

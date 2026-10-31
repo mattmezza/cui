@@ -2,6 +2,7 @@
 #include "cui/cui_sdl3.h"
 #include <SDL3/SDL.h>
 #include <assert.h>
+#include <stdio.h>
 int main(void) {
     assert(!cui_sdl3_set_visible(NULL, true));
     assert(!cui_sdl3_set_visible(NULL, false));
@@ -27,9 +28,13 @@ int main(void) {
     cui_sdl3_destroy(host);
     host =
         cui_sdl3_create_with_options("zero visible", 120, 80, NULL, (cui_sdl3_window_options){0});
+    if (!host)
+        fprintf(stderr, "SDL window creation failed: %s\n", SDL_GetError());
     assert(host && cui_sdl3_is_visible(host));
     cui_sdl3_destroy(host);
     host = cui_sdl3_create("legacy visible", 120, 80, NULL);
+    if (!host)
+        fprintf(stderr, "SDL window creation failed: %s\n", SDL_GetError());
     assert(host && cui_sdl3_is_visible(host));
     cui_sdl3_destroy(host);
     return 0;

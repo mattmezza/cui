@@ -24,7 +24,9 @@ def test_invocation(build, extra, platform, environment, locate, runtime=None):
         if runtime is not None:
             env['XDG_RUNTIME_DIR'] = str(runtime)
         env['CUI_TEST_VIRTUAL_DISPLAY'] = '1'
-        command = [virtual, '-a', '-s', '-screen 0 1920x1080x24', *command]
+        # Keep the private server alive across SDL video teardown/reinit. X's
+        # default last-client reset can race the next connection in one test.
+        command = [virtual, '-a', '-s', '-screen 0 1920x1080x24 -noreset', *command]
     else:
         cache = build / 'CMakeCache.txt'
         native = [line.removeprefix('CUI_BUILD_NATIVE:BOOL=') for line in cache.read_text().splitlines()

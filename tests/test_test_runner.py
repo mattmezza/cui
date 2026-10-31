@@ -13,7 +13,7 @@ class IsolatedRunner(unittest.TestCase):
     def test_linux_replaces_desktop_and_preserves_ctest_failure_arguments(self):
         original = {'DISPLAY': ':0', 'WAYLAND_DISPLAY': 'wayland-0', 'MIR_SOCKET': 'desktop', 'SDL_VIDEODRIVER': 'wayland', 'XDG_RUNTIME_DIR': '/user/session', 'KEEP': 'value'}
         command, env = runner.test_invocation(Path('build'), ['-R', 'meaningful'], 'linux', original, lambda _: '/usr/bin/xvfb-run', '/private/runtime')
-        self.assertEqual(command, ['/usr/bin/xvfb-run', '-a', '-s', '-screen 0 1920x1080x24', 'ctest', '--test-dir', 'build', '--output-on-failure', '-R', 'meaningful'])
+        self.assertEqual(command, ['/usr/bin/xvfb-run', '-a', '-s', '-screen 0 1920x1080x24 -noreset', 'ctest', '--test-dir', 'build', '--output-on-failure', '-R', 'meaningful'])
         self.assertNotIn('DISPLAY', env)
         self.assertNotIn('WAYLAND_DISPLAY', env)
         self.assertNotIn('MIR_SOCKET', env)

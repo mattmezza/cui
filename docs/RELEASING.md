@@ -1,7 +1,8 @@
-# Prerelease preparation: v0.1.0-alpha.3
+# Published prerelease: v0.1.0-alpha.3
 
-This document prepares **v0.1.0-alpha.3**. It does not establish publication,
-a frozen release revision or validated release artifacts. The current batch adds
+[**v0.1.0-alpha.3 is published**](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3)
+from frozen source `a7dee36090cbe9c1ca1db1c7bed0cd804c69985f` on 2026-10-31.
+The website was deployed and verified at that revision. The release adds
 civil DateTime selection, date-only picker actions, Questionnaire observations,
 snapshots, keyboard policies, progress, presentation and checked geometry, plus
 explicit Popover anchors/arrows. SDL3 and the browser gallery gain bounded
@@ -15,7 +16,7 @@ native video/audio and macOS Speech host integrations. Injected Apple fixtures
 are separate from physical microphone, permission and recognizer acceptance.
 Linux/Windows speech recognizers and broader native media support remain gaps.
 
-The pending batch also adds opt-in Stepper connectors, bitmap indicators and
+The release also adds opt-in Stepper connectors, bitmap indicators and
 shared design sizes, with a controlled interactive gallery; nested Resizable
 examples and repeated desktop/touch drag regression coverage; split-button styling
 and metadata; and growing InputGroup containment. Stepper visual builders are
@@ -25,7 +26,7 @@ documented binding omissions. Input caret/selection/IME projection after viewpor
 changes still has a documented one-frame limitation. These additions do not
 establish complete Stepper, Input or Resizable parity or native GPU acceptance.
 
-The integration candidate additionally includes Spinner finite/reduced-motion
+The release additionally includes Spinner finite/reduced-motion
 browser contracts, opt-in HoverCard raw outside-release policy, and initially
 hidden SDL3 window creation with explicit visibility APIs. Hidden-window authoring
 has focused Linux private-Xvfb tests in all five language paths; other native
@@ -35,8 +36,8 @@ renderers. Six builder root kinds have typed overrides across Python, JS/TS,
 Go and Rust. Eight additive C Checkbox/Radio/group facades can name indicators;
 legacy routes preserve anonymous identities. Indicator bindings, compound parts
 and portals remain open. Read `ELEMENT_SHADOWS.md`, `BRIDGE_SHADOWS.md` and
-`NAMED_SELECTION_INDICATORS.md` for ownership and limitations. These candidate
-additions still require integrated CI, release and deployment checks.
+`NAMED_SELECTION_INDICATORS.md` for ownership and limitations. These additions passed integrated CI, release artifact and deployment checks;
+that evidence does not close their documented broader parity gaps.
 
 CI preparation reuses checksum-verified raw optional-regex downloads and shares a
 private umbrella implementation across feature distribution tests. Independent
@@ -49,11 +50,10 @@ Rebuild consumers with matching headers and libraries: the Questionnaire state
 and several by-value options changed since alpha.2. Read the current binding
 coverage for C-only options; source packaging does not imply equivalent foreign
 APIs or registry publication. All 78 baseline families remain present, with
-feature-level omissions documented. Full parity is unfinished. Final integrated
-validation, release source freeze and artifact checks remain pending. Describe
-the actual frozen revision and supported subset in the published release notes.
+feature-level omissions documented. Full parity is unfinished. The published notes and asset manifest record the
+actual frozen revision, tested subset, host dependencies and remaining limitations.
 
-Published alpha.2 (`v0.1.0-alpha.2`, Python `0.1.0a2`) remains immutable. This document prepares the next development version, not another publication claim.
+Published alpha.2 (`v0.1.0-alpha.2`, Python `0.1.0a2`) remains immutable. Alpha.3 does not move or replace the alpha.2 tag or assets.
 
 Keep alpha.1 (`v0.1.0-alpha.1`, Python `0.1.0a1`) and any associated published
 assets immutable. This version update does not retag or replace alpha.1. No
@@ -62,9 +62,37 @@ or cross-platform native compatibility is established by changing metadata.
 Publish a coherent release after each major completed body of work; batch related
 commits together. Do not turn each implementation commit into a release.
 
+## Publication evidence
+
+All exact-main gates passed: [CI](https://github.com/mattmezza/cui/actions/runs/41226410425),
+[native binding callbacks](https://github.com/mattmezza/cui/actions/runs/41226410434)
+and [Pages with three browser shards](https://github.com/mattmezza/cui/actions/runs/41226410372).
+The public site verifier checked the same revision, docs, all 78 entries, API
+headers and native starter archive.
+
+Ten release assets were downloaded from the draft and compared byte-for-byte with
+local staging before publication; nine payload SHA-256 values and both annotated
+tag targets matched. Assets contain the source archive, Linux x86_64 static C
+install bundle, native Python wheel/npm tarball, Go source proxy bundle, Rust
+crate, notes, manifest, source inspection receipt and checksums. Installed C,
+native Python/Node, separate strict TypeScript 5.8.3, real-font packaged text and
+native Go/Rust consumer checks passed. Binary artifacts were built/tested with
+GNU libc 2.42 and compatible system SDL/FreeType/HarfBuzz; they are not certified
+for every Linux distribution. GPU and physical-platform acceptance remain deferred.
+The manifest records the earlier offline TypeScript metadata miss and the separate
+successful cached-compiler check; the combined command is not falsely reported green.
+
+The public Go tag `bindings/go/v0.1.0-alpha.3` points to the same source commit;
+the public Go proxy version-info endpoint was also verified against that commit.
+This does not establish PyPI/npm/crates.io ownership or publication. Use the asset
+manifest and current binding coverage when choosing a downloadable package.
+
+The procedures below remain the checklist for future releases; replace the tag,
+version and frozen source together rather than republishing immutable alpha.3.
+
 ## Version and source freeze
 
-| Surface | Prepared version |
+| Surface | Alpha.3 version |
 | --- | --- |
 | Repository/GitHub release | `v0.1.0-alpha.3` |
 | CMake ABI/base project version | `0.1.0` |
@@ -80,10 +108,16 @@ module version. See the [Go module tag rules](https://go.dev/ref/mod#vcs-version
 CMake's base version does not promise stable alpha ABI or full binding parity.
 
 Choose one reviewed commit, finish metadata changes, regenerate SDK copies, and
-commit them **before** building final assets. Require a clean checkout and clean
-source provenance. Record the full commit SHA, compiler/toolchain versions,
+commit them **before** building final assets. Require a clean packaging checkout and verified
+source content/provenance. Record the full commit SHA, compiler/toolchain versions,
 architecture, build options, dependency receipts, and validation logs. Do not
 publish packages staged from a dirty checkout just because packaging allows it.
+
+SDK `SOURCE_PROVENANCE.json` records the historical generator step; its HEAD and
+dirty flag are not a packaging-checkout receipt. Preserve it rather than rewriting
+history. Verify the complete generated SDK map against the frozen checkout and
+record the packaging commit plus final archive hashes externally. Alpha.3 includes
+that complete comparison in `source-artifact-inspection.json`.
 
 The audited tree repeats versions in Python project metadata, wheel backend NAME
 and METADATA, npm, Cargo, the Go packaging function, and CI artifact filenames.

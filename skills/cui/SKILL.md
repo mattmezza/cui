@@ -132,6 +132,7 @@ Read these with `read PATH --source CUI_SOURCE`:
 | State, identity, ownership and failures | `docs/IMMEDIATE_AND_STATE.md`, `docs/IDS_AND_LIFETIMES.md`, `docs/DEBUGGING.md` |
 | Accessibility and touch | `docs/ACCESSIBILITY.md`, `docs/NATIVE_ACCESSIBILITY.md`, `docs/TOUCH_COMPONENT_COVERAGE.md` |
 | Optional regex provider | `backends/regex/README.md`, `docs/INPUT_PATTERN_FORMATTING.md` |
+| Package/release provenance | `docs/PACKAGING.md`, `docs/RELEASING.md` |
 | Platform prerequisites and evidence | `docs/DEPENDENCIES.md`, `docs/PLATFORM_MATRIX.md`, `docs/V1_READINESS.md` |
 
 Configure a real font and assets for the selected host. Keep measuring and

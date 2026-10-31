@@ -12,8 +12,9 @@ release date is asserted.
 | State | What it means today |
 | --- | --- |
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
-| Verified deployment | Website revision `ab8fddbbbca4b78e3b2cc1b14752dd0c4ac96b30`; public docs, catalog, headers and native archive checked on 2026-10-31. |
-| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3/bridge windows across five language paths; named-element C shadow setters, six typed builder roots, and opt-in Checkbox/Radio indicator IDs. Focused checks exist; combined validation/publication is still pending. |
+| Verified deployment | Website revision `a7dee36090cbe9c1ca1db1c7bed0cd804c69985f`; public docs, catalog, headers and native archive checked on 2026-10-31. |
+| Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
+| Next integration | Compound paint-part IDs, semantic bridge part shadows, Button state-specific shadows and one-pass npm source verification have isolated tested slices; combined integration is still pending. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -23,14 +24,14 @@ can lag implementation: inspect current code and evidence before scheduling work
 
 ## Next deliveries
 
-- [ ] **Publish the pending component batch.** Finish combined browser/native and
-  binding checks; merge reviewed commits; deploy and verify the actual revision.
-  Preserve existing callbacks, defaults, Retina fixes and static-linking support.
+- [x] **Publish the alpha.3 component batch.** Merged, released and deployed from
+  `a7dee360`; exact-main CI, native binding and three browser shards passed.
+  Existing callbacks, defaults, Retina fixes and static-linking work were preserved.
 - [ ] **Initially hidden windows.** Ship creation with the native hidden flag,
   avoiding show-then-hide flashing; document explicit show/hide and daemon usage.
   SDL3 and Python/JS/TS/Go/Rust bridge paths have focused Linux private-Xvfb
-  evidence for actual hidden creation and first presentation. Integration,
-  publication and broader native-platform acceptance remain pending. Caller-owned
+  evidence for actual hidden creation and first presentation. Released in alpha.3;
+  broader native-platform acceptance remains pending. Caller-owned
   window hosts need their own policy.
 - [ ] **Consistent shadows.** Ship a clear typed API for presets and custom
   offset/blur/spread/color, mixed drop/inset layers and clearing. Existing shadow
@@ -44,33 +45,30 @@ can lag implementation: inspect current code and evidence before scheduling work
   all five facade checks. Eight C-only Checkbox/Radio/group facades now accept
   explicit indicator IDs while preserving legacy anonymous routes; their focused
   tests pass against captured old-library fixtures. Broader part/portal coverage,
-  corresponding indicator bindings, browser/GPU proof and integration remain pending.
-- [ ] **Release the completed major batch.** Freeze one source revision; validate
-  matching C, Python/npm, Go and Rust artifacts; publish release notes/checksums
-  and matching website docs. `0.1.0-alpha.3` is prepared, **not yet released**.
+  corresponding indicator bindings and browser/GPU proof remain pending. The initial
+  six-root/C-indicator slice is released; broader parts are not yet integrated.
+- [x] **Release the completed alpha.3 batch.** Matching source/C install, Python
+  wheel, npm tarball, Go source proxy and Rust crate published after installed
+  consumer checks and draft download verification. Registry publication is separate.
 
 ## Latest validation evidence
 
-- Combined production source `6e75b603`: warning-enabled focused Release build and
-  **10/10** headless C/Python tests passed. JS/Go/Rust runtime and actual older-library
-  compatibility checks passed **5/5**; TypeScript strict checks passed.
-- **18/18** consumer-skill tests, formatting and generated SDK/resource freshness
-  passed; workflow regressions passed **9/9** (bindings) and **5/5** (Pages).
-- Earlier gallery source `c52ce72f` passed headless HoverCard, Stepper and Spinner
-  probes. The combined candidate passed all three hosted Pages browser shards at
-  `b9c2f3d1`; the subsequent test-fixture fixes passed the full CI matrix at
-  `a6c7e5af`, including GCC sanitizers and Windows Debug/Release.
-- Hosted native binding gate `a6c7e5af` passed ten static/dynamic callback cases
-  and hidden-window checks in all five language paths on the combined candidate.
-- Release metadata agrees with `v0.1.0-alpha.3`; this checks local version
-  consistency, not release artifacts or registry availability.
-- Earlier guide/build/artifact invocation errors are corrected. GCC sanitizer CI
-  caught temporary bounds storage in the new indicator test; its lifetime is now
-  fixed, and a focused instrumented Core/test reproduction plus ordinary regression
-  pass locally. Windows also exposed oversized shadow-test stack workspaces;
-  bounded heap oracles and a passing 1 MB stack regression address that pressure.
-  The final sanitizer and both Windows gates now pass at `a6c7e5af`. Release and
-  deployment remain pending; results prove only their stated subsets.
+- Exact release source `a7dee360`: [full CI](https://github.com/mattmezza/cui/actions/runs/41226410425)
+  and [native binding gate](https://github.com/mattmezza/cui/actions/runs/41226410434)
+  passed, including GCC sanitizers, Windows Debug/Release and five hidden-window
+  language paths. These do not establish physical-platform/GPU acceptance.
+- [Pages gate](https://github.com/mattmezza/cui/actions/runs/41226410372) passed all
+  three headless browser shards. The deployed revision, public docs, 78 entries,
+  headers and native starter archive were independently verified.
+- Release installed-consumer checks passed for C, native Python/Node, strict
+  TypeScript 5.8.3 and native Go/Rust source packages. Packaged real-font text
+  matched the canonical reference. All ten downloaded draft assets matched local
+  files; nine payload checksums and both release/Go tag targets were verified.
+- Release assets include `ASSET_MANIFEST.json`, `SHA256SUMS` and source provenance
+  receipts. Binary validation covers the labelled Linux x86_64 host (glibc 2.42),
+  not all Linux distributions. Caller-selected fonts need glyph coverage/fallbacks.
+- Source warnings, meaningful legacy regressions, generated freshness and consumer
+  skill checks passed for the release. Broader feature claims remain open below.
 
 ## Component parity: verify and close the gaps
 
@@ -130,8 +128,8 @@ behavior families need justified exceptions rather than invented paint roots.
   runtime behavior, not just `.run()` or successful compilation.
 - [ ] **Package-manager delivery:** verify clean installed consumers and native
   dependencies; finish PyPI/npm/crates.io ownership, publisher/authentication and
-  publication gates, plus the correctly prefixed public Go module tag. Local
-  archives and a GitHub release do not establish registry availability.
+  publication gates. The prefixed Go tag and public proxy version are verified for
+  alpha.3; local archives/GitHub assets do not establish the other registries.
 - [ ] **Docs and website:** provide matching quickstarts, dependencies/build/linker
   flags, callbacks/state ownership, immediate/retained distinctions, language
   examples and professional composed-app recipes. Keep search, copyable snippets,

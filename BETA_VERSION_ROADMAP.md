@@ -61,10 +61,11 @@ can lag implementation: inspect current code and evidence before scheduling work
 - Hosted native binding gate `b553c8bb` passed ten static/dynamic callback cases
   and hidden-window checks in all five language paths. This predates the merged
   shadow slices and does not replace their final integrated checks.
-- Earlier CI exposed stale HoverCard guide text and missing test-build/artifact
-  arguments; those are corrected. One Chromium startup crash also needs a fresh
-  run. Release and deployment remain pending; these results prove only their
-  stated subsets.
+- Earlier guide/build/artifact invocation errors are corrected. GCC sanitizer CI
+  caught temporary bounds storage in the new indicator test; its lifetime is now
+  fixed, and a focused instrumented Core/test reproduction plus ordinary regression
+  pass locally. Full sanitizer CI and the full browser gate remain pending.
+  Release and deployment remain pending; results prove only their stated subsets.
 
 ## Component parity: verify and close the gaps
 

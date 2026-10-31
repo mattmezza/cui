@@ -341,7 +341,9 @@ static void requests_and_failures(void) {
         cui_context *ui = create(128, 512);
         cui_id indicator_id = mode == 7 ? 76894 : 101;
         check_owner o = {.parts = {indicator_id}};
-        cui_rect row = {0};
+        /* Bounds outputs are borrowed until end_frame, including across the
+         * conditional registration below. */
+        cui_rect row = {0}, tracked_indicator = {0};
         for (unsigned frame = 0; frame < 2; frame++) {
             if (frame)
                 click(ui, row);
@@ -374,7 +376,7 @@ static void requests_and_failures(void) {
                     ui, 10, &t, cui_string("Check"), &o.value,
                     (cui_checkbox_options){.on_change = request, .change_user = &o}, o.parts);
             if (!frame || mode == 0 || (mode >= 4 && mode != 7))
-                assert(cui_track_bounds(ui, indicator_id, &(cui_rect){0}));
+                assert(cui_track_bounds(ui, indicator_id, &tracked_indicator));
             if (!frame || mode == 0 || (mode >= 4 && mode != 7))
                 assert(cui_track_bounds(ui, 10, &row));
             if (frame && (mode == 3 || mode == 7))
@@ -382,6 +384,8 @@ static void requests_and_failures(void) {
                                                       (cui_corner_radii){0}));
             cui_draw_list list = cui_end_frame(ui);
             (void)list;
+            if (!frame || mode == 0 || (mode >= 4 && mode != 7))
+                assert(tracked_indicator.w > 0 && tracked_indicator.h > 0);
             if (frame && (mode == 1 || mode == 2)) {
                 assert(o.calls == 0 && o.value == CUI_CHECK_UNCHECKED);
                 size_t n;

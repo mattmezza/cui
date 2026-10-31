@@ -482,7 +482,6 @@ Proposed private C11 allocation layout:
 typedef struct { double value; bool present; } cui_core_numeric_slot;
 typedef struct {
     size_t frame_origin_count;
-    bool published_valid;
     cui_core_numeric_slot queued[CUI_CORE_EVENT_MAX];
     cui_core_numeric_slot frame[CUI_CORE_EVENT_MAX];
     uint32_t masks[]; /* current[N] followed by previous[N], N=config.max_elements */
@@ -494,8 +493,8 @@ One zeroed allocation of exactly
 checks `N <= (SIZE_MAX-sizeof(state))/(2*sizeof(uint32_t))` before arithmetic.
 `sizeof(state)` includes its fixed arrays/header/alignment, so this is the exact
 allocation formula, not an assumed unpadded byte sum. On ordinary64-bit ABI with
-16-byte slot the sidecars contribute32*EVENT_MAX bytes, header/alignment ordinarily
-16 bytes, plus8*N capability bytes; actual sizeof values belong in test evidence.
+16-byte slot the sidecars contribute32*EVENT_MAX bytes, header/alignment normally
+sizeof(size_t) rounded to struct alignment, plus8*N capability bytes; actual sizeof values belong in test evidence.
 Any implementation layout change must retain explicit formula and bounded cost.
 
 Allocate on first **otherwise-valid nonzero** numeric registration, after all
@@ -577,7 +576,8 @@ or input effects. Legacy zero-opt-in frame failure behavior remains unchanged.
 Existing `cui_last_error` is sufficient to detect the failed constraint case:
 completed failure has non-OK error, including restoring CUI_ERROR_LAYOUT at end
 if a caller cleared an error inside the failed frame. No dependency on another
-worker's private marker names and no public semantic-commit observer is proposed.
+worker's private marker names is needed. The approved narrow predicate below
+exposes only completed Core semantic readiness, not a general layout observer.
 Numeric publication integrates at Core's ordinary completed semantic commit:
 
 - Only successful painted semantic commit with `cui_last_error==CUI_OK` can copy
@@ -642,46 +642,80 @@ made before later failure to prove no dishonest rollback/replay promise.
 Signed revised contract: `/root/hidden_windows`, 2026-10-31. No production,
 compiler, dependencies, generated files, merge or push; pending root review.
 
-### Remaining adapter enforcement decision (explicit review gate)
+### Approved snapshot-ready predicate and production boundary
 
-Core's private persistent `published_valid` makes numeric query/queue/claim fail
-closed even if the caller clears sticky error after a failed completed frame.
-The separately compiled native adapter cannot inspect that flag through current
-public APIs. Therefore `cui_last_error==OK` alone must not be advertised as proof
-of a new valid snapshot after an outside-frame error clear.
-
-The minimal caller-only contract is: invoke numeric-enabled update only after a
-known successful end_frame, never merely after clearing an error. This requires
-host lifecycle tests and honest precondition documentation; it does not add a
-Core validity API. Core independently prevents numeric intent if a caller violates
-that publication precondition, but adapter snapshot validation cannot independently
-certify it. Native production approval must explicitly choose that responsibility.
-
-If independent adapter enforcement is required, a **separately reviewed narrow
-numeric-state query** is sufficient; no general layout observer is necessary:
+Root selected the following narrow predicate instead of the three-state proposal:
 
 ```c
-#define CUI_ACCESSIBILITY_NUMERIC_NONE 0u
-#define CUI_ACCESSIBILITY_NUMERIC_READY 1u
-#define CUI_ACCESSIBILITY_NUMERIC_INVALID 2u
-uint32_t cui_accessibility_numeric_snapshot_state(const cui_context *);
+bool cui_accessibility_numeric_snapshot_ready(const cui_context *);
 ```
 
-Outside frame, pointerNULL→NONE, owned state with valid successful publication
-and OK error→READY, otherwise INVALID; null/active-frame→INVALID with no mutation.
-This allocates nothing and exposes no geometry, scalar offsets, semantic pointer
-or general frame-commit guarantee. READY with mask0 is distinct from failure;
-NONE authorizes no numeric action and permits only existing nonnumeric snapshot
-contract. Numeric-enabled adapter can reject/suspend on INVALID before reading
-new semantics and resume only READY; NONE remains nonnumeric/default snapshot
-policy with caller's existing successful-frame publication precondition. The new
-mode may project read-only for unsupported numeric roles as documented, but may
-not certify numeric intent from NONE. No retained old value is a new capability.
+It means Core has a valid completed semantic snapshot. It certifies **neither**
+renderer/presentation success, working native bridge, physical AT acceptance,
+precise domain-value query parity nor any particular numeric capability.
 
-This query is an explicit proposal, **not approved production scope**. Core-only
-capability/payload slices can be reviewed independently; do not implement native
-snapshot enforcement by reaching into private context, inferring validity from
-nonempty arrays or silently treating error-clear as publication. Resolve the
-caller-precondition versus narrow-query choice before native host production.
+- false for NULL, before first successful completed frame, during any active
+  frame, and after a failed begin/end that invalidates layout/semantic geometry;
+- false persists after clearing the error from such an invalidating failure;
+  only a fresh successful completed frame restores it;
+- true after an ordinary successful frame even with no numeric allocation, no
+  registered capabilities, or an empty semantic list;
+- new numeric supported/enqueue paths require readiness and per-target previous
+  capability. True readiness alone never opts a legacy Slider into any action;
+- current claim uses the retained valid previous snapshot plus current eligibility
+  and error checks; the public predicate is intentionally false during frame.
+  Known failed current input/layout cannot deliver more requests. Already claimed
+  requests are not rolled back by a later failure.
 
-Signed boundary note: `/root/hidden_windows`, 2026-10-31. No code/build changes.
+Add one private context validity flag, separate from lazy numeric state; remove
+the redundant `published_valid` field from the lazy record. Initial flagfalse;
+set only at successful ordinary semantic publication. Invalidating begin/end
+failures clear it before returning, including new scroll-layout constraint
+failure and downstream end error. Error clear never sets it. Public predicate
+never allocates. Failed-begin admission checks must distinguish non-invalidating
+API misuse from geometry-invalidating failure; test exact cases rather than
+claim that every error destroys a snapshot. While a non-geometry sticky error
+is present numeric actions may conservatively reject; clearing that error does
+not recreate geometry and cannot override a false validity flag.
+
+The private idle delta is **one pointer plus one bool and containing-struct
+alignment**, not exactly8 bytes. Report baseline/modified `sizeof(cui_context)`
+and flag/pointer offsets on tested ABIs before implementation handoff; an
+8-aligned insertion of8+1 bytes may cost16 bytes, and32-bit may similarly add
+padding. Do not promise a platform-independent8-byte context growth. The only
+legacy cost is this bounded private layout delta; no eager numeric allocation or
+new cui_create OOM branch. Lazy record becomes `{size_t frame_origin_count;
+queued[EVENT_MAX]; frame[EVENT_MAX]; uint32_t masks[];}`. Exact allocation stays
+`sizeof(cui_core_numeric_state)+2*N*sizeof(uint32_t)` with checked overflow; no
+published-valid flag in that allocation. Normally slot16 yields fixed header
+`sizeof(size_t)+32*EVENT_MAX`, rounded to its actual struct alignment; record
+actual values instead of relying on the illustrative estimate.
+
+Numeric-enabled adapter update and drain must call the predicate. Update false
+rejects/suspends numeric publication, retaining last good copied tree rather than
+reading/certifying invalid Core semantics. Drain false discards pending numeric
+requests as invalid, never capacity-retries them. On recovery, fresh successful
+completed snapshot plus explicit per-target registration reauthorizes actions.
+Only genuine Core event-queue fullness retains numeric requests for retry; other
+invalid/stale/lifecycle outcomes are rejected, with accurate diagnostics. True
+predicate with no capabilities may still publish truthful new-mode read-only
+projection; no allocation or fake registration is required.
+
+Old accessibility constructor/mode and old FOCUS/ACTIVATE paths **never use this
+predicate**. Their existing timing/routing/error/snapshot behavior stays unchanged.
+Only the new numeric-enabled backend constructor policy gates on readiness; its
+versioned16-byte options record, explicit ENABLE_NUMERIC flag, reserved-field
+validation and separate bounded scalar mailbox cost above remain the contract.
+Host/Core snapshots and typed input capability are distinct from request owner
+acceptance; no rollback of callbacks already delivered.
+
+This resolves the observer decision. After the Core layout worker's handoff/base
+is available, root authorizes only the narrow Core capability, typed queue, claim
+and readiness slice, with real new-layout failure interoperability tests. Host
+backend implementation, typed Slider model, bridge receipt ABI, host option
+transport and all5 binding production remain independently gated. No pinned
+dependency patch, general dispatcher, keyboard fabrication, old public struct
+growth or full-host claim from Core helper proof.
+
+Signed contract revision: `/root/hidden_windows`, 2026-10-31. Design only; no
+production/compiler/dependency/generated changes at this checkpoint.

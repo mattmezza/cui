@@ -234,6 +234,24 @@ static void text_resources(void) {
     c.payload.legacy.text_source = (cui_text_line_source){0};
     c.payload.legacy.text = (cui_str){NULL, 1};
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
+    /* Context presence, including empty context, makes raw legacy text inactive. */
+    c.payload.legacy.text_paint = (cui_text_paint){0};
+    c.payload.legacy.text = (cui_str){(const char *)(uintptr_t)1, SIZE_MAX};
+    c.payload.legacy.text_source = (cui_text_line_source){{"", 0}, 0, 0};
+    assert(cui_software_v2_validate(&l, &o, true, true, &p) == CUI_OK);
+    assert(p.inspected_bytes == 0);
+    c.payload.legacy.text_source = (cui_text_line_source){{"ok", 2}, 0, 2};
+    assert(cui_software_v2_validate(&l, &o, true, true, &p) == CUI_OK);
+    assert(p.inspected_bytes == 2);
+    c.payload.legacy.text = (cui_str)CUI_STR("valid inactive text");
+    c.payload.legacy.text_source.byte_end = 3;
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
+    c.payload.legacy.text_source = (cui_text_line_source){{"\xff", 1}, 0, 1};
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
+    c.payload.legacy.text_source = (cui_text_line_source){{NULL, 1}, 0, 0};
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
+    c.payload.legacy.text_source = (cui_text_line_source){{NULL, 0}, 0, 1};
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
 }
 typedef struct {
     size_t allocations, frees, live, peak, fail;

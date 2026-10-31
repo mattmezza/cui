@@ -101,3 +101,12 @@ support query/render entry. See [software checkpoint](design/SOFTWARE_BACKGROUND
 A private [counted text recorder](TEXT_PREPARATION.md) supplies source-grid glyph
 coverage and explicit CUI ownership, but is not integrated into an adapter. Opaque
 new font/dependency temporaries remain outside the transaction byte envelope.
+
+The private software validator follows native contextual-text selection: a non-NULL
+paragraph pointer is authoritative even for an empty paragraph, so inactive raw
+text fields are ignored. A NULL paragraph with a nonzero length or range remains
+invalid; active contextual UTF-8 and byte boundaries are always validated.
+The correction is checked against the immutable original text implementation's
+empty-context behavior, poisoned inactive raw fields, malformed active contextual
+UTF-8/ranges, and transactional validator failures. Strict C11 warnings-as-errors
+and three focused private-Xvfb checks passed; no renderer capability is implied.

@@ -173,11 +173,11 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 (c->text_color_count && !c->text_colors))
                 return CUI_ERROR_INVALID_ACTION;
             size_t text_bytes =
-                c->text_source.paragraph.length ? c->text_source.paragraph.length : c->text.length;
+                c->text_source.paragraph.data ? c->text_source.paragraph.length : c->text.length;
             if (text_bytes > INT32_MAX ||
                 !cui_software_v2_add(&plan.inspected_bytes, text_bytes, (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
-            if (c->text_source.paragraph.length) {
+            if (c->text_source.paragraph.data) {
                 if (!cui_software_v2_alias(c->text_source.paragraph.data, text_bytes, out) ||
                     !cui_text_line_source_valid(c->text_source))
                     return CUI_ERROR_INVALID_ACTION;
@@ -197,7 +197,9 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                         return CUI_ERROR_INVALID_ACTION;
                     previous = range.byte_end;
                 }
-            } else if ((c->text.length && !c->text.data) || c->text_color_count ||
+            } else if (c->text_source.paragraph.length || c->text_source.byte_start ||
+                       c->text_source.byte_end || (c->text.length && !c->text.data) ||
+                       c->text_color_count ||
                        !cui_software_v2_alias(c->text.data, c->text.length, out))
                 return CUI_ERROR_INVALID_ACTION;
             if (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&

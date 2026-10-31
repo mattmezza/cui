@@ -8,6 +8,14 @@ bool cui_test_original_text_prepare(const char *regular, const char *bold_path, 
                                     size_t capacity, size_t *out_length) {
     cui_font *font = cui_font_open(regular), *bold = cui_font_open(bold_path);
     assert(font && bold);
+#ifdef CUI_TEXT_BIDI
+    /* Immutable original source selects context by pointer, even when empty. */
+    length = 0;
+    assert(cui_font_draw_context_line_scaled(font, (cui_str){(const char *)(uintptr_t)1, SIZE_MAX},
+                                             (cui_text_line_source){{"", 0}, 0, 0}, 12,
+                                             (cui_text_style){0}, 0, 0, 1, record, NULL));
+    assert(length == 0);
+#endif
     assert(cui_font_set_style(font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD}, bold));
     baseline(font);
     assert(length <= capacity);

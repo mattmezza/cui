@@ -2,6 +2,7 @@
 /* Independent frozen pre-extraction surface reducer versus current source. */
 #include "cui/cui_surface.h"
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 void legacy_cui_surface_init(cui_surface_state *, cui_id, cui_surface_kind);
@@ -72,10 +73,98 @@ static void frame(driver *d, bool legacy, unsigned index, cui_surface_options o)
     (void)list;
     (void)index;
 }
+static bool rect_equal(cui_rect a, cui_rect b) {
+    return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
+}
+static bool state_equal(const cui_surface_state *a, const cui_surface_state *b) {
+#define EQ(field) (a->field == b->field)
+    return EQ(overlay.id) && EQ(overlay.trigger) &&
+           rect_equal(a->overlay.bounds, b->overlay.bounds) && EQ(overlay.open) &&
+           EQ(overlay.modal) && EQ(overlay.dismiss_on_escape) && EQ(overlay.dismiss_on_outside) &&
+           EQ(overlay.has_bounds) && EQ(kind) && EQ(result) && EQ(sheet_size) &&
+           EQ(resize_origin) && EQ(resize_size) && EQ(resizing) && EQ(pending_close) &&
+           EQ(on_close) && EQ(body_scroll) && EQ(body_maximum) &&
+           rect_equal(a->body_viewport, b->body_viewport) &&
+           rect_equal(a->body_content, b->body_content) && EQ(sheet_progress) &&
+           EQ(sheet_motion_from) && EQ(sheet_animation_seconds) && EQ(sheet_motion_start) &&
+           EQ(sheet_motion_enabled) && EQ(sheet_closing) && EQ(sheet_close_result);
+#undef EQ
+}
+static void comparator_oracle(void) {
+    cui_surface_state a, b;
+    unsigned char member[sizeof a] = {0};
+    memset(&a, 0x55, sizeof a);
+    memset(&b, 0xaa, sizeof b);
+#define SET(field, value)                                                                          \
+    do {                                                                                           \
+        a.field = b.field = value;                                                                 \
+        memset(member + offsetof(cui_surface_state, field), 1, sizeof a.field);                    \
+    } while (0)
+    SET(overlay.id, 50);
+    SET(overlay.trigger, 1);
+    SET(overlay.bounds.x, 40);
+    SET(overlay.bounds.y, 40);
+    SET(overlay.bounds.w, 200);
+    SET(overlay.bounds.h, 180);
+    SET(overlay.open, true);
+    SET(overlay.modal, true);
+    SET(overlay.dismiss_on_escape, true);
+    SET(overlay.dismiss_on_outside, true);
+    SET(overlay.has_bounds, true);
+    SET(kind, CUI_SURFACE_DIALOG);
+    SET(result, CUI_SURFACE_NONE);
+    SET(sheet_size, 0);
+    SET(resize_origin, 0);
+    SET(resize_size, 0);
+    SET(resizing, false);
+    SET(pending_close, CUI_SURFACE_NONE);
+    SET(on_close, closed);
+    a.close_user = &a;
+    b.close_user = &b; /* Deliberately independent userdata. */
+    memset(member + offsetof(cui_surface_state, close_user), 1, sizeof a.close_user);
+    SET(body_scroll, 0);
+    SET(body_maximum, 0);
+    SET(body_viewport.x, 0);
+    SET(body_viewport.y, 0);
+    SET(body_viewport.w, 100);
+    SET(body_viewport.h, 100);
+    SET(body_content.x, 0);
+    SET(body_content.y, 0);
+    SET(body_content.w, 100);
+    SET(body_content.h, 200);
+    SET(sheet_progress, 0);
+    SET(sheet_motion_from, 0);
+    SET(sheet_animation_seconds, 0);
+    SET(sheet_motion_start, 0);
+    SET(sheet_motion_enabled, false);
+    SET(sheet_closing, false);
+    SET(sheet_close_result, CUI_SURFACE_NONE);
+#undef SET
+    unsigned padding = 0;
+    for (size_t i = 0; i < sizeof a; ++i)
+        if (!member[i]) {
+            assert(((const unsigned char *)&a)[i] != ((const unsigned char *)&b)[i]);
+            ++padding;
+        }
+    printf("DIALOG_COMPARE padding-distinct bytes%u; semantic mutation rejection PASS\n", padding);
+    assert(state_equal(&a, &b));
+    b.sheet_progress = .5f;
+    assert(!state_equal(&a, &b));
+    b.sheet_progress = a.sheet_progress;
+    b.overlay.modal = false;
+    assert(!state_equal(&a, &b));
+    b.overlay.modal = a.overlay.modal;
+    b.body_content.w += 1;
+    assert(!state_equal(&a, &b));
+    b.body_content.w = a.body_content.w;
+    b.on_close = NULL;
+    assert(!state_equal(&a, &b));
+    b.on_close = a.on_close;
+    assert(state_equal(&a, &b));
+}
 static void compare(const driver *a, const driver *b) {
-    cui_surface_state x = a->state, y = b->state;
-    x.close_user = y.close_user = NULL;
-    assert(memcmp(&x, &y, sizeof x) == 0);
+    assert(a->state.close_user == a && b->state.close_user == b);
+    assert(state_equal(&a->state, &b->state));
     assert(a->decisions == b->decisions && a->closes == b->closes);
     assert(a->decision_reason == b->decision_reason && a->close_reason == b->close_reason);
     assert(a->focus_on_close == b->focus_on_close);
@@ -94,7 +183,7 @@ static void compare(const driver *a, const driver *b) {
     assert(na == nb);
     for (size_t i = 0; i < na; ++i) {
         assert(sa[i].id == sb[i].id && sa[i].role == sb[i].role);
-        assert(memcmp(&sa[i].bounds, &sb[i].bounds, sizeof sa[i].bounds) == 0);
+        assert(rect_equal(sa[i].bounds, sb[i].bounds));
     }
 }
 static void queue(driver *d, unsigned step) {
@@ -112,6 +201,7 @@ static void queue(driver *d, unsigned step) {
     }
 }
 int main(void) {
+    comparator_oracle();
     unsigned frames = 0;
     for (unsigned kind = CUI_SURFACE_DIALOG; kind <= CUI_SURFACE_POPOVER; ++kind) {
         driver a = {0}, b = {0};

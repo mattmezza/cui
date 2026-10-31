@@ -35,6 +35,8 @@ it does not establish exact GPUI path rasterization or support in native adapter
 An earlier light/dark Chromium audit of the first 62 live stories identified ASCII stand-ins in C components. The subsequent source icon artwork implementation replaced those glyphs in Button, Disclosure, Tree, DropdownButton, Input Group and Notification. The gallery’s custom disclosure header still uses `+`/`-` in `web/gallery.c`; it is sample-owned content rather than component painting. The Message avatar is intentionally bottom-aligned: `src/components/cui_message.c` follows the frozen reference's `message.rs` bottom alignment. Input Group's separate block addon rows follow `src/components/cui_form.c`; the gallery gives its inline action enough width to keep “Open address” on one line.
 An idle-frame audit found continuous frames only for Skeleton, Spinner, Shimmer, and Attachment's brief entrance animation; Image schedules a load deadline. With reduced motion, all 62 stories in that audit stopped scheduling continuous frames.
 
+The host applies reduced-motion preferences before `cui_begin_frame`, so input and composition see the same preference and the frame consumes its invalidation. The host also skips a late media-query notification when an animation tick has already painted its current preference. Updating the preference after begin schedules a redundant follow-up frame; the Spinner browser regression exercises repeated preference transitions and verifies both zero animation deadlines and a stable frame count.
+
 Run the meaningful browser checks with pinned Playwright 1.58.0:
 
 ```sh

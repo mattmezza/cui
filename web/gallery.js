@@ -1462,7 +1462,9 @@ function handleCanvasKey(e,type){
  }requestFrame();
 }
 for(const [event,type] of [['keydown',3],['keyup',4]])canvas.addEventListener(event,e=>handleCanvasKey(e,type));
-reducedMotion.addEventListener('change',requestFrame);
+// An animation tick can paint the new preference before its change event arrives.
+// Coalesce that late notification; other input and pending frames retain their own scheduling.
+reducedMotion.addEventListener('change',()=>{if(window.cuiGallery?.renderedReducedMotion!==reducedMotion.matches)requestFrame();});
 systemDark.addEventListener('change',()=>{if(themeChoice==='system')syncTheme();});
 $('search').addEventListener('input',()=>{$('docs-page').hidden?navigation():docsNavigation();});window.addEventListener('hashchange',()=>{if(catalog&&documents)route();});window.addEventListener('popstate',()=>{if(catalog&&documents)route();});
 window.addEventListener('keydown',event=>{

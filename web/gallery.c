@@ -3138,8 +3138,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             redraw = true;
     }
     color_entry_restore = false;
-    cui_begin_frame(ui, width, height, host_dt);
+    /* Apply host preferences before begin resets invalidation and dispatches input.
+     * Updating after begin needlessly schedules a second preference-only frame. */
     cui_set_reduced_motion(ui, reduced_motion);
+    cui_begin_frame(ui, width, height, host_dt);
     if (story != 75 && story != 80)
         cui_begin_box(ui, cui_id_from(ui, "preview"),
                       (cui_box){.width = width,

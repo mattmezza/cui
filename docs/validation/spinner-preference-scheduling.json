@@ -1,0 +1,44 @@
+{
+  "scope": "Gallery host preference scheduling; legacy component and Core setter contracts unchanged",
+  "cause": [
+    "Updating reduced motion after begin invalidated an already submitted frame",
+    "An animation tick could paint a preference before its delayed media-query notification"
+  ],
+  "fix": [
+    "Apply preference before begin/input dispatch",
+    "Ignore a media notification if its current preference was already painted"
+  ],
+  "evidence": {
+    "initial_instrumented_transitions": {
+      "attempts": 24,
+      "extra_frames": 4
+    },
+    "setter_order_only": {
+      "attempts": 24,
+      "extra_frames": 14,
+      "remaining_cause": "late MediaQueryList requestFrame"
+    },
+    "complete_fix": {
+      "attempts": 24,
+      "extra_frames": 0
+    },
+    "browser_cases": [
+      "1280 DPR1",
+      "1280 DPR2",
+      "390 DPR1",
+      "390 DPR2"
+    ],
+    "additional_narrow_dpr2_transitions": 16,
+    "assertions": "Original zero deadline/frame/pixel checks retained; no added settling wait"
+  },
+  "wasm_build": "Pinned Zig0.16.0, C11 O2 Wall Wextra Wpedantic Werror; default non-regex gallery",
+  "sha256": {
+    "web/gallery.c": "1500fecb0b559c70676b4cfb92024e12809888ffd8a6f408be24e12434461da7",
+    "web/gallery.js": "a778aedc83563ba5c1d920e833d0f5c25694acdf58858ff66307429d18d31694",
+    "tests/web/test_spinner_contract_gallery.py": "8e7d2694c2f22588e39aef8cedeaf2b9241940405e637e40894ec331bd6558b4"
+  },
+  "remaining": [
+    "Hosted browser confirmation pending",
+    "No release or public deployment from these local checks"
+  ]
+}

@@ -125,6 +125,17 @@ def main():
                 page.wait_for_function('cuiGallery.renderedReducedMotion === true')
                 assert stat(1) == .25 and stat(11) == 0 and stat(2) == 0
                 idle()
+                # A preference change must be consumed by its first rendered frame,
+                # rather than leaving Core dirty and racing the idle observation.
+                if width == 390 and dpr == 2:
+                    for _ in range(16):
+                        page.emulate_media(reduced_motion='no-preference')
+                        page.wait_for_function('cuiGallery.renderedReducedMotion === false')
+                        page.emulate_media(reduced_motion='reduce')
+                        page.wait_for_function('cuiGallery.renderedReducedMotion === true')
+                        assert page.evaluate('cuiGallery.exports.gallery_redraw()') == 0
+                        assert stat(1) == .25 and stat(11) == 0 and stat(2) == 0
+                        idle()
                 assert page.locator('#accessible [role=status],#accessible [aria-busy=true]').count() == 0
                 page.goto(f'http://127.0.0.1:{server.server_port}/#Button')
                 page.wait_for_function('window.cuiGallery?.renderedComponent === "Button"')

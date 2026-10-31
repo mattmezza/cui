@@ -2072,5 +2072,7 @@ add_test(NAME named_selection_indicators COMMAND test_named_selection_indicators
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CUI_SANITIZE)
  add_test(NAME shadow_fixture_small_stack COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/bindings/bridge/tests/test_small_stack.py
-  $<TARGET_FILE:test_bridge_shadows> $<TARGET_FILE:test_component_shadow_ownership>)
+  $<TARGET_FILE:test_bridge_shadows> $<TARGET_FILE:test_component_shadow_ownership>
+  $<TARGET_FILE:test_bridge_part_shadows> $<TARGET_FILE:test_compound_shadow_parts>
+  $<TARGET_FILE:test_button_surface>)
 endif()

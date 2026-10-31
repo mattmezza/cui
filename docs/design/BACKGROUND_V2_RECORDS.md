@@ -498,3 +498,22 @@ bindings after disposal; unchanged V1 pools/routes; resize/error cleanup; byte a
 alignment admission limits; original-context loss refusal. Native GLCORE proof
 runs only via private-Xvfb where supported; no hardware PASS inferred from source
 inspection. Other four adapter ownership proofs remain independently required.
+
+## Approved text accounting clarification (V2 opt-in only)
+
+Following `SOFTWARE_V2_FONT_SESSION.md` (224309bd), `cpu_bytes` bounds adapter-owned
+transaction payload plus counted CUI text temporaries. Metadata is separately
+bounded. Existing caller-owned font/cache state AND newly allocated opaque
+FT/HB/Sheen/provider temporaries are outside that byte envelope. Their lifecycle
+and failures are audited, not silently reported as zero or jointly <=32MiB. This
+is not a process/RSS or arbitrary-provider allocation/time bound. No global
+allocator swaps or host dependency replacements follow from this clarification.
+
+Text admission additionally limits full paragraph input64KiB, aggregate repeated
+input256KiB, selected/fallback faces64, shaping attempts8192, segments4096,
+glyphs65536 and copied coverage8M pixels per frame; a bitmap has <=4096/side and
+4M pixels. Enforce countable input limits before work; output-dependent limits
+can fail after opaque allocation but before publication. Full shaping/fallback,
+selection and approved glyph transforms remain required; these opt-in limits do
+not alter V1. No adapter capability is advertised until preparation/painting and
+independent tests are complete.

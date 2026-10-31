@@ -1239,7 +1239,14 @@ typedef struct {
  * and CENTER_V1 tag required. Scales [1/65536,64], origins [-1e6,1e6], viewport
  * sides <=16384 (zero yields empty work). Explicit nonzero resource ceilings:
  * <=8M pixels/frame, <=4M/background; <=32MiB each CPU/texture/transfer and
- * <=1MiB metadata. Actual adapters must also preflight aggregate/inflight usage. */
+ * <=1MiB metadata. CPU covers adapter-owned transaction payload and counted CUI
+ * text temporaries, NOT existing font state or opaque new FT/HB/Bidi/provider
+ * allocations. No total-process/joint dependency-memory guarantee. Native text
+ * additionally admits <=64KiB/paragraph,256KiB aggregate input,64 faces,
+ * 8192 shaping attempts,4096 segments,65536 glyphs,8M copied coverage pixels;
+ * each glyph <=4096/side and4M pixels. Limits may reject V2 without publication.
+ * Opaque operations can allocate before output/work rejection. See software
+ * font-session contract. Actual adapters preflight aggregate/inflight usage. */
 typedef struct {
     uint32_t size, background_output;
     unsigned viewport_width, viewport_height;

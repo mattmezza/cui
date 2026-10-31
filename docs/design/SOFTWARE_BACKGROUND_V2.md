@@ -66,7 +66,7 @@ are owned; ordinary text/image/mesh/font input remains borrowed through the call
 No whole-list snapshot ownership claim. Reject reentrant render/resize/destroy.
 
 CPU accounting includes scratch target + all prepared background spans + shadow
-pixels + glyph preparation + temporary command copies, including old retained
+pixels + glyph copies + counted CUI text temporaries + command copies, including old retained
 capacity while replacement allocation is live. Metadata separately includes all
 aligned descriptor/clip tables; use checked actual sizeof/alignment. Both counts
 must fit options CPU<=32MiB and metadata<=1MiB respectively. Packed background
@@ -156,3 +156,9 @@ between query/render, repeated render, destroy and no-opt-in allocation checks.
 Run portable strict C11 selective/umbrella and software private-Xvfb tests; no GPU
 claims follow. SDL_Renderer, SDL_GPU, Sokol GLCORE, Canvas/wire and foreign authoring
 remain later mandatory checkpoints, as do all78 component-part coverage gaps.
+
+Approved text-accounting clarification: existing font state and new opaque
+FT/HB/Sheen/provider temporaries are explicitly separate from `cpu_bytes`; no joint
+32MiB/process guarantee. The private counted session and exact admission ceilings
+are specified in [SOFTWARE_V2_FONT_SESSION.md](SOFTWARE_V2_FONT_SESSION.md). Dependency
+operations may allocate before an output-dependent rejection. V1 is unchanged.

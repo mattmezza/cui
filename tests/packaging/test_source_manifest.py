@@ -15,6 +15,15 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def consumer_build_jobs():
+    # Keep local packaged-consumer checks gentle; CI can explicitly opt in to
+    # parallel compilation through CMake's standard environment setting.
+    value = os.environ.get('CMAKE_BUILD_PARALLEL_LEVEL') or '1'
+    if not value.isascii() or not value.isdecimal() or int(value) < 1:
+        raise ValueError('CMAKE_BUILD_PARALLEL_LEVEL must be a positive integer')
+    return str(int(value))
+
+
 def load(name):
     spec = importlib.util.spec_from_file_location(name, ROOT / 'scripts' / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
@@ -27,6 +36,17 @@ validator = load('test_binding_packages')
 
 
 class SourceManifest(unittest.TestCase):
+    def test_consumer_build_jobs(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(consumer_build_jobs(), '1')
+            for setting, expected in [('', '1'), ('1', '1'), ('4', '4'), ('02', '2')]:
+                os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = setting
+                self.assertEqual(consumer_build_jobs(), expected)
+            for setting in ('0', '-1', 'many', '1.5', ' 2', '٢'):
+                os.environ['CMAKE_BUILD_PARALLEL_LEVEL'] = setting
+                with self.subTest(setting=setting), self.assertRaises(ValueError):
+                    consumer_build_jobs()
+
     def make_archive(self, directory, kind, mode):
         path = directory / ('sample.whl' if kind == 'wheel' else 'sample.tgz')
         prefix = 'cui_bridge/_source/' if kind == 'wheel' else 'package/_source/'
@@ -227,7 +247,8 @@ class SourceManifest(unittest.TestCase):
                 self.assertEqual(configured_tests.returncode, 0, configured_tests.stdout[-8000:])
                 built = subprocess.run(
                     [shutil.which('cmake'), '--build', str(test_build), '--config', 'Release',
-                     '--target', 'test_date_time_picker', 'test_date_time_picker_styled', '--parallel', '4'],
+                     '--target', 'test_date_time_picker', 'test_date_time_picker_styled',
+                     '--parallel', consumer_build_jobs()],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=300)
                 self.assertEqual(built.returncode, 0, built.stdout[-8000:])
                 tested = subprocess.run(

@@ -38,5 +38,29 @@
   "verification_command": "taskset -c 0 nice -n 19 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/unit/test_background_v1_oracle.c build-shadow/baseline-cf72-libcui_software.a build-shadow/baseline-cf72-libcui.a -lm -o build-shadow/test_background_v1_reference_compare",
   "verification_test_command": "taskset -c 0 nice -n 19 python scripts/test_local.py --build-dir build-shadow -R '^background_v1_(reference_compare|reference_reject_mutation|abi_reference_selective|abi_reference_umbrella)$'",
   "verification_result": "4/4 PASS, including intentional first-byte golden mutation rejected. Same immutable old archives; rebuilt current integration library verification remains required before V2 production.",
-  "static_result": "Manifest78; format check; amalgamation/SDK/skill freshness; Python integrity4/4; consumer skill18/18 PASS."
+  "static_result": "Manifest78; format check; amalgamation/SDK/skill freshness; Python integrity4/4; consumer skill18/18 PASS.",
+  "independent_current_verification": {
+    "source_commit": "6c69bb1df3028a62880099be946a8006e9863022",
+    "source_provenance": "Integrator confirms library completion at native full-build steps115(Core) and126(software); subsequent source changes through f71 are docs-only. Root build remains active; worker did not rebuild or modify these libraries/headers.",
+    "library_flags": "/usr/bin/cc; CMake Release -O3 -DNDEBUG -std=c11 -fPIC -Wall -Wextra -Wpedantic -Werror; CUI_BUILD_NATIVE=ON",
+    "compile_command": "taskset -c 0 nice -n 19 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -I/home/matteo/.cache/cui-worktrees/resume-next104/include tests/unit/test_background_v1_oracle.c /home/matteo/.cache/cui-current-validation/native/libcui_software.a /home/matteo/.cache/cui-current-validation/native/libcui_text.a /home/matteo/.cache/cui-current-validation/native/libcui.a -lm /usr/lib/libharfbuzz.so /usr/lib/libfreetype.so /home/matteo/.cache/cui-current-validation/native/libcui_bidi.a -o build-shadow/test_background_v1_current_compare",
+    "abi_compile": "Same strict flags with current dist include; both selective and -DCUI_TEST_V1_UMBRELLA=1 declaration-only umbrella; no library link.",
+    "test_command": "taskset -c 0 nice -n 19 python scripts/test_local.py --build-dir build-shadow -R '^background_v1_current_(compare|reject_mutation|abi_selective|abi_umbrella)$'",
+    "result": "4/4 PASS; exact original frozen golden unchanged and intentional first-byte mutation refused. Independently rebuilt current Core/software gate completed before V2 production. Text pixels remain excluded; command text covered.",
+    "sha256": {
+      "/home/matteo/.cache/cui-current-validation/native/libcui.a": "4c0432931c4bf5b6ffcdc5130507f11188c269f865d09f6ea9b39163fc0f6904",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_software.a": "ca9d5af1e8963d6b1a3e7fec94564b76dac1e0b97fd656db0bc058366ecef941",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_text.a": "1514639af1ee590c46e9e864d0afa24f040f4575ce99cca507cfb8e76a4a5cab",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "16a954b2d66dca8352acc4e4d346a5022bb1499b4a11bfb1350d609c4a171274",
+      "/usr/lib/libharfbuzz.so.0.61500.0": "fafdbb580df68c905f4a989bb4c882cce389a90a40e07f50ec73b6d92d828315",
+      "/usr/lib/libfreetype.so.6.20.7": "0b0e16faaaed2145c89e193bc52f308bfb909ccd182fbed0d2f245329c248fca"
+    },
+    "header_sha256": {
+      "/home/matteo/.cache/cui-worktrees/resume-next104/include/cui/cui.h": "84a4bcd9a0746ba35d00058cdc757d564fb2968f93aaf2713fef8c4faf6c0694",
+      "/home/matteo/.cache/cui-worktrees/resume-next104/dist/cui.h": "746a29f998ec0125ac5d1ee94def3eaa2ae8832edcc31cc04d911ca3fc488305",
+      "/home/matteo/.cache/cui-worktrees/resume-next104/dist/cui_all.h": "bab2c67a9a930c9aab014b397edb5de7b93cb8b9cd0e445fa1ad64d53879c9ca",
+      "/home/matteo/.cache/cui-worktrees/resume-next104/dist/cui_renderer.h": "1468bc922ec07de05b7f686956e6e293bd9cf7ff8852c10c3623fe96c0c0f7e5"
+    },
+    "binary_sha256": "0223c758dfe1fb93fd440bbb8fa943045a43e3cdde8a8c20be70c7c21ab0a7c2"
+  }
 }

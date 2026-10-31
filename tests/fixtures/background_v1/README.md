@@ -39,4 +39,6 @@ No tests open desktop windows; run native CTest through `scripts/test_local.py`.
 
 Validation of this checkpoint uses preserved old archives without rebuilding Core.
 The normal comparison target is also wired into CTest for integration builds;
-that separately rebuilt current-library execution must pass before V2 production.
+that separately rebuilt current-library execution passed against source `6c69bb1d`
+with the original frozen expected output unchanged (receipt records hashes and flags).
+Re-run this gate for subsequent V2 production changes.

@@ -40,9 +40,24 @@ def main():
                     return page.evaluate(IMAGE)
                 def idle():
                     assert page.evaluate('cuiGallery.exports.gallery_next_wake()') == 0
-                    frame = page.evaluate('cuiGallery.frame'); shot = page.locator('canvas').screenshot()
+                    def snapshot():
+                        return page.evaluate("""() => ({
+                            frame: cuiGallery.frame,
+                            wake: cuiGallery.exports.gallery_next_wake(),
+                            reduced: cuiGallery.renderedReducedMotion,
+                            paints: cuiGallery.exports.gallery_spinner_contract(4),
+                            easingCalls: cuiGallery.exports.gallery_spinner_contract(10),
+                            scrollX, scrollY, now: performance.now()
+                        })""")
+                    before = snapshot()
+                    shot = page.locator('canvas').screenshot()
+                    after_screenshot = snapshot()
                     page.wait_for_timeout(100)
-                    assert page.evaluate('cuiGallery.frame') == frame
+                    after_wait = snapshot()
+                    assert after_wait['frame'] == before['frame'], {
+                        'before': before, 'after_screenshot': after_screenshot,
+                        'after_wait': after_wait, 'width': width, 'dpr': dpr,
+                    }
                     assert page.locator('canvas').screenshot() == shot
                 assert page.locator('#spinner-sizing').input_value() == '0'
                 assert image()['rect'][2:4] == [16, 16]

@@ -197,13 +197,19 @@ API: `cui_begin_bubble`, `cui_end_bubble`. [Public header](../include/cui/cui_co
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns application data; cui_button_options controls presentation.
+**State:** Caller owns application data and options. Button style callbacks/user are borrowed through submission; surface shadow arrays are copied by value, bounded to eight layers; no callback/list persists across frames.
 
 **Interaction:** Returns true on activation; invoke the application action in that branch.
 
 **Usage:** For Save, call save_document only when cui_button returns true. content is a composition callback, not an action handler.
 
 API: `cui_button`, `cui_button_ex`. [Public header](../include/cui/cui_components.h); [guide](BUTTON.md).
+
+Opt-in styling: `cui_button_styled_ex`, `cui_button_styled_paint`,
+`cui_button_surface_ex`, `cui_button_surface_paint_only`. Include
+[`cui/cui_button_styles.h`](../include/cui/cui_button_styles.h) explicitly; see
+[style phases, ownership and rejection](BUTTON_STYLES.md). These additive surface
+APIs are post-alpha.3 development APIs; published alpha.3 packages lack them.
 
 ## Checkbox
 

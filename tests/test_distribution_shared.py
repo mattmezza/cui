@@ -18,6 +18,7 @@ def validate(cmake, provider, independent):
     if '#define CUI_IMPLEMENTATION_ALL\n#include "cui_all.h"' not in independent or 'int main(void)' not in independent:
         errors.append('independent same-TU smoke required')
     block = cmake.split('# Private test-only umbrella implementation.', 1)[-1]
+    block = block.split('add_test(NAME distribution_shared_policy ', 1)[0]
     if 'add_library(dist_all_implementation OBJECT tests/distribution/all_implementation.c)' not in block:
         errors.append('private object provider required')
     if 'cui_warnings(dist_all_implementation)' not in block:
@@ -37,6 +38,18 @@ class DistributionSharedTests(unittest.TestCase):
         self.assertEqual(validate((ROOT/'CMakeLists.txt').read_text(),
                                  (ROOT/'tests/distribution/all_implementation.c').read_text(),
                                  (ROOT/'tests/distribution/all.c').read_text()), [])
+
+    def test_unrelated_later_targets_do_not_change_provider_policy(self):
+        cmake = (ROOT/'CMakeLists.txt').read_text()
+        provider = (ROOT/'tests/distribution/all_implementation.c').read_text()
+        independent = (ROOT/'tests/distribution/all.c').read_text()
+        unrelated = '\nadd_executable(other other.c)\ntarget_link_libraries(other PRIVATE cui)\n'
+        self.assertEqual(validate(cmake + unrelated, provider, independent), [])
+        marker = 'cui_warnings(dist_all_implementation)'
+        for forbidden in ('-O0', '-O1', '/Od', 'install(', 'PRIVATE cui)'):
+            with self.subTest(forbidden=forbidden):
+                modified = cmake.replace(marker, marker + '\n# ' + forbidden)
+                self.assertTrue(validate(modified, provider, independent))
 
     def test_feature_sources_keep_direct_implementation_default(self):
         fixtures = ('video_controls.c', 'dropdown_button_styles_all.c',
@@ -59,7 +72,7 @@ class DistributionSharedTests(unittest.TestCase):
         for bad in (cmake.replace('OBJECT tests/distribution/all_implementation.c', 'STATIC tests/distribution/all_implementation.c'),
                     cmake.replace('cui_warnings(dist_all_implementation)', ''),
                     cmake.replace(' dist_video_controls\n', ' dist_all\n'),
-                    cmake+'\n# -O0\n'):
+                    cmake.replace('cui_warnings(dist_all_implementation)', 'cui_warnings(dist_all_implementation)\n# -O0')):
             self.assertTrue(validate(bad,provider,independent))
         self.assertTrue(validate(cmake, provider.replace('CUI_IMPLEMENTATION_ALL','CUI_IMPLEMENTATION'), independent))
         self.assertTrue(validate(cmake,provider,independent.replace('#define CUI_IMPLEMENTATION_ALL','')))

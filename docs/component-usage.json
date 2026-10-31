@@ -248,7 +248,10 @@
       "scope": "styled frame component",
       "name": "Button",
       "public_header": "include/cui/cui_components.h",
-      "composition": "immediate frame submission"
+      "composition": "immediate frame submission",
+      "additional_public_headers": [
+        "include/cui/cui_button_styles.h"
+      ]
     },
     {
       "api_symbols": [

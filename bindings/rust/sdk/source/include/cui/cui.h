@@ -1011,7 +1011,11 @@ typedef struct {
  * and paint; hidden/zero range omits semantics and visible paint. Interactivity
  * never overrides disabled/readonly current owner/layout ancestors or inert/
  * layout-only policy. Active ancestry requires an existing matching SCROLLBAR
- * semantic on bar; inert/layout-only may suppress it normally. No input dispatch,
+ * semantic on bar; inert/layout-only may suppress it normally. INTERACTIVE owns
+ * the bar enabled policy: it may replace bar.disabled (including a disabled
+ * range placeholder). To author a disabled bar, CLEAR INTERACTIVE; bar.disabled
+ * alone does not override this explicit policy. Bar readonly still excludes it.
+ * No input dispatch,
  * model pointer or callback is added. Current caller policy must guard reducers;
  * publication cannot undo already delivered input. Existing scroll-layout failure
  * and end_frame lifetimes apply; see SCROLL_LAYOUT.md for full topology/limits. */

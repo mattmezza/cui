@@ -163,8 +163,12 @@ inert/layout-only ancestry the normally omitted semantics are accepted.
 
 Flags independently author VISIBLE (1) and INTERACTIVE (2); interactivity requires
 visibility. Visible disabled bars retain ordinary paint/shadows and a disabled
-semantic, with no capture/focus/input eligibility. INTERACTIVE may clear only the
-range-placeholder disabled state: readonly track, disabled/readonly owner or actual
+semantic, with no capture/focus/input eligibility. INTERACTIVE is the authoritative
+bar enabled policy and may replace the submitted bar.disabled field (including
+a disabled range placeholder). To author a disabled bar, the caller MUST clear
+INTERACTIVE: bar.disabled alone does not override an explicit interactive request.
+Core cannot distinguish an arbitrary disabled bar field from a range placeholder.
+The track readonly flag, disabled/readonly owner or actual
 layout ancestors, inert and layout-only still exclude input. Callers must apply
 current eligibility before invoking their existing reducers; publication cannot
 retroactively undo earlier application/input mutations. Core does not provide a

@@ -155,7 +155,9 @@ For current-frame intrinsic scroll-body allocation in C Core, read
 independent of allocated Y, support ordinary GROW descendants and hidden/overlay
 bars, and borrow distinct offset floats through end_frame. Optional 48-byte
 track records stage actual fixed track/thumb boxes with independent visibility
-and interactivity; compose positive fixed-height placeholders and register against
+and interactivity; INTERACTIVE owns bar enabled policy even when its submitted
+semantic is a disabled placeholder, so clear it to author a disabled bar. Compose
+positive fixed-height placeholders and register against
 a current Y clamp. The lazy LP64 layout payload is 12856 bytes (16 KiB bound),
 including for body-only opt-in users. Read exact topology and input-policy limits;
 this does not install a dispatcher or Base reducers. Failed opt-in frames

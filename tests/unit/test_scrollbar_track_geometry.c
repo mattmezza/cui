@@ -26,7 +26,7 @@ typedef struct {
     uint32_t flags;
     unsigned compositions, hooks;
     bool shadows, inert, layout_only, nested, owner_disabled, owner_readonly, ancestor_disabled,
-        cover_modal;
+        cover_modal, placeholder;
     cui_scroll_state child;
 } fixture;
 static bool near(float a, float b) {
@@ -87,7 +87,7 @@ static void begin_owner(fixture *f, unsigned i) {
     o.hide_scrollbars = false;
     o.scrollbar_style = &style;
     o.disabled = o.disabled || !(f->flags & PROTOTYPE_TRACK_INTERACTIVE);
-    if (f->viewport[i].w > 0 && f->viewport[i].h > 0) {
+    if (!f->placeholder && f->viewport[i].w > 0 && f->viewport[i].h > 0) {
         float x = 0;
         cui_base_scrollbar_overlay(f->ui, owner(i), &x, &f->state[i].y,
                                    (cui_rect){0, 0, f->viewport[i].w, f->viewport[i].h},
@@ -817,6 +817,46 @@ static void lifecycle_late_alias_and_reuse(void) {
         cui_destroy(ui);
     }
 }
+static void authoritative_bar_policy(fixture *f) {
+    f->inert = f->layout_only = f->nested = f->cover_modal = false;
+    f->shadows = true;
+    f->flags = PROTOTYPE_TRACK_VISIBLE | PROTOTYPE_TRACK_INTERACTIVE;
+    f->header = 40;
+    f->body = 800;
+    f->height = 260;
+    f->width = 240;
+    f->state[0].y = f->state[1].y = 0;
+    f->placeholder = true; /* Submit disabled semantics, no overlay reduction. */
+    geometry(f, scene(f));
+    cui_id bar = cui_scrollbar_id(BODY, true);
+    assert(!semantic(f->ui, bar)->disabled); /* INTERACTIVE replaces placeholder. */
+    assert(!semantic(f->ui, BODY)->disabled && !semantic(f->ui, bar)->details.readonly);
+    f->placeholder = false;
+    float x = f->thumb[1].x + 3, y = f->thumb[1].y + 2;
+    pointer(f, CUI_EVENT_POINTER_DOWN, x, y);
+    scene(f);
+    assert(cui_event_target(f->ui, 0) == bar && cui_pressed(f->ui, bar));
+    pointer(f, CUI_EVENT_POINTER_MOVE, x, y + 20);
+    scene(f);
+    assert(f->state[1].y > 0); /* The completed enabled snapshot routes real input. */
+    float before = f->state[1].y;
+    f->flags = PROTOTYPE_TRACK_VISIBLE; /* Author disabled policy before reduction. */
+    pointer(f, CUI_EVENT_POINTER_MOVE, x, y + 40);
+    geometry(f, scene(f)); /* Ordinary named paint and shadow oracle still runs. */
+    assert(semantic(f->ui, bar)->disabled && !semantic(f->ui, BODY)->disabled);
+    assert(!cui_pressed(f->ui, bar) && cui_focused(f->ui) != bar);
+    assert(f->state[1].y == before);
+    pointer(f, CUI_EVENT_POINTER_UP, x, y + 40);
+    scene(f);
+    pointer(f, CUI_EVENT_POINTER_DOWN, f->thumb[1].x + 3, f->thumb[1].y + 2);
+    geometry(f, scene(f));
+    assert(cui_event_target(f->ui, 0) != bar && f->state[1].y == before);
+    pointer(f, CUI_EVENT_POINTER_MOVE, x, y + 60);
+    geometry(f, scene(f));
+    assert(f->state[1].y == before && !cui_pressed(f->ui, bar));
+    pointer(f, CUI_EVENT_POINTER_UP, x, y + 60);
+    scene(f);
+}
 static void layout_only(fixture *f) {
     f->layout_only = true;
     f->inert = false;
@@ -892,6 +932,7 @@ int main(void) {
     assert(f.hooks == f.compositions);
     layout_only(&f);
     modal_eligibility(&f);
+    authoritative_bar_policy(&f);
     printf("FIXED_TRACK_THUMB resource=%zu node=%zu record=%zu, Core/Base math80000 comparisons, "
            "geometry/alpha/shadows/wheel/touch/drag PASS\n",
            prototype_track_resource_bytes(), prototype_track_node_bytes(),

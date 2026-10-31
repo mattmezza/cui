@@ -57,10 +57,10 @@ can lag implementation: inspect current code and evidence before scheduling work
 - **18/18** consumer-skill tests, formatting and generated SDK/resource freshness
   passed; workflow regressions passed **9/9** (bindings) and **5/5** (Pages).
 - Earlier gallery source `c52ce72f` passed headless HoverCard, Stepper and Spinner
-  probes. The merged candidate still needs fresh browser and integrated CI checks.
-- Hosted native binding gate `b553c8bb` passed ten static/dynamic callback cases
-  and hidden-window checks in all five language paths. This predates the merged
-  shadow slices and does not replace their final integrated checks.
+  probes. The combined candidate passed all three hosted Pages browser shards at
+  `b9c2f3d1`; final sanitizer/Windows checks remain pending after test-fixture fixes.
+- Hosted native binding gate `b9c2f3d1` passed ten static/dynamic callback cases
+  and hidden-window checks in all five language paths on the combined candidate.
 - Earlier guide/build/artifact invocation errors are corrected. GCC sanitizer CI
   caught temporary bounds storage in the new indicator test; its lifetime is now
   fixed, and a focused instrumented Core/test reproduction plus ordinary regression

@@ -367,9 +367,10 @@ cui_slider_model_result_v1 cui_base_slider_model_events_v1(
     }
     size_t count = 0;
     const cui_event *events = cui_frame_events(ui, &count);
+    const uint64_t event_count = (uint64_t)count;
     if (frame && handler.callback &&
-        (count > (UINT64_MAX - 1) / 3 ||
-         state->request_sequence > UINT64_MAX - (3 * (uint64_t)count + 1))) {
+        (event_count > (UINT64_MAX - 1) / 3 ||
+         state->request_sequence > UINT64_MAX - (3 * event_count + 1))) {
         result.status = CUI_SLIDER_MODEL_SEQUENCE_EXHAUSTED;
         return result;
     }

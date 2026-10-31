@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_SOFTWARE_V2_INTERNAL_H
 #define CUI_SOFTWARE_V2_INTERNAL_H
+#include "../../src/core/cui_alignment_internal.h"
 #include "../../src/core/cui_background_prepare_internal.h"
 #include "../../src/core/cui_text_paint_internal.h"
 #include "cui_shadow.h"
@@ -222,12 +223,20 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
  * allocations; uncounted font/shadow temporaries cannot be declared prepared. */
 /* Allocator callbacks follow malloc ownership: each successful nonzero request
  * returns a distinct live writable block of at least the requested byte size,
- * aligned for max_align_t. NULL reports failure. release accepts each returned
- * block exactly once. They must not expose/retain transaction memory after release;
+ * aligned for cui_fundamental_alignment_internal. NULL reports failure. release accepts each
+ * returned block exactly once. They must not expose/retain transaction memory after release;
  * workspace API reentrancy during allocate/release is rejected. Offset alignment
  * in take relies on this base-alignment contract, not on an arbitrary void pointer. */
 typedef void *(*cui_software_v2_alloc_fn)(void *, size_t);
 typedef void (*cui_software_v2_free_fn)(void *, void *);
+_Static_assert(_Alignof(cui_draw_command_v2) <= _Alignof(cui_fundamental_alignment_internal),
+               "V2 command exceeds workspace base alignment");
+_Static_assert(_Alignof(cui_software_v2_descriptor) <= _Alignof(cui_fundamental_alignment_internal),
+               "V2 descriptor exceeds workspace base alignment");
+_Static_assert(_Alignof(cui_software_v2_alloc_fn) <= _Alignof(cui_fundamental_alignment_internal),
+               "allocator pointer exceeds workspace base alignment");
+_Static_assert(_Alignof(cui_software_v2_free_fn) <= _Alignof(cui_fundamental_alignment_internal),
+               "release pointer exceeds workspace base alignment");
 typedef struct {
     void *cpu, *metadata;
     size_t cpu_capacity, metadata_capacity, cpu_used, metadata_used;
@@ -275,8 +284,8 @@ static inline cui_error cui_software_v2_workspace_begin(cui_software_v2_workspac
 }
 static inline void *cui_software_v2_workspace_take(cui_software_v2_workspace *w, bool metadata,
                                                    size_t bytes, size_t alignment) {
-    if (!w || !w->active || w->busy || !bytes || !alignment || alignment > _Alignof(max_align_t) ||
-        (alignment & (alignment - 1)))
+    if (!w || !w->active || w->busy || !bytes || !alignment ||
+        alignment > _Alignof(cui_fundamental_alignment_internal) || (alignment & (alignment - 1)))
         return NULL;
     size_t *used = metadata ? &w->metadata_used : &w->cpu_used;
     size_t capacity = metadata ? w->metadata_capacity : w->cpu_capacity;

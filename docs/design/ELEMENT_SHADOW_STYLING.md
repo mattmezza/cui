@@ -220,3 +220,48 @@ source manifests, SDK/amalgamation generators and consumer skill resources. Run
 generate_agent_skill.py and test_agent_skill.py under the agreed resource budget.
 This design-only file changes no consumer contract, generated data or manifest
 entry. No compilation or heavyweight test was run for this proposal.
+
+## Core seam checkpoint before implementation
+
+Closed-node decoration can reuse an existing private mechanism without creating
+custom paint on every element. `cui_set_scroll_offset` in `src/core/cui.c:1937`
+already resolves a node submitted in the current `ui->nodes[0..node_count)` and
+mutates its Clay hash-map element after closure. Clay's element retains its
+`config` through EndLayout: `third_party/clay/clay.h:3061` tests
+`config.custom.customData` while generating CUSTOM paint. There is no separate
+closed-element custom-data registration required.
+
+The proposed setter first matches the full public ID in the current node array
+(not merely its folded hash), rejects layout-only nodes, selects the context,
+then obtains `Clay__GetHashMapItem(node->clay_id)`. Before mutation it checks the
+returned element exists, its id matches, it is not text/exiting, and its
+`config.userData == node`. The node array is allocated to max_elements at context
+creation, not resized during a frame; existing configuration already stores these
+same node pointers as userData/customData. These checks reuse that explicit
+ownership contract rather than expose or save a new Clay pointer. No pointer is
+retained across frames. `appearedThisFrame` must NOT be used as a current-frame
+flag: Clay uses it for newly appearing/transition behavior, not submission age.
+Current-frame membership comes from the CUI node array reset by begin_frame.
+
+Only a successful explicit style call attaches `config.custom.customData=node`.
+Invalid calls leave both element config and copied style untouched. All list and
+geometry validation precedes attachment. Zero-count on an otherwise untouched
+node is a no-op so a clear does not insert needless CUSTOM commands. Clearing an
+already customized node preserves other underlay/outline/mesh/prepaint owners;
+its pre-existing custom pointer is retained. This does not attach custom paint to
+unmodified nodes and preserves their old Clay/CUI command paths byte for byte.
+A clear following actual opt-in can use the existing customized empty-list paint
+path; tests must compare its visible output and background ordering as well.
+
+Duplicate public/folded IDs already fail at begin_box before node registration.
+The setter must reject a frame reporting DUPLICATE_ID rather than styling the
+first submitted node under an ambiguous application request. Unknown, zero,
+previous-frame and layout-only targets reject with documented invalid-action
+errors. Mutation guard rejects prepaint, measurement and diagnostic reentrancy.
+
+This seam needs no public struct growth, node-wide preattachment, previous-frame
+bounds query, changed renderer or input-dispatch path. It does rely on the pinned
+private Clay hash-map/config mechanism already used by scroll-offset mutation;
+focused closed/open/portal tests must lock down that dependency. If those checks
+cannot find the current owned element, reject rather than guess or scan stale
+arena memory. Component part IDs and language authoring remain separate work.

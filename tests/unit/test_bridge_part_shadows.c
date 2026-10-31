@@ -52,6 +52,41 @@ typedef struct {
     cui_draw_command command;
     char bytes[128];
 } part_text_snapshot;
+static bool part_text_style_equal(cui_text_style a, cui_text_style b) {
+    return a.weight == b.weight && a.italic == b.italic && a.monospace == b.monospace &&
+           a.family == b.family && a.letter_spacing == b.letter_spacing;
+}
+static void text_style_comparison(void) {
+    cui_text_style a, b;
+    memset(&a, 0, sizeof a);
+    memset(&b, 0, sizeof b);
+    a.weight = b.weight = CUI_TEXT_WEIGHT_MEDIUM;
+    a.italic = b.italic = true;
+    a.monospace = b.monospace = false;
+    a.family = b.family = 42;
+    a.letter_spacing = b.letter_spacing = -.125f;
+    /* Padding after the bools differs on the Windows/Linux ABI. It is not style. */
+    size_t gap = offsetof(cui_text_style, monospace) + sizeof a.monospace;
+    for (size_t i = gap; i < offsetof(cui_text_style, family); ++i)
+        ((unsigned char *)&b)[i] = 0xa5;
+    assert(part_text_style_equal(a, b));
+    if (gap < offsetof(cui_text_style, family))
+        assert(memcmp(&a, &b, sizeof a));
+    b.weight = CUI_TEXT_WEIGHT_BOLD;
+    assert(!part_text_style_equal(a, b));
+    b.weight = a.weight;
+    b.italic = !a.italic;
+    assert(!part_text_style_equal(a, b));
+    b.italic = a.italic;
+    b.monospace = !a.monospace;
+    assert(!part_text_style_equal(a, b));
+    b.monospace = a.monospace;
+    b.family = a.family + 1;
+    assert(!part_text_style_equal(a, b));
+    b.family = a.family;
+    b.letter_spacing = a.letter_spacing + 1;
+    assert(!part_text_style_equal(a, b));
+}
 static size_t capture_part_text(cui_draw_list list, part_text_snapshot out[16]) {
     size_t count = 0;
     for (size_t i = 0; i < list.count; ++i)
@@ -70,10 +105,12 @@ static void check_part_text(cui_draw_list list, const part_text_snapshot expecte
         if (list.commands[i].type == CUI_DRAW_TEXT) {
             assert(matched < count);
             const cui_draw_command *a = &expected[matched].command, *b = &list.commands[i];
-            assert(!memcmp(&a->bounds, &b->bounds, sizeof a->bounds));
+            assert(a->bounds.x == b->bounds.x && a->bounds.y == b->bounds.y &&
+                   a->bounds.w == b->bounds.w && a->bounds.h == b->bounds.h);
             assert(a->font_size == b->font_size);
-            assert(!memcmp(&a->text_style, &b->text_style, sizeof a->text_style));
-            assert(!memcmp(&a->color, &b->color, sizeof a->color));
+            assert(part_text_style_equal(a->text_style, b->text_style));
+            assert(a->color.r == b->color.r && a->color.g == b->color.g &&
+                   a->color.b == b->color.b && a->color.a == b->color.a);
             assert(a->text.length == b->text.length &&
                    !memcmp(expected[matched].bytes, b->text.data, a->text.length));
             assert(a->text_color_count == b->text_color_count &&
@@ -346,6 +383,7 @@ static void part_input_errors(void) {
     cui_bridge_destroy(app);
 }
 int main(void) {
+    text_style_comparison();
     part_roots();
     group_parts();
     old_root_topology_unchanged();

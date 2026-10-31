@@ -1,5 +1,5 @@
 {
-  "baseline_source_commit": "97c317f0",
+  "baseline_source_commit": "97c317f0597d906558077bbdc76a474eb213f7c0",
   "baseline_scope": "Existing build-shadow libraries from completed named-indicator implementation build, before Button surface refactor. Logs /tmp/cui-named-selection-build.log and /tmp/cui-named-selection-tests.log survive. Baseline library is older than integration headers; no baseline library rebuild. Public old Button ABI unchanged.",
   "compiler": "cc (GCC) 16.2.1 20260810",
   "sha256": {
@@ -16,5 +16,6 @@
   "capture_registration": "Disposable build-shadow/CTestTestfile.cmake entry added without configuring/rebuilding library; normal reconfiguration removes it.",
   "capture_binary_sha256": "eec6714133de2c00c0ef8c02e27f06f979e8804107ed0db097072dc36dffcc81",
   "golden_sha256": "11be0263f00e655444b7c71545657519819d51f13f9c6778df8c101fd89cf15a",
-  "capture_result": "1/1 passed under private Xvfb; 60 frozen command/software/state triples, captured from old library before any production rebuild."
+  "capture_result": "1/1 passed under private Xvfb; 60 frozen command/software/state triples, captured from old library before any production rebuild.",
+  "integration_header_compatibility": "git diff 97c317f0..b9c2f3d1: old Button styles/components headers and Button component implementation unchanged; Core public header/implementation differences are clang-format only. No old Button ABI reinterpretation in capture harness."
 }

@@ -127,3 +127,102 @@ through the private wrapper. The new fixture also passed AddressSanitizer plus
 UndefinedBehaviorSanitizer with leak detection enabled, and the header passed
 strict C++11 syntax checking. The test compares legacy descriptor mutation and
 per-event callback multiplicity as well as passive zero-style equivalence.
+
+## Shadow-aware Button surface facade
+
+`cui_button_surface_ex` and passive `cui_button_surface_paint_only` are separate
+additive C APIs in the same header. Existing styled records, signatures, numeric
+rules and callbacks keep their behavior. The surface facade adds an owned fixed
+array of at most `CUI_BOX_SHADOW_MAX` (eight) mixed DROP/INSET layers. It adds no
+builtin/default shadow and does not add gradients, fonts, border styles or source
+focus rings. Complete source state-style refinement remains incomplete; see
+[the source audit](design/BUTTON_STYLE_COMPLETION.md).
+
+Prepare typed layers outside the pure style callback:
+
+```c
+#include "cui/cui_button_styles.h"
+
+typedef struct { cui_box_shadow elevation; } raised_button;
+
+static void raised_style(void *user, const cui_button_style_info *info,
+                         const cui_button_surface_paint *current,
+                         cui_button_surface_patch *out) {
+    const raised_button *owner = user;
+    (void)current;
+    if (info->phase == CUI_BUTTON_STYLE_HOVER) {
+        out->fields = CUI_BUTTON_SURFACE_SHADOWS;
+        out->value.shadow_count = 1;
+        out->value.shadows[0] = owner->elevation;
+    }
+}
+
+bool raised_button_draw(cui_context *ui, cui_id id, const cui_theme *theme,
+                        raised_button *owner, cui_button_surface_status *status) {
+    if (!cui_box_shadow_from_css(0, 3, 8, -1, (cui_color){0, 0, 0, 64},
+                                CUI_BOX_SHADOW_DROP, &owner->elevation))
+        return false;
+    return cui_button_surface_ex(ui, id, theme, cui_string("Save"),
+        (cui_button_options){0},
+        (cui_button_surface_styles){.hovered = raised_style, .user = owner}, status);
+}
+```
+
+`cui_button_surface_paint` contains initialized scalar `paint`, `shadow_count`
+and owned `shadows`; patch scalar bits are the existing six bits, with scalar
+values under `out->value.paint`. Root geometry stays inspection-only.
+`CUI_BUTTON_SURFACE_SHADOWS` grants complete-list presence: absent inherits the
+preceding phase, present zero count clears both DROP/INSET, present nonempty
+replaces rather than appends. Zero scalar values remain explicit values.
+Every submission recomputes defaults; no callback or list persists next frame.
+
+Phase eligibility/order is the existing styled order above. Disabled clears the
+shadow list before its callback, then replays the captured instance patch.
+Consequently an explicit instance list (including empty) wins selected and
+disabled lists, while an absent instance list allows their own lists. Instance
+runs once even if replayed twice. Pointer color defaults leave the list alone;
+loading fades the complete root; the focused callback runs after existing focus
+paint. Final root corners determine the shadow shape. This does not change the
+existing rectangular hit targets or claim complete source focus-ring parity.
+
+Callbacks follow the same borrowed pure-calculation rules above. The facade
+copies descriptors before accepted action callbacks, and copies each returned
+patch before later phases/content. Do not call CUI from a style calculation;
+construct presets/CSS layers beforehand. Content callbacks retain their normal
+submission rules. Root decoration encloses actual custom-slot geometry without
+submitting children twice or recoloring arbitrary child paint; the caret keeps
+its independent normal-ink rule.
+
+The NEW facade bounds present radii/corners to finite `[0,16384]`, opacity to
+finite `[0,1]`, count to eight, sigma to `[0,256]`, offsets/spread to
+`[-4096,4096]`, with valid DROP/INSET kind. A nonempty list also requires the
+effective options-derived root radii to fit the shadow bounds. Unknown bits or
+invalid present values discard the whole phase patch, preserve preceding paint,
+and continue later eligible callbacks. Unused layer entries, absent values and
+inspection-only geometry writes are ignored. Existing styled radius rules remain
+finite/nonnegative without this new upper bound. CSS blur radius `[0,512]`
+converts explicitly to `sigma = radius / 2` as described in [ELEMENT_SHADOWS.md](ELEMENT_SHADOWS.md).
+
+The optional status output is cleared on entry, even when no submission occurs.
+Each rejected callback patch sets `1u << phase` in `rejected_phases`; this reports
+authoring errors independently of the ordinary bool activation result. Passing
+NULL suppresses this report. Rejected phase patches do not poison the Core frame;
+ordinary frame/renderer failures still follow their existing error paths. The
+passive API paints an independently registered owner without reducing input or
+adding semantics. It does not manufacture action callbacks.
+
+Decoration uses the existing Core copied-layer path and its frame/resource,
+clipping, opacity and rendering limits. Layout-only work allocates no shadow
+paint. A later named-element setter replaces the list, and a retained bridge
+root override is applied after owner paint and also wins. This C facade has no
+event/group overload and no Python/JS/TS/Go/Rust phase authoring binding. Those
+builders' existing static root shadows remain their separately bounded API.
+
+Focused tests freeze 60 pre-change old-library command/software/event-state
+triples across six legacy routes. New tests cover phase replay, explicit clear,
+transactional rejection, options-derived shape, eight mixed layers, copied
+lifetimes, movement/resize, ancestor clips/opacity, ordinary-only independent
+software pixels, passive behavior and descriptor mutation during real accepted
+callbacks. Text command content is checked separately from fontless software
+paint. Linux portable software proof does not establish hardware GPU, browser
+or complete source paint parity.

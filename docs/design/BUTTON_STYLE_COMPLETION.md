@@ -1,11 +1,12 @@
 # Button paint refinement: source audit and proposed next slice
 
-Design checkpoint, 2026-10-31; CUI baseline `b9c2f3d1`. **No proposed API in
-this document exists.** Existing authority remains [BUTTON_STYLES.md](../BUTTON_STYLES.md),
-`include/cui/cui_button_styles.h`, and `src/components/cui_components.c`.
-The Button ledger's “complete source state-style refinement” remains pending.
-Editor stays deprioritized. This document changes no consumer contract, status,
-source metadata, generated resource, binding or build workflow.
+Historical design checkpoint, 2026-10-31; audited CUI baseline `b9c2f3d1`.
+The approved first shadow-aware facade has since been implemented; use
+[BUTTON_STYLES.md](../BUTTON_STYLES.md), `include/cui/cui_button_styles.h` and
+`src/components/cui_components.c` for its actual bounded contract. The remaining
+background/focus/text/border proposals below are not production APIs. The Button
+ledger's “complete source state-style refinement” remains pending. Editor stays
+deprioritized. Original review findings and proposed follow-on seams follow.
 
 ## Pinned evidence
 

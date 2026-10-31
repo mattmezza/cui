@@ -142,6 +142,13 @@ For responsive UI, derive available space from the host and use the documented
 layout constraints. Test narrow and wide viewports, long content and overflow;
 do not transplant CSS/browser assumptions into the C layout model.
 
+For C Button phase-dependent shadows, read `docs/BUTTON_STYLES.md` and
+`include/cui/cui_button_styles.h`: the additive surface facade copies at most
+eight mixed layers, preserves instance replay, and reports rejected phase
+patches independently of activation. Existing styled structs keep their ABI.
+This is not gradient/focus-ring/full Styled completion and has no typed foreign
+phase authoring or event/group overload.
+
 Typed builder root shadows cover only Row, Column, Label, Button, Badge and
 Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`
 record contract. The exact SDK revision must also provide the typed modules

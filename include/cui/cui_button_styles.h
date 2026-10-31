@@ -64,6 +64,52 @@ bool cui_button_styled_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui
 /* Paint only: caller registers the Button; no input reduction or semantics. */
 void cui_button_styled_paint(cui_context *, cui_id, const cui_theme *, cui_str, cui_button_options,
                              cui_button_styles);
+/* Additive shadow-aware facade. Existing records above keep their ABI/rules.
+ * New patches accept the six scalar bits plus SHADOWS; fixed arrays are owned
+ * values, never retained callback pointers. No gradients/font/layout refinement. */
+enum { CUI_BUTTON_SURFACE_SHADOWS = 1u << 6 };
+typedef struct {
+    unsigned rejected_phases; /* 1u << phase; zeroed on entry, independently of activation. */
+} cui_button_surface_status;
+typedef struct {
+    cui_button_style_paint paint;
+    size_t shadow_count;
+    cui_box_shadow shadows[CUI_BOX_SHADOW_MAX];
+} cui_button_surface_paint;
+typedef struct {
+    unsigned fields;
+    cui_button_surface_paint value;
+} cui_button_surface_patch;
+/* Same borrowed pure-calculation rules as cui_button_style_fn. out starts zero.
+ * Whole invalid patches are ignored and reported through optional status;
+ * later eligible phases continue. Scalars use the old presence bits, but NEW
+ * facade radii/corners are bounded to [0,16384]. Shadows: <=8 mixed layers,
+ * sigma [0,256], offset/spread [-4096,4096], all finite and valid kinds.
+ * A nonempty list requires final effective root radii within [0,16384], including
+ * options-derived radii; otherwise the whole phase patch is rejected. Unused
+ * entries/absent fields are ignored. No Core error for rejected phase patches. */
+typedef void (*cui_button_surface_fn)(void *user, const cui_button_style_info *info,
+                                      const cui_button_surface_paint *current,
+                                      cui_button_surface_patch *out);
+typedef struct {
+    cui_button_surface_fn instance, hovered, active, selected, disabled, focused;
+    void *user;
+} cui_button_surface_styles;
+/* Normal+instance; eligible pointer phase; selected/open+callback+instance replay;
+ * disabled colors+shadow clear+callback+instance replay; loading opacity *0.8;
+ * existing focus paint+focused callback. Instance runs once. Present SHADOWS
+ * replaces the entire list (zero clears DROP+INSET); absent inherits. Frame-local,
+ * no builtin/default shadow. Resolved root corners are used for every layer.
+ * status may be NULL; bool remains the existing aggregate activation result.
+ * Input/semantics/actions/content retain their existing exactly-once behavior.
+ * Later element setters/bridge overrides replace this decoration normally.
+ * Existing event/group APIs and typed builders do not accept these callbacks. */
+bool cui_button_surface_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_button_options,
+                           cui_button_surface_styles, cui_button_surface_status *);
+/* Independently registered owner, paint only: no semantics/input reduction. */
+void cui_button_surface_paint_only(cui_context *, cui_id, const cui_theme *, cui_str,
+                                   cui_button_options, cui_button_surface_styles,
+                                   cui_button_surface_status *);
 #ifdef __cplusplus
 }
 #endif

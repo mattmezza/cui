@@ -217,22 +217,32 @@
       "api_symbols": [
         "cui_button",
         "cui_button_ex",
-        "cui_button_events"
+        "cui_button_events",
+        "cui_button_styled_ex",
+        "cui_button_styled_paint",
+        "cui_button_surface_ex",
+        "cui_button_surface_paint_only"
       ],
       "state_types": [
-        "cui_button_options"
+        "cui_button_options",
+        "cui_button_styles",
+        "cui_button_surface_styles",
+        "cui_button_surface_status"
       ],
-      "state_ownership": "Caller owns application data; cui_button_options controls presentation.",
+      "state_ownership": "Caller owns application data and options. Button style callbacks/user are borrowed through submission; surface shadow arrays are copied by value, bounded to eight layers; no callback/list persists across frames.",
       "interaction": "Returns true on activation; invoke the application action in that branch.",
       "usage": "For Save, call save_document only when cui_button returns true. content is a composition callback, not an action handler.",
       "docs": [
         "docs/BUTTON.md",
         "docs/BUTTON_GROUP.md",
         "docs/CONTROL_EVENTS.md",
-        "docs/ELEMENT_SHADOWS.md"
+        "docs/ELEMENT_SHADOWS.md",
+        "docs/BUTTON_STYLES.md"
       ],
       "callback_symbols": [
-        "cui_button_content_fn"
+        "cui_button_content_fn",
+        "cui_button_style_fn",
+        "cui_button_surface_fn"
       ],
       "scope": "styled frame component",
       "name": "Button",

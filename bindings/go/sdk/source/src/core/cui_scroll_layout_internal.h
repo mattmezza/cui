@@ -20,10 +20,17 @@ typedef struct {
     uint32_t owner, flags;
 } cui_core_sl_clamp;
 typedef struct {
+    cui_scrollbar_track_layout_v1 record;
+    cui_rect track, thumb;
+    uint32_t clamp_index, flags;
+} cui_core_sl_track;
+typedef struct {
     cui_core_scroll_layout_header header;
     cui_core_sl_body bodies[CUI_CORE_SL_BODY_MAX];
     cui_core_sl_clamp clamps[CUI_CORE_SL_CLAMP_MAX];
     uint8_t order[CUI_CORE_SL_BODY_MAX];
+    uint32_t tracks, track_reserved;
+    cui_core_sl_track track[64];
 } cui_core_sl_state;
 static const cui_core_scroll_layout_header cui_core_sl_failed = {0, 0, CUI_CORE_SL_FAILED, 0};
 _Static_assert(sizeof(cui_scroll_body_layout_v1) == 80, "scroll body V1 ABI");
@@ -184,6 +191,10 @@ static bool cui_core_sl_conflicts(cui_context *ui, cui_core_sl_state *state,
                                            cui_core_sl_node(ui, old->record.content)))
             return true;
     }
+    for (size_t i = 0; i < state->tracks; ++i)
+        for (size_t a = 0; a < count; ++a)
+            if (ids[a] == state->track[i].record.bar || ids[a] == state->track[i].record.thumb)
+                return true;
     return false;
 }
 static cui_core_sl_clamp cui_core_sl_make_clamp(cui_id viewport, cui_id content, float *y,
@@ -406,6 +417,7 @@ static uint64_t cui_core_sl_widths(Clay_Context *context) {
     }
     return hash;
 }
+#include "cui_scrollbar_track_internal.h"
 static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
     Clay_RenderCommandArray trial = Clay_EndLayout(ui->dt);
     if (!ui->scroll_layout)
@@ -521,6 +533,8 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
             viewport->config.clip.childOffset.y = -p->staged;
         }
     }
+    if (!cui_core_sl_tracks_stage(ui, state))
+        return cui_core_sl_abort(ui);
     uint64_t widths = cui_core_sl_widths(context);
     size_t strings = ui->string_used, sources = ui->text_source_count,
            styles = ui->text_style_count;
@@ -529,6 +543,8 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
     int32_t dynamic_strings = context->dynamicStringData.length;
     context->wrappedTextLines.length = 0;
     Clay__CalculateFinalLayout(0, false, true);
+    if (!cui_core_sl_tracks_validate(ui, state))
+        return cui_core_sl_abort(ui);
     if (ui->error != CUI_OK || ui->wrap_failed || widths != cui_core_sl_widths(context) ||
         strings != ui->string_used || sources != ui->text_source_count ||
         styles != ui->text_style_count || resource_bytes != ui->resource_bytes ||
@@ -570,6 +586,7 @@ static Clay_RenderCommandArray cui_core_scroll_layout_end(cui_context *ui) {
                 ui->semantics[n].details.scroll_max_y = p->maximum;
             }
     }
+    cui_core_sl_tracks_publish(ui, state);
     state->header.flags = CUI_CORE_SL_READY;
     return context->renderCommands;
 }

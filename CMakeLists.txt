@@ -403,27 +403,22 @@ foreach(target test_accessibility_numeric test_accessibility_numeric_internals t
  add_test(NAME ${target} COMMAND ${target})
 endforeach()
 
-# TEST ONLY fixed scrollbar leaf staging: production Core inputs stay read-only.
-find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_Interpreter_FOUND)
- set(scrollbar_track_core "${CMAKE_CURRENT_BINARY_DIR}/scrollbar_track_core.inc")
- add_custom_command(OUTPUT "${scrollbar_track_core}"
-  COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/embed_scrollbar_track_probe.py"
-   "${CMAKE_CURRENT_SOURCE_DIR}" "${scrollbar_track_core}"
-  DEPENDS tests/unit/embed_scrollbar_track_probe.py src/core/cui.c src/core/cui_scroll_layout_internal.h)
- add_executable(test_scrollbar_track_geometry tests/unit/test_scrollbar_track_geometry.c
-  tests/unit/scrollbar_track_probe.c "${scrollbar_track_core}"
-  src/base/cui_scroll.c backends/software/cui_software.c src/effects/cui_effects.c)
- target_include_directories(test_scrollbar_track_geometry PRIVATE include third_party/clay src/core
-  "${CMAKE_CURRENT_BINARY_DIR}")
- if(NOT MSVC)
-  target_link_libraries(test_scrollbar_track_geometry PRIVATE m)
+# Bounded Core scrollbar geometry; no full component library or window host.
+foreach(mode native distribution)
+ add_executable(test_scrollbar_track_${mode} tests/unit/test_scrollbar_track_geometry.c
+  tests/unit/scrollbar_track_probe.c src/base/cui_scroll.c
+  backends/software/cui_software.c src/effects/cui_effects.c)
+ target_include_directories(test_scrollbar_track_${mode} PRIVATE include third_party/clay src/core)
+ if(mode STREQUAL "distribution")
+  target_include_directories(test_scrollbar_track_${mode} BEFORE PRIVATE dist)
+  target_compile_definitions(test_scrollbar_track_${mode} PRIVATE CUI_SCROLLBAR_TRACK_DISTRIBUTION=1)
  endif()
- cui_warnings(test_scrollbar_track_geometry)
- add_test(NAME scrollbar_track_geometry_prototype COMMAND test_scrollbar_track_geometry)
- add_test(NAME scrollbar_track_probe_generator COMMAND ${Python3_EXECUTABLE}
-  "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scrollbar_track_probe.py")
-endif()
+ if(NOT MSVC)
+  target_link_libraries(test_scrollbar_track_${mode} PRIVATE m)
+ endif()
+ cui_warnings(test_scrollbar_track_${mode})
+ add_test(NAME scrollbar_track_${mode} COMMAND test_scrollbar_track_${mode})
+endforeach()
 
 add_executable(test_scroll_layout_contract tests/unit/test_scroll_layout_contract.c)
 target_include_directories(test_scroll_layout_contract PRIVATE include third_party/clay)
@@ -2163,6 +2158,14 @@ if(CUI_BUILD_CPP_EXAMPLE AND CMAKE_CXX_COMPILER)
  cui_warnings(test_stepper_presentation_header)
  set_property(TARGET test_stepper_presentation_header PROPERTY CXX_STANDARD 17)
  add_test(NAME stepper_presentation_header COMMAND test_stepper_presentation_header)
+endif()
+
+if(CUI_BUILD_CPP_EXAMPLE AND CMAKE_CXX_COMPILER)
+ add_executable(test_scrollbar_track_header tests/unit/test_scrollbar_track_header.cpp)
+ target_include_directories(test_scrollbar_track_header PRIVATE include)
+ set_property(TARGET test_scrollbar_track_header PROPERTY CXX_STANDARD 17)
+ cui_warnings(test_scrollbar_track_header)
+ add_test(NAME scrollbar_track_header COMMAND test_scrollbar_track_header)
 endif()
 
 # Private test-only umbrella implementation. Never install/export this target.

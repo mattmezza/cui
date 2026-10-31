@@ -190,26 +190,9 @@ cui_rect cui_scrollbar_thumb(cui_rect track, float scroll, float viewport, float
 }
 cui_rect cui_scrollbar_thumb_ex(cui_rect track, float scroll, float viewport, float content,
                                 bool vertical, float minimum) {
-    float length = vertical ? track.h : track.w;
-    if (!isfinite(length) || length <= 0)
-        return (cui_rect){0};
-    viewport = cui_scroll_positive(viewport, length);
-    content = cui_scroll_positive(content, viewport);
-    float maximum = fmaxf(0, content - viewport);
-    minimum = cui_scroll_positive(minimum, 12);
-    float thumb =
-        fminf(length, fmaxf(fminf(minimum, length), length * fminf(1, viewport / content)));
-    float position =
-        maximum > 0 ? cui_scroll_limit(scroll, maximum) / maximum * (length - thumb) : 0;
-    if (vertical) {
-        track.y += position;
-        track.h = thumb;
-    } else {
-        track.x += position;
-        track.w = thumb;
-    }
-    return track;
+    return cui_scrollbar_thumb_geometry(track, scroll, viewport, content, vertical, minimum);
 }
+
 bool cui_base_scrollbar(cui_context *ui, cui_id root, cui_scroll_state *s,
                         cui_scroll_geometry geometry, cui_scroll_options o, bool vertical) {
     if (!ui || !root || !s)

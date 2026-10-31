@@ -986,6 +986,36 @@ bool cui_layout_scroll_body_v1(cui_context *, const cui_scroll_body_layout_v1 *,
 /* V1 supports only Y. Standalone viewport height is fixed and positive; content
  * cannot contain a registered body. No registration deduplication/replacement. */
 bool cui_layout_scroll_clamp_v1(cui_context *, const cui_scroll_clamp_v1 *, float *y);
+/* Pure geometry shared with Base scrollbar reducers. Preserves legacy thumb
+ * normalization: invalid/nonpositive length returns zero; viewport/content and
+ * minimum use finite positive fallbacks (length/viewport/12), scroll clamps.
+ * No frame/context required. Positions and the other track axis are preserved. */
+cui_rect cui_scrollbar_thumb_geometry(cui_rect track, float scroll, float viewport, float content,
+                                      bool vertical, float minimum);
+#define CUI_SCROLLBAR_TRACK_LAYOUT_VERSION_1 1u
+#define CUI_SCROLLBAR_TRACK_LAYOUT_V1_BYTES 48u
+#define CUI_SCROLLBAR_TRACK_VISIBLE 1u
+#define CUI_SCROLLBAR_TRACK_INTERACTIVE 2u
+typedef struct {
+    uint32_t struct_size, version, flags, reserved;
+    cui_id viewport, bar, thumb;
+    float thickness, minimum_thumb;
+} cui_scrollbar_track_layout_v1;
+/* After the matching Y clamp and all three boxes close: copied frame-only
+ * right-edge overlay track/thumb allocation, at most one per clamp (64 total).
+ * Track is an actual fixed, parent-attached child of viewport; its passive fixed
+ * thumb attaches to track. Submit positive fixed height placeholders, matching
+ * explicit widths=thickness; no flow children, portals or custom prepaint.
+ * Both thickness/minimum finite positive. Version/size exact, reserved zero;
+ * INTERACTIVE requires VISIBLE. Visible noninteractive retains disabled semantics
+ * and paint; hidden/zero range omits semantics and visible paint. Interactivity
+ * never overrides disabled/readonly current owner/layout ancestors or inert/
+ * layout-only policy. Active ancestry requires an existing matching SCROLLBAR
+ * semantic on bar; inert/layout-only may suppress it normally. No input dispatch,
+ * model pointer or callback is added. Current caller policy must guard reducers;
+ * publication cannot undo already delivered input. Existing scroll-layout failure
+ * and end_frame lifetimes apply; see SCROLL_LAYOUT.md for full topology/limits. */
+bool cui_layout_scrollbar_track_v1(cui_context *, const cui_scrollbar_track_layout_v1 *);
 /* Update a current-frame clipped box before end_frame computes layout. Useful
  * for scroll events deferred by children after their parent's begin call. */
 bool cui_set_box_scroll_offset(cui_context *, cui_id, float x, float y);

@@ -49,7 +49,7 @@ typedef struct {
         requested_height_percent;
     bool hover_hitbox;
     size_t prepaint;
-    bool clip, layout_only, inert;
+    bool clip, layout_only, inert, scrollbar_hidden;
     int16_t layer;
     float opacity;
     uint32_t paint_root;
@@ -3327,6 +3327,34 @@ void cui_pop_id(cui_context *ui) {
     else
         ui->scope_count--;
 }
+static float cui_core_thumb_positive(float value, float fallback) {
+    return isfinite(value) && value > 0 ? value : fallback;
+}
+static float cui_core_thumb_limit(float value, float maximum) {
+    return isfinite(value) ? fminf(fmaxf(value, 0), maximum) : 0;
+}
+cui_rect cui_scrollbar_thumb_geometry(cui_rect track, float scroll, float viewport, float content,
+                                      bool vertical, float minimum) {
+    float length = vertical ? track.h : track.w;
+    if (!isfinite(length) || length <= 0)
+        return (cui_rect){0};
+    viewport = cui_core_thumb_positive(viewport, length);
+    content = cui_core_thumb_positive(content, viewport);
+    float maximum = fmaxf(0, content - viewport);
+    minimum = cui_core_thumb_positive(minimum, 12);
+    float thumb =
+        fminf(length, fmaxf(fminf(minimum, length), length * fminf(1, viewport / content)));
+    float position =
+        maximum > 0 ? cui_core_thumb_limit(scroll, maximum) / maximum * (length - thumb) : 0;
+    if (vertical) {
+        track.y += position;
+        track.h = thumb;
+    } else {
+        track.x += position;
+        track.w = thumb;
+    }
+    return track;
+}
 cui_rect cui_bounds(cui_context *ui, cui_id id) {
     if (!ui || !id)
         return (cui_rect){0};
@@ -3797,7 +3825,7 @@ static void cui_core_prepaint_prepare(cui_context *ui, Clay_RenderCommandArray c
         ui->geometry[i] = (cui_core_geometry){
             .bounds = bounds,
             .clip = viewport,
-            .found = d.found && valid,
+            .found = d.found && valid && !ui->nodes[i].scrollbar_hidden,
             .modal_allowed = cui_core_prepaint_scope(ui, ui->nodes[i].focus_scope)};
     }
     size_t hit = SIZE_MAX;
@@ -4426,7 +4454,8 @@ cui_core_commands_done:
                         break;
                     }
         }
-        if (node != SIZE_MAX && (ui->nodes[node].inert || ui->nodes[node].layout_only))
+        if (node != SIZE_MAX && (ui->nodes[node].inert || ui->nodes[node].layout_only ||
+                                 ui->nodes[node].scrollbar_hidden))
             continue;
         if (ui->numeric)
             ui->numeric->masks[visible] = ui->numeric->masks[i];

@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* TEST ONLY real layout + queued UI input for proposed fixed track/thumb plan. */
+/* Production Core layout + queued UI input; independent frozen math oracle. */
 #include "cui/cui_scroll.h"
 #include "cui/cui_software.h"
 #include "scrollbar_track_probe.h"
@@ -25,7 +25,8 @@ typedef struct {
     cui_id prepaint_hit;
     uint32_t flags;
     unsigned compositions, hooks;
-    bool shadows, inert, nested, owner_disabled, owner_readonly, ancestor_disabled;
+    bool shadows, inert, layout_only, nested, owner_disabled, owner_readonly, ancestor_disabled,
+        cover_modal;
     cui_scroll_state child;
 } fixture;
 static bool near(float a, float b) {
@@ -158,7 +159,8 @@ static cui_draw_list scene(fixture *f) {
                             .max_height = f->height,
                             .custom_opacity = true,
                             .opacity = .5f,
-                            .inert = f->inert});
+                            .inert = f->inert,
+                            .layout_only = f->layout_only});
     cui_interact(f->ui, PANEL, CUI_ROLE_GROUP, cui_string("Ancestor"), f->ancestor_disabled, false,
                  0);
     assert(cui_set_prepaint(f->ui, (cui_prepaint_options){.callback = observe,
@@ -210,6 +212,14 @@ static cui_draw_list scene(fixture *f) {
     cui_end_box(f->ui);
     if (f->clip_height > 0)
         cui_end_box(f->ui);
+    if (f->cover_modal) {
+        assert(cui_begin_focus_scope(f->ui, 900, true));
+        cui_begin_portal(f->ui, 900, (cui_box){.background = {19, 29, 39, 255}},
+                         (cui_rect){0, 0, f->width, f->height}, 20);
+        cui_interact(f->ui, 900, CUI_ROLE_BUTTON, cui_string("Modal cover"), false, false, 0);
+        cui_end_box(f->ui);
+        cui_end_focus_scope(f->ui);
+    }
     cui_scroll_body_layout_v1 body = {.struct_size = 80,
                                       .version = 1,
                                       .mode = CUI_SCROLL_BODY_AUTO,
@@ -245,7 +255,7 @@ static void geometry(fixture *f, cui_draw_list draw) {
         float maximum = fmaxf(0, f->content[i].h - f->viewport[i].h);
         const cui_semantic *bar = semantic(f->ui, cui_scrollbar_id(owner(i), true));
         bool shown = (f->flags & PROTOTYPE_TRACK_VISIBLE) && maximum > 0 && f->viewport[i].h > 0;
-        if (!shown || f->inert)
+        if (!shown || f->inert || f->layout_only)
             assert(!bar);
         else {
             assert(bar && bar->disabled == (!(f->flags & PROTOTYPE_TRACK_INTERACTIVE) ||
@@ -289,7 +299,7 @@ static void geometry(fixture *f, cui_draw_list draw) {
                     ++shadow_seen;
             }
         }
-        if (shown) {
+        if (shown && !f->layout_only) {
             assert(track_seen == 1 && thumb_seen == 1);
             if (f->shadows)
                 assert(shadow_seen);
@@ -492,7 +502,16 @@ static void disabled_ownership(fixture *f) {
     }
     f->owner_disabled = f->owner_readonly = f->ancestor_disabled = false;
 }
-static prototype_track_record standalone(cui_context *ui, cui_id id, float y, float placeholder) {
+static bool forbidden_bar_callback(const cui_prepaint_info *info, const void *payload,
+                                   cui_prepaint_writer *writer) {
+    (void)info;
+    (void)writer;
+    unsigned *calls = *(unsigned *const *)payload;
+    ++*calls;
+    return true;
+}
+static prototype_track_record standalone_with_callback(cui_context *ui, cui_id id, float y,
+                                                       float placeholder, unsigned *calls) {
     cui_id bar = cui_scrollbar_id(id, true);
     cui_begin_box(ui, id, (cui_box){.width = 20, .height = 30, .clip = true});
     cui_interact(ui, id, CUI_ROLE_GROUP, cui_string("Scrollable"), false, false, 0);
@@ -509,11 +528,19 @@ static prototype_track_record standalone(cui_context *ui, cui_id id, float y, fl
                                                     .controls = id,
                                                     .orientation = CUI_ORIENTATION_VERTICAL});
     cui_begin_absolute_box(ui, bar, (cui_box){0}, (cui_rect){0, 0, 6, placeholder});
+    if (calls)
+        assert(cui_set_prepaint(ui, (cui_prepaint_options){.callback = forbidden_bar_callback,
+                                                           .payload = &calls,
+                                                           .payload_bytes = sizeof calls,
+                                                           .command_budget = 1}));
     cui_begin_absolute_box(ui, id + 2, (cui_box){0}, (cui_rect){0, 0, 6, placeholder});
     cui_end_box(ui);
     cui_end_box(ui);
     cui_end_box(ui);
     return (prototype_track_record){48, 1, 3, 0, id, bar, id + 2, 6, 8};
+}
+static prototype_track_record standalone(cui_context *ui, cui_id id, float y, float placeholder) {
+    return standalone_with_callback(ui, id, y, placeholder, NULL);
 }
 static void isolated_ownership_and_sizing(void) {
     for (unsigned trial = 0; trial < 4; ++trial) {
@@ -615,6 +642,112 @@ static void failure_and_capacity(void) {
         cui_destroy(ui);
     }
 }
+static void records_and_context_isolation(void) {
+    for (unsigned trial = 0; trial < 8; ++trial) {
+        cui_context *bad = cui_create((cui_config){.width = 100, .height = 100});
+        cui_context *good = cui_create((cui_config){.width = 100, .height = 100});
+        assert(bad && good);
+        float bad_y = 10000, good_y = 10000;
+        assert(cui_begin_frame(bad, 100, 100, .016f));
+        prototype_track_record r = standalone(bad, 1000, bad_y, 1);
+        cui_scroll_clamp_v1 clamp = {32, 1, CUI_SCROLL_CLAMP_Y, 0, 1000, 1001};
+        assert(cui_layout_scroll_clamp_v1(bad, &clamp, &bad_y));
+        switch (trial) {
+        case 0:
+            r.struct_size--;
+            break;
+        case 1:
+            r.version++;
+            break;
+        case 2:
+            r.reserved = 1;
+            break;
+        case 3:
+            r.flags = 4;
+            break;
+        case 4:
+            r.thickness = NAN;
+            break;
+        case 5:
+            r.minimum_thumb = INFINITY;
+            break;
+        case 6:
+            r.minimum_thumb = 0;
+            break;
+        case 7:
+            r.viewport = 9999;
+            break;
+        }
+        assert(!prototype_scrollbar_track(bad, &r));
+        assert(cui_last_error(bad) == CUI_ERROR_INVALID_ACTION);
+        cui_clear_error(bad);
+        assert(cui_end_frame(bad).count == 0 && cui_last_error(bad) == CUI_ERROR_LAYOUT);
+        assert(bad_y == 10000);
+        /* The immutable failed header must not poison another context. */
+        assert(cui_begin_frame(good, 100, 100, .016f));
+        r = standalone(good, 1000, good_y, 1);
+        assert(cui_layout_scroll_clamp_v1(good, &clamp, &good_y));
+        assert(prototype_scrollbar_track(good, &r));
+        cui_end_frame(good);
+        assert(cui_last_error(good) == CUI_OK && good_y == 170);
+        cui_destroy(bad);
+        cui_destroy(good);
+    }
+}
+static void portal_and_callback_admission(void) {
+    for (unsigned trial = 0; trial < 3; ++trial) {
+        cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
+        assert(ui);
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        float y = 20;
+        unsigned callbacks = 0;
+        prototype_track_record r =
+            standalone_with_callback(ui, 1000, y, 1, trial == 2 ? &callbacks : NULL);
+        cui_begin_portal(ui, 9000, (cui_box){.background = {91, 92, 93, 255}},
+                         (cui_rect){40, 40, 10, 10}, 4);
+        cui_end_box(ui);
+        cui_scroll_clamp_v1 clamp = {32, 1, CUI_SCROLL_CLAMP_Y, 0, 1000, 1001};
+        assert(cui_layout_scroll_clamp_v1(ui, &clamp, &y));
+        if (trial == 1)
+            r.thumb = 9000;
+        bool accepted = prototype_scrollbar_track(ui, &r);
+        assert(accepted == (trial == 0));
+        cui_draw_list draw = cui_end_frame(ui);
+        if (trial == 0) {
+            assert(cui_last_error(ui) == CUI_OK && y == 20);
+            bool portal = false;
+            for (size_t j = 0; j < draw.count; ++j)
+                portal |= draw.commands[j].type == CUI_DRAW_RECT && draw.commands[j].color.r == 91;
+            assert(portal); /* Independent portal survives and isn't a fake track child. */
+        } else
+            assert(cui_last_error(ui) != CUI_OK && draw.count == 0 && y == 20);
+        assert(callbacks == 0);
+        cui_destroy(ui);
+    }
+}
+static void modal_eligibility(fixture *f) {
+    f->inert = f->layout_only = f->nested = false;
+    f->shadows = false;
+    f->flags = 3;
+    f->header = 40;
+    f->body = 800;
+    f->height = 260;
+    f->width = 240;
+    f->state[0].y = f->state[1].y = 0;
+    scene(f);
+    f->cover_modal = true;
+    pointer(f, CUI_EVENT_POINTER_MOVE, 237, 50);
+    scene(f);
+    assert(f->prepaint_hit == 900);
+    pointer(f, CUI_EVENT_POINTER_DOWN, 237, 50);
+    scene(f);
+    assert(cui_event_target(f->ui, 0) == 900 && f->state[1].y == 0);
+    assert(cui_focused(f->ui) == 900);
+    pointer(f, CUI_EVENT_POINTER_UP, 237, 50);
+    scene(f);
+    f->cover_modal = false;
+    scene(f);
+}
 static void math_comparator(void) {
     uint32_t seed = 17;
     const float special[] = {0, -1, NAN, INFINITY, -INFINITY, 1, 12, 100};
@@ -628,16 +761,86 @@ static void math_comparator(void) {
         for (unsigned axis = 0; axis < 2; ++axis) {
             cui_rect a = prototype_thumb_geometry(track, v[2], v[3], v[4], axis != 0, v[5]);
             cui_rect b = cui_scrollbar_thumb_ex(track, v[2], v[3], v[4], axis != 0, v[5]);
+            cui_rect direct =
+                cui_scrollbar_thumb_geometry(track, v[2], v[3], v[4], axis != 0, v[5]);
             float aa[] = {a.x, a.y, a.w, a.h}, bb[] = {b.x, b.y, b.w, b.h};
-            for (unsigned k = 0; k < 4; ++k)
+            float cc[] = {direct.x, direct.y, direct.w, direct.h};
+            for (unsigned k = 0; k < 4; ++k) {
                 assert((isnan(aa[k]) && isnan(bb[k])) || !memcmp(&aa[k], &bb[k], sizeof(float)));
+                assert((isnan(aa[k]) && isnan(cc[k])) || !memcmp(&aa[k], &cc[k], sizeof(float)));
+            }
         }
     }
+}
+static void lifecycle_late_alias_and_reuse(void) {
+    for (unsigned trial = 0; trial < 4; ++trial) {
+        cui_context *ui = cui_create((cui_config){.width = 100, .height = 100});
+        assert(ui);
+        assert(!cui_layout_scrollbar_track_v1(ui, NULL));
+        assert(cui_last_error(ui) == CUI_ERROR_LIFECYCLE);
+        cui_clear_error(ui);
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        union {
+            float y;
+            cui_rect bounds;
+        } retained;
+        retained.y = 10000;
+        prototype_track_record old = standalone(ui, 1000, retained.y, 1);
+        cui_scroll_clamp_v1 clamp = {32, 1, CUI_SCROLL_CLAMP_Y, 0, 1000, 1001};
+        assert(cui_layout_scroll_clamp_v1(ui, &clamp, &retained.y));
+        assert(prototype_scrollbar_track(ui, &old));
+        if (trial == 0) { /* Actual pinned folded collision after registration. */
+            cui_begin_box(ui, 76894, (cui_box){.width = 1, .height = 1});
+            cui_end_box(ui);
+            cui_begin_box(ui, 86448, (cui_box){.width = 1, .height = 1});
+            cui_end_box(ui);
+        } else if (trial == 1) {
+            assert(cui_track_bounds(ui, old.bar, &retained.bounds));
+        } else if (trial == 2) {
+            cui_begin_box(ui, old.bar, (cui_box){.width = 1, .height = 1});
+            cui_end_box(ui);
+        } else
+            memset(&old, 0, sizeof old);
+        cui_draw_list draw = cui_end_frame(ui);
+        if (trial < 3)
+            assert(cui_last_error(ui) != CUI_OK && draw.count == 0 && retained.y == 10000);
+        else
+            assert(cui_last_error(ui) == CUI_OK && retained.y == 170);
+        cui_clear_error(ui);
+        assert(cui_begin_frame(ui, 100, 100, .016f));
+        retained.y = 10000;
+        old = standalone(ui, 1000, retained.y, 1);
+        assert(cui_layout_scroll_clamp_v1(ui, &clamp, &retained.y));
+        assert(prototype_scrollbar_track(ui, &old));
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK && retained.y == 170);
+        cui_destroy(ui);
+    }
+}
+static void layout_only(fixture *f) {
+    f->layout_only = true;
+    f->inert = false;
+    f->nested = false;
+    f->shadows = false;
+    f->flags = 3;
+    f->header = 40;
+    f->body = 800;
+    f->height = 260;
+    f->state[0].y = f->state[1].y = 10000;
+    unsigned hooks = f->hooks;
+    cui_draw_list draw = scene(f);
+    geometry(f, draw);
+    assert(draw.count == 0 && f->state[0].y == 10000 && f->state[1].y == 10000);
+    assert(f->hooks == hooks);
+    f->layout_only = false;
 }
 int main(void) {
     math_comparator();
     failure_and_capacity();
+    lifecycle_late_alias_and_reuse();
     isolated_ownership_and_sizing();
+    portal_and_callback_admission();
+    records_and_context_isolation();
     fixture f = {
         .width = 240, .height = 260, .header = 40, .body = 800, .flags = 3, .shadows = true};
     f.ui = cui_create((cui_config){.width = 240, .height = 260});
@@ -687,9 +890,12 @@ int main(void) {
     nested_consumption(&f);
     disabled_ownership(&f);
     assert(f.hooks == f.compositions);
-    printf("FIXED_TRACK_THUMB resource=%zu record=%zu, Core/Base math40000 comparisons, "
+    layout_only(&f);
+    modal_eligibility(&f);
+    printf("FIXED_TRACK_THUMB resource=%zu node=%zu record=%zu, Core/Base math80000 comparisons, "
            "geometry/alpha/shadows/wheel/touch/drag PASS\n",
-           prototype_track_resource_bytes(), sizeof(prototype_track_record));
+           prototype_track_resource_bytes(), prototype_track_node_bytes(),
+           sizeof(prototype_track_record));
     cui_destroy(f.ui);
     return 0;
 }

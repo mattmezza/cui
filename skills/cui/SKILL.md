@@ -153,7 +153,12 @@ do not transplant CSS/browser assumptions into the C layout model.
 For current-frame intrinsic scroll-body allocation in C Core, read
 `docs/SCROLL_LAYOUT.md` and `include/cui/cui.h`. The opt-in V1 APIs require widths
 independent of allocated Y, support ordinary GROW descendants and hidden/overlay
-bars, and borrow distinct offset floats through end_frame. Failed opt-in frames
+bars, and borrow distinct offset floats through end_frame. Optional 48-byte
+track records stage actual fixed track/thumb boxes with independent visibility
+and interactivity; compose positive fixed-height placeholders and register against
+a current Y clamp. The lazy LP64 layout payload is 12856 bytes (16 KiB bound),
+including for body-only opt-in users. Read exact topology and input-policy limits;
+this does not install a dispatcher or Base reducers. Failed opt-in frames
 have no valid geometry/prepaint snapshot; clear the error and rebuild next frame.
 Existing Scrollable/Base/Dialog behavior and five foreign builder APIs do not
 acquire this feature automatically. Do not claim full Dialog slot parity.

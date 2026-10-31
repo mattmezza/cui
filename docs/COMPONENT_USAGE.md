@@ -1152,3 +1152,12 @@ API: `cui_table_begin`, `cui_table_begin_row`, `cui_table_begin_cell`, `cui_tabl
 **Usage:** Initialize bounded workspace, set text on changes, then submit each frame. Decoded link URLs are borrowed only during callbacks: copy for deferred use.
 
 API: `cui_text_view_init`, `cui_text_view_set_text`, `cui_text_view`. [Public header](../include/cui/cui_text_view.h); [guide](TEXT_VIEW.md).
+
+## Core layout constraints
+
+**Scope:** Opt-in C Core only: current intrinsic Y body allocation, standalone Y clamping and fixed real overlay track/thumb boxes with independent visibility/interactivity and current final paint/hit geometry. Widths remain independent of allocated Y. Existing Scrollable/Base/Dialog composition APIs and all five foreign builders remain unchanged; this is not full slot composition or general constraint closure.
+
+**Capacity:** 32 body links, 64 total clamps (two per body) and 64 optional tracks, one per clamp; copied 80/32/48-byte records and distinct application offset destinations borrowed through end_frame. LP64 lazy payload 12856 bytes, bounded by 16 KiB; zero-opt-in legacy frames allocate none.
+
+Read [SCROLL_LAYOUT.md](SCROLL_LAYOUT.md) and the exact declarations in
+[Core public header](../include/cui/cui.h); these APIs do not change the 78-component manifest.

@@ -121,12 +121,77 @@ and prepaint do not repeat. Text measurement/shaping can repeat under their
 existing provider contracts. Vendored Clay is unchanged; the private adapter is
 pinned to the repository version and must be reviewed when that dependency moves.
 
-Storage is lazy within existing Core resource budgets: one 7216-byte payload on
+Storage is lazy within existing Core resource budgets: one 12856-byte payload on
 the measured LP64 build, plus an 8-byte opaque-context pointer even when idle and
-one shared immutable 16-byte failure header. No public config or existing public
+one shared immutable 16-byte failure header. The track extension adds 5640 bytes
+to the former 7216-byte layout payload, including for body/clamp-only opt-in users.
+Applications with exact custom resource-byte budgets must allow this increase.
+No public config or existing public
 struct grows. Other ABIs may have less padding; a compile-time 16 KiB payload bound
 and the same 32/64 capacities apply. No resource scan or extra calculation runs
 on a zero-opt-in legacy frame. Resource omission/collection follows the existing
 Core lifetime contract. Tests cover public APIs, fixed/narrow/wide/current-font,
 nested/empty/oversized regions, once-only callbacks, scroll/caret coherence,
 capacity/allocation failure, late aliases, context isolation and legacy behavior.
+
+
+## Current-frame overlay track and thumb
+
+`cui_layout_scrollbar_track_v1` optionally attaches a real track and passive thumb
+to an already registered Y clamp. This C Core API does not install Base input
+handlers or add Dialog/binding composition. `cui_scrollbar_thumb_geometry` is the
+pure Core rectangle helper; the existing Base `cui_scrollbar_thumb_ex` forwards to
+it with the same ABI, normalization and arithmetic order.
+
+The copied pointer-free `cui_scrollbar_track_layout_v1` is 48 bytes: four uint32
+fields (struct_size, version, flags, reserved), viewport/bar/thumb IDs at offsets
+16/24/32 and thickness/minimum_thumb floats at 40/44. Use version 1, reserved zero,
+finite positive thickness/minimum_thumb and at most one track per clamp (64 total).
+The record may leave scope after registration. No new pointer lifetime is added;
+the clamp's distinct borrowed model float still lives through end_frame.
+
+Compose and close both named boxes before registering. Track must attach directly
+to viewport; thumb directly to track. Both are no-flow absolute boxes with inherited
+clipping, the parent's layer/focus scope, fixed width equal to thickness and fixed
+positive placeholder height (1 is sufficient). No padding, aspect ratio, maximum
+size caps or custom prepaint hook is admitted. Track has exactly one floating child
+(the passive thumb); neither has flow children. Their actual IDs must be distinct
+from registered structural identities, including folded collisions. No portal or
+row fallback is inferred. The active track semantic must be SCROLLBAR, vertical,
+with parent and controls equal to viewport; the thumb has no semantic. Under
+inert/layout-only ancestry the normally omitted semantics are accepted.
+
+Flags independently author VISIBLE (1) and INTERACTIVE (2); interactivity requires
+visibility. Visible disabled bars retain ordinary paint/shadows and a disabled
+semantic, with no capture/focus/input eligibility. INTERACTIVE may clear only the
+range-placeholder disabled state: readonly track, disabled/readonly owner or actual
+layout ancestors, inert and layout-only still exclude input. Callers must apply
+current eligibility before invoking their existing reducers; publication cannot
+retroactively undo earlier application/input mutations. Core does not provide a
+new dispatcher or replay events. Existing input uses the preceding completed hit
+snapshot; final current-frame paint/prepaint hits and published semantic geometry
+use the actual final boxes. Visible style and input policy remain caller owned.
+
+Hidden or zero-range tracks have zero effective height and no visible paint,
+shadow halo or published semantic. Alpha-zero commands may remain in the draw
+list. Inert ancestry keeps visible paint while suppressing semantics/input;
+layout-only suppresses paint and leaves model scalars untouched. Independent
+portals and existing modal eligibility retain their normal Core behavior.
+
+Before the existing second calculation, Core derives local Y-only track/thumb
+geometry from planned viewport height, range and staged offset. Width remains
+independent of Y; overlay bars reserve no gutter. Final real boxes, clipping,
+culling, paint/shadow identity and hit/semantic bounds then share one layout.
+All tracks validate before any borrowed offset commits; malformed records,
+aliases, unsupported topology, capacity and final failures invalidate the entire
+opt-in frame under the rules above. Register afresh next frame; omission/reuse
+retains no record or caller pointer. This adds no second resource, public config
+field or context pointer beyond the existing opt-in layout allocation.
+
+Tests compare 80000 direct-Core/Base results with a frozen independent legacy
+math oracle, and exercise current resize/shrink, shadows/clip/alpha, queued wheel,
+touch/drag, nested consumption, inert/layout-only/disabled/modal policies,
+record copying, aliases, resource/capacity failure and next-frame recovery.
+These are software/headless C oracles, not GPU, text raster or full component
+parity claims. Base page/key/CANCEL and full Dialog/Root/all-five facade composition
+remain separate followups.

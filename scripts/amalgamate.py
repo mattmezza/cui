@@ -149,6 +149,7 @@ def generate(name,sources):
         for private_name in ['cui_background_valid_internal.h', 'cui_background_output_internal.h', 'cui_draw_v2_internal.h']:
             code=code.replace(f'#include "{private_name}"', (ROOT/'src/core'/private_name).read_text(encoding='utf-8'))
         code=code.replace('#include "cui_scroll_layout_internal.h"', (ROOT/'src/core/cui_scroll_layout_internal.h').read_text(encoding='utf-8'))
+        code=code.replace('#include "cui_scrollbar_track_internal.h"', (ROOT/'src/core/cui_scrollbar_track_internal.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_text_paint_internal.h"', (ROOT/'src/core/cui_text_paint_internal.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_design_metrics.h"', '#include "../base/cui_design_metrics.h"']:
             code=code.replace(private_include, (ROOT/'src/base/cui_design_metrics.h').read_text(encoding='utf-8'))

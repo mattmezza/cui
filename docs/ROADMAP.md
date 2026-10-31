@@ -16,3 +16,9 @@ Shared backgrounds have owned pure values/sampling and an unreleased
 for software, SDL_Renderer, SDL_GPU, Sokol and Canvas, foreign authoring, and
 component-part coverage across all78 remain pending. No family status is upgraded
 by generic setters or Core transport alone.
+
+Core Y-layout now includes optional bounded real overlay track/thumb allocation
+with independent visibility/interactivity and final current paint/hit geometry.
+This C-only constraint does not complete Base/Styled Dialog slots, Root/native-host
+actions or any of the five foreign-builder composition plans. See
+[SCROLL_LAYOUT.md](SCROLL_LAYOUT.md) for admission and resource-budget limits.

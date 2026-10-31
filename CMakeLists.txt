@@ -2295,3 +2295,31 @@ foreach(entry source distribution)
  cui_warnings(test_frame_input_snapshot_${entry})
  add_test(NAME test_frame_input_snapshot_${entry} COMMAND test_frame_input_snapshot_${entry})
 endforeach()
+
+# Typed Base Slider black-box contract; share one actual Core object with the
+# frozen legacy scalar oracle. No whole portable library is needed here.
+add_library(slider_model_core_fixture OBJECT src/core/cui.c)
+target_include_directories(slider_model_core_fixture PRIVATE include third_party/clay)
+cui_warnings(slider_model_core_fixture)
+add_executable(test_base_slider_model_source tests/unit/test_base_slider_model.c
+ src/base/cui_base_slider_model.c src/base/cui_slider_model.c $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_base_slider_model_source PRIVATE include)
+add_executable(test_slider_events_compatibility tests/unit/test_slider_events.c
+ src/base/cui_base.c src/base/cui_edit.c $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_slider_events_compatibility PRIVATE include)
+foreach(entry selective umbrella)
+ add_executable(test_base_slider_model_${entry} tests/unit/test_base_slider_model.c)
+ target_include_directories(test_base_slider_model_${entry} PRIVATE dist)
+ target_compile_definitions(test_base_slider_model_${entry} PRIVATE CUI_SLIDER_UI_DISTRIBUTION)
+ if(entry STREQUAL "umbrella")
+  target_compile_definitions(test_base_slider_model_${entry} PRIVATE CUI_SLIDER_UI_UMBRELLA)
+ endif()
+endforeach()
+foreach(target test_base_slider_model_source test_base_slider_model_selective
+ test_base_slider_model_umbrella test_slider_events_compatibility)
+ if(NOT MSVC)
+  target_link_libraries(${target} PRIVATE m)
+ endif()
+ cui_warnings(${target})
+ add_test(NAME ${target} COMMAND ${target})
+endforeach()

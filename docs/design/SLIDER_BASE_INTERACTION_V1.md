@@ -275,3 +275,53 @@ Required headless evidence before a Base implementation handoff:
 Signed: `/root/hidden_windows`, 2026-10-31. Design only; no production, generator,
 compiler, dependency, merge or push in this checkpoint. Await root review of
 layout signature, focus/delegation policy, modal helper reuse and narrow observer.
+
+## Approved implementation resolutions
+
+Root approved these narrow clarifications before production:
+
+- CANCEL continues to offer captured start and gesture domain unchanged. For
+  subsequent same-call eligible input, local intention uses that captured pair
+  only if its kind equals the current kind and it validates under the current
+  domain; otherwise it resets to immutable confirmed entry. A source-generation
+  change alone keeps captured-start progression when that pair remains valid.
+  No owner write, callback reread or legacy change is inferred.
+- A ready/admitted busy widget rejects only its own current numeric thumb targets,
+  after current modal/semantic/identity and previous capability checks. Refresh
+  mask0, attempt typed claim (failure preserves output/consumption), then explicitly
+  consume once as rejection with no callback/request/acceptance/count. This keeps
+  an earlier busy event unavailable after later same-call up restores mask7.
+  Foreign, stale, disabled/read-only or modal-blocked events are not consumed by
+  this shortcut. Consumption remains independent of application acceptance; no
+  numeric value or evidence is invented.
+
+Tests must combine domain/mode invalid captured starts with subsequent key and
+absolute SET in original order; and busy numeric→pointer-up→restored capability
+with a failed later claim/no replay. These supplement rather than replace the
+prior ordering/evidence and legacy .375/.375 checks.
+
+Signed resolution: `/root/hidden_windows`, 2026-10-31. Design clarification only;
+production remains in a separate implementation commit.
+
+
+## Implementation review: prior routing and geometry (2026-10-31)
+
+The existing `cui_accessibility_action_supported` query is outside-frame only;
+Base must not call it while reducing. No extra Core query or state ABI is needed.
+An unconsumed own-target numeric event already passed Core begin dispatch's prior
+role/capability/modal admission (`src/core/cui.c`, accessibility dispatch branch).
+The facade independently checks current own identity, writable semantics and modal
+policy; busy mask0 then rejects typed claim before explicit rejection consumption.
+Actual own pointer/key event targets are the existing previous routing evidence.
+Pointer start additionally requires positive previous track geometry.
+
+Nearest-thumb selection uses positive actual resolved prior thumb bounds as
+geometry only, not a semantic-presence claim. Pinned Clay end-layout prunes omitted
+hash entries (`third_party/clay/clay.h`, final generation prune); after a completed
+Single layout, START's fallback bound is zero even when an earlier Range used that
+same ID. Missing geometry falls back to current entry fraction on the prior track.
+Tests cover first Range with only END previously and Range→Single→Range reused IDs.
+The owned state stays160 bytes; Core/dispatcher/legacy routes are unchanged.
+
+Root approved this no-new-API resolution before implementation verification.
+Signed: `/root/hidden_windows`.

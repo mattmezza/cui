@@ -1450,16 +1450,20 @@
         "cui_slider_model_value_constrain_v1",
         "cui_slider_model_to_fraction_v1",
         "cui_slider_model_from_fraction_v1",
-        "cui_slider_model_state_init_v1"
+        "cui_slider_model_state_init_v1",
+        "cui_base_slider_model_events_v1",
+        "cui_base_slider_model_part_id_v1"
       ],
       "state_types": [
         "cui_slider_palette",
         "cui_slider_model_value_v1",
         "cui_slider_model_domain_v1",
-        "cui_slider_model_state_v1"
+        "cui_slider_model_state_v1",
+        "cui_slider_model_request_v1",
+        "cui_slider_model_result_v1"
       ],
-      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state are owned pointer-free doubles; pure helpers and initialization do not submit UI or accept proposals.",
-      "interaction": "Returns true when the value changes.",
+      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. Styled typed presentation, native numeric host delivery and all five language builders remain pending.",
+      "interaction": "Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values.",
       "usage": "Pass a volume value by pointer; apply audio settings only in the change branch.",
       "docs": [
         "docs/CONTROLS.md",
@@ -1467,9 +1471,12 @@
         "docs/ELEMENT_SHADOWS.md",
         "docs/CONTROL_SURFACE_SHADOW_GALLERY.md",
         "docs/SLIDER_PALETTE.md",
-        "docs/SLIDER_MODEL_VALUES.md"
+        "docs/SLIDER_MODEL_VALUES.md",
+        "docs/BASE_SLIDER_MODEL.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_slider_model_request_fn_v1"
+      ],
       "scope": "styled frame component",
       "name": "Slider",
       "public_header": "include/cui/cui_components.h",
@@ -1477,7 +1484,8 @@
       "additional_public_headers": [
         "include/cui/cui_styled_slider_events.h",
         "include/cui/cui_slider_palette.h",
-        "include/cui/cui_slider_model.h"
+        "include/cui/cui_slider_model.h",
+        "include/cui/cui_base_slider_model.h"
       ]
     },
     {

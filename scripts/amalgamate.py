@@ -114,6 +114,8 @@ def generate(name,sources):
     if name in {"cui_number_events", "cui_numeric_selection_events"}:
         lines += ['#include "cui_components.h"']
         lines += ['#ifndef CUI_NUMERIC_IMPLEMENTATION', '#define CUI_NUMERIC_IMPLEMENTATION', '#endif', '#include "cui_numeric.h"']
+    if name == "cui_base_slider_model":
+        lines += ['#ifndef CUI_SLIDER_MODEL_IMPLEMENTATION', '#define CUI_SLIDER_MODEL_IMPLEMENTATION', '#endif', '#include "cui_slider_model.h"']
     if name == "cui_styled_slider_events":
         lines += ['#ifndef CUI_BASE_IMPLEMENTATION', '#define CUI_BASE_IMPLEMENTATION', '#endif', '#include "cui_base.h"']
     if name == "cui_surface_events":

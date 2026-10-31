@@ -2,10 +2,12 @@
 
 Include `<cui/cui_slider_model.h>`. This C-only slice implements owned value/domain
 records, validation, endpoint proposal constraints, visual mapping and state
-initialization. It does not implement UI submission, reducers, requests/callbacks,
-Styled presentation, bridge/binding APIs or native accessibility delivery. The
-whole Slider family remains partial; the [typed model design](design/SLIDER_MODEL_ABI_V1.md)
-describes those planned slices separately. Legacy float APIs are unchanged.
+initialization. The separate [typed Base route](BASE_SLIDER_MODEL.md), declared in
+`<cui/cui_base_slider_model.h>`, implements explicit-size UI submission and ordered
+requests/callbacks using these values. Styled typed presentation, bridge/binding
+APIs and native numeric accessibility delivery remain pending. The whole Slider
+family remains partial; the [typed model design](design/SLIDER_MODEL_ABI_V1.md)
+describes those boundaries. Legacy float APIs are unchanged.
 
 ```c
 #include <cui/cui_slider_model.h>
@@ -30,8 +32,8 @@ value storage. Domain/value nested records use exactly the named v1 schema;
 unknown tags and nonzero reserved fields reject. The state initializer alone has
 a versioned top-level record: exact sizeof(v1) is required, all bytes are
 initialized, version/size are set, active thumb is END and every other field is
-zero. State has no pointers. Its reserved future capture/owner fields are not
-usable as an implemented reducer API.
+zero. State has no pointers. Pure helpers do not interpret capture/owner fields;
+the separate typed Base reducer owns their documented interaction lifecycle.
 
 SINGLE uses end only and ignores inactive start, including NaN; constrained output
 canonicalizes start to positive zero. RANGE requires two finite ordered endpoints
@@ -66,7 +68,8 @@ Other endpoints map exactly to 0/1 and back. Logarithmic mapping uses value-rati
 logs, close-ratio log1p/expm1 and an extreme-ratio fallback; it does not divide
 maximum/minimum when that would overflow, or subtract two rounded equal logs for
 adjacent large values. Linear interpolation uses one fused multiply-add. Visual
-log mapping does not redefine future additive keyboard steps or semantic units.
+log mapping does not redefine additive keyboard steps or semantic units in the
+separate typed Base route.
 
 The independent tests cover invalid records/output atomicity, copied initialized
 state, exact endpoints/zero span, min-origin/neighbor rules, tiny-step quotient

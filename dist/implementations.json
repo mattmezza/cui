@@ -556,6 +556,13 @@
       "sources": [
         "src/base/cui_slider_model.c"
       ]
+    },
+    {
+      "header": "cui_base_slider_model.h",
+      "macro": "CUI_BASE_SLIDER_MODEL_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_base_slider_model.c"
+      ]
     }
   ]
 }

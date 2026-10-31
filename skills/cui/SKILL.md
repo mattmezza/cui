@@ -181,7 +181,8 @@ record contract. The exact SDK revision must also provide the typed modules
 empty lists suppress defaults; reset restores defaults. The separate
 `docs/BRIDGE_PART_SHADOWS.md` target API supports only the documented ordinary-tree
 Checkbox/Radio indicators, Switch track/thumb, Slider track and explicit ROOT
-roles. ROOT and MAIN are distinct concepts; Slider has no thumb. A RadioGroup
+roles. ROOT and MAIN are distinct concepts; this builder Slider target has no
+thumb (the separate C-only typed Base route is not mapped). A RadioGroup
 with any authored ITEM indicator names all peers until last reset/removal. Query
 reports capability, never current presence; unsupported owner paths reject.
 Read matching typed modules `bindings/go/cui/part_shadows.go` and
@@ -338,9 +339,14 @@ No new host/model/bridge/Python/JS/TS/Go/Rust numeric authoring is implied.
 For the unreleased C-only typed Slider value/domain/math helpers, read
 `docs/SLIDER_MODEL_VALUES.md` and `include/cui/cui_slider_model.h`. Single/Range
 records and initialized state own their data; proposals require explicit owner
-acceptance. This slice has no typed UI reducer, presentation, request/receipt,
-host mapping or language builder API. Preserve legacy scalar routes and keep
-whole-family completion separate from pure numerical helper proof.
+acceptance. For the separate C-only explicit-size Base route include
+`cui/cui_base_slider_model.h` and read `docs/BASE_SLIDER_MODEL.md`. It paints
+Single/Range horizontal/vertical geometry and emits typed synchronous proposals
+with frozen current/evolving requested intent; callback may mutate external
+owner/userdata, never active UI/state/options. Numeric input is current-thumb
+opt-in and busy rejection is independent of owner acceptance. Styled typed
+presentation, native numeric host delivery and all five language builders remain
+pending. Preserve legacy scalar routes and whole-family partial status.
 
 For in-frame prior Core geometry/semantic validity use the narrowly scoped
 `cui_frame_input_snapshot_ready`, separately from outside-frame numeric readiness.

@@ -746,9 +746,9 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state are owned pointer-free doubles; pure helpers and initialization do not submit UI or accept proposals.
+**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. Styled typed presentation, native numeric host delivery and all five language builders remain pending.
 
-**Interaction:** Returns true when the value changes.
+**Interaction:** Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values.
 
 **Usage:** Pass a volume value by pointer; apply audio settings only in the change branch.
 
@@ -769,6 +769,12 @@ The unreleased independent typed value/math API is declared in
 It validates and constrains double Single/Range values, maps linear/log fractions
 and initializes owned state. It does not submit UI, emit requests, bind an owner,
 render typed Sliders or add language builder APIs.
+
+The unreleased C-only typed Base Slider route is in
+`<cui/cui_base_slider_model.h>`; follow [Base Slider usage](BASE_SLIDER_MODEL.md).
+It owns explicit-size Single/Range geometry and emits synchronous proposals;
+Styled typed presentation, native numeric host delivery and language builders
+remain pending. Legacy scalar APIs retain their existing behavior.
 
 ## Speech
 

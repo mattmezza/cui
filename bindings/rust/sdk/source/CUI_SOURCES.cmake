@@ -117,4 +117,5 @@ set(CUI_SOURCES
  src/components/cui_stepper_presentation.c
  src/theme/cui_slider_palette.c
  src/base/cui_slider_model.c
+ src/base/cui_base_slider_model.c
 )

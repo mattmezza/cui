@@ -124,7 +124,7 @@ These are **unreleased slices**, not completed beta areas:
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
 | Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check also passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
 | Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
-| Portability fixes | Packaged-source configuration fix passes focused checks; Windows alignment and WASM32 fixes need combined integration/hosted confirmation. |
+| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. New hosted Linux/macOS/Windows/browser confirmation remains open. |
 
 Keep detailed receipts with their implementation changes; refresh this summary
 when the integrated revision passes, merges or ships.

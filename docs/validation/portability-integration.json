@@ -1,0 +1,17 @@
+{
+  "tested_revision": "cf3975a1aa3b38a7e7afc0d40f258b18f47229b9",
+  "scope": "Package configure, private workspace alignment and Base Slider WASM32 guard integration; not full component parity or full-suite acceptance.",
+  "build": "GCC native selected targets; serial nice19 CPU0, 126 build steps, warnings clean",
+  "runtime": "Private-Xvfb wrapper: workspace validator, Base Slider source/selective/umbrella, legacy Slider compatibility: 5/5 passed",
+  "wasm": "Pinned Zig 0.16, wasm32-wasi, Base Slider source TU, C11 O2 Wall Wextra Wpedantic Werror: passed",
+  "skill": "18/18 passed",
+  "usage": "6/6 passed",
+  "freshness": "SDK, amalgamation, consumer skill and clang-format23 checks passed",
+  "hosted": "Pending new candidate; prior c66 native binding runners and Spinner browser step passed, full CI/Pages failed. No new deployment.",
+  "log_sha256": {
+    "portability-combined-build.log": "6862639e39bf6122f699ec6238a80d713b14a9ea3c1417654af22f302c3d9091",
+    "portability-combined-tests.log": "99594b85bc01e86ed0b5c5befb6a66c608982777529691863a9af73ff39a3529",
+    "portability-combined-skill.log": "7cff084a429d4af7220b40c2fd47fffcf82d4b4d86c354506b452b150ff6f382",
+    "portability-combined-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

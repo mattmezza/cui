@@ -1,0 +1,25 @@
+{
+  "kind": "TEST ONLY measurements; no production policy acceptance",
+  "source_base": "54244353",
+  "sha256": {
+    "tests/unit/shadow_v2_box_internal.h": "7b60c26ddee16bdf69b9ee2dbc651f5007d5dd4b5ed6b3418e09ad4733b2d4e3",
+    "tests/unit/test_shadow_v2_box_quality.c": "129000188d50fa25667434f3257ae1502f2afc8b977efa78d2c12517a1ca1209",
+    "tests/unit/test_shadow_v2_quality.c": "3e75b87045923bf4d91863387b7ac3cbc6d7c717d5481c972b409e7c6d537f15",
+    "tests/unit/software_v2_original_reference.c": "16d62894939180c63f3372d9fec8c8588b3c3f18982475b82d3e8cd28919369e",
+    "src/effects/cui_effects.c": "998d811b9c977fd27ca106f3058b3be0e1e7a0dee363e5ebc14c724d41488f1b",
+    "build-shadow/libcui.a": "96d40727c65d39de0accedf45edba34098a209ec41747bd05800d96362e1a137"
+  },
+  "flags": "cc -std=c11 -O3 -DNDEBUG -UNDEBUG -Wall -Wextra -Wpedantic -Werror -Iinclude -Ibackends/software; preserved libcui.a -lm",
+  "compiler": "GCC 16.2.1 20260810",
+  "execution": "CPU0 nice19; private test_local.py wrapper 1/1 PASS; no concurrent CUI heavy task",
+  "box_source_taps": 25714,
+  "matrix_domain_probes": 40,
+  "box_cpu_seconds": 0.004893,
+  "combined_cpu_seconds": 0.329634,
+  "box_rms_bytes": 24.91836185925431,
+  "legacy_rgba_mismatches": 0,
+  "uniform_point_mismatches": 0,
+  "report_sha256": "4834eb8a532592f8c77aa46e8ed0d37eb11cb4f2df6b1d3f8c092c399e56ba0f",
+  "timing": "single run clock process CPU, box timing includes validation/geometry/domain probe; total includes reference and legacy checks; not benchmark optimality",
+  "reference": "unchanged first report: nonzero sigma CENTER convolution, sigma0 pixel AREA; box integrates profile area for both; their differing nonzero-sigma footprints are intentional model differences"
+}

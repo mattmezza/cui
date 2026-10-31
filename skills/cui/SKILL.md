@@ -332,3 +332,10 @@ records and initialized state own their data; proposals require explicit owner
 acceptance. This slice has no typed UI reducer, presentation, request/receipt,
 host mapping or language builder API. Preserve legacy scalar routes and keep
 whole-family completion separate from pure numerical helper proof.
+
+For in-frame prior Core geometry/semantic validity use the narrowly scoped
+`cui_frame_input_snapshot_ready`, separately from outside-frame numeric readiness.
+Read `docs/CORE_NUMERIC_ACCESSIBILITY.md`: readiness does not imply current
+modal/target eligibility, renderer/host success or numeric capability; inert and
+layout-only calls still require their ordinary frame eligibility checks. Failed
+V2 admission invalidates new readiness without changing legacy input routing.

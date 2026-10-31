@@ -688,6 +688,12 @@ bool cui_set_accessibility_numeric_actions(cui_context *, cui_id, uint32_t mask)
  * False before first successful end, in-frame, or after invalidating failure;
  * error clear alone does not restore it. Does not allocate or grant capability. */
 bool cui_accessibility_numeric_snapshot_ready(const cui_context *);
+/* Ordinary admitted composition with a valid prior completed Core semantic/
+ * geometry snapshot and no known invalidating current-frame error. Not current
+ * final geometry, input eligibility, renderer or host success. False initially,
+ * outside submission and after invalidation; clear alone cannot restore it.
+ * Does not allocate or grant capability; legacy routing does not use this gate. */
+bool cui_frame_input_snapshot_ready(const cui_context *);
 /* Exact v1 size/version/reserved required. Copies scalar before return; invalid,
  * unsupported, lifecycle or capacity failure leaves queued input unchanged.
  * Generic no-payload SET_VALUE enqueue is invalid (never guesses zero). */
@@ -9569,6 +9575,10 @@ static bool cui_core_numeric_eligible(const cui_semantic *s, uint32_t mask,
 bool cui_accessibility_numeric_snapshot_ready(const cui_context *ui) {
     return ui && !ui->in_frame && ui->numeric_snapshot_ready && ui->error == CUI_OK;
 }
+bool cui_frame_input_snapshot_ready(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && ui->numeric_snapshot_ready &&
+           !ui->numeric_frame_invalid && ui->error == CUI_OK;
+}
 bool cui_set_accessibility_numeric_actions(cui_context *ui, cui_id id, uint32_t mask) {
     if (!cui_core_mutation(ui))
         return false;
@@ -9824,17 +9834,24 @@ static size_t cui_core_v2_min(size_t a, size_t b) {
 bool cui_begin_frame(cui_context *ui, float w, float h, float dt) {
     return cui_core_begin_frame(ui, w, h, dt, false);
 }
+/* A rejected V2 begin expires new input/numeric authority, including failures
+ * before common begin. Preserve existing diagnostics, queues and V1 dispatch. */
+static bool cui_core_v2_begin_rejected(cui_context *ui) {
+    if (ui)
+        ui->numeric_snapshot_ready = false;
+    return false;
+}
 bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
                         const cui_frame_v2_options *options) {
     if (!cui_core_mutation(ui) || !ui)
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     if (ui->in_frame) {
         cui_core_fail(ui, CUI_ERROR_LIFECYCLE);
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     }
     if (!isfinite(w) || !isfinite(h) || w < 0 || h < 0 || !isfinite(dt) || dt < 0) {
         cui_core_fail(ui, CUI_ERROR_LAYOUT);
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     }
     if (!options || options->size != sizeof(*options) ||
         options->support.size != sizeof(options->support) ||
@@ -9843,7 +9860,7 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
         (options->support.features & ~CUI_DRAW_V2_FEATURE_BACKGROUNDS) ||
         (options->required_features & ~options->support.features)) {
         cui_core_fail(ui, CUI_ERROR_INVALID_ACTION);
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     }
     cui_frame_v2_options value = *options;
     size_t cb = value.command_bytes ? value.command_bytes : CUI_DRAW_V2_DEFAULT_COMMAND_BYTES;
@@ -9852,7 +9869,7 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
     if (cb > CUI_DRAW_V2_MAX_BYTES || bb > CUI_DRAW_V2_MAX_BYTES || cb > PTRDIFF_MAX ||
         bb > PTRDIFF_MAX) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     }
     size_t commands = cui_core_v2_min(ui->config.max_commands, 16384);
     commands = cui_core_v2_min(commands, value.support.max_commands);
@@ -9864,14 +9881,14 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
     if (backgrounds) {
         if (ui->config.max_elements > bb / sizeof(uint32_t)) {
             cui_core_fail(ui, CUI_ERROR_CAPACITY);
-            return false;
+            return cui_core_v2_begin_rejected(ui);
         }
         map_bytes = ui->config.max_elements * sizeof(uint32_t);
         size_t alignment = _Alignof(cui_core_background_owner);
         size_t padding = (alignment - map_bytes % alignment) % alignment;
         if (padding > bb - map_bytes) {
             cui_core_fail(ui, CUI_ERROR_CAPACITY);
-            return false;
+            return cui_core_v2_begin_rejected(ui);
         }
         map_bytes += padding;
     }
@@ -9882,7 +9899,7 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
           !value.support.transfer_bytes || !value.support.metadata_bytes ||
           owners > (bb - map_bytes) / sizeof(cui_core_background_owner)))) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     }
     cui_core_v2 *state = ui->v2;
     bool fresh = !state;
@@ -9890,7 +9907,7 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
         state = calloc(1, sizeof(*state));
     if (!state) {
         cui_core_fail(ui, CUI_ERROR_CAPACITY);
-        return false;
+        return cui_core_v2_begin_rejected(ui);
     }
     /* Prior V2 lists expire at begin attempt. Free replaced frame-only blocks
      * BEFORE allocating successors: even transient payload stays <=16MiB+16MiB.
@@ -9923,7 +9940,9 @@ bool cui_begin_frame_v2(cui_context *ui, float w, float h, float dt,
     state->owner_limit = owners;
     state->features = value.required_features;
     ui->v2 = state;
-    return cui_core_begin_frame(ui, w, h, dt, true);
+    if (!cui_core_begin_frame(ui, w, h, dt, true))
+        return cui_core_v2_begin_rejected(ui);
+    return true;
 capacity:
     if (fresh) {
         free(state->commands);
@@ -9931,7 +9950,7 @@ capacity:
         free(state);
     }
     cui_core_fail(ui, CUI_ERROR_CAPACITY);
-    return false;
+    return cui_core_v2_begin_rejected(ui);
 }
 static bool cui_core_background_mode(cui_context *ui) {
     if (!cui_core_active(ui))

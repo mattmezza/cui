@@ -687,6 +687,12 @@ bool cui_set_accessibility_numeric_actions(cui_context *, cui_id, uint32_t mask)
  * False before first successful end, in-frame, or after invalidating failure;
  * error clear alone does not restore it. Does not allocate or grant capability. */
 bool cui_accessibility_numeric_snapshot_ready(const cui_context *);
+/* Ordinary admitted composition with a valid prior completed Core semantic/
+ * geometry snapshot and no known invalidating current-frame error. Not current
+ * final geometry, input eligibility, renderer or host success. False initially,
+ * outside submission and after invalidation; clear alone cannot restore it.
+ * Does not allocate or grant capability; legacy routing does not use this gate. */
+bool cui_frame_input_snapshot_ready(const cui_context *);
 /* Exact v1 size/version/reserved required. Copies scalar before return; invalid,
  * unsupported, lifecycle or capacity failure leaves queued input unchanged.
  * Generic no-payload SET_VALUE enqueue is invalid (never guesses zero). */

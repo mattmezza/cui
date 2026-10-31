@@ -100,10 +100,10 @@ int main(void) {
     assert(!cui_claim_accessibility_numeric_input_v1(ui, 10, 0, sizeof out, &out));
     assert(!memcmp(&out, &saved, sizeof out));
     (void)cui_end_frame(ui);
-    printf("numeric context=%zu baseline_unchanged_tail=%zu idle_delta=%zu numeric_fixed=%zu "
+    printf("numeric context=%zu baseline_without_numeric_block=%zu idle_delta=%zu numeric_fixed=%zu "
            "slot=%zu N32_allocation=%zu\n",
-           sizeof(cui_context), sizeof(cui_context) - offsetof(cui_context, scroll_layout),
-           offsetof(cui_context, scroll_layout), sizeof(cui_core_numeric_state),
+           sizeof(cui_context), sizeof(cui_context) - (offsetof(cui_context, scroll_layout) - offsetof(cui_context, numeric)),
+           offsetof(cui_context, scroll_layout) - offsetof(cui_context, numeric), sizeof(cui_core_numeric_state),
            sizeof(cui_core_numeric_slot), sizeof(cui_core_numeric_state) + 64 * sizeof(uint32_t));
     unsigned free_before = releases;
     cui_destroy(ui);

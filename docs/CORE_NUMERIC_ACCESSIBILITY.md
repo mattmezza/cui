@@ -34,6 +34,21 @@ authority until a successful fresh frame. Already claimed input is not rolled ba
 by a later error. Renderer/native/platform success is not certified by readiness.
 Old Focus/Activate paths do not use the new predicate.
 
+`cui_frame_input_snapshot_ready` is the distinct in-frame observer: true only in
+ordinary admitted composition with valid prior completed Core geometry/semantics
+and no known invalidating current-frame error. It is false outside that phase;
+it does not certify final current geometry or current target/modal eligibility.
+An empty prior semantic list and zero numeric allocations/capabilities can still
+be ready. Inert/layout-only composition requires the separate frame_sequence
+eligibility check; readiness alone does not permit reduction. Known current errors
+remain invalid after clear, and only successful end establishes next-frame
+readiness. Legacy input routes do not consult either new gate. Every rejected
+V2 begin conservatively expires new numeric/input authority, including options,
+budget or allocation failures before common begin; existing error codes, queued
+input and old Focus/Activate routing are preserved. Failed buffer growth still
+expires the old V2 list under its existing lifetime contract. This observer does
+not implement the planned typed Slider UI reducer or any host delivery.
+
 ## Typed queue, ownership and claims
 
 Use existing `cui_queue_accessibility_action` for opted-in INCREMENT/DECREMENT.
@@ -78,11 +93,17 @@ order, actual touch-origin shifts, repeat/invalid claim, masks/role/readonly/mod
 omission/compaction, queue capacity/recovery, legacy Focus/Activate and actual
 scroll-layout failure/error-clear recovery. TU-local allocator instrumentation
 checks zero legacy/zero-mask allocations and atomic first-allocation failure,
-retention/free and exact sizeof evidence without production hooks. All three
-focused tests passed under private Xvfb with strict C11 warnings. On the tested
-64-bit Linux ABI the context is 255504 bytes versus the unchanged old tail 255488
-(idle delta 16); private numeric fixed storage is 8200 bytes, each scalar slot 16,
-and opt-in N=32 allocation 8456 bytes. These measurements are ABI-specific.
+retention/free and exact sizeof evidence without production hooks. The observer source/distribution fixtures and numeric allocator fixture passed
+all three focused private-Xvfb tests with strict C11 warnings on the combined
+CoreV2 base. They include actual failed V2 buffer growth with queued Focus,
+Activate and key replay, first/fresh-frame authority, known current errors,
+clear-only rejection, modal/omission distinctions, V1 early and V2 late real
+scroll-layout failure, and matching/wrong-end lifecycle recovery. The observer
+adds no context fields or allocation. On the tested 64-bit Linux ABI the combined
+context is 255520 bytes versus 255504 without its existing numeric block (delta 16);
+private numeric fixed storage is 8200 bytes, each scalar slot 16, and opt-in N=32
+allocation 8456 bytes. The allocator fixture measures that block relative to the
+surrounding V2 layout, not the whole prefix. Measurements are ABI-specific.
 
 See [numeric action design](design/SLIDER_ACCESSIBILITY_ACTIONS.md) for independent
 native-mode/host SET_VALUE and future model/binding gates. Core helper tests do

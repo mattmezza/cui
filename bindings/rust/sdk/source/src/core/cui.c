@@ -1327,6 +1327,10 @@ static bool cui_core_numeric_eligible(const cui_semantic *s, uint32_t mask,
 bool cui_accessibility_numeric_snapshot_ready(const cui_context *ui) {
     return ui && !ui->in_frame && ui->numeric_snapshot_ready && ui->error == CUI_OK;
 }
+bool cui_frame_input_snapshot_ready(const cui_context *ui) {
+    return cui_frame_is_submitting(ui) && ui->numeric_snapshot_ready &&
+           !ui->numeric_frame_invalid && ui->error == CUI_OK;
+}
 bool cui_set_accessibility_numeric_actions(cui_context *ui, cui_id id, uint32_t mask) {
     if (!cui_core_mutation(ui))
         return false;

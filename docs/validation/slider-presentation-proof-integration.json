@@ -1,0 +1,17 @@
+{
+  "tested_revision": "e3388bfc",
+  "scope": "Controlled Base example and test-only responsive Styled geometry/fractional ring proof, not production Styled completion.",
+  "build": "Actual repository CMake Release, strict warnings; serial nice19 CPU0 cached dependencies.",
+  "runtime": "Private-Xvfb 2/2 passed: complete controlled callback example, 216 geometry frames and 240 software ring images.",
+  "oracle": "Independent source geometry and half-open annulus with scalar source-over; outside exact, covered RGB within one byte rounding.",
+  "cases": "Quarter progress 0..1, fractional strokes, round/square, clipping, rem16/24, source alpha replacement and parent opacity once.",
+  "checks": "Skill18/18, usage6/6, format23, SDK/amalgamation/skill freshness and diff passed.",
+  "remaining": "Production Styled facade, vertical registered-scroll admission, actual V2 adapter rendering and foreign binding support remain open.",
+  "log_sha256": {
+    "slider-proof-integration-build.log": "6ae05fa5cee5f42c9e8cd354445de438ced82c586d26c0a224fe3c151405f903",
+    "slider-proof-integration-tests.log": "e4709371e57458e90089c9faaec44f27647c42fa6ba57eb59330f2727f1dce30",
+    "slider-proof-integration-skill.log": "7f3620c13babb0336c445d1d7d3f5cf39f25e03fe94b87611653b556296b45ab",
+    "slider-proof-integration-usage.log": "10346328c70fef6f4d292f3700682407eb83cf13c29bc7460b859fad89f1c8cc",
+    "slider-proof-integration-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

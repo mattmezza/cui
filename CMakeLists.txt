@@ -2371,3 +2371,37 @@ if(NOT MSVC)
 endif()
 cui_warnings(test_slider_model_example)
 add_test(NAME test_slider_model_example COMMAND test_slider_model_example)
+
+# Pure owned style values, private NULL-route compatibility and actual source geometry.
+add_executable(test_slider_style tests/unit/test_slider_style.c
+ src/components/cui_slider_style.c src/theme/cui_slider_palette.c src/theme/cui_theme.c
+ src/core/cui_background.c)
+target_include_directories(test_slider_style PRIVATE include)
+add_executable(test_slider_style_null tests/unit/test_slider_style_null.c
+ src/base/cui_base_slider_model.c src/base/cui_slider_model.c
+ $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_slider_style_null PRIVATE include)
+add_executable(test_slider_source_flow tests/unit/test_slider_styled_flow.c
+ src/components/cui_slider_style.c
+ src/base/cui_base_slider_model.c src/base/cui_slider_model.c
+ src/theme/cui_slider_palette.c src/theme/cui_theme.c src/core/cui_background.c
+ $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_compile_definitions(test_slider_source_flow PRIVATE CUI_SLIDER_PRODUCTION_FLOW)
+target_include_directories(test_slider_source_flow PRIVATE include)
+target_link_libraries(test_slider_source_flow PRIVATE cui_software)
+foreach(entry selective umbrella)
+ add_executable(test_slider_style_${entry} tests/unit/test_slider_style.c)
+ target_include_directories(test_slider_style_${entry} PRIVATE dist)
+ target_compile_definitions(test_slider_style_${entry} PRIVATE CUI_SLIDER_STYLE_DISTRIBUTION)
+ if(entry STREQUAL "umbrella")
+  target_compile_definitions(test_slider_style_${entry} PRIVATE CUI_SLIDER_STYLE_UMBRELLA)
+ endif()
+endforeach()
+foreach(target test_slider_style test_slider_style_null test_slider_source_flow
+ test_slider_style_selective test_slider_style_umbrella)
+ if(NOT MSVC)
+  target_link_libraries(${target} PRIVATE m)
+ endif()
+ cui_warnings(${target})
+ add_test(NAME ${target} COMMAND ${target})
+endforeach()

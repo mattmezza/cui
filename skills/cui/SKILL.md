@@ -362,3 +362,9 @@ For a complete C-only controlled Base Slider program, read
 persistent state, callback, composition and a windowless driver; owner acceptance
 is explicit on UPDATE. CANCEL may carry an old kind/domain and must not be blindly
 accepted. This example does not add Styled rendering or foreign builders.
+
+Slider's unreleased C-only `cui_slider_style_resolve_v1` owns source metrics and
+an exact background brush value; read `docs/SLIDER_STYLE_VALUES.md` and its header.
+It is a pure resolver, not a Styled widget or renderer capability. Preserve
+Aurora's gradient and distinguish transparent masked overrides; never infer a
+preset from custom theme bytes or flatten a brush for unsupported adapters.

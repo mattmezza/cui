@@ -75,6 +75,7 @@
 #include "cui_slider_palette.h"
 #include "cui_slider_model.h"
 #include "cui_base_slider_model.h"
+#include "cui_slider_style.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -374,4 +375,8 @@
 #define CUI_BASE_SLIDER_MODEL_IMPLEMENTATION
 #endif
 #include "cui_base_slider_model.h"
+#ifndef CUI_SLIDER_STYLE_IMPLEMENTATION
+#define CUI_SLIDER_STYLE_IMPLEMENTATION
+#endif
+#include "cui_slider_style.h"
 #endif

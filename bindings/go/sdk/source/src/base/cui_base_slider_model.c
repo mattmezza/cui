@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_base_slider_model.h"
+#include "cui_base_slider_model_internal.h"
 #include <math.h>
 #include <string.h>
 static const cui_id cui_slider_ui_salts[4] = {
@@ -329,10 +329,11 @@ static bool cui_slider_ui_register(cui_context *ui, const cui_id ids[5],
     return cui_last_error(ui) == CUI_OK &&
            (!phase || cui_slider_ui_caps(ui, ids, value.kind, capabilities));
 }
-cui_slider_model_result_v1 cui_base_slider_model_events_v1(
+cui_slider_model_result_v1 cui_base_slider_model_present_internal(
     cui_context *ui, cui_id owner, cui_slider_model_value_v1 confirmed,
     cui_slider_model_state_v1 *state, const cui_slider_model_options_v1 *options,
-    const cui_base_slider_model_layout_v1 *layout, cui_slider_model_handler_v1 handler) {
+    const cui_base_slider_model_layout_v1 *layout, cui_slider_model_handler_v1 handler,
+    const cui_slider_model_presentation_internal *presentation) {
     cui_slider_model_result_v1 result = {
         .version = 1, .struct_size = sizeof result, .status = CUI_SLIDER_MODEL_INVALID_ARGUMENT};
     if (!ui || !owner || !options || !state || !layout || options->version != 1 ||
@@ -346,6 +347,10 @@ cui_slider_model_result_v1 cui_base_slider_model_events_v1(
         !cui_slider_ui_string(options->start_description) ||
         !cui_slider_ui_string(options->end_description))
         return result;
+    /* Private policy is snapshotted before any application callback. */
+    cui_slider_model_presentation_internal policy = {0};
+    if (presentation)
+        policy = *presentation;
     cui_slider_model_options_v1 o = *options;
     cui_base_slider_model_layout_v1 l = *layout;
     if (confirmed.kind == CUI_SLIDER_MODEL_SINGLE)
@@ -398,6 +403,8 @@ cui_slider_model_result_v1 cui_base_slider_model_events_v1(
     root.width = o.orientation == CUI_SLIDER_MODEL_HORIZONTAL ? l.length : l.cross_extent;
     root.height = o.orientation == CUI_SLIDER_MODEL_HORIZONTAL ? l.cross_extent : l.length;
     root.fixed_width = root.fixed_height = true;
+    if (presentation)
+        root = policy.root;
     cui_begin_box(ui, owner, root);
     result.flags |= CUI_SLIDER_MODEL_SUBMITTED;
     result.submission_frame = frame;
@@ -589,10 +596,21 @@ finish:
             cui_slider_model_value_valid_v1(o.domain, state->preview) &&
             state->preview.kind == confirmed.kind)
             paint = state->preview;
-        cui_slider_ui_paint(ui, ids, paint, o, l);
+        if (presentation && policy.compose)
+            policy.compose(ui, ids, paint, &o, &l, policy.user);
+        else
+            cui_slider_ui_paint(ui, ids, paint, o, l);
     }
     cui_end_box(ui);
     if (cui_last_error(ui) != CUI_OK)
         result.status = CUI_SLIDER_MODEL_CORE_FAILURE;
     return result;
+}
+
+cui_slider_model_result_v1 cui_base_slider_model_events_v1(
+    cui_context *ui, cui_id owner, cui_slider_model_value_v1 confirmed,
+    cui_slider_model_state_v1 *state, const cui_slider_model_options_v1 *options,
+    const cui_base_slider_model_layout_v1 *layout, cui_slider_model_handler_v1 handler) {
+    return cui_base_slider_model_present_internal(ui, owner, confirmed, state, options, layout,
+                                                  handler, NULL);
 }

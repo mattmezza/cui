@@ -1,8 +1,10 @@
 # Typed Styled Slider presenter checkpoint
 
 Design only, signed against Base `cf3c39312ecab7b1f2daaddecda0c8e712f1ada2`.
-No proposed symbol below is implemented. No production, generated files, builds
-or dependency changes accompany this checkpoint. All78 entries remain intact;
+The original checkpoint below preceded production. Followup step2 implements only
+the owned style-value resolver and private Base/source composition seams; public
+Styled facade, motion and adapter support remain planned. No dependency changes
+accompany this work. All78 entries remain intact;
 Styled/host/foreign completion is still open.
 
 ## Authority and complete scope
@@ -354,3 +356,53 @@ Spring behavior, actual hover/active propagation, the private production hook,
 Styled ABI, source gradient consumers/native hosts/allfive bindings and vertical
 registered-scroll admission still require their separate reviews and proofs.
 Signed evidence: `/root/hidden_windows`, 2026-10-31.
+
+## Step2 implementation: owned values and private composition
+
+The implemented public addition is `cui_slider_style_resolve_v1` in
+`cui_slider_style.h`, documented in [SLIDER_STYLE_VALUES.md](../SLIDER_STYLE_VALUES.md).
+It validates exact version/size/reserved/modes/masks before publishing an owned
+plan. Active transparent color overrides are distinguished from omission. The
+four builtins and38 named presets pass through the existing independently audited
+palette authority; tests compare every active linear color/stop/model/space/angle
+field after background conversion. Reversed authored stops and RGB at alpha0
+survive. No byte quantizer or renderer capability API was added.
+
+The private Base seam snapshots policy/root before callbacks, reduces once,
+then invokes composition inside ROOT with snapshotted options and the same paint
+pair the old painter would receive. A NULL policy executes the original root and
+painter unchanged. No state/context/public Base record grows. The private source
+composer uses the proven ordinary-flow track/fraction spacers/literal offsets,
+retains Base IDs, and calls an optional paint-only decorator inside each visible
+outer thumb. Appearance boxes are supplied explicitly by the future presenter;
+this geometry seam does not convert/flatten a brush or claim a renderer supports
+it. Disabled creates transparent outer semantic geometry, omitting decorations.
+
+Before refactoring, the signed `b0724c68` Base source was compiled independently
+against the retained actual Core/math objects and executed with the private Xvfb
+wrapper. Eight frozen fieldwise trace hashes cover Single/Range, axes and reverse
+across six frames each: actual command order/colors/corners/bounds, semantic IDs/
+values/bounds, passive results, state, callback phase/value/raw metadata and timing
+relative to composition. They exclude padding/addresses/platform sizeof. Both
+public and explicit private-NULL paths match those pre-hook traces. Additional
+hook tests enforce ordered synchronous key triples and pointer phases, frozen
+current versus external owner acceptance, ongoing preview versus terminal
+confirmed paint, and actual parent-attached child geometry. An initial test count
+forgot keys emit BEGIN/UPDATE/COMMIT; the test now asserts the exact11 phases and
+values rather than weakening ordering checks. Production behavior was unchanged.
+
+The actual private production source composer also runs through the prior216
+first/current-size ordinary geometry cases and240 independent software ring pixel
+oracles, plus disabled omission and registered-scroll rejection/recovery. These
+are source metrics/composition and test-authored decoration proofs, not a public
+Styled facade or live source animation. Strict C11 source/selective/umbrella value
+builds and rebuilt Base source/selective/umbrella plus legacy event regressions
+pass. Initial selective import failure was fixed by making the new header import
+Core before the background value header; its standalone fixture preserves that
+import-order proof. No production Core/renderer/input dispatch was changed.
+
+Still pending: the public Styled handler/options/presentation state and named
+parts, actual hover/pressed/focus/spring behavior, validated V1/V2 submission and
+real adapter consumers, vertical registered-scroll admission, native numeric
+hosts and all five typed builders. All78 families remain present and whole Slider
+completion stays open.

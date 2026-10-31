@@ -8,20 +8,34 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef CUI_SLIDER_PRODUCTION_FLOW
+#include "../../src/components/cui_slider_model_presentation_internal.h"
+enum { ROOT = 100, SURFACE = 200, RING = 300 };
+#define TRACK cui_base_slider_model_part_id_v1(ROOT, CUI_SLIDER_MODEL_TRACK)
+#define FILL cui_base_slider_model_part_id_v1(ROOT, CUI_SLIDER_MODEL_FILL)
+#define START cui_base_slider_model_part_id_v1(ROOT, CUI_SLIDER_MODEL_START_THUMB)
+#define END cui_base_slider_model_part_id_v1(ROOT, CUI_SLIDER_MODEL_END_THUMB)
+#else
 enum { ROOT = 100, TRACK = 103, FILL = 104, START = 101, END = 102, SURFACE = 200, RING = 300 };
+#endif
 typedef struct {
     bool vertical, grow, range, reverse;
     float length, rem, padding;
     double start, end;
 } plan;
+#ifndef CUI_SLIDER_PRODUCTION_FLOW
 static void box(cui_context *ui, cui_id id, cui_box b) {
     cui_begin_box(ui, id, b);
     cui_end_box(ui);
 }
+#endif
 /* Test-only presentation inputs; no production spring or Styled API. */
 static float ring_progress = 1, parent_opacity = 1;
 static cui_color ring_source_color = {90, 43, 177, 7};
 static bool ring_square;
+#ifdef CUI_SLIDER_PRODUCTION_FLOW
+static bool source_disabled;
+#endif
 typedef struct {
     float stroke, radius;
     cui_color color;
@@ -60,6 +74,7 @@ static void decoration(cui_context *ui, cui_id id, float rem) {
         (cui_rect){1, 1, inside, inside});
     cui_end_box(ui);
 }
+#ifndef CUI_SLIDER_PRODUCTION_FLOW
 static void thumb(cui_context *ui, plan p, cui_id id, double fraction) {
     float track = p.rem * .375f;
     /* This row/column follows the fill, so its cross origin is track_extent. */
@@ -88,7 +103,58 @@ static void thumb(cui_context *ui, plan p, cui_id id, double fraction) {
     cui_end_box(ui);
     cui_end_box(ui);
 }
+#endif
+#ifdef CUI_SLIDER_PRODUCTION_FLOW
+static void source_decoration(cui_context *ui, cui_id id, uint32_t thumb,
+                              const cui_slider_style_plan_v1 *style, void *user) {
+    (void)thumb;
+    (void)user;
+    decoration(ui, id, style->thumb_extent);
+}
+#endif
 static void compose(cui_context *ui, plan p) {
+#ifdef CUI_SLIDER_PRODUCTION_FLOW
+    cui_slider_style_options_v1 style = {.version = 1,
+                                         .struct_size = sizeof style,
+                                         .layout = p.grow ? CUI_SLIDER_STYLE_PARENT
+                                                          : CUI_SLIDER_STYLE_FIXED,
+                                         .rem = p.rem,
+                                         .length = p.length,
+                                         .full_radius = ring_square ? 0 : 1000};
+    assert(cui_slider_palette_builtin_get(CUI_SLIDER_PALETTE_LIGHT, &style.palette));
+    cui_slider_source_presentation_internal source = {
+        .track = {.background = {40, 0, 0, 255}},
+        .fill = {.background = {60, 0, 0, 255}},
+        .outer = {.background = {70, 0, 0, 255}, .radius = ring_square ? 0 : 1000},
+        .decorate = source_decoration};
+    assert(cui_slider_style_resolve_v1(&style, &source.plan));
+    cui_slider_model_options_v1 o = {.version = 1,
+                                     .struct_size = sizeof o,
+                                     .orientation = p.vertical ? CUI_SLIDER_MODEL_VERTICAL
+                                                               : CUI_SLIDER_MODEL_HORIZONTAL,
+                                     .flags = (p.reverse ? CUI_SLIDER_MODEL_REVERSE_FILL_BIT : 0) |
+                                              (source_disabled ? CUI_SLIDER_MODEL_DISABLED_BIT : 0),
+                                     .domain = {0, 1, 0, CUI_SLIDER_MODEL_LINEAR, 0},
+                                     .name = CUI_STR("Slider")};
+    cui_base_slider_model_layout_v1 l = {.version = 1,
+                                         .struct_size = sizeof l,
+                                         .length = 240,
+                                         .cross_extent = 1.5f * p.rem,
+                                         .track_extent = .375f * p.rem,
+                                         .thumb_extent = p.rem};
+    cui_slider_model_state_v1 state;
+    assert(cui_slider_model_state_init_v1(sizeof state, &state));
+    cui_slider_model_presentation_internal policy = {
+        cui_slider_source_root_internal(&source.plan, o.orientation),
+        cui_slider_source_compose_internal, &source};
+    cui_slider_model_value_v1 value = {.kind = p.range ? CUI_SLIDER_MODEL_RANGE
+                                                       : CUI_SLIDER_MODEL_SINGLE,
+                                       .start = p.start,
+                                       .end = p.end};
+    cui_slider_model_result_v1 result = cui_base_slider_model_present_internal(
+        ui, ROOT, value, &state, &o, &l, (cui_slider_model_handler_v1){0}, &policy);
+    assert(result.status == CUI_SLIDER_MODEL_OK);
+#else
     float cross = 1.5f * p.rem, track = .375f * p.rem;
     cui_begin_box(ui, ROOT,
                   (cui_box){.row = p.vertical,
@@ -147,6 +213,7 @@ static void compose(cui_context *ui, plan p) {
     thumb(ui, p, END, p.end);
     cui_end_box(ui);
     cui_end_box(ui);
+#endif
 }
 static void parent(cui_context *ui, plan p, bool clip) {
     float cross = 1.5f * p.rem;
@@ -476,7 +543,43 @@ static void registered_scroll(void) {
     }
     puts("PASS registered scroll horizontal / explicit vertical rejection and fresh recovery");
 }
+#ifdef CUI_SLIDER_PRODUCTION_FLOW
+static void disabled_omission(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 128});
+    assert(ui);
+    source_disabled = true;
+    assert(cui_begin_frame(ui, 400, 100, 0));
+    plan p = {false, true, true, false, 200, 16, 0, .25, .75};
+    parent(ui, p, false);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    assert(cui_bounds(ui, START).w == 16 && cui_bounds(ui, END).w == 16);
+    assert(cui_bounds(ui, END + SURFACE).w == 0 && cui_bounds(ui, END + RING).w == 0);
+    unsigned bars = 0;
+    for (size_t i = 0; i < list.count; ++i) {
+        unsigned red = list.commands[i].color.r;
+        assert(red != 70 && red != 80 && red != 90);
+        if (red == 40 || red == 60)
+            ++bars;
+    }
+    assert(bars == 2);
+    size_t count;
+    const cui_semantic *sem = cui_semantics(ui, &count);
+    unsigned thumbs = 0;
+    for (size_t i = 0; i < count; ++i)
+        if (sem[i].id == START || sem[i].id == END) {
+            assert(sem[i].disabled);
+            ++thumbs;
+        }
+    assert(thumbs == 2);
+    source_disabled = false;
+    cui_destroy(ui);
+}
+#endif
 int main(void) {
+#ifdef CUI_SLIDER_PRODUCTION_FLOW
+    disabled_omission();
+#endif
     ordinary();
     software_ring();
     registered_scroll();

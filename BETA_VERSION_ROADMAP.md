@@ -14,7 +14,7 @@ release date is asserted.
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `a7dee36090cbe9c1ca1db1c7bed0cd804c69985f`; public docs, catalog, headers and native archive checked on 2026-10-31. |
 | Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
-| Next integration | Compound paint-part IDs, semantic bridge part shadows, Button state-specific shadows and one-pass npm source verification have isolated tested slices; combined integration is still pending. |
+| Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows have isolated tested slices; combined integration is still pending. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -67,6 +67,9 @@ can lag implementation: inspect current code and evidence before scheduling work
 - Release assets include `ASSET_MANIFEST.json`, `SHA256SUMS` and source provenance
   receipts. Binary validation covers the labelled Linux x86_64 host (glibc 2.42),
   not all Linux distributions. Caller-selected fonts need glyph coverage/fallbacks.
+- The npm source verifier now streams gzip once with the same integrity checks;
+  offline security/read-work tests and verification of the real release artifact
+  pass locally. Hosted confirmation of this post-release CI improvement is pending.
 - Source warnings, meaningful legacy regressions, generated freshness and consumer
   skill checks passed for the release. Broader feature claims remain open below.
 

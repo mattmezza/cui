@@ -9,7 +9,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,7 +45,11 @@ class SourceManifest(unittest.TestCase):
             entries.append((prefix + 'SOURCE_FILES.sha256', b'' if mode == 'empty' else manifest.encode()))
         if kind == 'wheel':
             with zipfile.ZipFile(path, 'w') as archive:
-                for name, data in entries: archive.writestr(name, data)
+                for name, data in entries:
+                    if mode == 'directory_source' and name == prefix + 'source.c':
+                        archive.writestr(name + '/', b'')
+                    else:
+                        archive.writestr(name, data)
                 if mode == 'link':
                     member = zipfile.ZipInfo(prefix + 'link')
                     member.create_system = 3
@@ -54,8 +58,13 @@ class SourceManifest(unittest.TestCase):
         else:
             with tarfile.open(path, 'w:gz') as archive:
                 for name, data in entries:
-                    member = tarfile.TarInfo(name); member.size = len(data)
-                    archive.addfile(member, io.BytesIO(data))
+                    member = tarfile.TarInfo(name)
+                    if mode == 'directory_source' and name == prefix + 'source.c':
+                        member.type = tarfile.DIRTYPE
+                        archive.addfile(member)
+                    else:
+                        member.size = len(data)
+                        archive.addfile(member, io.BytesIO(data))
                 if mode == 'link':
                     member = tarfile.TarInfo(prefix + 'link')
                     member.type = tarfile.SYMTYPE; member.linkname = 'source.c'
@@ -68,9 +77,89 @@ class SourceManifest(unittest.TestCase):
             for kind in ('wheel', 'npm'):
                 self.assertEqual(validator.verify_source_manifest(self.make_archive(directory, kind, 'valid')), 1)
                 for mode in ('changed', 'absent', 'no_manifest', 'empty', 'duplicate', 'unsafe_manifest', 'malformed',
-                             'unlisted', 'unlisted_receipt', 'unsafe_archive', 'duplicate_archive', 'link'):
+                             'unlisted', 'unlisted_receipt', 'unsafe_archive', 'duplicate_archive', 'link', 'directory_source'):
                     with self.subTest(kind=kind, mode=mode), self.assertRaises(ValueError):
                         validator.verify_source_manifest(self.make_archive(directory, kind, mode))
+
+    def test_tar_archive_order_streams_once_with_bounded_payload_reads(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'reordered.tgz'
+            prefix = 'package/_source/'
+            # Several chunks per file; reverse manifest order forces backwards
+            # seeks in the old getmembers/extractfile implementation.
+            payloads = {f'{i}.c': bytes([i]) * (150000 + i) for i in range(4)}
+            manifest = ''.join(hashlib.sha256(data).hexdigest() + '  ' + name + '\n'
+                               for name, data in reversed(list(payloads.items()))).encode()
+            with tarfile.open(path, 'w:gz') as archive:
+                for name, data in [*payloads.items(), ('SOURCE_FILES.sha256', manifest)]:
+                    member = tarfile.TarInfo(prefix + name)
+                    member.size = len(data)
+                    archive.addfile(member, io.BytesIO(data))
+            class ForwardOnly(io.BytesIO):
+                read_bytes = 0
+                def read(self, size=-1):
+                    data = super().read(size)
+                    self.read_bytes += len(data)
+                    return data
+                def seek(self, *args):
+                    raise AssertionError('gzip input must never seek/replay')
+            compressed = path.read_bytes()
+            stream = ForwardOnly(compressed)
+            real_open = tarfile.open
+            real_extract = tarfile.TarFile.extractfile
+            reads = {}
+            def open_stream(*args, **kwargs):
+                self.assertEqual(args[1], 'r|gz')
+                return real_open(fileobj=stream, mode='r|gz')
+            def extract(archive, member):
+                source = real_extract(archive, member)
+                if member.name.endswith('/SOURCE_FILES.sha256'):
+                    return source
+                original_read = source.read
+                def read(size=-1):
+                    self.assertGreater(size, 0)
+                    self.assertLessEqual(size, 64 * 1024)
+                    data = original_read(size)
+                    reads[member.name] = reads.get(member.name, 0) + len(data)
+                    return data
+                source.read = read
+                return source
+            with patch.object(validator.tarfile, 'open', side_effect=open_stream), \
+                    patch.object(tarfile.TarFile, 'extractfile', extract):
+                self.assertEqual(validator.verify_source_manifest(path), len(payloads))
+            self.assertLessEqual(stream.read_bytes, len(compressed))
+            self.assertEqual(reads, {prefix + name: len(data) for name, data in payloads.items()})
+
+    def test_tar_nonregular_entries_and_receipt_exclusions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            prefix = 'package/_source/'
+            for kind in (tarfile.LNKTYPE, tarfile.FIFOTYPE, tarfile.CHRTYPE):
+                path = self.make_archive(directory, 'npm', 'valid')
+                # Rebuild rather than append a gzip archive.
+                with tarfile.open(path, 'r:gz') as archive:
+                    entries = [(m, archive.extractfile(m).read()) for m in archive if m.isfile()]
+                with tarfile.open(path, 'w:gz') as archive:
+                    for member, data in entries:
+                        archive.addfile(member, io.BytesIO(data))
+                    member = tarfile.TarInfo('outside-source/special')
+                    member.type = kind
+                    member.linkname = prefix + 'source.c'
+                    archive.addfile(member)
+                with self.subTest(kind=kind), self.assertRaises(ValueError):
+                    validator.verify_source_manifest(path)
+            path = self.make_archive(directory, 'npm', 'valid')
+            with tarfile.open(path, 'r:gz') as archive:
+                entries = [(m, archive.extractfile(m).read()) for m in archive if m.isfile()]
+            with tarfile.open(path, 'w:gz') as archive:
+                for member, data in entries:
+                    archive.addfile(member, io.BytesIO(data))
+                for name in ('bindings/go/sdk/source/SOURCE_FILES.sha256',
+                             'bindings/rust/sdk/source/SOURCE_FILES.sha256'):
+                    member = tarfile.TarInfo(prefix + name)
+                    member.size = 7
+                    archive.addfile(member, io.BytesIO(b'receipt'))
+            self.assertEqual(validator.verify_source_manifest(path), 1)
 
     def test_unsafe_paths(self):
         # Exercise the producer with a Windows relative path on every host.

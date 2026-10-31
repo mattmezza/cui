@@ -44,20 +44,38 @@ def verify_source_manifest(artifact):
             members[name] = member
         read = archive.read
         regular = lambda member: not member.is_dir()
+        digest_member = lambda member: hashlib.sha256(read(member)).hexdigest()
     else:
-        archive = tarfile.open(artifact, "r:gz")
+        # Stream gzip once in archive order. Retain only metadata/digests and the
+        # manifest text, never source payloads or extracted files. Manifest order
+        # need not match npm's archive order (seeking would replay gzip prefixes).
+        archive = tarfile.open(artifact, "r|gz")
         prefix = "package/_source/"
-        members = {}
-        for member in archive.getmembers():
-            name = archive_path(member.name.removesuffix("/") if member.isdir() else member.name)
-            if name in members:
-                archive.close()
-                raise ValueError("Duplicate archive entry: " + name)
-            if not (member.isfile() or member.isdir()):
-                archive.close()
-                raise ValueError("Nonregular archive entry: " + name)
-            members[name] = member
-        read = lambda member: archive.extractfile(member).read()
+        members, digests = {}, {}
+        manifest_bytes = None
+        try:
+            for member in archive:
+                name = archive_path(member.name.removesuffix("/") if member.isdir() else member.name)
+                if name in members:
+                    raise ValueError("Duplicate archive entry: " + name)
+                if not (member.isfile() or member.isdir()):
+                    raise ValueError("Nonregular archive entry: " + name)
+                members[name] = member
+                if member.isfile() and name.startswith(prefix):
+                    with archive.extractfile(member) as source:
+                        if name == prefix + "SOURCE_FILES.sha256":
+                            manifest_bytes = source.read()
+                            digests[name] = hashlib.sha256(manifest_bytes).hexdigest()
+                        else:
+                            digest = hashlib.sha256()
+                            for chunk in iter(lambda: source.read(64 * 1024), b""):
+                                digest.update(chunk)
+                            digests[name] = digest.hexdigest()
+        except BaseException:
+            archive.close()
+            raise
+        read = lambda member: manifest_bytes
+        digest_member = lambda member: digests[member.name]
         regular = lambda member: member.isfile()
     try:
         manifest = members.get(prefix + "SOURCE_FILES.sha256")
@@ -76,7 +94,7 @@ def verify_source_manifest(artifact):
             member = members.get(prefix + relative)
             if member is None or not regular(member):
                 raise ValueError("Missing archived source file: " + relative)
-            if hashlib.sha256(read(member)).hexdigest() != digest:
+            if digest_member(member) != digest:
                 raise ValueError("Archived source hash mismatch: " + relative)
         # Existing producer excludes nested SDK hash receipts from recursive hashing.
         receipt_exclusions = {"SOURCE_FILES.sha256",

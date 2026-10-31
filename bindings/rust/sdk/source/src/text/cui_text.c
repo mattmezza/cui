@@ -1686,6 +1686,11 @@ bool cui_text_prepare_line(cui_text_prepare_session *s, cui_font *font, const cu
               c->text_color_count <= CUI_TEXT_COLOR_SPAN_MAX &&
               (!c->text_color_count || c->text_colors);
 #ifndef CUI_TEXT_BIDI
+    /* V2 contextual text needs Bidi; never fall back to inactive raw text. */
+    if (ok && (c->text_source.paragraph.data || c->text_color_count)) {
+        o->error = CUI_ERROR_INVALID_ACTION;
+        ok = false;
+    }
     if (ok && (c->text.length > 65536 || (c->text.length && !c->text.data))) {
         o->error = CUI_ERROR_CAPACITY;
         ok = false;

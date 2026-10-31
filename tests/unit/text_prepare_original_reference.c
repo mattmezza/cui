@@ -4,6 +4,13 @@
 #include "../fixtures/text_prepare_v1/source/src/text/cui_text.c"
 #include "text_prepare_fixture_internal.h"
 #include <assert.h>
+#ifdef CUI_TEXT_BIDI
+/* Runtime-derived address remains unreadable without O3 bounds constant propagation. */
+static uintptr_t poison_address(void) {
+    static volatile uintptr_t address = 1;
+    return address;
+}
+#endif
 bool cui_test_original_text_prepare(const char *regular, const char *bold_path, unsigned char *out,
                                     size_t capacity, size_t *out_length) {
     cui_font *font = cui_font_open(regular), *bold = cui_font_open(bold_path);
@@ -11,9 +18,9 @@ bool cui_test_original_text_prepare(const char *regular, const char *bold_path, 
 #ifdef CUI_TEXT_BIDI
     /* Immutable original source selects context by pointer, even when empty. */
     length = 0;
-    assert(cui_font_draw_context_line_scaled(font, (cui_str){(const char *)(uintptr_t)1, SIZE_MAX},
-                                             (cui_text_line_source){{"", 0}, 0, 0}, 12,
-                                             (cui_text_style){0}, 0, 0, 1, record, NULL));
+    assert(cui_font_draw_context_line_scaled(
+        font, (cui_str){(const char *)poison_address(), SIZE_MAX},
+        (cui_text_line_source){{"", 0}, 0, 0}, 12, (cui_text_style){0}, 0, 0, 1, record, NULL));
     assert(length == 0);
 #endif
     assert(cui_font_set_style(font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD}, bold));

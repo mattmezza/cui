@@ -48,7 +48,10 @@ no pointer/padding/hash-only oracle. Bundled Inter tests include multiline/soft
 breaks, tracking, contextual colors/gradient paint, Bold selection and16x source
 raster; legacy cache/density/shaping tests supplement these. Every CUI allocation
 and explicit dependency failure step is swept; budgets, alias/lifetime and retry
-checks run headlessly. Bidi-disabled source is tested separately.
+checks run headlessly. Bidi-disabled source is tested separately. The private V2
+no-Bidi recorder rejects contextual paragraph pointers (including empty context)
+and color spans before reading borrowed strings or allocating. It does not use
+the public legacy no-Bidi raw-text fallback; that route remains unchanged.
 
 Frozen pre-refactor byte files additionally pin the captured toolchain, archive,
 source, flags and font hashes. They are not universal FT raster goldens. Set
@@ -68,3 +71,11 @@ with the explicit bundled font passed. The reference hash tests passed2/2 and
 installed-skill tests passed18/18. Full current native CMake integration and other
 host dependency builds remain integrator/CI gates. Failure injection covers every
 CUI request and explicit dependency-call boundary, not opaque internal malloc.
+
+Followup verification compiled Bidi and no-Bidi fixtures with actual Release
+`-O3 -DNDEBUG -UNDEBUG -fPIE -Wall -Wextra -Wpedantic -Werror` flags. Seven
+focused private-Xvfb checks passed. Poisoned pointers derive from volatile address1
+to preserve invalid-read detection without GCC constant-propagation array-bounds
+diagnostics in deliberately rejected inputs; warnings remain enabled. The no-Bidi
+context/span rejection tests assert zero allocator calls, dependency calls, input
+admission and published records. Integrator CMake/runtime verification is separate.

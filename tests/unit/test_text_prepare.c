@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 #ifndef CUI_TEXT_BASELINE_CAPTURE
+/* Runtime-derived address remains unreadable without O3 bounds constant propagation. */
+static uintptr_t poison_address(void) {
+    static volatile uintptr_t address = 1;
+    return address;
+}
 bool cui_test_original_text_prepare(const char *, const char *, unsigned char *, size_t, size_t *);
 bool cui_test_original_fallback(const char *, const char *, const cui_draw_command *,
                                 unsigned char *, size_t, size_t *);
@@ -122,17 +127,18 @@ static void recording_boundaries(cui_font *font) {
     r.records = (cui_text_prepare_session){.owner = &o};
     text_record_coverage(&r, 0, 0, 0, 2, 0, NULL, c.color, false);
     assert(!r.records.first && o.error == CUI_OK);
-    text_record_coverage(&r, 0, 0, 4097, 1, 4097, (const unsigned char *)(uintptr_t)1, c.color,
+    text_record_coverage(&r, 0, 0, 4097, 1, 4097, (const unsigned char *)poison_address(), c.color,
                          false);
     assert(o.error == CUI_ERROR_CAPACITY && !r.records.first && !o.cpu_used);
     o = owner(&calls);
     o.coverage_pixels = (size_t)8 * 1024 * 1024;
     r.records = (cui_text_prepare_session){.owner = &o};
-    text_record_coverage(&r, 0, 0, 1, 1, 1, (const unsigned char *)(uintptr_t)1, c.color, false);
+    text_record_coverage(&r, 0, 0, 1, 1, 1, (const unsigned char *)poison_address(), c.color,
+                         false);
     assert(o.error == CUI_ERROR_CAPACITY && !r.records.first);
     o = owner(&calls);
     cui_text_prepare_session s = {.owner = &o};
-    c.text_source = (cui_text_line_source){{(const char *)(uintptr_t)1, 65537}, 0, 65537};
+    c.text_source = (cui_text_line_source){{(const char *)poison_address(), 65537}, 0, 65537};
     assert(!cui_text_prepare_line(&s, font, &c, 1));
     assert(!o.dependencies && !s.first);
     cui_text_prepare_session_end(&s);
@@ -140,17 +146,39 @@ static void recording_boundaries(cui_font *font) {
     o = owner(&calls);
     s = (cui_text_prepare_session){.owner = &o};
     c = fixture(4);
-    c.text = (cui_str){(const char *)(uintptr_t)1, SIZE_MAX}; /* inactive contextual text */
+    c.text = (cui_str){(const char *)poison_address(), SIZE_MAX}; /* inactive contextual text */
     assert(cui_text_prepare_line(&s, font, &c, 1));
     cui_text_prepare_session_end(&s);
     o = owner(&calls);
     s = (cui_text_prepare_session){.owner = &o};
     c = fixture(0);
     c.text_source = (cui_text_line_source){(cui_str)CUI_STR(""), 0, 0};
-    c.text = (cui_str){(const char *)(uintptr_t)1, SIZE_MAX};
+    c.text = (cui_str){(const char *)poison_address(), SIZE_MAX};
     assert(cui_text_prepare_line(&s, font, &c, 1));
     assert(!s.first);
     cui_text_prepare_session_end(&s);
+#else
+    /* No-Bidi V2 rejects contextual mode before reading either borrowed string. */
+    for (unsigned i = 0; i < 5; ++i) {
+        size_t before = calls;
+        o = owner(&calls);
+        s = (cui_text_prepare_session){.owner = &o};
+        c = fixture(0);
+        c.text = (cui_str){(const char *)poison_address(), i & 1 ? SIZE_MAX : 1};
+        if (i < 4)
+            c.text_source = (cui_text_line_source){
+                {(const char *)poison_address(), i < 2 ? 0 : 1}, 0, i < 2 ? 0 : 1};
+        else {
+            c.text_colors = (const cui_text_color_span *)poison_address();
+            c.text_color_count = 1;
+        }
+        assert(!cui_text_prepare_line(&s, font, &c, 1));
+        assert(o.error == CUI_ERROR_INVALID_ACTION && !s.first && !s.last);
+        assert(calls == before && !o.dependencies && !o.input_bytes && !o.face_count);
+        assert(!o.cpu_used && !o.metadata_used && !s.busy);
+        cui_text_prepare_session_end(&s);
+        assert(calls == before);
+    }
 #endif
 }
 #ifdef CUI_TEXT_BIDI

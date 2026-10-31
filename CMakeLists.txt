@@ -2093,6 +2093,10 @@ add_test(NAME named_selection_indicators COMMAND test_named_selection_indicators
 # Exercise the shadow fixtures with Windows' default stack budget. Instrumented
 # tests retain their separate ASan stack budget, as bridge_small_stack does.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CUI_SANITIZE)
+ # This fixture's retained pixel oracle must also leave room for Debug call frames.
+ add_test(NAME bridge_part_shadows_small_stack COMMAND ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/bindings/bridge/tests/test_small_stack.py --stack-kib 256
+  $<TARGET_FILE:test_bridge_part_shadows>)
  add_test(NAME shadow_fixture_small_stack COMMAND ${Python3_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/bindings/bridge/tests/test_small_stack.py
   $<TARGET_FILE:test_bridge_shadows> $<TARGET_FILE:test_component_shadow_ownership>

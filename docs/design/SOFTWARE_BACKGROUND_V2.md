@@ -3,6 +3,9 @@
 Based on approved `BACKGROUND_V2_RECORDS.md` through `638fc225`, Core V2
 `3e18bbba`, and private preparation `34a499a4`. This checkpoint needs review before
 production. All five adapters remain required; this specifies software only.
+Slice(a) now supplies private structural validation/planning and counted arenas in
+`backends/software/cui_software_v2_internal.h`; there is no render/support entry
+point, prepared font session, target publication or successful renderer yet.
 
 ## Exact additive entry points
 

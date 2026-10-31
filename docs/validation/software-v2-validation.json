@@ -1,0 +1,40 @@
+{
+  "checkpoint": "software V2 slice(a), private validation and workspace only",
+  "compiler": "taskset -c 0 nice -n 19 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -Iinclude tests/unit/test_software_v2_validation.c build-shadow/libcui.a -lm -o build-shadow/test_software_v2_validation",
+  "test": "python scripts/test_local.py --build-dir build-shadow -R software_v2_validation_focused --output-on-failure",
+  "result": "PASS 1/1; strict compiler emitted no diagnostics",
+  "coverage": [
+    "all nine legacy kinds plus owned background interleaved, nested clips and shadow/font deferred flags",
+    "active-field checks; deliberately poisoned inactive pointers, NaNs and geometry ignored",
+    "headers/version/stride/features/errors/count/null rejection; late malformed image, mesh and text resources",
+    "clip depth64 success, overflow, underflow, unclosed scopes",
+    "aggregate background work/CPU/texture/transfer and separate metadata exact boundaries",
+    "fractional unequal density compared to shared query; command/output alias rejection",
+    "contextual UTF8/color span boundaries, gradient text combinations, missing font and tracking",
+    "allocator failures first/second allocation, no leaks, bounded peak, retry, alignment/overflow and callback reentrancy"
+  ],
+  "accounting": {
+    "known_cpu": "scratch target + background packed spans + conservative uniform-source shadow reservation; <=32MiB",
+    "metadata": "separate aligned descriptor envelope <=1MiB; not included in CPU ceiling",
+    "inspection_work": "<=32MiB paragraph/vertex scan bytes, including repeat span scans; a work quota, not an allocation budget",
+    "deferred": "font/shaping temporaries and actual shadow preparation are NOT completed/accounted by a successful structural plan; counted session/painters remain prerequisites"
+  },
+  "limits": [
+    "No public support query or render entry; no target mutation or painter implemented",
+    "V1 software call sites, allocation and renderer interface untouched",
+    "Arena tracks payload bytes; allocator bookkeeping and fixed stack/control records remain separate",
+    "No font provider side-effect rollback, GPU, native window, bridge or all-five completion claim"
+  ],
+  "validation_dependency": {
+    "archive": "preserved build-shadow/libcui.a (identical frozen baseline-cf72-libcui.a)",
+    "sha256": "96d40727c65d39de0accedf45edba34098a209ec41747bd05800d96362e1a137",
+    "provenance": "cf72b10e; immutable pre-V2 baseline recorded by background V1 oracle receipt",
+    "scope": "ordinary value/bitmap/mesh/text-source/effects validators unchanged; no Core V2 emitter called. Integrator must independently rebuild against current Core."
+  },
+  "maintenance_checks": [
+    "agent skill18/18 PASS after final allocator-contract documentation and generation",
+    "clang-format23.1.2 full source check PASS; final allocator comment clang-formatted",
+    "amalgamation/Go+Rust SDK/agent skill freshness PASS",
+    "git diff --check PASS"
+  ]
+}

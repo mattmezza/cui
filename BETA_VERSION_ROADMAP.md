@@ -13,7 +13,7 @@ No completion percentage or beta date is asserted.
 | Released library | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3). Ten verified assets; hidden windows, initial named shadows and component improvements included. |
 | Public website | Interactive C → WASM gallery with all 78 entries, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
 | Merged development work | Additional component-part and Button state shadows are merged and deployed, but absent from alpha.3 library packages. |
-| Work in integration | Current-frame scrollbar layout, a typed C-only Slider model, versioned background transport and private software preparation/validation. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
+| Work in integration | Current-frame scrollbar layout, a typed C-only Slider model, versioned background transport, private software preparation/validation and counted text recording. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
 | Package registries | Go alpha.3 tag/proxy verified. PyPI, npm and crates.io publication remains open; GitHub assets are available. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -123,7 +123,7 @@ These are **unreleased slices**, not completed beta areas:
 | Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
 | Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check also passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
-| Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
+| Background rendering | Transport, preparation and private validator checks pass. Counted text recording is integrated locally; its CMake/runtime integration gate remains open. This does **not** establish renderer painting support. |
 | Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. New hosted Linux/macOS/Windows/browser confirmation remains open. |
 
 Keep detailed receipts with their implementation changes; refresh this summary

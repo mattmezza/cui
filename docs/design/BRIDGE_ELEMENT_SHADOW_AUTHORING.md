@@ -218,3 +218,62 @@ resources and run required focused freshness/offline checks. Keep all78 catalog
 entries and the beta roadmap shadow item pending until its stated broader work
 is complete. This proposal changes no actual coverage, so the existing unchecked
 roadmap and C-only consumer limitation remain correct.
+
+## Approved V1 checkpoint before production
+
+The six-kind scope and owned override are approved. Freeze these additive names
+and signatures (all return `cui_bridge_status` except the two uint32 queries):
+
+```c
+uint32_t cui_bridge_box_shadows_v1_size(void);
+uint32_t cui_bridge_box_shadows_supported_v1(uint32_t kind);
+cui_bridge_status cui_bridge_set_box_shadows_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t struct_size, const cui_bridge_box_shadows_v1 *);
+cui_bridge_status cui_bridge_reset_box_shadows(cui_bridge_app *, cui_bridge_node);
+cui_bridge_status cui_bridge_box_shadow_from_css_v1(float x, float y, float blur_radius,
+    float spread, uint32_t rgba, uint32_t kind, uint32_t layer_size,
+    cui_bridge_box_shadow_v1 *out);
+cui_bridge_status cui_bridge_shadow_preset_v1(uint32_t preset,
+    float top_left, float top_right, float bottom_left, float bottom_right,
+    uint32_t struct_size, cui_bridge_box_shadows_v1 *out);
+```
+
+`cui_bridge_box_shadow_v1` is 24 bytes: float offset_x/y/sigma/spread at offsets
+0/4/8/12, uint32 kind/rgba at16/20. `cui_bridge_box_shadows_v1` is224 bytes:
+uint32 struct_size/schema_version/count/reserved at0/4/8/12, four float radii in
+Core named order at16/20/24/28, and eight layer records at32 with stride24.
+Schema is1; reserved is0. Size/offset assertions and each facade's layout tests
+are required. Packed color is numerically0xRRGGBBAA, independent of byte order.
+Factories reuse Core preset/CSS functions and commit outputs only on success.
+`preset_v1` constructs a complete owned style, so every facade can use precisely
+the same value setter for explicit, preset and empty lists.
+
+Private node storage is one inline224-byte V1 value; schema0 means no override,
+schema1/count0 means explicit empty, and schema1/count1..8 means replacement.
+No new allocation or retained pointer is introduced. All224 bytes are copied on
+successful set. Runtime application converts at most eight wire layers to a
+stack-local Core list, which Core itself copies. Existing whole-node creation
+initialization clears inherited slot state. Verify/document the actual node-size
+delta on the supported build ABI rather than assuming host struct packing.
+
+App setter/reset validation order is existing `bridge_valid_node` first
+(app lifecycle then live slot/generation), supported node kind next
+(INVALID_ARGUMENT), then exact record size/schema/reserved and complete active
+values. Invalid records preserve the old override. No new callback or mutation
+phase policy: follow existing setters' step/run-dispatch rules. Capability query
+returns exactly0 or1 for the six approved kinds. Pure factories have no app or
+handle; invalid size/output/value returns INVALID_ARGUMENT with output unchanged.
+NONE produces an explicit empty record with the same empty-list radii policy as
+Core. Reset returns the node to schema0, restoring normal defaults next frame.
+
+Facade numeric validation must reject values that overflow conversion to finite
+float32; C validates again. Python/Go optional loading must preserve old default
+library loads, with explicit unsupported-feature errors only when new authoring
+is requested. Static/dynamic facade layout checks must agree on224/24 and fixed
+offsets. Reapply only when `cui_frame_paint_enabled` is true, after complete owner
+submission; an unexpected missing named target in an ordinary painted pass
+becomes the existing bridge frame CORE_ERROR. Inert ancestry still paints.
+
+This signed checkpoint changes no production or coverage status. The pending
+beta shadow item remains unchecked; implementation and focused all-facade proof
+must follow under the coordinated build slot.

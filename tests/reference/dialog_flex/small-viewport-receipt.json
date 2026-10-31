@@ -1,0 +1,27 @@
+{
+  "source_pin": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "engine": "taffy",
+  "version": "0.13.0",
+  "features": [
+    "std",
+    "flexbox",
+    "taffy_tree",
+    "content_size"
+  ],
+  "engine_receipt_sha256": "6d1d9c30eaf58ff1af1143256fa1d86fb2547a0e964c0453e2af277c1413c628",
+  "frozen28_output_sha256": "477e1574d376a8e2338d49e32c84693fce140e161e5d6dd9f1c2d12691042c5a",
+  "driver_sha256": "3979fd50036f980f75f908d55499e9e62c6570c86ad8771e4972b59815b654ba",
+  "output_sha256": "c4946bca08a25a418ec7f5882a1d488c250a1a56feca8ed05c72927d80cafb9a",
+  "rlib_sha256": "e8eba30c895c928acb85714d4bd5aad48939b3c8afdf00070e627520c23902b2",
+  "binary_sha256": "f0832524a7d9acd86a901bcb478f549b23bd68d78b2aa7ffa7a677faf066095a",
+  "binary_bytes": 571296,
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)",
+  "flags": [
+    "--edition=2021",
+    "-D warnings",
+    "-C opt-level=1",
+    "-C debuginfo=0",
+    "-C codegen-units=1"
+  ],
+  "method": "Separate Rust TU, exact existing verified engine rlib; no engine rebuild, network or dependency setup. Frozen28 driver/output/receipt unchanged."
+}

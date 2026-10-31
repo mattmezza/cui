@@ -454,11 +454,20 @@ static void placement_proof(void) {
     static const struct {
         float host_w, host_h, body, max_h, expected_h, expected_y, width, preferred;
     } cases[] = {
-        {400, 600, 40, 568, 40, 60, 240, 60},   {400, 600, 550, 568, 550, 34, 240, 60},
-        {400, 600, 900, 568, 568, 16, 240, 60}, {180, 220, 900, 188, 188, 16, 148, 22},
-        {180, 220, 40, 188, 40, 22, 148, 22},   {800, 800, 80, 768, 80, 96, 420, 96},
-        {800, 800, 740, 768, 740, 44, 420, 96}, {400, 600, 40, 568, 40, 16, 240, 0},
-        {400, 600, 900, 568, 568, 16, 240, 60}, {400, 600, 40, 568, 40, 60, 240, 60},
+        {400, 600, 40, 568, 40, 60, 240, 60},
+        {400, 600, 550, 568, 550, 34, 240, 60},
+        {400, 600, 900, 568, 568, 16, 240, 60},
+        {180, 220, 900, 188, 188, 16, 148, 22},
+        {180, 220, 40, 188, 40, 22, 148, 22},
+        {800, 800, 80, 768, 80, 96, 420, 96},
+        {800, 800, 740, 768, 740, 44, 420, 96},
+        {400, 600, 40, 568, 40, 16, 240, 0},
+        {400, 600, 900, 568, 568, 16, 240, 60},
+        {400, 600, 40, 568, 40, 60, 240, 60},
+        /* Separate executed Taffy source minima override raw max48/max8. */
+        {180, 80, 20, 48, 96, 16, 148, 8},
+        {180, 80, 900, 48, 96, 16, 148, 8},
+        {180, 40, 0, 8, 96, 16, 148, 4},
     };
     fixture f = {.placement = true, .margin = 16};
     f.ui = cui_create((cui_config){.width = 800, .height = 800});
@@ -467,7 +476,8 @@ static void placement_proof(void) {
         test_case c = {.name = "source placement",
                        .has_body = true,
                        .body = cases[i].body,
-                       .maximum = cases[i].max_h};
+                       .maximum = i >= 10 ? fmaxf(96, cases[i].max_h) : cases[i].max_h,
+                       .minimum = i >= 10 ? 96 : 0};
         f.c = &c;
         f.host_width = cases[i].host_w;
         f.host_height = cases[i].host_h;
@@ -496,15 +506,19 @@ static void placement_proof(void) {
         unsigned top = (unsigned)cases[i].expected_y;
         unsigned bottom = (unsigned)(cases[i].expected_y + cases[i].expected_h);
         assert(w == (unsigned)f.host_width && h == (unsigned)f.host_height);
-        assert(pixels[((size_t)(top + 2) * w + x) * 4] == 130);
+        if (c.body > 0)
+            assert(pixels[((size_t)(top + 2) * w + x) * 4] == 130);
         assert(top > 0 && pixels[((size_t)(top - 1) * w + x) * 4 + 3] == 0);
-        assert(bottom < h && pixels[((size_t)bottom * w + x) * 4 + 3] == 0);
+        if (bottom < h)
+            assert(pixels[((size_t)bottom * w + x) * 4 + 3] == 0);
+        else if (c.body > f.bounds[4].h)
+            assert(pixels[((size_t)(h - 1) * w + x) * 4] == 130);
         cui_software_destroy(sw);
         equal(body->details.scroll_max_y, fmaxf(0, c.body - cases[i].expected_h),
               "placement current semantic range");
     }
     cui_destroy(f.ui);
-    puts("SOURCE_PLACEMENT first-open/current grow-shrink/width/layer10 PASS");
+    puts("SOURCE_PLACEMENT first-open/current grow-shrink/width/layer/minimum13 PASS");
 }
 int main(int argc, char **argv) {
     assert(argc == 2);

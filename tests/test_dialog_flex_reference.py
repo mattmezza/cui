@@ -123,6 +123,20 @@ class ReferenceAuthority(unittest.TestCase):
 
 
 class ProductionAuthority(unittest.TestCase):
+    def test_small_viewport_independent_receipt(self):
+        here = ROOT / 'tests/reference/dialog_flex'
+        receipt = json.loads((here / 'small-viewport-receipt.json').read_text())
+        for filename, key in [('small_viewport.rs', 'driver_sha256'),
+                              ('small-viewport.csv', 'output_sha256'),
+                              ('golden.csv', 'frozen28_output_sha256'),
+                              ('golden-receipt.json', 'engine_receipt_sha256')]:
+            self.assertEqual(REF.digest((here / filename).read_bytes()), receipt[key])
+        self.assertEqual(receipt['source_pin'], REF.SOURCE_PIN)
+        self.assertEqual(receipt['features'], REF.FEATURES)
+        lines = (here / 'small-viewport.csv').read_text().splitlines()
+        self.assertEqual(len(lines), 5)
+        self.assertEqual([float(row.split(',')[-1]) for row in lines[1:]], [96.] * 4)
+
     def test_geometry_probe_uses_unmodified_production_implementation(self):
         # A copied allocator would invalidate the independent runtime witness.
         # The C tests exercise geometry; this guard protects their authority.

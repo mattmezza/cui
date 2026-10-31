@@ -80,3 +80,36 @@ No CMake/public API/production mutation, engine execution or new build directory
 The source-compatible placement tree is now demonstrated for this admitted
 synthetic-content matrix, not a completed Dialog component or font/raster claim.
 Canonical skill freshness and offline reference authority are checked separately.
+
+## Source minimum beyond a small viewport
+
+Separate `small_viewport.rs` uses the exact existing verified Taffy0.13.0 rlib;
+original28-row main/CSV/receipt remain byte-identical. Actual warning-clean
+rustc session85403, edition2021/O1/debug0/codegen1, produced four rows: min96 wins
+max48 for body20 and body900; min96 wins max8 for empty Body; ordinary max568
+also yields96 for short Body. `small-viewport.csv` is captured actual output;
+its separate receipt includes driver, old engine receipt, rlib, binary and CSV
+hashes/features/toolchain. Added binary571296 bytes, existing reference cache
+now9.5MiB, no engine rebuild/fetch/new dependency or buildtree.
+
+Source CSS/Taffy accepts min96>raw max48/8 and gives the minimum precedence.
+Core's public record deliberately rejects min>max. The component must normalize
+its EFFECTIVE Core maximum to max(source minimum, source constrained maximum),
+retaining source minimum96; it must not lower the minimum or reject an otherwise
+ordinary small viewport. This is typed source-style normalization before strict
+Core admission, not a relaxation of Core validation or a new layout solver.
+
+Three additional actual CUI source/distribution placement rows pass: viewport
+180x80, Body20/900, effective Panel96, top16; viewport180x40, empty Body,
+effective Panel96, top16. The same GROW spacer collapses0 when Panel exceeds
+usable48/8. Current bounds, semantic/prepaint heights/top and once-only callback
+remain96/16; long-body software pixels clip at the host bottom. Ordinary Panel
+and Footer overflow policy is retained; no whole-Outer fallback appears.
+
+Session23510 strict five steps and private-Xvfb source/distribution2/2PASS0.30s.
+Besides two fixture TUs/two links, Ninja correctly rebuilt the touched generated
+Core distribution probe once after canonical selective regeneration. No source
+Core algorithm or public API was changed. The existing target now checks13
+placement transitions plus its original28 source rows/contracts. Offline receipt
+and engine authority checks7/7PASS. Component default normalization and real
+font/input/lifecycle validation remain subsequent production work.

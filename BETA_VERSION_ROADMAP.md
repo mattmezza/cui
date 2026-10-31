@@ -13,7 +13,7 @@ No completion percentage or beta date is asserted.
 | Released library | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3). Ten verified assets; hidden windows, initial named shadows and component improvements included. |
 | Public website | Interactive C → WASM gallery with all 78 entries, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
 | Merged development work | Additional component-part and Button state shadows are merged and deployed, but absent from alpha.3 library packages. |
-| Work in integration | Scroll layout, Slider foundations and versioned background drawing. Focused checks exist; this is not a released or fully validated batch. |
+| Work in integration | Current-frame scrollbar layout, a typed C-only Slider model, versioned background transport and private software preparation/validation. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
 | Package registries | Go alpha.3 tag/proxy verified. PyPI, npm and crates.io publication remains open; GitHub assets are available. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -113,6 +113,21 @@ private validator’s `max_align_t`; a Slider event-count guard warns on WASM32.
 The package configuration fix passes actual staged-source configuration and all
 five full-tree import fixtures locally. Portability fixes and hosted confirmation
 remain pending; there is no new public deployment.
+
+### Current integration evidence
+
+These are **unreleased slices**, not completed beta areas:
+
+| Slice | Evidence / remaining gate |
+| --- | --- |
+| Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
+| Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
+| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; hosted confirmation remains open. |
+| Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
+| Portability fixes | Packaged-source configuration fix passes focused checks; Windows alignment and WASM32 fixes need combined integration/hosted confirmation. |
+
+Keep detailed receipts with their implementation changes; refresh this summary
+when the integrated revision passes, merges or ships.
 
 ## Deferred or lower priority
 

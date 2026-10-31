@@ -1,0 +1,18 @@
+{
+  "tested_revision": "7934d76a33ab4913c7d9d9975adb798f9e2795ad",
+  "scope": "Additive C Core scroll-region sizing and corrected PRIVATE software V2 painter. No public renderer support or full Dialog completion.",
+  "build": "Actual current-library CMake Release warnings-clean focused rebuild (157 scheduled steps), nice19 CPU0 single job.",
+  "runtime": "Private-Xvfb test_local.py focused CTest10/10PASS, no skips: source/dist region sizing, independent reference authority, frozen V1 source/dist, source/dist scrollbar tracks, software validator/painter and C++ header.",
+  "wasm": "Pinned Zig0.16 wasm32-wasi strict C11 O2 actual header-object compilation passes public24/144-byte assertions. Initial -fsyntax-only probe hit Zig driver unused implicit -c warning; corrected by real object compilation, no warning suppression.",
+  "coalesced_checks": "Installed skill18/18PASS97.334s while sharing one lowpriority CPU with build; no performance inference. Component usage6/6, independent reference authority6/6, full format23.1.2, SDK/amalgamation/skill freshness and manifest78unique pass.",
+  "review": "Reviewed public Core record/contracts, region allocator, sidecar changes and software absolute-double row/UV correction. Worker original helper negativeprobe failed expected giant edge before correction; final integrated painter giant-edge cases pass.",
+  "limitations": "Not a full native suite or hosted acceptance of this revision. Software helper still rejects text and both shadows; no public adapter entry. Styled Slider, full Dialog actions/lifecycle, foreign builders and all other adapters remain open.",
+  "log_sha256": {
+    "core-paint-integration-build.log": "6a8c5f1d02e023326269ddc144606f3576d6760344d0d1b394602ce38a389a80",
+    "core-paint-integration-tests.log": "93cf48a7a13ddaa652f4e4a67d7a0ee716d1887d07ffd3112b9f782b6e6c179d",
+    "core-paint-integration-skill.log": "464ad09a4c5b0eeeac013605e434db2e0f2dceb8c88d5fded41a91a9bd5a501a",
+    "core-paint-integration-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "core-paint-integration-wasm-header.log": "54b1ec1ecdbc0b8f5fb1b456f97b2de47d7ee799f0cb99ce9d145103eb100f32",
+    "core-paint-integration-wasm-header-object.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

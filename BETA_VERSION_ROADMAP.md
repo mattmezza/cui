@@ -23,7 +23,7 @@ feature test does not establish complete component parity.
 
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; additive region-sizing work has passed worker checks and awaits integration. Finish Dialog composition/input and wider acceptance. |
+| 1 | Finish scroll layout and Dialog sizing | Core geometry and additive region sizing pass combined local validation. Finish Dialog composition/input and wider acceptance. |
 | 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
 | 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Confirm the final Windows fieldwise-test correction and obtain a clean full run of the latest candidate. |
@@ -113,12 +113,12 @@ The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actio
 [Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
 Integration candidate `3636bfbc` passed all browser shards and native binding
 runners; its only CI failure was a Windows Release struct-padding comparison.
-The fieldwise correction passes locally. Latest submitted candidate: `00aa1f99`;
-[CI](https://github.com/mattmezza/cui/actions/runs/41251863047),
-[native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050) and
-[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) require terminal
-confirmation. Branch checks do not deploy the public website. Older green results
-do not cover newer code.
+Latest submitted candidate `00aa1f99` passes
+[CI](https://github.com/mattmezza/cui/actions/runs/41251863047), including Windows
+Release, and [native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050).
+[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) remains pending.
+Branch checks do not deploy the public website. Older green results do not cover
+newer code.
 
 ### Current integration evidence
 
@@ -130,8 +130,8 @@ These are **unreleased slices**, not completed beta areas:
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). The controlled example, responsive/ring pixel proofs and pure C style resolver pass. Styled facade/motion and other languages remain open. |
 | Reduced-motion scheduling | Local viewport/DPI and repeated preference-change checks pass; all browser shards passed for candidate `3636bfbc`. Confirm the newest candidate separately. |
 | Background rendering | Transport, preparation and private validator checks pass. Counted text recording passes the repository Release O3 build, seven runtime checks, mutation rejection and skill18. The negative-fixture warning and no-Bidi admission gap are fixed. Wider suite/platform acceptance remains open. This does **not** establish renderer painting support. |
-| Worker handoffs awaiting integration | Core scroll-region sizing: source/distribution/legacy/header checks 6/6 and skill checks 18/18 pass. Private software painter: focused checks 5/5 and skill checks 18/18 pass, including a reproduced and corrected large-coordinate regression. These are not integrated or public renderer support. |
-| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. New hosted Linux/macOS/Windows/browser confirmation remains open. |
+| Core region sizing and private painting | Combined current-library warning-clean Release build and focused headless checks10/10 pass; skill18/18, generated freshness and WASM32 record sizes pass. See [receipt](docs/validation/core-paint-integration.json). Full Dialog and public renderer support remain open. |
+| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. Hosted Linux/macOS/Windows checks pass for `00aa1f99`; browser completion and newer slices require separate confirmation. |
 
 Keep detailed receipts with their implementation changes; refresh this summary
 when the integrated revision passes, merges or ships.

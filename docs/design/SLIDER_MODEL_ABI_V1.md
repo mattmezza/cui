@@ -193,14 +193,14 @@ CUI exceptions, not source-f32 bit parity claims.
 
 | Input / transition | Exact ordered callback emissions |
 | --- | --- |
-| Pointer down on admissible prior-layout root/thumb | BEGIN(entry), UPDATE(pointer proposal); captures chosen thumb/pointer and starting pair |
+| Pointer down on admissible prior-layout root/thumb | BEGIN(pre-pointer intention), UPDATE(pointer proposal); captures chosen thumb/pointer and pre-pointer intention pair |
 | Pointer move while dragging | UPDATE(evolving preview), even if same snapped value |
 | Pointer up while dragging | UPDATE(final pointer), COMMIT(final preview); no retained dragging |
 | Down+up in one frame | BEGIN, UPDATE, UPDATE, COMMIT, in original event order |
 | Up without active gesture | none |
 | Escape/generic/touch cancellation | CANCEL(captured start), no COMMIT; copied actual input where present |
-| Each supported key or claimed numeric a11y action while not dragging | BEGIN(entry), UPDATE(proposal from entry pair), COMMIT(same proposal) |
-| Two supported keys / two a11y actions in one call | Two independent three-phase groups; both proposals use immutable entry owner pair, not first callback's acceptance |
+| Each supported key or claimed numeric a11y action while not dragging | BEGIN(prior same-call intention), UPDATE(next intention), COMMIT(same next intention) |
+| Two supported keys / two a11y actions in one call | Two independent three-phase groups; requested intent evolves in original order (+1 then +2), while every current remains immutable entry |
 | Disabled/readonly/zero-span/source/domain/mode/axis change while dragging | One synthetic CANCEL before later admissible input; deterministic reason priority listed below |
 | Missing callback | Read-only cleanup; no invocation into absent user; zero counts |
 
@@ -265,11 +265,15 @@ requests once error is known. Already copied request/owner effects are not undon
 Any need for stronger capacity reservation requires a separate approved Core API,
 not a false preflight guarantee. No heap allocation in model state/reducer itself.
 
-Handler/function/user and strings remain alive through return. Callback can only
-accept/reject externally or enqueue application work for later composition; it
-must not destroy/mutate current UI/state/theme/options/users, recursively submit,
-or alter borrowed buffers mid-call. No callback retained by model. State/request
-copies contain owned numeric fields only. End-frame/renderer borrowed-storage
+Handler/function and userdata storage remain alive through return; referenced
+strings remain stable through return. Callback MAY mutate external owner storage,
+unrelated application state and mutable userdata fields, and enqueue work. It
+must not mutate the active UI context/model state/options/theme or string buffers
+borrowed by this submission (including aliases through userdata), recursively
+submit, destroy the context or free/replace active state/callback/userdata storage.
+Requesting later removal/shutdown in application state is allowed; actual teardown
+waits until return. No callback retained by model. State/request copies contain
+owned numeric fields only. End-frame/renderer borrowed-storage
 lifetime requirements of Styled presentation remain separately documented.
 
 ## Future bridge receipt/request ABI: exact mapping, no scalar fallback
@@ -405,7 +409,7 @@ Required offline/headless contracts before implementation approval/completion:
   min-origin step vs documented zero-origin source difference, off-grid neighbor,
   extreme finite doubles and high offsets. No roundtrip oracle copied from helpers.
 - Phase table asserted exactly with actual queued pointer/key/touch/a11y input:
-  unchanged repeated requests, same-call frozen pair, four callbacks for click,
+  unchanged requests at limits, frozen current/evolving requested pairs, four callbacks for click,
   six for two keys, cancel priority, no-handler read-only, omission/layout-only,
   acceptance on next frame, frame/sequence budget and duplicate submission.
 - Copied request metadata remains valid after callback/frame/context; actual numeric
@@ -432,3 +436,95 @@ owned brush rendering and installed native host delivery remain independent gate
 
 Signed: `/root/hidden_windows`, 2026-10-31. Design-only checkpoint; no production,
 generated files, compiler, dependencies, merge or push.
+
+## Root-review resolution: mutable application owners and evolving intent
+
+This revision supersedes the frozen-*requested* two-key proposal in the earlier
+broad audit; it does not change any legacy C API. The shared
+[component event contract](COMPONENT_EVENTS_CONTRACT.md) lines90–93 permits
+external owner assignment at a documented snapshot point,101–108 freezes evidence
+before callbacks and preserves original-order events,141–148 allows application/
+userdata mutation while protecting active storage/lifetimes. It does not require
+all proposals to be recomputed from the entry value. The narrower rules on some
+existing aggregate numeric wrappers are unchanged.
+
+Existing `cui_base_slider_controlled` / `cui_base_slider_events` / Styled scalar
+facade explicitly recompute each key from frozen entry, and
+`tests/unit/test_slider_events.c`:87–98 expects two Right keys from .25/step.125
+to both request .375. Their docs, IDs, callbacks, precision, input order and tests
+remain untouched. The new typed model is a distinct opt-in route. Pinned Base
+Slider accessibility increment/decrement reads and updates its retained entity
+value per original action, so its second increment progresses from the first.
+A new controlled route should preserve that input progression without silently
+accepting the proposed owner value.
+
+### Chosen new-route rule
+
+Keep **request.current immutable** as confirmed entry for the entire submission.
+Maintain a local owned **intention pair** initialized from confirmed entry when
+idle, or captured preview when a pointer gesture is already active. Process each
+eligible input in original order. Increment/decrement/arrow proposals derive from
+that intention; after snapping/domain/neighbor clamp, replace intention before
+callbacks and emit BEGIN(before intention), UPDATE(after intention),
+COMMIT(after intention) for each non-drag command. Home/End and absolute SET_VALUE
+replace the targeted endpoint intention; following commands evolve from it.
+Callback assignments are never reread during the same submission.
+
+Pointer motion continues to evolve gesture preview in order. If a new pointer
+gesture follows earlier idle commands in the same submission, capture its start
+from the current local intention (and BEGIN offers that pre-pointer intention),
+not by rereading external owner. CANCEL offers this captured pre-gesture intention;
+that may include earlier unaccepted same-call commands. The owner is still free
+to reject it. This is explicit proposed intent, not a claim of confirmed owner
+state; request.current remains entry throughout. After cancel, subsequent eligible
+inputs evolve from captured start intention. No implicit owner write occurs.
+
+Eligible command progression here is for no active pointer gesture. During a
+pointer gesture, arrow/Home/End commands remain ignored (Escape cancels); numeric
+a11y capabilities are temporarily revoked for both thumbs of that busy widget. A numeric
+action queued from a previous idle snapshot but encountered after a same-call
+pointer start must fail the refreshed current capability claim, not be claimed
+and silently dropped. Restore capability after gesture terminal state for future
+requests. No replay or hidden pointer-command interleaving policy is introduced.
+This busy-capability policy must be tested explicitly before production.
+
+Intention is speculative, so **rejection does not rewind the same-call input
+trajectory**. It rejects owner acceptance only, independent of input consumption.
+Owner remains unchanged unless callback explicitly assigns it (C) or accepts a
+receipt (future bridge). Idle intention is discarded at return; next submission
+initializes from then-confirmed owner. Only actual ongoing pointer preview persists
+across frames. No hidden keyboard/a11y accumulation survives rejected frames.
+No matter which proposals are accepted, same-call semantics/idle paint remain
+confirmed entry; after pointer terminal paint uses confirmed entry too.
+
+Example: confirmed .25, step.125, two Right events, no active drag:
+
+| Event | BEGIN requested | UPDATE/COMMIT requested | current in all phases |
+| --- | --- | --- | --- |
+| First Right | .25 | .375 | .25 |
+| Second Right | .375 | .5 | .25 |
+
+All six callbacks retain original per-event metadata. Accept both→external owner
+.5; reject both→owner .25; reject first/accept second→owner .5. If first callback
+assigns a different valid external owner (e.g..9), second still proposes .5 from
+intention, not1.025 or reread .9. That external assignment is observed next
+submission unless overwritten by another explicit acceptance. After rejecting
+both, a single Right next frame proposes .375 again, not .625. Left after Right
+in the same batch returns intention to .25. Repeated boundary events may propose
+the same clamped pair while preserving individual callbacks/counts.
+
+Bridge after-frame dispatch receives the same ordered copied proposals (.375,.5)
+and frozen current .25, with independent receipts valid within that submission
+window. Ordered acceptance updates owner to .5 without changing queued snapshots.
+Manual polling/receipt expiry/last-accepted sequence contracts stay as specified;
+no implicit acknowledgement feedback is introduced into the C reduction loop.
+
+Additional independent tests must cover accept all/none/only second, callbacks
+mutating external userdata counters/owner/unrelated state/enqueued work, aliased
+protected state rejection/lifetime rules, relative+absolute mixed commands,
+Range neighbor limits, log value-unit steps, busy pointer capability gating,
+same-call +1/+2 with frozen current, no cross-frame rejected accumulation, and
+legacy old-route .375/.375 regression alongside new-route .375/.5 proof.
+
+Signed resolution: `/root/hidden_windows`, 2026-10-31. Design only; no production,
+compiler, generated resources, dependencies, merge or push.

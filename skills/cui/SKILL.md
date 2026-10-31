@@ -141,6 +141,15 @@ For responsive UI, derive available space from the host and use the documented
 layout constraints. Test narrow and wide viewports, long content and overflow;
 do not transplant CSS/browser assumptions into the C layout model.
 
+Typed builder root shadows cover only Row, Column, Label, Button, Badge and
+Input. Read `docs/BRIDGE_SHADOWS.md` and the owning `include/cui/cui_bridge.h`
+record contract. The exact SDK revision must also provide the typed modules
+`bindings/python/cui_bridge/shadows.py`, `bindings/node/shadows.cjs` and
+`bindings/rust/src/shadows.rs`; these are readable through this helper. Explicit
+empty lists suppress defaults; reset restores defaults. Compound parts and
+portals are outside this bridge mapping. Python deferred CSS/preset requests
+normalize through the owning App's selected library at mount/update.
+
 ## Compose and verify
 
 CUI's C API composes visible UI every frame; application data and explicit models

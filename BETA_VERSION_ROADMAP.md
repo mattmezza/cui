@@ -40,6 +40,9 @@ can lag implementation: inspect current code and evidence before scheduling work
   nested-part and popup ownership, language bindings, copyable examples and
   browser/native proof. CSS-like blur
   convenience must not reinterpret existing sigma-based APIs or presets.
+  The six-kind owned bridge/facade override passes focused portable software and
+  all five facade checks; broader part/portal coverage, browser/GPU proof and
+  integration remain pending.
 - [ ] **Release the completed major batch.** Freeze one source revision; validate
   matching C, Python/npm, Go and Rust artifacts; publish release notes/checksums
   and matching website docs. `0.1.0-alpha.3` is prepared, **not yet released**.

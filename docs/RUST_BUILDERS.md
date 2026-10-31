@@ -117,3 +117,7 @@ may use them. Headless visibility queries return unavailable. This is an additiv
 Rust API and independent C window-options record, preserving the old C options
 ABI. Rebuild with matching native exports for the new methods. See the [shared
 contract and Linux proof](BINDING_BUILDERS.md#native-window-visibility).
+
+## Bounded typed root shadows
+
+See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementation, owned values, canonical CSS/preset factories and explicit clear/reset behavior. Focused portable runtime tests cover this subset; integration remains pending. This does not expose compound parts or portals.

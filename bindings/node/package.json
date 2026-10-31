@@ -16,6 +16,7 @@
   "license": "MIT",
   "files": [
     "index.cjs",
+    "shadows.cjs",
     "index.d.cts",
     "types",
     "addon.c",

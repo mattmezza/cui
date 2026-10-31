@@ -59,8 +59,9 @@ semantics or input behavior. See [DROP_SHADOW.md](DROP_SHADOW.md),
 [INSET_SHADOW.md](INSET_SHADOW.md) and [SHADOW_PRESETS.md](SHADOW_PRESETS.md) for
 renderer limits, masks, owned cache budgets and failure boundaries.
 
-The generic setter is C-only. Language builders and bridge do not yet expose this
-style contract; bundled C headers alone do not establish typed language support.
+The generic setter is a C API. The additive [bridge V1 authoring slice](BRIDGE_SHADOWS.md)
+implements six explicitly listed builder roots and is pending focused runtime
+validation; bundled C headers alone do not establish other typed language support.
 Popup/trigger/backdrop and anonymous or repeated component parts need explicit
 owner-specific public addressing and tests. Full 78-family component-part and
 binding coverage remains planned in `design/ELEMENT_SHADOW_STYLING.md`. The

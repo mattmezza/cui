@@ -4,6 +4,7 @@
 #include "cui/cui_stepper_visual.h"
 #include "cui_bridge_internal.h"
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -367,6 +368,140 @@ static cui_bridge_status bridge_valid_node(cui_bridge_app *app, cui_bridge_node 
     *out = node;
     return CUI_BRIDGE_OK;
 }
+_Static_assert(sizeof(cui_bridge_box_shadow_v1) == 24, "shadow layer V1 ABI");
+_Static_assert(sizeof(cui_bridge_box_shadows_v1) == 224, "shadow style V1 ABI");
+_Static_assert(offsetof(cui_bridge_box_shadows_v1, layers) == 32, "shadow layers offset");
+_Static_assert(offsetof(cui_bridge_box_shadow_v1, rgba) == 20, "shadow color offset");
+_Static_assert(offsetof(cui_bridge_box_shadow_v1, offset_x) == 0 &&
+                   offsetof(cui_bridge_box_shadow_v1, offset_y) == 4 &&
+                   offsetof(cui_bridge_box_shadow_v1, sigma) == 8 &&
+                   offsetof(cui_bridge_box_shadow_v1, spread) == 12 &&
+                   offsetof(cui_bridge_box_shadow_v1, kind) == 16,
+               "shadow V1 layer offsets");
+_Static_assert(offsetof(cui_bridge_box_shadows_v1, struct_size) == 0 &&
+                   offsetof(cui_bridge_box_shadows_v1, schema_version) == 4 &&
+                   offsetof(cui_bridge_box_shadows_v1, count) == 8 &&
+                   offsetof(cui_bridge_box_shadows_v1, reserved) == 12 &&
+                   offsetof(cui_bridge_box_shadows_v1, top_left) == 16 &&
+                   offsetof(cui_bridge_box_shadows_v1, top_right) == 20 &&
+                   offsetof(cui_bridge_box_shadows_v1, bottom_left) == 24 &&
+                   offsetof(cui_bridge_box_shadows_v1, bottom_right) == 28,
+               "shadow V1 style offsets");
+uint32_t cui_bridge_box_shadows_v1_size(void) {
+    return sizeof(cui_bridge_box_shadows_v1);
+}
+uint32_t cui_bridge_box_shadows_supported_v1(uint32_t kind) {
+    return kind == CUI_BRIDGE_ROW || kind == CUI_BRIDGE_COLUMN || kind == CUI_BRIDGE_LABEL ||
+           kind == CUI_BRIDGE_BUTTON || kind == CUI_BRIDGE_INPUT || kind == CUI_BRIDGE_BADGE;
+}
+static cui_box_shadow bridge_shadow_layer(cui_bridge_box_shadow_v1 layer) {
+    return (cui_box_shadow){
+        .layer = {.offset_x = layer.offset_x,
+                  .offset_y = layer.offset_y,
+                  .sigma = layer.sigma,
+                  .spread = layer.spread,
+                  .color = {(uint8_t)(layer.rgba >> 24), (uint8_t)(layer.rgba >> 16),
+                            (uint8_t)(layer.rgba >> 8), (uint8_t)layer.rgba}},
+        .kind = (cui_box_shadow_kind)layer.kind};
+}
+static cui_corner_radii bridge_shadow_radii(const cui_bridge_box_shadows_v1 *value) {
+    return (cui_corner_radii){value->top_left, value->top_right, value->bottom_left,
+                              value->bottom_right};
+}
+static bool bridge_shadows_valid(const cui_bridge_box_shadows_v1 *value) {
+    if (!value || value->struct_size != sizeof(*value) || value->schema_version != 1 ||
+        value->count > 8 || value->reserved)
+        return false;
+    for (uint32_t i = 0; i < value->count; ++i) {
+        cui_box_shadow layer = bridge_shadow_layer(value->layers[i]);
+        cui_rect ignored;
+        if (value->layers[i].kind > CUI_BOX_SHADOW_INSET ||
+            !cui_drop_shadow_bounds((cui_drop_shadow_paint){.caster = {0, 0, 1, 1},
+                                                            .radii = bridge_shadow_radii(value),
+                                                            .layer = layer.layer},
+                                    &ignored))
+            return false;
+    }
+    return true;
+}
+cui_bridge_status cui_bridge_set_box_shadows_v1(cui_bridge_app *app, cui_bridge_node handle,
+                                                uint32_t size,
+                                                const cui_bridge_box_shadows_v1 *value) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!cui_bridge_box_shadows_supported_v1(node->kind) || size != sizeof(*value) ||
+        !bridge_shadows_valid(value))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    node->shadows = *value;
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_reset_box_shadows(cui_bridge_app *app, cui_bridge_node handle) {
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    if (!cui_bridge_box_shadows_supported_v1(node->kind))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    memset(&node->shadows, 0, sizeof(node->shadows));
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_box_shadow_from_css_v1(float x, float y, float radius, float spread,
+                                                    uint32_t rgba, uint32_t kind, uint32_t size,
+                                                    cui_bridge_box_shadow_v1 *out) {
+    if (!out || size != sizeof(*out) || kind > CUI_BOX_SHADOW_INSET)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_box_shadow layer;
+    cui_color color = {(uint8_t)(rgba >> 24), (uint8_t)(rgba >> 16), (uint8_t)(rgba >> 8),
+                       (uint8_t)rgba};
+    if (!cui_box_shadow_from_css(x, y, radius, spread, color, (cui_box_shadow_kind)kind, &layer))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    *out = (cui_bridge_box_shadow_v1){x, y, layer.layer.sigma, spread, kind, rgba};
+    return CUI_BRIDGE_OK;
+}
+cui_bridge_status cui_bridge_shadow_preset_v1(uint32_t preset, float tl, float tr, float bl,
+                                              float br, uint32_t size,
+                                              cui_bridge_box_shadows_v1 *out) {
+    if (!out || size != sizeof(*out))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_drop_shadow layers[CUI_SHADOW_PRESET_MAX];
+    size_t count;
+    if (!cui_shadow_preset_layers((cui_shadow_preset)preset, layers, CUI_SHADOW_PRESET_MAX, &count))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_bridge_box_shadows_v1 value = {.struct_size = sizeof(value),
+                                       .schema_version = 1,
+                                       .count = (uint32_t)count,
+                                       .top_left = tl,
+                                       .top_right = tr,
+                                       .bottom_left = bl,
+                                       .bottom_right = br};
+    for (size_t i = 0; i < count; ++i) {
+        cui_color c = layers[i].color;
+        value.layers[i] = (cui_bridge_box_shadow_v1){
+            layers[i].offset_x,
+            layers[i].offset_y,
+            layers[i].sigma,
+            layers[i].spread,
+            CUI_BOX_SHADOW_DROP,
+            (uint32_t)c.r << 24 | (uint32_t)c.g << 16 | (uint32_t)c.b << 8 | c.a};
+    }
+    if (!bridge_shadows_valid(&value))
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    *out = value;
+    return CUI_BRIDGE_OK;
+}
+static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *node) {
+    if (!node->shadows.schema_version || !cui_frame_paint_enabled(app->ui))
+        return;
+    cui_box_shadow layers[8];
+    for (uint32_t i = 0; i < node->shadows.count; ++i)
+        layers[i] = bridge_shadow_layer(node->shadows.layers[i]);
+    if (!cui_element_set_box_shadows(app->ui, node->id, layers, node->shadows.count,
+                                     bridge_shadow_radii(&node->shadows)))
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+}
+
 uint32_t cui_bridge_abi_version(void) {
     return CUI_BRIDGE_ABI_VERSION;
 }
@@ -4742,6 +4877,8 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         }
         (void)cui_button_ex(app->ui, node->id, &app->theme, cui_string(node->text), options);
     }
+    if (cui_bridge_box_shadows_supported_v1(node->kind))
+        bridge_apply_shadows(app, node);
     node->disabled = previous_disabled;
 }
 /* Keep legal structural recursion away from component-specific stack locals. */
@@ -4763,6 +4900,7 @@ static void bridge_render_node(cui_bridge_app *app, uint32_t slot) {
     for (uint32_t child = node->first_child; child; child = app->nodes[child].next_sibling)
         bridge_render_node(app, child);
     cui_end_box(app->ui);
+    bridge_apply_shadows(app, node);
     node->disabled = previous_disabled;
 }
 cui_bridge_status cui_bridge_run(cui_bridge_app *app, cui_bridge_run_callback callback,

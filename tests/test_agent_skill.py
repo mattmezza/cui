@@ -260,6 +260,43 @@ class AgentSkillTests(unittest.TestCase):
             self.assertEqual([entry['name'] for entry in agent_resources.public_api(root)],
                              ['cui_zebra', 'cui_alpha'])
 
+    def test_typed_shadow_definition_modules_are_discoverable_offline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = ['bindings/python/cui_bridge/shadows.py',
+                        'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs']
+            for name in expected + ['bindings/python/private.py',
+                                    'bindings/rust/target/shadows.rs',
+                                    'bindings/python/private/shadows.py']:
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text('typed shadow definition\n', encoding='utf-8')
+            paths = {p.relative_to(root).as_posix(): p.read_text()
+                     for p in agent_resources.source_files(root)}
+            for name in expected:
+                self.assertEqual(paths[name], 'typed shadow definition\n')
+            self.assertNotIn('bindings/python/private.py', paths)
+            self.assertNotIn('bindings/rust/target/shadows.rs', paths)
+            self.assertNotIn('bindings/python/private/shadows.py', paths)
+        with tempfile.TemporaryDirectory(prefix='cui-shadow-installed-') as directory:
+            installed = Path(directory) / 'cui'
+            shutil.copytree(ROOT / 'skills/cui', installed)
+            helper = installed / 'scripts/cui.py'
+            for name in expected:
+                with self.subTest(resource=name):
+                    exact = (ROOT / name).read_text(encoding='utf-8')
+                    self.assertEqual(self.data['documents'][name], exact)
+                    result = subprocess.run([sys.executable, str(helper), 'read', name],
+                                            cwd=directory, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, exact + '\n')
+            result = subprocess.run([sys.executable, str(helper), 'api',
+                                     'cui_bridge_set_box_shadows_v1'],
+                                    cwd=directory, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn('include/cui/cui_bridge.h', result.stdout)
+
+
     def test_fingerprint_tracks_header_and_doc_changes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

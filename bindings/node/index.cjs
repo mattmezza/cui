@@ -7,6 +7,7 @@ const sourceArtifact = fs.existsSync(path.join(__dirname, '_source'));
 const addonPath = process.env.CUI_NODE_ADDON || (fs.existsSync(packaged) || sourceArtifact
   ? packaged : path.resolve(__dirname, '../../build-node/cui.node'));
 const native = require(addonPath);
+const {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii}=require('./shadows.cjs')(native);
 const NODE = Symbol('CUI node');
 let nextKey = 1;
 const disabledKinds = new Set([4,5,6,7,8,9,12,13,14,15,17,18,19,20,21,22,23,28,29,40,41,42,43,44,48,54,55,56,57,58,59,60,61,65,66,67,68,69,71,73,74,75,77,78,79]);
@@ -46,8 +47,16 @@ class Node {
     this.questionFlags=null;this.rootPaddingValue=0;this.gapValue = undefined; this.variantValue = 0; this.sizeValue = 3;
     this.roundingValue = 0; this.radiusValue = 0; this.disabledValue = false;
     this.extentValue=null; this.anchorValue=null; this.visualValue=null; this.closeValue=null; this.totalValue=kind===43?5:kind===59?6:10; this.attachmentValue=0; this.imageValue=null;this.chartDataValue=[];this.chartKindValue=0;this.plotPointsValue=[];this.matrixValue=null;this.selectionModeValue=0;this.textFormatValue=0;this.panelValue=null; this.timeValue=[0,0,0];this.dateValue=[2026,1,1];this.colorValue=0x000000ff; this.statusValue=null; this.openValue = false;this.openSet=false;this.checkedSet=false; this.detailValue = ""; this.selectedValue = null; this.checkedValue = false; this.numericValue = kind===42?1:0; this.rangeValue = kind===42?[1,10,1]:kind===43?[0,5,1]:[0,1,.01]; this.changeValue = undefined;
-    this.hoverValue = undefined; this.clickValue = undefined;
+    this.shadowStyleValue = null; this.hoverValue = undefined; this.clickValue = undefined;
   }
+  box_shadows(layers=[],radii=new CornerRadii()) {
+    if(![1,2,3,4,11,12].includes(this.kind))throw new Error('unsupported shadow root');
+    const style=layers instanceof ShadowStyle?layers:new ShadowStyle(layers,radii);
+    if(this.owner)native.setShadows(this.owner.handle,this[NODE],style.wire());
+    this.shadowStyleValue=style;return this;
+  }
+  shadow_preset(preset,radii=new CornerRadii()){return this.box_shadows(ShadowStyle.preset(preset,radii));}
+  reset_box_shadows(){if(![1,2,3,4,11,12].includes(this.kind))throw new Error('unsupported shadow root');if(this.owner)native.resetShadows(this.owner.handle,this[NODE]);this.shadowStyleValue=null;return this;}
   key(value) {
     if (this.owner) throw new Error('key cannot change after mount');
     if (typeof value !== 'string' || !value) throw new TypeError('key must be a nonempty string');
@@ -393,6 +402,7 @@ class App {
       if(node.statusValue!==null)native.setStepStatus(this.handle,node[NODE],node.statusValue);
       if(node.stepperVisualValue)native.setStepperVisual(this.handle,node[NODE],...node.stepperVisualValue);
       if(node.designSizeValue!==undefined)native.setDesignSize(this.handle,node[NODE],node.designSizeValue);
+      if(node.shadowStyleValue)native.setShadows(this.handle,node[NODE],node.shadowStyleValue.wire());
       if(node.avatarIdentityValue)native.setAvatarIdentity(this.handle,node[NODE],...node.avatarIdentityValue);
       if(node.avatarPlaceholderValue)native.setAvatarPlaceholder(this.handle,node[NODE],...node.avatarPlaceholderValue);
       if (node.kind === 4) {
@@ -532,4 +542,4 @@ class App {
   close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; return this; }
   dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; this.nodes.clear(); } }
 }
-module.exports = {App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+module.exports = {BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};

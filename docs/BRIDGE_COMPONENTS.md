@@ -128,3 +128,7 @@ after backend creation returns `CUI_BRIDGE_CORE_ERROR` rather than reporting
 the backend unavailable. The optional native regression test uses
 `CUI_TEST_FONT_PATH` for a primary font without ✓ and
 `CUI_TEST_FALLBACK_FONT_PATH` for a font with ✓; run it under isolated Xvfb.
+
+## Bounded typed root shadows
+
+See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementation, owned values, canonical CSS/preset factories and explicit clear/reset behavior. Focused portable runtime tests cover this subset; integration remains pending. This does not expose compound parts or portals.

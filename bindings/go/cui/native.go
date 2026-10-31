@@ -18,6 +18,7 @@ typedef pthread_t bridge_thread_token;
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stddef.h>
 
 static void *bridge_lib;
 #if defined(_WIN32)
@@ -272,6 +273,55 @@ static uint32_t go_notification_boolean(const cui_bridge_notification_v1 *n) { r
 static cui_bridge_table_notification_v1 go_notification_table(const cui_bridge_notification_v1 *n) { return n->payload.table; }
 static uint32_t go_notification_surface(const cui_bridge_notification_v1 *n) { return n->payload.surface_result; }
 static int bridge_initialized;
+_Static_assert(sizeof(cui_bridge_box_shadow_v1)==24, "shadow V1 layer size");
+_Static_assert(sizeof(cui_bridge_box_shadows_v1)==224, "shadow V1 style size");
+_Static_assert(offsetof(cui_bridge_box_shadows_v1,layers)==32, "shadow V1 layers offset");
+_Static_assert(offsetof(cui_bridge_box_shadow_v1,rgba)==20, "shadow V1 color offset");
+typedef uint32_t (*shadow_size_fn)(void);
+typedef cui_bridge_status (*shadow_set_fn)(cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_box_shadows_v1 *);
+typedef cui_bridge_status (*shadow_reset_fn)(cui_bridge_app *, cui_bridge_node);
+typedef cui_bridge_status (*shadow_css_fn)(float,float,float,float,uint32_t,uint32_t,uint32_t,cui_bridge_box_shadow_v1 *);
+typedef cui_bridge_status (*shadow_preset_fn)(uint32_t,float,float,float,float,uint32_t,cui_bridge_box_shadows_v1 *);
+#if defined(CUI_GO_STATIC)
+extern uint32_t cui_bridge_box_shadows_v1_size(void) __attribute__((weak));
+extern cui_bridge_status cui_bridge_set_box_shadows_v1(cui_bridge_app *,cui_bridge_node,uint32_t,const cui_bridge_box_shadows_v1 *) __attribute__((weak));
+extern cui_bridge_status cui_bridge_reset_box_shadows(cui_bridge_app *,cui_bridge_node) __attribute__((weak));
+extern cui_bridge_status cui_bridge_box_shadow_from_css_v1(float,float,float,float,uint32_t,uint32_t,uint32_t,cui_bridge_box_shadow_v1 *) __attribute__((weak));
+extern cui_bridge_status cui_bridge_shadow_preset_v1(uint32_t,float,float,float,float,uint32_t,cui_bridge_box_shadows_v1 *) __attribute__((weak));
+#define SHADOW_STATIC(dst,name) if (!bridge_lib) dst=cui_bridge_##name
+#else
+#define SHADOW_STATIC(dst,name)
+#endif
+#if defined(_WIN32)
+#define SHADOW_DYNAMIC(dst,name) do { if (bridge_lib) { FARPROC sym=GetProcAddress((HMODULE)bridge_lib,"cui_bridge_" #name); if(sym)memcpy(&dst,&sym,sizeof dst); } } while(0)
+#else
+#define SHADOW_DYNAMIC(dst,name) do { if (bridge_lib) { void *sym=dlsym(bridge_lib,"cui_bridge_" #name); if(sym)memcpy(&dst,&sym,sizeof dst); } } while(0)
+#endif
+#define SHADOW_RESOLVE(dst,name) do { SHADOW_STATIC(dst,name); SHADOW_DYNAMIC(dst,name); } while(0)
+static cui_bridge_status go_shadow_ready(void) {
+ shadow_size_fn size=NULL;SHADOW_RESOLVE(size,box_shadows_v1_size);
+ return size && size()==sizeof(cui_bridge_box_shadows_v1) ? CUI_BRIDGE_OK : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+static cui_bridge_status go_shadow_set(cui_bridge_app *a,cui_bridge_node n,const cui_bridge_box_shadows_v1 *v) {
+ shadow_set_fn fn=NULL;SHADOW_RESOLVE(fn,set_box_shadows_v1);
+ return fn && go_shadow_ready()==CUI_BRIDGE_OK ? fn(a,n,sizeof(*v),v) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+static cui_bridge_status go_shadow_reset(cui_bridge_app *a,cui_bridge_node n) {
+ shadow_reset_fn fn=NULL;SHADOW_RESOLVE(fn,reset_box_shadows);
+ return fn && go_shadow_ready()==CUI_BRIDGE_OK ? fn(a,n) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+static cui_bridge_status go_shadow_css(float x,float y,float radius,float spread,uint32_t rgba,uint32_t kind,cui_bridge_box_shadow_v1 *v) {
+ shadow_css_fn fn=NULL;SHADOW_RESOLVE(fn,box_shadow_from_css_v1);
+ return fn && go_shadow_ready()==CUI_BRIDGE_OK ? fn(x,y,radius,spread,rgba,kind,sizeof(*v),v) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+static cui_bridge_status go_shadow_preset(uint32_t p,float tl,float tr,float bl,float br,cui_bridge_box_shadows_v1 *v) {
+ shadow_preset_fn fn=NULL;SHADOW_RESOLVE(fn,shadow_preset_v1);
+ return fn && go_shadow_ready()==CUI_BRIDGE_OK ? fn(p,tl,tr,bl,br,sizeof(*v),v) : CUI_BRIDGE_BACKEND_UNAVAILABLE;
+}
+#undef SHADOW_RESOLVE
+#undef SHADOW_DYNAMIC
+#undef SHADOW_STATIC
+
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
 #if defined(CUI_GO_STATIC)
@@ -428,6 +478,7 @@ type Node struct {
 	designSize                                         int
 	hasDesignSize                                      bool
 	avatarIdentity, avatarCustomHue, hasAvatarIdentity bool
+	shadowStyle                                        *ShadowStyle
 	avatarHue                                          uint8
 	avatarAnonymous, hasAvatarPlaceholder              bool
 	avatarPlaceholder                                  string
@@ -1625,6 +1676,15 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasDesignSize {
 			if e := result(C.go_set_design_size(a.ptr, h, C.cui_bridge_button_size(n.designSize))); e != nil {
+				return e
+			}
+		}
+		if n.shadowStyle != nil {
+			wire, e := shadowWire(*n.shadowStyle)
+			if e != nil {
+				return e
+			}
+			if e := shadowResult(C.go_shadow_set(a.ptr, h, &wire)); e != nil {
 				return e
 			}
 		}
@@ -3365,4 +3425,154 @@ func (n *Node) SetRGBA(pixels []byte, width, height, stride uint32) error {
 	n.imagePixels = copyPixels
 	n.imageWidth, n.imageHeight, n.imageStride = width, height, stride
 	return nil
+}
+
+func shadowResult(status C.cui_bridge_status) error {
+	if status == C.CUI_BRIDGE_BACKEND_UNAVAILABLE {
+		return errors.New("shadow V1 unavailable; matching newer CUI bridge required")
+	}
+	return result(status)
+}
+
+// ShadowKind selects the root's DROP or INSET paint phase.
+type ShadowKind uint32
+
+const (
+	ShadowDrop ShadowKind = iota
+	ShadowInset
+)
+
+type ShadowPreset uint32
+
+const (
+	ShadowNone ShadowPreset = iota
+	Shadow2XS
+	ShadowXS
+	ShadowSM
+	ShadowMD
+	ShadowLG
+	ShadowXL
+	Shadow2XL
+)
+
+type CornerRadii struct{ TopLeft, TopRight, BottomLeft, BottomRight float64 }
+type BoxShadow struct {
+	OffsetX, OffsetY, Sigma, Spread float64
+	Kind                            ShadowKind
+	RGBA                            uint32
+}
+
+// ShadowStyle is copied when authored. Empty layers suppress shadows; ResetBoxShadows restores defaults.
+type ShadowStyle struct {
+	Layers []BoxShadow
+	Radii  CornerRadii
+}
+
+func shadowNumber(v, min, max float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= min && v <= max && !math.IsInf(float64(float32(v)), 0)
+}
+func shadowRadii(r CornerRadii) bool {
+	for _, v := range []float64{r.TopLeft, r.TopRight, r.BottomLeft, r.BottomRight} {
+		if !shadowNumber(v, 0, 16384) {
+			return false
+		}
+	}
+	return true
+}
+func shadowKind(kind int) bool {
+	return kind == 1 || kind == 2 || kind == 3 || kind == 4 || kind == 11 || kind == 12
+}
+func shadowWire(s ShadowStyle) (C.cui_bridge_box_shadows_v1, error) {
+	v := C.cui_bridge_box_shadows_v1{struct_size: 224, schema_version: 1, count: C.uint32_t(len(s.Layers)), top_left: C.float(s.Radii.TopLeft), top_right: C.float(s.Radii.TopRight), bottom_left: C.float(s.Radii.BottomLeft), bottom_right: C.float(s.Radii.BottomRight)}
+	if len(s.Layers) > 8 || !shadowRadii(s.Radii) {
+		return v, errors.New("invalid shadow layer count/radii")
+	}
+	for i, l := range s.Layers {
+		if l.Kind > ShadowInset || !shadowNumber(l.OffsetX, -4096, 4096) || !shadowNumber(l.OffsetY, -4096, 4096) || !shadowNumber(l.Sigma, 0, 256) || !shadowNumber(l.Spread, -4096, 4096) {
+			return v, errors.New("invalid shadow layer")
+		}
+		v.layers[i] = C.cui_bridge_box_shadow_v1{offset_x: C.float(l.OffsetX), offset_y: C.float(l.OffsetY), sigma: C.float(l.Sigma), spread: C.float(l.Spread), kind: C.uint32_t(l.Kind), rgba: C.uint32_t(l.RGBA)}
+	}
+	return v, nil
+}
+
+// BoxShadows styles only row/column/label/button/input/badge roots, not parts or portals.
+func (n *Node) BoxShadows(style ShadowStyle) *Node {
+	if n.err != nil {
+		return n
+	}
+	if !shadowKind(n.kind) {
+		n.err = errors.New("unsupported shadow root")
+		return n
+	}
+	wire, e := shadowWire(style)
+	if e != nil {
+		n.err = e
+		return n
+	}
+	if n.app != nil {
+		if e = n.app.check(); e == nil {
+			e = shadowResult(C.go_shadow_set(n.app.ptr, n.handle, &wire))
+		}
+		if e != nil {
+			n.err = e
+			return n
+		}
+	}
+	copied := style
+	copied.Layers = append([]BoxShadow(nil), style.Layers...)
+	n.shadowStyle = &copied
+	return n
+}
+func (n *Node) ResetBoxShadows() *Node {
+	if n.err != nil {
+		return n
+	}
+	if !shadowKind(n.kind) {
+		n.err = errors.New("unsupported shadow root")
+		return n
+	}
+	if n.app != nil {
+		if e := n.app.check(); e != nil {
+			n.err = e
+			return n
+		}
+		if e := shadowResult(C.go_shadow_reset(n.app.ptr, n.handle)); e != nil {
+			n.err = e
+			return n
+		}
+	}
+	n.shadowStyle = nil
+	return n
+}
+func (a *App) ShadowCSS(x, y, radius, spread float64, rgba uint32, kind ShadowKind) (BoxShadow, error) {
+	if e := a.check(); e != nil {
+		return BoxShadow{}, e
+	}
+	if kind > ShadowInset || !shadowNumber(x, -4096, 4096) || !shadowNumber(y, -4096, 4096) || !shadowNumber(radius, 0, 512) || !shadowNumber(spread, -4096, 4096) {
+		return BoxShadow{}, errors.New("invalid CSS shadow")
+	}
+	var v C.cui_bridge_box_shadow_v1
+	if e := shadowResult(C.go_shadow_css(C.float(x), C.float(y), C.float(radius), C.float(spread), C.uint32_t(rgba), C.uint32_t(kind), &v)); e != nil {
+		return BoxShadow{}, e
+	}
+	return BoxShadow{float64(v.offset_x), float64(v.offset_y), float64(v.sigma), float64(v.spread), ShadowKind(v.kind), uint32(v.rgba)}, nil
+}
+func (a *App) ShadowPreset(preset ShadowPreset, radii CornerRadii) (ShadowStyle, error) {
+	if e := a.check(); e != nil {
+		return ShadowStyle{}, e
+	}
+	if preset > Shadow2XL || !shadowRadii(radii) {
+		return ShadowStyle{}, errors.New("invalid shadow preset/radii")
+	}
+	var v C.cui_bridge_box_shadows_v1
+	if e := shadowResult(C.go_shadow_preset(C.uint32_t(preset), C.float(radii.TopLeft), C.float(radii.TopRight), C.float(radii.BottomLeft), C.float(radii.BottomRight), &v)); e != nil {
+		return ShadowStyle{}, e
+	}
+	s := ShadowStyle{Radii: radii}
+	for i := 0; i < int(v.count); i++ {
+		l := v.layers[i]
+		s.Layers = append(s.Layers, BoxShadow{float64(l.offset_x), float64(l.offset_y), float64(l.sigma), float64(l.spread), ShadowKind(l.kind), uint32(l.rgba)})
+	}
+	return s, nil
 }

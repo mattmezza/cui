@@ -957,5 +957,40 @@
       "Sokol and SDL_GPU hosts own window creation",
       "Python/Go new symbols optional; hidden feature unavailable on older libraries"
     ]
+  },
+  "box_shadow_authoring_v1": {
+    "status": "tested_subset_pending_integration",
+    "node_kinds": [
+      "Row",
+      "Column",
+      "Label",
+      "Button",
+      "Input",
+      "Badge"
+    ],
+    "languages": [
+      "python",
+      "javascript",
+      "typescript",
+      "go",
+      "rust"
+    ],
+    "scope": "Owned <=8 mixed DROP/INSET root layers, explicit radii, canonical CSS/preset factories, empty override and separate reset. No compound parts, detached portals or all78-family claim.",
+    "limitations": [
+      "Matching new symbols required only on feature use in Python/Go; old default loads remain supported.",
+      "Radii are explicit; no automatic component/state radius inference.",
+      "Portable software and all five facades checked; no browser/GPU, compound-part or portal proof. Integration pending."
+    ],
+    "docs": [
+      "docs/BRIDGE_SHADOWS.md"
+    ],
+    "tests": [
+      "tests/unit/test_bridge_shadows.c",
+      "bindings/python/test_shadows.py",
+      "bindings/node/test/shadows.test.cjs",
+      "bindings/node/test/shadows.types.ts",
+      "bindings/go/cui/shadows_test.go",
+      "bindings/rust/tests/shadows.rs"
+    ]
   }
 }

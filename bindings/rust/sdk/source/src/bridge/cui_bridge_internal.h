@@ -49,6 +49,7 @@ typedef struct {
     cui_bridge_button_rounding rounding;
     bool disabled, custom_hover;
     cui_color hover;
+    cui_bridge_box_shadows_v1 shadows;
     cui_button_state button_state;
     cui_checkbox_state checkbox_state;
     cui_switch_state switch_state;

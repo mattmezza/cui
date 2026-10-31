@@ -482,3 +482,7 @@ Sokol and SDL_GPU renderer-only hosts retain ownership of their own windows.
 The dedicated native-binding workflow also runs this focused visibility helper
 against its existing bridge build, with pinned TypeScript5.8.3 and Rust1.85.1.
 Hosted CI results remain separate from the local private-Xvfb evidence above.
+
+## Bounded typed root shadows
+
+See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementation, owned values, canonical CSS/preset factories and explicit clear/reset behavior. Focused portable runtime tests cover this subset; integration remains pending. This does not expose compound parts or portals.

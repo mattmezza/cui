@@ -153,3 +153,7 @@ loader resolves the new symbols optionally: default apps still load older ABI1
 libraries; feature calls fail explicitly if unavailable. See the [shared contract
 and Linux proof](BINDING_BUILDERS.md#native-window-visibility). Existing Go Options
 keyed literals remain source compatible; unkeyed literals need the new field.
+
+## Bounded typed root shadows
+
+See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementation, owned values, canonical CSS/preset factories and explicit clear/reset behavior. Focused portable runtime tests cover this subset; integration remains pending. This does not expose compound parts or portals.

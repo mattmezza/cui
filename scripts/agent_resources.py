@@ -46,6 +46,9 @@ def source_files(root):
                     and p.suffix in {'.c', '.h', '.py', '.js', '.cjs', '.ts', '.go', '.rs', '.toml'}
                     and ('examples' in p.parts or p.name in {'index.d.ts', '__init__.py', 'lib.rs'})):
                 paths.add(p)
+    # Narrow typed module exports; do not include arbitrary binding internals.
+    paths.update(root / path for path in ('bindings/python/cui_bridge/shadows.py',
+                 'bindings/node/shadows.cjs', 'bindings/rust/src/shadows.rs'))
     for path in ('web/gallery.c', 'web/gallery.js', 'cmake/sources.json', 'CMakeLists.txt',
                  'scripts/build_web.py', 'scripts/native_bundle.py', 'scripts/test_local.py',
                  'third_party/dependencies.json'):

@@ -21,10 +21,10 @@ export interface Button extends Node, DesignSized {
   disabled(value?: boolean): this; hover_color(value: string | [number, number, number, number]): this;
   on_click(callback: (event: ClickEvent) => void): this;
 }
-export function row(): Row;
-export function column(): Column;
-export function label(text?: string): Label;
-export function button(key?: string): Button;
+export function row(): Row & ShadowStyled;
+export function column(): Column & ShadowStyled;
+export function label(text?: string): Label & ShadowStyled;
+export function button(key?: string): Button & ShadowStyled;
 export class App {
   /** Submit without dispatch. Caller owns draining the shared queue. */
   step_only(dt?: number): this;
@@ -59,8 +59,8 @@ export function switch_control(key?: string, text?: string): BooleanControl;
 export function toggle(key?: string, text?: string): BooleanControl;
 export function slider(key?: string): Slider;
 export function progress(key?: string): NumericControl;
-export function badge(key?: string, text?: string): Label;
-export function input(key?: string, text?: string): Input;
+export function badge(key?: string, text?: string): Label & ShadowStyled;
+export function input(key?: string, text?: string): Input & ShadowStyled;
 export function textarea(key?: string, text?: string): Input;
 export function number_input(key?: string): NumberInput;
 
@@ -256,3 +256,23 @@ export type ValueNotificationV1 = NotificationV1 | ScalarChangeNotificationV1 | 
 
 /** RGBA icons apply only to Item children of Stepper; bytes are copied. */
 export interface Item {image_rgba(pixels: Uint8Array, width: number, height: number, stride?: number): this}
+
+/** Six root kinds only: row/column/label/button/input/badge. No nested parts or portals. */
+export const ShadowKind: Readonly<{DROP:0;INSET:1}>;
+export const ShadowPreset: Readonly<{NONE:0;XXS:1;XS:2;SM:3;MD:4;LG:5;XL:6;XXL:7}>;
+export class CornerRadii {constructor(topLeft?:number,topRight?:number,bottomLeft?:number,bottomRight?:number);readonly values:readonly number[]}
+export class BoxShadow {
+ constructor(offsetX?:number,offsetY?:number,sigma?:number,spread?:number,kind?:0|1,rgba?:number);
+ readonly values:readonly number[];
+ static css(offsetX?:number,offsetY?:number,blurRadius?:number,spread?:number,rgba?:number,kind?:0|1):BoxShadow;
+}
+export class ShadowStyle {
+ constructor(layers?:readonly BoxShadow[],radii?:CornerRadii);
+ readonly layers:readonly BoxShadow[];readonly radii:CornerRadii;
+ static preset(preset:0|1|2|3|4|5|6|7,radii?:CornerRadii):ShadowStyle;
+}
+export interface ShadowStyled {
+ box_shadows(layers:readonly BoxShadow[]|ShadowStyle,radii?:CornerRadii):this;
+ shadow_preset(preset:0|1|2|3|4|5|6|7,radii?:CornerRadii):this;
+ reset_box_shadows():this;
+}

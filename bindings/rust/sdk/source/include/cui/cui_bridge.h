@@ -25,6 +25,22 @@ typedef struct {
 typedef struct {
     float x, y, width, height;
 } cui_bridge_rect;
+/* Copied shadow authoring V1. Numeric RGBA is 0xRRGGBBAA; no borrowed fields.
+ * Only ROW/COLUMN/LABEL/BUTTON/INPUT/BADGE roots, not component parts/portals.
+ * Layer size24: offsets0/4, sigma8, spread12, kind16, rgba20.
+ * Style size224: header0/4/8/12, radii16/20/24/28, layers32.
+ * Active layers require finite offsets/spread[-4096,4096], sigma[0,256],
+ * kind0/1 and finite radii[0,16384]. Inactive layer slots are ignored.
+ * Empty lists retain Core's permissive no-paint radii policy. */
+typedef struct {
+    float offset_x, offset_y, sigma, spread;
+    uint32_t kind, rgba; /* kind0 DROP,1 INSET; sigma is NOT CSS blur radius. */
+} cui_bridge_box_shadow_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, count, reserved; /* exact size,1,0..8,0 */
+    float top_left, top_right, bottom_left, bottom_right;
+    cui_bridge_box_shadow_v1 layers[8];
+} cui_bridge_box_shadows_v1;
 typedef enum {
     CUI_BRIDGE_OK = 0,
     CUI_BRIDGE_EMPTY,
@@ -452,6 +468,30 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui
                                                         cui_bridge_kind kind, const char *key_utf8,
                                                         cui_bridge_node *out_node);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_node_remove(cui_bridge_app *app, cui_bridge_node node);
+/* Lifecycle/handle validation precedes kind then record validation. Unsupported
+ * kinds and invalid records return INVALID_ARGUMENT without replacing old state.
+ * Empty/NONE suppress both kinds each frame; reset restores component defaults.
+ * Same mutation/callback/thread rules as other setters. Exactly 224 owned bytes
+ * per node; input copied before return. No input/layout/semantic changes. */
+CUI_BRIDGE_API uint32_t cui_bridge_box_shadows_v1_size(void);
+/* Returns1 for the six supported root kinds, otherwise0; no app needed. */
+CUI_BRIDGE_API uint32_t cui_bridge_box_shadows_supported_v1(uint32_t kind);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_set_box_shadows_v1(cui_bridge_app *, cui_bridge_node,
+                                                               uint32_t struct_size,
+                                                               const cui_bridge_box_shadows_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_reset_box_shadows(cui_bridge_app *, cui_bridge_node);
+/* Pure factories; invalid arguments leave output unchanged. CSS radius[0,512]
+ * converts to sigma=radius/2; offsets/spread[-4096,4096], sigma[0,256]. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_box_shadow_from_css_v1(float x, float y,
+                                                                   float blur_radius, float spread,
+                                                                   uint32_t rgba, uint32_t kind,
+                                                                   uint32_t layer_size,
+                                                                   cui_bridge_box_shadow_v1 *out);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_shadow_preset_v1(uint32_t preset, float top_left,
+                                                             float top_right, float bottom_left,
+                                                             float bottom_right,
+                                                             uint32_t struct_size,
+                                                             cui_bridge_box_shadows_v1 *out);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node node,
                                                      const char *text_utf8);
 /* State setters apply to matching component kinds only. Boolean values must be 0 or 1.

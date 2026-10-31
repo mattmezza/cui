@@ -108,3 +108,7 @@ if(TARGET cui_sdl3)
    CUI_TEST_FONT=${CUI_TEST_FONT} ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_window_visibility_native_virtual.py)
  endif()
 endif()
+
+add_test(NAME bridge_python_shadows COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_shadows.py)

@@ -1863,10 +1863,123 @@ static int export_fn(napi_env env, napi_value exports, const char *name, napi_ca
     return napi_create_function(env, name, NAPI_AUTO_LENGTH, fn, (void *)data, &value) == napi_ok &&
            napi_set_named_property(env, exports, name, value) == napi_ok;
 }
+static napi_value shadow_array(napi_env env, const cui_bridge_box_shadows_v1 *style,
+                               const cui_bridge_box_shadow_v1 *single) {
+    napi_value array, value;
+    uint32_t count = single ? 6 : 4 + style->count * 6;
+    if (napi_create_array_with_length(env, count, &array) != napi_ok)
+        return NULL;
+    for (uint32_t i = 0; i < count; ++i) {
+        double number;
+        if (!single && i < 4) {
+            const float radii[4] = {style->top_left, style->top_right, style->bottom_left,
+                                    style->bottom_right};
+            number = radii[i];
+        } else {
+            uint32_t n = single ? i : i - 4;
+            const cui_bridge_box_shadow_v1 *s = single ? single : &style->layers[n / 6];
+            const double fields[6] = {s->offset_x, s->offset_y, s->sigma,
+                                      s->spread,   s->kind,     s->rgba};
+            number = fields[n % 6];
+        }
+        if (napi_create_double(env, number, &value) != napi_ok ||
+            napi_set_element(env, array, i, value) != napi_ok)
+            return NULL;
+    }
+    return array;
+}
+static int shadow_numbers(napi_env env, napi_value array, double *values, uint32_t *count) {
+    bool is_array = false;
+    if (napi_is_array(env, array, &is_array) != napi_ok || !is_array ||
+        napi_get_array_length(env, array, count) != napi_ok || *count > 52) {
+        fail(env, "invalid shadow array");
+        return 0;
+    }
+    for (uint32_t i = 0; i < *count; ++i) {
+        napi_value v;
+        if (napi_get_element(env, array, i, &v) != napi_ok || !number_arg(env, v, &values[i]))
+            return 0;
+    }
+    return 1;
+}
+static napi_value set_shadows(napi_env env, napi_callback_info info) {
+    napi_value v[3];
+    js_app *app;
+    js_node *node;
+    double fields[52];
+    uint32_t count;
+    if (!args(env, info, 3, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
+        !shadow_numbers(env, v[2], fields, &count))
+        return NULL;
+    if (count < 4 || (count - 4) % 6)
+        return fail(env, "invalid shadow array length");
+    cui_bridge_box_shadows_v1 style = {.struct_size = sizeof(style),
+                                       .schema_version = 1,
+                                       .count = (count - 4) / 6,
+                                       .top_left = (float)fields[0],
+                                       .top_right = (float)fields[1],
+                                       .bottom_left = (float)fields[2],
+                                       .bottom_right = (float)fields[3]};
+    for (uint32_t i = 0; i < style.count; ++i) {
+        double *f = &fields[4 + i * 6];
+        if (f[4] < 0 || f[4] > 1 || floor(f[4]) != f[4] || f[5] < 0 || f[5] > UINT32_MAX ||
+            floor(f[5]) != f[5])
+            return fail(env, "invalid shadow kind/color");
+        style.layers[i] = (cui_bridge_box_shadow_v1){(float)f[0], (float)f[1],    (float)f[2],
+                                                     (float)f[3], (uint32_t)f[4], (uint32_t)f[5]};
+    }
+    cui_bridge_status code =
+        cui_bridge_set_box_shadows_v1(app->bridge, node->node, sizeof(style), &style);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value reset_shadows(napi_env env, napi_callback_info info) {
+    napi_value v[2];
+    js_app *app;
+    js_node *node;
+    if (!args(env, info, 2, v) || !app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
+        return NULL;
+    cui_bridge_status code = cui_bridge_reset_box_shadows(app->bridge, node->node);
+    return code == CUI_BRIDGE_OK ? undefined(env) : status(env, code);
+}
+static napi_value shadow_css(napi_env env, napi_callback_info info) {
+    napi_value v[6];
+    double f[4];
+    uint32_t rgba, kind;
+    if (!args(env, info, 6, v))
+        return NULL;
+    for (unsigned i = 0; i < 4; ++i)
+        if (!number_arg(env, v[i], &f[i]))
+            return NULL;
+    if (!uint_arg(env, v[4], &rgba) || !uint_arg(env, v[5], &kind))
+        return NULL;
+    cui_bridge_box_shadow_v1 layer;
+    cui_bridge_status code = cui_bridge_box_shadow_from_css_v1(
+        (float)f[0], (float)f[1], (float)f[2], (float)f[3], rgba, kind, sizeof(layer), &layer);
+    return code == CUI_BRIDGE_OK ? shadow_array(env, NULL, &layer) : status(env, code);
+}
+static napi_value shadow_preset(napi_env env, napi_callback_info info) {
+    napi_value v[2];
+    double f[52];
+    uint32_t preset, count;
+    if (!args(env, info, 2, v) || !uint_arg(env, v[0], &preset) ||
+        !shadow_numbers(env, v[1], f, &count))
+        return NULL;
+    if (count != 4)
+        return fail(env, "four shadow radii required");
+    cui_bridge_box_shadows_v1 style;
+    cui_bridge_status code = cui_bridge_shadow_preset_v1(
+        preset, (float)f[0], (float)f[1], (float)f[2], (float)f[3], sizeof(style), &style);
+    return code == CUI_BRIDGE_OK ? shadow_array(env, &style, NULL) : status(env, code);
+}
+
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
     if (!export_fn(env, exports, name, fn, data))                                                  \
     return NULL
+    EXPORT("setShadows", set_shadows, 0);
+    EXPORT("resetShadows", reset_shadows, 0);
+    EXPORT("shadowCSS", shadow_css, 0);
+    EXPORT("shadowPreset", shadow_preset, 0);
     EXPORT("create", create, 0);
     EXPORT("dispose", dispose, 0);
     EXPORT("makeNode", make_node, 0);

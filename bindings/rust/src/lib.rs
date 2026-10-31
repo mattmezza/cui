@@ -1,4 +1,6 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
+mod shadows;
+pub use shadows::{BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii};
 use std::{
     cell::RefCell,
     collections::HashMap,

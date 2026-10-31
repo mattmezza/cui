@@ -18,11 +18,23 @@ Linux/Windows speech recognizers and broader native media support remain gaps.
 The pending batch also adds opt-in Stepper connectors, bitmap indicators and
 shared design sizes, with a controlled interactive gallery; nested Resizable
 examples and repeated desktop/touch drag regression coverage; split-button styling
-and metadata; and growing InputGroup containment. Stepper centered/flexible source
-geometry, complete interaction styling and corresponding language builders remain
-separate gaps. Input caret/selection/IME projection after viewport changes still
-has a documented one-frame limitation. These additions do not establish complete
-Stepper, Input or Resizable parity or native GPU acceptance.
+and metadata; and growing InputGroup containment. Stepper visual builders are
+available in Python, JS/TS, Go and Rust; centered/flexible geometry and interaction
+presentation also have additive C APIs. Those newer C presentation options remain
+documented binding omissions. Input caret/selection/IME projection after viewport
+changes still has a documented one-frame limitation. These additions do not
+establish complete Stepper, Input or Resizable parity or native GPU acceptance.
+
+The integration candidate additionally includes Spinner finite/reduced-motion
+browser contracts, opt-in HoverCard raw outside-release policy, and initially
+hidden SDL3 window creation with explicit visibility APIs. Hidden-window authoring
+has focused Linux private-Xvfb tests in all five language paths; other native
+platforms, Wayland and physical GPU behavior remain separately unverified.
+Initial named-element shadow setters and CSS blur conversion reuse existing
+renderers. Named control-part selectors cover the documented first subset;
+anonymous Checkbox/Radio indicators and broader part/binding coverage remain
+open. Read `ELEMENT_SHADOWS.md` for current ownership and limitations. These
+candidate additions still require integrated CI, release and deployment checks.
 
 CI preparation reuses checksum-verified raw optional-regex downloads and shares a
 private umbrella implementation across feature distribution tests. Independent

@@ -42,6 +42,16 @@ can lag implementation: inspect current code and evidence before scheduling work
   matching C, Python/npm, Go and Rust artifacts; publish release notes/checksums
   and matching website docs. `0.1.0-alpha.3` is prepared, **not yet released**.
 
+## Latest validation evidence
+
+- Candidate production source `c52ce72f`: warning-clean WASM build; headless
+  HoverCard release, Stepper visual and Spinner contract probes passed. Native
+  hidden-window and shadow checks are recorded in their linked API guides.
+- Formatting, 17 consumer-skill tests and generated SDK/resource freshness passed.
+- CI found two binding jobs selecting new tests without building their executables.
+  Candidate `b553c8bb` fixes the build lists; eight workflow tests passed. Hosted
+  CI and publication are still pending. This is evidence for these slices only.
+
 ## Component parity: verify and close the gaps
 
 This is a work list, not a declaration that everything below is absent. Some

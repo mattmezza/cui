@@ -279,11 +279,17 @@ static void workspace(void) {
            CUI_ERROR_CAPACITY);
     assert(!a.live && a.frees == 1 && !memcmp(&w, &previous, sizeof(w)));
     a.fail = 0;
-    assert(cui_software_v2_workspace_begin(&w, 256, 128, allocate, release, &a) == CUI_OK);
+    assert(cui_software_v2_workspace_begin(&w, 1024, 128, allocate, release, &a) == CUI_OK);
     assert(a.live == 2 && a.peak == 2);
+    cui_draw_command_v2 *command =
+        cui_software_v2_workspace_take(&w, false, sizeof(*command), _Alignof(cui_draw_command_v2));
+    assert(command && (uintptr_t)command % _Alignof(cui_draw_command_v2) == 0);
+    *command = (cui_draw_command_v2){.kind = CUI_DRAW_V2_BACKGROUND};
+    assert(command->kind == CUI_DRAW_V2_BACKGROUND);
     assert(cui_software_v2_workspace_take(&w, false, 1, 1));
-    void *p = cui_software_v2_workspace_take(&w, false, sizeof(max_align_t), _Alignof(max_align_t));
-    assert(p && (uintptr_t)p % _Alignof(max_align_t) == 0);
+    void *p = cui_software_v2_workspace_take(&w, false, sizeof(cui_fundamental_alignment_internal),
+                                             _Alignof(cui_fundamental_alignment_internal));
+    assert(p && (uintptr_t)p % _Alignof(cui_fundamental_alignment_internal) == 0);
     size_t used = w.cpu_used;
     assert(!cui_software_v2_workspace_take(&w, false, SIZE_MAX, 1) && w.cpu_used == used);
     assert(!cui_software_v2_workspace_take(&w, false, 1, 3));

@@ -403,6 +403,28 @@ foreach(target test_accessibility_numeric test_accessibility_numeric_internals t
  add_test(NAME ${target} COMMAND ${target})
 endforeach()
 
+# TEST ONLY fixed scrollbar leaf staging: production Core inputs stay read-only.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+ set(scrollbar_track_core "${CMAKE_CURRENT_BINARY_DIR}/scrollbar_track_core.inc")
+ add_custom_command(OUTPUT "${scrollbar_track_core}"
+  COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/embed_scrollbar_track_probe.py"
+   "${CMAKE_CURRENT_SOURCE_DIR}" "${scrollbar_track_core}"
+  DEPENDS tests/unit/embed_scrollbar_track_probe.py src/core/cui.c src/core/cui_scroll_layout_internal.h)
+ add_executable(test_scrollbar_track_geometry tests/unit/test_scrollbar_track_geometry.c
+  tests/unit/scrollbar_track_probe.c "${scrollbar_track_core}"
+  src/base/cui_scroll.c backends/software/cui_software.c src/effects/cui_effects.c)
+ target_include_directories(test_scrollbar_track_geometry PRIVATE include third_party/clay src/core
+  "${CMAKE_CURRENT_BINARY_DIR}")
+ if(NOT MSVC)
+  target_link_libraries(test_scrollbar_track_geometry PRIVATE m)
+ endif()
+ cui_warnings(test_scrollbar_track_geometry)
+ add_test(NAME scrollbar_track_geometry_prototype COMMAND test_scrollbar_track_geometry)
+ add_test(NAME scrollbar_track_probe_generator COMMAND ${Python3_EXECUTABLE}
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_scrollbar_track_probe.py")
+endif()
+
 add_executable(test_scroll_layout_contract tests/unit/test_scroll_layout_contract.c)
 target_include_directories(test_scroll_layout_contract PRIVATE include third_party/clay)
 if(NOT WIN32)

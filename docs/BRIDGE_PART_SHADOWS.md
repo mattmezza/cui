@@ -1,5 +1,8 @@
 # Typed semantic part shadows
 
+Development additions after alpha.3: use a matching current source checkout and
+headers/facades. These APIs are absent from the published alpha.3 packages.
+
 The additive target V1 API styles a bounded set of existing component surfaces.
 It does not expand the old six-root `box_shadows` allowlist, name every component
 part, or provide a style cascade. Focused portable implementation checks pass; integration remains pending. See the

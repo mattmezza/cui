@@ -1,5 +1,8 @@
 # Control surface shadow gallery
 
+Development additions after alpha.3: use a matching current source checkout and
+headers/facades. These APIs are absent from the published alpha.3 packages.
+
 On Button, Checkbox, Radio, Switch and Slider routes, **Surface shadows** enables
 an additive example. It starts off on each route; turning it off uses the existing
 legacy call. Button collection mode retains its existing route and disables this

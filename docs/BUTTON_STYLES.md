@@ -130,6 +130,9 @@ per-event callback multiplicity as well as passive zero-style equivalence.
 
 ## Shadow-aware Button surface facade
 
+Development additions after alpha.3: use a matching current source checkout and
+headers/facades. These APIs are absent from the published alpha.3 packages.
+
 `cui_button_surface_ex` and passive `cui_button_surface_paint_only` are separate
 additive C APIs in the same header. Existing styled records, signatures, numeric
 rules and callbacks keep their behavior. The surface facade adds an owned fixed

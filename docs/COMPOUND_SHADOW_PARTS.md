@@ -1,5 +1,8 @@
 # Compound paint identities
 
+Development additions after alpha.3: use a matching current source checkout and
+headers/facades. These APIs are absent from the published alpha.3 packages.
+
 The additive C getters in `cui_content.h`, `cui_message.h`, `cui_status.h` and
 `cui_media.h` expose the existing identities of compound parts. They do not submit,
 open, allocate or query the presence of a box. Zero owners/scopes, invalid enums,

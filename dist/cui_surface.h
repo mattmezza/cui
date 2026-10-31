@@ -211,6 +211,14 @@ void cui_alert_dialog(cui_context *, const cui_theme *, cui_surface_state *, cui
 /* src/base/cui_surface.c */
 /* SPDX-License-Identifier: MIT */
 
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_DIALOG_INTERNAL_H
+#define CUI_DIALOG_INTERNAL_H
+
+/* Private route: only legacy Body wheel and reserved action reduction differ. */
+bool cui_dialog_surface_update(cui_context *, cui_surface_state *, cui_surface_options);
+#endif
+
 #include <float.h>
 #include <math.h>
 static bool cui_popover_float(double value) {
@@ -569,7 +577,8 @@ static void cui_surface_resize_event(cui_context *ui, cui_surface_state *s, cui_
         cui_invalidate(ui);
     }
 }
-bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
+static bool cui_surface_update_route(cui_context *ui, cui_surface_state *s, cui_surface_options o,
+                                     bool composed) {
     if (!ui || !s || !cui_surface_popover_valid(s, o))
         return false;
     s->sheet_animation_seconds =
@@ -635,7 +644,7 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
         cui_event e = events[i];
         if (!s->sheet_motion_enabled || s->sheet_progress >= 1)
             cui_surface_resize_event(ui, s, o, e, i);
-        if (e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&
+        if (!composed && e.type == CUI_EVENT_SCROLL && isfinite(e.dy) &&
             cui_event_target(ui, i) == cui_surface_part_id(s->overlay.id, 6)) {
             s->body_scroll = fminf(s->body_maximum,
                                    fmaxf(0, s->body_scroll - e.dy * (e.scroll_precise ? 1 : 48)));
@@ -643,12 +652,14 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
         }
         cui_id activation = cui_event_activation(ui, i);
         cui_surface_result reason = CUI_SURFACE_NONE;
-        if (s->kind == CUI_SURFACE_ALERT && activation == cui_surface_part_id(s->overlay.id, 2))
+        if (!composed && s->kind == CUI_SURFACE_ALERT &&
+            activation == cui_surface_part_id(s->overlay.id, 2))
             reason = CUI_SURFACE_ACCEPTED;
-        else if (s->kind == CUI_SURFACE_ALERT &&
+        else if (!composed && s->kind == CUI_SURFACE_ALERT &&
                  activation == cui_surface_part_id(s->overlay.id, 3))
             reason = CUI_SURFACE_CANCELLED;
-        else if (!o.hide_close && (s->kind != CUI_SURFACE_ALERT || o.show_alert_close) &&
+        else if (!composed && !o.hide_close &&
+                 (s->kind != CUI_SURFACE_ALERT || o.show_alert_close) &&
                  activation == cui_surface_part_id(s->overlay.id, 1))
             reason = CUI_SURFACE_CLOSED;
         else if (!o.no_escape_dismiss && e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_ESCAPE &&
@@ -667,6 +678,12 @@ bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_
             cui_surface_close(ui, s, reason);
     }
     return !s->overlay.open;
+}
+bool cui_base_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
+    return cui_surface_update_route(ui, s, o, false);
+}
+bool cui_dialog_surface_update(cui_context *ui, cui_surface_state *s, cui_surface_options o) {
+    return cui_surface_update_route(ui, s, o, true);
 }
 bool cui_base_surface_begin(cui_context *ui, cui_surface_state *s, cui_str title,
                             cui_str description, cui_surface_options o) {

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 /* Independent frozen pre-extraction surface reducer versus current source. */
+#include "../../src/base/cui_dialog_internal.h"
 #include "cui/cui_surface.h"
 #include <assert.h>
 #include <stddef.h>
@@ -15,7 +16,7 @@ typedef struct {
     unsigned decisions, closes;
     cui_id focus_on_close;
     cui_surface_result decision_reason, close_reason;
-    bool veto;
+    bool veto, composed;
 } driver;
 static bool decide(void *user, cui_surface_result reason) {
     driver *d = user;
@@ -41,8 +42,9 @@ static void frame(driver *d, bool legacy, unsigned index, cui_surface_options o)
     o.decision_user = d;
     o.on_close = closed;
     o.close_user = d;
-    bool changed = legacy ? legacy_cui_base_surface_update(d->ui, &d->state, o)
-                          : cui_base_surface_update(d->ui, &d->state, o);
+    bool changed = legacy        ? legacy_cui_base_surface_update(d->ui, &d->state, o)
+                   : d->composed ? cui_dialog_surface_update(d->ui, &d->state, o)
+                                 : cui_base_surface_update(d->ui, &d->state, o);
     assert(changed == !d->state.overlay.open);
     cui_begin_box(d->ui, 1, (cui_box){.width = 20, .height = 20});
     cui_interact(d->ui, 1, CUI_ROLE_BUTTON, cui_string("Trigger"), false, false, 0);
@@ -143,6 +145,8 @@ static void comparator_oracle(void) {
     unsigned padding = 0;
     for (size_t i = 0; i < sizeof a; ++i)
         if (!member[i]) {
+            ((unsigned char *)&a)[i] = 0x55;
+            ((unsigned char *)&b)[i] = 0xaa;
             assert(((const unsigned char *)&a)[i] != ((const unsigned char *)&b)[i]);
             ++padding;
         }
@@ -187,9 +191,12 @@ static void compare(const driver *a, const driver *b) {
     }
 }
 static void queue(driver *d, unsigned step) {
-    if (step == 2)
+    if (step == 2) {
+        assert(cui_queue_event(d->ui,
+                               (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 100, .y = 100}));
         assert(cui_queue_event(
             d->ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = 100, .y = 100, .dy = -2}));
+    }
     if (step == 4 || step == 6)
         assert(
             cui_queue_event(d->ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
@@ -199,6 +206,48 @@ static void queue(driver *d, unsigned step) {
             cui_queue_event(d->ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = x, .y = 45}));
         assert(cui_queue_event(d->ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = x, .y = 45}));
     }
+}
+static void composed_route_gate(void) {
+    driver old = {0}, composed = {.composed = true};
+    old.ui = cui_create((cui_config){0});
+    composed.ui = cui_create((cui_config){0});
+    assert(old.ui && composed.ui);
+    cui_surface_init(&old.state, 50, CUI_SURFACE_DIALOG);
+    cui_surface_init(&composed.state, 50, CUI_SURFACE_DIALOG);
+    cui_surface_options o = {.viewport = {0, 0, 400, 300}};
+    cui_surface_open(old.ui, &old.state, 1);
+    cui_surface_open(composed.ui, &composed.state, 1);
+    frame(&old, false, 0, o);
+    frame(&composed, false, 0, o);
+    /* Legacy max publishes from previous retained bounds on its next update. */
+    frame(&old, false, 1, o);
+    frame(&composed, false, 1, o);
+    queue(&old, 2);
+    queue(&composed, 2);
+    frame(&old, false, 2, o);
+    frame(&composed, false, 2, o);
+    assert(cui_event_target(old.ui, 1) == cui_surface_part_id(50, 6));
+    assert(cui_event_target(composed.ui, 1) == cui_surface_part_id(50, 6));
+    assert(old.state.body_scroll == 96 && composed.state.body_scroll == 0);
+    queue(&old, 8);
+    queue(&composed, 8);
+    frame(&old, false, 8, o);
+    frame(&composed, false, 8, o);
+    assert(!old.state.overlay.open && composed.state.overlay.open);
+    assert(old.closes == 1 && composed.closes == 0);
+    queue(&composed, 6);
+    frame(&composed, false, 6, o);
+    assert(!composed.state.overlay.open && composed.closes == 1);
+    assert(composed.close_reason == CUI_SURFACE_CANCELLED);
+    cui_surface_open(composed.ui, &composed.state, 1);
+    frame(&composed, false, 0, o);
+    cui_surface_request_close(composed.ui, &composed.state, CUI_SURFACE_ACCEPTED);
+    frame(&composed, false, 15, o);
+    assert(!composed.state.overlay.open && composed.closes == 2);
+    assert(composed.close_reason == CUI_SURFACE_ACCEPTED);
+    cui_destroy(old.ui);
+    cui_destroy(composed.ui);
+    puts("DIALOG_COMPOSED private wheel/action gates; Escape/request timing PASS");
 }
 int main(void) {
     comparator_oracle();
@@ -233,6 +282,7 @@ int main(void) {
         cui_destroy(a.ui);
         cui_destroy(b.ui);
     }
+    composed_route_gate();
     printf("DIALOG_LEGACY frozen four-kind reducer trace %u frames PASS\n", frames);
     return 0;
 }

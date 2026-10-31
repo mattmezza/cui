@@ -1,0 +1,327 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_SOFTWARE_V2_PAINT_INTERNAL_H
+#define CUI_SOFTWARE_V2_PAINT_INTERNAL_H
+#include "cui_mesh.h"
+#include "cui_shape.h"
+#include "cui_software_v2_internal.h"
+/* Private incomplete painter: TEXT and both SHADOW kinds reject atomically.
+ * Not wired to a V1 renderer, public V2 entry, or capability advertisement.
+ * Inputs/target view stay stable through return, including allocator callbacks.
+ * Allocators obey the workspace distinct-live-block/alignment contract.
+ * Target pixels and input records/resources must be disjoint. */
+typedef struct {
+    unsigned char *pixels;
+    unsigned width, height;
+    size_t stride, capacity;
+    bool busy;
+} cui_software_v2_target;
+typedef struct {
+    double left, top, right, bottom;
+} cui_software_v2_clip;
+typedef struct {
+    cui_software_v2_clip clip;
+    cui_background_prepared_query background;
+    unsigned char *pixels;
+} cui_software_v2_paint_descriptor;
+_Static_assert(_Alignof(cui_software_v2_paint_descriptor) <=
+                   _Alignof(cui_fundamental_alignment_internal),
+               "paint descriptor exceeds workspace alignment");
+static inline cui_software_v2_clip cui_software_v2_clip_all(void) {
+    return (cui_software_v2_clip){-FLT_MAX / 4, -FLT_MAX / 4, FLT_MAX / 4, FLT_MAX / 4};
+}
+static inline cui_software_v2_clip cui_software_v2_clip_push(cui_software_v2_clip a, cui_rect b) {
+    return (cui_software_v2_clip){fmax(a.left, b.x), fmax(a.top, b.y),
+                                  fmin(a.right, (double)b.x + b.w),
+                                  fmin(a.bottom, (double)b.y + b.h)};
+}
+/* Outward float cover is culling only. Exact double center tests use clip below. */
+static inline cui_rect cui_software_v2_clip_cover(cui_software_v2_clip c) {
+    if (c.left >= c.right || c.top >= c.bottom)
+        return (cui_rect){0};
+    float x = (float)c.left, y = (float)c.top;
+    if (x > c.left)
+        x = nextafterf(x, -INFINITY);
+    if (y > c.top)
+        y = nextafterf(y, -INFINITY);
+    float w = (float)(c.right - x), h = (float)(c.bottom - y);
+    if ((double)x + w < c.right)
+        w = nextafterf(w, INFINITY);
+    if ((double)y + h < c.bottom)
+        h = nextafterf(h, INFINITY);
+    return (cui_rect){x, y, w, h};
+}
+static inline bool cui_software_v2_target_disjoint(const cui_software_v2_target *t, size_t span,
+                                                   const void *p, size_t bytes) {
+    return cui_background_prepare_disjoint_internal(t->pixels, span, p, bytes) &&
+           cui_background_prepare_disjoint_internal(t, sizeof(*t), p, bytes);
+}
+static inline bool cui_software_v2_pixel_inside(cui_software_v2_clip c, double x, double y) {
+    return x >= c.left && x < c.right && y >= c.top && y < c.bottom;
+}
+/* Same straight-byte source-over arithmetic as immutable V1, including alpha0. */
+static inline void cui_software_v2_blend(unsigned char *p, cui_color c) {
+    unsigned alpha = c.a * 255u + p[3] * (255u - c.a);
+    if (!alpha) {
+        memset(p, 0, 4);
+        return;
+    }
+    unsigned src[3] = {c.r, c.g, c.b};
+    for (unsigned i = 0; i < 3; ++i)
+        p[i] =
+            (unsigned char)((src[i] * c.a * 255u + p[i] * p[3] * (255u - c.a) + alpha / 2) / alpha);
+    p[3] = (unsigned char)((alpha + 127) / 255);
+}
+typedef struct {
+    unsigned char *pixels;
+    const cui_render_v2_options *options;
+    cui_software_v2_clip clip;
+} cui_software_v2_surface;
+static inline void cui_software_v2_emit(void *user, int x, int y, cui_color color) {
+    cui_software_v2_surface *s = user;
+    const cui_render_v2_options *o = s->options;
+    double lx = (x + .5 - o->origin_x) / o->scale_x;
+    double ly = (y + .5 - o->origin_y) / o->scale_y;
+    if (cui_software_v2_pixel_inside(s->clip, lx, ly))
+        cui_software_v2_blend(s->pixels + ((size_t)y * o->viewport_width + (unsigned)x) * 4, color);
+}
+/* Intersect in double/device space before any integer cast, even for huge input. */
+static inline bool cui_software_v2_cover(cui_rect bounds, cui_software_v2_surface *s, int *x0,
+                                         int *y0, int *x1, int *y1) {
+    const cui_render_v2_options *o = s->options;
+    double left = fmax(bounds.x, s->clip.left), top = fmax(bounds.y, s->clip.top);
+    double right = fmin((double)bounds.x + bounds.w, s->clip.right);
+    double bottom = fmin((double)bounds.y + bounds.h, s->clip.bottom);
+    if (left >= right || top >= bottom)
+        return false;
+    left = fmax(0, left * o->scale_x + o->origin_x);
+    top = fmax(0, top * o->scale_y + o->origin_y);
+    right = fmin(o->viewport_width, right * o->scale_x + o->origin_x);
+    bottom = fmin(o->viewport_height, bottom * o->scale_y + o->origin_y);
+    if (left >= right || top >= bottom)
+        return false;
+    *x0 = (int)floor(left);
+    *y0 = (int)floor(top);
+    *x1 = (int)ceil(right);
+    *y1 = (int)ceil(bottom);
+    return true;
+}
+static inline void cui_software_v2_shape_paint(cui_software_v2_surface *s,
+                                               const cui_draw_command *c) {
+    int x0, y0, x1, y1;
+    if (!cui_software_v2_cover(c->bounds, s, &x0, &y0, &x1, &y1))
+        return;
+    float radii[4], edges[4];
+    cui_shape_values(c, radii, edges);
+    const cui_render_v2_options *o = s->options;
+    for (int y = y0; y < y1; ++y) {
+        double ly = (y + .5 - o->origin_y) / o->scale_y;
+        float left, right, il = 0, ir = 0;
+        float yy = (float)(ly - c->bounds.y);
+        if (!cui_shape_span(c, radii, edges, false, yy, &left, &right))
+            continue;
+        bool inner =
+            c->type == CUI_DRAW_BORDER && cui_shape_span(c, radii, edges, true, yy, &il, &ir);
+        for (int x = x0; x < x1; ++x) {
+            double lx = (x + .5 - o->origin_x) / o->scale_x;
+            float xx = (float)(lx - c->bounds.x);
+            if (xx < left || xx >= right || (inner && xx >= il && xx < ir))
+                continue;
+            cui_color color = c->color;
+            if (c->type == CUI_DRAW_IMAGE) {
+                const cui_bitmap_paint *p = &c->bitmap;
+                unsigned sx = (unsigned)fminf(p->bitmap.width - 1,
+                                              floorf(p->source.x + xx / c->bounds.w * p->source.w));
+                unsigned sy = (unsigned)fminf(p->bitmap.height - 1,
+                                              floorf(p->source.y + yy / c->bounds.h * p->source.h));
+                const unsigned char *pixel =
+                    p->bitmap.pixels + (size_t)sy * p->bitmap.stride + sx * 4;
+                color = (cui_color){pixel[0], pixel[1], pixel[2],
+                                    (unsigned char)lroundf(pixel[3] * p->opacity)};
+                if (p->grayscale)
+                    color.r = color.g = color.b = (unsigned char)lroundf(
+                        .2126f * color.r + .7152f * color.g + .0722f * color.b);
+                if (p->custom_tint) {
+                    color.r = (unsigned char)((unsigned)color.r * p->tint.r / 255);
+                    color.g = (unsigned char)((unsigned)color.g * p->tint.g / 255);
+                    color.b = (unsigned char)((unsigned)color.b * p->tint.b / 255);
+                    color.a = (unsigned char)((unsigned)color.a * p->tint.a / 255);
+                }
+            }
+            cui_software_v2_emit(s, x, y, color);
+        }
+    }
+}
+static inline void cui_software_v2_mesh_paint(cui_software_v2_surface *s, const cui_mesh_paint *p) {
+    const cui_render_v2_options *o = s->options;
+    cui_color color = {cui_mesh_cpu_channel(p->color.r, p->color.a),
+                       cui_mesh_cpu_channel(p->color.g, p->color.a),
+                       cui_mesh_cpu_channel(p->color.b, p->color.a), 0};
+    for (size_t i = 0; i < p->vertex_count; i += 3) {
+        cui_mesh_cpu_vertex v[3];
+        for (size_t j = 0; j < 3; ++j) {
+            const cui_mesh_vertex *in = &p->vertices[i + j];
+            v[j] = (cui_mesh_cpu_vertex){
+                (p->origin_x + (double)p->scale * in->x) * o->scale_x + o->origin_x,
+                (p->origin_y + (double)p->scale * in->y) * o->scale_y + o->origin_y, in->s, in->t};
+        }
+        cui_mesh_cpu_triangle(v, color, p->color.a, o->viewport_width, o->viewport_height,
+                              (cui_rect){0, 0, (float)o->viewport_width, (float)o->viewport_height},
+                              cui_software_v2_emit, s);
+    }
+}
+static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
+                                              const cui_draw_list_v2 *list, cui_color clear,
+                                              const cui_render_v2_options *options,
+                                              cui_software_v2_alloc_fn allocate,
+                                              cui_software_v2_free_fn release, void *user) {
+    if (!target || target->busy || !list || !options || !allocate || !release || !target->pixels ||
+        !target->width || !target->height || target->width > 16384 || target->height > 16384 ||
+        options->viewport_width != target->width || options->viewport_height != target->height)
+        return CUI_ERROR_INVALID_ACTION;
+    size_t row = (size_t)target->width * 4;
+    if (target->stride < row || target->height - 1 > (SIZE_MAX - row) / target->stride)
+        return CUI_ERROR_CAPACITY;
+    size_t span = (target->height - 1) * target->stride + row;
+    if (span > target->capacity)
+        return CUI_ERROR_CAPACITY;
+    if (!cui_background_prepare_disjoint_internal(target->pixels, span, target, sizeof(*target)) ||
+        !cui_software_v2_target_disjoint(target, span, options, sizeof(*options)) ||
+        !cui_software_v2_target_disjoint(target, span, list, sizeof(*list)))
+        return CUI_ERROR_INVALID_ACTION;
+    cui_software_v2_plan plan;
+    cui_error error = cui_software_v2_validate(list, options, false, false, &plan);
+    if (error != CUI_OK)
+        return error;
+    if (!cui_software_v2_target_disjoint(target, span, list->commands,
+                                         list->count * sizeof(*list->commands)))
+        return CUI_ERROR_INVALID_ACTION;
+    cui_software_v2_clip stack[64], clip = cui_software_v2_clip_all();
+    size_t depth = 0, background_pixels = 0, background_bytes = 0;
+    for (size_t i = 0; i < list->count; ++i) {
+        const cui_draw_command_v2 *v = &list->commands[i];
+        if (v->kind == CUI_DRAW_V2_BACKGROUND) {
+            cui_background_prepared_query q;
+            error = cui_background_prepare_query(v->payload.background, options,
+                                                 cui_software_v2_clip_cover(clip), &q);
+            if (error != CUI_OK)
+                return error;
+            if (!cui_software_v2_add(&background_pixels, (size_t)q.width * q.height,
+                                     options->max_pixels) ||
+                !cui_software_v2_add(&background_bytes, q.bytes, options->cpu_bytes))
+                return CUI_ERROR_CAPACITY;
+        } else {
+            const cui_draw_command *c = &v->payload.legacy;
+            if (cui_shadow_type(c->type) || c->type == CUI_DRAW_TEXT)
+                return CUI_ERROR_INVALID_ACTION;
+            if (c->type == CUI_DRAW_CLIP_PUSH) {
+                stack[depth++] = clip;
+                clip = cui_software_v2_clip_push(clip, c->bounds);
+            } else if (c->type == CUI_DRAW_CLIP_POP)
+                clip = stack[--depth];
+            else if (c->type == CUI_DRAW_IMAGE &&
+                     !cui_software_v2_target_disjoint(target, span, c->bitmap.bitmap.pixels,
+                                                      c->bitmap.bitmap.stride *
+                                                          c->bitmap.bitmap.height))
+                return CUI_ERROR_INVALID_ACTION;
+            else if (c->type == CUI_DRAW_MESH &&
+                     !cui_software_v2_target_disjoint(target, span, c->mesh.vertices,
+                                                      c->mesh.vertex_count *
+                                                          sizeof(*c->mesh.vertices)))
+                return CUI_ERROR_INVALID_ACTION;
+        }
+    }
+    size_t commands_bytes = list->count * sizeof(*list->commands);
+    size_t cpu_bytes = commands_bytes,
+           metadata_bytes = list->count * sizeof(cui_software_v2_paint_descriptor);
+    if (metadata_bytes > options->metadata_bytes ||
+        !cui_software_v2_add(&cpu_bytes, plan.scratch_bytes, options->cpu_bytes) ||
+        !cui_software_v2_add(&cpu_bytes, background_bytes, options->cpu_bytes) ||
+        background_bytes > options->texture_bytes || background_bytes > options->transfer_bytes)
+        return CUI_ERROR_CAPACITY;
+    target->busy = true;
+    cui_software_v2_workspace workspace = {0};
+    error = cui_software_v2_workspace_begin(&workspace, cpu_bytes, metadata_bytes, allocate,
+                                            release, user);
+    if (error != CUI_OK) {
+        target->busy = false;
+        return error;
+    }
+    cui_draw_command_v2 *commands =
+        list->count ? cui_software_v2_workspace_take(&workspace, false, commands_bytes,
+                                                     _Alignof(cui_draw_command_v2))
+                    : NULL;
+    cui_software_v2_paint_descriptor *descriptors =
+        list->count ? cui_software_v2_workspace_take(&workspace, true, metadata_bytes,
+                                                     _Alignof(cui_software_v2_paint_descriptor))
+                    : NULL;
+    unsigned char *scratch =
+        cui_software_v2_workspace_take(&workspace, false, plan.scratch_bytes, 1);
+    if (list->count)
+        memcpy(commands, list->commands, commands_bytes);
+    clip = cui_software_v2_clip_all();
+    depth = 0;
+    for (size_t i = 0; i < list->count && error == CUI_OK; ++i) {
+        const cui_draw_command_v2 *v = &commands[i];
+        descriptors[i] = (cui_software_v2_paint_descriptor){.clip = clip};
+        if (v->kind == CUI_DRAW_V2_BACKGROUND) {
+            cui_background_prepared_query q;
+            error = cui_background_prepare_query(v->payload.background, options,
+                                                 cui_software_v2_clip_cover(clip), &q);
+            if (error != CUI_OK)
+                break;
+            unsigned char *pixels =
+                q.bytes ? cui_software_v2_workspace_take(&workspace, false, q.bytes, 1) : NULL;
+            error = cui_background_prepare_raster(v->payload.background, options,
+                                                  cui_software_v2_clip_cover(clip), pixels,
+                                                  q.stride, q.bytes, &descriptors[i].background);
+            descriptors[i].pixels = pixels;
+        } else if (v->kind == CUI_DRAW_CLIP_PUSH) {
+            stack[depth++] = clip;
+            clip = cui_software_v2_clip_push(clip, v->payload.legacy.bounds);
+        } else if (v->kind == CUI_DRAW_CLIP_POP)
+            clip = stack[--depth];
+    }
+    /* No pixel mutation, including scratch clear, precedes complete preparation. */
+    if (error == CUI_OK) {
+        for (size_t i = 0; i < plan.scratch_bytes; i += 4) {
+            scratch[i] = clear.r;
+            scratch[i + 1] = clear.g;
+            scratch[i + 2] = clear.b;
+            scratch[i + 3] = clear.a;
+        }
+        cui_software_v2_surface surface = {.pixels = scratch, .options = options};
+        for (size_t i = 0; i < list->count; ++i) {
+            const cui_draw_command_v2 *v = &commands[i];
+            surface.clip = descriptors[i].clip;
+            if (v->kind == CUI_DRAW_V2_BACKGROUND) {
+                const cui_background_prepared_query *q = &descriptors[i].background;
+                for (unsigned y = 0; y < q->height; ++y)
+                    for (unsigned x = 0; x < q->width; ++x) {
+                        double lx =
+                            ((double)q->physical_x + x + .5 - options->origin_x) / options->scale_x;
+                        double ly =
+                            ((double)q->physical_y + y + .5 - options->origin_y) / options->scale_y;
+                        /* Occupancy skip only: never paint outside shape. Covered bytes
+                         * already include radius and opacity; blend exactly once. */
+                        if (!cui_background_prepare_inside_internal(v->payload.background, lx, ly))
+                            continue;
+                        const unsigned char *p =
+                            descriptors[i].pixels + (size_t)y * q->stride + x * 4;
+                        cui_software_v2_emit(&surface, q->physical_x + (int)x,
+                                             q->physical_y + (int)y,
+                                             (cui_color){p[0], p[1], p[2], p[3]});
+                    }
+            } else if (v->kind == CUI_DRAW_MESH)
+                cui_software_v2_mesh_paint(&surface, &v->payload.legacy.mesh);
+            else if (v->kind == CUI_DRAW_RECT || v->kind == CUI_DRAW_BORDER ||
+                     v->kind == CUI_DRAW_IMAGE)
+                cui_software_v2_shape_paint(&surface, &v->payload.legacy);
+        }
+        for (unsigned y = 0; y < target->height; ++y)
+            memcpy(target->pixels + y * target->stride, scratch + (size_t)y * row, row);
+    }
+    cui_software_v2_workspace_end(&workspace);
+    target->busy = false;
+    return error;
+}
+#endif

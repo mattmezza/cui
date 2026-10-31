@@ -17,7 +17,9 @@ have different alpha/geometry semantics. This C-only math API does not apply pai
 or enable gradient rendering. For unreleased opt-in Core V2 mode/setters/emission,
 read `docs/CORE_DRAW_V2.md` and `include/cui/cui_draw_v2.h`; no adapter currently
 consumes that list. Private `docs/BACKGROUND_PREPARATION.md` describes an allocation-free maintainer
-building block and a private software validation/workspace slice, not a public renderer.
+building block and private software validation/workspace/partial painting slices,
+not a public renderer. `docs/SOFTWARE_V2_PAINTING.md` states the supported private
+kinds; text and both shadow kinds still reject before allocation/publication.
 Validation success does not mean adapter font/shadow resources are prepared.
 `docs/TEXT_PREPARATION.md` describes private counted recording only; opaque new
 font/dependency temporaries are outside the transaction CPU byte envelope. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.

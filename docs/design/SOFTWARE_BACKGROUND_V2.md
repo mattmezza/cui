@@ -3,9 +3,11 @@
 Based on approved `BACKGROUND_V2_RECORDS.md` through `638fc225`, Core V2
 `3e18bbba`, and private preparation `34a499a4`. This checkpoint needs review before
 production. All five adapters remain required; this specifies software only.
-Slice(a) now supplies private structural validation/planning and counted arenas in
-`backends/software/cui_software_v2_internal.h`; there is no render/support entry
-point, prepared font session, target publication or successful renderer yet.
+Slice(a) supplies private structural validation/planning and counted arenas.
+A private [partial painter](../SOFTWARE_V2_PAINTING.md) now stages shapes, images,
+meshes and backgrounds; it rejects TEXT and both SHADOW kinds. A counted source-
+glyph recorder exists separately, but no full text/shadow painter or public
+render/support entry exists. All-five completion remains pending.
 
 ## Exact additive entry points
 
@@ -109,7 +111,9 @@ workspace. No GPU lifetime, retirement or driver-memory claim is involved.
 Background spans are exact physical cells at query physical_x/y, stride from raster
 output, sampled at inverse physical pixel centers. Blend each cell directly: no
 logical-ceil bitmap cache, image resampling, grayscale/tint, opacity multiplication
-or second corner mask. Apply ancestor clip ONCE with the physical center test
+or additional radius/opacity multiplication. A binary occupancy SKIP using the
+same shared predicate/same inverse center prevents writes outside rounded shape;
+covered alpha0 and uncovered cells must remain distinct. Apply ancestor clip ONCE with the physical center test
 against transformed original clip; preparation's outward cover is only culling.
 Corner masking and ancestor opacity already occur once in the shared helper.
 Keep hidden RGB/alpha quantization exactly CENTER_V1. Integer placement is derived

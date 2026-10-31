@@ -29,12 +29,13 @@ The copyable snippet contains real public-header C functions and follows the
 selected size/design tokens. Application state remains caller-owned. The examples
 use built-in control artwork; they introduce no text glyph icons. These C
 callbacks and named-part seams do not imply corresponding language-builder
-callback support. All78 component/portal/glyph/binding shadow coverage remains
+callback support. All 78 component/portal/glyph/binding shadow coverage remains
 open beyond the explicitly implemented and tested slices.
 
-Implementation and the focused fixture are staged for the integrator's combined
-WASM build. **No actual browser proof is claimed at this source checkpoint.**
-After that build, run the existing Playwright environment headlessly:
+The integrator built the combined WASM source at `a07bd7ce` and passed all ten
+component/viewport cases, including actual pixel differences, state/input checks
+and strict C11 compilation of copied usage snippets. Hosted integration and public
+deployment of these additions remain pending. Reproduce the focused headless check:
 
 ```sh
 nice -n 19 taskset -c 0 python tests/web/test_control_surface_shadow_gallery.py \

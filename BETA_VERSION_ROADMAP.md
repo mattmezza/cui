@@ -14,7 +14,7 @@ release date is asserted.
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `a7dee36090cbe9c1ca1db1c7bed0cd804c69985f`; public docs, catalog, headers and native archive checked on 2026-10-31. |
 | Released | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3): Spinner/Stepper/HoverCard updates, hidden windows, named C shadows, six typed builder roots and opt-in C selection-indicator IDs. Ten assets published with verified download checksums. |
-| Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows have isolated tested slices; combined integration is still pending. |
+| Next integration | Compound paint-part IDs, semantic bridge part shadows and Button state-specific shadows pass combined local native, facade and browser checks; hosted integration is still pending. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -53,6 +53,11 @@ can lag implementation: inspect current code and evidence before scheduling work
 
 ## Latest validation evidence
 
+- Pending styling branch: **22/22** native/Python regressions, **5/5** root and
+  **5/5** part facade/older-library checks, strict TypeScript and **18/18** skill
+  tests passed. Five fixtures pass the 1 MB stack guard. The WASM gallery passed
+  ten desktop/narrow-DPR cases with actual paint/input checks and copied C usage.
+  These additions remain unreleased and are absent from alpha.3 packages.
 - Exact release source `a7dee360`: [full CI](https://github.com/mattmezza/cui/actions/runs/41226410425)
   and [native binding gate](https://github.com/mattmezza/cui/actions/runs/41226410434)
   passed, including GCC sanitizers, Windows Debug/Release and five hidden-window
@@ -69,7 +74,7 @@ can lag implementation: inspect current code and evidence before scheduling work
   not all Linux distributions. Caller-selected fonts need glyph coverage/fallbacks.
 - The npm source verifier now streams gzip once with the same integrity checks;
   offline security/read-work tests and verification of the real release artifact
-  pass locally. Hosted confirmation of this post-release CI improvement is pending.
+  passed. Full hosted CI passed at `04911c7f`.
 - Source warnings, meaningful legacy regressions, generated freshness and consumer
   skill checks passed for the release. Broader feature claims remain open below.
 
@@ -102,6 +107,8 @@ behavior families need justified exceptions rather than invented paint roots.
   hover-latency issues with reproducible Linux/macOS evidence; verify narrow/wide
   composed apps, overflow and current-frame caret/selection/IME projection.
   Keep the responsive C API and language guidance clear.
+  Headless Dialog prototypes reproduce intrinsic auto-sizing and same-frame
+  scroll-clamping gaps; fixed-height success does not establish those behaviors.
 - [ ] **Typography and design:** finish authoring/provider gaps for font families,
   numeric weights/stretch/variable axes, tracking, line height, wrapping and
   alignment. Preserve existing typography tokens and gradient text; document

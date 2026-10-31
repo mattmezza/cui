@@ -190,6 +190,9 @@ jobs:
       - name: Gallery split-button names and keyboard ordering
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_dropdown_metadata_gallery.py --directory build/web
+      - name: Verify control surface shadows paint states and copied usage
+        if: ${{ matrix.shard == 1 }}
+        run: uv run tests/web/test_control_surface_shadow_gallery.py --directory build/web --compile-usage
       - name: Gallery Stepper connectors icons and controlled navigation
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_stepper_visual_gallery.py --directory build/web

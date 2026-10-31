@@ -1,0 +1,26 @@
+{
+  "tested_revision": "7d7dc725",
+  "scope": "Private counted text preparation and contextual selection; no renderer support or full parity claim.",
+  "build": "Repository CMake native Release, GCC16.2 O3, warnings as errors; serial nice19 CPU0; 18/18 steps passed.",
+  "runtime": "Private Xvfb: Bidi and no-Bidi preparation, legacy cache/density/shaping, workspace validator and reference contract: 7/7 passed, no skips.",
+  "mutation": "Actual prepared-text executable rejects modified captured golden normally: 1/1 private-Xvfb passed.",
+  "reference": "All four frozen source files independently compared byte-for-byte against declared Git reference revision; match.",
+  "skill": "18/18 passed",
+  "checks": "Full clang-format23, SDK/amalgamation/skill freshness and diff checks passed.",
+  "corrected_findings": [
+    "O3 negative fixture constant propagation: runtime-derived poisoned address preserves invalid-read detection without disabling warnings.",
+    "No-Bidi V2 rejects contextual text and spans before reading borrowed strings; public legacy route unchanged."
+  ],
+  "remaining": [
+    "Full integrated suite and other-platform checks for this slice.",
+    "Actual software/native/Canvas V2 painting and real adapter capability negotiation.",
+    "Opaque font dependency allocations are separate from counted CUI storage; no total-process memory bound."
+  ],
+  "log_sha256": {
+    "text-integration-build.log": "b1d47e66d7bf3a155c44585d2384011922a2f48fb9a46568aaea11c416b81946",
+    "text-integration-tests.log": "2d789cd9dc6d39591dc52ca3e10e91edb08a9c5030bf57ba6d565043d4c98740",
+    "text-integration-mutation.log": "4d4a28e4ca0978f1cf38bb98fb7abc0d73a50b0ff50b366c9764a049025a0557",
+    "text-integration-final-skill.log": "8a7e553021f1b563a0c5a24de434eb5cab0f639f28fa064cb3ce46e2b6fe86f4",
+    "text-integration-final-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

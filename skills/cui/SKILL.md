@@ -377,3 +377,12 @@ an exact background brush value; read `docs/SLIDER_STYLE_VALUES.md` and its head
 It is a pure resolver, not a Styled widget or renderer capability. Preserve
 Aurora's gradient and distinguish transparent masked overrides; never infer a
 preset from custom theme bytes or flatten a brush for unsupported adapters.
+
+The unreleased C-only typed Styled Slider facade is in `cui_styled_slider_model.h`;
+read `docs/STYLED_SLIDER_MODEL.md` and the complete compiled
+`examples/styled_slider_model_controlled.c`. It reuses the Base handler and double
+Single/Range ownership, with separate owned ring motion and passive absolute Core
+wake deadlines. Visible V1 gradient thumbs reject atomically; copied V2 support is
+a host obligation, and current adapters do not render Aurora. Inert/layout-only/
+blocked/recovery calls never advance presentation; native numeric hosts and five
+typed builders remain pending. Do not describe this C slice as whole Slider parity.

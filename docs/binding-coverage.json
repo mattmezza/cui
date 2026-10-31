@@ -1062,5 +1062,27 @@
       "bindings/go/cui/part_shadows_test.go",
       "bindings/rust/tests/part_shadows.rs"
     ]
+  },
+  "typed_slider_model_v1": {
+    "status": "c_only_unreleased",
+    "headers": [
+      "include/cui/cui_base_slider_model.h",
+      "include/cui/cui_slider_style.h",
+      "include/cui/cui_styled_slider_model.h"
+    ],
+    "languages": [
+      "python",
+      "javascript",
+      "typescript",
+      "go",
+      "rust"
+    ],
+    "binding_status": "not_implemented",
+    "guide": "docs/STYLED_SLIDER_MODEL.md",
+    "limitations": [
+      "Existing builders retain legacy scalar Slider behavior; no typed double Single/Range reducer/presentation records or request/result receipts are exposed.",
+      "C-only Styled solid facade, owned style values and decorative getters do not add bridge/node roles or binding APIs.",
+      "Visible V1 gradient thumbs reject atomically; current live adapters do not consume V2 backgrounds. Native numeric host/physical AT proof and typed authoring in all five languages remain pending."
+    ]
   }
 }

@@ -307,6 +307,9 @@
     ],
     "cui_slider_style": [
       "src/components/cui_slider_style.c"
+    ],
+    "cui_styled_slider_model": [
+      "src/components/cui_styled_slider_model.c"
     ]
   },
   "native": {

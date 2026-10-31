@@ -32,7 +32,8 @@ static void verify(cui_slider_style_options_v1 o) {
     assert(p.padding == 1 && p.axis_offset == -8 && p.cross_offset == -5 && p.ring_max_width == 3);
     assert(p.fill.r == o.palette.bar.r && p.fill.a == o.palette.bar.a);
     assert(p.track.a == o.palette.bar.a * .2f && p.outer.a == o.palette.bar.a * .5f);
-    assert(memcmp(&p.ring, &o.palette.ring, sizeof p.ring) == 0);
+    color(p.ring, (cui_background_color){o.palette.ring.r, o.palette.ring.g, o.palette.ring.b,
+                                         o.palette.ring.a});
     assert(cui_background_valid(&p.thumb));
     if (o.palette.thumb.kind == CUI_SLIDER_BRUSH_SOLID) {
         assert(p.thumb.kind == CUI_BACKGROUND_SOLID);
@@ -50,14 +51,31 @@ static void verify(cui_slider_style_options_v1 o) {
     cui_slider_style_plan_v1 active;
     assert(cui_slider_style_resolve_v1(&o, &active));
     assert(active.flags == o.flags && active.track.a == o.palette.bar.a * .4f);
-    assert(memcmp(&active.thumb, &p.thumb, sizeof p.thumb) == 0); /* disabled never flattens */
+    assert(active.thumb.kind == p.thumb.kind); /* disabled never flattens */
+    if (p.thumb.kind == CUI_BACKGROUND_SOLID)
+        color((cui_slider_palette_color){active.thumb.solid.r, active.thumb.solid.g,
+                                         active.thumb.solid.b, active.thumb.solid.a},
+              p.thumb.solid);
+    else {
+        assert(active.thumb.model == p.thumb.model && active.thumb.space == p.thumb.space &&
+               active.thumb.angle_degrees == p.thumb.angle_degrees);
+        for (unsigned i = 0; i < 2; ++i) {
+            assert(active.thumb.stops[i].position == p.thumb.stops[i].position);
+            color((cui_slider_palette_color){active.thumb.stops[i].color.r,
+                                             active.thumb.stops[i].color.g,
+                                             active.thumb.stops[i].color.b,
+                                             active.thumb.stops[i].color.a},
+                  p.thumb.stops[i].color);
+        }
+    }
 }
 static void invalid(cui_slider_style_options_v1 o) {
-    cui_slider_style_plan_v1 p, before;
+    cui_slider_style_plan_v1 p;
+    unsigned char before[sizeof p];
     memset(&p, 0xa5, sizeof p);
-    before = p;
+    memcpy(before, &p, sizeof before);
     assert(!cui_slider_style_resolve_v1(&o, &p));
-    assert(memcmp(&p, &before, sizeof p) == 0);
+    assert(memcmp(&p, before, sizeof p) == 0);
 }
 int main(void) {
     cui_slider_style_options_v1 o = options();

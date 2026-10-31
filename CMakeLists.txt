@@ -2458,3 +2458,47 @@ foreach(target test_slider_style test_slider_style_null test_slider_source_flow
  cui_warnings(${target})
  add_test(NAME ${target} COMMAND ${target})
 endforeach()
+
+# Typed Styled Slider: shared numeric kernel, actual source facade and public distribution.
+add_executable(test_slider_spring tests/unit/test_slider_spring.c)
+target_include_directories(test_slider_spring PRIVATE include)
+add_library(slider_switch_components_fixture OBJECT src/components/cui_components.c)
+target_include_directories(slider_switch_components_fixture PRIVATE include)
+cui_warnings(slider_switch_components_fixture)
+add_executable(test_slider_switch_trace tests/unit/test_slider_switch_trace.c
+ $<TARGET_OBJECTS:slider_switch_components_fixture>)
+target_include_directories(test_slider_switch_trace PRIVATE include)
+target_link_libraries(test_slider_switch_trace PRIVATE cui)
+add_library(styled_slider_model_fixture OBJECT
+ src/components/cui_styled_slider_model.c src/components/cui_slider_style.c
+ src/base/cui_base_slider_model.c src/base/cui_slider_model.c
+ src/theme/cui_slider_palette.c src/theme/cui_theme.c src/core/cui_background.c)
+target_include_directories(styled_slider_model_fixture PRIVATE include)
+cui_warnings(styled_slider_model_fixture)
+add_executable(test_styled_slider_model_source tests/unit/test_styled_slider_model.c
+ $<TARGET_OBJECTS:styled_slider_model_fixture> $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_styled_slider_model_source PRIVATE include)
+add_executable(test_styled_slider_pixels tests/unit/test_styled_slider_pixels.c
+ $<TARGET_OBJECTS:styled_slider_model_fixture> $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_styled_slider_pixels PRIVATE include)
+target_link_libraries(test_styled_slider_pixels PRIVATE cui_software)
+add_executable(test_styled_slider_example examples/styled_slider_model_controlled.c
+ $<TARGET_OBJECTS:styled_slider_model_fixture> $<TARGET_OBJECTS:slider_model_core_fixture>)
+target_include_directories(test_styled_slider_example PRIVATE include)
+foreach(entry selective umbrella)
+ add_executable(test_styled_slider_model_${entry} tests/unit/test_styled_slider_model.c)
+ target_include_directories(test_styled_slider_model_${entry} PRIVATE dist)
+ target_compile_definitions(test_styled_slider_model_${entry} PRIVATE CUI_STYLED_SLIDER_DISTRIBUTION)
+ if(entry STREQUAL "umbrella")
+  target_compile_definitions(test_styled_slider_model_${entry} PRIVATE CUI_STYLED_SLIDER_UMBRELLA)
+ endif()
+endforeach()
+foreach(target test_slider_spring test_slider_switch_trace test_styled_slider_model_source
+ test_styled_slider_pixels test_styled_slider_example
+ test_styled_slider_model_selective test_styled_slider_model_umbrella)
+ if(NOT MSVC)
+  target_link_libraries(${target} PRIVATE m)
+ endif()
+ cui_warnings(${target})
+ add_test(NAME ${target} COMMAND ${target})
+endforeach()

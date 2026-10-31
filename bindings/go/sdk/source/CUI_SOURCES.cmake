@@ -119,4 +119,5 @@ set(CUI_SOURCES
  src/base/cui_slider_model.c
  src/base/cui_base_slider_model.c
  src/components/cui_slider_style.c
+ src/components/cui_styled_slider_model.c
 )

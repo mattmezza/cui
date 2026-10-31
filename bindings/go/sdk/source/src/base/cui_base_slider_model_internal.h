@@ -17,6 +17,11 @@ typedef struct {
     cui_slider_model_compose_internal compose;
     void *user;
 } cui_slider_model_presentation_internal;
+/* Shared admission only: no mutation, callback or box submission. */
+cui_slider_model_result_v1 cui_base_slider_model_validate_internal(
+    cui_context *, cui_id, cui_slider_model_value_v1, const cui_slider_model_state_v1 *,
+    const cui_slider_model_options_v1 *, const cui_base_slider_model_layout_v1 *,
+    cui_slider_model_handler_v1, cui_id ids[5]);
 cui_slider_model_result_v1 cui_base_slider_model_present_internal(
     cui_context *, cui_id, cui_slider_model_value_v1, cui_slider_model_state_v1 *,
     const cui_slider_model_options_v1 *, const cui_base_slider_model_layout_v1 *,

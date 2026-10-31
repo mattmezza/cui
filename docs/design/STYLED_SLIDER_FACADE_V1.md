@@ -291,3 +291,55 @@ open until their separate implementations and runtime proofs land.
 
 Signed design checkpoint: `/root/hidden_windows`, 2026-11-01. No production code,
 generator output, compiler, dependencies or build artifacts accompany this contract.
+
+## Implemented step3 followup
+
+The declared records/functions are now implemented in the canonical public header
+`cui_styled_slider_model.h` and component source. Consumer authority is
+[STYLED_SLIDER_MODEL.md](../STYLED_SLIDER_MODEL.md), with exact portable CMake build
+and windowless run commands and a complete compiled application. This updates the
+historical checkpoint's proposed status; it does not close whole Slider parity.
+
+Shared Base admission was extracted without mutation so facade-only rejection
+precedes reduction. The public NULL route still matches the independent pre-hook
+8×6-frame trace. The Switch numerical function was extracted to a private owned
+value kernel, with fieldwise wrapper preserving its public state/tooltip. Before
+editing the wrapper, the signed `c7f1438a` full component source was compiled and
+its actual public Switch run against the retained identical Core/library:6 modes
+of10 frames. Actual commands/order/colors/bounds, IDs, semantics and motion hashes
+match the new wrapper exactly. A frozen old-source function fixture additionally
+compares924 samples fieldwise (each double bitwise, bool separately), including
+backwards/zero clock, interrupt, all damping regimes, extreme finite settings,
+travel=false and reduced motion. No struct-padding comparison is used.
+
+The final focused17-case private-Xvfb suite passes source/selective/umbrella facade
+and pure-style builds, existing Base three routes/legacy events, the frozen NULL
+trace, independent38-preset oracle/data, shared kernel, actual Switch trace, the
+complete example and public-facade software pixels. Facade cases include4 builtins,
+37 named solids and explicit V1 rejection of the1 named gradient,14 invalid-record
+atomic checks,256 channel byte roundtrips, both axes/current parent resize/mode
+changes, real keys/mouse/touch/ROOT capture/acceptance, readonly/handlerless/disabled,
+modal/inert/layout-only/omission/current-error-clear recovery, extreme clock,
+host-mismatched V2 failure and genuine Core V2 brush transport with declared
+fixture support. The latter is not a consumer/renderer capability claim.
+
+Actual public facade raster proof covers160 fractional pointer-ring images and16
+keyboard-focus images, both axes, rem16/24, square/round, clip and ancestor opacity.
+The independent annulus/source-over oracle checks exact outside coverage and at
+most1-byte channel rounding inside, with zero-ring no paint. An initial focus
+oracle expected87 at source alpha173/parent opacity.5; existing Core's prepaint
+byte multiplication truncates to86. Only that independent expectation was corrected
+(no production change or wider tolerance), with the initial failure log preserved.
+Atomic record assertions snapshot original bytes with memcpy, rather than compare
+padding after struct assignment. Computed style/brush equality is fieldwise.
+
+Strict pinned Zig0.16 wasm32-wasi C11/O2/Wall/Wextra/Wpedantic/Werror compilation
+passes the facade and refactored Base TUs. Observed Linux64 record sizes are
+options328/presentation112/motion32/result80; these are observations, not a cross
+ABI size promise. Local bounded builds reused actual cached Core/software/text/
+CUI libraries for final links and did not rebuild the engine or open desktop
+windows. SDK/dist/skill copies are generated canonically from the source.
+
+Remaining boundaries: real V2 background consumers/Aurora rendering, vertical
+registered-scroll admission, native numeric host/physical AT delivery and all
+five typed builders. Existing source/CUI input exceptions remain Base authority.

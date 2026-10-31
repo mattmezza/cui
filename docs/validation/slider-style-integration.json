@@ -1,0 +1,23 @@
+{
+  "tested_revision": "384cd13893e050b3f0f68f13266dfe820fcbed3c",
+  "scope": "Pure C-owned Slider style values and private Base presentation seam; no public Styled facade or renderer support.",
+  "native": "Actual CMake Release warnings-clean32-step build; nine style/source/selective/umbrella/NULL-route/Base legacy tests passed. Rebuilt palette probe plus independent preset/data checks2/2 passed.",
+  "wasm": "Pinned Zig0.16 strict C11O2 WASM32 compilation of Base model and style resolver passed.",
+  "contracts": "Frozen old Base semantic command/event trace; responsive geometry216 and software ring240 cases; pure selective style module needs no Core.",
+  "coalesced_checks": "Skill18/18, usage6/6, full format23, generated SDK/amalgamation/skill freshness and diff passed.",
+  "windows_fix": "The sole old hosted Windows Release failure was a raw padded text-style comparison. Fieldwise comparison with padding/field-change regressions passes local strict build and headless bridge test1/1; Windows confirmation remains pending.",
+  "ci_scheduling": "Portable CI only: two CTest processes and bounded nested consumer builds. Selected local headless overlap13/13 passed, no skips. No measured hosted speedup claimed.",
+  "remaining": "Styled motion/facade/named parts, vertical registered-scroll admission, actual V2 adapter rendering and foreign authoring remain open.",
+  "log_sha256": {
+    "slider-style-integration-build.log": "f334d548fccf5e11ad3b4c5ed8b1651033598c8ce1ad1c31b56bce3a1ffed07a",
+    "slider-style-integration-tests.log": "190928f5fe0e5c0c06c67b9f0305cddc4f2ec87f7d284a65556d08f0411a158c",
+    "slider-style-palette-build.log": "fa738dfc25212234e86d8acec44f2704046a379fe0291779a1a0408ce91b74ff",
+    "slider-style-palette-tests.log": "c9693444c54dd15fec3935679c613046b8a3d714ff2a1bf3fc9c1efea95105db",
+    "foundation-candidate-skill.log": "353b5aae7cd0477ffeedbbfa922c2f517e7ab08468a30ad5c3577c97b7d2c49e",
+    "foundation-candidate-usage.log": "641707ee636ccc27bbd9f4dcf18f4640c6ee5d9a088160ea262843b54ffbed4b",
+    "foundation-candidate-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "windows-padding-fix-build.log": "43a53e1cdcbedfe2c6cef71165d8980bb12dccabf9de906df4aa438d30973519",
+    "windows-padding-fix-tests.log": "0ccf4c303b6c1d41fcc45923ee20b698f8d756095795c11489b73775585f0446",
+    "ci-portable-overlap-tests.log": "1706b29646baa82b25c38a0a3b33e5d4ef29d7782dea0ad15c26b5a943730478"
+  }
+}

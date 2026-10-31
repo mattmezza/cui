@@ -65,3 +65,11 @@ jobs:
             --library "$RUNNER_TEMP/cui-run-native/libcui_bridge.so" \
             --font "$PWD/third_party/inter/Inter-Regular.otf" \
             --node-include "$node_include" --mode all
+      - name: Verify initially hidden windows in all five language paths
+        # Reuse the native bridge above; the helper owns private-Xvfb setup.
+        run: |
+          tsc_compiler="$(npm exec --yes --package typescript@5.8.3 -- which tsc)"
+          test -f "$tsc_compiler"
+          rustup run 1.85.1 python scripts/test_window_visibility_bindings.py \
+            --build-dir "$RUNNER_TEMP/cui-run-native" \
+            --font "$PWD/third_party/inter/Inter-Regular.otf" --tsc "$tsc_compiler"

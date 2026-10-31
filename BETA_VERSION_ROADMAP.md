@@ -13,7 +13,7 @@ release date is asserted.
 | --- | --- |
 | Live | Interactive C → WebAssembly gallery, all 78 catalog entries, browsable docs and API index. Impeccable artifacts removed. |
 | Verified deployment | Website revision `ab8fddbbbca4b78e3b2cc1b14752dd0c4ac96b30`; public docs, catalog, headers and native archive checked on 2026-10-31. |
-| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3 windows; named-element C shadow setters and CSS blur conversion. Focused checks exist; combined validation/publication is still pending. |
+| Pending integration/release | Spinner browser improvements; Stepper visual builders and C presentation; HoverCard outside-release policy; initially hidden SDL3/bridge windows across five language paths; named-element C shadow setters and CSS blur conversion. Focused checks exist; combined validation/publication is still pending. |
 | In progress | Shadow component-part and language-binding coverage; completion of remaining component and cross-platform gaps. |
 | Deprioritized | Editor expansion/polish and color-picker polish. Existing regressions still need fixes. |
 
@@ -28,9 +28,10 @@ can lag implementation: inspect current code and evidence before scheduling work
   Preserve existing callbacks, defaults, Retina fixes and static-linking support.
 - [ ] **Initially hidden windows.** Ship creation with the native hidden flag,
   avoiding show-then-hide flashing; document explicit show/hide and daemon usage.
-  Complete foreign-language authoring separately: the current SDL3 slice does not
-  make bridge/builders create hidden windows. Caller-owned window hosts need their
-  own policy.
+  SDL3 and Python/JS/TS/Go/Rust bridge paths have focused Linux private-Xvfb
+  evidence for actual hidden creation and first presentation. Integration,
+  publication and broader native-platform acceptance remain pending. Caller-owned
+  window hosts need their own policy.
 - [ ] **Consistent shadows.** Ship a clear typed API for presets and custom
   offset/blur/spread/color, mixed drop/inset layers and clearing. Existing shadow
   renderers must be reused. Initial named-box C setters have focused tests; full

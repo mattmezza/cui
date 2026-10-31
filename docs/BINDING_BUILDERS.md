@@ -478,3 +478,7 @@ python scripts/test_window_visibility_bindings.py --build-dir build --font /abso
 The helper downloads nothing, builds only focused dynamic tests/addon and a Linux
 test-only SDL interposer, then uses `scripts/test_local.py` for private Xvfb.
 Sokol and SDL_GPU renderer-only hosts retain ownership of their own windows.
+
+The dedicated native-binding workflow also runs this focused visibility helper
+against its existing bridge build, with pinned TypeScript5.8.3 and Rust1.85.1.
+Hosted CI results remain separate from the local private-Xvfb evidence above.

@@ -29,6 +29,8 @@ def validate(text):
         '--library "$RUNNER_TEMP/cui-run-native/libcui_bridge.so"',
         '--font "$PWD/third_party/inter/Inter-Regular.otf"',
         '--node-include "$node_include" --mode all', 'test -f "$node_include/node_api.h"',
+        'typescript@5.8.3', 'rustup run 1.85.1 python scripts/test_window_visibility_bindings.py',
+        '--build-dir "$RUNNER_TEMP/cui-run-native"', '--tsc "$tsc_compiler"',
     )
     for item in required:
         if item not in text:
@@ -52,6 +54,8 @@ class WorkflowTests(unittest.TestCase):
         source = WORKFLOW.read_text()
         for before, after in (('--mode all', '--mode dynamic'),
                               ('CUI_SANITIZE=OFF', 'CUI_SANITIZE=ON'),
+                              ('typescript@5.8.3', 'typescript@latest'),
+                              ('scripts/test_window_visibility_bindings.py', 'scripts/omitted_visibility.py'),
                               ('actions/checkout@11d5960a326750d5838078e36cf38b85af677262', 'actions/checkout@main')):
             with self.subTest(after=after):
                 self.assertTrue(validate(source.replace(before, after)))
@@ -103,7 +107,7 @@ class WorkflowTests(unittest.TestCase):
                     break
                 body.append(candidate[indent + 2:])
             scripts.append('\n'.join(body))
-        self.assertEqual(len(scripts), 6)
+        self.assertEqual(len(scripts), 7)
         for script in scripts:
             result = subprocess.run(['bash', '-n'], input=script, text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)

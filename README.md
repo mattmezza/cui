@@ -4,6 +4,8 @@ An experimental C11 native UI framework: Clay layout, unstyled interaction primi
 
 **Development snapshot; full component parity remains unfinished.** All 78 component families have real C/WASM gallery stories and explicit [feature status](docs/gpui-parity.json). The library includes themed controls, Unicode editing, retained docking and virtual lists, charts, Markdown and composed application examples. Native accessibility, full language services/IME/bidi and exact platform behavior remain in progress; a tested subset does not verify a whole family.
 
+[**Beta roadmap and remaining work**](BETA_VERSION_ROADMAP.md) — current delivery status, priorities and completion gates.
+
 [**Open the browser component gallery**](https://matteo.merola.co/cui/) — all 78 catalog entries, with interactive stories compiled from the same C11 implementation to WebAssembly. The HTML/Canvas browser host is an optional gallery adapter; native applications do not depend on it. See [browser build and validation](docs/WEB_GALLERY.md).
 
 ![CUI workspace composed from real components and rendered from C in WebAssembly](docs/screenshots/readme-workspace.png)

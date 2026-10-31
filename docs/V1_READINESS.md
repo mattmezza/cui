@@ -1,5 +1,7 @@
 # CUI v1.0 readiness
 
+For the maintained delivery checklist, see the [beta roadmap](https://github.com/mattmezza/cui/blob/main/BETA_VERSION_ROADMAP.md). This document retains its dated readiness assessment.
+
 CUI is a working alpha. A live gallery and passing tests demonstrate useful functionality; they do not establish production readiness or complete component parity. This assessment is dated 17 October 2026.
 
 The catalog contains all 78 families: 77 tested subsets, one implemented family and zero fully verified families. The feature ledger contains 360 entries: 315 tested, four implemented and 41 not started. Features differ greatly in complexity, so these counts are not a completion percentage or a release-date estimate. The machine-readable component manifest remains the acceptance ledger.

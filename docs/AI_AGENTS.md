@@ -2,6 +2,8 @@
 
 Give an agent your application requirements and the repository's current API and tests. CUI is a portable C11 library with optional host/renderer adapters. The live gallery covers 78 entries, while the feature manifest still records incomplete reference behavior.
 
+For repository development, use [the beta roadmap](https://github.com/mattmezza/cui/blob/main/BETA_VERSION_ROADMAP.md) as the maintained delivery checklist. Update it when completing a slice or discovering a gap; keep implementation, validation, integration and publication status distinct.
+
 ## Install the CUI skill
 
 ```sh

@@ -93,6 +93,17 @@ class WorkflowTests(unittest.TestCase):
                 self.assertIsNotNone(build)
                 self.assertIn('test_bridge_portable_run', build.group(1).split())
 
+    def test_filtered_bridge_jobs_build_new_test_executables(self):
+        source = (ROOT / '.github/workflows/ci.yml').read_text()
+        for job in ('node-builders', 'go-rust-builders'):
+            section = source.split('  ' + job + ':', 1)[1]
+            section = re.split(r'\n  [a-zA-Z][\w-]*:', section, maxsplit=1)[0]
+            build = re.search(r'cmake --build [^\n]+--target ([^\n]+)', section)
+            self.assertIsNotNone(build)
+            for target in ('test_bridge_window_visibility', 'test_bridge_stepper_visual'):
+                with self.subTest(job=job, target=target):
+                    self.assertIn(target, build.group(1).split())
+
     def test_every_literal_run_block_is_valid_bash(self):
         # This workflow deliberately uses only multiline literal shell blocks.
         lines = WORKFLOW.read_text().splitlines()

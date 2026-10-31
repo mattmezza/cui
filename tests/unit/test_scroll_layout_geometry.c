@@ -279,12 +279,21 @@ static void title_commands(cui_draw_list draw, unsigned expected_lines) {
         }
     assert(lines == expected_lines && letters == 20);
 }
+static unsigned expected_lines_from_metrics(float a, float space, float width) {
+    /* The existing word wrapper reserves the following space for each of
+     * the first 19 words. Only the final word has no following space. A font
+     * where ten bare words fit but ten word+space groups do not exposes the
+     * difference; do not assume every line can omit its last reserved space. */
+    unsigned per_line = (unsigned)floorf(width / (a + space));
+    assert(per_line > 0);
+    unsigned completed_lines = 18 / per_line;
+    float final_width = (19 - completed_lines * per_line) * (a + space) + a;
+    return completed_lines + 1 + (final_width > width);
+}
 static unsigned expected_lines(cui_font *font, float width) {
     float a = font ? cui_font_measure(font, cui_string("A"), 10).width : 8;
     float space = font ? cui_font_measure(font, cui_string(" "), 10).width : 4;
-    unsigned per_line = (unsigned)floorf((width + space) / (a + space));
-    assert(per_line > 0);
-    return (20 + per_line - 1) / per_line;
+    return expected_lines_from_metrics(a, space, width);
 }
 static void geometry_suite(cui_font *font, bool solve) {
     fixture f;
@@ -315,6 +324,31 @@ static void geometry_suite(cui_font *font, bool solve) {
     scene(&f, 272, 332, 1000, 320);
     eq(f.footer.y, 276);
     callbacks(&f, 9);
+    cui_destroy(f.ui);
+}
+static cui_size boundary_measure(void *user, cui_str text, float size) {
+    (void)user;
+    (void)size;
+    float width = 0;
+    for (size_t i = 0; i < text.length; ++i)
+        width += text.data[i] == ' ' ? 4 : 6;
+    return (cui_size){width, 10};
+}
+static void trailing_space_boundary(void) {
+    assert(expected_lines_from_metrics(6, 4, 96) == 3);
+    assert(expected_lines_from_metrics(6, 4, 100) == 2);
+    assert(expected_lines_from_metrics(6, 4, 200) == 1);
+    fixture f = {.solve = true, .auto_panel = true};
+    f.ui = cui_create((cui_config){.width = 272, .height = 332, .measure = boundary_measure});
+    assert(f.ui);
+    /* At width96 ten A's plus nine spaces fit exactly; ten word+space
+     * groups need100. The wrapper reserves the nonfinal space, so only nine fit.
+     * This synthetic case reproduces the bundled Inter font's layout boundary. */
+    cui_draw_list draw = scene(&f, 128, 332, 20, 0);
+    eq(f.header.h, 30);
+    eq(f.panel.h, 166);
+    title_commands(draw, 3);
+    callbacks(&f, 1);
     cui_destroy(f.ui);
 }
 static bool auto_size_probe(cui_font *font, bool require_intrinsic) {
@@ -638,6 +672,7 @@ static void late_measurement_offsets(cui_font *font) {
     puts("LATE_FONT_CALLBACK_NONFINITE_BEFORE_AND_AFTER_STAGING PASS");
 }
 int main(int argc, char **argv) {
+    trailing_space_boundary();
     if (argc > 2 && !strcmp(argv[2], "--probe-scroll-resize")) {
         return scroll_resize_probe(true) ? 0 : 3;
     }

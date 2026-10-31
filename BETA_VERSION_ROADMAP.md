@@ -1,6 +1,6 @@
 # CUI beta roadmap
 
-Updated: **2026-10-31** · Status: **working alpha; beta scope unfinished**.
+Updated: **2026-11-01** · Status: **working alpha; beta scope unfinished**.
 
 **Goal:** complete and verify all **78 frozen component families**, plus the
 requested native, language-binding, documentation and website capabilities.
@@ -13,7 +13,7 @@ No completion percentage or beta date is asserted.
 | Released library | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3). Ten verified assets; hidden windows, initial named shadows and component improvements included. |
 | Public website | Interactive C → WASM gallery with all 78 entries, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
 | Merged development work | Additional component-part and Button state shadows are merged and deployed, but absent from alpha.3 library packages. |
-| Work in integration | Current-frame scrollbar layout, a typed C-only Slider model, versioned background transport and private software preparation/validation. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
+| Work in integration | Current-frame scrollbar layout, a typed C-only Slider model, versioned background transport, private software preparation/validation and counted text recording. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
 | Package registries | Go alpha.3 tag/proxy verified. PyPI, npm and crates.io publication remains open; GitHub assets are available. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -23,10 +23,10 @@ feature test does not establish complete component parity.
 
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Scrollbar geometry has focused integration passes. Verify the source-referenced Dialog composition prototype, then implement component input and lifecycle behavior. |
-| 1 | Finish Slider behavior | Typed C-only Base model has focused passes. Complete styled/responsive composition, component integration, language bindings and compatibility validation. |
-| 1 | Finish backgrounds and gradients | Validate Core transport and preparation; implement software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Spinner scheduling fix passes local headless checks. Confirm it remotely; integrate and verify fixes for packaged-source configuration, Windows workspace alignment and WASM32 Slider compilation. Obtain a clean combined run. |
+| 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; additive region-sizing work has passed worker checks and awaits integration. Finish Dialog composition/input and wider acceptance. |
+| 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
+| 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
+| 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Confirm the final Windows fieldwise-test correction and obtain a clean full run of the latest candidate. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -49,15 +49,15 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests now default to one compiler job. Keep laptop load and build artifacts bounded. |
+| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Button state/style refinement, Slider ranges and themes; consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Button state/style refinement, Styled Slider ranges/themes, native numeric delivery and five builders (the typed C Base model is integrated); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
-| Overlays | Dialog slots/sizing, Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
+| Overlays | Dialog independent header/title slots and separate Content/Body flex sizing; Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
 | App structure | Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services; verify composed apps. |
@@ -68,6 +68,30 @@ subsets. Detailed ledgers and headers remain authoritative.
 For each family, verify applicable state ownership, callbacks/results,
 keyboard/pointer/touch, focus/accessibility, visual states, responsive bounds,
 omission/removal and resource lifetime. Record justified nonvisual/host exceptions.
+
+### Reported regressions: closure checklist
+
+These groups remain open until existing fixes are reconciled with regression
+coverage and the deployed gallery. This is an acceptance checklist, not a claim
+that every listed defect still reproduces.
+
+- [ ] **Alignment and sizing:** button/control text, Accordion caret, Avatar initials,
+  Pagination counter, Select label, Tooltip, DatePicker, AlertDialog and HoverCard
+  content sizing; all applicable size tokens, including Attachment layout.
+- [ ] **Images and presentation:** real Attachment/Image previews, avatar stack,
+  semantic Alert/Bubble variants, reusable Message demo, Notification action/close
+  spacing and Markdown code blocks.
+- [ ] **Input and selection:** Radio exclusivity, Rating stars, Stepper behavior,
+  Calendar icons, locale/year selection, full-width Select/Combobox/Command,
+  InputGroup wrapping and text navigation/scrolling regressions.
+- [ ] **Layout and navigation:** working Resizable/Dock/VirtualList demos, Sidebar
+  clipping, bounded Tabs scrolling/overflow button, meaningful Toolbar find and
+  Theme demos, native TitleBar capability/fallback, gallery scroll preservation.
+- [ ] **Data and motion:** Table/DataTable sorting and consistent scrolling,
+  alternate/header backgrounds, Chart line quality, Plot pan/zoom/pinch,
+  Progress and Sheet animation, optional scrollbar appearance only where useful.
+- [ ] **Media:** reusable player plus base video surface; visible seek controls,
+  video-only fullscreen, audible playback and documented host support.
 
 ## Validation and delivery gates
 
@@ -84,12 +108,17 @@ omission/removal and resource lifetime. Record justified nonvisual/host exceptio
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
 
-Latest reliable delivery evidence: [CI](https://github.com/mattmezza/cui/actions/runs/41236071825),
+The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actions/runs/41236071825),
 [native bindings](https://github.com/mattmezza/cui/actions/runs/41236071845) and
-[browser/deployment](https://github.com/mattmezza/cui/actions/runs/41236071976)
-passed for the merged styling revision. New integration work has focused passes,
-but its latest combined native run and browser gate are **not clean**; fixes and
-confirmation remain pending. Older green results do not cover newer code.
+[Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
+Integration candidate `3636bfbc` passed all browser shards and native binding
+runners; its only CI failure was a Windows Release struct-padding comparison.
+The fieldwise correction passes locally. Latest submitted candidate: `00aa1f99`;
+[CI](https://github.com/mattmezza/cui/actions/runs/41251863047),
+[native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050) and
+[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) require terminal
+confirmation. Branch checks do not deploy the public website. Older green results
+do not cover newer code.
 
 ### Current integration evidence
 
@@ -98,10 +127,11 @@ These are **unreleased slices**, not completed beta areas:
 | Slice | Evidence / remaining gate |
 | --- | --- |
 | Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
-| Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
-| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
-| Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
-| Portability fixes | Packaged-source configuration fix passes focused checks; Windows alignment and WASM32 fixes need combined integration/hosted confirmation. |
+| Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). The controlled example, responsive/ring pixel proofs and pure C style resolver pass. Styled facade/motion and other languages remain open. |
+| Reduced-motion scheduling | Local viewport/DPI and repeated preference-change checks pass; all browser shards passed for candidate `3636bfbc`. Confirm the newest candidate separately. |
+| Background rendering | Transport, preparation and private validator checks pass. Counted text recording passes the repository Release O3 build, seven runtime checks, mutation rejection and skill18. The negative-fixture warning and no-Bidi admission gap are fixed. Wider suite/platform acceptance remains open. This does **not** establish renderer painting support. |
+| Worker handoffs awaiting integration | Core scroll-region sizing: source/distribution/legacy/header checks 6/6 and skill checks 18/18 pass. Private software painter: focused checks 5/5 and skill checks 18/18 pass, including a reproduced and corrected large-coordinate regression. These are not integrated or public renderer support. |
+| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. New hosted Linux/macOS/Windows/browser confirmation remains open. |
 
 Keep detailed receipts with their implementation changes; refresh this summary
 when the integrated revision passes, merges or ships.

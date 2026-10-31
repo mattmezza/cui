@@ -1974,10 +1974,11 @@
       ],
       "state_ownership": "Caller retains cui_theme value and any icon-loader user/backing storage.",
       "interaction": "cui_theme_icon_loader_fn resolves icon SVG; theme selection is an application event.",
-      "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it.",
+      "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math; they do not apply backgrounds or enable any renderer.",
       "docs": [
         "docs/THEME_GUIDE.md",
-        "docs/TYPOGRAPHY.md"
+        "docs/TYPOGRAPHY.md",
+        "docs/BACKGROUND_VALUES.md"
       ],
       "callback_symbols": [
         "cui_theme_icon_loader_fn"
@@ -1985,7 +1986,10 @@
       "scope": "application style data; passed during frame submission",
       "name": "Theme",
       "public_header": "include/cui/cui_theme.h",
-      "composition": "application model + frame composition"
+      "composition": "application model + frame composition",
+      "additional_public_headers": [
+        "include/cui/cui_background.h"
+      ]
     },
     {
       "api_symbols": [

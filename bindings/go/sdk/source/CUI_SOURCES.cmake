@@ -10,6 +10,7 @@ set(CUI_SOURCES
  src/components/cui_editor.c
  src/base/cui_virtual_scroll.c
  src/components/cui_virtual.c
+ src/core/cui_background.c
  src/effects/cui_effects.c
  src/base/cui_questionnaire.c
  src/components/cui_questionnaire.c

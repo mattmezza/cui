@@ -11,6 +11,12 @@ In commands below, `HELPER` means that absolute `scripts/cui.py` path. No pip
 packages are required. The skill includes offline documentation, headers and
 examples; it does not include the CUI implementation or compiler toolchain.
 
+For unreleased owned background colors/two-stop values and pure sampling, read
+`docs/BACKGROUND_VALUES.md` and `include/cui/cui_background.h`. CSS and SOURCE_038
+have different alpha/geometry semantics. This C-only math API does not apply paint
+or enable gradient rendering; V2 commands, all five adapters and bindings remain
+pending. Existing Plot/effects/text gradient contracts remain distinct.
+
 ## Start with the project's actual integration
 
 Inspect the existing app before choosing a language, host or renderer. Preserve

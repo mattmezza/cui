@@ -55,6 +55,13 @@
       ]
     },
     {
+      "header": "cui_background.h",
+      "macro": "CUI_BACKGROUND_IMPLEMENTATION",
+      "sources": [
+        "src/core/cui_background.c"
+      ]
+    },
+    {
       "header": "cui_effects.h",
       "macro": "CUI_EFFECTS_IMPLEMENTATION",
       "sources": [

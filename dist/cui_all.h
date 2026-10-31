@@ -8,6 +8,7 @@
 #include "cui_plot_view.h"
 #include "cui_editor.h"
 #include "cui_virtual_scroll.h"
+#include "cui_background.h"
 #include "cui_effects.h"
 #include "cui_questionnaire.h"
 #include "cui_speech.h"
@@ -103,6 +104,10 @@
 #define CUI_VIRTUAL_SCROLL_IMPLEMENTATION
 #endif
 #include "cui_virtual_scroll.h"
+#ifndef CUI_BACKGROUND_IMPLEMENTATION
+#define CUI_BACKGROUND_IMPLEMENTATION
+#endif
+#include "cui_background.h"
 #ifndef CUI_EFFECTS_IMPLEMENTATION
 #define CUI_EFFECTS_IMPLEMENTATION
 #endif

@@ -26,6 +26,9 @@
       "src/base/cui_virtual_scroll.c",
       "src/components/cui_virtual.c"
     ],
+    "cui_background": [
+      "src/core/cui_background.c"
+    ],
     "cui_effects": [
       "src/effects/cui_effects.c"
     ],

@@ -1,0 +1,11 @@
+{
+  "tested_revision": "e546eac3",
+  "scope": "TEST-ONLY source-placement tree through existing public Core V2; not a completed Dialog component.",
+  "result": "Warnings-clean four-step actual CMake fixture rebuild, private-Xvfb test_local.py source/distribution2/2PASS0.30s.",
+  "coverage": "Ten first-open/current grow-shrink/narrow-wide/layer/low-preference transitions: tracked, semantic and prepaint bounds, current scroll ranges, clipping pixels and callbacks once. Source Positioner is inspected at frozen revision, not executed.",
+  "remaining": "Full component fonts, six slots, input/actions/lifecycle, Root services and language facades remain open.",
+  "log_sha256": {
+    "dialog-placement-integration-build.log": "6514436ad39f990195314cd88cc0bb0dd3b297afc3ae2fe809a13559eaa6b867",
+    "dialog-placement-integration-tests.log": "85368357d034da9b7fb5d071a3e73546505eb8f3f29d583c6fedb43125aa5f34"
+  }
+}

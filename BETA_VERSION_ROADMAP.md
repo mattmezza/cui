@@ -26,7 +26,7 @@ feature test does not establish complete component parity.
 | 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; 15 focused regressions and two Inter-font checks pass. Finish Dialog composition/input and wider acceptance. |
 | 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Fix hosted source-package configuration, Windows alignment and WASM32 warning failures; confirm Spinner scheduling in hosted CI and obtain a clean full run. |
+| 1 | Resolve current validation failures | Fix hosted source-package configuration, Windows alignment and WASM32 warning failures; Spinner scheduling now passes its hosted check; obtain a clean full run. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -122,7 +122,7 @@ These are **unreleased slices**, not completed beta areas:
 | --- | --- |
 | Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
 | Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
-| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; hosted confirmation remains open. |
+| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; the named hosted check also passed in Pages run `41247866200`. Whole workflow remains failed for WASM32 compilation. |
 | Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
 | Portability fixes | Packaged-source configuration fix passes focused checks; Windows alignment and WASM32 fixes need combined integration/hosted confirmation. |
 

@@ -116,7 +116,23 @@ Ordinary shape/image/mesh painters must evaluate the corresponding logical point
 from each physical center, preserving source UVs and clip semantics. Text requires
 an explicit density-aware glyph preparation/coverage mapping, including unequal
 scales, colored glyphs and text gradients; rescaling font_size alone is insufficient.
-This mapping is an implementation-review prerequisite, not an assumed existing API.
+`cui_font_draw_context_line_scaled` and its colored counterpart already emit
+physical glyph coordinates/bitmaps, but accept ONE positive scale <=16, whereas
+V2 permits independent scales through64. `cui_text_layout_draw_scaled` has the
+same scalar shape. These are useful for the supported isotropic subset, not proof
+of the complete transform. Mesh CPU preparation likewise uses a scalar mesh paint
+scale and origin before triangle rasterization; composing anisotropic target
+scales needs private per-axis transformed vertices, not overwriting that scalar.
+Full text mapping is an implementation-review prerequisite: specify an explicit
+coverage resampling policy for anisotropic/extreme density and source selection
+before advertising it. No existing generic transform API solves that boundary.
+
+Independently reviewable software slices: (a) complete list validator and bounded
+transaction workspace with no advertised background support; (b) physical ordinary
+shape/image/mesh mapping plus backgrounds and independent pixels; (c) complete
+scaled/colored/gradient text preparation, fault tests and final support query.
+An intermediate test-only renderer may reject unsupported text/density before
+painting; public support must not imply that these remaining cases are complete.
 
 ## Required independent proof before support is advertised
 

@@ -13,7 +13,7 @@ No completion percentage or beta date is asserted.
 | Released library | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3). Ten verified assets; hidden windows, initial named shadows and component improvements included. |
 | Public website | Interactive C → WASM gallery with all 78 entries, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
 | Merged development work | Additional component-part and Button state shadows are merged and deployed, but absent from alpha.3 library packages. |
-| Work in integration | Scroll layout, Slider foundations and versioned background drawing. Focused checks exist; this is not a released or fully validated batch. |
+| Work in integration | Current-frame scrollbar layout, a typed C-only Slider model, versioned background transport and private software preparation/validation. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
 | Package registries | Go alpha.3 tag/proxy verified. PyPI, npm and crates.io publication remains open; GitHub assets are available. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -23,10 +23,10 @@ feature test does not establish complete component parity.
 
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Integrate scrollbar geometry, then component composition/input; verify current-frame sizing and scrolling. |
-| 1 | Finish Slider behavior | Integrate numeric accessibility and range math; implement the reviewed interactive model, typed events and bindings. |
+| 1 | Finish scroll layout and Dialog sizing | Scrollbar geometry has focused integration passes. Verify the source-referenced Dialog composition prototype, then implement component input and lifecycle behavior. |
+| 1 | Finish Slider behavior | Typed C-only Base model has focused passes. Complete styled/responsive composition, component integration, language bindings and compatibility validation. |
 | 1 | Finish backgrounds and gradients | Validate Core transport and preparation; implement software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Diagnose narrow/high-DPI Spinner reduced-motion idle failure; obtain hosted confirmation of the font-sensitive layout fixture fix and a clean combined run. |
+| 1 | Resolve current validation failures | Spinner scheduling fix passes local headless checks. Confirm it remotely; integrate and verify fixes for packaged-source configuration, Windows workspace alignment and WASM32 Slider compilation. Obtain a clean combined run. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -90,6 +90,21 @@ Latest reliable delivery evidence: [CI](https://github.com/mattmezza/cui/actions
 passed for the merged styling revision. New integration work has focused passes,
 but its latest combined native run and browser gate are **not clean**; fixes and
 confirmation remain pending. Older green results do not cover newer code.
+
+### Current integration evidence
+
+These are **unreleased slices**, not completed beta areas:
+
+| Slice | Evidence / remaining gate |
+| --- | --- |
+| Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
+| Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). C-only support; styled component and other languages remain open. |
+| Reduced-motion scheduling | Four local viewport/DPI cases and repeated preference changes pass; hosted confirmation remains open. |
+| Background rendering | Transport, preparation and private validator checks pass. This does **not** establish renderer painting support. |
+| Portability fixes | Packaged-source configuration fix passes focused checks; Windows alignment and WASM32 fixes need combined integration/hosted confirmation. |
+
+Keep detailed receipts with their implementation changes; refresh this summary
+when the integrated revision passes, merges or ships.
 
 ## Deferred or lower priority
 

@@ -59,8 +59,10 @@ can lag implementation: inspect current code and evidence before scheduling work
 - Earlier gallery source `c52ce72f` passed headless HoverCard, Stepper and Spinner
   probes. The combined candidate passed all three hosted Pages browser shards at
   `b9c2f3d1`; final sanitizer/Windows checks remain pending after test-fixture fixes.
-- Hosted native binding gate `b9c2f3d1` passed ten static/dynamic callback cases
+- Hosted native binding gate `a6c7e5af` passed ten static/dynamic callback cases
   and hidden-window checks in all five language paths on the combined candidate.
+- Release metadata agrees with `v0.1.0-alpha.3`; this checks local version
+  consistency, not release artifacts or registry availability.
 - Earlier guide/build/artifact invocation errors are corrected. GCC sanitizer CI
   caught temporary bounds storage in the new indicator test; its lifetime is now
   fixed, and a focused instrumented Core/test reproduction plus ordinary regression

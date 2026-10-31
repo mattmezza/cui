@@ -23,10 +23,10 @@ feature test does not establish complete component parity.
 
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Integrate scrollbar geometry, then component composition/input; verify current-frame sizing and scrolling. |
+| 1 | Finish scroll layout and Dialog sizing | Core geometry integrated; 15 focused regressions and two Inter-font checks pass. Finish Dialog composition/input and wider acceptance. |
 | 1 | Finish Slider behavior | Integrate numeric accessibility and range math; implement the reviewed interactive model, typed events and bindings. |
-| 1 | Finish backgrounds and gradients | Core transport and bounded preparation are integrated with focused evidence; implement software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Diagnose narrow/high-DPI Spinner reduced-motion idle failure; finish diagnosing the hosted-only idle failure and obtain a clean combined run. The font-sensitive fixture fix passed hosted macOS native CI. |
+| 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
+| 1 | Resolve current validation failures | Diagnose the hosted-only Spinner reduced-motion idle failure; obtain a clean full integration run. The font-sensitive fixture fix passed hosted macOS native CI. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -91,9 +91,14 @@ passed for the merged styling revision. New integration work has focused passes,
 6/6 usage tests and generated freshness after background preparation integration
 (`2cfe490a`). Fresh strict C11/headless background checks passed 107 grids and
 8,500 frozen-sampler comparisons; this establishes preparation, not renderer support.
-Candidate `b2a4db93` passed hosted macOS native and native binding
-checks. Spinner passed four local viewport/DPI cases, but its hosted idle failure
-is unresolved. The latest combined native run and browser gate are **not clean**.
+Candidate `b2a4db93` passed [full hosted CI](https://github.com/mattmezza/cui/actions/runs/41244554704)
+and [native bindings](https://github.com/mattmezza/cui/actions/runs/41244554789).
+Newer Core integration `6fb1357d` passed a 157-step warnings-clean build, all 15
+focused layout/background/legacy-pixel tests and two Inter-font checks. Private
+software validation `0625580a` also passed against that rebuilt Core. Painting and
+font/shadow resource preparation remain unfinished. Spinner passed four local
+viewport/DPI cases, but its hosted idle failure is unresolved. No clean **full**
+regression run or browser gate covers the complete newer integration yet.
 Older green results do not cover newer code.
 
 ## Deferred or lower priority

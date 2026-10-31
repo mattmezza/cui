@@ -247,6 +247,17 @@ typedef struct {
     void *indicator_user;
     bool source_behavior; /* Styled no-pointer-focus; use cui_checkbox_source. */
 } cui_checkbox_options;
+/* Explicit optional naming for new *_with_parts entries only. Existing entries
+ * keep anonymous indicators. Capture this value before callbacks; no pointer is
+ * retained. Row/indicator IDs must be nonzero and distinct. Invalid local parts
+ * reject before reduction with INVALID_ACTION. Global/folded collisions and
+ * capacity failures are diagnosed during ordinary box submission, possibly
+ * after Base/callbacks; input/owner state is not rolled back. The named box adds
+ * no semantics/input target and uses existing indicator geometry/paint timing.
+ * Bool returns still mean changed, not validity/completed rendering. */
+typedef struct {
+    cui_id indicator;
+} cui_selection_indicator_parts;
 /* Checkbox root id includes its label/content row; indicator is anonymous. */
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
@@ -257,6 +268,15 @@ bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, boo
 bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                          cui_checkbox_options);
 
+bool cui_checkbox_ex_with_parts(cui_context *, cui_id, const cui_theme *, cui_str,
+                                cui_check_state *, cui_checkbox_options,
+                                cui_selection_indicator_parts);
+bool cui_checkbox_source_with_parts(cui_context *, cui_id, const cui_theme *, cui_str,
+                                    cui_check_state *, cui_checkbox_options,
+                                    cui_selection_indicator_parts);
+bool cui_checkbox_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
+                             bool disabled, cui_selection_indicator_parts);
+
 /* Controlled immutable entry snapshot, source no-pointer-focus policy.
  * options.on_change/change_user must be NULL. Owner assignments are observed
  * next submission; this call keeps its snapshot for requests/paint/semantics.
@@ -264,6 +284,11 @@ bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_
 cui_component_action_result cui_checkbox_events(cui_context *, cui_id, const cui_theme *, cui_str,
                                                 cui_check_state, cui_checkbox_options,
                                                 cui_component_check_handler);
+cui_component_action_result cui_checkbox_events_with_parts(cui_context *, cui_id, const cui_theme *,
+                                                           cui_str, cui_check_state,
+                                                           cui_checkbox_options,
+                                                           cui_selection_indicator_parts,
+                                                           cui_component_check_handler);
 
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {
@@ -359,6 +384,10 @@ typedef cui_checkbox_options cui_radio_options;
 bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                   cui_radio_options);
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
+bool cui_radio_ex_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                             cui_radio_options, cui_selection_indicator_parts);
+bool cui_radio_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                          bool disabled, cui_selection_indicator_parts);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity

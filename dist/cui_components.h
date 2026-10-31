@@ -248,6 +248,17 @@ typedef struct {
     void *indicator_user;
     bool source_behavior; /* Styled no-pointer-focus; use cui_checkbox_source. */
 } cui_checkbox_options;
+/* Explicit optional naming for new *_with_parts entries only. Existing entries
+ * keep anonymous indicators. Capture this value before callbacks; no pointer is
+ * retained. Row/indicator IDs must be nonzero and distinct. Invalid local parts
+ * reject before reduction with INVALID_ACTION. Global/folded collisions and
+ * capacity failures are diagnosed during ordinary box submission, possibly
+ * after Base/callbacks; input/owner state is not rolled back. The named box adds
+ * no semantics/input target and uses existing indicator geometry/paint timing.
+ * Bool returns still mean changed, not validity/completed rendering. */
+typedef struct {
+    cui_id indicator;
+} cui_selection_indicator_parts;
 /* Checkbox root id includes its label/content row; indicator is anonymous. */
 bool cui_checkbox_ex(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                      cui_checkbox_options);
@@ -258,6 +269,15 @@ bool cui_checkbox(cui_context *, cui_id, const cui_theme *, cui_str, bool *, boo
 bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_check_state *,
                          cui_checkbox_options);
 
+bool cui_checkbox_ex_with_parts(cui_context *, cui_id, const cui_theme *, cui_str,
+                                cui_check_state *, cui_checkbox_options,
+                                cui_selection_indicator_parts);
+bool cui_checkbox_source_with_parts(cui_context *, cui_id, const cui_theme *, cui_str,
+                                    cui_check_state *, cui_checkbox_options,
+                                    cui_selection_indicator_parts);
+bool cui_checkbox_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, bool *,
+                             bool disabled, cui_selection_indicator_parts);
+
 /* Controlled immutable entry snapshot, source no-pointer-focus policy.
  * options.on_change/change_user must be NULL. Owner assignments are observed
  * next submission; this call keeps its snapshot for requests/paint/semantics.
@@ -265,6 +285,11 @@ bool cui_checkbox_source(cui_context *, cui_id, const cui_theme *, cui_str, cui_
 cui_component_action_result cui_checkbox_events(cui_context *, cui_id, const cui_theme *, cui_str,
                                                 cui_check_state, cui_checkbox_options,
                                                 cui_component_check_handler);
+cui_component_action_result cui_checkbox_events_with_parts(cui_context *, cui_id, const cui_theme *,
+                                                           cui_str, cui_check_state,
+                                                           cui_checkbox_options,
+                                                           cui_selection_indicator_parts,
+                                                           cui_component_check_handler);
 
 typedef void (*cui_boolean_change_fn)(void *user, bool requested);
 typedef struct {
@@ -360,6 +385,10 @@ typedef cui_checkbox_options cui_radio_options;
 bool cui_radio_ex(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
                   cui_radio_options);
 bool cui_radio(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option, bool disabled);
+bool cui_radio_ex_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                             cui_radio_options, cui_selection_indicator_parts);
+bool cui_radio_with_parts(cui_context *, cui_id, const cui_theme *, cui_str, int *, int option,
+                          bool disabled, cui_selection_indicator_parts);
 /* Double controlled Styled facade: include cui_styled_slider_events.h. */
 /* Existing Slider track identity. Root id also includes label/framing; this
  * entry has no separate thumb. Returns0 for owner0 or derived zero. Identity
@@ -1954,8 +1983,19 @@ static cui_color cui_checkbox_mix(cui_color from, cui_color to, float amount) {
         (uint8_t)(from.r + (to.r - from.r) * amount), (uint8_t)(from.g + (to.g - from.g) * amount),
         (uint8_t)(from.b + (to.b - from.b) * amount), (uint8_t)(from.a + (to.a - from.a) * amount)};
 }
-bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
-                     cui_check_state *value, cui_checkbox_options options) {
+static bool cui_components_indicator_parts_valid(cui_context *ui, cui_id id,
+                                                 cui_selection_indicator_parts parts) {
+    if (ui && id && parts.indicator && parts.indicator != id)
+        return true;
+    if (ui)
+        cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
+                                                    .operation = "selection_indicator_parts",
+                                                    .id = id});
+    return false;
+}
+static bool cui_components_checkbox_render(cui_context *ui, cui_id id, const cui_theme *t,
+                                           cui_str label, cui_check_state *value,
+                                           cui_checkbox_options options, cui_id indicator) {
     cui_design_metrics design;
     if (!ui || !t || !value || *value < CUI_CHECK_UNCHECKED || *value > CUI_CHECK_MIXED ||
         (options.custom_role &&
@@ -2088,7 +2128,7 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
         cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
         cui_end_box(ui);
     }
-    cui_begin_box(ui, 0, paint.indicator);
+    cui_begin_box(ui, indicator, paint.indicator);
     size = fmaxf(0, fminf(paint.indicator.width, paint.indicator.height));
     if (options.indicator) {
         options.indicator(ui, options.indicator_user,
@@ -2168,6 +2208,33 @@ bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str lab
     } else if (options.state) {
         options.state->tooltip = (cui_hover_state){0};
     }
+    return changed;
+}
+bool cui_checkbox_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
+                     cui_check_state *value, cui_checkbox_options options) {
+    return cui_components_checkbox_render(ui, id, t, label, value, options, 0);
+}
+bool cui_checkbox_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
+                                cui_check_state *value, cui_checkbox_options options,
+                                cui_selection_indicator_parts parts) {
+    if (!cui_components_indicator_parts_valid(ui, id, parts))
+        return false;
+    return cui_components_checkbox_render(ui, id, t, label, value, options, parts.indicator);
+}
+bool cui_checkbox_source_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
+                                    cui_check_state *value, cui_checkbox_options options,
+                                    cui_selection_indicator_parts parts) {
+    options.source_behavior = true;
+    return cui_checkbox_ex_with_parts(ui, id, t, label, value, options, parts);
+}
+bool cui_checkbox_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str label,
+                             bool *value, bool disabled, cui_selection_indicator_parts parts) {
+    if (!value)
+        return false;
+    cui_check_state state = *value ? CUI_CHECK_CHECKED : CUI_CHECK_UNCHECKED;
+    bool changed = cui_checkbox_ex_with_parts(ui, id, t, label, &state,
+                                              (cui_checkbox_options){.disabled = disabled}, parts);
+    *value = state == CUI_CHECK_CHECKED;
     return changed;
 }
 bool cui_checkbox_source(cui_context *ui, cui_id id, const cui_theme *theme, cui_str label,
@@ -2595,8 +2662,9 @@ bool cui_toggle_group_ex(cui_context *ui, cui_id id, const cui_theme *t,
     return changed;
 }
 
-bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
-                  int option, cui_radio_options options) {
+static bool cui_components_radio_render(cui_context *ui, cui_id id, const cui_theme *t,
+                                        cui_str name, int *value, int option,
+                                        cui_radio_options options, cui_id indicator) {
     cui_design_metrics design;
     if (!ui || !t || !value || !cui_components_design(t, options.design_size, &design))
         return false;
@@ -2640,7 +2708,7 @@ bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, 
         cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
         cui_end_box(ui);
     }
-    cui_begin_box(ui, 0,
+    cui_begin_box(ui, indicator,
                   (cui_box){.width = size,
                             .height = size,
                             .radius = size / 2,
@@ -2664,6 +2732,22 @@ bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, 
     }
     cui_end_box(ui);
     return changed;
+}
+bool cui_radio_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
+                  int option, cui_radio_options options) {
+    return cui_components_radio_render(ui, id, t, name, value, option, options, 0);
+}
+bool cui_radio_ex_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name,
+                             int *value, int option, cui_radio_options options,
+                             cui_selection_indicator_parts parts) {
+    if (!cui_components_indicator_parts_valid(ui, id, parts))
+        return false;
+    return cui_components_radio_render(ui, id, t, name, value, option, options, parts.indicator);
+}
+bool cui_radio_with_parts(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value,
+                          int option, bool disabled, cui_selection_indicator_parts parts) {
+    return cui_radio_ex_with_parts(ui, id, t, name, value, option,
+                                   (cui_radio_options){.disabled = disabled}, parts);
 }
 bool cui_radio(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, int *value, int option,
                bool disabled) {
@@ -3868,10 +3952,9 @@ cui_component_action_result cui_button_events(cui_context *ui, cui_id id, const 
     (void)cui_button_ex(ui, id, theme, name, options);
     return result;
 }
-cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, const cui_theme *theme,
-                                                cui_str name, cui_check_state value,
-                                                cui_checkbox_options options,
-                                                cui_component_check_handler handler) {
+static cui_component_action_result cui_components_checkbox_events_render(
+    cui_context *ui, cui_id id, const cui_theme *theme, cui_str name, cui_check_state value,
+    cui_checkbox_options options, cui_component_check_handler handler, cui_id indicator) {
     cui_component_action_result result = {0};
     cui_design_metrics design;
     if (!ui || !id || !theme || (name.length && !name.data) || value < CUI_CHECK_UNCHECKED ||
@@ -3887,8 +3970,26 @@ cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, cons
     cui_control_events_private_check forward = {value, handler, &result};
     options.on_change = cui_control_events_private_check_request;
     options.change_user = &forward;
-    (void)cui_checkbox_source(ui, id, theme, name, &value, options);
+    options.source_behavior = true;
+    (void)cui_components_checkbox_render(ui, id, theme, name, &value, options, indicator);
     return result;
+}
+cui_component_action_result cui_checkbox_events(cui_context *ui, cui_id id, const cui_theme *theme,
+                                                cui_str name, cui_check_state value,
+                                                cui_checkbox_options options,
+                                                cui_component_check_handler handler) {
+    return cui_components_checkbox_events_render(ui, id, theme, name, value, options, handler, 0);
+}
+cui_component_action_result cui_checkbox_events_with_parts(cui_context *ui, cui_id id,
+                                                           const cui_theme *theme, cui_str name,
+                                                           cui_check_state value,
+                                                           cui_checkbox_options options,
+                                                           cui_selection_indicator_parts parts,
+                                                           cui_component_check_handler handler) {
+    if (!cui_components_indicator_parts_valid(ui, id, parts))
+        return (cui_component_action_result){0};
+    return cui_components_checkbox_events_render(ui, id, theme, name, value, options, handler,
+                                                 parts.indicator);
 }
 
 cui_component_action_result cui_switch_events(cui_context *ui, cui_id id, const cui_theme *theme,

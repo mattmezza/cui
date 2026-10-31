@@ -237,15 +237,22 @@
       "api_symbols": [
         "cui_checkbox",
         "cui_checkbox_ex",
-        "cui_checkbox_events"
+        "cui_checkbox_events",
+        "cui_checkbox_ex_with_parts",
+        "cui_checkbox_source_with_parts",
+        "cui_checkbox_with_parts",
+        "cui_checkbox_events_with_parts"
       ],
-      "state_types": [],
+      "state_types": [
+        "cui_selection_indicator_parts"
+      ],
       "state_ownership": "Caller retains bool or cui_check_state value; context owns focus.",
       "interaction": "Returns true when the caller-owned value changes.",
       "usage": "Pass the current value by pointer and persist preferences in the change branch.",
       "docs": [
         "docs/CONTROLS.md",
-        "docs/CONTROL_EVENTS.md"
+        "docs/CONTROL_EVENTS.md",
+        "docs/NAMED_SELECTION_INDICATORS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -688,10 +695,15 @@
       "api_symbols": [
         "cui_radio",
         "cui_radio_ex",
-        "cui_radio_group_events"
+        "cui_radio_group_events",
+        "cui_radio_ex_with_parts",
+        "cui_radio_with_parts",
+        "cui_radio_group_with_parts",
+        "cui_radio_group_events_with_parts"
       ],
       "state_types": [
-        "cui_radio_group_state"
+        "cui_radio_group_state",
+        "cui_selection_indicator_parts"
       ],
       "state_ownership": "For grouped choices, retain one selected cui_id and cui_radio_group_state per collection; standalone radios retain one shared integer.",
       "interaction": "cui_radio_group resolves controlled callback requests before painting and provides arrow/Home/End navigation with one Tab stop; standalone functions return true when selection changes.",
@@ -699,7 +711,8 @@
       "docs": [
         "docs/RADIO_GROUP.md",
         "docs/CONTROLS.md",
-        "docs/SELECTION_EVENTS.md"
+        "docs/SELECTION_EVENTS.md",
+        "docs/NAMED_SELECTION_INDICATORS.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",

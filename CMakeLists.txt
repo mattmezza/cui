@@ -2007,3 +2007,9 @@ add_executable(test_component_shadow_ownership tests/unit/test_component_shadow_
 target_link_libraries(test_component_shadow_ownership PRIVATE cui cui_software)
 cui_warnings(test_component_shadow_ownership)
 add_test(NAME component_shadow_ownership COMMAND test_component_shadow_ownership)
+
+add_executable(test_named_selection_indicators tests/unit/test_named_selection_indicators.c)
+target_link_libraries(test_named_selection_indicators PRIVATE cui cui_software)
+cui_warnings(test_named_selection_indicators)
+add_test(NAME named_selection_indicators COMMAND test_named_selection_indicators
+ ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/named_selection_legacy.golden)

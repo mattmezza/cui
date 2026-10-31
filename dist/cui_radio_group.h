@@ -57,6 +57,21 @@ cui_radio_group_event_result cui_radio_group_events(cui_context *, cui_id, const
                                                     const cui_radio_group_item *, size_t, cui_id *,
                                                     cui_radio_group_state *,
                                                     cui_radio_group_options, cui_selection_handler);
+/* Opt-in named indicators, one copied descriptor per item, count<=64. Parts
+ * must be nonzero and full-ID distinct across group/items/indicators. Local
+ * invalidity rejects before Base; global/folded collision/capacity is a later
+ * composition failure and does not roll back owner callbacks or values. Parts
+ * are copied before callbacks; items retain their existing borrowed contract.
+ * No extra semantics/input targets. Legacy APIs retain anonymous indicators. */
+cui_radio_group_result cui_radio_group_with_parts(cui_context *, cui_id, const cui_theme *,
+                                                  const cui_radio_group_item *, size_t, cui_id *,
+                                                  cui_radio_group_state *, cui_radio_group_options,
+                                                  const cui_selection_indicator_parts *,
+                                                  size_t part_count);
+cui_radio_group_event_result cui_radio_group_events_with_parts(
+    cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
+    cui_radio_group_state *, cui_radio_group_options, const cui_selection_indicator_parts *,
+    size_t part_count, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif
@@ -267,11 +282,13 @@ cui_base_radio_group_events(cui_context *ui, cui_id id, const cui_radio_group_it
 /* SPDX-License-Identifier: MIT */
 
 #include <math.h>
+#include <string.h>
 static cui_radio_group_result
 cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
                        const cui_radio_group_item *items, size_t count, cui_id *selected,
                        cui_radio_group_state *state, cui_radio_group_options o,
-                       cui_selection_handler handler, cui_selection_event_result *observed) {
+                       cui_selection_handler handler, cui_selection_event_result *observed,
+                       const cui_selection_indicator_parts *parts) {
     cui_radio_group_result r = {0};
     if (!t)
         return r;
@@ -323,7 +340,7 @@ cui_radio_group_render(cui_context *ui, cui_id id, const cui_theme *t,
             cui_begin_box(ui, 0, (cui_box){.height = size * .125f});
             cui_end_box(ui);
         }
-        cui_begin_box(ui, 0,
+        cui_begin_box(ui, parts ? parts[i].indicator : 0,
                       (cui_box){.width = size,
                                 .height = size,
                                 .radius = size / 2,
@@ -349,7 +366,7 @@ cui_radio_group_result cui_radio_group(cui_context *ui, cui_id id, const cui_the
                                        cui_id *selected, cui_radio_group_state *state,
                                        cui_radio_group_options options) {
     return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                  (cui_selection_handler){0}, NULL);
+                                  (cui_selection_handler){0}, NULL, NULL);
 }
 cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
                                                     const cui_theme *theme,
@@ -360,7 +377,56 @@ cui_radio_group_event_result cui_radio_group_events(cui_context *ui, cui_id id,
     cui_radio_group_event_result result;
     memset(&result, 0, sizeof(result));
     result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
-                                           handler, &result.events);
+                                           handler, &result.events, NULL);
+    return result;
+}
+
+static bool cui_radio_group_parts_copy(cui_context *ui, cui_id id,
+                                       const cui_radio_group_item *items, size_t count,
+                                       const cui_selection_indicator_parts *parts,
+                                       size_t part_count,
+                                       cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX]) {
+    bool valid = ui && id && count <= CUI_RADIO_GROUP_MAX && part_count == count &&
+                 (!count || (items && parts));
+    for (size_t i = 0; valid && i < count; i++) {
+        valid = items[i].id && items[i].id != id && parts[i].indicator && parts[i].indicator != id;
+        for (size_t j = 0; valid && j < count; j++)
+            valid = parts[i].indicator != items[j].id;
+        for (size_t j = 0; valid && j < i; j++)
+            valid = parts[i].indicator != parts[j].indicator && items[i].id != items[j].id;
+    }
+    if (!valid) {
+        if (ui)
+            cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_INVALID_ACTION,
+                                                        .operation = "radio_group_parts",
+                                                        .id = id});
+        return false;
+    }
+    if (count)
+        memcpy(copied, parts, count * sizeof(*parts));
+    return true;
+}
+cui_radio_group_result
+cui_radio_group_with_parts(cui_context *ui, cui_id id, const cui_theme *theme,
+                           const cui_radio_group_item *items, size_t count, cui_id *selected,
+                           cui_radio_group_state *state, cui_radio_group_options options,
+                           const cui_selection_indicator_parts *parts, size_t part_count) {
+    cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
+    if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
+        return (cui_radio_group_result){0};
+    return cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
+                                  (cui_selection_handler){0}, NULL, copied);
+}
+cui_radio_group_event_result cui_radio_group_events_with_parts(
+    cui_context *ui, cui_id id, const cui_theme *theme, const cui_radio_group_item *items,
+    size_t count, cui_id *selected, cui_radio_group_state *state, cui_radio_group_options options,
+    const cui_selection_indicator_parts *parts, size_t part_count, cui_selection_handler handler) {
+    cui_radio_group_event_result result = {0};
+    cui_selection_indicator_parts copied[CUI_RADIO_GROUP_MAX];
+    if (!cui_radio_group_parts_copy(ui, id, items, count, parts, part_count, copied))
+        return result;
+    result.legacy = cui_radio_group_render(ui, id, theme, items, count, selected, state, options,
+                                           handler, &result.events, copied);
     return result;
 }
 

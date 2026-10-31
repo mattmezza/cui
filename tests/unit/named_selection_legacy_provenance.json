@@ -1,0 +1,16 @@
+{
+  "baseline_source_commit": "94654394aa3754750d039aae5725e66a296c3907",
+  "baseline_scope": "Existing build-shadow library from preceding completed ownership validation, before named-indicator refactor; no baseline rebuild.",
+  "compiler": "cc (GCC) 16.2.1 20260810",
+  "flags": "CMake Release -O3 -DNDEBUG; library -Wall -Wextra -Wpedantic -Werror -std=c11; capture harness uses -O2 -UNDEBUG",
+  "sha256": {
+    "build-shadow/libcui.a": "57223e95c1f4d614df58a189bb277958b2f06c34f32b0016f58592420bd8cf68",
+    "build-shadow/libcui_software.a": "d4ecd272fd27945a3e89527550c00a4982078de076d169064ea39d26f651619e",
+    "tests/unit/test_named_selection_indicators.c": "b6a6f63ea7e606162e34032c6ad1f5a225caf4ab6d9ae44322c01052e0f36c11"
+  },
+  "baseline_symbol_check": "nm: cui_checkbox_ex and cui_radio_group present; new cui_checkbox_ex_with_parts and cui_radio_group_with_parts absent",
+  "capture_command": "cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror -UNDEBUG -DCUI_CAPTURE_LEGACY=1 -Iinclude tests/unit/test_named_selection_indicators.c build-shadow/libcui_software.a build-shadow/libcui.a -lm -o build-shadow/test_named_selection_indicators",
+  "capture_binary_sha256": "2bbb8bee0589d140c17500701dc881229c47030a22c4d4037aeee99aaa0e867b",
+  "golden_sha256": "8ad0856692744180e55987a2a9431dc398e0fb56bb6b0908830162eb43652263",
+  "capture_result": "24 command/software pairs from old libraries; capture-only binary ran through test_local.py private Xvfb wrapper, 1/1 passed before rebuilding source."
+}

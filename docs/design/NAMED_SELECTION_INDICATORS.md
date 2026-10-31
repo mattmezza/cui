@@ -1,9 +1,9 @@
 # Explicit named Checkbox and Radio indicators: review checkpoint
 
-Status: proposal only, not implemented. Audit follows first ownership slice
-94654394. Existing Checkbox/Radio indicators remain anonymous. Their row IDs and
-the generic element-shadow API do not establish indicator coverage. The beta
-all78-parts and language-authoring milestones remain pending.
+Status: the approved additive named-indicator slice is implemented. Audit follows
+first ownership slice94654394. Existing legacy Checkbox/Radio indicators remain
+anonymous; only explicit new entry points name them. The beta all78-parts and
+language-authoring milestones remain pending.
 
 ## Current entry points and timing
 
@@ -35,7 +35,7 @@ item rows/anonymous indicators for up to CUI_RADIO_GROUP_MAX64 items. Group-even
 preserves legacy owner request before its observer. It must not be implemented by
 calling the individual interactive Radio facade for each item.
 
-## Proposed additive public surface
+## Approved additive public surface
 
 Use one small value descriptor in cui_components.h; no existing options/state
 structure grows and no descriptor contains platform types or borrowed pointers:
@@ -59,6 +59,7 @@ bool cui_radio_with_parts(cui_context *, cui_id, const cui_theme *, cui_str,
     int *, int option, bool disabled, cui_selection_indicator_parts);
 ```
 
+The implemented descriptor/entry signatures above retain the approved contract.
 Both IDs must be nonzero and indicator must differ from row ID. New entry points
 require explicit indicator identity; descriptor0 is invalid, not an implicit
 request to change anonymous defaults. Old functions keep their anonymous route.
@@ -192,3 +193,47 @@ Never map MAIN silently to a label row because its indicator is still anonymous.
 All five typed language facades need the same declared target capability and
 copy/error/clear semantics. That rollout and the remaining78-family ownership
 matrix stay pending, rather than marking Checkbox/Radio or shadow authoring full.
+
+
+## First implementation evidence
+
+Eight additive entry points share the old private Checkbox, individual Radio and
+RadioGroup painters with only indicator-ID parameters; every legacy route passes
+0/NULL. Group descriptors are locally validated and copied before Base callbacks.
+No Core source, identity query/reservation, renderer or dispatch path changed.
+Existing public options/state layouts and old component defaults remain intact.
+All changed C sources/headers/tests use clang-format23.1.2 before generation.
+
+A capture-only harness was compiled against the existing pre-refactor ownership
+libraries before any new source build. Its external24 command/software pairs live
+in `tests/unit/named_selection_legacy.golden`; adjacent provenance records known
+94654394 source, GCC16.2.1, library/harness/binary/fixture SHA256 and exact capture
+flags. The capture ran through the private-Xvfb wrapper. Expectations were never
+computed from the new implementation. Hashing uses owned scalar values, literal
+text/bitmap bytes and actual software output, not pointer addresses or padding.
+Font-free software omits text commands; explicit stub metrics supply layout.
+
+The regression then checks all24 old-facade scenes and24 corresponding unstyled
+named scenes against those frozen outputs: Checkbox ex/source/bool/events,
+individual Radio ex/bool, group and group-events in three state/disabled scenes.
+New tests independently exercise genuine queued requests, accepted owner state,
+immutable event snapshots, group owner-before-observer order, captured descriptor
+storage surviving callbacks and reorder, custom style/indicator/content order,
+local rejection without semantics/model/callback effects, and approved late
+full/folded collision diagnostics after exactly one accepted owner request.
+
+Current-layout indicator geometry, mixed DROP/INSET actual software changes,
+explicit Checkbox/circular Radio radii, ancestor clip/opacity and absence of
+indicator semantics are checked for all eight named routes. A1..16 element-budget
+sweep compares old/named Checkbox and group failure/count boundaries. The focused
+strict portable Release build used the existing build-shadow, nice19, CPU0 and
+-j1. Wrapper checks passed7/7: new named fixture, legacy Checkbox source/motion,
+RadioGroup, control/selection events and prior component-shadow ownership.
+
+Canonical SDK/distribution/consumer-skill resources are regenerated. Installed
+skill tests passed17/17; SDK checksum, distribution and skill freshness checks
+passed, as did the78-entry manifest check and clang-format23.1.2 dry-run. No new
+browser/GPU/sanitizer or foreign-builder evidence, no renderer pixel-equivalence
+claim and no all78-family completion claim is added. Bridge MAIN indicator mapping
+and consistent Python/Node/TypeScript/Go/Rust layer authoring remain subsequent
+mandatory slices; the current C capability does not complete those beta rows.

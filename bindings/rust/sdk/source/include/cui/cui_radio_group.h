@@ -56,6 +56,21 @@ cui_radio_group_event_result cui_radio_group_events(cui_context *, cui_id, const
                                                     const cui_radio_group_item *, size_t, cui_id *,
                                                     cui_radio_group_state *,
                                                     cui_radio_group_options, cui_selection_handler);
+/* Opt-in named indicators, one copied descriptor per item, count<=64. Parts
+ * must be nonzero and full-ID distinct across group/items/indicators. Local
+ * invalidity rejects before Base; global/folded collision/capacity is a later
+ * composition failure and does not roll back owner callbacks or values. Parts
+ * are copied before callbacks; items retain their existing borrowed contract.
+ * No extra semantics/input targets. Legacy APIs retain anonymous indicators. */
+cui_radio_group_result cui_radio_group_with_parts(cui_context *, cui_id, const cui_theme *,
+                                                  const cui_radio_group_item *, size_t, cui_id *,
+                                                  cui_radio_group_state *, cui_radio_group_options,
+                                                  const cui_selection_indicator_parts *,
+                                                  size_t part_count);
+cui_radio_group_event_result cui_radio_group_events_with_parts(
+    cui_context *, cui_id, const cui_theme *, const cui_radio_group_item *, size_t, cui_id *,
+    cui_radio_group_state *, cui_radio_group_options, const cui_selection_indicator_parts *,
+    size_t part_count, cui_selection_handler);
 #ifdef __cplusplus
 }
 #endif

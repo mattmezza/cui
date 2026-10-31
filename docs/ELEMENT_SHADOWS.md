@@ -93,9 +93,9 @@ perform no presence check. A hidden count badge or inactive tooltip has no panel
 to style that frame. Do not reconstruct internal ID salts or treat another part's
 semantic ID as the surface.
 
-Checkbox and Radio caller IDs denote whole rows including labels. Their anonymous
-indicator boxes remain unexposed. Single Radio and RadioGroup are separate paint
-owners. Their future named-parts route needs explicit opt-in and capacity/collision
-contracts; this slice does not change legacy anonymous IDs or claim indicator
-coverage. These part contracts remain C-only until matching bridge and typed
-language authoring is implemented.
+Checkbox and Radio legacy caller IDs denote whole rows including labels and
+retain anonymous indicators. Explicit `_with_parts` entries can instead register
+caller-supplied indicator IDs; see [NAMED_SELECTION_INDICATORS.md](NAMED_SELECTION_INDICATORS.md)
+for capture, early validation and late collision/capacity boundaries. Single Radio
+and RadioGroup remain separate paint owners. These C-only part contracts do not
+change legacy anonymous IDs or establish typed bridge/language support.

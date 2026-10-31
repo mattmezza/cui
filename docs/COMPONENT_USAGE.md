@@ -746,7 +746,7 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller retains float value and supplies min/max/step.
+**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage.
 
 **Interaction:** Returns true when the value changes.
 
@@ -755,6 +755,13 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 API: `cui_slider`. [Public header](../include/cui/cui_components.h); [guide](CONTROLS.md).
 
 Additional event includes: `cui/cui_styled_slider_events.h`.
+
+The unreleased C-only palette value API is declared in
+[`cui_slider_palette.h`](../include/cui/cui_slider_palette.h); include
+`<cui/cui_slider_palette.h>` and follow the [palette usage guide](SLIDER_PALETTE.md).
+`cui_slider_palette_preset_get` copies an owned value for inspection; it does
+not apply a palette to Slider rendering. There is no presenter setter, sampler
+or language builder API in this slice. Disabled/theme presentation remains partial.
 
 ## Speech
 

@@ -84,6 +84,9 @@ bool cui_element_set_background(cui_context *, cui_id, const cui_background *);
 #define CUI_DRAW_V2_DECLARATIONS_READY
 #endif
 
+#if defined(CUI_IMPLEMENTATION) && !defined(CUI_IMPLEMENTATION_ONCE)
+#include "cui.h"
+#endif
 #if defined(CUI_DRAW_V2_IMPLEMENTATION) && defined(CUI_DRAW_V2_DECLARATIONS_READY) && !defined(CUI_DRAW_V2_IMPLEMENTATION_ONCE)
 #define CUI_DRAW_V2_IMPLEMENTATION_ONCE
 #endif

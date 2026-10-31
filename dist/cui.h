@@ -1076,7 +1076,7 @@ void cui_set_reduced_motion(cui_context *, bool);
 #define CUI_DECLARATIONS_READY
 #endif
 
-#if defined(CUI_IMPLEMENTATION) && defined(CUI_DECLARATIONS_READY) && !defined(CUI_IMPLEMENTATION_ONCE)
+#if defined(CUI_IMPLEMENTATION) && defined(CUI_DECLARATIONS_READY) && !defined(CUI_IMPLEMENTATION_ONCE) && (!defined(CUI_BACKGROUND_H) || defined(CUI_BACKGROUND_DECLARATIONS_READY)) && (!defined(CUI_DRAW_V2_H) || defined(CUI_DRAW_V2_DECLARATIONS_READY))
 #define CUI_IMPLEMENTATION_ONCE
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_BACKGROUND_H

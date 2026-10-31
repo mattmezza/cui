@@ -1,0 +1,11 @@
+{
+  "baseline_commit": "3e18bbbad703dd1d9ba17cd368081b6818c7ee29",
+  "baseline_core_sha256": "54999cb77694da36d55e58125fc70c5e0c99774045743686a9fe019acb044044",
+  "baseline_background_sha256": "61624285ae420cd7e045299fb134ae43e65e226e58d3d9e7d2b4891d7e60e0e1",
+  "negative_reproduction": "3e generated BG-first with global Core+value implementation fails unknown cui_background type. Only quoted Core include rewritten to immutable copied filename; compiler uses no candidate header in this reproduction.",
+  "negative_first_error": "/home/matteo/.cache/cui-worktrees/element-shadow-audit/build-shadow/background_order_prechange_core.h:1165:5: error: unknown type name \u2018cui_background\u2019",
+  "positive_scope": "BG-first,V2-first,Core-first,repeated imports,umbrella actual Core/value symbols, and copied Core-only file without supplemental includes. Five strict-C11 O0 executables;5/5 private-Xvfb runtime PASS.",
+  "compiler_flags": "taskset-c0 nice-n19 /usr/bin/cc -std=c11 -O0 -Wall -Wextra -Wpedantic -Werror; -DCUI_TEST_BACKGROUND_ORDER=0..4, -Idist except copiedCoreonly -Ibuild-shadow; -lm. No library/engine rebuild or new builddir.",
+  "test_command": "taskset -c 0 nice -n 19 python scripts/test_local.py --build-dir build-shadow -R '^background_order_fix_[0-4]$'",
+  "static": "Core-single-file offline test1/1;skill18/18;amalgamation/SDK/skill freshness;format PASS. No canonical public/header/source behavior change."
+}

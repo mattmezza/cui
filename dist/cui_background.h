@@ -68,6 +68,9 @@ bool cui_background_sample_srgba8(const cui_background *background, cui_rect fra
 #define CUI_BACKGROUND_DECLARATIONS_READY
 #endif
 
+#if defined(CUI_IMPLEMENTATION) && !defined(CUI_IMPLEMENTATION_ONCE)
+#include "cui.h"
+#endif
 #if defined(CUI_BACKGROUND_IMPLEMENTATION) && defined(CUI_BACKGROUND_DECLARATIONS_READY) && !defined(CUI_BACKGROUND_IMPLEMENTATION_ONCE)
 #define CUI_BACKGROUND_IMPLEMENTATION_ONCE
 /* src/core/cui_background.c */

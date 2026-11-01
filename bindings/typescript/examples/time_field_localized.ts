@@ -13,7 +13,7 @@ const disabled=button('disabled').label('Toggle disabled').on_click(()=>english.
 const bounds=button('bounds').label('Toggle bounds').on_click(()=>{const old=english.get_config();english.configure({...old,editGeneration:old.editGeneration+1n,minimum:old.minimum?null:[8,0,0],maximum:old.maximum?null:[18,0,0]});});
 try{
  app.enable_localized_time_fields(16);app.mount(column().children(summary,row().children(column().children(english),column().children(arabic)),row().children(clear,readonly,disabled,bounds)));
- app.step_only();const box=english.bounds();app.pointer('down',box.x+box.width/2,box.y+box.height/2).pointer('up',box.x+box.width/2,box.y+box.height/2).text_input('10:15:30').step();
+ app.step_only();app.step_only();english.latest_result();const box=english.bounds();app.pointer('down',box.x+box.width/5,box.y+box.height/2).pointer('up',box.x+box.width/5,box.y+box.height/2).text_input('10:15:30').step();
  const observed=applied();
  if(!observed||observed.value[0]!==10||observed.value[1]!==15||observed.value[2]!==30)throw new Error('missing actual applied TimeField record');
  console.log(`PASS TS localized UI: ${observed.value.join(':')} frame ${observed.frame}`);

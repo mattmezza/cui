@@ -1,12 +1,12 @@
 'use strict';
 const assert=require('node:assert/strict');const c=require('..');
 const {appointments}=require('../examples/time-field-localized.cjs');
-function paste(app,node,text){const b=node.bounds();assert.ok(b.width>0&&b.height>0);app.pointer('down',b.x+b.width/2,b.y+b.height/2).pointer('up',b.x+b.width/2,b.y+b.height/2).text_input(text).step_only();}
+function paste(app,node,text){app.step_only();app.step_only();node.latest_result();const b=node.bounds();assert.ok(b.width>0&&b.height>0);app.pointer('down',b.x+b.width/5,b.y+b.height/2).pointer('up',b.x+b.width/5,b.y+b.height/2).text_input(text).step_only();}
 function one(){const app=new c.App();const node=c.localized_time_field('time',{precision:'second'}).time_value(9,30,0);app.mount(c.column().children(c.row().children(node)));app.step_only();return {app,node};}
 {
  const ui=appointments(),{app,english,arabic}=ui;
  try{
-  assert.equal(app.supports_localized_time_field(),true);app.step_only();
+  assert.equal(app.supports_localized_time_field(),true);app.step_only();app.step_only();
   assert.deepEqual(english.current_time(),[9,30,0]);assert.deepEqual(arabic.current_time(),[13,45,0]);
   const initial=english.latest_result();assert.equal(typeof initial.frame,'bigint');assert.equal(initial.node,english);
   paste(app,english,'10:15:30');const copied=app.poll_localized_time_change();

@@ -1,11 +1,13 @@
-# JavaScript/TypeScript localized TimeField (source checkpoint)
+# JavaScript/TypeScript localized TimeField
 
-Unreleased, source-only preparation over the integrated localized C bridge.
-No Node compilation, runtime, TypeScript compiler or generated-skill acceptance
-has run for this slice. The existing `time_field()` remains legacy kind 55.
+Unreleased authoring over the integrated localized C bridge. Focused Linux worker
+validation passed 37/37 private-display checks, including strict C11 addon builds
+and cached TypeScript 5.8.3 compilation/runtime. Root integration and generated
+SDK/skill acceptance remain pending; see the
+[verification receipt](validation/node-localized-time-field-worker.json). The existing `time_field()` remains legacy kind 55.
 `localized_time_field()` is a distinct subclass using that same kind and the
 bridge-owned localized editor. Python/Go/Rust localized authoring remains pending;
-this source checkpoint establishes no validated language support or all 78 parity.
+these focused results establish no all 78 parity or other-language acceptance.
 
 Complete authored UI sources are
 [JavaScript](../bindings/node/examples/time-field-localized.cjs) and
@@ -57,9 +59,10 @@ Removal prunes unread C records; slot reuse cannot redirect an old observation.
 All calls remain serialized on the owning OS thread through destruction. No
 shared-WASM, native AT, IME or native Tab traversal support is claimed.
 
-Prepared gates cover protocol poisoning/reserved/UTF8/BigInt boundaries, real
+The focused gates cover protocol poisoning/reserved/UTF8/BigInt boundaries, real
 English/Arabic queued input, disabled/read-only/bounds/clear, copied C ownership,
 callback error/return/reentry/lifetimes, an actual later Slider capacity failure,
-old/partial group fallback and compiled TS-authored runtime. These are prepared
-fixtures, not test results. Compilation and native tests await the explicit lease;
-native automation must use the private-display wrapper, never the desktop.
+old/partial group fallback and compiled TS-authored runtime. These are focused
+fixtures backed by the worker receipt. Native automation must use the
+private-display wrapper, never the desktop. The frozen initial failures and
+fixture-only warmup/coordinate corrections remain recorded in that receipt.

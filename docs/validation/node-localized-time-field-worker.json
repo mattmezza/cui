@@ -1,0 +1,97 @@
+{
+  "scope": "Worker focused Node/TypeScript localized TimeField verification; root integration and generated resource acceptance pending",
+  "source_checkpoint": "03af17d5",
+  "base": "8a402c2b",
+  "runtime": "Node v25.8.0",
+  "typescript": "cached TypeScript 5.8.3; no installation/network",
+  "compiler": "/usr/bin/cc",
+  "flags": [
+    "-std=c11",
+    "-O3",
+    "-UNDEBUG",
+    "-Wall",
+    "-Wextra",
+    "-Wpedantic",
+    "-Werror",
+    "-fPIC",
+    "-shared",
+    "-I/usr/include/node",
+    "-Iinclude"
+  ],
+  "resource_policy": "taskset -c 1 nice -n 19; serial; existing build-shadow/node-time-field scratch harness; no engine rebuild",
+  "libraries": [
+    {
+      "path": "/home/matteo/.cache/cui-current-validation/native/libcui_bridge.so",
+      "sha256": "3eec086861ab58dfa91cb922c90494080f080906d41bdf6c53b8a6cff5224410",
+      "authority": "Matching root current bridge; includes integrated localized C API"
+    },
+    {
+      "path": "/home/matteo/.cache/cui-current-validation/pre-typed-slider/libcui_bridge.so",
+      "sha256": "44a76c34ddbb75b1d1ce428bd604a6d53321ee45c8d2a0c5a9894fa8c7334afa",
+      "authority": "Preserved actual pre-typed-Slider bridge, unchanged; no localized API"
+    }
+  ],
+  "native_record_transport": "C structs are native-endian. N-API performs per-field native uint32/uint64 to explicit little-endian binding-local copied buffers and back, including all string lengths; no borrowed views. No big-endian hardware runtime claim.",
+  "build": {
+    "session": 47527,
+    "exit": 0,
+    "log": "/home/matteo/.cache/cui-current-validation/node-time-first-build.log",
+    "log_sha256": "3713e43746eec07ba8c6a71bde194ba554c84a2d0f46559230354d875c5e8230",
+    "outputs": "Two addon TUs linked current/immutable-old bridge and eleven missing-group provider shared objects; warning-clean"
+  },
+  "initial_failures": [
+    {
+      "session": 88890,
+      "log": "node-time-first-tests.log",
+      "result": "All37 Not Run: scratch harness assumed absent /usr/bin/cmake. Corrected to discovered existing cmake; no source change."
+    },
+    {
+      "session": 91565,
+      "log": "node-time-runtime-first.log",
+      "result": "32/37 passed. Actual fixture read result after one warmup; four legacy harness omissions: two missing documented preload providers and two examples missing --headless."
+    },
+    {
+      "session": 51499,
+      "log": "node-time-actual-warm.log",
+      "result": "Initial readiness corrected; Arabic x+width/4 hit separator and produced no edit."
+    }
+  ],
+  "diagnostic": {
+    "session": 17580,
+    "log": "node-time-arabic-diagnostic.log",
+    "result": "Public seven-position queued paste scan: x fractions .1/.2/.35/.45/.6 produced Arabic14:10:30; .25/.75 remained unchanged. Fixture uses .2 inside first-quarter textbox; no Core/input-policy change."
+  },
+  "focused_actual": {
+    "session": 90551,
+    "exit": 0,
+    "tests": "1/1",
+    "seconds": 0.25,
+    "log": "node-time-actual-coordinate.log"
+  },
+  "final": {
+    "session": 25375,
+    "exit": 0,
+    "tests": "37/37",
+    "seconds": 10.62,
+    "command": "taskset -c 1 nice -n 19 python scripts/test_local.py --build-dir build-shadow/node-time-field -j1 -E ^arabic_diagnostic$",
+    "log": "/home/matteo/.cache/cui-current-validation/node-time-corrected-tests.log",
+    "log_sha256": "9d8398af7839fafac0e081ea7c875ea8259d538ddcbb203565c4ad284e295875",
+    "harness_sha256": "c840743324ac597674a6ede32257629ea9c5d23b6d27ec2e9b3e4dae8d276c92"
+  },
+  "coverage": [
+    "Real nested English/Arabic kind55 widgets: queued localized input, read-only/disabled/bounds/owner-invalid/clear, copied config and observation ownership",
+    "Poststep ignored callback return, exception pop-before-callback/no replay, nested calls, close/dispose/removal",
+    "Actual later controlled Slider capacity failure after TimeField applied edit, frame_status5 observation and healthy recovery",
+    "Complete optional ten-symbol group, each symbol missing, actual old library, unavailable version and each invalid record size",
+    "Synthetic reserved/padding/UTF8/range/BigInt/generation poisoning and immutable wire copies, raw unaligned Buffer configuration",
+    "Cached strict TS type assertions and actual authored localized/controlled-Slider examples",
+    "Existing binding/addon/component/extended/model/notification/value/shadow/part/Slider/run/workspace regressions"
+  ],
+  "limitations": [
+    "No native AT/IME/Tab traversal/shared-WASM claim",
+    "No new Python/Go/Rust localized validation claim",
+    "No all78 source parity promotion",
+    "Only Linux private-Xvfb Node/TS worker acceptance; root CMake integration and SDK/skill generation still pending",
+    "No Node dependency installation or full engine/browser/native desktop run"
+  ]
+}

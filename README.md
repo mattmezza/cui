@@ -25,16 +25,22 @@ FreeType and HarfBuzz development packages. See the guide for platform limits.
 ```sh
 cmake -S . -B build -G Ninja
 cmake --build build
-ctest --test-dir build --output-on-failure
+python scripts/test_local.py --build-dir build
 ./build/cui_gallery
 ./build/cui_gpu_demo --font /path/to/font.ttf
 ```
 
+On Linux, automated tests use the wrapper above to run in invisible Xvfb; they must
+never use your desktop display. The example executables below intentionally open
+windows when launched manually.
+
 Core/software need a C11 compiler and CMake; Python3 checks generated headers and the manifest. Native examples optionally discover SDL3 >=3.2, FreeType and HarfBuzz through pkg-config. Set `CUI_FONT` or `--font` for an explicit font. Missing native dependencies leave portable targets available; they do not create a fake native gallery.
 
 ```sh
-cmake --preset headless && cmake --build --preset headless && ctest --preset headless
-cmake --preset sanitize && cmake --build --preset sanitize && ctest --preset sanitize
+cmake --preset headless && cmake --build --preset headless
+python scripts/test_local.py --build-dir build-headless
+cmake --preset sanitize && cmake --build --preset sanitize
+python scripts/test_local.py --build-dir build-sanitize
 ./build/cui_gallery --headless --section text --dark --screenshot build/text.ppm
 ./build/cui_gallery --smoke 3 --screenshot build/native.bmp
 ```

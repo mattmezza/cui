@@ -4,7 +4,8 @@ Updated: **2026-11-01** · Status: **working alpha; beta scope unfinished**.
 
 **Goal:** complete and verify all **78 frozen component families**, plus the
 requested native, language-binding, documentation and website capabilities.
-No completion percentage or beta date is asserted.
+No completion percentage or beta date is asserted. Start with **Next milestones**;
+use the checklists below to track acceptance and delivery.
 
 ## At a glance
 
@@ -33,10 +34,10 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Current-frame geometry, frozen compatibility and small-viewport proofs pass. Nested Dialog close/reopen can still retain an old routed touch scroll; finish and verify lifecycle cancellation before integration. |
-| Typed Slider | C Base/Styled models and controlled gallery are integrated. Full browser regression, 42 representative touch checks and 19 mobile navigation checks pass locally. C bridge is under review, including failed-frame authority and metadata; five language builders and native numeric delivery remain open. |
-| Backgrounds, shadows and text | Transport, counted text preparation and private ordinary software painter are integrated. Private shadow profiles pass frozen comparisons. Transactional private shadow painting passes worker tests but awaits integrator acceptance. Text painting and public support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain open. |
-| Validation | Candidate `00aa1f99` passed hosted CI/native bindings; Pages still needs terminal confirmation. Those results do not cover newer integration work. A fresh combined build/test gate remains required. |
+| Dialog and scrolling | Geometry and compatibility checks pass. A test-only cancellation candidate passes 22 checks; frozen legacy traces and broader reducer coverage still gate production integration. Audit newly identified direct-key paths in Rating/legacy Slider and idle drag cancellation. |
+| Typed C models, gallery and C bridge are integrated with focused headless/browser checks. Python has preliminary tests but is not integrated. Finish all language builders and native numeric delivery. |
+| Private software painting, transactional shadows and owned 64× text recording are integrated with focused checks. Finish text painting and public renderer support; combined acceptance remains open. Public text scaling remains limited to 16×. |
+| Older candidate `00aa1f99` passed hosted CI/native bindings, with Pages unconfirmed. Newer combined build is running; full headless tests and exact-revision hosted checks remain open. |
 
 ## Remaining beta scope
 

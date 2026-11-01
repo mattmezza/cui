@@ -275,3 +275,16 @@ is not runtime/final-memory proof. Native interactive and remaining integration
 matrix/generation/package gates remain open. The durable optional wrapped
 comparison runner/CMake flags are committed for integrator registration proof;
 worker equivalent scratch registration ran under the private wrapper.
+
+
+### Shared typed-facade defaults
+
+New localized configuration helpers across Python, JS/TS, Go and Rust follow the
+C initializer: English explicit tokens, H23, minute precision, edit generation 1,
+no bounds, empty segment names and false disabled/read-only/owner-invalid flags.
+Go's zero struct is not an initialized configuration; use its English helper.
+Full-seconds examples must opt into second precision explicitly. This applies to
+the new unreleased typed route only: existing scalar kind55 constructors and
+legacy seconds behavior stay unchanged. Python's initial source-only second-
+precision default is corrected before delivery rather than becoming an implicit
+language-specific exception. Generation zero is rejected, not normalized.

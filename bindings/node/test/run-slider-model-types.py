@@ -17,6 +17,6 @@ subprocess.run([*base, '--rootDir', str(root / 'bindings'), '--outDir', str(a.ou
                 str(root / 'bindings/typescript/examples/slider_model.ts')], check=True)
 node_dir = a.output / 'node'
 node_dir.mkdir(parents=True, exist_ok=True)
-for name in ('index.cjs', 'shadows.cjs', 'slider-model.cjs'):
+for name in ('index.cjs', 'shadows.cjs', 'slider-model.cjs', 'time-field-localized.cjs'):
     shutil.copyfile(root / 'bindings/node' / name, node_dir / name)
 subprocess.run([a.node, str(a.output / 'typescript/examples/slider_model.js')], check=True)

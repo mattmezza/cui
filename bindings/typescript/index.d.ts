@@ -343,3 +343,56 @@ export interface App {
   accept_slider_request(receipt:SliderReceipt,value:SliderValue):void;
   dispatch_slider_requests():number;
 }
+
+/** Unreleased localized kind55 authoring; copied applied changes, never proposals.
+ * Optional complete bridge group. Explicit locale tokens, no locale lookup/IME/AT promise. */
+export type LocalizedTime = readonly [number, number, number];
+export interface TimeFieldLocale {
+  readonly digits: readonly string[];
+  readonly separator: string; readonly periodSeparator: string;
+  readonly am: string; readonly pm: string;
+}
+export interface LocalizedTimeConfigInput {
+  locale?: TimeFieldLocale; cycle?: 'h23' | 'h12'; precision?: 'minute' | 'second';
+  minimum?: LocalizedTime | null; maximum?: LocalizedTime | null; editGeneration?: bigint;
+  disabled?: boolean; readonly?: boolean; ownerInvalid?: boolean; names?: readonly string[];
+}
+export interface LocalizedTimeConfig {
+  readonly locale: TimeFieldLocale; readonly cycle: 'h23' | 'h12'; readonly precision: 'minute' | 'second';
+  readonly minimum: LocalizedTime | null; readonly maximum: LocalizedTime | null;
+  readonly editGeneration: bigint; readonly disabled: boolean; readonly readonly: boolean;
+  readonly ownerInvalid: boolean; readonly names: readonly string[];
+}
+export interface LocalizedTimeChange {
+  readonly handle: Readonly<{slot: number; generation: number}>;
+  readonly frame: bigint; readonly node: LocalizedTimeField | undefined;
+  readonly previous: LocalizedTime; readonly value: LocalizedTime;
+  readonly validation: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  readonly rejectedCount: number; readonly frameStatus: number;
+}
+export interface LocalizedTimeResult extends LocalizedTimeChange {
+  readonly status: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  readonly changed: boolean; readonly queuedChangeCount: 0 | 1;
+}
+export interface LocalizedTimeField extends Label {
+  time_value(hour: number, minute: number, second?: number): this;
+  current_time(): [number, number, number];
+  configure(config: LocalizedTimeConfigInput): this;
+  get_config(): LocalizedTimeConfig; latest_result(): LocalizedTimeResult;
+  disabled(value?: boolean): this; readonly(value?: boolean): this;
+  owner_invalid(value?: boolean): this; clear_validation(): this;
+  on_localized_change(callback: ((change: LocalizedTimeChange) => void) | null): this;
+}
+export function localized_time_config(config?: LocalizedTimeConfigInput): LocalizedTimeConfig;
+export function time_locale_english(): TimeFieldLocale;
+export function time_locale_arabic(): TimeFieldLocale;
+export function localized_time_field(key: string, config?: LocalizedTimeConfigInput, text?: string): LocalizedTimeField;
+export interface App {
+  supports_localized_time_field(): boolean;
+  enable_localized_time_fields(capacity?: number): this;
+  /** Copied applied record; explicitly drain after a failed step as well. */
+  poll_localized_time_change(): LocalizedTimeChange | undefined;
+  dispatch_localized_time_changes(): number;
+}
+
+export const LocalizedTimeField: {new(key: string, config?: LocalizedTimeConfigInput, text?: string): LocalizedTimeField};

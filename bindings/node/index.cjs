@@ -359,6 +359,7 @@ function settings(key,text=""){return new Node(80,text).key(key);}
 function questionnaire(key,text=""){return new Node(78,text).key(key);}
 function dock(key,text=""){return new Node(79,text).key(key);}
 const sliderModels = require('./slider-model.cjs')(native, Node, NODE, keyFor);
+const localizedTimes = require('./time-field-localized.cjs')(native, Node, NODE, keyFor);
 class App {
   constructor(options = {}) {
     if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
@@ -379,6 +380,7 @@ class App {
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
     sliderModels.preflight(this, root);
+    localizedTimes.preflight(this, root);
     const attach = (node, parent) => {
       node[NODE] = node.kind===81 ? sliderModels.mount(this,node,parent && parent[NODE]) : native.makeNode(this.handle, parent && parent[NODE], node.kind, node.keyValue);
       node.owner = this;
@@ -397,6 +399,7 @@ class App {
       if(node.kind===52)native.setAttachmentStatus(this.handle,node[NODE],node.attachmentValue);
       if(node.imageValue)native.setImage(this.handle,node[NODE],...node.imageValue);
       if(node.kind===55)native.setTime(this.handle,node[NODE],...node.timeValue);
+      localizedTimes.mount(this,node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
       if(node.kind===69){native.setChartKind(this.handle,node[NODE],node.chartKindValue);native.setChart(this.handle,node[NODE],node.chartDataValue);}
@@ -435,7 +438,7 @@ class App {
   _remove(node) {
     this._alive();
     native.removeNode(this.handle, node[NODE]);
-    const clear = current => { if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
+    const clear = current => { localizedTimes.release(current); if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
     clear(node);
     if (node === this.root) this.root = null;
     if (node.parent) node.parent.childrenValue = node.parent.childrenValue.filter(child => child !== node);
@@ -458,6 +461,7 @@ class App {
   }
   step(dt = 1 / 60) {
     if(this.sliderDispatching)throw new Error('step unavailable during controlled Slider callback');
+    if(this.localizedTimeDispatching)throw new Error('step unavailable during localized TimeField callback');
     this._alive();
     if (this.running) throw new Error("step is unavailable during run");
     native.step(this.handle, dt);
@@ -465,6 +469,7 @@ class App {
   }
   step_only(dt = 1 / 60) {
     if(this.sliderDispatching)throw new Error('step_only unavailable during controlled Slider callback');
+    if(this.localizedTimeDispatching)throw new Error('step_only unavailable during localized TimeField callback');
     this._alive();
     if (this.running) throw new Error("step is unavailable during run");
     native.step(this.handle, dt);
@@ -516,6 +521,7 @@ class App {
   }
   _dispatch() {
     if(this.sliderDispatching)throw new Error('nested controlled Slider dispatch unavailable');
+    if(this.localizedTimeDispatching)throw new Error('nested localized TimeField dispatch unavailable');
     let event; let delivered = 0;
     while ((event = native.poll(this.handle)) !== undefined) {
       const node = this.nodes.get(keyFor(event));
@@ -525,15 +531,21 @@ class App {
       if (this.disposed || this.closed) break;
     }
     if(this.sliderEnabled && !this.closed && !this.disposed)delivered+=sliderModels.dispatch(this);
+    if(this.localizedTimeEnabled && !this.closed && !this.disposed)delivered+=localizedTimes.dispatch(this);
     return delivered;
   }
+  supports_localized_time_field(){return localizedTimes.supports(this);}
+  enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}
+  poll_localized_time_change(){if(this.localizedTimeDispatching)throw new Error('poll unavailable during localized TimeField callback');return localizedTimes.poll(this);}
+  dispatch_localized_time_changes(){return localizedTimes.dispatch(this);}
   supports_slider_model(){this._alive();return sliderModels.supports(this);}
   enable_slider_requests(capacity=4096){return sliderModels.enable(this,capacity);}
   poll_slider_request(){return sliderModels.poll(this);}
   accept_slider_request(receipt,value){sliderModels.accept(this,receipt,value);}
-  dispatch_slider_requests(){return sliderModels.dispatch(this);}
+  dispatch_slider_requests(){if(this.localizedTimeDispatching)throw new Error('nested typed dispatch unavailable');return sliderModels.dispatch(this);}
   run() {
     if(this.sliderDispatching)throw new Error('run unavailable during controlled Slider callback');
+    if(this.localizedTimeDispatching)throw new Error('run unavailable during localized TimeField callback');
     this._alive();
     if (this.running || this.timer) throw new Error('app is already running');
     this.running = true;
@@ -560,9 +572,11 @@ class App {
   theme_preset(index) {this._alive();if(!Number.isInteger(index)||index<0||index>0xffffffff)throw new TypeError("invalid theme index");native.setThemePreset(this.handle,index);return this;}
   current_theme_preset() {this._alive();return native.getThemePreset(this.handle);}
   stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } return this; }
-  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values())if(node.kind===81)node.requestValue=null; return this; }
-  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values())if(node.kind===81)node.requestValue=null; this.nodes.clear(); } }
+  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values()){localizedTimes.release(node);if(node.kind===81)node.requestValue=null;} return this; }
+  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values()){localizedTimes.release(node);if(node.kind===81)node.requestValue=null;} this.nodes.clear(); } }
 }
 module.exports = {radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
 
 Object.assign(module.exports, sliderModels.exports);
+
+Object.assign(module.exports,localizedTimes.exports);

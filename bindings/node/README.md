@@ -71,3 +71,8 @@ Read [the Node/TypeScript controlled guide](../../docs/NODE_SLIDER_MODEL.md)
 and its complete authored UI examples. This is additive to the scalar `slider()`
 above: owned copied records, BigInt identities and explicit full-pair receipt
 acceptance after stepping. Direct C custom Styled state is not exposed.
+
+Localized TimeField source preparation is documented in
+[the dedicated guide](../../docs/NODE_TIME_FIELD_LOCALIZED.md), with complete
+English/Arabic JS and TS UI examples. This unreleased optional group has prepared
+fixtures but no Node/TS acceptance yet; legacy `time_field()` remains unchanged.

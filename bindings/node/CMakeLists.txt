@@ -189,3 +189,40 @@ if(CUI_NODE_TSC_EXECUTABLE)
   --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
   --output ${CMAKE_CURRENT_BINARY_DIR}/slider-model-types)
 endif()
+
+# Localized TimeField uses an independent applied-change FIFO, never Slider receipts.
+add_test(NAME node_time_field_localized COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/time-field-localized.test.cjs)
+add_test(NAME node_time_field_localized_protocol COMMAND ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/time-field-localized-protocol.test.cjs)
+add_test(NAME node_time_field_localized_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/time-field-localized.cjs)
+if(TARGET cui_node_old_slider_bindings)
+ add_test(NAME node_time_field_localized_actual_old COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> CUI_TIME_FIXTURE=missing
+  ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/time-field-localized-optional.test.cjs)
+ foreach(missing RANGE 0 10)
+  add_library(cui_time_optional_${missing} SHARED test/time-field-localized-provider.c)
+  target_include_directories(cui_time_optional_${missing} PRIVATE ../../include)
+  target_compile_definitions(cui_time_optional_${missing} PRIVATE CUI_TIME_OMIT=${missing})
+  target_compile_options(cui_time_optional_${missing} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME node_time_field_localized_missing_${missing} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> LD_PRELOAD=$<TARGET_FILE:cui_time_optional_${missing}>
+   CUI_TIME_FIXTURE=$<IF:$<EQUAL:${missing},10>,complete,missing>
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/time-field-localized-optional.test.cjs)
+ endforeach()
+ foreach(mode unavailable config_size result_size change_size)
+  add_test(NAME node_time_field_localized_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> LD_PRELOAD=$<TARGET_FILE:cui_time_optional_10>
+   CUI_TIME_FIXTURE=${mode} ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/time-field-localized-optional.test.cjs)
+ endforeach()
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_time_field_localized_types_runtime COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-time-field-localized-types.py
+  --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
+  --output ${CMAKE_CURRENT_BINARY_DIR}/time-field-localized-types)
+endif()

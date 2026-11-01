@@ -34,7 +34,7 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Test-only cancellation candidate passes 26 checks, including frozen Scroll/Resizable compatibility. Five confirmed failures remain in Rating/legacy Slider stale keys and controlled Slider idle drag; review and verify those fixes before production integration. |
+| Dialog and scrolling | Test-only cancellation candidate passes 38 checks, including numeric stale-key/idle fixes, bare-scope Escape and frozen compatibility. Production transfer still needs remaining reducer coverage and explicit scope-ID alias limitations. |
 | Typed Slider | C models, gallery, C bridge and Python/JS/TS authoring are integrated with focused compatibility checks; standalone Node CMake tests pass 61/61. Finish Go/Rust and native numeric delivery. These additions are unreleased. |
 | Backgrounds, shadows and text | Private software painting, transactional shadows and owned text painting are integrated; current-build renderer and skill checks pass. Finish public software support and the other four adapters. Public text scaling stays at 16×; private owned recording supports 64×. |
 | Validation | Combined warning-enabled build passed (945 steps). Full Linux suite: 481 passed, two skipped; typography rerun passed, optional original-theme fixture audit remains skipped. Focused Python integration checks also pass. Hosted exact-revision checks and delivery remain open. |

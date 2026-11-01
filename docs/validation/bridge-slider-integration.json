@@ -1,0 +1,33 @@
+{
+  "scope": "Integrated controlled C Slider bridge; five foreign builders/native numeric AT still pending",
+  "source_revision": "60368041",
+  "worker_commit": "18a4c4a151514eb823f39105552da523c17637b2",
+  "build": "Actual current CMake Release build, seven focused targets, 19 warning-enabled compile/link steps plus regeneration; CPU0 nice19 -j1",
+  "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -R '^bridge_(core|slider_.*)$' -j1",
+  "runtime": "10/10 PASS0.17s, private Xvfb",
+  "coverage": [
+    "Legacy core and exact frozen legacy trace",
+    "Typed model and fixed-record ABI",
+    "Failed-frame/native-render-error simulation and recovery",
+    "Layout-only preservation and ordinary omission",
+    "Wrong-thread and unsupported-build behavior",
+    "Complete accept and reject examples"
+  ],
+  "source_sha256": {
+    "src/bridge/cui_bridge.c": "e2c97d8260f7e53741d28bd8e36a825c16cb45788ee01373e18a785f59b6fea7",
+    "src/bridge/cui_bridge_internal.h": "66453f0456d32cb4e1aee5ca811be38e4fb1b8d2f195c09cd7fe484f036842c2",
+    "src/bridge/cui_bridge_slider_internal.h": "580566de0023ec1f8b7793665e4e75cf32886ac26298968ea1332da826df8f4a",
+    "include/cui/cui_bridge.h": "718c629eccf152aadb03d7a918ade5901b3833cd581d0249778595ee3d4fa66b"
+  },
+  "artifacts_sha256": {
+    "libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "libcui_bridge.so": "5e53aeb2075ec8050c5ee065c13bf4e106c5bdcbf3f8dc8b2d52574871483a41"
+  },
+  "limitations": [
+    "Focused integration check only; full suite and hosted exact-revision checks remain",
+    "No physical native render-failure or assistive-technology proof",
+    "WASM policy verification is per final module; no threaded/shared support",
+    "No release or deployment"
+  ],
+  "consumer_skill": "18/18 PASS39.224s after canonical SDK/amalgamation/skill regeneration on integrated tree"
+}

@@ -1,0 +1,17 @@
+{
+  "tested_revision": "86aadbed",
+  "scope": "Test-only independent positive-sigma shadow area reference; production geometry/painter unchanged.",
+  "build": "Actual integrated cached strict Release CMake target test_shadow_v2_area_quality: four scheduled steps, warning-clean.",
+  "runtime": "python scripts/test_local.py private Xvfb focused shadow_v2_area_quality: 1/1 PASS1.83 seconds; all512 legacy RGBA comparisons exact.",
+  "source_and_report": "Independent source/report SHA256 match committed worker receipt; existing core/effects archive reused only after exact source digest match.",
+  "limitations": [
+    "Reference numerical refinement is empirical, not a rigorous error bound.",
+    "Sigma-zero rows retain the older area model.",
+    "Fractional inset/source-grid/kernel and empty-hole differences remain.",
+    "No production V2 shadow renderer acceptance."
+  ],
+  "log_sha256": {
+    "shadow-area-integration-build.log": "6f1a70cfd68d41fc94acdb4e47754b266b315850f55bdc7185d55e75221ce30f",
+    "shadow-area-integration-tests.log": "37b5d24d70ce0d86828d2bf13cb152f56a4487aeaf830923fb7f81111c5e1d6d"
+  }
+}

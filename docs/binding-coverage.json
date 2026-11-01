@@ -1175,6 +1175,14 @@
       "Prepared source fixtures have focused worker proof recorded in docs/validation/time-field-bridge-first.json; full integration/generation/package and native interactive proof remain pending. No language support promotion.",
       "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
       "Global segment Tab remains a source-focus parity exception; IME/clipboard and physical AT remain pending."
-    ]
+    ],
+    "python_source_checkpoint": {
+      "implementation": "Source prepared; no Python runtime, old-library, example, package or freshness proof yet. No tested localized binding support is advertised.",
+      "module": "bindings/python/cui_bridge/time_field.py",
+      "guide": "docs/PYTHON_TIME_FIELD_LOCALIZED.md",
+      "test": "bindings/python/test_time_field.py",
+      "example": "bindings/bridge/examples/time_field_localized.py",
+      "scope": "Complete optional10group; frozen owned616/80/64records; post-step applied observations; no Python reducer, controlled receipt or direct C state/style binding."
+    }
   }
 }

@@ -264,7 +264,7 @@ class AgentSkillTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             expected = ['bindings/rust/build.rs', 'bindings/python/cui_bridge/shadows.py',
-                        'bindings/python/cui_bridge/slider_model.py',
+                        'bindings/python/cui_bridge/slider_model.py', 'bindings/python/cui_bridge/time_field.py',
                         'bindings/rust/src/shadows.rs', 'bindings/rust/src/slider_model.rs', 'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs',
                         'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs']
             for name in expected + ['bindings/python/private.py',

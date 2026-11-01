@@ -130,6 +130,8 @@ class _API:
         bind_part_api(self, bind, _Handle)
         from .slider_model import bind_api
         bind_api(self, bind)
+        from .time_field import bind_api as bind_time_api
+        bind_time_api(self, bind)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -1444,6 +1446,8 @@ class App:
         self._by_handle: dict[tuple[int, int], Widget] = {}
         self._slider_enabled = False
         self._slider_dispatching = False
+        self._time_field_enabled = False
+        self._time_field_dispatching = False
 
     def _ensure_open(self) -> None:
         if not self._ptr:
@@ -1497,6 +1501,8 @@ class App:
         validate(tree, None, "root", 0)
         if any(node.kind == "slider_model" for node, _, _ in order) and not self._slider_enabled:
             self.enable_slider_requests()
+        if any(isinstance(node, LocalizedTimeField) for node, _, _ in order) and not self._time_field_enabled:
+            self.enable_time_changes()
         created: list[Widget] = []
         try:
             for node, parent, key in order:
@@ -1528,6 +1534,9 @@ class App:
                 if node.kind == "attachment": node._change("set_attachment",node._attachment)
                 if node._image is not None: node._change("set_image",*node._image)
                 if node.kind == "time_field": node._change("set_time",_Time(*node._time))
+                if isinstance(node, LocalizedTimeField):
+                    from .time_field import mount_node as mount_time_node
+                    mount_time_node(self, node)
                 if node.kind in {"calendar", "date_picker"}: node._change("set_date",_Date(*node._date))
                 if node.kind == "color_picker": node._change("set_color",node._color)
                 if node.kind == "chart": node.chart_kind(("line","area","bar","pie")[node._chart_kind]);node.chart_data(node._chart_data)
@@ -1594,6 +1603,8 @@ class App:
         return self
 
     def step(self, dt: float = 1 / 60) -> None:
+        if self._time_field_dispatching:
+            raise RuntimeError("step is unavailable during localized TimeField dispatch")
         if self._slider_dispatching:
             raise RuntimeError("step is unavailable during controlled Slider dispatch")
         if getattr(self, "_running", False):
@@ -1895,6 +1906,8 @@ class App:
 
     def dispatch(self) -> int:
         """Invoke callbacks after step; Python exceptions propagate outside C frames."""
+        if self._time_field_dispatching:
+            raise RuntimeError("nested localized TimeField dispatch is unavailable")
         if self._slider_dispatching:
             raise RuntimeError("nested controlled Slider dispatch is unavailable")
         count = 0
@@ -1906,6 +1919,8 @@ class App:
             count += 1
         if self._slider_enabled and self._ptr:
             count += self.dispatch_slider_requests()
+        if self._time_field_enabled and self._ptr:
+            count += self.dispatch_time_changes()
         return count
 
     def supports_slider_model(self) -> bool:
@@ -1925,7 +1940,25 @@ class App:
         accept(self, receipt, value)
 
     def dispatch_slider_requests(self) -> int:
+        if self._time_field_dispatching:
+            raise RuntimeError("nested typed dispatch is unavailable")
         from .slider_model import dispatch
+        return dispatch(self)
+
+    def supports_time_field(self) -> bool:
+        from .time_field import supported
+        return supported(self)
+
+    def enable_time_changes(self, capacity: int = 4096) -> "App":
+        from .time_field import enable
+        return enable(self, capacity)
+
+    def poll_time_changes(self) -> Iterator["TimeFieldChange"]:
+        from .time_field import poll
+        return poll(self)
+
+    def dispatch_time_changes(self) -> int:
+        from .time_field import dispatch
         return dispatch(self)
 
     def run(self, dt: float = 1 / 60) -> None:
@@ -1934,6 +1967,8 @@ class App:
         dt is retained for source compatibility and validated; native scheduling
         supplies actual frame timing. Older bridges fail clearly without fallback.
         """
+        if self._time_field_dispatching:
+            raise RuntimeError("run is unavailable during localized TimeField dispatch")
         if self._slider_dispatching:
             raise RuntimeError("run is unavailable during controlled Slider dispatch")
         self._ensure_open()
@@ -1974,6 +2009,10 @@ class App:
 
     def close(self) -> None:
         if self._ptr:
+            if self._time_field_enabled:
+                import threading
+                if threading.get_ident() != self._time_field_owner_thread:
+                    raise RuntimeError("localized TimeField App must close on its owner thread")
             if self._slider_enabled:
                 import threading
                 if threading.get_ident() != self._slider_owner_thread:
@@ -1985,6 +2024,8 @@ class App:
                 node._disposed = True
                 if isinstance(node, SliderModel):
                     node._request_callback = None
+                if isinstance(node, LocalizedTimeField):
+                    node._time_callback = None
             self._by_handle.clear()
 
     def __enter__(self) -> "App":
@@ -2048,3 +2089,8 @@ from .slider_model import (SliderSingle, SliderRange, SliderDomain, SliderConfig
     SliderInput, SliderRequest, SliderPresentation, SliderModel, slider_model)
 from .slider_model import __all__ as _slider_exports
 __all__ += _slider_exports
+
+from .time_field import (TimeValue, TimeCycle, TimePrecision, TimeTextStatus, TimeLocale,
+    TimeFieldConfig, TimeFieldChange, TimeFieldResult, LocalizedTimeField, localized_time_field)
+from .time_field import __all__ as _time_field_exports
+__all__ += _time_field_exports

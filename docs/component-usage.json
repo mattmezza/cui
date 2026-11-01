@@ -1652,7 +1652,8 @@
         "docs/TIME_FIELD_TEXT.md",
         "docs/TIME_FIELD_LOCALIZED.md",
         "docs/TIME_FIELD_LOCALIZED_EXAMPLE.md",
-        "docs/BRIDGE_TIME_FIELD_LOCALIZED.md"
+        "docs/BRIDGE_TIME_FIELD_LOCALIZED.md",
+        "docs/PYTHON_TIME_FIELD_LOCALIZED.md"
       ],
       "callback_symbols": [
         "cui_time_change_fn"

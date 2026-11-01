@@ -840,6 +840,9 @@ The additive [localized bridge source checkpoint](BRIDGE_TIME_FIELD_LOCALIZED.md
 is unvalidated; existing foreign builders still expose only the scalar subset.
 Its owned records are declared in `cui/cui_bridge.h`, independently of direct C
 borrowed widget state. No new bridge/binding support is advertised yet.
+The [Python localized source checkpoint](PYTHON_TIME_FIELD_LOCALIZED.md) prepares
+owned configuration/observations and a complete authored UI, but has not passed
+Python runtime or package checks. Other four localized builders remain pending.
 
 ## Carousel
 

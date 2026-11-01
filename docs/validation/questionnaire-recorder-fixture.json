@@ -1,0 +1,29 @@
+{
+  "date": "2026-11-01",
+  "scope": "Questionnaire deterministic V1 software text test provider",
+  "failure": "Combined build stopped at dist_questionnaire_geometry_legacy with unresolved private V2 recorder functions. The fake CUI_HAS_TEXT provider implemented V1 glyph callbacks only.",
+  "fix": "Namespace the fixture recorder entry points, advertise no contextual recording, and abort if recorder work is reached. This preserves real V1 rendering tests without pretending to implement V2 text. Production code is unchanged.",
+  "verification": {
+    "warning_build": "Ten affected source/distribution executables rebuilt successfully, twenty compile/link steps.",
+    "headless_tests": {
+      "passed": 10,
+      "failed": 0,
+      "seconds": 1.61
+    },
+    "logs": {
+      "questionnaire-recorder-fixture-build.log": {
+        "sha256": "7be07617d8e24aa417a5026fd7328e63f2e490e9a1835929488834f1bcfb339a"
+      },
+      "questionnaire-recorder-fixture-other-build.log": {
+        "sha256": "b059b8afb62a6ad50c94ac34491ac9e28422b4ca63a977d7c6a9a07d322f7cfb"
+      },
+      "questionnaire-recorder-fixture-all-tests.log": {
+        "sha256": "abfc6062d905e8d46f94b5cc12c5f6a8c2dd0610b635bc41c29396b60770090f"
+      }
+    }
+  },
+  "remaining": [
+    "Full combined build and suite pending.",
+    "This fixture provides no native shaping or V2 recorder support."
+  ]
+}

@@ -8,6 +8,9 @@
 #define cui_software_pixels progress_software_pixels
 #define cui_software_save_ppm progress_software_save_ppm
 #define cui_software_interface progress_software_interface
+#define cui_text_prepare_context_available_internal progress_prepare_context_available
+#define cui_text_prepare_line progress_prepare_line
+#define cui_text_prepare_session_end progress_prepare_session_end
 #define cui_font_text_capabilities progress_font_capabilities
 #define cui_font_draw_context_line progress_font_draw
 #define cui_font_draw_context_line_colored progress_font_draw_colored
@@ -48,6 +51,27 @@ bool progress_font_draw_colored(cui_font *font, cui_text_line_source source, flo
 #define CUI_HAS_TEXT 1
 #include "../../../backends/software/cui_software.c"
 #undef CUI_HAS_TEXT
+/* This fixture supplies deterministic V1 glyph coverage only. It deliberately
+ * advertises no contextual V2 recorder; reaching recorder work would invalidate
+ * the fixture rather than silently simulate successful native text preparation. */
+bool progress_prepare_context_available(void) {
+    return false;
+}
+bool progress_prepare_line(cui_text_prepare_session *session, cui_font *font,
+                           const cui_draw_command *command, float density) {
+    (void)session;
+    (void)font;
+    (void)command;
+    (void)density;
+    abort();
+}
+void progress_prepare_session_end(cui_text_prepare_session *session) {
+    (void)session;
+    abort();
+}
+#undef cui_text_prepare_context_available_internal
+#undef cui_text_prepare_line
+#undef cui_text_prepare_session_end
 #undef cui_font_text_capabilities
 #undef cui_font_draw_context_line
 #undef cui_font_draw_context_line_colored

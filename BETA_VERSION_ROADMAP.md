@@ -40,8 +40,8 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Corrected test-only header-priority + event-coordinate candidate passes 65/65 focused checks, including reviewed modal/overlap cases. The independent production Table slice compiled and passed runtime checks; distribution allowlist corrected and offline checks pass; final integrated acceptance remains open. The inert/layout-only guard was confirmed in the existing frame-sequence dependency. Broader Dialog cancellation remains open. The frozen/current legacy trace passes. Production transfer and scope-ID alias limitations stay open. |
-| TimeField | Pure locale-aware parsing/formatting and bounds helpers passed strict source/distribution, five headless, C++ header and WASM layout checks. Legacy-consumer and metadata acceptance remain open; not yet integrated. This does not yet provide a localized editor, IME support or foreign-language bindings. |
+| Dialog and scrolling | Corrected test-only header-priority + event-coordinate candidate passes 65/65 focused checks, including reviewed modal/overlap cases. The independent production Table touch slice is integrated: source/distribution runtime checks pass, all nine source/test hashes match, and the integrated skill suite passes 18/18. Full-suite and hosted acceptance remain open. The inert/layout-only guard was confirmed in the existing frame-sequence dependency. Broader Dialog cancellation remains open. The frozen/current legacy trace passes. Production transfer and scope-ID alias limitations stay open. |
+| TimeField | Pure locale-aware parsing/formatting and bounds helpers passed strict source/distribution, five headless, C++ header and WASM layout checks. Six legacy-consumer tests, usage6 and skill18 also pass in the worker tree. Integrated as `173e5d48`; combined-revision five headless tests and skill18 pass. Full regression and hosted validation remain open. This does not yet provide a localized editor, IME support or foreign-language bindings. |
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight implementation is next; SDL V2 production rendering, compatibility measurements and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
@@ -141,6 +141,8 @@ that every listed defect still reproduces.
   deployed website revision verified before declaring delivery complete.
 
 Owned-frame acceptance: [lifecycle, frozen references and WASM layout](docs/validation/cpu-v2-owned-frame-integration.json).
+
+TimeField acceptance: [combined-revision source/distribution and consumer checks](docs/validation/time-field-text-integration.json).
 
 Rust acceptance: [dynamic, default-static and lifetime checks](docs/validation/rust-slider-integration.json).
 

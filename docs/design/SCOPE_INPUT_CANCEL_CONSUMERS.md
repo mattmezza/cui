@@ -32,8 +32,9 @@ capture-loss/fresh-gesture case passes using its existing reducer.
 
 See [the source audit](DIALOG_RETAINED_CONSUMER_AUDIT.md) and
 [the counterexample receipt](../validation/dialog-retained-consumer-counterexamples.json).
-The next candidate must clear only scoped pending press state, preserve changes
-already delivered, and emit no invented model/completion callback. Production
+The [reviewed test-only reset plan](DIALOG_TABLE_COLOR_CANCEL_PROOF.md)
+clears only scoped pending press state, preserves changes
+already delivered, and emits no invented model/completion callback. Production
 transfer remains gated by corrected runtime and frozen legacy traces.
 
 ## Remaining audit

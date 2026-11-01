@@ -57,7 +57,7 @@ custom colors, icon draw commands, nonfocusable status semantics, zero-count
 content preservation and invalid-input callback isolation. Arbitrary child
 styles remain ordinary Core composition; there is no global text-style scope.
 
-## Configured artwork route (unvalidated source checkpoint)
+## Configured artwork route (focused C validation, unreleased)
 
 `cui_badge_with_icon` is an additive C route for ICON markers. Its
 `cui_badge_icon_content` borrows an initialized `cui_icon_state` and full
@@ -90,7 +90,10 @@ cui_badge_result result = cui_badge_with_icon(
 /* Handle result.icon_error separately from Core frame completion. */
 ```
 
-This source checkpoint has not been compiled or executed. Native/WASM ABI,
-software pixel equivalence, old-route compatibility and configured consumer
-checks remain pending. Foreign configured Badge authoring is still unavailable;
+The first focused worker C11 strict compile and private-Xvfb test passed. It
+compared software pixels with an independent ordinary Icon tree and checked
+frozen old-route scenes and retained old-mask rendering. Descriptor sizes were
+measured as136 bytes native/104 WASM32; WASM was a header probe only. Broader
+resize/nesting/failure additions remain prepared, not executed; configured
+consumer and canonical freshness checks remain pending. Foreign configured Badge authoring is still unavailable;
 this does not complete the frozen family.

@@ -141,6 +141,105 @@ static void pixel_control(void) {
     cui_software_destroy(renderer);
     cui_icon_state_destroy(&state);
 }
+typedef struct {
+    cui_theme theme;
+    float width;
+    unsigned outer_calls, inner_calls, activations;
+} nested_model;
+static void nested_child(cui_context *ui, void *user) {
+    nested_model *m = user;
+    ++m->inner_calls;
+    cui_begin_box(ui, 701, (cui_box){.width = m->width, .height = 40});
+    if (cui_button(ui, 702, &m->theme, cui_string("Inbox"), false))
+        ++m->activations;
+    cui_end_box(ui);
+}
+static void nested_content(cui_context *ui, void *user) {
+    nested_model *m = user;
+    ++m->outer_calls;
+    cui_badge_options dot = cui_badge_defaults();
+    dot.variant = CUI_BADGE_DOT;
+    assert(cui_badge_ex(ui, 700, &m->theme, dot, nested_child, m));
+}
+static void nested_resize(void) {
+    cui_context *ui = cui_create((cui_config){.width = 320, .height = 200});
+    assert(ui);
+    nested_model m = {.theme = cui_theme_light()};
+    const float widths[] = {120, 48, 160, 48};
+    for (size_t i = 0; i < sizeof(widths) / sizeof(widths[0]); ++i) {
+        m.width = widths[i];
+        if (i == 1) {
+            cui_rect r = cui_bounds(ui, 702);
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = r.x + 4, .y = r.y + 4}));
+            assert(cui_queue_event(
+                ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = r.x + 4, .y = r.y + 4}));
+        }
+        assert(cui_begin_frame(ui, i % 2 ? 180 : 320, 200, .016f));
+        cui_badge_options count = cui_badge_defaults();
+        count.count = i == 2 ? 0 : 100;
+        assert(cui_badge_ex(ui, 600, &m.theme, count, nested_content, &m));
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        assert(cui_bounds(ui, 600).w == m.width && cui_bounds(ui, 700).w == m.width);
+        cui_rect child = cui_bounds(ui, 700), dot = cui_bounds(ui, cui_badge_indicator_id(700));
+        assert(dot.w == 6 && dot.h == 6 && dot.x == child.x + child.w - 6 && dot.y == child.y);
+        size_t n;
+        const cui_semantic *sem = cui_semantics(ui, &n);
+        unsigned status = 0;
+        for (size_t j = 0; j < n; ++j)
+            status += sem[j].role == CUI_ROLE_STATUS;
+        assert(status == (i == 2 ? 1u : 2u));
+        assert(m.outer_calls == i + 1 && m.inner_calls == i + 1);
+    }
+    assert(m.activations == 1);
+    /* Whole subtree omission followed by fresh first-frame reappearance. */
+    assert(cui_begin_frame(ui, 320, 200, .016f));
+    cui_end_frame(ui);
+    size_t n;
+    cui_semantics(ui, &n);
+    assert(n == 0);
+    assert(cui_begin_frame(ui, 320, 200, .016f));
+    cui_badge_options dot = cui_badge_defaults();
+    dot.variant = CUI_BADGE_DOT;
+    assert(cui_badge_ex(ui, 600, &m.theme, dot, nested_content, &m));
+    cui_end_frame(ui);
+    assert(m.outer_calls == 5 && m.inner_calls == 5 && m.activations == 1);
+    cui_destroy(ui);
+}
+static void artwork_failures(void) {
+    cui_context *ui = cui_create((cui_config){.width = 200, .height = 100});
+    assert(ui);
+    cui_theme theme = cui_theme_light();
+    cui_icon_state state = {0};
+    cui_badge_options options = cui_badge_defaults();
+    options.variant = CUI_BADGE_ICON;
+    cui_badge_icon_content icon = {.state = &state,
+                                   .options = {.size = CUI_ICON_CUSTOM, .custom_size = 24}};
+    assert(cui_icon_set_limits(&state, (cui_icon_limits){.max_pixels = 256, .max_versions = 1}));
+    assert(cui_icon_set_data(
+        &state,
+        cui_string("<svg width=\"24\" height=\"24\"><rect width=\"12\" height=\"12\"/></svg>")));
+    unsigned before = calls;
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    cui_badge_result r = cui_badge_with_icon(ui, 100, &theme, options, &icon, content, &calls);
+    assert(r.submitted && r.icon_error == CUI_ICON_LIMIT && calls == before + 1);
+    cui_end_frame(ui);
+    assert(cui_bounds(ui, 100).w == 80);
+    icon.options.custom_size = 12;
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    r = cui_badge_with_icon(ui, 100, &theme, options, &icon, content, &calls);
+    assert(r.submitted && r.icon_error == CUI_ICON_OK);
+    cui_end_frame(ui);
+    assert(cui_icon_set_data(&state, cui_string("<svg><path/>")));
+    cui_icon_state_collect(&state); /* Previous synchronous rendering borrows ended. */
+    assert(cui_begin_frame(ui, 200, 100, .016f));
+    r = cui_badge_with_icon(ui, 100, &theme, options, &icon, content, &calls);
+    assert(r.submitted && r.icon_error == CUI_ICON_PARSE);
+    cui_end_frame(ui);
+    cui_destroy(ui);
+    cui_icon_state_destroy(&state);
+}
 int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 200});
     assert(ui);
@@ -194,5 +293,7 @@ int main(void) {
     cui_icon_state_destroy(&state);
     legacy_control();
     pixel_control();
+    nested_resize();
+    artwork_failures();
     return 0;
 }

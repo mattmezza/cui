@@ -338,3 +338,14 @@ then run the emitted test directory only through `scripts/test_local.py`.
 Native descriptor/options offset is136/8; WASM32 is104/4. Result size/error offset
 is8/4 on both. WASM was a header assembly probe, not a runtime claim. Generation,
 configured full CMake consumption and the remaining family matrix are pending.
+
+### Prepared remaining C family cases (not executed)
+
+The fixture now additionally submits nested dot/count Badges around an actual
+button, asserts current first-frame width and corner geometry at120→48→160→48,
+marker omission/reappearance without losing nested semantics, once-only content
+callbacks and exactly one queued child click. Whole subtree omission/reappearance
+must not replay activation. Separate Icon max-pixel failure keeps content/shell,
+then reduced artwork size recovers; malformed SVG reports PARSE under the same
+composition contract. These new assertions have not run. They cover deterministic
+resource limits, not injected allocator failure; no all-family claim follows.

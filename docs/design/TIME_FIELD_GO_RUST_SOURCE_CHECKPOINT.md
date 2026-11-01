@@ -17,3 +17,18 @@ facade; `docs/GO_RUST_TIME_FIELD_LOCALIZED.md` documents APIs/ownership/limitati
 Only source formatters ran. Compiler, Go/Cargo tests, examples, optional old/partial
 provider runtime, exact raw ABI assertions, installed/package/toolchain and all
 canonical generations remain pending the exclusive heavy lease.
+
+## Focused dynamic execution followup
+
+Defaults now use edit generation1; authored0 is rejected in both facades. All
+other token/name/bounds/precision/reserved domains were reviewed against the actual
+bridge validator. Initial no-callback failures are preserved: two ordinary frames
+plus a successful result getter establish admission; minute-only center clicks
+land on a separator, so the actual textbox is selected at the first quarter.
+No C policy change or assertion relaxation was needed. New Rust typed dispatch
+counts consumed copied records even without a callback, consistent with Go.
+
+The final private wrapper passed9/9 checks14.66s, including actual old/partial
+providers and English/Arabic authored examples. See the hashed dynamic receipt.
+Default static, canonical regeneration, installed packages and true later-frame
+failure interop remain pending. The heavy lease was released before documentation.

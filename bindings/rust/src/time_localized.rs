@@ -45,7 +45,7 @@ impl TimeFieldConfig {
             owner_invalid: false,
             minimum: None,
             maximum: None,
-            edit_generation: 0,
+            edit_generation: 1,
             tokens: [
                 "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", " ", "AM", "PM",
             ]
@@ -64,6 +64,9 @@ impl TimeFieldConfig {
         c
     }
     fn validate(&self) -> Result<()> {
+        if self.edit_generation == 0 {
+            return Err(Error(3));
+        }
         for (i, t) in self.tokens.iter().enumerate() {
             if t.is_empty() || t.len() > 16 || t.contains('\0') {
                 return Err(Error(3));
@@ -609,9 +612,9 @@ impl App {
                 .as_ref()
                 .and_then(|s| s.callbacks.get(&c.node.raw))
                 .cloned();
+            count += 1;
             if let Some(cb) = cb {
                 (cb.borrow_mut())(&c);
-                count += 1
             }
         }
     }

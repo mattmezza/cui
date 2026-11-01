@@ -128,15 +128,25 @@ fn main() -> Result<()> {
         return app.run_with(apply);
     }
     app.step(0.016)?;
+    app.step(0.016)?;
+    app.localized_time_result(en)?;
     for (n, text) in [(en, "10:45"), (ar, "٠٣:٢٠ م")] {
         let r = app.bounds(n)?;
-        app.pointer(Phase::Down, r.x + r.width / 2., r.y + r.height / 2.)?;
-        app.pointer(Phase::Up, r.x + r.width / 2., r.y + r.height / 2.)?;
+        app.pointer(Phase::Down, r.x + r.width / 4., r.y + r.height / 2.)?;
+        app.pointer(Phase::Up, r.x + r.width / 4., r.y + r.height / 2.)?;
         app.queue_text(text)?;
         app.step(0.016)?;
         app.dispatch()?;
         apply(&mut app)?;
     }
+    assert_eq!(
+        app.localized_time_result(ar)?.change.value,
+        Time {
+            hour: 15,
+            minute: 20,
+            second: 0
+        }
+    );
     println!("English applied: {:?}", app.localized_time_result(en)?);
     Ok(())
 }

@@ -1,7 +1,9 @@
-# Go and Rust localized TimeField (unvalidated source checkpoint)
+# Go and Rust localized TimeField (focused dynamic proof, unreleased)
 
-This additive authoring slice is prepared against root `8a402c2b`. No Go/Cargo,
-compiler, runtime, generation or installed-package gate has run for these wrappers.
+This additive authoring slice is based on root `8a402c2b`. Focused Linux dynamic
+Go/Rust compile, private-wrapper tests and both authored examples passed; see
+[the exact receipt](validation/time-field-go-rust-dynamic.json). Default static,
+canonical generation and installed-package gates have not run.
 The authoritative C contract is [BRIDGE_TIME_FIELD_LOCALIZED.md](BRIDGE_TIME_FIELD_LOCALIZED.md)
 and `include/cui/cui_bridge.h`. Existing scalar TimeField APIs stay unchanged.
 This does not bind direct Base/Styled options, drafts, clipboard/IME policy or
@@ -12,7 +14,8 @@ The new modules are `bindings/go/cui/time_localized.go` and
 result80 and change64 record. Fourteen explicit UTF-8 prefix-free tokens have
 1–16 bytes; four optional segment names have0–64. English/Arabic constructors
 are conveniences containing explicit tokens, not a locale registry. Same-day
-inclusive bounds are optional. Minute precision requires seconds0. Tokens/names
+inclusive bounds are optional. Minute precision requires seconds0. Edit generation must be nonzero: convenience
+defaults use1, and explicitly authored0 is rejected rather than normalized. Tokens/names
 and bounds are copied; rejected updates preserve the old C configuration and
 Go builder value. No foreign reducer, normalization or owner-value clamping.
 
@@ -70,7 +73,9 @@ new unmounted declarative tree/provider: its existing builder already borrows Ap
 
 `localized_time_config`, `localized_time_result`, `clear_time_validation`,
 `poll_time_field_change`, `dispatch_time_field_changes` map to the same C contract.
-Normal `dispatch` drains the typed queue after the existing queues. App remains
+Normal `dispatch` drains the typed queue after the existing queues. The new typed
+dispatch count reports consumed owned observations, including records without a
+registered callback; legacy dispatch counting is unchanged. App remains
 !Send/!Sync through its existing Rc marker; it and all native UI calls stay on
 the creating OS thread. Rust borrows prevent aliasing mutable App into callbacks;
 callbacks can retain owned copies in local Rc/RefCell state, and `run_with`'s
@@ -111,14 +116,19 @@ replay occurs in either wrapper.
 fields, same-day bounds, read-only/disabled/bounds toggles, validation clearing and
 summary updates from copied callbacks. Default mode is windowless scripted input;
 `--native` uses existing host run and real input, requiring `CUI_TEST_FONT`.
-Neither path has run. Automated native runs must use the private-Xvfb wrapper;
+The windowless scripts ran with both actual localized values asserted. Native
+interactive mode has not run. Automated native runs must use the private-Xvfb wrapper;
 never launch these examples on the maintainer desktop during validation.
 
-Prepared tests cover owned wire copies/prefix/precision validation, real typed
+Executed focused tests cover owned wire copies/prefix/precision validation, real typed
 changes after step, invalid replacement, wrong kind, capacity/constructor rollback,
 no result replay, copied failed-frame decoding, and Rust callback panic recovery.
-Still required: actual matching C library runtime, Arabic/control behavior,
-wrong-thread/close/removal callbacks, real failed-frame copied records, old and
-partial-group provider subprocess tests, schema-poison checks, native run unwind,
-MSRV/installed-package source closure, canonical SDK generation and required
-skill tests. Prepared tests are not evidence of execution or complete bindings.
+Matching current, old and partial-provider dynamic runtimes passed; Arabic
+read-only/disabled/bounds/clear, Go wrong-thread/close/panic and Rust panic/no-handler
+count also passed. Initial no-callback failures remain in the receipt. Scripted
+input first completes two ordinary frames and checks result admission; a minute-only
+field center is a separator, so the script clicks its first-quarter textbox.
+Still required: real later-failed-frame copied observations at the facade boundary,
+additional schema-poison providers, native run unwind, MSRV/installed-package and
+static source closure, canonical SDK generation and required skill tests. No full
+binding/source-family parity follows from these focused checks.

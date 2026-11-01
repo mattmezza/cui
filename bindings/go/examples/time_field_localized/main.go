@@ -24,7 +24,9 @@ func main() {
 	summary := cui.Label("No applied edits").Key("summary")
 	en := cui.TimeField("english").Time(cui.Time{Hour: 9, Minute: 30}).LocalizedTime(english)
 	ar := cui.TimeField("arabic").Time(cui.Time{Hour: 14, Minute: 15}).LocalizedTime(arabic)
+	changes := 0
 	update := func(c cui.TimeFieldChange) {
+		changes++
 		must(summary.SetText(fmt.Sprintf("Applied %02d:%02d → %02d:%02d; frame status %d", c.Previous.Hour, c.Previous.Minute, c.Value.Hour, c.Value.Minute, c.FrameStatus)))
 	}
 	en.OnTimeFieldChange(update)
@@ -59,18 +61,27 @@ func main() {
 		return
 	}
 	must(a.Step(.016))
+	must(a.Step(.016))
+	if _, e := a.LocalizedTimeResult(en); e != nil {
+		panic(e)
+	}
 	for _, item := range []struct {
 		n    *cui.Node
 		text string
 	}{{en, "10:45"}, {ar, "٠٣:٢٠ م"}} {
 		r, e := a.Bounds(item.n)
 		must(e)
-		must(a.QueuePointer(cui.PointerDown, r.X+r.Width/2, r.Y+r.Height/2))
-		must(a.QueuePointer(cui.PointerUp, r.X+r.Width/2, r.Y+r.Height/2))
+		must(a.QueuePointer(cui.PointerDown, r.X+r.Width/4, r.Y+r.Height/2))
+		must(a.QueuePointer(cui.PointerUp, r.X+r.Width/4, r.Y+r.Height/2))
 		must(a.QueueText(item.text))
 		must(a.Step(.016))
 		_, e = a.Dispatch()
 		must(e)
+	}
+	arabicValue, e := a.Time(ar)
+	must(e)
+	if changes != 2 || arabicValue != (cui.Time{Hour: 15, Minute: 20}) {
+		panic("localized examples did not apply both edits")
 	}
 	value, e := a.Time(en)
 	must(e)

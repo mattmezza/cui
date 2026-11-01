@@ -34,7 +34,7 @@ type TimeFieldConfig struct {
 }
 
 func EnglishTimeField() TimeFieldConfig {
-	return TimeFieldConfig{Tokens: [14]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", " ", "AM", "PM"}}
+	return TimeFieldConfig{EditGeneration: 1, Tokens: [14]string{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", " ", "AM", "PM"}}
 }
 func ArabicTimeField() TimeFieldConfig {
 	c := EnglishTimeField()
@@ -60,7 +60,7 @@ func timeValid(t Time, p TimePrecision) bool {
 func timeSeconds(t Time) uint32 { return t.Hour*3600 + t.Minute*60 + t.Second }
 func (c TimeFieldConfig) validate() error {
 	bad := errors.New("invalid localized TimeField configuration")
-	if c.Cycle > TimeH12 || c.Precision > TimeSecond {
+	if c.EditGeneration == 0 || c.Cycle > TimeH12 || c.Precision > TimeSecond {
 		return bad
 	}
 	for i, t := range c.Tokens {

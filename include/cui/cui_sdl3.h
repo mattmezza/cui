@@ -2,6 +2,7 @@
 #ifndef CUI_SDL3_H
 #define CUI_SDL3_H
 #include "cui_accessibility.h"
+#include "cui_draw_v2.h"
 #include "cui_platform.h"
 #include "cui_renderer.h"
 #include "cui_text.h"
@@ -57,6 +58,34 @@ void cui_sdl3_size(cui_sdl3 *backend, float *width, float *height);
  * copies it. Only X11 supplies screen position; Wayland reports false. */
 bool cui_sdl3_accessibility_window(cui_sdl3 *, cui_accessibility_window *out);
 bool cui_sdl3_render(cui_sdl3 *backend, const cui_draw_list *list, cui_color clear);
+/* Unreleased SDL_Renderer-only V2 opt-in; query before Core V2 composition.
+ * Main thread, owned window backbuffer only. Exact out->size required; failure
+ * preserves output. Query may invoke SDL allocator hooks. No other backend or
+ * foreign-binding support is implied. */
+enum {
+    CUI_SDL3_V2_TEXT_A8 = 1u << 0,
+    CUI_SDL3_V2_TEXT_CONTEXT = 1u << 1,
+    CUI_SDL3_V2_TEXT_TRACKING = 1u << 2
+};
+typedef struct {
+    uint32_t size;
+    cui_draw_v2_support draw;
+    uint32_t text_features;
+    cui_render_v2_options defaults;
+} cui_sdl3_v2_info;
+cui_error cui_sdl3_query_v2(const cui_sdl3 *, cui_sdl3_v2_info *out);
+/* NULL options uses fresh output/logical density. Borrowed resources and opaque
+ * font/SDL graphs remain stable and disjoint from owner/output throughout return;
+ * no same-font recursive rendering. Preparation is transactional; native drawing
+ * cannot be rolled back. Success means checked submission and Present attempted,
+ * not physical presentation. Failed state restoration faults this owner until
+ * idle destruction/recreation. During V2, owner APIs refuse without native calls;
+ * void size/destroy are no-ops (destroy must be retried). Existing font/provider
+ * state and opaque dependency/SDL/driver allocations are outside CPU quota.
+ * See docs/design/SDL_V2_PUBLIC_ENTRY_CHECKPOINT.md for lifecycle and bounds. */
+cui_error cui_sdl3_render_v2(cui_sdl3 *, const cui_draw_list_v2 *, cui_color clear,
+                             const cui_render_v2_options *options);
+
 /* Capture before presenting, when the framebuffer contents are defined. */
 bool cui_sdl3_render_capture(cui_sdl3 *backend, const cui_draw_list *list, cui_color clear,
                              const char *path);

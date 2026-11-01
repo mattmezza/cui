@@ -1,0 +1,34 @@
+{
+  "source_revision": "38a9cf2f14a42460e6e333dd552a4d1b79bc1925",
+  "files_observed": 1170,
+  "first_pass_changed_bytes": [
+    "bindings/go/sdk/SOURCE_PROVENANCE.json",
+    "bindings/rust/sdk/SOURCE_PROVENANCE.json",
+    "skills/cui/data/resources.json"
+  ],
+  "unchanged_byte_timestamp_churn": [],
+  "second_pass_all_bytes_and_mtimes_unchanged": true,
+  "canonical_order": [
+    [
+      "python",
+      "scripts/generate_go_sdk.py"
+    ],
+    [
+      "python",
+      "scripts/amalgamate.py"
+    ],
+    [
+      "python",
+      "scripts/generate_agent_skill.py"
+    ]
+  ],
+  "freshness": "all three PASS",
+  "limits": "No elapsed-time or CI speedup claimed; build result recorded separately.",
+  "scope": "Integrated generator acceptance; no performance speedup claimed.",
+  "native_build": {
+    "result": "PASS",
+    "initial_steps": 550,
+    "post_generation_steps": 34,
+    "limitation": "Incremental follow-up includes CMake regeneration and changed generation dependencies; not an unchanged-build benchmark."
+  }
+}

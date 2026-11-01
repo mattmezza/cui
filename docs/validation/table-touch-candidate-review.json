@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-01",
+  "scope": "Test-only Table touch experiments and root review; no production transfer",
+  "signed_worker_checkpoint": "7a9908db",
+  "evidence": {
+    "baseline": "Original and query-only controls retained independent touch reorder failures",
+    "diagnostic": "Actual touch DOWN to header followed by CANCEL and ancestor SCROLL; no pointer MOVE/UP reached reducer",
+    "priority_only": "Strict candidate 54/55 PASS; only later mouse sample in same batch still failed",
+    "priority_plus_event_query": "Strict candidate 55/55 PASS 0.34 s; ordinary/bidirectional touch, tap/sort/threshold, disabled/loading/column disabled, pinned crossing, body/nonmovable-header pan, multicontact cancel/fresh and prior47 checks",
+    "frozen_trace": "Existing fieldwise mouse/legacy trace remains passing"
+  },
+  "root_review_gaps": [
+    "Current query used previous modal eligibility and caller scope; newly opened disjoint modal could incorrectly admit prior outside targets. Source correction and tests prepared, unexecuted.",
+    "Same paint-root unrelated interactive siblings were not treated as blockers. Existing retained layout semantic-parent indexes can distinguish descendants without new storage. Stronger test-only semantics approved; no public query implemented."
+  ],
+  "next": "Prove modal/same-root/descendant tests before deciding production query contract and transferring compatible Table fix. No dispatch architecture change approved.",
+  "log": "/home/matteo/.cache/cui-hover-raw-build/dialog-table-priority-experiments.log"
+}

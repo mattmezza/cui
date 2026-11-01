@@ -33,8 +33,8 @@ def digest(data):
 
 def source_digest(directory):
     result = hashlib.sha256()
-    for file in sorted(directory.rglob('*.rs')):
-        result.update(str(file.relative_to(directory)).encode() + b'\0' + file.read_bytes())
+    for file in sorted(directory.rglob('*.rs'), key=lambda p: p.relative_to(directory).as_posix()):
+        result.update(file.relative_to(directory).as_posix().encode() + b'\0' + file.read_bytes())
     return result.hexdigest()
 
 

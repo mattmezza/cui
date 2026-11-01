@@ -6,7 +6,7 @@ import math
 import importlib.util
 import io
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import tarfile
 import tempfile
 import unittest
@@ -68,6 +68,20 @@ class ReferenceAuthority(unittest.TestCase):
         (cache / 'taffy-0.13.0.crate').write_bytes(data)
         pins = {'taffy': ('0.13.0', hashlib.sha256(data).hexdigest())}
         return cache, here, pins
+
+    def test_source_digest_uses_portable_paths_and_order(self):
+        class File:
+            def __init__(self, name, data):
+                self.name, self.data = name, data
+            def relative_to(self, _directory):
+                return PureWindowsPath(self.name)
+            def read_bytes(self):
+                return self.data
+        class Directory:
+            def rglob(self, _pattern):
+                return [File('src/a.rs', b'lower'), File('src/Z.rs', b'upper')]
+        expected = hashlib.sha256(b'src/Z.rs\0upper' + b'src/a.rs\0lower').hexdigest()
+        self.assertEqual(REF.source_digest(Directory()), expected)
 
     def test_offline_prepare_and_exact_source_manifest(self):
         with tempfile.TemporaryDirectory() as temp:

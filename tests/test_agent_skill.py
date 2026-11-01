@@ -39,7 +39,7 @@ class AgentSkillTests(unittest.TestCase):
         result = subprocess.run([sys.executable, str(SCRIPTS / 'cui.py'), 'read', resource],
                                 capture_output=True, env=dict(os.environ, PYTHONIOENCODING='cp1252'))
         self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
-        self.assertEqual(result.stdout.decode('utf-8'), (ROOT / resource).read_text(encoding='utf-8') + '\n')
+        self.assertEqual(result.stdout.decode('utf-8').replace('\r\n', '\n'), (ROOT / resource).read_text(encoding='utf-8') + '\n')
 
     def test_presentation_preserves_json_full_and_read(self):
         for name in ('Select', 'Input'):

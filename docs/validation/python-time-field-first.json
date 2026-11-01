@@ -26,5 +26,21 @@
     "actual CMake registration acceptance",
     "native interactive example"
   ],
-  "limits": "No C compiler/engine rebuild, package claim, IME/physical AT or one-root Tab claim. Partial-group tests synthetic loader protocol; real old-provider separate process."
+  "limits": "No C compiler/engine rebuild, package claim, IME/physical AT or one-root Tab claim. Partial-group tests synthetic loader protocol; real old-provider separate process.",
+  "actual_partial_provider": {
+    "archive_sha256": "55dc10cbef55df647327197455831b42c7ad548491d858a6b66de5636b469566",
+    "library_sha256": "9d552d10c2566621ff1f56bd7081ceda761a5e20ddab4d2c18aeb440103cae96",
+    "source_sha256": {
+      "src/bridge/cui_bridge.c": "26369d6058176cbb8c24845b247617d8727e8cc65ce0911be4645ab479fab1a4",
+      "src/bridge/cui_bridge_time_internal.h": "cc15758398883012867a029af7101416070765658ce23f0ad50b39f763922961"
+    },
+    "compile": "nice -n 19 taskset -c 1 python bindings/python/build_time_field_partial_provider.py --engine-archive build-focused/time-field-bridge/baseline-libcui.a --output build-focused/python-time-field/libpartial.so",
+    "result": "strict C11 O2 Wall/Wextra/Wpedantic/Werror compile PASS; private wrapper1/1 PASS0.61s;15 localized methods no skips including separate actual old/partial modules",
+    "logs": [
+      "build-focused/python-time-field/partial-build.log",
+      "build-focused/python-time-field/partial-runtime.log"
+    ],
+    "symbol_check": "nm -D: original change_size_v1 absent; renamed cui_test_hidden_time_size and real time_field_versions present",
+    "scope": "Only bridge TU compiled, no engine/SDL; production source unchanged."
+  }
 }

@@ -278,8 +278,15 @@ class LocalizedTime(unittest.TestCase):
             self.assertEqual(event.value.hour, 12)
             self.assertEqual(second.get_value().hour, 10)
 
+    @unittest.skipUnless(os.environ.get('CUI_TIME_FIELD_PARTIAL_LIBRARY'), 'actual partial module path required')
+    def test_actual_partial_library_in_separate_process(self):
+        self._unsupported_library(os.environ['CUI_TIME_FIELD_PARTIAL_LIBRARY'])
+
     @unittest.skipUnless(os.environ.get('CUI_TIME_FIELD_OLD_LIBRARY'), 'actual older module path required')
     def test_actual_old_library_in_separate_process(self):
+        self._unsupported_library(os.environ['CUI_TIME_FIELD_OLD_LIBRARY'])
+
+    def _unsupported_library(self, library):
         program = """
 from cui_bridge import *
 with App(library=OLD) as app:
@@ -292,7 +299,7 @@ with App(library=OLD) as app:
     app.mount(column('root').children(field)); app.step()
     assert field.current_time()==(9,45,30)
 """
-        old = str(Path(os.environ['CUI_TIME_FIELD_OLD_LIBRARY']).resolve())
+        old = str(Path(library).resolve())
         subprocess.run([sys.executable, '-c', 'OLD=' + repr(old) + '\n' + program], check=True)
 
 

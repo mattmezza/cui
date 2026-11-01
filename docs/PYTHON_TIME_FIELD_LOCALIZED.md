@@ -132,3 +132,17 @@ module proof uses optional `CUI_TIME_FIELD_OLD_LIBRARY` in a separate process;
 without that path it skips honestly. The local run supplied the preserved old
 module and passed all 14 localized checks without skips; existing regression
 modules retained two unrelated optional skips.
+
+For optional real partial-group coverage, compile only the bridge translation
+unit against a matching already validated engine archive (no engine rebuild):
+
+```sh
+python bindings/python/build_time_field_partial_provider.py \
+  --engine-archive /absolute/immutable/libcui.a --output /absolute/libpartial.so
+```
+
+Set `CUI_TIME_FIELD_PARTIAL_LIBRARY=/absolute/libpartial.so` when running the Python
+test, or configure `CUI_PYTHON_TIME_FIELD_PARTIAL_LIBRARY` for its registered CTest.
+The provider renames just the change-size export; remaining exports are real.
+Without this optional artifact the separate-process test skips. Keep it separate
+from the real older-library proof (`CUI_PYTHON_TIME_FIELD_OLD_LIBRARY`).

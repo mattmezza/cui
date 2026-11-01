@@ -1,0 +1,32 @@
+{
+  "source_revision": "63b77c0bc4e0c95e57d2be2a3c28bfe89e3128f9",
+  "worker_commit": "690189fd",
+  "scope": "Private transactional software V2 with-font painter; no public adapter entry",
+  "build": "Actual current CMake build: 15 warning-enabled compile/link steps PASS, CPU0 nice19 -j1",
+  "checks": {
+    "renderer": "6/6 PASS0.72s through isolated Linux wrapper",
+    "consumer_skill": "18/18 PASS39.307s",
+    "SDK_distribution_skill_freshness": "all PASS"
+  },
+  "coverage": [
+    "Bidi/no-Bidi/no-text variants",
+    "Independent physical axes, density through64, glyph coverage/gradient/span and original ordering",
+    "Pixel atomicity, bounded allocation, aliases, clips, failures and recovery",
+    "Frozen original software/text comparisons and existing nontext/shadow paths"
+  ],
+  "log_sha256": "ebd29fe928ca140fc5a47e1eaba25d0d16dda30d0b2847f31b8b09c4ac36ca69",
+  "source_sha256": {
+    "backends/software/cui_software_v2_internal.h": "b25919e506001272107924183d48e4b22e4892c076c046906d87e81bde12549f",
+    "backends/software/cui_software_v2_paint_internal.h": "06efe07d81839bf1f6a7a4f5c17353d9332fd324895a203cd6b6b7a4b70a1266",
+    "backends/software/cui_software_v2_text_internal.h": "4e451665f47b730e54d24dfff78545d85a74350856070e2f796338f56b21db16",
+    "tests/unit/test_software_v2_text.c": "389709dc5828b4b2708afd6fedbbe3720f174475f23bd2186f6dfeb9b9d8b846"
+  },
+  "limitations": [
+    "Private implementation only; no software support query or public render entry",
+    "SDL_Renderer, SDL_GPU, Sokol and Canvas V2 support remain open",
+    "Public text scale remains capped at16; private owned recording admits64",
+    "Font dependency allocations and opaque graph aliasing retain explicit contracts; no total-process memory bound",
+    "No intrinsic color-font bitmap support",
+    "No release or website deployment; full suite predates this slice and focused integration checks cover these changes"
+  ]
+}

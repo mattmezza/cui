@@ -35,7 +35,7 @@ feature test does not establish complete component parity.
 | --- | --- |
 | Dialog and scrolling | Test-only cancellation candidate passes 26 checks, including frozen Scroll/Resizable compatibility. Five confirmed failures remain in Rating/legacy Slider stale keys and controlled Slider idle drag; review and verify those fixes before production integration. |
 | Typed Slider | Typed C models, gallery, C bridge and Python authoring are integrated. Python current-build checks pass: four typed/example cases, ten legacy cases and consumer-skill checks. Finish JS/TS, Go, Rust and native numeric delivery; all new work remains unreleased. |
-| Backgrounds, shadows and text | Private software painting, transactional shadows and owned 64× text recording are integrated. Private text painting passes initial tests but awaits final checks and integration. Public renderer support remains incomplete; public text scaling stays at 16×. |
+| Backgrounds, shadows and text | Private software painting, transactional shadows and owned text painting are integrated; current-build renderer and skill checks pass. Finish public software support and the other four adapters. Public text scaling stays at 16×; private owned recording supports 64×. |
 | Validation | Combined warning-enabled build passed (945 steps). Full Linux suite: 481 passed, two skipped; typography rerun passed, optional original-theme fixture audit remains skipped. Focused Python integration checks also pass. Hosted exact-revision checks and delivery remain open. |
 
 ## Remaining beta scope

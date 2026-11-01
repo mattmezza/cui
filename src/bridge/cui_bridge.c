@@ -342,6 +342,7 @@ static cui_bridge_status bridge_copy(const char *s, char **out) {
     *out = copy;
     return CUI_BRIDGE_OK;
 }
+static cui_bridge_status bridge_slider_thread_check(cui_bridge_app *app);
 static cui_bridge_status bridge_ready(cui_bridge_app *app) {
     if (!app)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -349,7 +350,7 @@ static cui_bridge_status bridge_ready(cui_bridge_app *app) {
         return CUI_BRIDGE_CLOSED;
     if (app->stepping)
         return CUI_BRIDGE_INVALID_STATE;
-    return CUI_BRIDGE_OK;
+    return bridge_slider_thread_check(app);
 }
 static cui_bridge_node_record *bridge_node(cui_bridge_app *app, cui_bridge_node handle) {
     if (!handle.slot || handle.slot > app->max_nodes)
@@ -681,6 +682,8 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
 }
 
+#include "cui_bridge_slider_internal.h"
+
 uint32_t cui_bridge_abi_version(void) {
     return CUI_BRIDGE_ABI_VERSION;
 }
@@ -803,6 +806,7 @@ failed:
     return NULL;
 }
 static void bridge_free_node_resources(cui_bridge_node_record *node) {
+    bridge_slider_remove(node->owner, node->own_slot);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -1372,6 +1376,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->notification_entries);
     free(app->notifications);
     free(app->nodes);
+    free(app->slider);
     free(app);
 }
 cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
@@ -1380,6 +1385,8 @@ cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node pa
     cui_bridge_status status = bridge_ready(app);
     if (status != CUI_BRIDGE_OK)
         return status;
+    if (kind == CUI_BRIDGE_SLIDER_MODEL)
+        return CUI_BRIDGE_INVALID_STATE; /* Versioned factory supplies atomic config+pair. */
     if (!out_node || kind < CUI_BRIDGE_ROW || kind > CUI_BRIDGE_SETTINGS)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     bool root = parent.slot == 0 && parent.generation == 0;
@@ -1783,6 +1790,8 @@ cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node handl
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
         return status;
+    if (node->kind == CUI_BRIDGE_SLIDER_MODEL)
+        return bridge_slider_text(app, handle.slot, text_utf8);
     if (node->parent && app->nodes[node->parent].kind == CUI_BRIDGE_DOCK &&
         app->nodes[node->parent].dock && app->nodes[node->parent].dock->initialized)
         return CUI_BRIDGE_INVALID_STATE;
@@ -2497,6 +2506,8 @@ cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *app, cui_bridge_node h
          (app->nodes[node->parent].kind == CUI_BRIDGE_ITEM && app->nodes[node->parent].parent &&
           app->nodes[app->nodes[node->parent].parent].kind == CUI_BRIDGE_SETTINGS)))
         return CUI_BRIDGE_INVALID_STATE;
+    if (node->kind == CUI_BRIDGE_SLIDER_MODEL)
+        return bridge_slider_disabled(app, handle.slot, disabled);
     for (uint32_t ancestor = node->parent; ancestor; ancestor = app->nodes[ancestor].parent)
         if (app->nodes[ancestor].kind == CUI_BRIDGE_QUESTIONNAIRE &&
             app->nodes[ancestor].questionnaire &&
@@ -5055,6 +5066,8 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
             node->checked = value;
             bridge_change(app, slot);
         }
+    } else if (node->kind == CUI_BRIDGE_SLIDER_MODEL) {
+        bridge_slider_render(app, slot);
     } else if (node->kind == CUI_BRIDGE_SLIDER) {
         float value = (float)node->value;
         if (cui_slider(app->ui, node->id, &app->theme, cui_string(node->text), &value,
@@ -5157,6 +5170,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         status = CUI_BRIDGE_CORE_ERROR;
         goto done;
     }
+    bridge_slider_begin(app);
     for (uint32_t i = 1; i <= app->max_nodes; i++)
         if (app->nodes[i].live && app->nodes[i].speech)
             (void)cui_speech_pump(&app->nodes[i].speech->state, app->now_seconds);
@@ -5175,6 +5189,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
     if (status == CUI_BRIDGE_OK)
         status = app->frame_error;
 done:
+    bridge_slider_finish(app, status);
     app->stepping = false;
     if (status == CUI_BRIDGE_CLOSED)
         app->closed = true;

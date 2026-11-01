@@ -292,6 +292,8 @@ typedef struct {
 } cui_bridge_slider_receipt_v1;
 typedef struct {
     uint32_t type, flags, key, modifiers;
+    /* modifiers uses the named CUI_BRIDGE_MOD_SHIFT/CTRL/ALT/META bits below;
+     * unknown source bits fail publication rather than guessing a vocabulary. */
     float x, y;
     uint32_t repeat, pointer_type, pointer_button, accessibility_action;
     uint64_t pointer_id, pointer_device, accessibility_target;
@@ -316,7 +318,10 @@ CUI_BRIDGE_API uint32_t cui_bridge_slider_value_v1_size(void);
 CUI_BRIDGE_API uint32_t cui_bridge_slider_receipt_v1_size(void);
 CUI_BRIDGE_API uint32_t cui_bridge_slider_request_v1_size(void);
 CUI_BRIDGE_API uint32_t cui_bridge_slider_presentation_v1_size(void);
-/* UI-owner OS thread remains alive until destroy; serialize calls, never race
+/* Handles/receipts belong to one matching loaded bridge image/module instance;
+ * cross-image mixing is unsupported. Epochs are unique within that instance,
+ * not a process-global security boundary across duplicate libraries/modules.
+ * UI-owner OS thread remains alive until destroy; serialize calls, never race
  * destroy. Enable lazily owns capacity1..4096 (0=>4096); same-size reenable is
  * idempotent. Default/shared WASM unsupported; explicit unshared builds require
  * actual FINAL module verification, not compiler flags alone. Versions bit0

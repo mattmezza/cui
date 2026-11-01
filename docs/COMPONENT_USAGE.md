@@ -746,7 +746,7 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. Optional style plans own source metrics and background brush values; the pure resolver does not render or submit a Styled widget. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. The unreleased C-only Styled facade owns separate ring motion and rejects visible V1 gradient thumbs before reduction; actual V2 adapters, native numeric host delivery and all five typed language builders remain pending.
+**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. Optional style plans own source metrics and background brush values; the pure resolver does not render or submit a Styled widget. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. The unreleased C-only Styled facade owns separate ring motion and rejects visible V1 gradient thumbs before reduction; actual V2 adapters, native numeric host delivery and all five typed language builders remain pending. The unreleased C bridge kind81 owns reducer/presentation state and a copied request FIFO; explicit receipt acceptance updates a full double Single/Range pair after step without legacy CHANGE.
 
 **Interaction:** Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values.
 
@@ -775,6 +775,11 @@ The unreleased C-only typed Base Slider route is in
 It owns explicit-size Single/Range geometry and emits synchronous proposals;
 Styled typed presentation, native numeric host delivery and language builders
 remain pending. Legacy scalar APIs retain their existing behavior.
+
+The unreleased C-only controlled bridge route is in `<cui/cui_bridge.h>`;
+follow [typed bridge Slider usage](BRIDGE_SLIDER_MODEL.md). It owns copied
+requests and accepts explicit full pairs after step. All five typed language
+builders, native numeric delivery and V2 adapters remain pending.
 
 ## Speech
 

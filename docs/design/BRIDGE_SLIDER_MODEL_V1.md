@@ -528,3 +528,71 @@ Successful normal final-module validation is a prerequisite. Four offline tests
 pass, actual pinned unshared artifact passes and actual shared artifact fails.
 The runtime fixture additionally asserts actual Memory.buffer is not shared.
 No renderer negotiation or automatic supported-host discovery is inferred.
+
+### Implementation review resolutions
+
+The private epoch counter is scoped to one loaded bridge image / unshared WASM
+module instance, not a registry across independent duplicate libraries/modules.
+All handles and receipts must stay within the matching instance and app;
+cross-image mixing is unsupported. Same-image app epochs never reuse/wrap.
+This supersedes the proposal's overly broad “process counter” wording; no
+registry, random nonce or security boundary is added.
+
+Any failed actual bridge step, including later-node preflight/facade failure or
+native rendering after successful Core end, revokes all typed receipt windows.
+Queued copies remain readable; presentation/bounds return CORE_ERROR unchanged.
+A retained private failure bit survives diagnostic clear and geometry/layout-only
+recovery until a healthy ordinary admitted model state-frame. Invalid argument
+rejection before submission does not expire existing authority. Already delivered
+application effects are never rolled back.
+
+Outer named thumb bounds are rem-sized interaction/layout geometry, not the
+inner rem-2 painted surface/rings. Disabled source omits thumb paint but keeps
+track/fill paint and their actual positive bounds. Unsupported future producer
+tags/modifiers or incoherent numeric evidence fail publication atomically; a
+failed map latches observable frame error and suppresses remaining publication,
+so an unissued sequence gap cannot become an acceptable interval.
+
+### C implementation evidence (2026-11-01)
+
+The additive C-only kind81 implementation is verified, pending integration; this
+is not completion of native AT, five typed builders, bridge touch/SET injection,
+vertical registered-scroll admission or actual V2 adapters. The original proposal
+above is retained as review history; implemented consumer authority is
+`include/cui/cui_bridge.h` and `docs/BRIDGE_SLIDER_MODEL.md`.
+
+Strict GCC C11/O2/Wall/Wextra/Wpedantic/Werror, linked to the integrator's existing
+engine without rebuilding it, and private-Xvfb CTest:11/11 passed. Public UI proof
+composes nested Row/Column, Single/Range and both axes; verifies original-order
+keys, immutable current/evolving intent, explicit alternative full-pair owner
+acceptance, double retention, readonly/disabled policy, capacity and expiry.
+Test-only same-TU proof covers lazy allocation failure, actual Core normalized
+SET .75→domain75/raw .75,64-bit target identity, failed Core clear/recovery,
+later-node CAPACITY with valid Core snapshot, simulated native render failure
+through actual step/end/render/finish, phase0 observation/receipt preservation,
+ordinary omission, removal/reuse, revision/epoch exhaustion and failed-map gaps.
+The simulated host proves control flow, not physical SDL/hardware failure.
+
+Independent frozen legacy trace from exact `ecb97d5e` bridge TU/private/public
+headers linked to the SAME engine matched candidate and preserved pre-typed
+binary byte-for-byte in three distinct executable processes. SHA256:
+`e2ce75ffe88a98e784acead4e5269175e1565a70e7081b6924b9850f89790415`.
+The preserved binary's source revision is unknown; no revision is inferred.
+No LD_LIBRARY_PATH/LD_PRELOAD; each executable has its intended absolute rpath.
+The portable regression retains that independently captured trace and normalizes
+only CRT `%a` spelling, comparing exact represented doubles without tolerance.
+
+Actual LP64 object sizes: private app1280→1288 (+8), old node73136 unchanged,
+lazy header56 (failure bit fits padding), per-new-owner472. Enable block is
+`align_up(56+(max_nodes+1)*sizeof(pointer),alignof(request))+capacity*296`;
+default256nodes/4096requests uses1,214,528bytes, allocated only on enable.
+Existing constructor allocation count is unchanged; its private allocation grows8.
+Node keys/names retain existing separate allocation policy.
+
+Pinned Zig0.16 wasm32-wasi strict actual bridge TU policy assertions passed:
+default0, explicit unshared1, atomics/pthread0. Fixed record ABI assertions also
+compiled/linked and ran in actual Node WASI (24/32/72/56/72/296/32/16byte records).
+The earlier real memory/TLS probes remain the supported-mode evidence; these
+object checks are not a final application renderer/AT/runtime proof.
+Canonical SDK/agent generation, usage6, skill18 and format/amalgamation/SDK/skill
+freshness all passed. No new dependencies or build/output tree were created.

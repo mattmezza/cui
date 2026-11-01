@@ -13,6 +13,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Switch | `cui_switch_ex` | checked, change, disabled | Boolean only |
 | Toggle | `cui_toggle` | checked, change, disabled | Boolean only |
 | Slider | `cui_slider` | value, range, step, change, disabled | Float native precision |
+| SliderModel (kind81, C only) | `cui_styled_slider_model_events_v1` | owned double Single/Range, separate copied request FIFO, explicit receipt acceptance | [Exact contract](BRIDGE_SLIDER_MODEL.md); no five typed builders, native numeric AT, V2 adapter or typed shadows |
 | Progress | `cui_progress` | value in [0,1] | Width fixed at 160 |
 | Badge | `cui_badge` | copied UTF-8 text | Legacy text badge |
 | Input | `cui_input_ex` | per-node edit model, text, change, disabled | 4096 UTF-8 bytes |

@@ -169,8 +169,202 @@ typedef enum {
     CUI_BRIDGE_SPEECH,
     CUI_BRIDGE_QUESTIONNAIRE,
     CUI_BRIDGE_DOCK,
-    CUI_BRIDGE_SETTINGS
+    CUI_BRIDGE_SETTINGS,
+    CUI_BRIDGE_SLIDER_MODEL = 81 /* Additive controlled route; use versioned factory. */
 } cui_bridge_kind;
+/* Unreleased controlled Slider V1. Independent request FIFO; old Slider scalar
+ * setters/events/CHANGE/autocommit are unchanged. All records own their values,
+ * contain no pointers and require exact size/schema1/reserved0. New language
+ * builders/native numeric delivery/V2 gradient adapters are not implemented. */
+#define CUI_BRIDGE_SLIDER_MODEL_V1 1u
+enum { CUI_BRIDGE_SLIDER_SINGLE, CUI_BRIDGE_SLIDER_RANGE };
+enum { CUI_BRIDGE_SLIDER_LINEAR, CUI_BRIDGE_SLIDER_LOGARITHMIC };
+enum { CUI_BRIDGE_SLIDER_HORIZONTAL, CUI_BRIDGE_SLIDER_VERTICAL };
+enum { CUI_BRIDGE_SLIDER_FIXED, CUI_BRIDGE_SLIDER_PARENT };
+enum {
+    CUI_BRIDGE_SLIDER_REQUESTS = 1u,
+    CUI_BRIDGE_SLIDER_READONLY = 2u,
+    CUI_BRIDGE_SLIDER_REVERSE_FILL = 4u,
+    CUI_BRIDGE_SLIDER_REDUCED_MOTION = 8u,
+    CUI_BRIDGE_SLIDER_HIDE_FOCUS = 16u
+};
+enum {
+    CUI_BRIDGE_SLIDER_BEGIN,
+    CUI_BRIDGE_SLIDER_UPDATE,
+    CUI_BRIDGE_SLIDER_COMMIT,
+    CUI_BRIDGE_SLIDER_CANCEL
+};
+enum {
+    CUI_BRIDGE_SLIDER_ROOT,
+    CUI_BRIDGE_SLIDER_TRACK,
+    CUI_BRIDGE_SLIDER_FILL,
+    CUI_BRIDGE_SLIDER_START_THUMB,
+    CUI_BRIDGE_SLIDER_END_THUMB
+};
+enum {
+    CUI_BRIDGE_SLIDER_REASON_INPUT,
+    CUI_BRIDGE_SLIDER_REASON_DISABLED,
+    CUI_BRIDGE_SLIDER_REASON_READONLY,
+    CUI_BRIDGE_SLIDER_REASON_ZERO_SPAN,
+    CUI_BRIDGE_SLIDER_REASON_SOURCE_REPLACED,
+    CUI_BRIDGE_SLIDER_REASON_DOMAIN_CHANGED,
+    CUI_BRIDGE_SLIDER_REASON_MODE_CHANGED,
+    CUI_BRIDGE_SLIDER_REASON_AXIS_CHANGED,
+    CUI_BRIDGE_SLIDER_REASON_OMITTED,
+    CUI_BRIDGE_SLIDER_REASON_CAPTURE_LOST
+};
+enum {
+    CUI_BRIDGE_SLIDER_EVENT_REQUEST = 1,
+    CUI_BRIDGE_SLIDER_EVENT_COMMIT = 3,
+    CUI_BRIDGE_SLIDER_EVENT_LIFECYCLE = 5
+};
+enum {
+    CUI_BRIDGE_SLIDER_SOURCE_UNKNOWN,
+    CUI_BRIDGE_SLIDER_SOURCE_PROGRAMMATIC,
+    CUI_BRIDGE_SLIDER_SOURCE_POINTER,
+    CUI_BRIDGE_SLIDER_SOURCE_KEYBOARD,
+    CUI_BRIDGE_SLIDER_SOURCE_ACCESSIBILITY
+};
+enum {
+    CUI_BRIDGE_SLIDER_HAS_FRAME = 1u,
+    CUI_BRIDGE_SLIDER_HAS_INDEX = 2u,
+    CUI_BRIDGE_SLIDER_HAS_SOURCE = 4u
+};
+enum { CUI_BRIDGE_SLIDER_HAS_INPUT = 1u, CUI_BRIDGE_SLIDER_HAS_NUMERIC_VALUE = 2u };
+enum {
+    CUI_BRIDGE_SLIDER_INPUT_MOVE = 0,
+    CUI_BRIDGE_SLIDER_INPUT_DOWN = 1,
+    CUI_BRIDGE_SLIDER_INPUT_UP = 2,
+    CUI_BRIDGE_SLIDER_INPUT_KEY = 3,
+    CUI_BRIDGE_SLIDER_INPUT_CANCEL = 7,
+    CUI_BRIDGE_SLIDER_INPUT_ACCESSIBILITY = 13
+};
+enum {
+    CUI_BRIDGE_SLIDER_KEY_NONE = 0,
+    CUI_BRIDGE_SLIDER_KEY_ESCAPE = 4,
+    CUI_BRIDGE_SLIDER_KEY_LEFT = 5,
+    CUI_BRIDGE_SLIDER_KEY_RIGHT = 6,
+    CUI_BRIDGE_SLIDER_KEY_UP = 7,
+    CUI_BRIDGE_SLIDER_KEY_DOWN = 8,
+    CUI_BRIDGE_SLIDER_KEY_HOME = 9,
+    CUI_BRIDGE_SLIDER_KEY_END = 10,
+    CUI_BRIDGE_SLIDER_KEY_PAGEUP = 19,
+    CUI_BRIDGE_SLIDER_KEY_PAGEDOWN = 20
+};
+enum { CUI_BRIDGE_SLIDER_MOUSE, CUI_BRIDGE_SLIDER_TOUCH, CUI_BRIDGE_SLIDER_PEN };
+enum { CUI_BRIDGE_SLIDER_PRIMARY, CUI_BRIDGE_SLIDER_SECONDARY, CUI_BRIDGE_SLIDER_MIDDLE };
+enum {
+    CUI_BRIDGE_SLIDER_INCREMENT = 2,
+    CUI_BRIDGE_SLIDER_DECREMENT = 3,
+    CUI_BRIDGE_SLIDER_SET_VALUE = 4
+};
+enum {
+    CUI_BRIDGE_SLIDER_RENDER_OK,
+    CUI_BRIDGE_SLIDER_RENDER_INVALID_ARGUMENT,
+    CUI_BRIDGE_SLIDER_RENDER_INVALID_STATE,
+    CUI_BRIDGE_SLIDER_RENDER_UNSUPPORTED,
+    CUI_BRIDGE_SLIDER_RENDER_BASE_REJECTED,
+    CUI_BRIDGE_SLIDER_RENDER_CORE_FAILURE
+};
+typedef struct {
+    uint32_t kind, reserved;
+    double start, end;
+} cui_bridge_slider_value_v1;
+typedef struct {
+    double minimum, maximum, step;
+    uint32_t scale, reserved;
+} cui_bridge_slider_domain_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, flags, orientation;
+    uint64_t source_generation;
+    cui_bridge_slider_domain_v1 domain;
+    float rem, length;
+    uint32_t layout, reserved;
+} cui_bridge_slider_config_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, capacity, reserved;
+} cui_bridge_slider_queue_options_v1;
+typedef struct {
+    uint32_t struct_size, schema_version;
+    uint64_t app_epoch;
+    cui_bridge_node node;
+    uint64_t source_generation, configuration_revision, submission_frame, request_sequence;
+} cui_bridge_slider_receipt_v1;
+typedef struct {
+    uint32_t type, flags, key, modifiers;
+    /* modifiers uses the named CUI_BRIDGE_MOD_SHIFT/CTRL/ALT/META bits below;
+     * unknown source bits fail publication rather than guessing a vocabulary. */
+    float x, y;
+    uint32_t repeat, pointer_type, pointer_button, accessibility_action;
+    uint64_t pointer_id, pointer_device, accessibility_target;
+    double accessibility_value;
+} cui_bridge_slider_input_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, phase, reason;
+    uint32_t thumb, event_kind, event_source, event_flags;
+    cui_bridge_slider_receipt_v1 receipt;
+    uint64_t event_target, event_frame, event_index;
+    cui_bridge_slider_value_v1 current, requested;
+    cui_bridge_slider_domain_v1 domain, gesture_domain;
+    cui_bridge_slider_input_v1 input;
+} cui_bridge_slider_request_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, render_status, reserved;
+    double core_time, next_wake_seconds;
+} cui_bridge_slider_presentation_v1;
+CUI_BRIDGE_API uint32_t cui_bridge_slider_model_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_slider_config_v1_size(void);
+CUI_BRIDGE_API uint32_t cui_bridge_slider_value_v1_size(void);
+CUI_BRIDGE_API uint32_t cui_bridge_slider_receipt_v1_size(void);
+CUI_BRIDGE_API uint32_t cui_bridge_slider_request_v1_size(void);
+CUI_BRIDGE_API uint32_t cui_bridge_slider_presentation_v1_size(void);
+/* Handles/receipts belong to one matching loaded bridge image/module instance;
+ * cross-image mixing is unsupported. Epochs are unique within that instance,
+ * not a process-global security boundary across duplicate libraries/modules.
+ * UI-owner OS thread remains alive until destroy; serialize calls, never race
+ * destroy. Enable lazily owns capacity1..4096 (0=>4096); same-size reenable is
+ * idempotent. Default/shared WASM unsupported; explicit unshared builds require
+ * actual FINAL module verification, not compiler flags alone. Versions bit0
+ * advertises V1. Unsupported new operations return BACKEND_UNAVAILABLE. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_queue_enable_v1(
+    cui_bridge_app *, uint32_t, const cui_bridge_slider_queue_options_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_create_v1(
+    cui_bridge_app *, cui_bridge_node parent, const char *key_utf8, uint32_t config_size,
+    const cui_bridge_slider_config_v1 *, uint32_t value_size, const cui_bridge_slider_value_v1 *,
+    cui_bridge_node *out);
+/* Configure validates complete config+pair atomically; direct replacements
+ * revise receipt authority, retaining the reducer for captured CANCEL. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_configure_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_slider_config_v1 *, uint32_t,
+    const cui_bridge_slider_value_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_get_config_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, cui_bridge_slider_config_v1 *out);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_set_value_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, const cui_bridge_slider_value_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_get_value_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, cui_bridge_slider_value_v1 *out);
+/* Poll owns one immutable copy, never invokes a callback or drains legacy FIFO.
+ * Invalid size preserves queue/output; valid poll may prune removed origins.
+ * Copied readability survives frames/dispose; acceptance authority does not. */
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_poll_slider_request_v1(cui_bridge_app *, uint32_t, cui_bridge_slider_request_v1 *out);
+/* UI thread outside step; after-frame is allowed. Checks live full receipt,
+ * latest admitted painted state-frame, configuration/source and increasing
+ * issued sequence. Explicit whole pair may differ from proposal. No autoaccept,
+ * retroactive paint, CHANGE notification or rollback of already delivered work.
+ * Invalid/stale/unsupported leaves output/queue/owner unchanged. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_accept_slider_request_v1(
+    cui_bridge_app *, uint32_t, const cui_bridge_slider_receipt_v1 *, uint32_t,
+    const cui_bridge_slider_value_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_get_presentation_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t, cui_bridge_slider_presentation_v1 *out);
+/* Last completed actual geometry, never ID-derived presence. Absent=>EMPTY and
+ * output unchanged. Presentation deadlines use absolute accumulated Core time. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_slider_model_part_bounds_v1(cui_bridge_app *,
+                                                                        cui_bridge_node,
+                                                                        uint32_t part,
+                                                                        cui_bridge_rect *out);
+
 CUI_BRIDGE_API cui_bridge_status cui_bridge_settings_set_query(cui_bridge_app *,
                                                                cui_bridge_node settings,
                                                                const char *query_utf8);

@@ -397,3 +397,12 @@ transitions to deliver captured CANCEL; do not accept a cancelled old-domain pai
 blindly. Convert passive Core-clock deadlines to the host monotonic clock.
 The demonstration does not confer native numeric/all-five builder/V2 adapter
 support or vertical registered-scroll admission.
+
+For unreleased C bridge controlled Slider kind81, read
+`docs/BRIDGE_SLIDER_MODEL.md` and matching `include/cui/cui_bridge.h`. Resolve the
+complete optional symbol group before use; enable the separate owned FIFO, poll
+after step and explicitly accept full double Single/Range pairs using receipts.
+Polling never autoaccepts or emits legacy CHANGE. Expired records remain readable,
+not acceptable. Native owner TLS and explicit final-module-verified unshared WASM
+are the supported modes; default/shared WASM remains versions0. All five typed
+language builders, native numeric delivery and V2 gradient adapters remain pending.

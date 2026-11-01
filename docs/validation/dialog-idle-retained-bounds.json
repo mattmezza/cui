@@ -76,5 +76,16 @@
     "headless": "6/6 PASS zero skips in41.57s; intrinsic,idle,SDLreader,SDKfreshness,skillfreshness,skillcontract",
     "log": "dialog-idle-combined-tests.log",
     "browser": "Pending strict rebuilt WASM rerun"
+  },
+  "browser_acceptance": {
+    "result": "PASS",
+    "artifact_source": "1f40cc5a",
+    "toolchain": "Zig0.16.0 strict C11 -O2 -Wall -Wextra -Wpedantic -Werror",
+    "wasm_sha256": "9d3fa5f464d2589ac12168ac16f3b70a757e9e1e013ed50426d61d647ea9ea1e",
+    "build_log": "dialog-idle-web-build.log",
+    "full_gate_log": "dialog-idle-browser.log",
+    "focused_time_log": "time-field-idle-revision-browser.log",
+    "coverage": "Real headless Chromium; all78 catalog stories,80compiledusageexcerpts,first-frame shortDialog/AlertDialog,longBodywheel+fixedFooter,idlequiescence,TimeFieldkeyboard/H12/Arabic/readonly/bounds,otherexistingfull-suite interactions and/cui/hosting",
+    "pending": "Touch audit currently running; broader native,platform,release/deployment gates remain open."
   }
 }

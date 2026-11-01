@@ -85,9 +85,15 @@ N=existing cui_bridge_node. Except the U32 queries, functions return existing
 cui_bridge_status. Pointer arguments are synchronous borrowed call arguments, not
 wire members; all mutable source/config bytes are copied before returning.
 
-- `icon_versions(void)->U32` bit0; `icon_record_size_v1(U32 record_kind)->U32`
+- `icon_versions(void)->U32` bit0 means the complete owned-resource/utilities
+  group only. Separate future `badge_versions(void)->U32` bit0 means the complete
+  configured-Badge group; its foreign facade requires both. No stubs advertise
+  later Badge functions. `icon_record_size_v1(U32 record_kind)->U32`
   kinds STYLE0/CONSTRAINTS1/OPTIONS2/LIMITS3/INFO4/BITMAP5/BADGE_CONFIG6/BADGE_RESULT7,
-  unknown=>0. Complete optional group required before any facade mount.
+  unknown=>0. Resource-only implementation exposes only LIMITS3/INFO4/BITMAP5;
+  STYLE0/CONSTRAINTS1/OPTIONS2/BADGE_CONFIG6/BADGE_RESULT7 return0 until their real
+  parser/render consumers are implemented. Their declarations likewise wait,
+  rather than publishing inert records. Each advertised optional group is complete.
 - `icon_create_v1(A,const limits*,H*)`; `icon_destroy_v1(A,H)`;
   `icon_get_info_v1(A,H,info*)`; `icon_set_limits_v1(A,H,const limits*)`;
   `icon_get_limits_v1(A,H,limits*)`; `icon_default_limits_v1(limits*)`.

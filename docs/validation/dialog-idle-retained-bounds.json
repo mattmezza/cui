@@ -1,0 +1,73 @@
+{
+  "status": "FOCUSED_IDLE_FIX_PASS_ROOT_BROWSER_PENDING",
+  "previous_worker_commit": "ff69804d",
+  "browser_failure": "Root artifactdba5043e passed shortFIT/max0, longbodyrange>0, wheeloffset>0 andFooterposition, then timed out30s waiting gallery_redraw==0. Root targetedprobe reproduced with pointeroutside and focusProductupdates.",
+  "cause": "compose cleared all layout.completed rectangles each ordinaryframe before registering them as retained cui_track_bounds destinations. Core correctly compares oldretained vsnewbounds and invalidates; this made nonzero presentparts appear changed forever.",
+  "fix": "Keep present tracking destinations intact acrossordinaryframes; clear only absent slotrectangles. Existing openhelper resets all for newlifetime. No Core/default/input/fade/dispatcher changes. Failed opt-in frame geometry remains explicitly invalid as before.",
+  "proof": {
+    "original": "Exactff69804d module compiled as independentoldcontrol, same realcontrols/clock/fade12frames, fails strict !needs_redraw: dirty1 focus310 max392. Originalsource SHA256 f5e594c169f56202d554f00807ec90a15da49909a3d17a384dd1b8d5095642cd",
+    "fixed": "StrictC11O2 Wall/Wextra/Wpedantic/Werror rebuild. Privatewrapper7/7PASS .19s, session93498terminal0: steadyidle dirty0focus310max392, wheelfollowedbyidle, outsidepointeridle, actualresize dirty\u2192settle, omittedslotzero\u2192settle, newopenrectreset; previousgeometry/actions/contracts/guide regressions pass.",
+    "diagnostic": "Disposable actualCore testcopy logged trackedold/newbounds anddirtywrites only, no productionCoreedit. Afterfix no repeating TRACK mismatch; earlyremaining dirties were boundedfadeinvalidate calls.",
+    "early_oracle_correction": "Initial3frame idle assertion was earlier than .032+.064fade budget; child310 is semanticdescendant but not a Body focus scope, so it does not force heldbarpolicy. Retained initialfailurelogs. Final original-vs-fixed oracle waits12frames (>budget), identicalfixture/clock/strictassertion.",
+    "freshness": "SDK\u2192amalgamation\u2192skill generation, full formatcheck and allthreefreshnesschecks PASS,86895terminal0. SDK446files/binding."
+  },
+  "source_hashes": {
+    "src/base/cui_dialog_composition.c": "0d0d9c752f58397e10abc63e4757f7b72359df1fc488d915637350b3d91e925b",
+    "tests/unit/test_dialog_composition_intrinsic.c": "dd2b0d4c076c8b1799c7d03edb09d1d0ebc20986559c9728e4e51ec7fbf66d10",
+    "tests/run_dialog_composition_probe.py": "127656eb4dd18e36ee830f082279d6071e4b21f9e31fee21de2bd2a0f2c6d2ac",
+    "CMakeLists.txt": "a79e425b84f88b3b902f70b50b0d2d319a1e65a33aa2d74add1f98b2fb8bdc97",
+    "docs/DIALOG_COMPOSITION.md": "76262eb985796b164d28e1ef494f29ec8662d5d05b3b676f1f76b8b29a0807d9"
+  },
+  "logs": {
+    "dialog-idle-original-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-original-build.log",
+      "sha256": "09488977d6d989a1633742a751205a9f6fb17d4f370e068475b8e4ac8c160cfc"
+    },
+    "dialog-idle-original-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-original-runtime.log",
+      "sha256": "e1ad30836c5ac1d83e1374471ac0b452c5b1e7943a5fd08d233759d9dba8a84c"
+    },
+    "dialog-idle-fixed-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-fixed-build.log",
+      "sha256": "09488977d6d989a1633742a751205a9f6fb17d4f370e068475b8e4ac8c160cfc"
+    },
+    "dialog-idle-fixed-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-fixed-runtime.log",
+      "sha256": "1cfb361baf23511a0f11319cef20f6a9b6ef4c162fbdfabfd1d8708486055bde"
+    },
+    "dialog-idle-diagnostic-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-diagnostic-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "dialog-idle-diagnostic-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-diagnostic-runtime.log",
+      "sha256": "c8bb04dc620d805d2997ce5227b3fbc5e4593afe0ef9d0dbd81054477229dd19"
+    },
+    "dialog-idle-final-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-final-build.log",
+      "sha256": "09488977d6d989a1633742a751205a9f6fb17d4f370e068475b8e4ac8c160cfc"
+    },
+    "dialog-idle-original-12-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-original-12-runtime.log",
+      "sha256": "72a6a99d2f7c1de838f63b3de2bc330441ea997ebc3358850d258841f010a020"
+    },
+    "dialog-idle-final-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-final-runtime.log",
+      "sha256": "9f78e291ff6ce40c7dee30c612149cb300a86935640b304f798fb716c42bc59d"
+    },
+    "dialog-idle-gates.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-idle-gates.log",
+      "sha256": "30767d1bd4ee0ea3de96d415c8dff64eb7aa465de565c9c66d4df14d9026e46b"
+    }
+  },
+  "diagnostic_source": {
+    "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-current/diagnostic-core.c",
+    "sha256": "a44987254abe4a2c6d315118125fb5030702d07093eee70b16e1328682134450"
+  },
+  "remaining": [
+    "Root actualintegrated configuredidle/privateSDL/build and combinedskill18; no workerrepeat18 perexplicitcoordination.",
+    "Root fullWASM/browser rerun; no workerbrowserclaim.",
+    "Originalheldinput/Root/host/foreignfacade/platform limitations unchanged."
+  ],
+  "lease": "No compiler/heavy remains; released after86895terminal."
+}

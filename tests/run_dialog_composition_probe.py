@@ -50,6 +50,7 @@ def main():
         run([*flags, f'tests/unit/test_dialog_composition_{case}.c', *objects, *link, '-o', binary])
         fonts = [ROOT / 'third_party/inter/Inter-Regular.otf', ROOT / 'third_party/inter/Inter-Bold.otf'] if case in ['geometry', 'intrinsic'] else []
         tests.append((f'dialog_composition_{case}', binary, fonts))
+    tests.append(('dialog_composition_idle', prefix / 'intrinsic', [ROOT / 'third_party/inter/Inter-Regular.otf', ROOT / 'third_party/inter/Inter-Bold.otf', '--idle']))
     guide = (ROOT / 'docs/DIALOG_COMPOSITION.md').read_text()
     example = guide.split('```c\n', 1)[1].split('\n```', 1)[0]
     example_file = prefix / 'guide.c'

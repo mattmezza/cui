@@ -651,7 +651,8 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
                                          (cui_rect){0, 0, 1, 1}, (cui_size){1, 1},
                                          (cui_scroll_options){.hide_scrollbars = true});
     }
-    memset(l->completed, 0, sizeof l->completed);
+    /* These are retained tracking destinations. Clearing present rectangles
+     * before end_frame makes unchanged bounds look changed and never quiesces. */
     cui_dialog_frame f = {.ui = ui,
                           .layout = l,
                           .options = o,
@@ -719,8 +720,10 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
             !(c->omit & (1u << kind)) &&
             ((c->present & (1u << kind)) || (kind == CUI_DIALOG_TITLE && c->name.length) ||
              (kind == CUI_DIALOG_DESCRIPTION && c->description.length));
-        if (!present)
+        if (!present) {
+            l->completed[1 + kind] = (cui_rect){0};
             continue;
+        }
         cui_dialog_gap(&f, &count, kind);
         cui_begin_box(ui, cui_dialog_part(&f, parts[kind]),
                       cui_dialog_slot_box(&f, kind, r->panel.padding));
@@ -733,6 +736,8 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
             content = true;
     }
     bool body = s->overlay.open && (c->present & (1u << CUI_DIALOG_BODY));
+    if (!body)
+        l->completed[5] = l->completed[6] = (cui_rect){0};
     if (body)
         cui_dialog_gap(&f, &count, CUI_DIALOG_BODY);
     cui_begin_box(ui, cui_dialog_part(&f, 15), (cui_box){.width = width, .height = -1});
@@ -779,6 +784,8 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
     cui_end_box(ui);
     cui_end_box(ui);
     bool footer = s->overlay.open && (c->present & (1u << CUI_DIALOG_FOOTER));
+    if (!footer)
+        l->completed[7] = (cui_rect){0};
     if (footer) {
         cui_begin_box(ui, cui_dialog_part(&f, 12),
                       cui_dialog_slot_box(&f, CUI_DIALOG_FOOTER, r->panel.padding));

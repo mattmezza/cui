@@ -164,6 +164,13 @@ owner remains open: Panel, Header, Title, Description, Content, BodyViewport,
 BodyContent, Footer, Outer, Column. These are borrowed tracking destinations,
 not an input cache to be copied back into current paint geometry.
 
+Present-part rectangles remain retained across ordinary submissions so unchanged
+tracked bounds do not request another frame. Omitted parts clear their rectangles;
+a new open lifetime resets all retained rectangles. A successful stable Dialog
+can quiesce after input and bounded animations settle. Auto-hide fading may request
+frames while active; focused scrollbar visibility does not itself require an
+endless redraw loop. Failed opt-in frames still provide no valid current geometry.
+
 ## Complete source example
 
 This small native headless program composes its first open frame, renders to a

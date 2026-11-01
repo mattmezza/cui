@@ -107,11 +107,68 @@ static void check_fit(dialog_fixture *f) {
     for (unsigned i = 0; i < CUI_DIALOG_SLOT_COUNT; ++i)
         assert(f->calls[i] == ((f->composition.present >> i) & 1u));
 }
+static void idle_sequence(cui_font *font) {
+    dialog_fixture f;
+    short_model model;
+    prepare(&f, &model, font, true);
+    model.long_body = true;
+    f.theme.scrollbar = (cui_scrollbar_style){
+        .visibility = CUI_SCROLLBAR_AUTO_HIDE, .idle_seconds = .032f, .fade_seconds = .064f};
+    dialog_fixture_frame(&f);
+    assert(cui_focused(f.ui) == 310); /* actual focused child; this is not a Body focus scope */
+    for (unsigned i = 0; i < 12; ++i)
+        dialog_fixture_frame(&f);
+    fprintf(stderr, "idle witness: dirty=%d focus=%llu scroll=%g maximum=%g\n",
+            cui_needs_redraw(f.ui), (unsigned long long)cui_focused(f.ui), f.surface.body_scroll,
+            range(&f));
+    assert(!cui_needs_redraw(f.ui));
+    cui_rect b = f.layout.completed[5];
+    assert(cui_queue_event(
+        f.ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = b.x + 20, .y = b.y + 20}));
+    assert(cui_queue_event(
+        f.ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = b.x + 20, .y = b.y + 20, .dy = -2}));
+    dialog_fixture_frame(&f);
+    float scroll = f.surface.body_scroll;
+    assert(scroll > 0);
+    for (unsigned i = 0; i < 12; ++i)
+        dialog_fixture_frame(&f);
+    assert(!cui_needs_redraw(f.ui) && f.surface.body_scroll == scroll);
+    assert(cui_queue_event(f.ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = 1, .y = 1}));
+    for (unsigned i = 0; i < 12; ++i)
+        dialog_fixture_frame(&f);
+    assert(!cui_needs_redraw(f.ui) && f.surface.body_scroll == scroll);
+    /* Current geometry still changes and requests its ordinary settling frame. */
+    f.sizing.width = 280;
+    dialog_fixture_frame(&f);
+    assert(cui_needs_redraw(f.ui));
+    for (unsigned i = 0; i < 12; ++i)
+        dialog_fixture_frame(&f);
+    assert(!cui_needs_redraw(f.ui));
+    f.composition.present &= ~((1u << CUI_DIALOG_BODY) | (1u << CUI_DIALOG_CONTENT) |
+                               (1u << CUI_DIALOG_HEADER) | (1u << CUI_DIALOG_FOOTER));
+    f.composition.omit |= (1u << CUI_DIALOG_TITLE) | (1u << CUI_DIALOG_DESCRIPTION);
+    dialog_fixture_frame(&f);
+    for (unsigned i = 1; i <= 7; ++i)
+        assert(f.layout.completed[i].w == 0 && f.layout.completed[i].h == 0);
+    for (unsigned i = 0; i < 12; ++i)
+        dialog_fixture_frame(&f);
+    assert(!cui_needs_redraw(f.ui));
+    cui_overlay_close(f.ui, &f.surface.overlay);
+    assert(cui_dialog_open_v1(f.ui, &f.layout, 0));
+    for (unsigned i = 0; i < 10; ++i)
+        assert(f.layout.completed[i].w == 0 && f.layout.completed[i].h == 0);
+    dialog_fixture_destroy(&f);
+}
 int main(int argc, char **argv) {
-    assert(argc == 3);
+    assert(argc == 3 || (argc == 4 && strcmp(argv[3], "--idle") == 0));
     cui_font *font = cui_font_open(argv[1]);
     assert(font && cui_font_register_style(
                        font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_SEMIBOLD}, argv[2]));
+    if (argc == 4) {
+        idle_sequence(font);
+        cui_font_close(font);
+        return 0;
+    }
     dialog_fixture f;
     short_model model;
     prepare(&f, &model, font, false);

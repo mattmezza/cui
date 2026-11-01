@@ -1792,6 +1792,8 @@ if(TARGET cui_text)
    "${CUI_DIALOG_TEST_FONT}" "${CUI_DIALOG_TEST_BOLD}")
   add_test(NAME dialog_composition_intrinsic COMMAND test_dialog_composition_intrinsic
    "${CUI_DIALOG_TEST_FONT}" "${CUI_DIALOG_TEST_BOLD}")
+  add_test(NAME dialog_composition_idle COMMAND test_dialog_composition_intrinsic
+   "${CUI_DIALOG_TEST_FONT}" "${CUI_DIALOG_TEST_BOLD}" --idle)
  endif()
 endif()
 add_executable(test_surface_base tests/unit/test_surface.c src/core/cui.c src/base/cui_models.c src/base/cui_overlay.c src/base/cui_surface.c)

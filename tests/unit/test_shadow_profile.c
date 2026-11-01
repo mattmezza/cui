@@ -45,8 +45,8 @@ static void compare(cui_drop_shadow_paint p, float scale, float ox, float oy) {
         rect_equal(c.bounds, d.bounds);
         assert(c.width == d.width && c.height == d.height && c.bytes == d.bytes);
     }
-    cui_shadow_drop_profile_internal drop;
-    cui_shadow_inset_profile_internal inset;
+    cui_shadow_drop_profile_internal drop = {0};
+    cui_shadow_inset_profile_internal inset = {0};
     bool dp = cui_shadow_drop_prepare_internal(p, scale, ox, oy, &drop);
     bool ip = cui_shadow_inset_prepare_internal(p, scale, ox, oy, &inset);
     assert(dp == ip);

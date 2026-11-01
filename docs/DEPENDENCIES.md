@@ -10,3 +10,10 @@ require no Markdown runtime or Python environment. Raw Markdown HTML is escaped.
 Run `uv run tests/test_docs.py` to check rendering, links, assets and document coverage.
 
 Optional bidi analysis uses vendored SheenBidi 3.0.0, commit `cfe430e7375a7845b679adae9d51dac6deaa8858`, Apache-2.0, Unicode 17. All vendored files and normative conformance fixtures have checked SHA256 pins. `CUI_BUILD_BIDI=OFF` omits the compiled `cui_bidi` library. Core never links it implicitly. The optional static library includes its backend objects, so `pkg-config --libs cui-bidi` needs no additional runtime installation. CUI wrapper/tests use the normal warning policy; four specific unused/fallthrough warnings are suppressed only for unmodified upstream. See [BIDI.md](BIDI.md) for current analysis and integration limits.
+
+### MSVC bridge builds
+
+The C bridge owner guard uses C11 atomics and thread-local storage. Use a recent
+MSVC toolset with C11 atomics support; CMake enables `/experimental:c11atomics`
+for C compilation. Manual bridge builds must enable that flag alongside C11 mode.
+Portable CI compilation is separate from native Windows runtime acceptance.

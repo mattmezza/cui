@@ -151,7 +151,7 @@ jobs:
         with:
           node-version: '25.8.0'
       - run: cmake -S bindings/node -B build-node -DCUI_BUILD_NATIVE=OFF
-      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components test_bridge_avatar_style test_bridge_shadows test_bridge_part_shadows test_bridge_window_visibility test_bridge_stepper_visual cui_notification_v1_fixture cui_value_notification_fixture
+      - run: cmake --build build-node --target cui_node_bindings test_bridge_core test_bridge_components test_bridge_avatar_style test_bridge_shadows test_bridge_part_shadows test_bridge_window_visibility test_bridge_stepper_visual cui_notification_v1_fixture cui_value_notification_fixture test_bridge_slider_model test_bridge_slider_model_abi test_bridge_slider_model_internal test_bridge_slider_model_unsupported test_bridge_slider_legacy_trace bridge_slider_model_example test_bridge_time_field test_bridge_time_field_unsupported test_bridge_time_field_abi test_bridge_time_field_legacy bridge_time_field_example bridge_time_field_example_static
       - run: python scripts/test_local.py --build-dir build-node -R '^(bridge_|node_)'
       - run: node bindings/node/examples/save.cjs --headless
       - run: node bindings/node/examples/workspace.cjs --headless
@@ -235,7 +235,7 @@ jobs:
           cache: false
       - run: rustup toolchain install 1.85.1 --profile minimal
       - run: cmake -S . -B build -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
-      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components test_bridge_avatar_style test_bridge_shadows test_bridge_part_shadows test_bridge_portable_run test_bridge_window_visibility test_bridge_stepper_visual test_bridge_notifications test_bridge_value_notifications test_bridge_text_notifications test_bridge_selection_notifications
+      - run: cmake --build build --target cui_bridge test_bridge_core test_bridge_components test_bridge_avatar_style test_bridge_shadows test_bridge_part_shadows test_bridge_portable_run test_bridge_window_visibility test_bridge_stepper_visual test_bridge_notifications test_bridge_value_notifications test_bridge_text_notifications test_bridge_selection_notifications test_bridge_slider_model test_bridge_slider_model_abi test_bridge_slider_model_internal test_bridge_slider_model_unsupported test_bridge_slider_legacy_trace bridge_slider_model_example test_bridge_time_field test_bridge_time_field_unsupported test_bridge_time_field_abi test_bridge_time_field_legacy bridge_time_field_example bridge_time_field_example_static test_bridge_time_field_header_bridge_first test_bridge_time_field_header_widget_first test_bridge_icon_resources test_bridge_icon_resource_abi test_bridge_icon_resource_cpp test_bridge_icon_old_header test_bridge_icon_thread test_bridge_icon_native_oom
       - run: python scripts/test_local.py --build-dir build -R '^bridge_'
       - name: Real Go component state and callback tests
         working-directory: bindings/go

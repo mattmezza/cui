@@ -49,7 +49,7 @@ struct cui_font {
 static bool text_owned_char_size(float size, FT_F26Dot6 *out, cui_text_owner_internal *owner) {
     float request = size * 64;
     if (!isfinite(size) || size <= 0 || size > 4096.f * 64 || !isfinite(request) ||
-        (double)request > LONG_MAX || (double)request < LONG_MIN) {
+        (double)request > (double)LONG_MAX || (double)request < (double)LONG_MIN) {
         owner->error = CUI_ERROR_CAPACITY;
         return false;
     }
@@ -60,7 +60,7 @@ static bool text_owned_origin(float logical, float scale, int *out,
                               cui_text_owner_internal *owner) {
     float source = logical * scale;
     if (!isfinite(source) || (double)source < INT_MIN || (double)source > INT_MAX ||
-        (double)source < LONG_MIN || (double)source > LONG_MAX) {
+        (double)source < (double)LONG_MIN || (double)source > (double)LONG_MAX) {
         owner->error = CUI_ERROR_CAPACITY;
         return false;
     }
@@ -181,7 +181,7 @@ cui_font *cui_font_open(const char *path) {
     return f;
 }
 cui_font *cui_font_open_memory(const void *data, size_t size) {
-    if (!data || !size || size > LONG_MAX)
+    if (!data || !size || size > (double)LONG_MAX)
         return NULL;
     cui_font *f = calloc(1, sizeof(*f));
     if (!f)

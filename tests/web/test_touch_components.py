@@ -197,6 +197,7 @@ def run_cases(a):
                                         ('Popover', 'Open account card', 3, None)]:
         a.case(family, 'touch opens and dismisses overlay', lambda f=family,o=opener,s=slot,c=closer: a.overlay(f,o,s,c))
     def nested_modal():
+        a.configure('dialog-long-body', True)
         a.tap(a.target('Edit preferences', 1))
         owner = a.target(predicate=lambda s: s['f'][17] and s['f'][21] > 40)
         before = owner['f'][19]

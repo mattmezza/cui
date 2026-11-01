@@ -1,0 +1,24 @@
+{
+  "status": "SOURCE_CHECKPOINT_BROWSER_RUNTIME_PENDING",
+  "scope": "Dialog compact default, real opt-in long content, first-presented-frame and nested touch browser scenarios",
+  "checks": [
+    "node --check web/gallery.js passed",
+    "Python syntax checks passed",
+    "git diff --check passed",
+    "Canonical SDK -> amalgamation -> skill generation completed"
+  ],
+  "not_executed": [
+    "Changed gallery C/WASM compilation",
+    "Headless browser behavior",
+    "Current-source broad regression after this checkpoint"
+  ],
+  "reason": "The localized TimeField worker holds the single heavy/compiler lease. Preserve this source checkpoint for later combined validation; it is not delivered or verified UI behavior.",
+  "sources": {
+    "web/gallery.c": "56602a0c0936eae95ba73a7be32128d70b609fafea5bad8206f7cc5002f81098",
+    "web/gallery.js": "f85f04919f55c5a693a3922c84635d61a0356c8c1de59835629f88f027b0fae8",
+    "scripts/build_web.py": "d3afb2eddbe156c553051e8c59085d750abf0555cd3d67097583f3009b43242a",
+    "tests/web/test_browser.py": "bbad528cbaa498143e8edda01b8eba9b0396e2c8e78912388361426f894b1418",
+    "tests/web/test_touch_components.py": "061c073dcbdf5e528b669fcfaae8663b7b28750ee05be1ddf916460200574bca",
+    "docs/WEB_GALLERY.md": "1921c28f57f6f115bae466fc2a2893a8965c04b5e0095ba7680dbe1fec61ab66"
+  }
+}

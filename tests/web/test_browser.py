@@ -436,6 +436,33 @@ def main():
                 return target[1:3]
             def click_semantic(name, role=None):
                 page.mouse.click(*semantic_point(name, role))
+            def open_surface_first_frame(opener, slot, role, footer):
+                # Observe immediately after the first host RAF that publishes the
+                # open surface, before any later geometry-correction frame.
+                page.evaluate('''args=>{
+                    const state={sample:null,stopped:false};
+                    window.__firstSurfaceState=state;
+                    const original=requestAnimationFrame;
+                    window.__surfaceRAF=original;
+                    window.requestAnimationFrame=callback=>original(time=>{
+                        callback(time);
+                        if(state.stopped||state.sample||!cuiGallery.exports.gallery_surface_open(args.slot))return;
+                        const e=cuiGallery.exports,d=new TextDecoder();
+                        const rows=Array.from({length:e.gallery_semantic_count()},(_,i)=>({
+                            role:e.gallery_semantic(i,0),name:d.decode(new Uint8Array(
+                                e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i))),
+                            bounds:[1,2,3,4].map(f=>e.gallery_semantic(i,f)),maximum:e.gallery_semantic(i,21)}));
+                        state.sample={panel:rows.find(r=>r.role===args.role),
+                            footer:rows.find(r=>r.role===1&&r.name===args.footer),
+                            body:rows.find(r=>r.name==='Dialog body')||null};
+                    });
+                }''', {'slot':slot,'role':role,'footer':footer})
+                try:
+                    click_semantic(opener)
+                    page.wait_for_function('window.__firstSurfaceState.sample!==null')
+                    return page.evaluate('window.__firstSurfaceState.sample')
+                finally:
+                    page.evaluate('window.__firstSurfaceState.stopped=true;requestAnimationFrame=window.__surfaceRAF;delete window.__surfaceRAF;delete window.__firstSurfaceState')
             def dropdown_select(control, value, role=None):
                 control_change('dropdown-'+control, value)
                 if role is not None:
@@ -1868,14 +1895,19 @@ def main():
             assert page.locator('#accessible button[aria-label="Save profile"]').is_disabled()
             page.evaluate('location.hash="Dialog"')
             page.wait_for_function('cuiGallery.renderedComponent==="Dialog"')
-            click_semantic('Edit preferences')
+            first_dialog = open_surface_first_frame('Edit preferences', 0, 17, 'Save changes')
+            assert first_dialog['panel'] and first_dialog['footer'] and first_dialog['body'], first_dialog
+            assert first_dialog['body']['maximum'] == 0, first_dialog
+            assert first_dialog['panel']['bounds'][3] < 448, first_dialog
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1')
             assert page.locator('#accessible [role=dialog][aria-modal=true]').count() == 1
             assert page.locator('#accessible [role=dialog]').get_attribute('aria-labelledby')
             dialog_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Notification preferences'))
             footer_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Save changes'))
             assert footer_bounds[1] + footer_bounds[3] <= dialog_bounds[1] + dialog_bounds[3]
-            body = semantic_index('Surface content')
+            control_change('dialog-long-body', True)
+            footer_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', semantic_index('Save changes'))
+            body = semantic_index('Dialog body')
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,21)>0', arg=body)
             body_bounds = page.evaluate('(i)=>Array.from({length:4},(_,f)=>cuiGallery.exports.gallery_semantic(i,f+1))', body)
             rectangle = canvas.bounding_box()
@@ -1893,7 +1925,7 @@ def main():
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1
             click_semantic('Edit preferences')
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(0)===1')
-            body = semantic_index('Surface content')
+            body = semantic_index('Dialog body')
             rectangle = canvas.bounding_box()
             page.mouse.move(rectangle['x']+body_bounds[0]+body_bounds[2]/2,rectangle['y']+body_bounds[1]+body_bounds[3]/2)
             page.mouse.wheel(0,-1000)
@@ -1935,42 +1967,31 @@ def main():
             page.wait_for_function('(i)=>cuiGallery.exports.gallery_semantic(i,7)===1', arg=semantic_index('Edit preferences', 1))
             page.evaluate('location.hash="AlertDialog"')
             page.wait_for_function('cuiGallery.renderedComponent==="AlertDialog"')
-            click_semantic('Delete workspace')
+            first_alert = open_surface_first_frame('Delete workspace', 1, 35, 'Delete')
+            assert first_alert['panel'] and first_alert['footer'] and first_alert['body'] is None, first_alert
+            assert first_alert['panel']['bounds'][3] < 288, first_alert
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===1')
             assert page.locator('#accessible [role=alertdialog][aria-modal=true]').count() == 1
-            alert_geometry = page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
-                const sem=Array.from({length:e.gallery_semantic_count()},(_,i)=>i);
-                const panel=sem.find(i=>e.gallery_semantic(i,0)===35);
-                const confirm=sem.find(i=>e.gallery_semantic(i,0)===1&&d.decode(new Uint8Array(
-                    e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==='Delete');
-                const title=Array.from({length:e.gallery_count()},(_,i)=>i).find(i=>e.gallery_command(i,0)===2&&
-                    d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),e.gallery_command_length(i)))==='Delete workspace?');
-                return [e.gallery_command(title,2),e.gallery_semantic(confirm,2)+e.gallery_semantic(confirm,4),
-                    e.gallery_semantic(panel,2)+e.gallery_semantic(panel,4)/2];}''')
-            assert abs((alert_geometry[0]+alert_geometry[1])/2-alert_geometry[2]) < 1, alert_geometry
+            alert_panel = first_alert['panel']['bounds']
+            alert_action = first_alert['footer']['bounds']
+            assert alert_action[1] >= alert_panel[1], first_alert
+            assert alert_action[1]+alert_action[3] <= alert_panel[1]+alert_panel[3], first_alert
             click_semantic('Delete')
             page.wait_for_function('cuiGallery.exports.gallery_alert_attempts()===1')
             assert page.evaluate('cuiGallery.exports.gallery_surface_open(1)') == 1
             page.wait_for_function('document.querySelector("#accessible [role=alertdialog]")?.getAttribute("aria-description")?.includes("rejected once")')
-            # Rejection changes the centered content height. Allow the measured
-            # body and its corrected layout to render before clicking again.
-            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+            # The changed description and Footer use the current tree; there
+            # is no measured-height correction-frame protocol on this route.
             rejected_bounds = page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();
-                return ['Surface content','Delete'].map(name=>{const i=Array.from({length:e.gallery_semantic_count()},(_,i)=>i)
-                    .find(i=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name);
-                    return [1,2,3,4].map(f=>e.gallery_semantic(i,f));});}''')
-            assert rejected_bounds[1][0] >= rejected_bounds[0][0], rejected_bounds
-            assert rejected_bounds[1][0]+rejected_bounds[1][2] <= rejected_bounds[0][0]+rejected_bounds[0][2]+.1, rejected_bounds
+                const sem=Array.from({length:e.gallery_semantic_count()},(_,i)=>i);
+                const panel=sem.find(i=>e.gallery_semantic(i,0)===35);
+                const action=sem.find(i=>e.gallery_semantic(i,0)===1&&d.decode(new Uint8Array(
+                    e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==='Delete');
+                return [panel,action].map(i=>[1,2,3,4].map(f=>e.gallery_semantic(i,f)));}''')
+            for axis in (0,1):
+                assert rejected_bounds[1][axis] >= rejected_bounds[0][axis], rejected_bounds
+                assert rejected_bounds[1][axis]+rejected_bounds[1][axis+2] <= rejected_bounds[0][axis]+rejected_bounds[0][axis+2]+.1, rejected_bounds
             click_semantic('Delete')
-            page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
-            print('Alert second confirmation:', page.evaluate('''()=>{const e=cuiGallery.exports,d=new TextDecoder();return {
-                attempts:e.gallery_alert_attempts(),open:e.gallery_surface_open(1),
-                pointers:[e.gallery_pointer_stats(0),e.gallery_pointer_stats(1),e.gallery_pointer_stats(2),e.gallery_pointer_stats(3)],
-                canvas:[document.querySelector('canvas').getBoundingClientRect().x,document.querySelector('canvas').getBoundingClientRect().y],
-                semantics:Array.from({length:e.gallery_semantic_count()},(_,i)=>i).map(i=>({
-                    name:d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i))),
-                    role:e.gallery_semantic(i,0),bounds:[1,2,3,4].map(f=>e.gallery_semantic(i,f)),
-                    focused:e.gallery_semantic(i,7),scroll:e.gallery_semantic(i,19),maximum:e.gallery_semantic(i,21)}))};}'''), flush=True)
             page.wait_for_function('cuiGallery.exports.gallery_surface_open(1)===0')
             index = semantic_index('Delete workspace')
             assert page.evaluate('(i)=>cuiGallery.exports.gallery_semantic(i,7)', index) == 1

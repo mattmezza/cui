@@ -2309,6 +2309,7 @@ static cui_surface_state dialog_surface, alert_dialog_surface, sheet_surface, po
 static cui_dialog_layout_v1 dialog_layout, alert_dialog_layout, nested_dialog_layout;
 static int surface_variant, alert_attempts;
 static bool dialog_updates = true, popover_updates;
+static bool dialog_long_body;
 static cui_popover_position gallery_popover_position;
 static bool popover_edge, popover_inert, popover_modal;
 static float popover_opacity = 1;
@@ -2373,6 +2374,19 @@ static void gallery_dialog_body(cui_context *context, const cui_dialog_frame *fr
             "Body content wraps at the current width and scrolls above the independent Footer."),
         f->theme->font_size, f->theme->text, f->theme->font_size * 1.25f, (cui_text_style){0}, true,
         NULL, 0);
+    if (dialog_long_body) {
+        static const char *details[] = {
+            "Release notes summarize new features, fixes and changes to your workspace.",
+            "Security alerts describe sign-in activity and account settings that need attention.",
+            "Team updates include invitations, shared projects and changes to membership.",
+            "Delivery preferences apply to this workspace and can be changed at any time.",
+            "Weekly summaries group less urgent updates into a single message.",
+            "Your preferences remain available while you review these descriptions."};
+        for (size_t i = 0; i < sizeof details / sizeof details[0]; ++i)
+            (void)cui_text_paragraph_colored(
+                context, cui_string(details[i]), f->theme->font_size, f->theme->text,
+                f->theme->font_size * 1.25f, (cui_text_style){0}, true, NULL, 0);
+    }
 }
 static void gallery_dialog_footer(cui_context *context, const cui_dialog_frame *frame, void *user) {
     gallery_dialog_frame *f = user;
@@ -7186,6 +7200,9 @@ void gallery_popover_options(int mode, int anchor, int custom_offset, float offs
     else if (!next_modal && popover_modal)
         cui_surface_close(ui, &dialog_surface, CUI_SURFACE_CANCELLED);
     popover_modal = next_modal;
+}
+void gallery_dialog_options(int long_body) {
+    dialog_long_body = long_body != 0;
 }
 void gallery_surface_variant(int variant) {
     if (surface_variant != variant)

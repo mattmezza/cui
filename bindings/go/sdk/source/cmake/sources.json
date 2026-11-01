@@ -310,6 +310,10 @@
     ],
     "cui_styled_slider_model": [
       "src/components/cui_styled_slider_model.c"
+    ],
+    "cui_time_types": [],
+    "cui_time_text": [
+      "src/base/cui_time_text.c"
     ]
   },
   "native": {

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "scope": "Unreleased pure C TimeField locale/domain text helpers; widget and foreign bindings unchanged",
+  "baseline": "332fdaa8897c055fd4d150ca147c6e903dcc543d",
+  "contract_commits": [
+    "2bd9dfe7",
+    "a1ca79f1",
+    "f14c77e5"
+  ],
+  "resource_policy": "CPU1 nice19 sequential, existing build-focused; native tests private Xvfb; no engine rebuild",
+  "first_failure": "Strict fixture compilation rejected four nonzero partial cui_time initializers; changed tests to explicit three-field literals. No production behavior change.",
+  "first_gate": {
+    "strict_cmake_steps": 11,
+    "ctest": "5/5 PASS",
+    "native_measured_sizes": {
+      "cui_time_locale_v1": 240,
+      "cui_time_text_options_v1": 64
+    },
+    "cpp": "strict C++11 old/new include orders compile and run PASS",
+    "wasm": "Pinned Zig0.16 wasm32-wasi strict O2 source/header compile PASS; compile-time sizes128/60",
+    "oracle": "Independent snprintf ASCII expected strings for every valid second in H23/H12 second mode and every minute in both minute modes, plus Arabic UTF8 literal, invalid/configuration/domain and atomic-buffer vectors",
+    "logs": [
+      "build-focused/time-text-first.log",
+      "build-focused/time-text-retry.log",
+      "build-focused/time-text-probes.log",
+      "build-focused/time-text-final.log"
+    ]
+  },
+  "legacy_source_comparison": {
+    "src/base/cui_picker.c": {
+      "sha256": "18ec469c4e881e42897c61610052d798b031e1532f03c11854bfd019cbd7d636",
+      "matches_integrator_source": true
+    },
+    "src/components/cui_picker.c": {
+      "sha256": "0158393eef1fd9d42e5f11676cc4c01b5d584b06fbadd9b5f2dfeeaa9a728ecf",
+      "matches_integrator_source": true
+    },
+    "src/base/cui_picker_events.c": {
+      "sha256": "bb57178ede2390c18d184abc55629440a3e7ae7830b358ac94f5d16167cf152b",
+      "matches_integrator_source": true
+    },
+    "src/components/cui_picker_events.c": {
+      "sha256": "4eb2221894c200a657808b6cfc9e5fd0c59b6b4405760ba3fdc29fdbb6bc63fe",
+      "matches_integrator_source": true
+    },
+    "src/base/cui_date_time_picker.c": {
+      "sha256": "7650416c4a34d74c2625d058b86b8ed405a0e9cdaf5cbf4972ef51cf2e152639",
+      "matches_integrator_source": true
+    },
+    "src/components/cui_date_time_picker.c": {
+      "sha256": "f79c42223a5c060712c7a3b03fdc57f2e984cc5df0b4d1c5ad254efbd5087aa9",
+      "matches_integrator_source": true
+    },
+    "tests/unit/test_picker.c": {
+      "sha256": "2e866d6b291341e53eab897f20f32f4e553f95b41576631b7cf5ff0e18ec5fe7",
+      "matches_integrator_source": true
+    },
+    "tests/unit/test_time_field_events.c": {
+      "sha256": "a9d290e72e30b66a3bde7c5ef25afa41300f7b490cd1547e6f346cb9dce61f98",
+      "matches_integrator_source": true
+    },
+    "tests/unit/test_date_time_picker.c": {
+      "sha256": "265169a105a120ffcd0eaacff8d8a6593fc81accd58851b98ca0cb9b93772c0a",
+      "matches_integrator_source": true
+    },
+    "tests/unit/test_date_time_picker_styled.c": {
+      "sha256": "9ba711b0ca62d7e53cfd9072b8c53a788bc1e344498a4d966280b560cc226e9b",
+      "matches_integrator_source": true
+    }
+  },
+  "cached_legacy_binary_sha256": {
+    "test_picker": "fd6c6bd026308ddcc27b70c9816dc2188c846f82228132cf03cfe73c0ea3ce3f",
+    "test_picker_base": "1cd5d035280fd91d4c921dd8631b1361141d8bfa11d404eca2b818001d113e22",
+    "test_picker_events": "2ac803658bc57062fa384bfed8dba83e164329b37f0ad1a2a34d68017cef7ccd",
+    "test_time_field_events": "f7dd40cefc25b41c3ead303fe0d8e04220b00191b36df053977262104193223e",
+    "test_date_time_picker": "557f68db8a9057f4206c46422170901ad8559f46fe3c6ce7a0acf0275fb95b2d",
+    "test_date_time_picker_styled": "31b71afd224cd8807d2eef93898b4481c1333c6c4feb733774497d0ec8776796"
+  },
+  "omissions": [
+    "No new localized widget/reducer/Styled facade/DateTime integration",
+    "No foreign binding delivery",
+    "No IME/physical native accessibility or GPU claim",
+    "Wasm compile/layout evidence only; no new Wasm runtime here",
+    "Cached legacy binaries were reused, not rebuilt against the factored header; separate current header order tests prove source inclusion compatibility"
+  ],
+  "final_gate": {
+    "cached_legacy_ctest": "6/6 PASS0.75s",
+    "component_usage": "6/6 PASS7.054s",
+    "agent_skill": "18/18 PASS39.533s",
+    "freshness": "SDK/amalgamation/agent skill all PASS",
+    "manifest": "78 unique entries preserved",
+    "format": "owned canonical headers/source/tests clang-format dry-run PASS",
+    "initial_log": "build-focused/time-text-first.log",
+    "terminal_log": "build-focused/time-text-final.log"
+  },
+  "new_source_sha256": {
+    "include/cui/cui_time_types.h": "150656bcc3cb85e366e10961ff8339d50c6e4d42aa778103665a044d5bc66b6d",
+    "include/cui/cui_time_text.h": "795da1c8c8c86e05857942f3d70bfc3e7c953f195c22bce0165da970ba59a809",
+    "src/base/cui_time_text.c": "1692265edb6732d1518a074dc06aca38171ea8b13ee7f5b8ec4d5176eb76be50",
+    "tests/unit/test_time_text.c": "194003d521a06c6ad9acc8a492515423c8c8cbc929bf5a2b67be96f421ce50e9",
+    "tests/unit/test_time_text_headers.c": "231988ba34b073c7534ccf469a783de39bc176eb265c0d6100d53cc090087436"
+  },
+  "final_format_correction": "Initial owned clang-format check rejected picker include ordering; command sequence erroneously continued to local commit. Sorted includes, repeated owned format check PASS, regenerated SDK\u2192amalgamation\u2192skill and all freshness PASS before amended handoff. No production logic change or runtime rerun."
+}

@@ -673,7 +673,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "limitations": [
+        "Existing scalar widget subset only. Pure cui_time_text.h locale/domain parse-format records and typed C aggregate observer remain unbound in all five languages."
+      ]
     },
     {
       "name": "Carousel",

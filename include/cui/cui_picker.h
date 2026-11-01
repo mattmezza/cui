@@ -4,6 +4,7 @@
 #include "cui_base.h"
 #include "cui_overlay.h"
 #include "cui_theme.h"
+#include "cui_time_types.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -102,9 +103,6 @@ cui_calendar_result cui_base_date_picker(cui_context *, cui_id trigger, cui_id c
                                          cui_date_picker_options);
 bool cui_date_picker(cui_context *, cui_id, const cui_theme *, cui_str, cui_date_picker_state *,
                      cui_date_selection *, cui_date_picker_options);
-typedef struct {
-    unsigned hour, minute, second;
-} cui_time;
 typedef struct {
     unsigned segment;
     unsigned digit_count, draft;

@@ -77,6 +77,7 @@
 #include "cui_base_slider_model.h"
 #include "cui_slider_style.h"
 #include "cui_styled_slider_model.h"
+#include "cui_time_text.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -384,4 +385,8 @@
 #define CUI_STYLED_SLIDER_MODEL_IMPLEMENTATION
 #endif
 #include "cui_styled_slider_model.h"
+#ifndef CUI_TIME_TEXT_IMPLEMENTATION
+#define CUI_TIME_TEXT_IMPLEMENTATION
+#endif
+#include "cui_time_text.h"
 #endif

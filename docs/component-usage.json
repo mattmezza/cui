@@ -1590,7 +1590,12 @@
     {
       "api_symbols": [
         "cui_time_field",
-        "cui_time_field_events"
+        "cui_time_field_events",
+        "cui_time_locale_init_v1",
+        "cui_time_text_options_init_v1",
+        "cui_time_validate_v1",
+        "cui_time_parse_v1",
+        "cui_time_format_v1"
       ],
       "state_types": [
         "cui_time_state",
@@ -1601,7 +1606,8 @@
       "usage": "Submit segment state and time by pointer; persist accepted time in the change branch.",
       "docs": [
         "docs/PICKERS.md",
-        "docs/TIME_FIELD_EVENTS.md"
+        "docs/TIME_FIELD_EVENTS.md",
+        "docs/TIME_FIELD_TEXT.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -1609,7 +1615,9 @@
       "public_header": "include/cui/cui_picker.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_picker_events.h"
+        "include/cui/cui_picker_events.h",
+        "include/cui/cui_time_types.h",
+        "include/cui/cui_time_text.h"
       ]
     },
     {

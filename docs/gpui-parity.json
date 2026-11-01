@@ -4906,7 +4906,8 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending."
+        "Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending.",
+        "Additive pure locale/domain text helpers are an unreleased C-only slice; localized widget editing, IME, validation appearance and all five bindings remain pending."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4919,7 +4920,7 @@
           ]
         },
         {
-          "name": "parse/validation/localization",
+          "name": "localized editor, validation appearance and IME integration",
           "status": "not_started",
           "evidence": []
         },
@@ -4938,10 +4939,18 @@
           ]
         },
         {
-          "name": "strict HH:MM[:SS] model parse/format",
+          "name": "strict ASCII HH:MM[:SS] model parse/format and atomic validation",
           "status": "tested",
           "evidence": [
             "tests/unit/test_picker.c"
+          ]
+        },
+        {
+          "name": "pure explicit locale/domain parse-format helpers",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_time_text.c",
+            "docs/TIME_FIELD_TEXT.md"
           ]
         }
       ],

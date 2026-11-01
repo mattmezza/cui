@@ -825,6 +825,10 @@ API: `cui_time_field`. [Public header](../include/cui/cui_picker.h); [guide](PIC
 
 Additional event includes: `cui/cui_picker_events.h`.
 
+Pure locale/domain text helpers use `cui/cui_time_text.h`; the unchanged `cui_time`
+value is declared in `cui/cui_time_types.h`. See [TimeField text values](TIME_FIELD_TEXT.md).
+These unreleased C-only helpers do not localize the existing widget.
+
 ## Carousel
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.

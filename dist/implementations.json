@@ -577,6 +577,13 @@
       "sources": [
         "src/components/cui_styled_slider_model.c"
       ]
+    },
+    {
+      "header": "cui_time_text.h",
+      "macro": "CUI_TIME_TEXT_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_time_text.c"
+      ]
     }
   ]
 }

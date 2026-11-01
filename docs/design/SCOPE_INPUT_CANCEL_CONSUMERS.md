@@ -21,11 +21,26 @@ cancellation path. This source observation does not prove nested lifetime reset
 coverage; retain it as a separate runtime acceptance case. Suppressing activation,
 consuming input and cancelling a proposed value remain separate operations.
 
+## Additional retained-state counterexamples
+
+Six actual nested-owner diagnostics now produce **five failures and one pass**.
+Table applies stale resize (100 → 138, one width callback) and reorder
+([1,2] → [2,1], one move callback); an idle reset leaves resizing active.
+ColorPicker applies a stale hue change and retains its drag flag on idle reset.
+Each test first establishes capture through a real DOWN event. The typed Slider
+capture-loss/fresh-gesture case passes using its existing reducer.
+
+See [the source audit](DIALOG_RETAINED_CONSUMER_AUDIT.md) and
+[the counterexample receipt](../validation/dialog-retained-consumer-counterexamples.json).
+The next candidate must clear only scoped pending press state, preserve changes
+already delivered, and emit no invented model/completion callback. Production
+transfer remains gated by corrected runtime and frozen legacy traces.
+
 ## Remaining audit
 
 These are inspection candidates, **not established defects or verified support**:
 
-- Table resize/reorder/selection and its retained drag state.
+- Table selection and other retained states beyond the confirmed resize/reorder cases.
 - Choice/menu/select popup pointer and keyboard reducers.
 - Picker, legacy numeric controls, text selection, chrome/window drag and surfaces.
 - Typed Slider models and other consumers that already check consumption: verify

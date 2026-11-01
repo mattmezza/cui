@@ -1,0 +1,25 @@
+{
+  "status": "counterexamples_confirmed_unreleased_candidate",
+  "scope": "Six actual retained-consumer diagnostics; no production reset implemented or all-component safety claim.",
+  "log": "/home/matteo/.cache/cui-hover-raw-build/dialog-retained-six-first-runtime.log",
+  "log_sha256": "9a4bf358ed7e90df3fbcc76528a172c81e1a18bc70c900c0b940fe8bd944d929",
+  "results": {
+    "passed": 1,
+    "failed": 5,
+    "seconds": 0.77
+  },
+  "failures": [
+    "Table stale resize 100 -> 138; width observer invoked once",
+    "Table stale reorder [1,2] -> [2,1]; move observer invoked once",
+    "Table idle resizing remains active",
+    "ColorPicker stale drag changes RGB 204/255/0 -> 204/0/255",
+    "ColorPicker idle drag remains active"
+  ],
+  "positive": "Typed Slider actual capture loss and fresh gesture pass using existing path.",
+  "fixture": {
+    "path": "tests/unit/test_dialog_composition_input.c",
+    "worker_source_sha256": "fbb0cc898feb28cfde588ab415de8f0e12a9cbb22adef5d298154cf7dbc5800d"
+  },
+  "environment": "Private Linux Xvfb wrapper; one strict fixture TU/link, cached candidate objects. Initial capture assertions passed; state was not seeded manually.",
+  "next": "Test-only explicit-scope resets; preserve already delivered mutations/callbacks; actual frozen legacy traces and fresh gesture recovery before production transfer."
+}

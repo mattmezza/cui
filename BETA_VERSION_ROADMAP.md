@@ -41,10 +41,23 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Test-only candidate passes 44/47 checks. Original/current controls confirm an existing touch-reorder defect; frozen Table/Color trace setup remains unresolved. Production transfer and scope-ID alias limitations stay open. |
+| Dialog and scrolling | Test-only candidate passes 44/47 checks. Original/current controls confirm an existing touch-reorder defect. The corrected frozen/current trace passes its focused check; the full 47-check candidate has not been rerun. Production transfer and scope-ID alias limitations stay open. |
 | Typed Slider | C/Python/JS/TS/Go authoring is integrated with focused checks. Rust passes its first worker UI tests; compatibility/integration remain open. Remaining copied-wire checks and native numeric delivery are unfinished. Unreleased. |
-| Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Complete the other four adapters and foreign authoring APIs. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
+| Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction, the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
+
+## Immediate priorities
+
+| Priority | Deliverable | Completion condition |
+| --- | --- | --- |
+| 1 | Finish in-flight integration | Shared CPU helpers and Rust job control passed focused acceptance; extract and verify the owned-frame lifecycle for the next adapter. |
+| 2 | Close interaction and binding gaps | Resolve Table touch-drop admission, transfer reviewed Dialog fixes, and validate/integrate Rust typed Slider compatibility. Preserve legacy behavior. |
+| 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
+| 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
+
+**Maintainer/external gates:** package-registry ownership/authentication and actual
+macOS/Windows/GPU/assistive-technology acceptance need their own evidence. They do
+not block source work that can be validated headlessly on Linux.
 
 ## Remaining beta scope
 
@@ -65,7 +78,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Consumer test harnesses request one compiler job; Rust’s embedded CMake build still uses two and needs correction. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
+| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Consumer test harnesses request one compiler job. Rust’s embedded CMake build now follows Cargo NUM_JOBS with a conservative fallback of one; three offline job-control tests pass. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 
@@ -124,6 +137,8 @@ that every listed defect still reproduces.
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
 
+Latest integration receipt: [CPU helper relocation and Rust job control](docs/validation/cpu-v2-common-integration.json).
+
 Detailed validation receipts live in [docs/validation](docs/validation).
 Older green runs do not cover newer source; worker checks do not establish
 integrated, released or deployed support.
@@ -135,6 +150,9 @@ integrated, released or deployed support.
 - **v1.0:** follows beta acceptance; see [v1 readiness](docs/V1_READINESS.md).
 
 ## Maintenance rule for humans and agents
+
+This is the repository’s running beta checklist, not a replacement for the detailed
+API contracts or validation receipts. Keep status summaries short and link evidence.
 
 Update this document **in the same change** that completes a slice or discovers a
 new gap. Update the corresponding detailed ledger/guide too. Check a row only when

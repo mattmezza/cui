@@ -10,8 +10,10 @@
   "durable_backup": "/home/matteo/.local/state/cui-agent/cleanup-2026-11-01",
   "validation_cache": "One shared current validation cache retained; no toolchain/browser dependency cache deleted.",
   "limits": "Audit byte totals are approximate, not a controlled filesystem free-space measurement; ongoing validation also creates artifacts.",
-  "completed_worker_worktrees_removed": 2,
-  "total_worktrees_removed": 23,
+  "completed_worker_worktrees_removed": 3,
+  "total_worktrees_removed": 24,
   "worker_evidence_files_retained": 140,
-  "additional_worker_tree_estimate_bytes": 344981504
+  "additional_worker_tree_estimate_bytes": 344981504,
+  "final_worker_evidence_files_retained": 321,
+  "compatibility_relocation": "Retained frozen legacy executable, library and partial provider in durable local state; affected Python/Go/Rust checks pass after relocation. Current build no longer references removed worker."
 }

@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-01",
+  "source_commit": "0e0473cbef25acc0e717dd57fdd33bcc999e69b1",
+  "web_build": "PASS",
+  "documentation_pages": 484,
+  "shareable_pages": 566,
+  "browser": "PASS: 78 component stories plus Video; 80/80 displayed excerpts compile; interactions, themes, search, mobile viewport and metadata checks",
+  "deployment": "Not deployed; local artifact only",
+  "logs": {
+    "alpha4-web-build.log": "b8409cbf2195009f8f92720c091da935c8fdaa67c2d644853e6fc33ee5a90410",
+    "alpha4-browser.log": "0c64e43ee1fbecb9b802445a7be3e067a0723cd06b05dbd6e3485be6e24cb696"
+  },
+  "durable_logs": "/home/matteo/.local/state/cui-agent/alpha4-validation-2026-11-01"
+}

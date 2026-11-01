@@ -4,7 +4,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-CONSUMERS = ('dist_video_controls', 'dist_dropdown_button_styles_all',
+CONSUMERS = ('dist_video_controls', 'dist_table_touch_all', 'dist_dropdown_button_styles_all',
              'dist_dropdown_button_metadata_all', 'dist_questionnaire_geometry_all',
              'dist_questionnaire_presentation_all', 'dist_questionnaire_progress',
              'dist_questionnaire_observer', 'dist_date_time_all',
@@ -55,7 +55,7 @@ class DistributionSharedTests(unittest.TestCase):
         fixtures = ('video_controls.c', 'dropdown_button_styles_all.c',
                     'dropdown_button_metadata_all.c', 'questionnaire_geometry_all.c',
                     'questionnaire_presentation_all.c', 'questionnaire_progress.c',
-                    'questionnaire_observer.c', 'date_time_picker.c', 'stepper_visual.c')
+                    'questionnaire_observer.c', 'date_time_picker.c', 'stepper_visual.c', 'table_touch.c')
         for name in fixtures:
             with self.subTest(name=name):
                 text = (ROOT/'tests/distribution'/name).read_text()

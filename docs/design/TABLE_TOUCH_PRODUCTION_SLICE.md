@@ -44,3 +44,22 @@ implementation for the distribution case), and introduces no public declaration.
 The standalone Table touch fixture uses only ordinary production Core/Table.
 Umbrella distribution compilation shares the existing test implementation target.
 No complete Dialog, general raw-consumer lifecycle, bindings or GPU claim.
+
+## First production verification
+
+Approved source f179c8a0 compiled against exact production Core/Table without the
+lifecycle prototype. Session5083 passed strict compilation/linking of source,
+query witness, generated Core, selective Table and complete umbrella consumers.
+Source/fixtures used C11 O3/Werror; scoped generated implementation consumers
+used O0/Werror to bound optimizer work. C++11 signature and existing80/144-byte
+record checks passed. Approved cached archives supplied unchanged modules;
+explicit actual Core/Table objects supplied this slice's behavior.
+
+All36 native/C++ runtime checks passed via private-Xvfb CTest. Initial40 total
+cases passed39: only the offline shared-umbrella guard lacked the new approved
+consumer allowlist entry. The exact two-line guard/fixture-list repair passed4/4
+without recompilation or production edits. Other offline usage/header/V1 ABI
+checks passed. Canonical SDK/dist/skill generation and freshness checks passed.
+The required18-test installed skill suite remains queued behind TimeField;
+integrator may own it on the actual merged revision. See the validation receipt.
+No CMake full-library rebuild, desktop window, dependency install or second tree.

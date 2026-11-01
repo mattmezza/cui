@@ -5359,6 +5359,86 @@ bool cui_pressed(cui_context *ui, cui_id id) {
     return ui && id && !cui_core_inert(ui) && (ui->capture == id || ui->space_capture == id);
 }
 
+/* Indexed previous-frame pointer-region admission. No event mutation. */
+static bool cui_core_event_hover_eligible(const cui_context *ui, size_t index) {
+    if (!cui_core_previous_allowed(ui, index))
+        return false;
+    cui_id current_modal = 0;
+    if (ui->top_modal != SIZE_MAX) {
+        if (ui->top_modal >= ui->focus_scope_count || !ui->focus_scopes[ui->top_modal].active)
+            return false;
+        current_modal = ui->focus_scopes[ui->top_modal].id;
+    }
+    bool inside_current_modal = !current_modal;
+    size_t scope = ui->previous_semantic_scopes[index];
+    for (size_t steps = 0; scope != SIZE_MAX; ++steps) {
+        if (scope >= ui->previous_focus_scope_count || steps >= ui->previous_focus_scope_count)
+            return false;
+        bool active = false;
+        cui_id id = ui->previous_focus_scopes[scope].id;
+        for (size_t i = 0; i < ui->focus_scope_count; ++i)
+            if (ui->focus_scopes[i].id == id && ui->focus_scopes[i].active)
+                active = true;
+        inside_current_modal |= id == current_modal;
+        if (!active)
+            return false;
+        scope = ui->previous_focus_scopes[scope].parent;
+    }
+    return inside_current_modal;
+}
+static bool cui_core_event_hover_descendant(const cui_context *ui, size_t child, size_t ancestor,
+                                            bool *valid) {
+    size_t parent = ui->previous_parents[child];
+    for (size_t steps = 0; parent != SIZE_MAX; ++steps) {
+        if (parent >= ui->previous_count || steps >= ui->previous_count) {
+            *valid = false;
+            return false;
+        }
+        if (parent == ancestor)
+            return true;
+        parent = ui->previous_parents[parent];
+    }
+    return false;
+}
+bool cui_event_hovered(cui_context *ui, size_t event_index, cui_id id) {
+    if (!ui || !id || !cui_frame_sequence(ui) || !cui_frame_input_snapshot_ready(ui) ||
+        event_index >= ui->event_count)
+        return false;
+    const cui_event *event = &ui->events[event_index];
+    if ((event->type != CUI_EVENT_POINTER_DOWN && event->type != CUI_EVENT_POINTER_MOVE &&
+         event->type != CUI_EVENT_POINTER_UP) ||
+        !isfinite(event->x) || !isfinite(event->y))
+        return false;
+    for (size_t i = 0; i < ui->previous_count; ++i) {
+        if (ui->previous[i].id != id || ui->previous[i].disabled ||
+            !cui_core_event_hover_eligible(ui, i) ||
+            !cui_core_inside(ui->previous_hits[i], event->x, event->y))
+            continue;
+        for (size_t j = 0; j < ui->previous_count; ++j) {
+            const cui_semantic *s = &ui->previous[j];
+            bool blocks =
+                s->details.blocks_pointer_activation ||
+                (!s->disabled && (cui_core_focusable(s) || s->details.pointer_activatable));
+            if (!blocks || !cui_core_event_hover_eligible(ui, j) ||
+                !cui_core_inside(ui->previous_hits[j], event->x, event->y))
+                continue;
+            bool same_layer = ui->previous_layers[j] == ui->previous_layers[i];
+            uint64_t root_j = ui->previous_order[j] >> 32;
+            uint64_t root_i = ui->previous_order[i] >> 32;
+            if (ui->previous_layers[j] > ui->previous_layers[i] || (same_layer && root_j > root_i))
+                return false;
+            if (same_layer && root_j == root_i && ui->previous_order[j] > ui->previous_order[i]) {
+                bool valid = true;
+                bool descendant = cui_core_event_hover_descendant(ui, j, i, &valid);
+                if (!valid || !descendant)
+                    return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
 bool cui_hovered(cui_context *ui, cui_id id) {
     if (!ui || !id || cui_core_inert(ui) || !cui_core_pointer_available(ui))
         return false;

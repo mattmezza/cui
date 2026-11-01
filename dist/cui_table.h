@@ -983,7 +983,10 @@ static bool drop_column(cui_context *ui, cui_id id, cui_table_model *m, cui_tabl
                         cui_table_options o, const cui_event *event,
                         const cui_table_input_observer *observer) {
     size_t from = column(m, s->dragging);
-    if (from == SIZE_MAX || !cui_hovered(ui, id) || !isfinite(event->x) || !isfinite(event->y))
+    if (from == SIZE_MAX ||
+        !(event->pointer_type == CUI_POINTER_TOUCH ? cui_event_hovered(ui, observer->index, id)
+                                                   : cui_hovered(ui, id)) ||
+        !isfinite(event->x) || !isfinite(event->y))
         return false;
     cui_rect table = cui_bounds(ui, id),
              head = cui_bounds(ui, cui_table_header_id(id, s->dragging));
@@ -1699,6 +1702,7 @@ void cui_table_submit_header_column(cui_context *ui, cui_id id, cui_table_model 
         ui, cid,
         (cui_semantic_details){.parent = id,
                                .column_index = (unsigned)c + 1,
+                               .touch_drag_priority = !disabled && m->cols[c].movable,
                                .cursor = disabled ? CUI_CURSOR_NOT_ALLOWED : CUI_CURSOR_POINTER,
                                .selected = !m->cols[c].nonselectable &&
                                            o.selection_mode == CUI_TABLE_SELECT_COLUMN &&

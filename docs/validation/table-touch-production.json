@@ -1,0 +1,54 @@
+{
+  "status": "production_source_native_verified_skill_suite_pending_integrator",
+  "branch": "feat/table-touch-admission",
+  "base": "32dfddb3",
+  "source_checkpoint": "f179c8a0",
+  "scope": "Only read-only event-coordinate query, enabled movable Table header touch priority and TOUCH-only indexed drop; no Dialog/marker/cancellation/contact/dispatch transfer",
+  "native_build_session": 5083,
+  "compiler": {
+    "source": "C11 O3 Wall Wextra Wpedantic Werror; CPU1 nice19 sequential; assertions enabled",
+    "distribution": "same warnings C11 O0 scoped generated Core/selective/umbrella implementation consumers",
+    "cpp": "C++11 Wall Wextra Wpedantic Werror; exact function signature +80/144byte existing records"
+  },
+  "runtime": {
+    "wrapper": "/home/matteo/dev/cui/scripts/test_local.py privateXvfb, temporary CTest descriptors in reused builddir",
+    "initial_cases": 40,
+    "initial_pass": 39,
+    "native_and_cpp": 36,
+    "initial_failure": "offline distribution shared-policy allowlist missing newly registered consumer",
+    "repair": "two-line explicit approved consumer and direct-implementation fixture inclusion",
+    "repaired_offline_guard": "4/4PASS",
+    "other_static": "component usage6, Core single-header, background V1 ABI passed"
+  },
+  "native_coverage": [
+    "source+generated Core query clipping/currentmodal/scope/phase/nonfinite/disabled/occlusion/layout witness",
+    "source/selective/umbrella eight touch modes each",
+    "current-base byte-frozen Table31frame independent fieldwise/callback trace",
+    "existing Core, base Table, Table events/selection, pointer presence, accepted activation, layout-only, input identity",
+    "C++ API/old public record layout"
+  ],
+  "canonical": "Go/Rust SDK441files each, amalgamation and agent resources generated; all --check freshness PASS; all78manifest entries retained",
+  "pending": [
+    "required tests/test_agent_skill.py suite scheduled after TimeField; integrator may run on integrated revision",
+    "registered CMake targets not built locally: approved bounded direct compilation avoided unrelated stale-cache rebuilds",
+    "hosted Windows/macOS/WASM actual integration gates not executed by this worker"
+  ],
+  "builddir": "/home/matteo/.cache/cui-hover-raw-build",
+  "sizes": "385MiB before,407MiB after (+22MiB); one reused buildtree",
+  "source_sha256": {
+    "include/cui/cui.h": "1178430aa86e78e9a1ea6ea2784f74f350b391d250f3e012ff8afad01b2565f4",
+    "src/core/cui.c": "41bbef25388e7d0ba83d2bb702a6e3bde83f4247064e0b103fc7f84b847464d9",
+    "src/base/cui_table.c": "617c5a52cbbe4c36c5775b0af49324172aa8e205374d14694e0290ae8d55015a",
+    "tests/unit/test_event_hover.c": "11cbc49cb1d4f7c45e97757e1d1944f5c643dfdb9973bec74b3d6cb211e68ab3",
+    "tests/unit/event_hover_core_probe.c": "6fa9ff4b0aff5b865fde5adfec450575113469001dcca5112eb4ab8f5813409c",
+    "tests/unit/test_table_touch_admission.c": "1f9a43bc5d668e1be000adad12d6577c2967a07781f0e64f3612de0230d48057",
+    "tests/unit/test_table_touch_legacy.c": "33dd05003c43c3e3070e7b159300b439046ee59f77889ee9dde8a044bd7e1d0f",
+    "tests/reference/table_touch/cui_table_original.c": "5fdf1936f3d8c6ca6874bdea90bf57ae46b639c85a172bc1bd8b9c2882485cba",
+    "tests/test_distribution_shared.py": "f5ae73f07564f21671bfb89f2b04a82a493807ec9d482c4cc739f068f93ab308"
+  },
+  "artifact_receipts": {
+    "table-touch-production-build-runtime.log": "0c71e57da61a77a0566e9a0024eb276baf90eb70e148a63d6f1fd7881fc94f64",
+    "table-touch-production-commands.json": "4270403f624f595231f1e3a15a76dec16d4280f5cd07884151a017364b503d4d"
+  },
+  "limitations": "No full Dialog/allconsumer/binding/GPU parity claim. Mouse cui_hovered function byte-exact to base. No production edits after native proof."
+}

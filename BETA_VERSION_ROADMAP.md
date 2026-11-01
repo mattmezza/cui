@@ -6,34 +6,37 @@ Updated: **2026-11-01** · Status: **working alpha; beta scope unfinished**.
 requested native, language-binding, documentation and website capabilities.
 No completion percentage or beta date is asserted.
 
-**Family ledger:** 77 `tested` (partial evidence), 1 `implemented`, **0 fully
-verified**. All 78 entries are preserved. [Structural audit](docs/validation/beta-manifest-audit.json)
-also found no Impeccable-named artifacts or active configuration references; it
-does not establish behavioral parity.
+## At a glance
 
-## Current delivery status
-
-| Stage | Status |
+| Track | Current status |
 | --- | --- |
-| Released library | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3). Ten verified assets; hidden windows, initial named shadows and component improvements included. |
-| Public website | Interactive C → WASM gallery with all 78 entries, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Merged development work | Additional component-part and Button state shadows are merged and deployed, but absent from alpha.3 library packages. |
-| Work in integration | Current-frame scroll-region sizing, typed Base/Styled C Sliders, a controlled Slider gallery, versioned background transport, private software painting/validation and counted text recording. Focused checks pass; these slices are unreleased. Public renderer support, bindings and final combined validation remain unfinished. |
-| Package registries | Go alpha.3 tag/proxy verified. PyPI, npm and crates.io publication remains open; GitHub assets are available. |
+| Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
+| Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
+| Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
+| Integration branch | New Slider, scroll geometry, background/text preparation and private software rendering work is **unreleased**. Combined validation is unfinished. |
+| Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
 
-## Immediate priorities
+## Next milestones, in order
 
-| Priority | Work | Next acceptance checkpoint |
-| --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Core geometry and additive region sizing integrated. Current-size placement and small-viewport overflow proofs pass. Finish Dialog composition/input and lifecycle acceptance. |
-| 1 | Finish Slider behavior | Typed Base/Styled C interaction and presentation pass focused integrated checks; controlled gallery passes focused headless checks. Finish bridge, five language builders, native numeric delivery, vertical registered scrolling and wider acceptance. |
-| 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Candidate `00aa1f99` passes CI and native bindings, including Windows. Confirm Pages and run the newer integrated source through final checks. |
-| 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
-| 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
+1. **Finish active implementation:** Dialog sizing/lifecycle, typed Slider bridge
+   and language builders, then complete background/shadow/text rendering support.
+2. **Close component and ecosystem gaps:** reconcile every family with the frozen
+   baseline and the reported regressions below; finish bindings and documentation.
+3. **Validate the integrated revision:** compatibility, headless regressions,
+   platform evidence, generated files and exact-revision CI/browser checks.
+4. **Ship matching artifacts:** library/packages, website and reproducible examples.
+
+### Active work and known blockers
+
+| Work | Landed evidence / next requirement |
+| --- | --- |
+| Dialog and scrolling | Current-frame geometry, frozen compatibility and small-viewport proofs pass. Nested Dialog close/reopen can still retain an old routed touch scroll; finish and verify lifecycle cancellation before integration. |
+| Typed Slider | C Base/Styled models and controlled gallery are integrated. Full browser regression, 42 representative touch checks and 19 mobile navigation checks pass locally. C bridge is under review, including failed-frame authority and metadata; five language builders and native numeric delivery remain open. |
+| Backgrounds, shadows and text | Transport, counted text preparation and private ordinary software painter are integrated. Private shadow profiles pass frozen comparisons. Transactional private shadow painting passes worker tests but awaits integrator acceptance. Text painting and public support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain open. |
+| Validation | Candidate `00aa1f99` passed hosted CI/native bindings; Pages still needs terminal confirmation. Those results do not cover newer integration work. A fresh combined build/test gate remains required. |
 
 ## Remaining beta scope
 
@@ -44,7 +47,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | --- | --- | --- |
 | [ ] | Component parity | Audit all 78 families against the frozen baseline; complete missing behavior, styling, lifecycle and documented exceptions. See the family breakdown below. |
 | [ ] | Responsive layout and speed | Verify continuous live resize and hover responsiveness on Linux/macOS; finish intrinsic sizing, overflow and current-frame caret/selection/IME projection. Keep APIs simple and document composed-app usage. |
-| [ ] | Shadows and backgrounds | Complete root, nested-part and popup shadow ownership across components/bindings; finish gradients and renderer support, clipping, opacity, resource limits and failure behavior. Resolve unequal-scale shadow quality before enabling the proposed software path; preserve legacy rendering. |
+| [ ] | Shadows and backgrounds | Complete root, nested-part and popup shadow ownership across components/bindings; finish gradients and renderer support, clipping, opacity, resource limits and failure behavior. Preserve legacy rendering. |
 | [ ] | Typography and design tokens | Complete font-family/provider, weights/stretch/axes, tracking, line-height, wrapping and alignment coverage; consistent sizes, spacing, rounding and gradient text across advertised hosts/bindings. |
 | [ ] | Events and async UX | Finish the event coverage/exception matrix, typed contract and binding support; preserve legacy timing/mutations. Verify offline async fetch, wakeup, loading, retry, stale responses, cancellation and pending-work shutdown. |
 | [ ] | Touch, states and scrollbars | Verify pointer/keyboard/touch, cancellation, nested scrolling, optional scrollbar styles, pan/pinch, custom cursors, disabled/loading/inert and hover/pressed/focus states wherever applicable. |
@@ -54,7 +57,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Pages browser-tool installation now has a 20-minute failure bound after an observed prolonged stall; this does not shorten healthy test coverage. Keep laptop load and artifacts bounded. |
+| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 
@@ -113,40 +116,9 @@ that every listed defect still reproduces.
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
 
-The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actions/runs/41236071825),
-[native bindings](https://github.com/mattmezza/cui/actions/runs/41236071845) and
-[Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
-Integration candidate `3636bfbc` passed all browser shards and native binding
-runners; its only CI failure was a Windows Release struct-padding comparison.
-The fieldwise correction passes locally. Submitted candidate `00aa1f99` has successful
-[CI](https://github.com/mattmezza/cui/actions/runs/41251863047),
-[native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050) runs. Its
-[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) result still requires terminal
-confirmation. Branch checks do not deploy the public website. Older green results
-do not cover newer code.
-
-### Current integration evidence
-
-These are **unreleased slices**, not completed beta areas:
-
-| Slice | Evidence / remaining gate |
-| --- | --- |
-| Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
-| Typed Base/Styled Slider | Integrated source/distribution/legacy/example checks pass (16/16), alongside strict WASM compilation, usage6 and skill18. Owned presentation, motion and 176 software pixel proofs are covered; see [receipt](docs/validation/styled-slider-facade-integration.json). Bridge, five builders and native numeric delivery remain open. |
-| Typed Slider bridge | Worker native/WASM ABI and initial runtime/legacy checks pass. Review found failed bridge frames could leave earlier receipts acceptable; invalidation and recovery fixes are under test. Integration and all five authoring builders remain open. |
-| Controlled Slider gallery | Integrated at `259e298a`; focused headless acceptance covers owner acceptance/rejection, Single/Range pairs, pixels, pointer/touch/keys and passive idle. Full headless browser regression passes, including 80 compiling usage excerpts and all 78 baseline entries. Representative actual-touch audit42/42 and mobile page-navigation19/19 also pass; full touch parity remains open. Deployment and hosted checks of this newer revision remain open. |
-| Reduced-motion scheduling | Local viewport/DPI and repeated preference-change checks pass; all browser shards passed for candidate `3636bfbc`. Confirm the newest candidate separately. |
-| Background rendering | Transport, preparation and private validator checks pass. Counted text recording passes the repository Release O3 build, seven runtime checks, mutation rejection and skill18. The negative-fixture warning and no-Bidi admission gap are fixed. Wider suite/platform acceptance remains open. This does **not** establish renderer painting support. |
-| Scroll regions and private painter | Both integrated. Focused private checks pass (10/10), alongside skill18. Large-coordinate regression reproduced and corrected. See [receipt](docs/validation/core-paint-integration.json). Private painting does not establish public adapter support. |
-| Dialog sizing | Current-size placement, frozen compatibility and small-viewport proofs pass. Worker actual-font geometry/contracts pass; input testing found a late scrollbar-registration error after accepted close. Worker fix advances past close/veto/focus checks, but held-touch testing reproduces old-contact scrolling after reopen. Held-action and plain child tests reproduce stale touch, mouse and Space release activating the reopened dialog, with accepted-activation evidence. Scroll-owner identity or touch-only fixes are insufficient. An unpublished scoped-cancellation prototype now passes10 focused headless cases, including these old-release regressions, fresh presses and omission/error recovery. A separate late-receipt test now passes for pointer, Space and same-batch release-policy Enter, preserving delivered effects/copies while cancelling pending siblings. Nested/portal and drag-batch gates remain; no public fix has shipped. No family closure claimed. |
-| Native Slider delivery | [Source audit](docs/validation/native-slider-delivery-audit.json) confirms native adapter routes only focus/click and publishes legacy float values. Additive numeric mode, owned double payload/authority, host opt-ins and real AT delivery remain open. |
-| Shadow diagnostics | Independent area reference passes; 512 legacy RGBA comparisons remain exact. Fractional inset/source-kernel differences persist. [Receipt](docs/validation/shadow-area-integration.json). |
-| Private shadow profiles | Integrated source/distribution/umbrella/legacy checks4/4 pass; V1 behavior preserved. [Receipt](docs/validation/shadow-profile-integration.json). |
-| Private V2 shadow painter | Worker strict/headless checks3/3 pass after corrected Image-preserving mixed frames, large-coordinate and clip-boundary coverage. Final maintenance checks and integration remain open. Text and public/all-adapter support remain unfinished. |
-| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. Hosted CI/native bindings pass for `00aa1f99`; newer slices still require exact-revision hosted/browser confirmation. |
-
-Keep detailed receipts with their implementation changes; refresh this summary
-when the integrated revision passes, merges or ships.
+Detailed validation receipts live in [docs/validation](docs/validation).
+Older green runs do not cover newer source; worker checks do not establish
+integrated, released or deployed support.
 
 ## Deferred or lower priority
 

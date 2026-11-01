@@ -28,7 +28,7 @@
   ],
   "manifest_entries": 78,
   "pending": [
-    "Headless browser runtime scenarios (full WASM build passed)",
+    "Full catalog browser gate and broader TimeField mobile/touch/IME/foreign coverage",
     "Whole-suite regression after Dialog and localized TimeField integration",
     "One-root Tab, IME and foreign authoring coverage",
     "Release and deployed gallery verification"
@@ -58,5 +58,21 @@
     "usage_excerpts": 80,
     "failure": "Default short Dialog first-open body scroll maximum is43, expected0; panel420x298 and body420x63. Browser stopped before localized TimeField scenarios.",
     "impact": "Intrinsic Dialog geometry requires correction; TimeField browser acceptance remains unexecuted."
+  },
+  "focused_browser": {
+    "result": "PASS",
+    "artifact_source": "dba5043e",
+    "command": "python tests/web/test_time_field.py --directory /home/matteo/.cache/cui-current-validation/web",
+    "headless": true,
+    "log": "time-field-focused-browser.log",
+    "checks": [
+      "Keyboard change and exactly one observer callback",
+      "12-hour AM/PM segment",
+      "Arabic locale and accessible segment label",
+      "Read-only prevents keyboard mutation and callbacks",
+      "Bounds rejection preserves value and callbacks",
+      "Explicit validation reset"
+    ],
+    "scope": "Focused real Chromium/WASM acceptance; full catalog gate still fails at Dialog idle and does not pass."
   }
 }

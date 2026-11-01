@@ -42,7 +42,13 @@ Run the meaningful browser checks with pinned Playwright 1.58.0:
 ```sh
 uv run --with playwright==1.58.0 playwright install chromium
 uv run tests/web/test_browser.py
+uv run tests/web/test_time_field.py --directory build/web
 ```
+
+The focused TimeField gate independently checks real pointer/keyboard input,
+H12/Arabic segments, read-only behavior, bounds rejection and validation reset.
+It complements the complete catalog gate; passing it does not establish full
+catalog or platform coverage.
 
 CI may use `playwright install --with-deps chromium` on its disposable runner. An installed Chromium can instead be selected with `--chromium /absolute/path/to/chrome`. Tests serve the artifact beneath `/cui/`, instantiate the real WASM, exercise pointer activation, keyboard activation, disabled behavior, checkbox state, slider stepping and input editing; exercise delayed tooltip open/Escape, hover-card close, popup selection/menu activation, modal Tab trapping, Escape trigger-focus restoration and tab arrow navigation; inspect all live stories; verify all 78 entries, search, themes, pending entries and narrow layout. There is no mocked C implementation.
 

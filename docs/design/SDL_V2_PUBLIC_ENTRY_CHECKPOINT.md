@@ -196,3 +196,37 @@ Implementation may proceed in isolation. Public support stays unadvertised until
 frozen V1 runtime differentials, all-command V2 output, native failure injection,
 reentry/aliasing and state restoration checks pass. This decision introduces no
 new input dispatch or application state-ownership architecture.
+
+
+## Runtime-informed transfer amendment (2026-11-01)
+
+The first strict source/legacy-ABI compilation passed, but the first real private-
+Xvfb software-renderer query failed. Preserved diagnostics identify SDL 3.4.18
+software formats ARGB8888/XRGB8888/INDEX8 (BGRA32 on this host), no native RGBA32,
+and an absent maximum-texture-size property. This evidence supersedes the
+RGBA32-only admission above; it does not establish rendering support yet.
+
+Integrator approves this bounded implementation slice:
+
+- Prefer advertised RGBA32; otherwise accept advertised BGRA32. Reject all other
+  formats. No implicit SDL format conversion or color-space conversion is admitted.
+- For BGRA32, swap red/blue bytes in the already owned, fully painted CPU plane
+  immediately before upload. Preserve green/alpha exactly. No additional pixel
+  plane, retained image, allocation category or public ownership change.
+- SDL maximum texture size zero means no reported limit (including an absent
+  property), following SDL's own checked-creation behavior. Continue enforcing
+  CUI's 16384 dimension ceiling and all byte/pixel budgets. A positive reported
+  maximum additionally bounds dimensions; reject a negative value. Texture
+  creation failure remains a checked error, not proof of supported dimensions.
+- Use SDL's documented sRGB default for an absent output-colorspace property;
+  explicitly non-sRGB/HDR output remains rejected.
+- Prove the channel permutation with independent pixel/alpha oracles and real
+  software-renderer upload/readback. Cover both format-selection branches and
+  rejected formats, missing/zero/positive/negative limits, native failures and
+  immutable V1 compatibility. Keep original failed logs and distinguish source,
+  compile and runtime outcomes. No physical GPU or cross-platform claim.
+
+This amendment changes only native transfer admission. Shared composition,
+layout, input, common painting, state restoration and bounded frame ownership
+remain under their previously reviewed contracts. Public support stays unfinished
+until the implementation and integrated verification pass.

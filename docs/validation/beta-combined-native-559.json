@@ -1,0 +1,12 @@
+{
+  "source_revision": "7c7ac4e0ff30cc26b3642e3e05da37cb39d5f8db",
+  "result": "PASS",
+  "tests": 559,
+  "skips": 0,
+  "elapsed_seconds": 298.22,
+  "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 --output-on-failure",
+  "execution": "nice19, CPU1, private Xvfb, real font and pinned theme fixtures",
+  "log_sha256": "a94e16081c472ccb52d41700576341a91106887662c023d14e4eb14afcb6a103",
+  "last_test_sha256": "976ea7e2f3a6854b9fea31acfe1ab28a578bd990f13a566aa22aa9492c97c862",
+  "scope": "Integrated native suite including Dialog composition/idle, localized TimeField and timestamp-preserving generators. Unintegrated SDL V2 and localized TimeField bridge are excluded. No physical GPU, macOS, Windows or deployment claim."
+}

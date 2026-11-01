@@ -1,0 +1,41 @@
+{
+  "date": "2026-11-01",
+  "source_revision": "b234adeb18457d2b20664826441327340c5a21b3",
+  "status": "FOCUSED_COMBINED_DIALOG_ACCEPTED",
+  "build": "Configured native CMake build of new Base/Styled modules, ABI object, three runtime targets and O0 standalone umbrella consumer completed with warnings enabled.",
+  "tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 41.44,
+    "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 -R \"^(dialog_composition_(contracts|geometry|actions)|dist_dialog_composition|dialog_surface_legacy_trace|agent_skill_(freshness|contract)|binding_sdk_freshness)$\" --output-on-failure",
+    "includes": [
+      "Dialog descriptor/title/phase contracts",
+      "current-frame geometry, real-font wrapping and scrollbar visibility",
+      "owner actions/veto/focus",
+      "configured standalone umbrella consumer",
+      "frozen legacy reducer trace",
+      "SDK and agent skill freshness",
+      "installed skill contract"
+    ]
+  },
+  "generation": "SDK -> amalgamation -> skill completed; 449 source files per SDK.",
+  "worker_evidence": "docs/validation/dialog-six-slot-final.json; worker geometry/guide/C++/WASM proof remains separately scoped.",
+  "remaining": [
+    "New gallery first-frame sizing and nested touch tests must be adapted and run headlessly.",
+    "Combined WASM/browser build and deployment remain pending.",
+    "Held-input reopening lifecycle and foreign slot facades remain unfinished.",
+    "The earlier full541 run predates Dialog; this is focused acceptance, not a newer full-suite result."
+  ],
+  "logs": {
+    "dialog-combined-generation.log": {
+      "sha256": "80828fb3d6f1629d2629bd1e23dedf0309b78dd852faf8a501873cd11f289dcc"
+    },
+    "dialog-combined-build.log": {
+      "sha256": "6c95c07b5f5e013a5c808182575b69b6b17af53701c3c363638f8a2ea0e43a3e"
+    },
+    "dialog-combined-tests.log": {
+      "sha256": "ad9718e47150f36999bb105a80dfd47ede193d10426c0af362e559ae8df469bf"
+    }
+  }
+}

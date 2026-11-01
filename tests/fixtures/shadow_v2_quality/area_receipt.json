@@ -1,0 +1,22 @@
+{
+  "kind": "TEST ONLY independent area reference; no production acceptance",
+  "source_base": "2cdc5984",
+  "sha256": {
+    "tests/unit/test_shadow_v2_area_quality.c": "27dc23692713a4a4811c068e544dbd4cb61e761336181524783f0cb73050e464",
+    "tests/unit/shadow_v2_box_internal.h": "7b60c26ddee16bdf69b9ee2dbc651f5007d5dd4b5ed6b3418e09ad4733b2d4e3",
+    "tests/unit/test_shadow_v2_quality.c": "3e75b87045923bf4d91863387b7ac3cbc6d7c717d5481c972b409e7c6d537f15",
+    "src/effects/cui_effects.c": "998d811b9c977fd27ca106f3058b3be0e1e7a0dee363e5ebc14c724d41488f1b",
+    "build-shadow/libcui.a": "96d40727c65d39de0accedf45edba34098a209ec41747bd05800d96362e1a137"
+  },
+  "compiler": "GCC16.2.1 20260810",
+  "flags": "cc -std=c11 -O3 -DNDEBUG -UNDEBUG -Wall -Wextra -Wpedantic -Werror -Iinclude -Ibackends/software; preserved libcui.a -lm",
+  "execution": "taskset CPU0 nice19; private test_local.py wrapper1/1 PASS1.85s",
+  "reference": "positive sigma Gaussian/pixel-area convolution; analytic X antiderivative, midpoint Y; inset clips target X/Y to unblurred element before averaging; Gaussian tails8sigma (primitive9sigma)",
+  "refinement": "32 to64 rows, DROP sourceY multiplier2, INSET sourceZ multiplier4, zero sigma existing area reference rows multiplier4; empirical not proven bound",
+  "reference_work": 6754944,
+  "cpu_seconds": 1.817899,
+  "rms_bytes": 23.475499587232253,
+  "max_refinement_bytes": 0.0219352908,
+  "legacy_rgba_mismatches": 0,
+  "report_sha256": "7db38437e271dc907996dc9145696deb795f8c7cdfec68b353e5e70e12292a2a"
+}

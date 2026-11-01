@@ -35,3 +35,21 @@ Overall RMS against the mixed reference is 24.918362 bytes (prior point 31.50407
 The analytical overlap tests establish the implemented weighted-discrete-profile operation independently of the Gaussian reference. They also prove cap rejection before reads/writes, full normalization after support cropping, late-reader output atomicity and successful retry. A 16,384-logical-wide caster at q64 fails the existing full-raster query while the tiny visible box operation succeeds with exactly 1,024 source taps; cap1,023 rejects atomically. The rotated case exceeds the 1M budget and rejects without sampling/output. This establishes bounded planning, not permission to bypass sampler geometry validation.
 
 Recommendation: review target-pixel area integration as an explicit V2 coverage policy, preserving exact V1 behavior. The experiment supports its arithmetic and alias reduction, while its quality relative to a center-sampled blur is intentionally different. Production remains unapproved pending that semantic decision and the private shared-geometry review above.
+
+## Independent positive-sigma pixel-area reference
+
+`test_shadow_v2_area_quality.c` adds a separate reference and report (`area_report.csv`, `area_receipt.json`), preserving both earlier CSVs and their sources. Positive-sigma DROP integrates the unsnapped physical shape against the Gaussian convolved with the target pixel box: X uses an analytic Gaussian-CDF antiderivative, Y uses segmented midpoint integration over source rows. INSET instead integrates target rows inside the original element and subtracts the hole convolution over the element-clipped target X span. This applies the element mask before pixel averaging; it does not multiply independently averaged hole and element masks. Gaussian/box convolution commutes for DROP, but element masking remains ordered for INSET.
+
+The antiderivative has independent 65,536-midpoint CDF, interval-symmetry and exact far-tail tests. Primitive tails truncate at9sigma and source Gaussian integration at8sigma; segment boundaries include corners and narrow blur transitions. Reported32→64 midpoint refinement is empirical, not a rigorous error bound. The maximum observed refinement was0.0219353 alpha byte. Sigma-zero rows deliberately retain the original area-reference model (including its inset mask-product convention) at256/128 rows; this checkpoint adds no independent correction or exactness claim for that pre-existing model.
+
+| Positive-sigma case / kind | Box versus AREA max bytes | Box versus original CENTER max bytes |
+|---|---:|---:|
+| min-axis blur / drop | 0.010097 | 120.382533 |
+| max-min blur / drop | 0.004736 | 65.884857 |
+| large-visible / drop | 0.007407 | 94.581377 |
+| max-min blur / inset | 0.005309 | 0.005184 |
+| fractional blur / inset | 132.320726 | 132.246296 |
+
+The first three large discrepancies were footprint-model differences, not reconstruction failures under the area contract. The fractional inset difference remains a genuine difference between the snapped legacy source profile/kernel and this unsnapped reference; area integration does not remove it. Collapsed-hole inset still differs by173 bytes because the legacy source treats an empty hole as empty output, while the independent reference treats it as full element coverage. Overall mixed-case AREA RMS is23.475500 bytes; that aggregate includes legacy semantic differences and is not an acceptance threshold or CSS parity claim.
+
+The strict O3 two-TU build and private-display test passed1/1 in1.85seconds. The measurement made6,754,944 reference row evaluations in1.817899 process-CPU seconds onCPU0/nice19, without concurrent CUI heavy work. All512 frozen legacy-unit RGBA comparisons remain exact. No profile parameters were tuned to either reference. Production approval, shared geometry review and complete renderer integration remain pending.

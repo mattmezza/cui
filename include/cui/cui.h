@@ -1076,6 +1076,22 @@ bool cui_set_box_scroll_offset(cui_context *, cui_id, float x, float y);
 bool cui_track_bounds(cui_context *ui, cui_id id, cui_rect *retained);
 /* Previous-frame clipped region, excluding higher interactive layers/modal scopes. */
 bool cui_hovered(cui_context *ui, cui_id id);
+/* Indexed pointer-coordinate query, read-only and independent of consumption,
+ * activation and capture. Ordinary begin/end-frame submission only, with a valid
+ * prior completed input snapshot. False for null/zero/invalid arguments, non-
+ * pointer events, nonfinite coordinates, errors, inert/layout-only/measurement/
+ * prepaint phases or a disabled target. DOWN/MOVE/UP are pointer events here.
+ * Uses prior clipped target regions, prior modal eligibility and currently active
+ * retained named ancestors; target ancestry must also belong to the current
+ * active modal, regardless of the caller's scope stack. Higher interactive layers
+ * or paint roots occlude. In the same layer/root, later interactive layout
+ * siblings occlude; actual layout descendants do not. Higher-root descendants
+ * still occlude. Focusable/pointer-activatable nodes and explicit pointer barriers
+ * participate (including disabled barriers). No event propagation or mutation.
+ * No allocation/retained storage; bounded scans over configured semantic/scope
+ * capacities and retained layout ancestry. Does not change cui_hovered. */
+bool cui_event_hovered(cui_context *ui, size_t event_index, cui_id id);
+
 /* Cursor of the captured or topmost hovered enabled semantic from the completed
  * frame. Hosts apply this after end_frame; clipping and modal scopes apply. */
 cui_cursor cui_pointer_cursor(cui_context *ui);

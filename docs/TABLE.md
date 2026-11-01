@@ -50,6 +50,14 @@ pixel increments. Secondary clicks return a contextual row/column request withou
 do not resize. Manual selection moves the cursor without changing selection.
 Disabled state prevents reducer mutation.
 
+Enabled movable column headers opt into touch drag priority: a primary touch
+starting on the header reorders rather than handing off to ancestor scrolling.
+Nonmovable headers and body content retain pan behavior. Touch drop admission
+uses that UP event's coordinates and the prior clipped/modal-eligible semantic
+region, so a later mouse sample in the same batch cannot change its result.
+Mouse routing and callback timing remain unchanged. See [indexed pointer-region
+admission](EVENT_HOVER.md) for the Core query contract and occlusion rules.
+
 The body uses fixed row heights, fractional scroll offsets, bounded row and column overscan and
 real ancestor clipping. The header remains fixed vertically and shares horizontal
 scroll with the body. Width-aware horizontal column virtualization includes partial edge columns. An optional pinned row-number header selects whole rows and navigates enabled rows. Its result requests ROW selection mode; the caller applies that request to the controlled options. Row headers continue working when all data columns are disabled. Result fields report actual visible row/column windows (without overscan), changes to those windows, and an opt-in load-more request near the end. Load requests fire once per threshold entry or changed row count; applications append rows and rebind. They are suppressed while disabled. Both grid and body expose scroll extents for core wheel routing and boundary bubbling. Wheel scrolling can move the cursor offscreen without

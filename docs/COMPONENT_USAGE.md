@@ -1126,7 +1126,7 @@ Event API includes: `cui/cui_command_events.h`.
 
 **Interaction:** cui_table_result reports interaction; cui_table_label_fn provides accessibility text and cui_table_cell_fn composes visible cells.
 
-**Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result.
+**Usage:** Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.
 
 API: `cui_table_create`, `cui_data_table`, `cui_table_destroy`. [Public header](../include/cui/cui_table.h); [guide](TABLE.md).
 

@@ -459,3 +459,12 @@ inactive numeric evidence before publishing receipt authority. Accessibility
 INCREMENT/DECREMENT carry zero numeric evidence; explicit typed SET remains
 supported. This does not imply complete type-specific inactive-field or native
 accessibility coverage; inspect the per-language wire conformance guide.
+
+## Indexed pointer regions and Table touch
+
+Read `docs/EVENT_HOVER.md` and the full `include/cui/cui.h` contract before using
+`cui_event_hovered`. It reads an indexed pointer event against prior clipped
+semantic geometry, independent of consumption/capture; it does not publish
+current paint bounds or perform event propagation. Enabled movable Table headers
+own touch reorder while body/nonmovable header pan remains available. Follow
+`docs/TABLE.md`; do not infer Dialog reopen or all-consumer lifecycle completion.

@@ -1,0 +1,7 @@
+{
+  "base_revision": "32dfddb3",
+  "source": "src/base/cui_table.c",
+  "bytes": 78448,
+  "sha256": "5fdf1936f3d8c6ca6874bdea90bf57ae46b639c85a172bc1bd8b9c2882485cba",
+  "policy": "Frozen implementation bytes unchanged; wrapper only renames public symbols; independent contexts compare semantic fields and callback ordering."
+}

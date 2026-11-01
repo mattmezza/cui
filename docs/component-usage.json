@@ -2265,10 +2265,11 @@
       ],
       "state_ownership": "Caller retains allocated model/state, data rows/columns and any borrowed label storage.",
       "interaction": "cui_table_result reports interaction; cui_table_label_fn provides accessibility text and cui_table_cell_fn composes visible cells.",
-      "usage": "Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result.",
+      "usage": "Bind data when changed, submit virtual cells each frame, and handle selection/sort actions from the result. Enabled movable headers own touch reorder; body/nonmovable headers retain pan, and touch drops use indexed clipped-region admission.",
       "docs": [
         "docs/TABLE.md",
-        "docs/TABLE_EVENTS.md"
+        "docs/TABLE_EVENTS.md",
+        "docs/EVENT_HOVER.md"
       ],
       "callback_symbols": [
         "cui_table_label_fn",

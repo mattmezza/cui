@@ -446,3 +446,9 @@ numeric evidence must be zero, coordinates/numeric evidence finite, repeat 0/1,
 and absent source UNKNOWN. Invalid copied evidence raises BridgeError before
 publishing a request; do not invent metadata. See docs/PYTHON_SLIDER_MODEL.md and
 docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md for per-language omissions.
+
+Node/TypeScript and Go controlled Slider copied requests also reject nonzero
+inactive numeric evidence before publishing receipt authority. Accessibility
+INCREMENT/DECREMENT carry zero numeric evidence; explicit typed SET remains
+supported. This does not imply complete type-specific inactive-field or native
+accessibility coverage; inspect the per-language wire conformance guide.

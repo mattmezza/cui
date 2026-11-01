@@ -57,10 +57,10 @@ def main():
         case('missing_' + str(missing), {'CUI_BRIDGE_LIBRARY': out / f'optional-{missing}.so',
              'CUI_SLIDER_PROTOCOL': 'missing', 'CUI_SLIDER_FIXTURE': 'missing'},
              ['-test.run', '^TestSliderOptionalProtocol$', '-test.v'])
-    modes = ['edges', 'unavailable', 'config_size', 'value_size', 'receipt_size', 'request_size',
+    modes = ['edges', 'numeric_set', 'inactive_numeric_zero', 'unavailable', 'config_size', 'value_size', 'receipt_size', 'request_size',
              'presentation_size', 'receipt_size_bad', 'receipt_schema', 'phase', 'reason', 'source',
              'flags', 'absent_source', 'absent_frame', 'absent_index', 'absent_input', 'input_flags',
-             'modifiers', 'key', 'input_type', 'numeric', 'value_reserved', 'domain_reserved']
+             'modifiers', 'key', 'input_type', 'numeric', 'inactive_numeric', 'inactive_numeric_key', 'value_reserved', 'domain_reserved']
     for mode in modes:
         case(mode, {'CUI_BRIDGE_LIBRARY': out / 'optional-16.so', 'CUI_SLIDER_PROTOCOL': mode,
                     'CUI_SLIDER_FIXTURE': mode}, ['-test.run', '^TestSliderOptionalProtocol$', '-test.v'])

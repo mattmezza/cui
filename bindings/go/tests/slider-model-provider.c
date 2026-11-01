@@ -182,6 +182,26 @@ cui_bridge_status cui_bridge_poll_slider_request_v1(cui_bridge_app *app, uint32_
         out->input.type = 999;
     if (is("numeric"))
         out->input.flags = 2;
+    if (is("numeric_set") || is("inactive_numeric_zero")) {
+        out->event_source = CUI_BRIDGE_SLIDER_SOURCE_ACCESSIBILITY;
+        memset(&out->input, 0, sizeof(out->input));
+        out->input.flags = CUI_BRIDGE_SLIDER_HAS_INPUT;
+        out->input.type = CUI_BRIDGE_SLIDER_INPUT_ACCESSIBILITY;
+        out->input.accessibility_target = out->event_target;
+        out->input.accessibility_action = CUI_BRIDGE_SLIDER_INCREMENT;
+        if (is("numeric_set")) {
+            out->input.flags |= CUI_BRIDGE_SLIDER_HAS_NUMERIC_VALUE;
+            out->input.accessibility_action = CUI_BRIDGE_SLIDER_SET_VALUE;
+            out->input.accessibility_value = .25;
+        }
+    }
+    if (is("inactive_numeric") || is("inactive_numeric_key")) {
+        out->input.accessibility_value = .25;
+        if (is("inactive_numeric")) {
+            out->input.type = CUI_BRIDGE_SLIDER_INPUT_ACCESSIBILITY;
+            out->input.accessibility_action = CUI_BRIDGE_SLIDER_INCREMENT;
+        }
+    }
     if (is("value_reserved"))
         out->current.reserved = 1;
     if (is("domain_reserved"))

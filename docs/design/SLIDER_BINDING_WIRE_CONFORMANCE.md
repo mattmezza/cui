@@ -23,7 +23,7 @@ actual producer as evidence, not a guessed metadata rule.
 | HAS_INPUT absent ⇒ every input field0 | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | repeat only0/1, finite x/y | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | finite numeric value even without numeric flag | Rejects nonfinite (Python follow-up) | Rejects | Rejects | Rejects |
-| HAS_NUMERIC_VALUE absent ⇒ numeric value0 | Rejects (Python follow-up) | **Missing** | **Missing** | Rejects; `inactive_numeric` provider/private test prepared |
+| HAS_NUMERIC_VALUE absent ⇒ numeric value0 | Rejects (Python follow-up) | Rejects (Node/TS follow-up) | Rejects (Go follow-up) | Rejects; `inactive_numeric` provider/private test prepared |
 | Numeric flag ⇒ input present, typeACCESSIBILITY, actionSET_VALUE | Rejects | Rejects | Rejects | Rejects |
 | HAS_SOURCE absent ⇒ sourceUNKNOWN0 | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | Absent frame0 / indexUINT64_MAX | Rejects | Rejects | Rejects | Rejects |
@@ -50,7 +50,10 @@ regression first reproduced 16 failures before the fix; its expanded cases also
 cover inactive identity fields and rejection through the poll boundary without
 publishing a request. Integrated private-Xvfb acceptance passed seven CTest checks including current
 authored UI/examples, actual pre-typed library and the full consumer-skill suite;
-see docs/validation/python-slider-wire-integration.json. JS/TS and Go inactive-numeric checks remain open.
+see docs/validation/python-slider-wire-integration.json. JS/TS and Go now reject inactive numeric evidence before publishing receipt authority.
+Their new regressions and integrated compatibility checks passed Go46/46, Node31/31
+and the full consumer-skill suite; see docs/validation/node-go-slider-wire-integration.json;
+this does not establish the broader inactive type-field matrix below.
 
 ## Small compatible follow-up
 

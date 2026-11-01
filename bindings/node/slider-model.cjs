@@ -84,6 +84,7 @@ module.exports = function sliderModelModule(native, Node, NODE, keyFor) {
     const input = freeze({type:enumValue(i[0],[0,1,2,3,7,13]),flags:uint(i[1],3),key:enumValue(i[2],[0,4,5,6,7,8,9,10,19,20]),modifiers:uint(i[3],15),x:number(i[4]),y:number(i[5]),repeat:uint(i[6],1),pointerType:uint(i[7],2),pointerButton:uint(i[8],2),accessibilityAction:enumValue(i[9],[0,2,3,4]),pointerId:big(i[10]),pointerDevice:big(i[11]),accessibilityTarget:big(i[12]),accessibilityValue:number(i[13])});
     if ((!(eventFlags&1) && eventFrame!==0n) || (!(eventFlags&2) && eventIndex!==0xffffffffffffffffn) || (!(eventFlags&4) && eventSource!==0) || ((input.flags&2) && (!(input.flags&1) || input.type!==13 || input.accessibilityAction!==4))) throw new TypeError('incoherent Slider evidence');
     if (!(input.flags&1) && i.some((v,index)=>index>=10&&index<=12?v!==0n:v!==0)) throw new TypeError('nonzero absent Slider input');
+    if (!(input.flags&2) && input.accessibilityValue!==0) throw new TypeError('nonzero inactive Slider numeric evidence');
     receipts.set(receipt,{namespace:appNamespaces.get(app),wire:freeze([...r])});
     return freeze({phase,reason,thumb,eventKind,eventSource,eventFlags,receipt,eventTarget,eventFrame,eventIndex,current,requested,domain:d,gestureDomain,input});
   }

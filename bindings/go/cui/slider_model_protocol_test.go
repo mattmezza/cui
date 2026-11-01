@@ -34,7 +34,7 @@ func TestSliderOptionalProtocol(t *testing.T) {
 	}
 	check(t, a.EnableSliderRequests(4096))
 	r, ok, e := a.PollSliderRequest()
-	if mode != "edges" {
+	if mode != "edges" && mode != "numeric_set" && mode != "inactive_numeric_zero" {
 		if e == nil || ok || r.Receipt.namespace != nil {
 			t.Fatal("malformed copy published", mode, r, e)
 		}
@@ -44,11 +44,17 @@ func TestSliderOptionalProtocol(t *testing.T) {
 	if !ok {
 		t.Fatal("missing synthetic request")
 	}
+	if mode == "numeric_set" && (r.Input.AccessibilityValue != .25 || r.Input.Flags != 3 || r.Input.AccessibilityAction != 4) {
+		t.Fatal("valid numeric SET lost", r.Input)
+	}
+	if mode == "inactive_numeric_zero" && (r.Input.AccessibilityValue != 0 || r.Input.AccessibilityAction != 2) {
+		t.Fatal("inactive numeric evidence lost", r.Input)
+	}
 	i := r.Receipt.Info()
-	if i.AppEpoch != ^uint64(0) || i.SourceGeneration != ^uint64(0) || i.Slot != ^uint32(0) || i.Generation != ^uint32(0) || i.ConfigurationRevision != ^uint64(0) || i.SubmissionFrame != ^uint64(0) || i.RequestSequence != ^uint64(0) || r.EventTarget != ^uint64(0) || r.EventFrame != ^uint64(0) || r.EventIndex != ^uint64(0) || r.Input.PointerID != ^uint64(0) || r.Input.PointerDevice != ^uint64(0) {
+	if i.AppEpoch != ^uint64(0) || i.SourceGeneration != ^uint64(0) || i.Slot != ^uint32(0) || i.Generation != ^uint32(0) || i.ConfigurationRevision != ^uint64(0) || i.SubmissionFrame != ^uint64(0) || i.RequestSequence != ^uint64(0) || r.EventTarget != ^uint64(0) || r.EventFrame != ^uint64(0) || r.EventIndex != ^uint64(0) || (mode == "edges" && (r.Input.PointerID != ^uint64(0) || r.Input.PointerDevice != ^uint64(0))) {
 		t.Fatal("identity narrowed", r)
 	}
-	if r.Current.Start() != 20 || r.Current.End() != 60 || r.Requested.End() != 59 || r.Input.Modifiers != 15 {
+	if r.Current.Start() != 20 || r.Current.End() != 60 || r.Requested.End() != 59 || (mode == "edges" && r.Input.Modifiers != 15) {
 		t.Fatal(r)
 	}
 	info := r.Receipt.Info()

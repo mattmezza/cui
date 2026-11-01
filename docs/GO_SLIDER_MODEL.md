@@ -72,6 +72,11 @@ pointer/device/accessibility IDs. Unknown tags/masks and incoherent unavailable
 input evidence reject rather than being guessed.
 
 Receipts have private authority fields plus `Info()` returning inert metadata.
+Copied input records require zero numeric evidence when HAS_NUMERIC_VALUE is
+absent, including keyboard events and accessibility INCREMENT/DECREMENT. Explicit
+numeric SET evidence remains supported. Malformed records are rejected before a
+request or receipt authority is published; previously copied records stay valid.
+
 Assignment preserves an issued receipt; constructing only metadata does not
 invent authority. A nonzero-size private per-App namespace token retains no App
 or C pointer. Keep handles/receipts within the matching App and loaded bridge

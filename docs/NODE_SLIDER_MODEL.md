@@ -77,7 +77,12 @@ Old-only applications neither require nor enable this feature.
 
 `poll_slider_request()` returns one immutable owned request or undefined. Nested
 receipt/value/domain/input records are copied before leaving N-API and frozen;
-no C pointer or view survives into a user callback. Copies stay readable after
+no C pointer or view survives into a user callback.
+Copied input records require zero numeric evidence when HAS_NUMERIC_VALUE is
+absent, including keyboard events and accessibility INCREMENT/DECREMENT. Explicit
+numeric SET evidence remains supported. Malformed records are rejected before a
+request or receipt authority is published; previously copied records stay valid.
+ Copies stay readable after
 frames, removal, close or disposal. Keep the original returned receipt object:
 reconstructed/cloned numeric fields do not confer acceptance authority. Authority
 belongs to one matching App and loaded bridge image, not a process-global security

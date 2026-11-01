@@ -3818,6 +3818,9 @@ func (a *App) sliderReadRequest(w C.cui_bridge_slider_request_v1) (SliderRequest
 	if !finite(float32(i.x)) || !finite(float32(i.y)) || !sliderFinite(float64(i.accessibility_value)) || i.flags&2 != 0 && (i.flags&1 == 0 || i._type != 13 || i.accessibility_action != 4) {
 		return bad()
 	}
+	if i.flags&2 == 0 && i.accessibility_value != 0 {
+		return bad()
+	}
 	out := SliderRequest{Phase: SliderPhase(w.phase), Reason: uint32(w.reason), Thumb: uint32(w.thumb), EventKind: uint32(w.event_kind), EventSource: uint32(w.event_source), EventFlags: uint32(w.event_flags), Receipt: SliderReceipt{SliderReceiptInfo{uint64(r.app_epoch), uint32(r.node.slot), uint32(r.node.generation), uint64(r.source_generation), uint64(r.configuration_revision), uint64(r.submission_frame), uint64(r.request_sequence)}, a.sliderNamespace}, EventTarget: uint64(w.event_target), EventFrame: uint64(w.event_frame), EventIndex: uint64(w.event_index), Current: current, Requested: requested, Domain: domain, GestureDomain: gesture, Input: SliderInput{uint32(i._type), uint32(i.flags), uint32(i.key), uint32(i.modifiers), float32(i.x), float32(i.y), uint32(i.repeat), uint32(i.pointer_type), uint32(i.pointer_button), uint32(i.accessibility_action), uint64(i.pointer_id), uint64(i.pointer_device), uint64(i.accessibility_target), float64(i.accessibility_value)}}
 	return out, nil
 }

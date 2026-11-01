@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-01",
+  "scope": "Node/TypeScript and Go controlled Slider inactive numeric evidence validation; no public record, C producer, legacy timing or acceptance mutation change",
+  "checks": {
+    "Node_red": "Expected malformed-request assertion failed before fix; preserved log",
+    "Go_red": "44/46 passed before fix; inactive_numeric and inactive_numeric_key failed as expected",
+    "Go_green": "46/46 PASS 4.75 s under private Xvfb, strict C11 tiny providers/current dynamic authored UI/actual old library/16 missing symbols; includes valid numeric SET and canonical inactive-zero acceptance",
+    "Node_green": "31/31 PASS 3.83 s under private Xvfb, current authored UI/examples, actual old/missing/provider groups and existing TypeScript runtime/compiler tests",
+    "receipt_authority": "Node malformed-copy tests assert no WeakMap authority writes; Go failed decode returns no copied receipt namespace; valid previous copies stay readable",
+    "skill": "2/2 CTest PASS 40.48 s, including full18-method contract40.10 s and generated freshness; SDK/amalgamation freshness also passed"
+  },
+  "source_sha256": {
+    "bindings/node/slider-model.cjs": "1dccb310f81136ce744f15865738f82f7ca960615e1070e57e9c64226f47aceb",
+    "bindings/node/test/slider-model-protocol.test.cjs": "cf958d10c57607efe826a4526a38b733a1a04a04255d6d90b619a58613366d9d",
+    "bindings/go/cui/native.go": "43fa0060252dcadb4006acbf0443d83375a2bca5c169f776743e20247f98321d",
+    "bindings/go/cui/slider_model_protocol_test.go": "61c020112bc5f60ea14f8f2c1ff82abe3957366d8b4f3bfa1ac570f31650e1a3",
+    "bindings/go/tests/slider-model-provider.c": "c01a0aa5cd5bc985dc9bcb183b2be4c280f96bbddfacc631156b5f9aa11979d9",
+    "bindings/go/tests/test_slider_protocol.py": "633b5d5b2fffb9dad68452a561db32020dcca1a9ca72397115284052cf166788"
+  },
+  "logs": [
+    "/home/matteo/.cache/cui-current-validation/node-wire-red.log",
+    "/home/matteo/.cache/cui-current-validation/go-wire-red.log",
+    "/home/matteo/.cache/cui-current-validation/go-wire-green.log",
+    "/home/matteo/.cache/cui-current-validation/node-wire-green.log",
+    "/home/matteo/.cache/cui-current-validation/node-go-wire-skill.log"
+  ],
+  "limitations": [
+    "Broader type-specific inactive-field matrix remains incomplete",
+    "No native numeric accessibility delivery or cross-platform/package publication claim",
+    "Focused checks do not substitute for final consolidated full-suite acceptance"
+  ]
+}

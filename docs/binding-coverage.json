@@ -1158,7 +1158,7 @@
     "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
   },
   "localized_time_field_v1_source_checkpoint": {
-    "implementation": "Integrated unreleased C bridge and Python localized facade have focused root proof. C bridge: thirteen checks; Python: sixteen configured root entries, including fifteen localized methods/current-old-partial providers and authored example. Remaining four localized facades, package publication and broader platform/IME/focus acceptance remain open.",
+    "implementation": "Integrated unreleased C bridge and Python localized facade have focused root proof. C bridge: thirteen checks; Python: sixteen configured root entries, including fifteen localized methods/current-old-partial providers and authored example. Go/Rust source is integrated with focused dynamic worker proof; root/default-static acceptance remains open. JS/TS worker source awaits integration and root acceptance. Package publication and broader platform/IME/focus acceptance remain open.",
     "public_header": "include/cui/cui_bridge.h",
     "node_kind": 55,
     "languages": {
@@ -1172,7 +1172,7 @@
     "example": "bindings/bridge/examples/time_field_localized.c",
     "scope": "Owned localized config/state/value and copied applied aggregate time changes; no controlled receipts, no callbacks inside Core. Default legacy scalar route unchanged.",
     "limitations": [
-      "Focused C/Python evidence is recorded in validation receipts. Broad integration, package and native interactive acceptance remain open; other four localized facades remain pending.",
+      "Focused C/Python root evidence and Go/Rust dynamic worker evidence are recorded in validation receipts. Broad integration, default-static consumers, package and native interactive acceptance remain open. JS/TS source is not integrated yet.",
       "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
       "Global segment Tab remains a source-focus parity exception; IME/clipboard and physical AT remain pending."
     ],

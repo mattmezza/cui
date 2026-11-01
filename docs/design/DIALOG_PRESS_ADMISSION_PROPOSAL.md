@@ -201,3 +201,48 @@ publication waits for the complete proof gate above and source review. Pending
 activation cancellation must use the explicit existing cancellation operation,
 independently of event consumption. No new storage or zero-allocation claim is
 established by this design approval.
+
+## Nested component counterexample and pending-stream decision
+
+Actual89767: a same-context nested modal remains open/adjacent while the parent
+controlled-closes/reopens; a queued continuing child Body MOVE changes child
+scroll30 to40 in the first new parent frame. Gate-only18869 removes pointer-
+scope-allowed from explicit lifetime cancellation; the same strict assertion
+still fails40 versus30. Separate small logs are retained in the reused build.
+No generic event_within_scope modal policy changed.
+
+Reason: begin_frame already routed a touch SCROLL to the child. Contact blocking
+prevents future dispatch, but does not revoke that current routed delta. The
+parent's ordinary modal-aware stale-event guard correctly cannot act as that
+nested modal's input consumer. The child independently remains ready and reduces
+its already-routed delta. The explicit lifetime operation needs a separately
+reviewed pending press-stream consumption contract.
+
+Proposed bounded extension, not implemented/approved in this checkpoint:
+preflight a second mask for still-unconsumed owned pointer DOWN/MOVE/UP/CANCEL,
+Space/Enter key press samples, and touch SCROLL/GESTURE samples. Ownership is
+explicit current/prior full-ID scope ancestry via event target/routed touch owner
+or matching owned contact, not screen bounds or pointer routing permission.
+After all validation, atomically mark selected pending samples consumed AND
+cancel pending activation slots independently. Do not infer cancellation from
+consumption and do not call blanket origin invalidation across delivered slots.
+Preserve event target/coordinates for diagnostics, focus, semantics, copied
+snapshots, already accepted live receipts and callback/owner effects.
+
+Late cancellation cannot undo a callback that already read an unconsumed raw
+sample. Such raw samples may subsequently become consumed, but accepted receipt
+slots and their down origins remain protected from activation invalidation over
+the whole pass. Already accepted release events remain protected themselves.
+This distinction must be tested for default pointer/Space and release-policy
+same-batch DOWN+UP, plus independent later unaccepted activation cancellation.
+
+This is not a general input flush: unrelated scopes/background/trigger, non-touch
+wheel, text/composition, accessibility and programmatic input are unchanged by
+this Core operation. The component's existing stale-event guard remains a
+separate owner/modal-aware policy. Persistent physical contacts remain blocked
+until genuine terminal input; no synthesized event or dispatcher alteration.
+
+Before production: turn the actual nested failure into success, verify fresh
+child input after UP/CANCEL, add nested captured pointer drag and gesture cases,
+then rerun all previous strict receipts/phase/atomicity/legacy gates. Report any
+remaining one-shot-input/independent nested-owner policy limit explicitly.

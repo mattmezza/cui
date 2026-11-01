@@ -197,3 +197,22 @@ header-order compile/link tests. Preserve the frozen legacy palette/presentation
 fixture and rerun it against the combined object set. Strict WASM source/header
 and selective/umbrella distribution closures remain later gates. No shared CMake,
 manifest, metadata, skill, generator or generated-resource edit in this checkpoint.
+
+### Focused public-route proof completed
+
+The new API passed strict native object/three-fixture links and four C/C++11
+header-order consumers against rootb7e494ba cached actual engine/palette library.
+Final private-Xvfb wrapper7/7 passed; actual own-root first-frame and320→91→420
+resizing, half/grow/fixed/zero/percent precedence, source custom-background/alpha0,
+parent/root opacity, border+background pulse alpha at0/.25/.5/.75/1,15 atomic
+rejections, callback snapshots, registered Y fixed-height/full-width success and
+expected percent-height failure/recovery all executed. Independent frozen old
+phase/ex callback/pixel fixtures passed unchanged against current cached root.
+Pinned Zig0.16 wasm32-wasi strict compile newsource/header passed; not runtime.
+
+First driver failed by leaking `-x c` onto binary archive inputs, not a CUI source
+failure. Corrected driver resets language and limits diagnostics. Complete initial
+diagnostics are losslessly gzipped/CRC-verified; compact receipt records raw size
+and hash without retaining1.7GB of disposable raw output. Canonical distribution
+closure/metadata/skill remain root-owned pending gates; no five-binding/platform
+or full-family claim follows this local proof.

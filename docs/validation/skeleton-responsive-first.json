@@ -1,0 +1,52 @@
+{
+  "status": "focused_public_route_proof_passed_unreleased",
+  "source_checkpoint": "17b465df",
+  "engine_source": "rootb7e494ba6eb1f0e3307364d15c58c6292003ce11 actualcachedarchive",
+  "archive_sha256": {
+    "libcui.a": "51b2b5d2690d013af9decb57cd86bcd4cfe03c5cc078532c323e2aaa3e30cd9f",
+    "libcui_software.a": "5da8eb0343355c70852941306817e4bef030c10261d3ce226c3a5e920a9cde5c",
+    "libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+    "libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "source_sha256": {
+    "include/cui/cui_skeleton_presentation.h": "37539edd60e0f84206d70649da34de0aa17e47afdc56a65793c78ef0a7c8f18d",
+    "src/components/cui_skeleton_presentation.c": "1bf76e6364117f60e7433d60f22d2ad143b6cc5beba028397dc242b0b5333c94",
+    "tests/unit/test_skeleton_responsive.c": "bbb47afe4e83449acefca9152b49b60e64b4f3603baa8b67a07d03e5e7cb9c1c",
+    "tests/unit/test_skeleton_presentation_contract.c": "1a8472235236d0887c642f9d4dddfc6148f59ac39dd7ff781486e578957d460b",
+    "tests/fixtures/skeleton/presentation_header.c": "3d8110deb66b0fbfd40c7a9e760894d7ed5ca7982923242fc1c8f379423863bd",
+    "tests/unit/test_skeleton_presentation.c": "f05949728357998465e0f7fb4edb5e9eb93d5f60193cd4c77712d16654858182",
+    "tests/fixtures/skeleton/frozen.c.inc": "6f3ee89a2f4ba576ef6764b219c8a80fd30c016421ce64634664308f02236272"
+  },
+  "linkage": "Only new presentation source compiled; its object first on link line, then existing rootcui/software/text/bidi. No engine rebuild; frozen old phase/ex linked against actual root current palette/content.",
+  "native": "C11O2 Wall/Wextra/Wpedantic/Werror UNDEBUG; C/C++11 header four include-order cases; corrected bounded driver fmax-errors10",
+  "results": {
+    "final_runtime": "7/7private-Xvfb wrapperPASS0.02s session2351",
+    "public_responsive": "Actual firstframe320\u219291\u2192420, half width/customalpha0/rootopacity/borders/pixels/clip; registered Y fixedheight/fullwidth success plus percentHEIGHTLAYOUT/freshrecovery PASS",
+    "contract": "15 failure atomics, callback entrysnapshots, grow/fixed/fraction/max precedence/zero, layoutonly/inert, exact backgroundANDborder alpha at0/.25/.5/.75/1 PASS",
+    "legacy": "Independent frozen956phase/ex pixel/callback timing fixture PASS unchanged",
+    "wasm": "PinnedZig0.16.0 wasm32-wasi C11O2 Wall/Wextra/Wpedantic/Werror source+header2TUs compilePASS; no WASM runtime claim"
+  },
+  "first_failure": "Local driver leaked -x c onto binary object/archive files after successful newsource+3fixture links; stopped only own task subprocesses, fixed -x none reset and diagnostic limits. No production behavior change.",
+  "preserved_diagnostics": {
+    "path": "build-focused/skeleton-proof/responsive-first.log.gz",
+    "raw_bytes": 1806860342,
+    "raw_sha256": "f5afd390a945139c0754bc248486e579e30921d1819485c878a969b88facf47f",
+    "verified": "streamed fullgzip decompression+CRC with hash, no raw recreation; compact compressed61MB retained"
+  },
+  "commands": [
+    "nice -n 19 taskset -c 1 python build-focused/skeleton-proof/run_responsive.py",
+    "nice -n 19 taskset -c 1 python build-focused/skeleton-proof/run_responsive_final.py"
+  ],
+  "logs": [
+    "build-focused/skeleton-proof/responsive-first.log.gz",
+    "build-focused/skeleton-proof/responsive-second.log",
+    "build-focused/skeleton-proof/responsive-final.log"
+  ],
+  "allocation_contract": "Presentation owns no additional retained resources; Core may use its existing arena.",
+  "pending": [
+    "rootCMake/source manifest and canonicalSDK/selective/umbrella closure",
+    "root metadata/usage6/skill18/freshness",
+    "modern bridge/fivebindings",
+    "browser/native interactive/physicalGPU/AT evidence"
+  ]
+}

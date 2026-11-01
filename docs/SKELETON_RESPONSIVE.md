@@ -1,9 +1,9 @@
 # Own-root responsive Skeleton presentation
 
-Unreleased source checkpoint: implementation and focused public-API tests are
-prepared but have not been compiled or run. The earlier ordinary-box prototype
-has separate focused proof; that does not validate this new entrypoint. Canonical
-SDK/skill integration and modern five-binding authoring remain pending.
+Unreleased focused proof: strict native C11, four C/C++ header-order consumers,
+real public responsive/contract tests, frozen legacy checks and pinned WASM
+compilation passed. Canonical SDK/skill integration and modern five-binding
+authoring remain pending. See the [receipt](validation/skeleton-responsive-first.json).
 
 Include `cui/cui_skeleton_presentation.h`. This is a separate additive route;
 `cui_skeleton`, `cui_skeleton_ex` and `cui_skeleton_with_palette` are unchanged.
@@ -76,8 +76,8 @@ Schedule the finite absolute `result.next_wake_seconds` in the same domain as
 to restart. Layout-only/inert follows Core suppression, without implying motion
 rollback. Skeleton is decorative: applications own busy/status and content replacement.
 
-Registered Y bodies with fixed Skeleton height/full width have prototype evidence;
-the real public API tests still await execution. Percentage HEIGHT remains rejected
+Registered Y bodies with fixed Skeleton height/full width passed the real public
+API first-frame/resize tests. Percentage HEIGHT remains rejected
 by existing registered scroll admission. A cleared diagnostic cannot make that
 failed geometry valid; rebuild a fresh healthy frame. No Core admission widening,
 GPU/browser/native accessibility or full Styled/platform parity is claimed.

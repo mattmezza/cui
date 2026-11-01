@@ -30,7 +30,8 @@ cui_skeleton_presentation cui_skeleton_presentation_default(void);
  * returns false with state/out/paint unchanged. Callback effects cannot rollback.
  * Other root values use Core normalization; root.opacity/custom_opacity are
  * inactive because animation replaces them, even when authored opacity is NaN.
- * State/out must not overlap each other or borrowed inputs. No allocation.
+ * State/out must not overlap each other or borrowed inputs. No additional retained
+ * resources; ordinary Core submission may use its existing arena.
  * True means component submission, not later layout/render success. Inspect
  * completed frame diagnostics; later Core errors do not rollback state/effects.
  * Registered scroll percent HEIGHT remains subject to existing Core rejection.

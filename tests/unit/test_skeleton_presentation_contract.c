@@ -87,6 +87,42 @@ static void failures(cui_context *ui) {
         assert(cui_end_frame(ui).count == 0 && cui_last_error(ui) == CUI_OK);
     }
 }
+static void pulse_border(cui_context *ui) {
+    const double times[] = {0, .25, .5, .75, 1};
+    cui_loading_motion state = {.ready = true, .started = 0, .last_time = 0};
+    for (size_t i = 0; i < sizeof times / sizeof *times; ++i) {
+        cui_skeleton_palette palette = {{255, 255, 255, 201}};
+        cui_skeleton_presentation p = cui_skeleton_presentation_default();
+        p.root.width = 40; p.root.width_percent = false;
+        p.root.background = (cui_color){13, 57, 91, 173};
+        p.root.border = (cui_color){255, 255, 255, 221}; p.root.border_width = 1;
+        p.custom_background = true; p.secondary = true; p.now_seconds = times[i];
+        cui_loading_motion_result result;
+        assert(cui_begin_frame(ui, 640, 300, 0));
+        cui_begin_box(ui, 10, (cui_box){.width = 80, .height = 80,
+                                       .custom_opacity = true, .opacity = .5f});
+        assert(cui_skeleton_present(ui, 12, &palette, &state, p, &result));
+        cui_end_box(ui); cui_draw_list list = cui_end_frame(ui);
+        double triangle = times[i]; /* First half of period2 has triangle=t. */
+        double eased = triangle < .5 ? 2 * triangle * triangle
+                                     : 1 - 2 * (1 - triangle) * (1 - triangle);
+        float opacity = (float)(1 - eased * .5);
+        assert(result.opacity == opacity);
+        size_t backgrounds = 0, borders = 0;
+        for (size_t j = 0; j < list.count; ++j) {
+            cui_draw_command c = list.commands[j];
+            if (c.type == CUI_DRAW_RECT) {
+                assert(c.color.a == (uint8_t)(173 * (opacity * .5f)));
+                backgrounds++;
+            }
+            if (c.type == CUI_DRAW_BORDER) {
+                assert(c.color.a == (uint8_t)(221 * (opacity * .5f)));
+                borders++;
+            }
+        }
+        assert(backgrounds == 1 && borders == 1);
+    }
+}
 static void grow_and_precedence(cui_context *ui) {
     const cui_box roots[] = {
         {.width = -1, .height = 16},
@@ -122,7 +158,7 @@ int main(void) {
     assert(ui);
     cui_skeleton_presentation d = cui_skeleton_presentation_default();
     assert(d.root.width == 1 && d.root.width_percent && d.root.height == 16 && d.duration == 2);
-    snapshots(ui); failures(ui); grow_and_precedence(ui);
+    snapshots(ui); failures(ui); pulse_border(ui); grow_and_precedence(ui);
     cui_destroy(ui);
     return 0;
 }

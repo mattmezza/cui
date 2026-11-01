@@ -137,3 +137,30 @@ do not misreport host-configured SDL headers as a supported WASM adapter.
 Constructor-byte measurement is exactly the frozen one `calloc(1,sizeof(*s))`
 request; SDL's separately owned allocations are not counted as this object.
 Report old/new bytes and actual old-offset equality before choosing growth.
+
+## Exact lease-only microgate command
+
+Prepared runner (not executed) compiles four small assembly-only TUs serially,
+parses unsigned constants and writes `commands.log` plus `receipt.json`. It verifies
+all 37 old offsets, alignment, exact constructor-byte=object-size correspondence,
+and guards beyond the complete old cursor-array extent. It reports growth rather
+than assuming a permissible bound. It never links or initializes SDL.
+
+```sh
+python tests/distribution/measure_sdl_v2_guard.py \
+  --output-dir build-shadow/sdl-guard-layout \
+  --zig /home/matteo/.cache/uv/archive-v0/Owlnrxx9q6JToEVIXt6mk/ziglang/zig \
+  --cpu 1
+```
+
+The runner pins itself to CPU1/nice19, records exact compiler versions/flags,
+verifies frozen source hashes before compilation and hashes generated TUs.
+Native uses strict C11/O1/Werror. WASM uses pinned Zig clang/no-default-config,
+explicit WASI libc roots plus SDL public headers from `/usr/include`; no link or
+host libc is intended. Cross-target SDL public-header compatibility is unproven:
+if headers reject WASI or select incompatible system definitions, retain failure
+and review accommodation rather than silently replacing SDL types/weakening
+warnings. This diagnostic is distinct from an actual Emscripten/SDL ABI claim.
+The constructor-byte result concerns CUI's sole opaque-object calloc request;
+SDL/runtime allocation behavior still requires the frozen paired runtime gate.
+No microgate execution occurred while root held the browser/heavy lease.

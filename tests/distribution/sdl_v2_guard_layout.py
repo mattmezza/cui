@@ -14,6 +14,7 @@ def prepare(candidate=False):
     source = source.replace('"../../src/', '"' + str(ROOT / 'src') + '/')
     source = source.replace('"../software/', '"' + str(ROOT / 'backends/software') + '/')
     source += '\n/* Exact calloc(1,sizeof(*s)) request; no native calls in this TU. */\n'
+    source += 'const unsigned sdl_v1_tail_end = offsetof(cui_sdl3, cursors) + sizeof(((cui_sdl3 *)0)->cursors);\n'
     source += '_Static_assert(sizeof(cui_sdl3) <= 0xffffffffu, "compact measurement");\n'
     return source
 

@@ -190,3 +190,14 @@ child drag, MOVE+UP batch, omitted/failed prior scope, unknown ongoing contact,
 new genuine DOWN after UP/CANCEL, nested modal/portal/background/trigger and
 inert/layout-only/error no-mutation. Verify callback counts/order, current enabled
 semantics, frozen legacy trace and no duplicate cancellation/dismiss callbacks.
+
+## Integrator review resolution
+
+The final two-phase scoped-cancellation alternative is approved for an unpublished
+proof only. The earlier ledger and final-capture-query alternatives are withdrawn.
+This is an explicit additive lifetime operation over existing dispatch, not a new
+input-dispatch architecture; legacy routes must remain unchanged. Production API
+publication waits for the complete proof gate above and source review. Pending
+activation cancellation must use the explicit existing cancellation operation,
+independently of event consumption. No new storage or zero-allocation claim is
+established by this design approval.

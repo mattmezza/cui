@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-01",
+  "scope": "Private owned CPU V2 frame extraction; public software V1/V2 compatibility retained, no new SDL/backend or binding support",
+  "worker_commit": "b386ec55b907b8431339ba1897a33d497200a87d",
+  "integration_parent": "332fdaa8",
+  "checks": {
+    "warning_Release_build": "45/45 C/C++ steps PASS, single compiler job nice19 CPU1, existing native cache",
+    "private_Xvfb": "24/24 CTest PASS42.24 s: frame lifecycle plain/text, immutable common-reference old/new include order/text, public V1/V2 plus Bidi/noBidi matrices, private validation/paint/shadow/text and header consumers",
+    "consumer_skill": "Full18-method suite PASS39.82 s plus generated freshness inside CTest",
+    "WASM32": "Pinned Zig0.16 clang actual production/proposal layout static assertions compile warning-clean for text and no-text fixture; no WASM runtime claim",
+    "freshness": "441-file Go/Rust SDK, amalgamation and generated skill fresh"
+  },
+  "ownership": "EMPTY/PREPARING/READY/RELEASING address-stable private handle; one owned workspace and embedded text owner/session; published software target copied only after complete preparation; no second target allocation",
+  "review_findings_fixed": [
+    "Distinct EMPTY frame sharing already busy owner now rejects after pure alias preflight, before callback/state mutation.",
+    "Partial workspace reservation retained by frame so failure cleanup enters RELEASING before workspace free callbacks. Original workspace_begin immediate unwind remains a compatibility wrapper. Text recorder temporary frees while PREPARING are separately documented."
+  ],
+  "source_authority": "Worker source hashes match exact integrated headers/fixture; all four immutable original headers remain hash-checked. Only unchanged shadow/text headers retain mechanical token equality; independent old implementation runtime tests cover edited ownership helpers.",
+  "logs": [
+    "/home/matteo/.cache/cui-current-validation/owned-frame-configure.log",
+    "/home/matteo/.cache/cui-current-validation/owned-frame-build.log",
+    "/home/matteo/.cache/cui-current-validation/owned-frame-runtime.log",
+    "/home/matteo/.cache/cui-current-validation/owned-frame-wasm-layout.log"
+  ],
+  "limitations": [
+    "No SDL public API or other adapter/foreign V2 support added",
+    "WASM checks compile only; physical GPU/OS acceptance remains separate",
+    "Final consolidated full suite, exact-revision hosted checks, release and website delivery remain open"
+  ]
+}

@@ -40,16 +40,16 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Test-only header-priority + event-coordinate candidate passes 55/55 focused checks; priority alone passes 54/55. Review found missing current-modal and same-root occlusion cases, so production transfer stays open. The frozen/current legacy trace passes. Production transfer and scope-ID alias limitations stay open. |
+| Dialog and scrolling | Corrected test-only header-priority + event-coordinate candidate passes 65/65 focused checks, including reviewed modal/overlap cases. An independent production Table fix is next; broader Dialog cancellation remains open. The frozen/current legacy trace passes. Production transfer and scope-ID alias limitations stay open. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
-| Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (first six worker checks pass; root acceptance pending), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
+| Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
 
 ## Immediate priorities
 
 | Priority | Deliverable | Completion condition |
 | --- | --- | --- |
-| 1 | Finish in-flight integration | Shared CPU helpers and Rust job control passed focused acceptance; extract and verify the owned-frame lifecycle for the next adapter. |
+| 1 | Finish in-flight integration | Shared CPU helpers, owned-frame lifecycle and Rust job control passed focused acceptance; implement and verify the next adapter. |
 | 2 | Close interaction and binding gaps | Resolve Table touch-drop admission, transfer reviewed Dialog fixes, and validate the remaining native Slider and minimum-compiler gates. Preserve legacy behavior. |
 | 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
 | 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
@@ -135,6 +135,8 @@ that every listed defect still reproduces.
 - [ ] Performance and memory claims have reproducible evidence and limitations.
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
+
+Owned-frame acceptance: [lifecycle, frozen references and WASM layout](docs/validation/cpu-v2-owned-frame-integration.json).
 
 Rust acceptance: [dynamic, default-static and lifetime checks](docs/validation/rust-slider-integration.json).
 

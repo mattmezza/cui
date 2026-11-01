@@ -401,6 +401,7 @@ static int bridge_same_thread(bridge_thread_token t) {
 #endif
 }
 #include "slider_model_ffi.h"
+#include "time_localized_ffi.h"
 */
 import "C"
 
@@ -419,14 +420,16 @@ import (
 )
 
 type App struct {
-	sliderNamespace                  *sliderNamespace
-	sliderDispatching, sliderClosing bool
-	ptr                              *C.cui_bridge_app
-	thread                           C.bridge_thread_token
-	root                             *Node
-	nodes                            map[uint64]*Node
-	closed                           bool
-	running                          bool
+	timeEnabled, timeDispatching, timeClosing bool
+	timeCapacity                              uint32
+	sliderNamespace                           *sliderNamespace
+	sliderDispatching, sliderClosing          bool
+	ptr                                       *C.cui_bridge_app
+	thread                                    C.bridge_thread_token
+	root                                      *Node
+	nodes                                     map[uint64]*Node
+	closed                                    bool
+	running                                   bool
 }
 type Options struct {
 	InitiallyHidden          bool
@@ -437,6 +440,8 @@ type Options struct {
 	MaxNodes, MaxEvents      uint32
 }
 type Node struct {
+	timeLocalized                        *TimeFieldConfig
+	timeChange                           func(TimeFieldChange)
 	slider                               *sliderNode
 	kind                                 int
 	key, text                            string
@@ -1099,11 +1104,13 @@ func (a *App) Close() error {
 	}
 	C.go_destroy(a.ptr)
 	for _, n := range a.nodes {
+		n.timeChange = nil
 		if n.slider != nil {
 			n.slider.callback = nil
 		}
 	}
 	a.sliderClosing = true
+	a.timeClosing = true
 	a.ptr = nil
 	a.closed = true
 	if !a.running {
@@ -1116,6 +1123,9 @@ func (a *App) RequestClose() error {
 		return err
 	}
 	e := result(C.go_request_close(a.ptr))
+	if e == nil {
+		a.timeClosing = true
+	}
 	if e == nil && a.sliderNamespace != nil {
 		a.sliderClosing = true
 	}
@@ -1609,6 +1619,9 @@ func (a *App) Mount(root *Node) error {
 	if err := visit(root, 1); err != nil {
 		return err
 	}
+	if e := a.timePreflight(root); e != nil {
+		return e
+	}
 	if e := a.sliderPreflight(root); e != nil {
 		return e
 	}
@@ -1697,6 +1710,11 @@ func (a *App) Mount(root *Node) error {
 		}
 		if n.hasTime {
 			if e := result(C.go_set_time(a.ptr, h, C.cui_bridge_time{hour: C.uint32_t(n.timeValue.Hour), minute: C.uint32_t(n.timeValue.Minute), second: C.uint32_t(n.timeValue.Second)})); e != nil {
+				return e
+			}
+		}
+		if n.timeLocalized != nil {
+			if e := n.SetLocalizedTime(*n.timeLocalized); e != nil {
 				return e
 			}
 		}
@@ -1910,7 +1928,7 @@ func (a *App) Mount(root *Node) error {
 	return nil
 }
 func (a *App) Step(dt float32) error {
-	if a != nil && a.sliderDispatching {
+	if a != nil && (a.sliderDispatching || a.timeDispatching) {
 		return errors.New("Step unavailable during controlled Slider dispatch")
 	}
 	if a != nil && a.running {
@@ -2239,8 +2257,8 @@ func (a *App) PollValueNotificationV1() (ValueNotificationV1, bool, error) {
 }
 
 func (a *App) Dispatch() (int, error) {
-	if a != nil && a.sliderDispatching {
-		return 0, errors.New("nested controlled Slider dispatch")
+	if a != nil && (a.sliderDispatching || a.timeDispatching) {
+		return 0, errors.New("nested typed dispatch")
 	}
 	count := 0
 	for {
@@ -2251,6 +2269,13 @@ func (a *App) Dispatch() (int, error) {
 		if !ok {
 			if a.sliderNamespace != nil && !a.closed && !a.sliderClosing {
 				n, e := a.DispatchSliderRequests()
+				if e != nil {
+					return count + n, e
+				}
+				count += n
+			}
+			if a.timeEnabled && !a.closed && !a.timeClosing {
+				n, e := a.DispatchTimeFieldChanges()
 				return count + n, e
 			}
 			return count, nil
@@ -2274,8 +2299,8 @@ func (a *App) Dispatch() (int, error) {
 // Run owns native event pumping, including live resize. dt is retained for
 // compatibility; native scheduling supplies actual frame timing.
 func (a *App) Run(dt float32) error {
-	if a != nil && a.sliderDispatching {
-		return errors.New("Run unavailable during controlled Slider dispatch")
+	if a != nil && (a.sliderDispatching || a.timeDispatching) {
+		return errors.New("Run unavailable during typed dispatch")
 	}
 	if err := a.check(); err != nil {
 		return err
@@ -2325,6 +2350,7 @@ func (n *Node) Remove() error {
 	mark = func(x *Node) {
 		delete(x.app.nodes, keyID(x.handle))
 		x.removed = true
+		x.timeChange = nil
 		if x.slider != nil {
 			x.slider.callback = nil
 		}
@@ -3882,4 +3908,33 @@ func (a *App) sliderPresentationNative(n *Node) (SliderPresentation, bool, error
 		return SliderPresentation{}, false, errors.New("invalid Slider presentation")
 	}
 	return out, true, nil
+}
+
+func (a *App) timeCall(n *Node, op uint32, capacity uint32, bytes []byte) (uint32, error) {
+	if e := a.check(); e != nil {
+		return 0, e
+	}
+	var h C.cui_bridge_node
+	if n != nil {
+		if n.app != a || n.removed || n.kind != 55 {
+			return 0, errors.New("invalid localized TimeField")
+		}
+		h = n.handle
+	}
+	var p *C.uchar
+	if len(bytes) > 0 {
+		p = (*C.uchar)(unsafe.Pointer(&bytes[0]))
+	}
+	code := C.go_time_call(a.ptr, h, C.uint32_t(op), C.uint32_t(capacity), p)
+	runtime.KeepAlive(bytes)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return uint32(code), nil
+	}
+	return uint32(code), result(code)
+}
+func (a *App) SupportsLocalizedTimeField() (bool, error) {
+	if e := a.check(); e != nil {
+		return false, e
+	}
+	return C.go_time_supported() != 0, nil
 }

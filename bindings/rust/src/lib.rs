@@ -1,6 +1,7 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod shadows;
 mod slider_model;
+mod time_localized;
 pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};
 pub use slider_model::{
     SliderConfig, SliderDomain, SliderInput, SliderLayout, SliderOrientation, SliderPart,
@@ -13,6 +14,9 @@ use std::{
     ffi::{c_char, c_void, CString},
     marker::PhantomData,
     rc::Rc,
+};
+pub use time_localized::{
+    TimeCycle, TimeFieldChange, TimeFieldConfig, TimeFieldResult, TimePrecision,
 };
 
 #[repr(C)]
@@ -945,6 +949,7 @@ pub struct App {
     callbacks: HashMap<(RawNode, u32), Rc<RefCell<Callback>>>,
     running: bool,
     slider: Option<slider_model::State>,
+    time_localized: Option<time_localized::State>,
     _local: PhantomData<Rc<()>>,
 }
 type NativeRunner =
@@ -1135,6 +1140,7 @@ impl App {
             callbacks: HashMap::new(),
             running: false,
             slider: None,
+            time_localized: None,
             _local: PhantomData,
         })
     }
@@ -1169,6 +1175,16 @@ impl App {
         check(unsafe { cui_bridge_node_remove(self.raw, raw) })?;
         self.callbacks.retain(|(node, _), _| *node != raw);
         self.slider_removed(raw);
+        if let Some(state) = &mut self.time_localized {
+            let app = self.raw;
+            state.callbacks.retain(|node, _| {
+                let mut required = 0;
+                let status = unsafe {
+                    cui_bridge_get_text(app, *node, std::ptr::null_mut(), 0, &mut required)
+                };
+                status == 0 || status == 5
+            });
+        }
         Ok(())
     }
     pub fn text(&mut self, n: Node, value: &str) -> Result<&mut Self> {
@@ -1861,7 +1877,7 @@ impl App {
         })
     }
     pub fn step(&mut self, dt: f32) -> Result<()> {
-        if self.running || self.slider_dispatching() {
+        if self.running || self.slider_dispatching() || self.time_dispatching() {
             return Err(Error(8));
         }
         check(unsafe { cui_bridge_step(self.raw, dt) })
@@ -2123,7 +2139,7 @@ impl App {
         })
     }
     pub fn dispatch(&mut self) -> Result<usize> {
-        if self.slider_dispatching() {
+        if self.slider_dispatching() || self.time_dispatching() {
             return Err(Error(8));
         }
         let mut count = 0;
@@ -2165,7 +2181,7 @@ impl App {
                 count += 1;
             }
         }
-        Ok(count + self.dispatch_slider_requests()?)
+        Ok(count + self.dispatch_slider_requests()? + self.dispatch_time_field_changes()?)
     }
     /// Own the native event loop, including live resize. Panics from callbacks
     /// resume only after the native runner has returned and released its host.
@@ -2174,7 +2190,7 @@ impl App {
     }
     /// Optional after-frame hook for app updates or requesting close.
     pub fn run_with(&mut self, mut after_frame: impl FnMut(&mut App) -> Result<()>) -> Result<()> {
-        if self.running || self.slider_dispatching() {
+        if self.running || self.slider_dispatching() || self.time_dispatching() {
             return Err(Error(8));
         }
         let runner = native_runner().ok_or(Error(9))?;
@@ -2255,6 +2271,9 @@ impl App {
     pub fn close(&mut self) -> Result<()> {
         check(unsafe { cui_bridge_request_close(self.raw) })?;
         self.slider_close_requested();
+        if let Some(state) = &mut self.time_localized {
+            state.closing = true;
+        }
         Ok(())
     }
 }

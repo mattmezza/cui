@@ -1,0 +1,13 @@
+{
+  "date": "2026-11-01",
+  "clean_worktrees_removed": 6,
+  "generated_only_worktrees_removed": 14,
+  "additional_clean_build_only_worktree_removed": 1,
+  "obsolete_build_directories_removed": 8,
+  "missing_worktree_registrations_pruned": 101,
+  "estimated_removed_bytes": 2985963520,
+  "retention": "All branch refs remain. Binary patches, original file hashes/status and CTest logs retained in local state before generated-only worktrees were removed. All six dirty source worktrees remain. Main codex-resume.sh preserved.",
+  "durable_backup": "/home/matteo/.local/state/cui-agent/cleanup-2026-11-01",
+  "validation_cache": "One shared current validation cache retained; no toolchain/browser dependency cache deleted.",
+  "limits": "Audit byte totals are approximate, not a controlled filesystem free-space measurement; ongoing validation also creates artifacts."
+}

@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.3**; alpha.4 metadata is prepared but unpublished; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New component, binding and renderer work is **unreleased**. Current Linux run: **580/581 passed**; its only failure was a Badge guide/metadata mismatch, repaired with the affected check passing. Browser/touch evidence remains tied to its artifact revision. Platform acceptance and publication remain unfinished. |
+| Working source | Alpha.4 candidate is reconciled onto `main`, **unpublished**. Icon/Skeleton focused integration checks pass; the complete candidate rebuild/regression is underway. The prior 580/581 baseline predates these slices and had a repaired documentation-only failure. Platform acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -150,7 +150,7 @@ that every listed defect still reproduces.
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
 
-Current integration evidence (not yet on `main`):
+Accepted source evidence (now on `main`; not yet released):
 
 | Slice | Evidence | Still required |
 | --- | --- | --- |
@@ -158,8 +158,8 @@ Current integration evidence (not yet on `main`):
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle and deployment; nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and focused plus full browser gates pass | Broader touch/IME and platform coverage; C bridge/Python have focused root acceptance, Go/Rust bundled-source static acceptance passes; broader package/native acceptance remains open. |
 
-Integration-only receipts must travel with their source changes; worker evidence
-must not be presented as validation of `main`.
+Receipts travel with their source changes. Worker-only evidence remains distinct
+from root acceptance and does not establish the final alpha.4 release revision.
 
 Detailed validation receipts live in [docs/validation](docs/validation).
 Older green runs do not cover newer source; worker checks do not establish

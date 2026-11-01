@@ -124,3 +124,145 @@ The first review should settle the small icon/options and bridge ownership contr
 there is no justification for an input dispatcher or new global state. The C
 geometry foundation is substantial, but foreign authoring and configured-icon
 fidelity prevent a complete-family claim today.
+
+## Proposed additive authoring contract (source-only, not declarations)
+
+This checkpoint proposes APIs; none is implemented or measured. Preserve both
+`cui_badge` and `cui_badge_ex`, including their existing named-icon painter.
+Do not enlarge `cui_badge_options`. Existing Icon already supports owned SVG
+state, path/name loaders, affine rotation, explicit/inherited size/color,
+opacity, box decoration and numeric constraints (`include/cui/cui_icon.h`).
+Reuse that implementation instead of adding Badge-specific rasterization.
+
+```c
+/* Proposed in cui_components.h; names subject to review. */
+typedef struct {
+    cui_icon_state *state;
+    cui_icon_options options;
+} cui_badge_icon_content;
+typedef struct {
+    bool submitted;
+    cui_icon_error icon_error;
+} cui_badge_result;
+cui_badge_result cui_badge_with_icon(
+    cui_context *, cui_id, const cui_theme *, cui_badge_options,
+    const cui_badge_icon_content *, cui_button_content_fn, void *);
+```
+
+The configured route requires ICON variant and nonnull initialized state and
+content descriptor. Reject incompatible variants before invoking child content.
+Shell geometry still follows Badge size; artwork is a separate ordinary Icon
+child, with its own configured dimensions and transform. No extent-minus-two
+rewrite. Supply source fallback inherited text size 14/10/8 for Large/Medium/
+Small-or-XSmall, inherited white, while explicit icon size/color remain
+unchanged. `Size::Size(_)` on source Badge maps to Medium shell/fallback; explicit
+CUI design scaling remains separately documented. An inherited-size descriptor
+can use these Badge defaults; authored Icon overrides take precedence. Copy
+options locally before applying fallbacks; never mutate caller records. Force
+artwork decorative so Badge STATUS/name remains the sole marker semantic;
+child content keeps its own semantics. Rotation affects artwork paint, not
+shell dimensions, anchoring or input.
+
+The descriptor/options/style/constraints and callback userdata are borrowed
+synchronously. State masks must outlive rendering of every returned draw list;
+collect/destroy follows the existing Icon contract. SVG replacement preserves
+older masks. Validate descriptor fields before submission; missing/parse/limit
+errors from icon preparation are reported in `icon_error`, with the valid shell
+and ordinary child content retained (not falsely reported as atomic UI rollback).
+`submitted` distinguishes invalid call from admitted Badge with failed artwork.
+The implementation must preflight preparation before invoking content so error
+ordering is deterministic. Exact native/WASM sizes and offsets require a later
+compiler lease; no constants are published by this checkpoint.
+
+### Bounded owned bridge proposal
+
+Add a separate optional Badge configuration to the existing legacy Badge node.
+Absent configuration keeps its current legacy text painter and child policy.
+Configured Badge explicitly owns an ordered list of ordinary child nodes;
+submit each exactly once inside the Badge content callback. This admits nested
+badges, avatar nodes and custom child rows/buttons without a synthetic text-only
+wrapper. Apply the existing graph's parent, mount rollback, destruction and
+cycle checks; no second ownership graph or portal reparenting. A marker is an
+internal part, never an independently destroyable child handle.
+
+Proposed pointer-free bridge record and explicit copied source setter:
+
+```c
+/* Proposed bridge ABI V1; source tag NONE/NAME/SVG. */
+typedef struct {
+    uint32_t version, variant, size, flags;
+    uint64_t count, maximum;
+    uint32_t rgba, reserved;
+    float icon_width, icon_height;
+    float icon_rgba_r, icon_rgba_g, icon_rgba_b, icon_rgba_a;
+    float transform[6];
+    uint32_t icon_flags, reserved_icon;
+} cui_bridge_badge_options_v1;
+/* Proposed signatures use existing app/node/error types. */
+cui_bridge_error cui_bridge_badge_set_options(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_badge_options_v1 *);
+cui_bridge_error cui_bridge_badge_set_icon_source(
+    cui_bridge_app *, cui_bridge_node, uint32_t source_kind,
+    const char *bytes, size_t length);
+cui_bridge_error cui_bridge_badge_reset(cui_bridge_app *, cui_bridge_node);
+```
+
+This proposed record is 96 bytes by field arithmetic, NOT an ABI measurement.
+Flags express custom background, artwork dimensions/color/transform; unused
+fields/reserved bytes must be zero. Colors are straight RGBA; background uses
+0xRRGGBBAA. Float32 values must be finite and accepted by Icon's existing domain;
+facades reject overflowing conversions. Counts uint64 must fit native size_t
+before commit, including WASM32. A separate name setter should reuse the existing
+copied node text/name mechanism, not overload SVG bytes or infer accessibility
+from paths. Version/flags/numeric/source validation and allocations finish before
+replacing old values; failures preserve old configuration and child ownership.
+
+Proposal: lazily allocate one per-configured-node payload, capped at 256 bytes
+excluding the existing Icon state/cache and copied strings; measure actual
+payload before approval. Cap source bytes at 64KiB, name/path at 1KiB and
+accessible name at 1KiB; additionally apply existing Icon pixel/cache/version
+limits, not an unlimited per-node raster cache. Allocation counts/bytes and
+retained old draw-list versions must be disclosed separately. Zero configured
+Badge nodes incur no payload allocation. Clearing source means empty artwork
+while keeping the ICON shell; resetting configuration restores the legacy pill.
+Removing a child does not reset options. Node destruction frees sources/state
+only after outstanding rendering borrows end under the existing bridge frame
+lifetime. Replacement/destruction and slot reuse need actual tests.
+
+### Five-language surface and required review decisions
+
+All five facades should expose a typed `BadgeOptions` and `BadgeIcon` value,
+count/dot/icon constructors, optional content children, and explicit reset.
+Python dataclasses, JS frozen/plain validated records, TS discriminated unions,
+Go value structs and Rust enums/builders map to the same owned bridge contract.
+Unmounted builders retain a request locally; mount validates against their owning
+app/library. Never normalize through another global library. Mounted setters
+commit facade state only after C success; absent new symbols preserve old loads
+and return feature-unavailable on new authoring. No facade duplicates Icon math.
+Source byte ownership is copied; arbitrary native loaders/callback pointers are
+not exposed as cross-language records.
+
+Before production settle: whether complete Icon decoration/constraints belong
+in this first bridge record or an additive owned Icon descriptor shared with
+standalone Icon (preferred for full family fidelity); exact Icon inherited versus
+authored-size flags; source-red token mapping; and reachable outer Badge style.
+The small record above covers required rotation/color/dimensions but must NOT be
+claimed to represent all Icon refinements until those remaining fields have a
+reviewed shared route. Source Badge has no Styled implementation; its private
+style field alone does not justify inventing public Badge refinement methods.
+
+### Meaningful acceptance tests
+
+| Gate | Independent witness |
+| --- | --- |
+| Configured artwork | Same asymmetric SVG through standalone Icon and Badge: rotation, custom color/alpha, width/height, inherited fallback; compare software pixels and shell bounds |
+| All variants | Count/max boundaries, zero hiding, dot and icon transitions, every source size; existing legacy painter frozen control |
+| Composition | Empty/multiple children, avatar, nested Badge, interactive child; callback once, wrapper intrinsic first-frame/resize, marker zero-flow and clipped pixels |
+| Semantics | One passive marker STATUS, explicit/default name, no icon duplicate/focus; child keyboard/touch activation retained |
+| Ownership | Source replacement with old draw list alive, failed parse/allocation/oversize replacement, reset/clear, node removal/reuse and bounded cache collection |
+| Five runtimes | Actual configured count/dot/icon/custom SVG and nested child rendering in Python/JS/Go/Rust, TS typechecks; old-library load and failed mount rollback |
+| ABI and resources | Native/WASM sizeof/offsetof, exact source caps, uint64→size_t and float32 overflow, invalid flags/reserved fields, zero-idle allocation and payload size |
+
+No production or generation is authorized by this proposed-record checkpoint.
+Full family verification still requires the preceding matrix, not just these
+new route tests or a legacy text-pill facade.

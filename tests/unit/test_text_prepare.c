@@ -17,6 +17,8 @@ static uintptr_t poison_address(void) {
 bool cui_test_original_text_prepare(const char *, const char *, unsigned char *, size_t, size_t *);
 bool cui_test_original_fallback(const char *, const char *, const cui_draw_command *,
                                 unsigned char *, size_t, size_t *);
+bool cui_test_original_density(const char *, const char *, const cui_draw_command *, float,
+                               unsigned char *, size_t, size_t *);
 #endif
 #include "text_prepare_fixture_internal.h"
 #ifndef CUI_TEXT_BASELINE_CAPTURE
@@ -172,7 +174,7 @@ static void recording_boundaries(cui_font *font) {
             c.text_colors = (const cui_text_color_span *)poison_address();
             c.text_color_count = 1;
         }
-        assert(!cui_text_prepare_line(&s, font, &c, 1));
+        assert(!cui_text_prepare_line(&s, font, &c, i & 1 ? 64 : 1));
         assert(o.error == CUI_ERROR_INVALID_ACTION && !s.first && !s.last);
         assert(calls == before && !o.dependencies && !o.input_bytes && !o.face_count);
         assert(!o.cpu_used && !o.metadata_used && !s.busy);
@@ -221,6 +223,185 @@ static void fallback_recording(const char *regular) {
     }
 }
 #endif
+static void owned_density64(cui_font *font, const char *regular, const char *bold_path) {
+#ifdef CUI_TEXT_BIDI
+    assert(cui_text_prepare_context_available_internal());
+#else
+    assert(!cui_text_prepare_context_available_internal());
+#endif
+    static unsigned char expected[sizeof result];
+    const float fractional[] = {1.25f, 3.5f, 15.75f};
+    size_t calls = 0;
+    unsigned width16 = 0, height16 = 0;
+    for (unsigned i = 0; i < 19; ++i) {
+        float q = i < 16 ? i + 1.f : fractional[i - 16];
+        cui_draw_command c = fixture(7);
+        c.text_style.weight = i & 1 && q != 16 ? CUI_TEXT_WEIGHT_BOLD : CUI_TEXT_WEIGHT_NORMAL;
+        size_t n = 0;
+        assert(cui_test_original_density(regular, bold_path, &c, q, expected, sizeof expected, &n));
+        cui_text_owner_internal o = owner(&calls);
+        cui_text_prepare_session session = {.owner = &o};
+        assert(cui_text_prepare_line(&session, font, &c, q));
+        length = 0;
+        for (cui_text_recorded_glyph_internal *g = session.first; g; g = g->next) {
+            assert(g->source_density == q);
+            record(NULL, g->x, g->y, (int)g->width, (int)g->height, (int)g->width, g->coverage);
+            if (q == 16) {
+                width16 = g->width;
+                height16 = g->height;
+            }
+        }
+        assert(length == n && !memcmp(result, expected, n));
+        assert(!font->glyph_cache);
+        cui_text_prepare_session_end(&session);
+        assert(!o.cpu_used && !o.metadata_used);
+    }
+    cui_draw_command c = fixture(7);
+    cui_text_owner_internal o = owner(&calls);
+    cui_text_prepare_session session = {.owner = &o};
+    assert(cui_text_prepare_line(&session, font, &c, 64));
+    assert(session.first && !session.first->next && session.first->source_density == 64);
+    assert(session.first->width > 3 * width16 && session.first->height > 3 * height16);
+    assert(font->face->size->metrics.y_ppem == 320); /* 5 logical pixels *64, not16. */
+    assert(!font->glyph_cache && o.coverage_pixels <= 8 * 1024 * 1024);
+    printf("owned q64: q16=%ux%u q64=%ux%u ppem=%u CPUpeak=%zu metadataPeak=%zu\n", width16,
+           height16, session.first->width, session.first->height, font->face->size->metrics.y_ppem,
+           o.cpu_peak, o.metadata_peak);
+    cui_text_prepare_session_end(&session);
+    assert(!o.cpu_used && !o.metadata_used);
+#ifdef CUI_TEXT_BIDI
+    for (unsigned f = 4; f <= 5; ++f) {
+        c = fixture(f);
+        o = owner(&calls);
+        session = (cui_text_prepare_session){.owner = &o};
+        assert(cui_text_prepare_line(&session, font, &c, 64));
+        assert(session.first && session.first->source_density == 64);
+        if (f == 4)
+            assert(session.first->colored);
+        else
+            assert(session.first->paint.kind == CUI_TEXT_PAINT_LINEAR);
+        cui_text_prepare_session_end(&session);
+        assert(!o.cpu_used && !o.metadata_used);
+    }
+#endif
+    c = fixture(7);
+    const float invalid[] = {nextafterf(64, INFINITY), INFINITY, NAN, 0, -1};
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
+        size_t before = calls;
+        o = owner(&calls);
+        session = (cui_text_prepare_session){.owner = &o};
+        assert(!cui_text_prepare_line(&session, font, &c, invalid[i]));
+        assert(!session.first && !o.dependencies && calls == before);
+        cui_text_prepare_session_end(&session);
+    }
+    /* All old public scaled entry guards stay<=16; callback output stays empty. */
+    for (unsigned i = 0; i < 2; ++i) {
+        float q = i ? 64 : nextafterf(16, INFINITY);
+        length = 0;
+        size_t n = 99;
+        assert(
+            !cui_test_original_density(regular, bold_path, &c, q, expected, sizeof expected, &n) &&
+            !n);
+        assert(!cui_font_draw_context_line_scaled(font, c.text, c.text_source, c.font_size,
+                                                  c.text_style, c.bounds.x, c.bounds.y, q, record,
+                                                  NULL));
+        assert(!length && !font->glyph_cache);
+#ifdef CUI_TEXT_BIDI
+        cui_draw_command colored_command = fixture(4);
+        assert(!cui_font_draw_context_line_colored_scaled(
+            font, colored_command.text_source, colored_command.font_size,
+            colored_command.text_style, 0, 0, colored_command.color, colored_command.text_colors,
+            colored_command.text_color_count, q, colored, NULL));
+        assert(!length && !font->glyph_cache);
+        cui_text_layout *layout = NULL;
+        assert(cui_font_layout_line(font, c.text, c.font_size, c.text_style, CUI_BIDI_AUTO_LTR, 0,
+                                    c.text.length, NULL, &layout) == CUI_TEXT_LAYOUT_OK);
+        assert(!cui_text_layout_draw_scaled(layout, 0, 0, q, record, NULL));
+        cui_text_layout_destroy(layout);
+        assert(!length && !font->glyph_cache);
+#endif
+    }
+}
+static void owned_format_and_casts(cui_font *font) {
+    size_t calls = 0;
+    cui_text_owner_internal o = owner(&calls);
+    FT_GlyphSlotRec slot = {0};
+    slot.bitmap.width = 1;
+    slot.bitmap.rows = 1;
+    slot.bitmap.buffer = (unsigned char *)poison_address();
+    slot.bitmap.num_grays = 256;
+    const unsigned char modes[] = {FT_PIXEL_MODE_NONE,  FT_PIXEL_MODE_MONO, FT_PIXEL_MODE_GRAY2,
+                                   FT_PIXEL_MODE_GRAY4, FT_PIXEL_MODE_LCD,  FT_PIXEL_MODE_LCD_V,
+                                   FT_PIXEL_MODE_BGRA};
+    for (size_t i = 0; i < sizeof modes / sizeof *modes; ++i) {
+        o = owner(&calls);
+        slot.bitmap.pixel_mode = modes[i];
+        assert(!text_owned_bitmap(&slot, &o) && o.error == CUI_ERROR_INVALID_ACTION && !calls);
+    }
+    slot.bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+    slot.bitmap.num_grays = 255;
+    o = owner(&calls);
+    assert(!text_owned_bitmap(&slot, &o) && !calls);
+    slot.bitmap.num_grays = 256;
+    o = owner(&calls);
+    assert(text_owned_bitmap(&slot, &o));
+    slot.bitmap.width = 0;
+    slot.bitmap.pixel_mode = FT_PIXEL_MODE_BGRA;
+    assert(text_owned_bitmap(&slot, &o)); /* zero work ignores format/buffer */
+    FT_F26Dot6 size = 123;
+    o = owner(&calls);
+    assert(text_owned_char_size(4096.f * 64, &size, &o) && size == 16777216);
+    const float invalid[] = {NAN, INFINITY, -INFINITY, 0, -1, nextafterf(4096.f * 64, INFINITY)};
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
+        size = 123;
+        o = owner(&calls);
+        assert(!text_owned_char_size(invalid[i], &size, &o) && size == 123 && !calls &&
+               !o.dependencies);
+    }
+    int position = 123;
+    o = owner(&calls);
+    assert(text_owned_origin(1e7f, 64, &position, &o) && position == 640000000);
+    position = 123;
+    o = owner(&calls);
+    assert(!text_owned_origin(FLT_MAX, 64, &position, &o) && position == 123 && !calls);
+    /* Seed actual hot V1 slot; owned lookup reads it without insertion/dependency.
+     * Poisoned unsupported slot must reject before any byte or FT/HB operation. */
+    cui_draw_command c = fixture(7);
+    length = 0;
+    assert(cui_font_draw_context_line_scaled(font, c.text, c.text_source, c.font_size, c.text_style,
+                                             c.bounds.x, c.bounds.y, 16, record, NULL));
+    FT_UInt glyph = FT_Get_Char_Index(font->face, 'g');
+    FT_F26Dot6 key = (FT_F26Dot6)lroundf(c.font_size * 16 * 64);
+    size_t index = ((size_t)glyph * 33u + (size_t)key) % GLYPH_CACHE_SLOTS;
+    glyph_cache_entry *entry = &font->glyph_cache[index];
+    assert(entry->valid && entry->glyph == glyph && entry->size == key);
+    o = owner(&calls);
+    assert(raster_glyph_owned(font, glyph, c.font_size * 16, &o) == &entry->slot);
+    assert(!calls && !o.dependencies && entry->valid);
+    FT_Bitmap saved = entry->slot.bitmap;
+    for (size_t i = 0; i < sizeof modes / sizeof *modes; ++i) {
+        entry->slot.bitmap.pixel_mode = modes[i];
+        entry->slot.bitmap.buffer = (unsigned char *)poison_address();
+        o = owner(&calls);
+        assert(!raster_glyph_owned(font, glyph, c.font_size * 16, &o));
+        assert(o.error == CUI_ERROR_INVALID_ACTION && !calls && !o.dependencies && entry->valid);
+        assert(raster_glyph(font, glyph, c.font_size * 16) ==
+               &entry->slot); /* NULL-owner unchanged */
+    }
+    entry->slot.bitmap = saved;
+    /* Original live cached bytes remain unchanged after successful owned copy. */
+    unsigned char before[GLYPH_CACHE_BITMAP_MAX];
+    size_t n = (size_t)saved.pitch * saved.rows;
+    assert(n <= sizeof before);
+    memcpy(before, saved.buffer, n);
+    o = owner(&calls);
+    cui_text_prepare_session session = {.owner = &o};
+    assert(cui_text_prepare_line(&session, font, &c, 16));
+    assert(entry->valid && entry->slot.bitmap.buffer == saved.buffer &&
+           !memcmp(before, saved.buffer, n));
+    cui_text_prepare_session_end(&session);
+    assert(!o.cpu_used && !o.metadata_used);
+}
 static size_t allocation_calls, allocation_fail, live_blocks;
 static cui_text_prepare_session *reentrant_session;
 static cui_font *reentrant_font;
@@ -377,6 +558,8 @@ int main(int argc, char **argv) {
     assert(expected_length == length && !memcmp(expected, result, length));
     failures(font);
     recording_boundaries(font);
+    owned_density64(font, argv[1], argv[2]);
+    owned_format_and_casts(font);
 #ifdef CUI_TEXT_BIDI
     fallback_recording(argv[1]);
 #endif

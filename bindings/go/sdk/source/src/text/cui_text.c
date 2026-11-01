@@ -44,20 +44,59 @@ struct cui_font {
     size_t fallback_count;
     bool owns_fallbacks;
 };
+/* Owned-only numeric admission. NULL-owner public paths retain their original
+ * casts/limits; V2 source density can reach64 without changing logical shaping. */
+static bool text_owned_char_size(float size, FT_F26Dot6 *out, cui_text_owner_internal *owner) {
+    float request = size * 64;
+    if (!isfinite(size) || size <= 0 || size > 4096.f * 64 || !isfinite(request) ||
+        (double)request > LONG_MAX || (double)request < LONG_MIN) {
+        owner->error = CUI_ERROR_CAPACITY;
+        return false;
+    }
+    *out = (FT_F26Dot6)lroundf(request); /* <=16777216, fits minimum32-bit FT_Long. */
+    return true;
+}
+static bool text_owned_origin(float logical, float scale, int *out,
+                              cui_text_owner_internal *owner) {
+    float source = logical * scale;
+    if (!isfinite(source) || (double)source < INT_MIN || (double)source > INT_MAX ||
+        (double)source < LONG_MIN || (double)source > LONG_MAX) {
+        owner->error = CUI_ERROR_CAPACITY;
+        return false;
+    }
+    *out = (int)lroundf(source);
+    return true;
+}
+static bool text_owned_bitmap(FT_GlyphSlot slot, cui_text_owner_internal *owner) {
+    if (slot->bitmap.width && slot->bitmap.rows &&
+        (slot->bitmap.pixel_mode != FT_PIXEL_MODE_GRAY || slot->bitmap.num_grays != 256)) {
+        owner->error = CUI_ERROR_INVALID_ACTION;
+        return false;
+    }
+    return true;
+}
 static FT_GlyphSlot raster_glyph_owned(cui_font *font, FT_UInt glyph, float size,
                                        cui_text_owner_internal *owner) {
-    FT_F26Dot6 raster_size = (FT_F26Dot6)lroundf(size * 64);
+    FT_F26Dot6 raster_size;
+    if (owner) {
+        if (!text_owned_char_size(size, &raster_size, owner))
+            return NULL;
+    } else
+        raster_size = (FT_F26Dot6)lroundf(size * 64);
     size_t index = ((size_t)glyph * 33u + (size_t)raster_size) % GLYPH_CACHE_SLOTS;
     glyph_cache_entry *entry = font->glyph_cache ? &font->glyph_cache[index] : NULL;
-    if (entry && entry->valid && entry->glyph == glyph && entry->size == raster_size)
+    if (entry && entry->valid && entry->glyph == glyph && entry->size == raster_size) {
+        if (owner && !text_owned_bitmap(&entry->slot, owner))
+            return NULL;
         return &entry->slot;
+    }
     if (!cui_text_dependency_internal(owner) || FT_Load_Glyph(font->face, glyph, FT_LOAD_DEFAULT) ||
         !cui_text_dependency_internal(owner) ||
         FT_Render_Glyph(font->face->glyph, FT_RENDER_MODE_NORMAL))
         return NULL;
     FT_GlyphSlot slot = font->face->glyph;
-    if (owner)
-        return slot; /* V2 cold raster never inserts into the caller-owned cache. */
+    if (owner) /* V2 cold raster never inserts into the caller-owned cache. */
+        return text_owned_bitmap(slot, owner) ? slot : NULL;
     /* FreeType's negative-pitch layout is left untouched on the uncached path. */
     if (slot->bitmap.pitch < 0 ||
         (slot->bitmap.rows &&
@@ -894,7 +933,7 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
                              cui_color_glyph_fn colored, cui_color color,
                              const cui_text_color_span *spans, size_t count, float scale,
                              void *user, cui_text_owner_internal *owner) {
-    if (!isfinite(scale) || scale <= 0 || scale > 16)
+    if (!isfinite(scale) || scale <= 0 || scale > (owner ? 64 : 16))
         return false;
     if (!layout || (!emit && !colored) || !isfinite(x) || !isfinite(y) || fabsf(x) > 1e6f ||
         fabsf(y) > 1e6f)
@@ -911,9 +950,14 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
         cui_font *selected_face = layout->faces[layout->runs[run].face_index];
         if (selected_face != face) {
             face = selected_face;
+            FT_F26Dot6 requested;
+            if (owner) {
+                if (!text_owned_char_size(layout->size * scale, &requested, owner))
+                    return false;
+            } else
+                requested = (FT_F26Dot6)lroundf(layout->size * scale * 64);
             if (!cui_text_face_internal(owner, face) || !cui_text_dependency_internal(owner) ||
-                FT_Set_Char_Size(face->face, 0, (FT_F26Dot6)lroundf(layout->size * scale * 64), 72,
-                                 72))
+                FT_Set_Char_Size(face->face, 0, requested, 72, 72))
                 return false;
         }
         const cui_text_glyph *g = &layout->glyphs[i];
@@ -928,8 +972,12 @@ static bool text_layout_draw(cui_text_layout *layout, float x, float y, cui_glyp
             continue;
         }
         if (owner) {
-            double dx = (double)lroundf(px * scale) + slot->bitmap_left;
-            double dy = (double)lroundf(py * scale) - slot->bitmap_top;
+            int source_x, source_y;
+            if (!text_owned_origin(px, scale, &source_x, owner) ||
+                !text_owned_origin(py, scale, &source_y, owner))
+                return false;
+            double dx = (double)source_x + slot->bitmap_left;
+            double dy = (double)source_y - slot->bitmap_top;
             if (dx < INT_MIN || dx > INT_MAX || dy < INT_MIN || dy > INT_MAX ||
                 slot->bitmap.width > INT_MAX || slot->bitmap.rows > INT_MAX) {
                 owner->error = CUI_ERROR_CAPACITY;
@@ -1602,10 +1650,12 @@ static bool text_record_simple(cui_font *font, text_recording *r) {
     const cui_draw_command *c = r->command;
     cui_text_owner_internal *o = r->records.owner;
     cui_font *f = selected(font, c->text_style);
+    FT_F26Dot6 logical_size, source_size;
     if (!f || c->text_color_count || c->text_style.letter_spacing != 0 ||
+        !text_owned_char_size(c->font_size, &logical_size, o) ||
+        !text_owned_char_size(c->font_size * r->density, &source_size, o) ||
         !cui_text_face_internal(o, f) || o->attempts >= 8192 || o->segments >= 4096 ||
-        !cui_text_dependency_internal(o) ||
-        FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)lroundf(c->font_size * 64), 72, 72))
+        !cui_text_dependency_internal(o) || FT_Set_Char_Size(f->face, 0, logical_size, 72, 72))
         return false;
     ++o->attempts;
     ++o->segments;
@@ -1637,8 +1687,7 @@ static bool text_record_simple(cui_font *font, text_recording *r) {
     }
     o->glyphs += n;
     float x = c->bounds.x, baseline = c->bounds.y + (float)f->face->size->metrics.ascender / 64;
-    ok = cui_text_dependency_internal(o) &&
-         !FT_Set_Char_Size(f->face, 0, (FT_F26Dot6)lroundf(c->font_size * r->density * 64), 72, 72);
+    ok = cui_text_dependency_internal(o) && !FT_Set_Char_Size(f->face, 0, source_size, 72, 72);
     for (unsigned i = 0; ok && i < n; ++i) {
         if (fabsf(x) > 1e7f || fabsf(baseline) > 1e7f) {
             ok = false;
@@ -1650,10 +1699,15 @@ static bool text_record_simple(cui_font *font, text_recording *r) {
             ok = false;
             break;
         }
-        double gx = (double)lroundf((x + (float)positions[i].x_offset / 64) * r->density) +
-                    slot->bitmap_left;
-        double gy = (double)lroundf((baseline - (float)positions[i].y_offset / 64) * r->density) -
-                    slot->bitmap_top;
+        int source_x, source_y;
+        if (!text_owned_origin(x + (float)positions[i].x_offset / 64, r->density, &source_x, o) ||
+            !text_owned_origin(baseline - (float)positions[i].y_offset / 64, r->density, &source_y,
+                               o)) {
+            ok = false;
+            break;
+        }
+        double gx = (double)source_x + slot->bitmap_left;
+        double gy = (double)source_y - slot->bitmap_top;
         if (gx < INT_MIN || gx > INT_MAX || gy < INT_MIN || gy > INT_MAX ||
             slot->bitmap.width > INT_MAX || slot->bitmap.rows > INT_MAX) {
             ok = false;
@@ -1669,6 +1723,13 @@ static bool text_record_simple(cui_font *font, text_recording *r) {
     return ok;
 }
 #endif
+bool cui_text_prepare_context_available_internal(void) {
+#ifdef CUI_TEXT_BIDI
+    return true;
+#else
+    return false;
+#endif
+}
 bool cui_text_prepare_line(cui_text_prepare_session *s, cui_font *font, const cui_draw_command *c,
                            float density) {
     if (!s || !s->owner || s->busy || s->owner->callback_active || !font || !c ||
@@ -1678,13 +1739,16 @@ bool cui_text_prepare_line(cui_text_prepare_session *s, cui_font *font, const cu
     c = &owned_command;
     cui_text_owner_internal *o = s->owner;
     s->busy = true;
-    bool ok = isfinite(density) && density >= 1 && density <= 16 && isfinite(c->bounds.x) &&
+    bool ok = isfinite(density) && density >= 1 && density <= 64 && isfinite(c->bounds.x) &&
               isfinite(c->bounds.y) && isfinite(c->font_size) && c->font_size > 0 &&
               c->font_size <= 4096 && valid_style(c->text_style) &&
               cui_text_paint_valid(c->text_paint, true) &&
               !(c->text_paint.kind == CUI_TEXT_PAINT_LINEAR && c->text_color_count) &&
               c->text_color_count <= CUI_TEXT_COLOR_SPAN_MAX &&
               (!c->text_color_count || c->text_colors);
+    FT_F26Dot6 source_size;
+    if (ok && !text_owned_char_size(c->font_size * density, &source_size, o))
+        ok = false;
 #ifndef CUI_TEXT_BIDI
     /* V2 contextual text needs Bidi; never fall back to inactive raw text. */
     if (ok && (c->text_source.paragraph.data || c->text_color_count)) {

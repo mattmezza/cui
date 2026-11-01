@@ -22,7 +22,9 @@ not a public renderer. `docs/SOFTWARE_V2_PAINTING.md` states the supported priva
 kinds: bounded AREA DROP/INSET shadow preparation/painting is private only; text
 still rejects before allocation/publication.
 Validation success does not mean adapter font/shadow resources are prepared.
-`docs/TEXT_PREPARATION.md` describes private counted recording only; opaque new
+`docs/TEXT_PREPARATION.md` describes private counted recording only, with owned
+source density up to64 and GRAY256 coverage; public scaled font APIs remain
+limited to16. This does not enable V2 text painting. Opaque new
 font/dependency temporaries are outside the transaction CPU byte envelope. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.
 
 ## Start with the project's actual integration

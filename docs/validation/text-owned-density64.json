@@ -1,0 +1,49 @@
+{
+  "base": "2002dafe",
+  "scope": "Owned-only text recording q<=64 and GRAY256 admission; no renderer support or public font ABI changes. Public/NULL-owner density<=16 preserved.",
+  "compile": "GCC16.2.1 strict C11 O3 UNDEBUG Wall Wextra Wpedantic Werror; CPU0 nice19, sequential candidate and immutable reference Bidi/noBidi fixture TUs; no library rebuilt.",
+  "tests": "Private-Xvfb6/6 PASS0.17s: Bidi/noBidi recording, legacy cache/density/shaping, actual golden-mutation rejection. Explicit bundled font and frozen-exact gate; no skips. Verbose two-variant evidence2/2 PASS.",
+  "q64": {
+    "q16_dimensions": [
+      39,
+      62
+    ],
+    "q64_dimensions": [
+      156,
+      246
+    ],
+    "ft_y_ppem": 320,
+    "logical_size": 5,
+    "bidi_cpu_peak": 38792,
+    "nobidi_cpu_peak": 38392,
+    "metadata_peak": 112
+  },
+  "negative": "Unsupported pixel modes and num_grays reject owned nonempty cold-admission/hot-cache paths without buffer read; hot NULL-owner behavior unchanged. Numeric output sentinels, no-Bidi poisoned contextual source, negative pitch, source/work/allocator failures retained.",
+  "initial_failure": "Initial link used immutable pre-owner Bidi archive and correctly lacked private owned symbols. Corrected link to current read-only Bidi archive; retained initial log. No warnings disabled.",
+  "accounting": "Only CUI-owned recording payload/prefix/metadata charged. Existing font runtime and opaque new FT/HB/Sheen/provider allocations remain separate, not a total-process memory bound.",
+  "pending": [
+    "Root actual CMake rebuilt-library acceptance",
+    "Actual V2 text painting, public software entry and four other adapters/bindings"
+  ],
+  "sha256": {
+    "src/text/cui_text.c": "edeac29fdc1d934a0178c8683c0cc095e8a5b8c890fe90709858c613da622e0e",
+    "src/text/cui_text_prepare_internal.h": "0e68d2ad7c03671b9cd0dd1a7f9548dd1198f74a6e8a61106d413d0599936fe5",
+    "tests/fixtures/text_prepare_v1/source/src/text/cui_text.c": "bf43eec9ee29ebd10ccf74d7d16915359d902601009c2b41972b51585261ea6a",
+    "tests/fixtures/text_prepare_v1/source/src/text/cui_bidi.c": "d62f97bd643d95c6925fb9ef7b9d40717e8d8f0b8ca0706a764d2001b29e19be",
+    "tests/fixtures/text_prepare_v1/records_pixels.golden": "79e4c013dc2bc3ecb57f9f3801e6163dc241b0370ad22cadcebd690fd964caf8",
+    "tests/fixtures/text_prepare_v1/records_pixels_nobidi.golden": "3cf4d175e42746a2519f44fd658ff3c2fa4c41536635df73b564e159f0f1b15c",
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+    "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d",
+    "build-shadow/q64-build.log": "156c1ebcf0e6bb54ce609c2eeaeb49eb116870b094372178fd624431e64e5548",
+    "build-shadow/q64-build-corrected.log": "a51923e86c12b8a2803cfb820bb08683f3938c157312e9ac2048f98bf40a23d7",
+    "build-shadow/q64-tests.log": "54392ca3dff65940cd0fe44d64becbe44de0c0d1ab111f3afb0b3157a7de06dd",
+    "build-shadow/q64-evidence.log": "e047b4693e4534e76bc98bc8554c9326bd8780dcdbbf07f53ea67743bcbe24f9",
+    "/home/matteo/.cache/cui-current-validation/native/libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483",
+    "build-shadow/baseline-font-libcui_software.a": "ca9d5af1e8963d6b1a3e7fec94564b76dac1e0b97fd656db0bc058366ecef941",
+    "build-shadow/q64-skill.log": "c64110de4de394c4992d9cb0b084ae08a3fc722ed27612d21d8b355820a3e99f"
+  },
+  "original_source_receipt": "tests/fixtures/text_prepare_v1/receipt.json; four original files compared against recorded Git reference independently before handoff.",
+  "skill": "18/18 PASS38.840s; sole CPU0 nice19 required suite",
+  "checks": "Canonical SDK/amalgamation/skill generation and freshness, clang-format23.1.2 and diff checks PASS."
+}

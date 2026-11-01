@@ -32,7 +32,10 @@ typedef struct {
  * byte guarantee. Failure appends nothing, becomes sticky until session end;
  * existing records survive for teardown only. All borrowed fonts/input remain
  * stable through session end/render completion. No public renderer capability follows from
- * recording. */
+ * recording. Owned source_density is finite1..64; nonempty glyph coverage must
+ * be256-level GRAY. Public/NULL-owner scaled APIs retain their existing<=16 limit. */
+/* Actual compiled contextual recorder availability; not a public font capability. */
+bool cui_text_prepare_context_available_internal(void);
 bool cui_text_prepare_line(cui_text_prepare_session *, cui_font *, const cui_draw_command *,
                            float source_density);
 void cui_text_prepare_session_end(cui_text_prepare_session *);

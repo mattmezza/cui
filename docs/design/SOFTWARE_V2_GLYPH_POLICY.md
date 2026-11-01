@@ -1,5 +1,10 @@
 # Proposed software V2 glyph coverage policy
 
+Historical checkpoint: the source-q<=16 recommendation below is superseded by
+[the full text transaction design](SOFTWARE_V2_TEXT_TRANSACTION.md). Owned recording
+now admits q<=64; public scaled APIs retain<=16. Target text painting remains
+pending, so neither proposal advertises renderer support.
+
 Review checkpoint before text painting, not an implemented guarantee. Keep V1
 font selection, shaping, fallback, tracking and color-cluster rules unchanged.
 Existing scaled line/colored/layout drawing accepts one source scale <=16; V2

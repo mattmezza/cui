@@ -52,3 +52,29 @@ bool cui_test_original_fallback(const char *regular, const char *fallback_path,
     cui_font_close(fallback);
     return ok;
 }
+/* Arbitrary <=16 density oracle uses immutable original source above. This does
+ * not regenerate any durable expected fixture from the candidate. */
+bool cui_test_original_density(const char *regular, const char *bold_path,
+                               const cui_draw_command *c, float density, unsigned char *out,
+                               size_t capacity, size_t *out_length) {
+    cui_font *font = cui_font_open(regular), *bold = cui_font_open(bold_path);
+    assert(font && bold);
+    assert(cui_font_set_style(font, (cui_text_style){.weight = CUI_TEXT_WEIGHT_BOLD}, bold));
+    length = 0;
+    bool ok = c->text_color_count
+                  ? cui_font_draw_context_line_colored_scaled(
+                        font, c->text_source, c->font_size, c->text_style, c->bounds.x, c->bounds.y,
+                        c->color, c->text_colors, c->text_color_count, density, colored, NULL)
+                  : cui_font_draw_context_line_scaled(font, c->text, c->text_source, c->font_size,
+                                                      c->text_style, c->bounds.x, c->bounds.y,
+                                                      density, record, NULL);
+    if (ok) {
+        assert(length <= capacity);
+        memcpy(out, result, length);
+        *out_length = length;
+    } else
+        *out_length = 0;
+    cui_font_close(font);
+    cui_font_close(bold);
+    return ok;
+}

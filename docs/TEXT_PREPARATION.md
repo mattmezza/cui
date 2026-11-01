@@ -8,7 +8,13 @@ Initialize a zero `cui_text_owner_internal` with malloc-compatible aligned,
 distinct-block allocation/free callbacks and the **remaining** transaction CPU and
 metadata envelope; create `cui_text_prepare_session` with that owner. Call
 `cui_text_prepare_line(session,font,TEXT_command,source_density)` synchronously.
-Density is explicit1..16; future renderer chooses the approved q from target axes.
+Owned density is explicit1..64; public/NULL-owner scaled APIs retain their1..16
+limit. A future renderer chooses q from target axes; recording at64 does not
+advertise target rendering support. The private contextual-availability query
+reports the actual compiled Bidi recorder. Nonempty owned glyphs require256-level
+FreeType GRAY coverage, including hot-cache reads; other bitmap formats reject
+without changing legacy raster behavior. Checked source sizes and origins reject
+unrepresentable FreeType/integer coordinates before conversion.
 This records original source-grid positions, color/paint and tightly packed owned
 glyph coverage. It does not perform bilinear resampling or target blending.
 

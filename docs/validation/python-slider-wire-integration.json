@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-01",
+  "scope": "Python controlled Slider copied-wire canonical evidence validation, without callback/state-acceptance changes",
+  "regression": "Offline regression reproduced 16 assertion failures before decoder change; expanded regression covers inactive identity fields, source/queue authority, nonfinite evidence, numeric activation and invalid poll boundary without publishing a request.",
+  "logs": [
+    "/home/matteo/.cache/cui-current-validation/python-wire-red.log",
+    "/home/matteo/.cache/cui-current-validation/python-wire-runtime.log"
+  ],
+  "limitations": [
+    "JS/TS and Go inactive numeric checks remain open",
+    "No change to C producer or native accessibility delivery",
+    "No release, package publication or website deployment inferred"
+  ],
+  "checks": {
+    "offline_regression": "PASS after fix; 16 failures retained from pre-fix run",
+    "private_Xvfb_CTest": "7/7 PASS, 41.43 s; components, controlled Slider including actual pre-typed library, accept/reject-vertical/single authored examples, generated freshness and full skill contract",
+    "agent_skill_contract": "18 methods passed, 40.03 s",
+    "compiler": "No C behavior or compiled source changed; Python-only validation against existing bridge SHA886a7d615ccf6ec4417b8447c14d0ac0df1c1538be872e9d7b0e0633b4aac717"
+  },
+  "source_sha256": {
+    "bindings/python/cui_bridge/slider_model.py": "fe915a84431e6aca3b882a852715f616b368b03c595b84688347078d39b9e239",
+    "bindings/python/test_slider_model.py": "d5579c7271742abb8388b8c3aa94f90a6a2a84270df1c90a53dba4f18fdfb85c"
+  }
+}

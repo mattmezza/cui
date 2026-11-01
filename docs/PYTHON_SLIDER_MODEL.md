@@ -77,6 +77,13 @@ Single/Range current/requested, current/gesture domains and original input/event
 metadata. Input/event tags and flags retain the documented C vocabulary; absent
 evidence remains absent, rather than guessing a key/pointer source.
 
+Copied wire records reject malformed or noncanonical evidence before exposing a
+request: absent input has all-zero fields, repeat is 0/1, coordinates and numeric
+evidence are finite, inactive numeric evidence is zero, and an absent source flag
+requires UNKNOWN. A queue namespace must exist before a receipt is published.
+Invalid records raise `BridgeError`; already copied requests remain unchanged.
+This validates provider records and does not invent unavailable host metadata.
+
 `app.dispatch_slider_requests()` invokes typed handlers after C has returned.
 `app.dispatch()` first runs the preexisting legacy event dispatch, then the typed
 FIFO. There is no global ordering between queues. A legacy callback that advances

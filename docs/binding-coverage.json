@@ -1106,7 +1106,7 @@
       "Python actual-old-library fallback test skips unless CUI_BRIDGE_OLD_LIBRARY supplies an independent binary; local proof used the preserved pre-typed runtime.",
       "Node historical optional-group tests require CUI_NODE_SLIDER_OLD_LIBRARY; TypeScript requires an existing compiler. Direct C Styled style/motion objects remain unbound.",
       "Go tests cover dynamic current/actual-old modules and matching default embedded-source closure on Linux. Existing historical notification/shadow/visibility fixture skips are separate; first legacy run missing FontPath was retained and recovered with bundled Inter.",
-      "Copied-wire conformance is partial: Python absent-input/repeat/finite-coordinate/source evidence checks and Go/JS/TS inactive numeric checks remain open; see docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md."
+      "Copied-wire conformance is partial: Python now rejects noncanonical absent-input/repeat/nonfinite/source/inactive-numeric evidence and missing receipt authority; Go/JS/TS inactive numeric checks remain open. See docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md and focused validation receipts."
     ],
     "docs": [
       "docs/BRIDGE_SLIDER_MODEL.md",

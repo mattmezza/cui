@@ -440,3 +440,9 @@ explicit receipt acceptance and the existing creating-goroutine OS-thread lock
 through Close. RequestClose only requests shutdown; copied records retain no App.
 Rust controlled builders, native numeric delivery and V2 gradient adapters
 remain pending.
+
+For controlled Python Slider provider records, absent input fields and inactive
+numeric evidence must be zero, coordinates/numeric evidence finite, repeat 0/1,
+and absent source UNKNOWN. Invalid copied evidence raises BridgeError before
+publishing a request; do not invent metadata. See docs/PYTHON_SLIDER_MODEL.md and
+docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md for per-language omissions.

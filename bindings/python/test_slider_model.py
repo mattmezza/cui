@@ -348,6 +348,58 @@ class ControlledSlider(unittest.TestCase):
         raw.input.flags = 2
         with self.assertRaises(ValueError): wire._copy_request(raw, object())
 
+    def test_copied_wire_canonical_input_evidence(self):
+        def record():
+            raw = wire._Request()
+            raw.struct_size, raw.schema_version, raw.phase = 296, 1, 1
+            raw.event_kind, raw.event_index = 1, (1 << 64) - 1
+            raw.receipt = wire._Receipt(56, 1, 1, wire._Handle(2, 3), 4, 5, 6, 7)
+            raw.current, raw.requested = wire._Value(0, 0, 0, 40), wire._Value(0, 0, 0, 41)
+            raw.domain = raw.gesture_domain = wire._Domain(0, 100, 1, 0, 0)
+            return raw
+        namespace = object()
+        saved = wire._copy_request(record(), namespace)
+        for field, value in (("type", 3), ("key", 5), ("modifiers", 1),
+                             ("repeat", 1), ("x", 1), ("y", 1),
+                             ("pointer_type", 1), ("pointer_button", 1),
+                             ("accessibility_action", 2), ("accessibility_value", .25),
+                             ("pointer_id", 1), ("pointer_device", 1),
+                             ("accessibility_target", 1)):
+            with self.subTest(absent_input=field):
+                raw = record(); setattr(raw.input, field, value)
+                with self.assertRaises(ValueError): wire._copy_request(raw, namespace)
+        for field, value in (("repeat", 2), ("x", math.nan), ("y", math.inf),
+                             ("accessibility_value", math.nan), ("accessibility_value", .25)):
+            with self.subTest(active_input=field, value=value):
+                raw = record(); raw.input.flags, raw.input.type = 1, 3
+                setattr(raw.input, field, value)
+                with self.assertRaises(ValueError): wire._copy_request(raw, namespace)
+        raw = record(); raw.event_source = 1
+        with self.assertRaises(ValueError): wire._copy_request(raw, namespace)
+        with self.assertRaises(ValueError): wire._copy_request(record(), None)
+        raw = record(); raw.input.flags, raw.input.type = 1, 13
+        raw.input.accessibility_action = 2  # INCREMENT has no numeric evidence.
+        self.assertEqual(wire._copy_request(raw, namespace).input.accessibility_value, 0)
+        raw.input.accessibility_value = .25
+        with self.assertRaises(ValueError): wire._copy_request(raw, namespace)
+        raw.input.flags, raw.input.accessibility_action = 3, 4
+        self.assertEqual(wire._copy_request(raw, namespace).input.accessibility_value, .25)
+        self.assertEqual(saved.current, SliderSingle(40))
+        self.assertIs(saved.receipt._namespace, namespace)
+        # A malformed provider record is consumed, never exposed as a request.
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        invalid = record(); invalid.input.x = 1
+        def invalid_poll(pointer, size, output):
+            wire.C.memmove(output, wire.C.byref(invalid), wire.C.sizeof(invalid))
+            return 0
+        app = SimpleNamespace(_ptr=1, _slider_namespace=namespace,
+                              _api=SimpleNamespace(check=lambda status: None))
+        with patch.object(wire, "_api", return_value=SimpleNamespace(
+                poll_slider_request_v1=invalid_poll)):
+            with self.assertRaises(BridgeError): next(wire.poll(app))
+        self.assertEqual(saved.current, SliderSingle(40))
+
     @unittest.skipUnless(os.environ.get("CUI_BRIDGE_OLD_LIBRARY"), "actual pre-typed library required")
     def test_actual_old_library_defaults_still_work_and_new_use_fails_before_mount(self):
         program = '''

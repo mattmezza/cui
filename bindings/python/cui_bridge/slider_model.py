@@ -326,6 +326,8 @@ def _receipt(wire, namespace):
 
 
 def _copy_request(wire, namespace):
+    if namespace is None:
+        raise ValueError("request queue has no receipt authority")
     if wire.struct_size != 296 or wire.schema_version != 1 or wire.thumb not in (0, 1) or wire.event_kind not in (1, 3, 5) or wire.event_source not in range(5) or wire.event_flags & ~7:
         raise ValueError("unknown request vocabulary")
     i = wire.input
@@ -333,6 +335,15 @@ def _copy_request(wire, namespace):
         (i.type not in (0, 1, 2, 3, 7, 13) or i.key not in (0, 4, 5, 6, 7, 8, 9, 10, 19, 20) or
          i.pointer_type not in (0, 1, 2) or i.pointer_button not in (0, 1, 2) or i.accessibility_action not in (0, 2, 3, 4))):
         raise ValueError("unknown input vocabulary")
+    if not i.flags & 1 and any(getattr(i, name) != 0 for name, _ in _Input._fields_):
+        raise ValueError("inactive input fields must be zero")
+    if i.repeat not in (0, 1) or not all(math.isfinite(value) for value in
+                                        (i.x, i.y, i.accessibility_value)):
+        raise ValueError("invalid input evidence")
+    if not i.flags & 2 and i.accessibility_value != 0:
+        raise ValueError("inactive numeric evidence must be zero")
+    if not wire.event_flags & 4 and wire.event_source != 0:
+        raise ValueError("inactive event source must be unknown")
     if i.flags & 2 and (not i.flags & 1 or i.type != 13 or i.accessibility_action != 4 or not math.isfinite(i.accessibility_value)):
         raise ValueError("incoherent typed numeric evidence")
     if not wire.event_flags & 1 and wire.event_frame != 0:

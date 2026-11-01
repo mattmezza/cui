@@ -19,15 +19,15 @@ actual producer as evidence, not a guessed metadata rule.
 | Copied output invariant | Python `_copy_request` | JS/TS `copyRequest` | Go `sliderReadRequest` | Rust candidate `read_request/read_input` |
 |---|---|---|---|---|
 | Exact request/receipt schema+sizes, reserved value/domain fields | Rejects | Native addon rejects before copied JS arrays | Rejects | Rejects; static size/offset assertions |
-| Unknown request/input vocabularies and masks | Rejects active input vocabularies; absent-input fields currently bypass vocabulary check | Rejects | Rejects active input; absent-input allzero guard | Rejects active input; absent-input allzero guard |
-| HAS_INPUT absent ⇒ every input field0 | **Missing** | Rejects | Rejects | Rejects |
-| repeat only0/1, finite x/y | **Missing** | Rejects | Rejects | Rejects |
-| finite numeric value even without numeric flag | Only tested when numeric flag set | Rejects | Rejects | Rejects |
-| HAS_NUMERIC_VALUE absent ⇒ numeric value0 | **Missing** | **Missing** | **Missing** | Rejects; `inactive_numeric` provider/private test prepared |
+| Unknown request/input vocabularies and masks | Rejects active vocabularies and nonzero absent input (Python follow-up) | Rejects | Rejects active input; absent-input allzero guard | Rejects active input; absent-input allzero guard |
+| HAS_INPUT absent ⇒ every input field0 | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
+| repeat only0/1, finite x/y | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
+| finite numeric value even without numeric flag | Rejects nonfinite (Python follow-up) | Rejects | Rejects | Rejects |
+| HAS_NUMERIC_VALUE absent ⇒ numeric value0 | Rejects (Python follow-up) | **Missing** | **Missing** | Rejects; `inactive_numeric` provider/private test prepared |
 | Numeric flag ⇒ input present, typeACCESSIBILITY, actionSET_VALUE | Rejects | Rejects | Rejects | Rejects |
-| HAS_SOURCE absent ⇒ sourceUNKNOWN0 | **Missing** | Rejects | Rejects | Rejects |
+| HAS_SOURCE absent ⇒ sourceUNKNOWN0 | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | Absent frame0 / indexUINT64_MAX | Rejects | Rejects | Rejects | Rejects |
-| Queue namespace established before publishing a receipt | Python real C poll rejects before enable; conversion accepts None namespace, which accept later rejects | `appNamespaces.has` rejects before publication | Explicit queue namespace guard before C poll | Explicit queue namespace guard before C poll |
+| Queue namespace established before publishing a receipt | Python real C poll rejects before enable; copied conversion rejects None namespace (Python follow-up) | `appNamespaces.has` rejects before publication | Explicit queue namespace guard before C poll | Explicit queue namespace guard before C poll |
 | Full u64 identities and no C views over callbacks | Python int / frozen copies | BigInt / frozen copied arrays+records | uint64 / value copies | u64 / owned copies; pending actual runtime |
 
 Exact decoder seams: `bindings/python/cui_bridge/slider_model.py`:325–343;
@@ -42,6 +42,15 @@ All domain adapters must also enforce the actual portable math contract in
 minimum>0 and maximum>minimum. Merely finite individual bounds or positive equal
 log bounds are insufficient. Root has aligned Python, JS/TS and Go domain validation with this contract;
 Rust candidate validates both authoring and copied domains before C use, pending runtime acceptance.
+
+## Python follow-up status
+
+The Python decoder now enforces the proven canonical checks above. An offline
+regression first reproduced 16 failures before the fix; its expanded cases also
+cover inactive identity fields and rejection through the poll boundary without
+publishing a request. Integrated private-Xvfb acceptance passed seven CTest checks including current
+authored UI/examples, actual pre-typed library and the full consumer-skill suite;
+see docs/validation/python-slider-wire-integration.json. JS/TS and Go inactive-numeric checks remain open.
 
 ## Small compatible follow-up
 

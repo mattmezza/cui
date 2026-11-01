@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-01",
+  "scope": "Additive own-root Skeleton presentation, source distributions, C11/C++11 consumers",
+  "source_base": "919fb6a7",
+  "strict_build": "148/148 PASS; -Wall -Wextra -Wpedantic -Werror; CPU1 nice19 -j1",
+  "runtime": "Original batch24/25 PASS10.56s; only documentation header authority failed. Manifest/usage mapping corrected; affected check1/1 PASS, no runtime code changed. Do not report a single25/25 run.",
+  "initial_failures": [
+    "New symbols were indexed under legacy content header, outside its include closure.",
+    "First repair changed usage header but missed matching manifest header; second repair aligns both exact authorities."
+  ],
+  "features": [
+    "actual full/fraction/flex root sizing and current-frame resize",
+    "source paint order including parent opacity/custom alpha0/pulse border",
+    "callback snapshots and failure atomicity",
+    "frozen legacy phase/ex pixels and timing",
+    "nativeC11/C++11 four include orders",
+    "independent selective and umbrella distribution runtime",
+    "actual38-preset C oracle, no skips"
+  ],
+  "logs": {
+    "/home/matteo/.cache/cui-current-validation/alpha4-responsive-root-build.log": "ab5899004e41c1372a7b93dd155851e5b70c8bdce3983912702799c9a8aaa421",
+    "/home/matteo/.cache/cui-current-validation/alpha4-responsive-root-tests.log": "b18e13042d0f50bf863aed6067be1222a9e149b997720b742910ecf68700eafd",
+    "/home/matteo/.cache/cui-current-validation/alpha4-responsive-root-LastTest.log": "6cf2de86dbff47f194e3809fdb1b203db4a061edf732543c07494ac02c3053a0",
+    "/home/matteo/.cache/cui-current-validation/alpha4-responsive-doc-repair.log": "9f39966ca25bfc5d14ee8159ffaa88537129a7d9f99d014661b384f7263b5a8b",
+    "/home/matteo/.cache/cui-current-validation/alpha4-responsive-doc-repair-final.log": "0444a60cacc4ac9df759d85df196478d1d585cfe0ea1e011652c7728f55bb4d3"
+  },
+  "limitations": [
+    "Modern Python/JS/TS/Go/Rust Skeleton options remain omitted.",
+    "Root semantic/platform/GPU acceptance is not inferred from headless proof.",
+    "Complete current release-candidate regressions and publication are separate gates."
+  ]
+}

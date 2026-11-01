@@ -2,8 +2,10 @@
 
 Unreleased focused proof: strict native C11, four C/C++ header-order consumers,
 real public responsive/contract tests, frozen legacy checks and pinned WASM
-compilation passed. Canonical SDK/skill integration and modern five-binding
-authoring remain pending. See the [receipt](validation/skeleton-responsive-first.json).
+compilation passed. Root strict/runtime/distribution acceptance also passes;
+modern five-binding authoring and publication remain pending. See the
+[worker receipt](validation/skeleton-responsive-first.json) and
+[root receipt](validation/skeleton-responsive-root.json).
 
 Include `cui/cui_skeleton_presentation.h`. This is a separate additive route;
 `cui_skeleton`, `cui_skeleton_ex` and `cui_skeleton_with_palette` are unchanged.
@@ -34,8 +36,12 @@ on each frame. For complete compilable authored Core composition, see
 creates the context/software renderer, composes and resizes the actual root, and
 exercises registered scrolling. [The contract fixture](../tests/unit/test_skeleton_presentation_contract.c)
 contains real callback/config snapshots, grow/fraction/fixed sizing and failures.
-Integrator registers their CMake targets; build commands await that registration,
-so this source checkpoint does not advertise an unregistered target.
+Build and run these examples headlessly from a configured repository:
+
+```sh
+cmake --build build --target test_skeleton_responsive test_skeleton_presentation_contract
+python scripts/test_local.py --build-dir build -- -R '^skeleton_(responsive|presentation_contract)$' --output-on-failure
+```
 
 The painted own root receives `cui_box` layout directly. Defaults use percent width1,
 not a fixed160px child or a growing wrapper. Under a definite parent, set

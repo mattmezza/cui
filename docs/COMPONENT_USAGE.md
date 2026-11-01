@@ -489,9 +489,9 @@ API: `cui_shimmer_text`. [Public header](../include/cui/cui_status.h); [guide](S
 
 **Interaction:** Decorative presentation adds no action, focus or busy semantics. Optional easing runs synchronously during sampling; application loading semantics remain separate.
 
-**Usage:** Use cui_skeleton_ex with persistent motion for scheduled fixed-size painting, or cui_skeleton_with_palette for explicit preset/custom RGBA including alpha0. Schedule returned absolute wakes. Responsive presentation remains test-only; legacy phase APIs retain their behavior.
+**Usage:** Use cui_skeleton_ex or cui_skeleton_with_palette for fixed-size painting, or cui_skeleton_present for own-root full/fraction/flex sizing and style refinement. Retain motion and schedule absolute wakes. Explicit palettes preserve custom RGBA including alpha0; legacy routes retain their behavior.
 
-API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_skeleton_with_palette`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md).
+API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_skeleton_with_palette`, `cui_skeleton_presentation_default`, `cui_skeleton_present`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_skeleton_presentation.h); [legacy header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md).
 
 ## Spinner
 

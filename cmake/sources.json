@@ -327,6 +327,9 @@
     ],
     "cui_skeleton_palette": [
       "src/theme/cui_skeleton_palette.c"
+    ],
+    "cui_skeleton_presentation": [
+      "src/components/cui_skeleton_presentation.c"
     ]
   },
   "native": {

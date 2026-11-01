@@ -2,7 +2,7 @@
 
 Unreleased focused proof: strict native C11 and C/C++ headers, actual C38-preset
 oracle, software pixels, frozen compatibility/callback timing, and pinned WASM
-compilation passed. Responsive composition is test-only, not a public API.
+compilation passed. Responsive composition has a separate additive API; read [the responsive guide](SKELETON_RESPONSIVE.md).
 Root strict integration build and 17 targeted private-Xvfb checks pass, including
 selective/umbrella distributions, C/C++ include orders and the actual 38-preset
 C oracle (four methods, zero skips). All 18 consumer-skill tests and canonical
@@ -62,8 +62,9 @@ not overlap inputs/each other. Submission success does not certify later layout,
 rendering or native/AT delivery. Caller checks the existing frame diagnostic.
 Omission keeps caller motion state; reset it explicitly to restart.
 
-This fixed-size API does not supply source full/fraction/flex root sizing, own-root
-Styled border/layout overrides or modern foreign options. Python, JS/TS, Go and
+This fixed-size API does not supply source full/fraction/flex root sizing or own-root
+Styled border/layout overrides; use the separate `cui_skeleton_present` route for
+those. Modern foreign options remain pending. Python, JS/TS, Go and
 Rust retain their existing legacy Skeleton constructors and timing; none exposes
 this new palette. Application-owned busy/status semantics remain as documented in
 [the semantic audit](design/ALERT_SKELETON_SEMANTICS_AUDIT.md). See

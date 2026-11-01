@@ -2676,7 +2676,7 @@
       "reference_url": "https://gpui-kit.com/component/skeleton/",
       "category": "fundamentals",
       "base_behavior": [],
-      "public_header": "include/cui/cui_content.h",
+      "public_header": "include/cui/cui_skeleton_presentation.h",
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_content.c",
@@ -2694,7 +2694,7 @@
       },
       "limitations": [
         "Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition.",
-        "Additive owned palette and fixed-size painter source is integrated; focused worker C/software/38-preset oracle and WASM compile evidence is recorded in docs/validation/skeleton-palette-first.json. Integrated strict build, 17 targeted headless checks, 18 consumer-skill tests and canonical freshness checks pass; see docs/validation/skeleton-palette-root.json. Responsive root composition remains a test-only prototype; all five language builders retain legacy Skeleton options. No full-family or deployed support claim."
+        "Additive owned palette and fixed-size painter source is integrated; focused worker C/software/38-preset oracle and WASM compile evidence is recorded in docs/validation/skeleton-palette-first.json. Integrated strict build, 17 targeted headless checks, 18 consumer-skill tests and canonical freshness checks pass; see docs/validation/skeleton-palette-root.json. Responsive root composition now has the additive cui_skeleton_present source route with focused worker and integrated strict/runtime/distribution proof; all five language builders retain legacy Skeleton options. No full-family or deployed support claim."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

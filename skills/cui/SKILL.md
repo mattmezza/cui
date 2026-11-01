@@ -485,9 +485,9 @@ from scheduled fixed-size `cui_skeleton_ex` and owned-color `cui_skeleton_with_p
 Explicit preset resolution preserves Skeleton source colors and authored alpha0;
 `from_theme` is a secondary-color fallback, never inferred preset identity.
 Focused worker native/software/WASM proof and root strict/distribution checks
-pass (17 headless checks and 18 skill tests). Own-root responsive presentation
-is test-only, and all five language
-builders still expose the legacy route. Do not invent a public responsive API.
+pass (17 headless checks and 18 skill tests). The additive `cui_skeleton_present` route owns its responsive root layout; read
+`docs/SKELETON_RESPONSIVE.md` and its header. Focused root runtime/distribution checks pass, and all five language
+builders still expose the legacy route. Do not invent foreign responsive options.
 
 For owned bridge Icon resources, read `docs/BRIDGE_ICON_RESOURCES.md` and the
 complete bridge header. The additive resource group has focused worker/root proof (15 headless checks); it copies source/map/bitmap data and requires matching app/owner

@@ -1,24 +1,44 @@
 # Changelog
 
-## Unreleased
+## Unreleased — 0.1.0-alpha.4 candidate
 
-These changes are integrated on the working branch. They are not part of the
-published alpha.3 artifacts or the deployed website. Full regression and delivery
-checks remain open.
+Prepared source candidate; **not published or deployed**. Keep alpha.3 artifacts
+immutable. Exact-revision release/package/platform gates are tracked in
+[the release checklist](docs/RELEASING.md) and [beta roadmap](BETA_VERSION_ROADMAP.md).
 
 - Adds controlled typed Slider APIs and authoring support in Python, JS/TS, Go
-  and Rust, with compatibility, lifetime and malformed-record checks. Native
-  numeric accessibility delivery and broader binding coverage remain incomplete.
-- Adds opt-in public C software V2 query/render support, bounded CPU preparation
-  and owned-frame lifetimes for backgrounds, shadows and styled text. The other
-  adapters and foreign authoring APIs do not yet expose equivalent support.
-- Fixes movable Table header touch-drop admission using an additive read-only
-  event-coordinate query; legacy mouse behavior remains unchanged.
-- Adds pure C locale-aware time parsing/formatting and inclusive bounds helpers.
-  These helpers do not localize the existing TimeField widget. The new localized
-  widget and Dialog composition routes remain separate unverified worker drafts.
-- Adds the maintained [beta roadmap](BETA_VERSION_ROADMAP.md), with feature-level
-  gaps and separate implementation, validation, release and deployment status.
+  and Rust, with compatibility, lifetime, malformed-record and copied-value checks.
+  Native numeric accessibility delivery remains incomplete.
+- Adds a separate locale-aware TimeField widget with typed configuration,
+  parsing/formatting, bounds and C/Python/JS/TS/Go/Rust authoring. Legacy scalar
+  fields remain available. Focused current/old/partial-provider, dynamic/static
+  and browser checks pass; broader native IME/platform acceptance remains open.
+- Adds six-slot Dialog composition, intrinsic initial sizing, fixed-footer body
+  scrolling and idle quiescence, with desktop/touch gallery coverage. Broader
+  lifecycle policies and foreign composition facades remain open.
+- Adds configured C Badge artwork using ordinary Icon state, style constraints
+  and explicit ownership; the gallery includes real artwork and child activation.
+  Configured Badge language authoring remains pending.
+- Adds opt-in public C software V2 rendering, bounded preparation and owned-frame
+  lifetimes for backgrounds, shadows and styled text; SDL_Renderer V2 consumes
+  the same checked representation. SDL_GPU, Sokol and equivalent foreign paint
+  authoring are not established by this change.
+- Adds owned Skeleton theme palettes and explicit preset/custom colors, a fixed
+  painter, and own-root full/fraction/flex presentation with source-ordered style
+  refinement. Legacy phase/easing behavior is preserved; modern binding options
+  and gallery exposure remain separate gaps.
+- Adds app-owned C bridge Icon resources with copied SVG/maps/bitmap utilities,
+  bounded ownership and source quotas. These utilities do not yet provide
+  configured Icon/Badge node rendering or foreign resource facades.
+- Fixes movable Table header touch-drop admission without changing the legacy
+  mouse path. Representative nested scrolling and touch regressions are covered.
+- Preserves timestamps for unchanged generated SDK/distribution/skill outputs and
+  bounds compiler concurrency. Rebuild/hosted-CI speedups remain unmeasured.
+- Adds a maintained beta roadmap and updated API, human and agent guidance.
+
+All 78 baseline families remain present. This candidate does not establish full
+component parity, physical GPU/OS/assistive-technology acceptance or publication
+to PyPI/npm/crates.io. Use matching headers/libraries and consult binding omissions.
 
 ## 0.1.0-alpha.3 — 2026-10-31
 

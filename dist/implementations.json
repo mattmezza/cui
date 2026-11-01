@@ -613,6 +613,13 @@
       "sources": [
         "src/theme/cui_skeleton_palette.c"
       ]
+    },
+    {
+      "header": "cui_skeleton_presentation.h",
+      "macro": "CUI_SKELETON_PRESENTATION_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_skeleton_presentation.c"
+      ]
     }
   ]
 }

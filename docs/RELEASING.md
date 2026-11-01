@@ -1,3 +1,24 @@
+# Next candidate: v0.1.0-alpha.4 (unpublished)
+
+Version metadata is prepared as `0.1.0-alpha.4` (Python `0.1.0a4`); CMake's base
+remains `0.1.0`. No alpha.4 tag, registry release, GitHub release or website
+publication is implied. The last published release below remains alpha.3.
+
+The candidate batches typed Slider and localized TimeField language authoring,
+Dialog composition, configured C Badge artwork, software/SDL_Renderer V2,
+Skeleton palettes/responsive roots and owned bridge Icon utilities. See
+[the changelog](../CHANGELOG.md) for supported subsets and remaining omissions.
+
+Before publication, freeze the reconciled clean `main` commit, rerun exact-source
+hosted CI/native-binding/Pages browser gates, build matching release assets and
+validate installed consumers. Prepare/download/verify the draft assets before
+publishing. Keep both old repository and nested Go tags immutable. Registry
+ownership and actual physical-platform acceptance remain separate gates.
+
+Use `python scripts/test_release_metadata.py --tag v0.1.0-alpha.4` for this
+candidate. The alpha.3 records and examples below describe the immutable previous
+release; substitute alpha.4 only when executing the next release checklist.
+
 # Published prerelease: v0.1.0-alpha.3
 
 [**v0.1.0-alpha.3 is published**](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3)

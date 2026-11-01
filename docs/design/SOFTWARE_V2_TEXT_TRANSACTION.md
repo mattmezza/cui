@@ -67,3 +67,12 @@ Only after all resources and glyph plans succeed clear scratch and execute origi
 Smallest useful compatibility slice first: owned-only q64/pixel-format/private-context-query admission with frozen same-runtime original text/Bidi/public<=16 and cache parity, no renderer advertisement. Then wire the complete private with-font painter (all current text command forms and full axis domain), using synthetic recorded-glyph sampling plus actual fonts. Do not publish a successful unit-only or raw-Latin-only partial renderer. The following public software entry is a separate final slice after this text path passes; other adapters remain outstanding.
 
 Required headless evidence: independent tiny asymmetric A8 bilinear tables including zero-weight halos, negative pitch, adjacent/overlapping glyphs and nonzero hidden RGB; exact unit/integer-phase V1 software RGBA with real bundled Inter/Bold and same-runtime frozen original source; min/max axes through64 (including64×1/65536), fractional/negative/large origins, clip boundaries, zero-size/empty/contextual lines, multiline/soft separators, Bidi/ligature/mark/fallback/tracking/style selection, span cluster color and resolved gradients/duplicate transparent stops. Compare all kinds interleaved and glyph order independently. Sweep counted allocations and dependency failure seams, first/late command failure, no-Bidi poisoned raw/context cases, owner/source/target aliases, pixel-mode rejection, source/output/work/budget exact/below limits, reentrancy/teardown/retry and cold-cache no-insertion. Verify q1..16 remains exact and q64 truly reaches FT with64x source dimensions under bitmap quotas; assert no silent16 clamp. Retain current background/shadow/V1 oracles unchanged. No hardware/GPU or intrinsic-color-font completion claim follows from these software checks.
+
+## Integrator checkpoint
+
+Approved first implementation slice: owned-only q64 admission, owned grayscale
+format validation including cache hits, explicit numeric checks and private
+context availability query. Public source-density limits and V1 rendering stay
+unchanged. Require frozen q1..16 compatibility and real q64 source-raster evidence
+under existing budgets. The complete private text transaction and public renderer
+advertisement remain subsequent review gates; this approval establishes neither.

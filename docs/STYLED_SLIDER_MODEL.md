@@ -5,7 +5,8 @@ controlled [Base model](BASE_SLIDER_MODEL.md) and the owned
 [style resolver](SLIDER_STYLE_VALUES.md). Legacy float/double Slider APIs and all
 old records remain unchanged. Full family closure is still open: visible Aurora
 Light gradients need actual V2 adapters, vertical registered-scroll layout is
-still rejected, native numeric hosts and all five typed builders remain pending.
+still rejected, native numeric hosts and JavaScript/TypeScript/Go/Rust typed builders remain pending; the
+[Python controlled bridge subset](PYTHON_SLIDER_MODEL.md) is available unreleased.
 
 Start with the complete, windowless
 [controlled application](../examples/styled_slider_model_controlled.c). It contains
@@ -13,7 +14,8 @@ real application storage, checked init/default construction, callback, compositi
 and main; accepts two ordered key proposals externally, demonstrates actual hover
 motion and advances the Core clock to a settled idle deadline. Reuse callback and
 compose in your own native/browser host. This example does not create a window,
-install a renderer or imply a foreign-language builder exists.
+install a renderer or expose the direct C style/motion structs through bindings.
+The separate Python bridge subset uses its own owned records and narrower options.
 
 From the repository root, with a C11 compiler, CMake≥3.20, Ninja and Python3
 ([dependency guide](DEPENDENCIES.md)), build and run only this example:
@@ -135,5 +137,7 @@ The browser maps that deadline to its monotonic host clock and coalesces it with
 other wakes; reduced motion and settled state return zero. No manual animation
 loop is required. V1 reports unsupported only when actual resolved visible paint
 is linear; a theme name alone never selects gradient capability. This gallery
-migration does not implement native numeric delivery, typed foreign builders,
-V2 gradient adapters or vertical registered-scroll admission.
+migration does not implement native numeric delivery, V2 gradient adapters or
+vertical registered-scroll admission. The separate Python bridge subset does not
+expose arbitrary C Styled style/state objects; the other four controlled builders
+remain pending.

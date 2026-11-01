@@ -3,10 +3,13 @@
 Include `<cui/cui_base_slider_model.h>`. This additive route owns its fixed-size
 root, track, fill and thumb boxes. It implements Single/Range double-valued input
 and plain Base painting, independently of legacy `cui_slider`,
-`cui_base_slider_events` and their snapshot/callback behavior. It is not the
-Styled presenter: palette brushes, source themes/disabled styling, animation,
-focus rings, native numeric host delivery and all five language builders remain
-pending. The whole Slider family remains partial.
+`cui_base_slider_events` and their snapshot/callback behavior. The separate
+[Styled C presenter](STYLED_SLIDER_MODEL.md) adds palette/source styling, motion
+and focus rings. Direct C model/state/result structs are not foreign-language
+records; the [Python bridge-owned controlled subset](PYTHON_SLIDER_MODEL.md)
+exposes copied double Single/Range proposals and explicit receipt acceptance.
+Native numeric host delivery and JavaScript/TypeScript/Go/Rust controlled builders
+remain pending. The whole Slider family remains partial.
 
 The complete, independently runnable C11 example is
 [`examples/slider_model_controlled.c`](../examples/slider_model_controlled.c).

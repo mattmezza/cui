@@ -260,10 +260,11 @@ class AgentSkillTests(unittest.TestCase):
             self.assertEqual([entry['name'] for entry in agent_resources.public_api(root)],
                              ['cui_zebra', 'cui_alpha'])
 
-    def test_typed_shadow_definition_modules_are_discoverable_offline(self):
+    def test_typed_definition_modules_are_discoverable_offline(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             expected = ['bindings/python/cui_bridge/shadows.py',
+                        'bindings/python/cui_bridge/slider_model.py',
                         'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs',
                         'bindings/go/cui/part_shadows.go', 'bindings/rust/src/part_shadows.rs']
             for name in expected + ['bindings/python/private.py',

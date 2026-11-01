@@ -73,6 +73,22 @@ add_test(NAME bridge_python_components COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_components.py)
 
+add_test(NAME bridge_python_slider_model COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_slider_model.py)
+foreach(mode accept reject_vertical single)
+ if(mode STREQUAL "reject_vertical")
+  set(slider_example_args --reject --vertical)
+ elseif(mode STREQUAL "single")
+  set(slider_example_args --single)
+ else()
+  set(slider_example_args)
+ endif()
+ add_test(NAME bridge_python_slider_example_${mode} COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/slider_model.py ${slider_example_args})
+endforeach()
+
 # ASan instrumentation has a separate stack budget; native Windows defaults to 1 MB.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CUI_SANITIZE)
  add_test(NAME bridge_small_stack COMMAND ${Python3_EXECUTABLE}

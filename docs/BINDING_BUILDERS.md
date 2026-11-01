@@ -490,3 +490,11 @@ See [typed root shadow authoring](BRIDGE_SHADOWS.md) for the six-kind implementa
 For bounded semantic ROOT/MAIN/indicator/track/thumb authoring, read
 [typed part shadows](BRIDGE_PART_SHADOWS.md). Slider has no thumb; owner topology,
 whole-group naming and separate reset are explicit parts of that contract.
+
+## Python controlled Single/Range Slider
+
+The unreleased additive `slider_model(key, config, confirmed)` builder owns frozen
+double Single/Range request records and uses explicit receipt acceptance after
+step. Read [the exact Python contract and complete authored UI](PYTHON_SLIDER_MODEL.md).
+The old `slider()` examples above preserve scalar float/autocommit CHANGE behavior.
+JavaScript/TypeScript/Go/Rust controlled builders remain pending.

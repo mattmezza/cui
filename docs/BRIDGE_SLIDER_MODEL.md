@@ -1,10 +1,10 @@
 # Controlled typed Slider through the C bridge
 
-Unreleased, C bridge only. Include `<cui/cui_bridge.h>` from the same revision as
+Unreleased C bridge and Python subset. Include `<cui/cui_bridge.h>` from the same revision as
 the library. `cui_bridge_slider_model_versions() & 1` advertises this independent
 schema; old libraries lack this symbol. Foreign loaders must resolve the entire
-optional symbol group before use. Python, JavaScript, TypeScript, Go and Rust
-typed builders are still pending. Existing `slider()` builders keep their scalar
+optional symbol group before use. The [Python controlled builder](PYTHON_SLIDER_MODEL.md) wraps this route.
+JavaScript, TypeScript, Go and Rust typed builders remain pending. Existing `slider()` builders keep their scalar
 float precision, autoacceptance and CHANGE timing.
 
 Enable the owned request queue once, then create kind81 with

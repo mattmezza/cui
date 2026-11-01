@@ -128,6 +128,8 @@ class _API:
         from .shadows import bind_shadow_api, bind_part_api
         bind_shadow_api(self, bind, _Handle)
         bind_part_api(self, bind, _Handle)
+        from .slider_model import bind_api
+        bind_api(self, bind)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -259,6 +261,7 @@ _KIND = {"row": 1, "column": 2, "label": 3, "button": 4, "checkbox": 5,
          "radio": 6, "switch": 7, "toggle": 8, "slider": 9, "progress": 10, "badge": 11, "input": 12, "textarea": 13, "number_input": 14, "collapsible": 15, "alert": 16, "radio_group": 17, "tabs": 18, "accordion": 19, "item": 20, "select": 21, "combobox": 22, "dropdown_button": 23, "dialog": 24, "alert_dialog": 25, "sheet": 26, "popover": 27, "tooltip": 28, "hover_card": 29, "avatar": 30, "bubble": 31, "empty_view": 32, "group_box": 33, "kbd": 34, "skeleton": 35, "spinner": 36, "tag": 37, "marker": 38, "shimmer": 39, "list_view": 40, "menu": 41, "pagination": 42, "rating": 43, "stepper": 44, "description_list": 45, "scrollable": 46, "status_bar": 47, "toolbar": 48, "title_bar": 49, "icon": 50, "message": 51, "attachment": 52, "image": 53, "tree": 54, "time_field": 55, "color_picker": 56, "calendar": 57, "date_picker": 58, "otp_input": 59, "form": 60, "input_group": 61, "notification": 62, "focus_trap": 63, "message_scroller": 64, "carousel": 65, "resizable": 66, "text_view": 67, "editor": 68, "chart": 69, "table": 70, "data_table": 71, "plot": 72, "command": 73, "virtual_list": 74, "sidebar": 75, "root_view": 76, "speech": 77, "questionnaire": 78, "dock": 79, "settings": 80}
 _BOOLEAN = {"checkbox", "radio", "switch", "toggle"}
 _NUMERIC = {"slider", "progress", "number_input", "pagination", "rating"}
+_KIND["slider_model"] = 81
 _EDITABLE = {"input", "textarea", "number_input", "combobox"}
 _GROUP = {"radio_group", "tabs", "accordion", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "description_list", "status_bar", "toolbar", "title_bar"}
 _SURFACE = {"dialog", "alert_dialog", "sheet", "popover"}
@@ -275,6 +278,7 @@ _DISABLED |= {"dock", "questionnaire", "speech", "sidebar", "command", "virtual_
 _SELECTED = {"sidebar","radio_group", "tabs", "select", "combobox", "dropdown_button", "list_view", "menu", "stepper", "tree", "carousel"}
 _SURFACE |= {"notification"}
 _CHANGE = (_DISABLED - {"button", "accordion", "form"}) | {"message_scroller", "settings"}
+_DISABLED.add("slider_model")  # No legacy CHANGE callback for the controlled route.
 _CONSTRUCTOR_CONTAINER = {"root_view","row", "column", "collapsible", "item", "dialog", "sheet", "popover", "hover_card", "group_box", "scrollable", "focus_trap"}
 _CONTAINER = _CONSTRUCTOR_CONTAINER | _GROUP
 _VARIANT = {"primary": 0, "secondary": 1, "outline": 2, "ghost": 3}
@@ -1438,6 +1442,8 @@ class App:
             raise RuntimeError("bridge create failed")
         self._root: Widget | None = None
         self._by_handle: dict[tuple[int, int], Widget] = {}
+        self._slider_enabled = False
+        self._slider_dispatching = False
 
     def _ensure_open(self) -> None:
         if not self._ptr:
@@ -1463,7 +1469,7 @@ class App:
         seen: set[int] = set()
         keys: set[str] = set()
         order: list[tuple[Widget, Widget | None, str]] = []
-        def validate(node: Widget, parent: Widget | None, path: str, depth: int) -> None:
+        def validate(node: Widget, parent: Widget | None, path: str, depth: int, lineage=()) -> None:
             if depth >= 128:
                 raise ValueError("widget tree exceeds 128 levels")
             if id(node) in seen:
@@ -1473,6 +1479,11 @@ class App:
             if node._disposed:
                 raise ValueError("widget belongs to a disposed App")
             seen.add(id(node))
+            if node.kind == "slider_model":
+                if not isinstance(node, SliderModel):
+                    raise TypeError("use slider_model() for the controlled route")
+                if any(ancestor.kind not in ("row", "column") for ancestor in lineage):
+                    raise ValueError("controlled Slider requires Row/Column ancestry")
             key = node.key if node.key is not None else f"{node.kind}@{path}"
             _utf8(key)
             if _KIND[node.kind] >= 3:
@@ -1482,15 +1493,21 @@ class App:
             keys.add(key)
             order.append((node, parent, key))
             for index, child in enumerate(node._children):
-                validate(child, node, f"{path}/{index}", depth + 1)
+                validate(child, node, f"{path}/{index}", depth + 1, lineage + (node,))
         validate(tree, None, "root", 0)
+        if any(node.kind == "slider_model" for node, _, _ in order) and not self._slider_enabled:
+            self.enable_slider_requests()
         created: list[Widget] = []
         try:
             for node, parent, key in order:
                 handle = _Handle()
                 parent_handle = parent._handle if parent else _Handle()
-                self._api.check(self._api.node_create(self._ptr, parent_handle, _KIND[node.kind],
-                                                       _utf8(key), C.byref(handle)))
+                if node.kind == "slider_model":
+                    from .slider_model import mount_node
+                    mount_node(self, node, parent_handle, key, handle)
+                else:
+                    self._api.check(self._api.node_create(self._ptr, parent_handle, _KIND[node.kind],
+                                                           _utf8(key), C.byref(handle)))
                 node._app, node._handle = self, handle
                 created.append(node)
                 self._by_handle[(handle.slot, handle.generation)] = node
@@ -1577,6 +1594,8 @@ class App:
         return self
 
     def step(self, dt: float = 1 / 60) -> None:
+        if self._slider_dispatching:
+            raise RuntimeError("step is unavailable during controlled Slider dispatch")
         if getattr(self, "_running", False):
             raise RuntimeError("step is unavailable during run")
         self._ensure_open()
@@ -1876,6 +1895,8 @@ class App:
 
     def dispatch(self) -> int:
         """Invoke callbacks after step; Python exceptions propagate outside C frames."""
+        if self._slider_dispatching:
+            raise RuntimeError("nested controlled Slider dispatch is unavailable")
         count = 0
         for event in self.poll_events():
             callback = (event.node._callback if event.type == "click" else
@@ -1883,7 +1904,29 @@ class App:
             if callback:
                 callback(event)
             count += 1
+        if self._slider_enabled and self._ptr:
+            count += self.dispatch_slider_requests()
         return count
+
+    def supports_slider_model(self) -> bool:
+        from .slider_model import supported
+        return supported(self)
+
+    def enable_slider_requests(self, capacity: int = 4096) -> "App":
+        from .slider_model import enable
+        return enable(self, capacity)
+
+    def poll_slider_requests(self) -> Iterator["SliderRequest"]:
+        from .slider_model import poll
+        return poll(self)
+
+    def accept_slider_request(self, receipt: "SliderReceipt", value: "SliderSingle | SliderRange") -> None:
+        from .slider_model import accept
+        accept(self, receipt, value)
+
+    def dispatch_slider_requests(self) -> int:
+        from .slider_model import dispatch
+        return dispatch(self)
 
     def run(self, dt: float = 1 / 60) -> None:
         """Run the native event loop; dispatch after paint, including live resize.
@@ -1891,6 +1934,8 @@ class App:
         dt is retained for source compatibility and validated; native scheduling
         supplies actual frame timing. Older bridges fail clearly without fallback.
         """
+        if self._slider_dispatching:
+            raise RuntimeError("run is unavailable during controlled Slider dispatch")
         self._ensure_open()
         if not math.isfinite(dt) or dt <= 0:
             raise ValueError("run requires positive finite dt")
@@ -1929,11 +1974,17 @@ class App:
 
     def close(self) -> None:
         if self._ptr:
+            if self._slider_enabled:
+                import threading
+                if threading.get_ident() != self._slider_owner_thread:
+                    raise RuntimeError("controlled Slider App must close on its owner thread")
             self._api.destroy(self._ptr)
             self._ptr = None
             for node in self._by_handle.values():
                 node._app = node._handle = None
                 node._disposed = True
+                if isinstance(node, SliderModel):
+                    node._request_callback = None
             self._by_handle.clear()
 
     def __enter__(self) -> "App":
@@ -1991,3 +2042,9 @@ __all__ += ["DesignSize"]
 __all__ += ["BoxShadow", "CSSBoxShadow", "ShadowStyle", "PresetShadowStyle", "ShadowKind", "ShadowPreset", "CornerRadii"]
 
 __all__ += ["ShadowPart", "ShadowTargetInfo"]
+
+from .slider_model import (SliderSingle, SliderRange, SliderDomain, SliderConfig, SliderScale,
+    SliderOrientation, SliderLayout, SliderPhase, SliderReason, SliderPart, SliderReceipt,
+    SliderInput, SliderRequest, SliderPresentation, SliderModel, slider_model)
+from .slider_model import __all__ as _slider_exports
+__all__ += _slider_exports

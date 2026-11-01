@@ -406,5 +406,12 @@ complete optional symbol group before use; enable the separate owned FIFO, poll
 after step and explicitly accept full double Single/Range pairs using receipts.
 Polling never autoaccepts or emits legacy CHANGE. Expired records remain readable,
 not acceptable. Native owner TLS and explicit final-module-verified unshared WASM
-are the supported modes; default/shared WASM remains versions0. All five typed
-language builders, native numeric delivery and V2 gradient adapters remain pending.
+are the supported modes; default/shared WASM remains versions0. The unreleased Python controlled builder is documented in
+`docs/PYTHON_SLIDER_MODEL.md`; read its complete source records in
+`bindings/python/cui_bridge/slider_model.py` and runnable UI in
+`bindings/bridge/examples/slider_model.py`. Resolve the complete optional group,
+keep int identities and frozen copies, dispatch after legacy events, explicitly
+accept full pairs, and never retain ctypes views across callbacks. Typed callbacks
+may mutate external owner state/enqueue later work; nested step/run/dispatch reject.
+JavaScript/TypeScript/Go/Rust typed builders, native numeric delivery and V2
+gradient adapters remain pending.

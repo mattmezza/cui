@@ -1,0 +1,61 @@
+{
+  "status": "focused_local_proof_passed_unreleased",
+  "source_chain": [
+    "9d95a603",
+    "65742454",
+    "65af7185",
+    "current fixture-only followup"
+  ],
+  "frozen_legacy_source": "956a853c src/components/cui_content.c phase/ex functions; macro name remapping only, helper copied",
+  "compiler": "native cc C11 O2 Wall Wextra Wpedantic Werror UNDEBUG; C++11 header four order/language cases",
+  "reuse": "Cached root actual Core/software/text/bidi archives, no engine compilation. Current root checkout observed6e3c0213240bf471ac384e55b0e4d89c141701f4; archive identity is authoritative, no exact whole-library source revision inferred. Candidate content/palette objects precede archive on link line.",
+  "archive_sha256": {
+    "libcui.a": "f7152b29cf3b4b26e05f2a2d38092476c03fbc304fdbefad23401d32320bc274",
+    "libcui_software.a": "5da8eb0343355c70852941306817e4bef030c10261d3ce226c3a5e920a9cde5c",
+    "libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+    "libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "source_sha256": {
+    "include/cui/cui_skeleton_palette.h": "6a0ca1ef80ef67846291c130da5333cee945d8c9358c36d287cee32c0c1d7ca0",
+    "include/cui/cui_content.h": "153dc78f3e864bf0c4d1965a870833eb92e92536a1b404bab8e717069510edb4",
+    "src/theme/cui_skeleton_palette.c": "180f35d14a54da6b29b1afe35b10b9abe85548160715d473fd2416f9315352d4",
+    "src/theme/cui_skeleton_palette_presets.inc": "210355005f928bc254e13cc719a5e763544fc7e255796529c57f4b641652a0a0",
+    "src/components/cui_content.c": "b66c20351fc60eda02479cbc17174ab3ddb2430ea8660e62374c78930506e177",
+    "scripts/generate_skeleton_palettes.py": "be393896c98537507ae8a481faea28b4b31959fd460de104579eff262142d52f",
+    "tests/unit/test_skeleton_palette.c": "3791ae42856521506c45708e1bab1b35a90c18cf1fa77e4628fa38a4dcbdbb9f",
+    "tests/unit/test_skeleton_presentation.c": "f05949728357998465e0f7fb4edb5e9eb93d5f60193cd4c77712d16654858182",
+    "tests/unit/test_skeleton_responsive_prototype.c": "b7abb0d70a931441175fe420ef4cf9bf1f25584ebf614f51246570acbdf861fd",
+    "tests/fixtures/skeleton/frozen.c.inc": "6f3ee89a2f4ba576ef6764b219c8a80fd30c016421ce64634664308f02236272",
+    "tests/test_skeleton_palette.py": "f011c20e96259d8becc97a89c47c23d7684a896d9f06c08e243da83d8cef2ed4"
+  },
+  "results": {
+    "native_strict": "9 initial compile/link commands PASS, corrected single fixture compile PASS, no warnings",
+    "final_private_wrapper": "8/8PASS0.14s, session15212",
+    "actual_oracle": "4methodsPASS0.028s, zero skips; C38 rows matched independent normalized pinned source oracle",
+    "presentation": "frozen phase/ex pixels/commands, legacy post-easing theme mutation/newpalette snapshot, pulse/corners/clip/alpha0/reduced/omission/reset/error atomics PASS",
+    "responsive_test_only": "actual first-frame320\u219291\u2192420 own fullwidth16px, halfwidth, corners/border/pixels/rootopacity/customalpha0, registered Ybody fullwidth/fixedheight, expected percentHEIGHTfailure/fresh recovery PASS",
+    "wasm": "Zig0.16.0 wasm32-wasi C11 O2 strict compile palette/content/header3TUs PASS; no runtime claim"
+  },
+  "initial_failures": [
+    "first runtime7/8: fixture incorrectly assumed s.started0 after firstsample4.001; fixed expected capturedpriorstart, production unchanged",
+    "first/second oracle entry erroneously skipped actualCdumper because decorator evaluated CLI value before parsing; in-method optional skip fixed, final4methods0skip verified; earlier no-skip report corrected"
+  ],
+  "commands": [
+    "nice -n 19 taskset -c 1 python build-focused/skeleton-proof/run_first.py",
+    "nice -n 19 taskset -c 1 python build-focused/skeleton-proof/run_second.py",
+    "nice -n 19 taskset -c 1 python scripts/test_local.py --build-dir build-focused/skeleton-proof"
+  ],
+  "logs": [
+    "build-focused/skeleton-proof/first.log",
+    "build-focused/skeleton-proof/second.log",
+    "build-focused/skeleton-proof/final-runtime.log"
+  ],
+  "pending": [
+    "root source manifest/CMake registration",
+    "canonical SDK/selective/umbrella compiled closure",
+    "metadata/usage6/skill18/freshness integration",
+    "public responsive/Styled implementation",
+    "modern five-binding Skeleton authoring",
+    "physical native/GPU/browser Skeleton changes not tested in this slice"
+  ]
+}

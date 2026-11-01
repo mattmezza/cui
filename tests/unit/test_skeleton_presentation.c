@@ -149,13 +149,14 @@ int main(void) {
     o.reduced_motion = true;
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
     assert(!r.active && r.opacity == 1 && r.next_wake_seconds == 0);
+    double retained_start = s.started;
     /* Omission does not silently reset caller state; explicit reset starts at now. */
     assert(cui_begin_frame(ui, 64, 48, 0));
     assert(cui_end_frame(ui).count == 0);
     palette.background = (cui_color){255, 255, 255, 200};
     o.reduced_motion = false; o.now_seconds = 7.25;
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
-    assert(s.started == 0 && r.opacity < 1);
+    assert(s.started == retained_start && r.opacity < 1);
     s = (cui_loading_motion){0};
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
     assert(s.started == 7.25 && r.opacity == 1);

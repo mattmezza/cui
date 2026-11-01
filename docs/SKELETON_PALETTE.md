@@ -1,8 +1,10 @@
 # Skeleton palette and fixed-size presentation
 
-Unreleased source checkpoint: offline data/generator tests passed; C compilation,
-actual C oracle, software pixels and compatibility fixtures are prepared but not
-executed. This is not a whole-family or installed-package support claim.
+Unreleased focused proof: strict native C11 and C/C++ headers, actual C38-preset
+oracle, software pixels, frozen compatibility/callback timing, and pinned WASM
+compilation passed. Responsive composition is test-only, not a public API.
+Canonical distribution/skill integration remains pending; this is not a whole-family
+or installed-package support claim.
 
 Include `cui/cui_skeleton_palette.h` for owned values and pure resolvers, and
 `cui/cui_content.h` for `cui_skeleton_with_palette`. The existing phase API and
@@ -63,3 +65,10 @@ Rust retain their existing legacy Skeleton constructors and timing; none exposes
 this new palette. Application-owned busy/status semantics remain as documented in
 [the semantic audit](design/ALERT_SKELETON_SEMANTICS_AUDIT.md). See
 [the parity checkpoint](design/SKELETON_PARITY_CHECKPOINT.md) for remaining scope.
+
+Focused proof receipt: [skeleton-palette-first.json](validation/skeleton-palette-first.json).
+The initial omission test incorrectly assumed an animation started at zero; the
+corrected fixture preserves its actual first sample time. An initially skipped
+C-oracle method was corrected to check its optional dumper at runtime; the final
+run executed all four oracle methods with no skips. Logs retain both earlier
+failures/limitations rather than presenting those runs as complete proof.

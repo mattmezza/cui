@@ -95,8 +95,9 @@ class SkeletonPalette(unittest.TestCase):
             finally:
                 generator.ROOT, generator.PIN = old_root, old_pin
 
-    @unittest.skipUnless(DUMPER, 'actual C dumper path not supplied')
     def test_actual_c_records(self):
+        if not DUMPER:
+            self.skipTest('actual C dumper path not supplied')
         rows = []
         for line in subprocess.check_output([DUMPER], text=True).splitlines():
             numbers = tuple(map(int, line.split()))

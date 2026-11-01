@@ -141,3 +141,49 @@ OK/syntax/value/range and a genuine value difference. Latest results may be
 unchanged, but must identify the requested node, report a healthy frame, agree
 with their changed bit and never claim more queued changes than applied change.
 Malformed-wire and valid-unchanged controls passed alongside real queue tests.
+
+## Durable opt-in CTest acceptance
+
+The reusable runner is `bindings/go/tests/test_time_localized.py`. Integration
+uses `CUI_TIME_FIELD_BINDING_TESTS=ON` (default OFF), with explicit existing actual
+old and partial DSOs, an existing current bridge target and retained Rust cache:
+
+```sh
+cmake -S . -B EXISTING_BUILD -DCUI_BUILD_BRIDGE=ON \
+  -DCUI_TIME_FIELD_BINDING_TESTS=ON \
+  -DCUI_TIME_FIELD_OLD_LIBRARY=/absolute/actual-old/libcui_bridge.so \
+  -DCUI_TIME_FIELD_PARTIAL_LIBRARY=/absolute/actual-partial/libpartial.so \
+  -DCUI_TIME_FIELD_RUST_TARGET_DIR=/absolute/existing/cargo-target
+python scripts/test_local.py --build-dir EXISTING_BUILD -j1 -V \
+  -R '^(bridge_go_time_localized|bridge_rust_time_localized|bridge_time_localized_runner_offline)$'
+```
+
+Root owns the shared CMake wiring. When opted in, Go/Cargo and the explicit
+providers are required; missing prerequisites must fail configuration rather
+than silently skip acceptance. `bridge_go_time_localized` and
+`bridge_rust_time_localized` use the same runner with `--language go|rust`,
+`--build-dir`, `--library`, `--old-library`, `--partial-library`, optional `--go`
+and `--cargo`, and Rust's required `--target-dir`. Both language invocations accept
+all tool/cache arguments for common CMake wiring. Tests run serially with a
+300-second outer CTest timeout. No runtime command is installed or downloaded.
+
+The runner requires the private wrapper's invisible-display marker and Linux;
+it never passes `--native` to examples. Go uses `cui_dynamic`, one build job,
+network-off settings and the selected exact provider in separate processes.
+Rust sets `CUI_BRIDGE_LIB_DIR` to the current library before Cargo, so build.rs
+cannot fall back to compiling the engine/SDK. Cargo is offline/locked, no default
+features and single-job. It reports the actual test executable through JSON;
+that same executable runs against current, actual old and partial providers.
+Two small symlink directories select the real old/partial artifacts with the
+required linker filename; no engine/DSO copy is made. Existing nonmatching files
+or aliases are never overwritten. Rust then executes strict wire units and the
+asserting English/Arabic example; Go executes its matching tests and example.
+All command failures stop the suite immediately. This is dynamic acceptance only;
+static SDK/package acceptance remains a separate pending gate.
+
+`bindings/go/tests/test_time_localized_runner.py` is an offline six-test harness
+proof: it mocks all tools and checks provider selection, offline/serial flags,
+reported-binary reuse, malformed Cargo output, desktop rejection, fail-fast and
+non-destructive aliases. It ran6/6 without Go/Cargo or native execution. The new
+runner itself has not yet been executed; prior dynamic evidence used the retained
+scratch harness, and root's configured acceptance remains required.

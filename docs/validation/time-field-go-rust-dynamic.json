@@ -68,5 +68,20 @@
     "result": "9/9 PASS 14.66s",
     "log": "/home/matteo/.cache/cui-hover-raw-build/time-localized-go-rust/coalesced-current-providers-examples.log",
     "scope": "earlier selected legacy+typed regression batch before final decoder tightening"
+  },
+  "durable_runner": {
+    "source_sha256": {
+      "bindings/go/tests/test_time_localized.py": "75bd96026edc5700cd16e7fc63c8ba20059e6f7fd18a4cb376c64a96d1141411",
+      "bindings/go/tests/test_time_localized_runner.py": "4b765b0913eec304569d27f486fd6300831d77310e3eda6c2ccc1843b867be25"
+    },
+    "offline_harness_result": "6/6 PASS .011s; no Go/Cargo/compiler/runtime/dependencies",
+    "runtime_result": "pending; prior runtime receipt used scratch harness",
+    "proposed_cmake_option": "CUI_TIME_FIELD_BINDING_TESTS default OFF",
+    "proposed_ctest_names": [
+      "bridge_go_time_localized",
+      "bridge_rust_time_localized",
+      "bridge_time_localized_runner_offline"
+    ],
+    "scope": "explicit current/actual-old/partial dynamic providers; reusable Cargo cache; no static SDK claim"
   }
 }

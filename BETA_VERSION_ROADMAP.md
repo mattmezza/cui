@@ -13,7 +13,7 @@ No completion percentage or beta date is asserted.
 | Released library | [v0.1.0-alpha.3](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3). Ten verified assets; hidden windows, initial named shadows and component improvements included. |
 | Public website | Interactive C → WASM gallery with all 78 entries, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
 | Merged development work | Additional component-part and Button state shadows are merged and deployed, but absent from alpha.3 library packages. |
-| Work in integration | Current-frame scrollbar/region layout, a typed C-only Slider model, versioned background transport, private software painting and counted text recording. Focused checks exist; renderer painting, binding coverage and combined validation remain unfinished. |
+| Work in integration | Current-frame scroll-region sizing, typed Base/Styled C Sliders, a controlled Slider gallery, versioned background transport, private software painting/validation and counted text recording. Focused checks pass; these slices are unreleased. Public renderer support, bindings and final combined validation remain unfinished. |
 | Package registries | Go alpha.3 tag/proxy verified. PyPI, npm and crates.io publication remains open; GitHub assets are available. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -23,10 +23,10 @@ feature test does not establish complete component parity.
 
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
-| 1 | Finish scroll layout and Dialog sizing | Core geometry and additive region sizing pass combined local validation. Finish Dialog composition/input and wider acceptance. |
-| 1 | Finish Slider delivery | C-only controlled Base/Styled Single/Range, motion and styles pass combined local checks. Finish gallery migration, native delivery, bindings and vertical registered-scroll support. |
+| 1 | Finish scroll layout and Dialog sizing | Core geometry and additive region sizing integrated. Current-size placement and small-viewport overflow proofs pass. Finish Dialog composition/input and lifecycle acceptance. |
+| 1 | Finish Slider behavior | Typed Base/Styled C interaction and presentation pass focused integrated checks; controlled gallery passes focused headless checks. Finish bridge, five language builders, native numeric delivery, vertical registered scrolling and wider acceptance. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
-| 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Confirm the final Windows fieldwise-test correction and obtain a clean full run of the latest candidate. |
+| 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Candidate `00aa1f99` passes CI and native bindings, including Windows. Confirm Pages and run the newer integrated source through final checks. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
 | 3 | Deliver the next verified release | Matching packages, docs, installed examples and exact-revision website checks. |
 
@@ -55,7 +55,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Button state/style refinement, typed Slider gallery/native delivery and five builders (C Base/Styled ranges, themes and motion are integrated); consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are integrated but unreleased); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
 | Overlays | Dialog independent header/title slots and separate Content/Body flex sizing; Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
@@ -113,12 +113,12 @@ The deployed styling revision passed [CI](https://github.com/mattmezza/cui/actio
 [Pages](https://github.com/mattmezza/cui/actions/runs/41236071976).
 Integration candidate `3636bfbc` passed all browser shards and native binding
 runners; its only CI failure was a Windows Release struct-padding comparison.
-Latest submitted candidate `00aa1f99` passes
-[CI](https://github.com/mattmezza/cui/actions/runs/41251863047), including Windows
-Release, and [native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050).
-[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) remains pending.
-Branch checks do not deploy the public website. Older green results do not cover
-newer code.
+The fieldwise correction passes locally. Submitted candidate `00aa1f99` has successful
+[CI](https://github.com/mattmezza/cui/actions/runs/41251863047),
+[native bindings](https://github.com/mattmezza/cui/actions/runs/41251863050) runs. Its
+[Pages](https://github.com/mattmezza/cui/actions/runs/41251862625) result still requires terminal
+confirmation. Branch checks do not deploy the public website. Older green results
+do not cover newer code.
 
 ### Current integration evidence
 
@@ -126,13 +126,15 @@ These are **unreleased slices**, not completed beta areas:
 
 | Slice | Evidence / remaining gate |
 | --- | --- |
-| Scrollbar and Dialog layout | Combined geometry/region checks pass. Current-height source-placement prototype passes source/distribution tests2/2 across ten transitions; no prior-height fallback. Dialog input, actions, actual-font composition and lifecycle remain open. |
-| Typed Slider | C Base/Styled controlled Single/Range, motion, styles and complete example pass combined source/selective/umbrella/legacy checks16/16;176 software images, strict WASM32 compilation, skill18/usage6 and full format pass. [Receipt](docs/validation/styled-slider-facade-integration.json). Gallery, bindings, native numeric delivery, vertical registered scrolling and real V2 gradients remain open. |
+| Scrollbar layout | Focused geometry, layout, resize and input-policy checks pass; Dialog integration remains open. |
+| Typed Base/Styled Slider | Integrated source/distribution/legacy/example checks pass (16/16), alongside strict WASM compilation, usage6 and skill18. Owned presentation, motion and 176 software pixel proofs are covered; see [receipt](docs/validation/styled-slider-facade-integration.json). Bridge, five builders and native numeric delivery remain open. |
+| Controlled Slider gallery | Integrated at `259e298a`; focused headless acceptance covers owner acceptance/rejection, Single/Range pairs, pixels, pointer/touch/keys and passive idle. Full headless browser regression also passes, including 80 compiling usage excerpts and all 78 baseline entries. Deployment and hosted checks of this newer revision remain open. |
 | Reduced-motion scheduling | Local viewport/DPI and repeated preference-change checks pass; all browser shards passed for candidate `3636bfbc`. Confirm the newest candidate separately. |
 | Background rendering | Transport, preparation and private validator checks pass. Counted text recording passes the repository Release O3 build, seven runtime checks, mutation rejection and skill18. The negative-fixture warning and no-Bidi admission gap are fixed. Wider suite/platform acceptance remains open. This does **not** establish renderer painting support. |
-| Shadow quality | [Measured test-only report](docs/design/SOFTWARE_V2_SHADOW_QUALITY.md) rejects four-sample reconstruction for general unequal scales. Legacy unit pixels match; admitted minification aliases. A bounded footprint-filtering prototype is next; no new shadow renderer support is claimed. |
-| Core region sizing and private painting | Combined current-library warning-clean Release build and focused headless checks10/10 pass; skill18/18, generated freshness and WASM32 record sizes pass. See [receipt](docs/validation/core-paint-integration.json). Full Dialog and public renderer support remain open. |
-| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. Hosted Linux/macOS/Windows checks pass for `00aa1f99`; browser completion and newer slices require separate confirmation. |
+| Scroll regions and private painter | Both integrated. Focused private checks pass (10/10), alongside skill18. Large-coordinate regression reproduced and corrected. See [receipt](docs/validation/core-paint-integration.json). Private painting does not establish public adapter support. |
+| Dialog sizing | Current-size placement, independent frozen compatibility checks and small-viewport minimum/overflow proofs pass. Composition and input/lifecycle fixtures are in progress; no family closure claimed. |
+| Shadow quality | Test-only profile/footprint diagnostics preserve 512 legacy RGBA comparisons. Independent positive-blur area reference and production geometry/rendering decisions remain open. |
+| Portability fixes | Combined local build and five runtime checks pass; pinned WASM32 compilation, skill18 and generated freshness pass. Hosted CI/native bindings pass for `00aa1f99`; newer slices still require exact-revision hosted/browser confirmation. |
 
 Keep detailed receipts with their implementation changes; refresh this summary
 when the integrated revision passes, merges or ships.

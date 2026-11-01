@@ -147,3 +147,10 @@ test, or configure `CUI_PYTHON_TIME_FIELD_PARTIAL_LIBRARY` for its registered CT
 The provider renames just the change-size export; remaining exports are real.
 Without this optional artifact the separate-process test skips. Keep it separate
 from the real older-library proof (`CUI_PYTHON_TIME_FIELD_OLD_LIBRARY`).
+
+The new, unreleased typed `TimeFieldConfig()` defaults to H23, minute precision
+and edit generation 1, matching the C initializer and the other typed bindings.
+Request `precision=TimePrecision.SECOND` explicitly for `HH:MM:SS` input (as the
+complete example does). This alignment does not change the legacy scalar
+`time_field()` factory or its seconds values. The focused default-wire and legacy
+factory regression added for this change awaits the next serial validation batch.

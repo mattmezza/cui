@@ -32,7 +32,7 @@ class LocalizedTime(unittest.TestCase):
         app = App(width=760, height=640)
         self.addCleanup(app.close)
         app.enable_time_changes(capacity)
-        node = localized_time_field('time', config or TimeFieldConfig(), TimeValue(9, 45, 30), 'Appointment')
+        node = localized_time_field('time', config or TimeFieldConfig(precision=TimePrecision.SECOND), TimeValue(9, 45, 30), 'Appointment')
         app.mount(column('root').children(label('Schedule', key='title'), row('row').children(node)))
         app.step(); app.step()
         return app, node
@@ -42,6 +42,17 @@ class LocalizedTime(unittest.TestCase):
         app.queue_pointer('down', x + width / 2, y + height / 2)
         app.queue_pointer('up', x + width / 2, y + height / 2)
         app.queue_text(text)
+
+    def test_typed_defaults_match_c_wire_without_changing_scalar_factory(self):
+        config = TimeFieldConfig()
+        native = wire._config(config)
+        # Published C init/default vocabulary: H23=0, MINUTE=0, generation=1.
+        self.assertEqual((native.cycle, native.precision, native.edit_generation), (0, 0, 1))
+        self.assertEqual(config.precision, TimePrecision.MINUTE)
+        with App() as app:
+            legacy = time_field('legacy-default').time_value(9, 45, 37)
+            app.mount(column('root').children(legacy)); app.step()
+            self.assertEqual(legacy.current_time(), (9, 45, 37))
 
     def test_config_validation_and_frozen_records(self):
         for make in (lambda: TimeValue(True, 0), lambda: TimeValue(24, 0),
@@ -85,7 +96,7 @@ class LocalizedTime(unittest.TestCase):
 
     def test_locale_large_paste_bounds_clear_and_owner_replacement(self):
         locale = TimeLocale(tuple('α' + 'a' * 13 + str(i) for i in range(10)))
-        config = TimeFieldConfig(locale, maximum=TimeValue(18, 0), edit_generation=0xFEDCBA9876543210)
+        config = TimeFieldConfig(locale, precision=TimePrecision.SECOND, maximum=TimeValue(18, 0), edit_generation=0xFEDCBA9876543210)
         app, node = self.create(config)
         self.assertEqual(node.get_config(), config)
         text = ':'.join(''.join(locale.digits[int(d)] for d in part) for part in ('12', '34', '56'))
@@ -149,7 +160,7 @@ class LocalizedTime(unittest.TestCase):
         app = App(width=760, height=640); self.addCleanup(app.close)
         app.enable_time_changes(4); app.enable_slider_requests(1)
         copies = []
-        node = localized_time_field('time', value=TimeValue(9, 45)).on_time_change(copies.append)
+        node = localized_time_field('time', TimeFieldConfig(precision=TimePrecision.SECOND), value=TimeValue(9, 45)).on_time_change(copies.append)
         later = slider_model('later', SliderConfig(reduced_motion=True), SliderSingle(40))
         app.mount(column('root').children(row('nested').children(node), later))
         app.step(); app.step()

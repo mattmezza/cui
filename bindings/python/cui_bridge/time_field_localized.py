@@ -77,7 +77,7 @@ class TimeLocale:
 class TimeFieldConfig:
     locale: TimeLocale = TimeLocale()
     cycle: TimeCycle = TimeCycle.H23
-    precision: TimePrecision = TimePrecision.SECOND
+    precision: TimePrecision = TimePrecision.MINUTE
     minimum: TimeValue | None = None
     maximum: TimeValue | None = None
     edit_generation: int = 1

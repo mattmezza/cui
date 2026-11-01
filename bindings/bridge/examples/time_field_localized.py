@@ -5,16 +5,16 @@ Headless path validated locally; optional native interactive path remains untest
 import argparse
 from dataclasses import replace
 from cui_bridge import (App, BridgeError, button, column, label, row, localized_time_field,
-    TimeValue, TimeLocale, TimeFieldConfig, TimeCycle, TimeTextStatus)
+    TimeValue, TimeLocale, TimeFieldConfig, TimeCycle, TimePrecision, TimeTextStatus)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--font', help='explicit existing TTF path for interactive SDL')
     args = parser.parse_args()
-    english_config = TimeFieldConfig(minimum=TimeValue(8, 0), maximum=TimeValue(18, 0))
+    english_config = TimeFieldConfig(precision=TimePrecision.SECOND, minimum=TimeValue(8, 0), maximum=TimeValue(18, 0))
     arabic_config = TimeFieldConfig(TimeLocale(tuple('٠١٢٣٤٥٦٧٨٩'), am='ص', pm='م'),
-        cycle=TimeCycle.H12, minimum=TimeValue(8, 0), maximum=TimeValue(18, 0),
+        cycle=TimeCycle.H12, precision=TimePrecision.SECOND, minimum=TimeValue(8, 0), maximum=TimeValue(18, 0),
         segment_names=('ساعة', 'دقيقة', 'ثانية', 'فترة'))
     english = localized_time_field('english', english_config, TimeValue(9, 30), 'English24h')
     arabic = localized_time_field('arabic', arabic_config, TimeValue(10, 15), 'Arabic12h')

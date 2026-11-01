@@ -1,7 +1,8 @@
 # Dialog lifetime cancellation: builtin reducer checkpoint
 
-Status: design proposal only. No marker/query or Base change is implemented.
-The unpublished cancellation prototype remains gated on this remaining case.
+Status: **unpublished prototype; no production marker/query or Base change**.
+The candidate passes 22 headless checks; frozen legacy traces and broader reducer
+coverage still gate transfer. See [the consumer audit](SCOPE_INPUT_CANCEL_CONSUMERS.md).
 
 ## Actual counterexample
 
@@ -62,12 +63,12 @@ No claim that arbitrary custom callbacks can be retroactively undone is made.
 ## Memory and alternatives
 
 Current `cui_core_focus_scope` is `{cui_id id; size_t parent; bool modal, active;}`.
-There are two arrays of 256 records. The added bool is expected to fit existing
-padding on LP64 and WASM32 (expected record sizes 24 and 16 respectively), so the
-expected context-size delta is zero and allocation/resource delta zero. This is
-NOT measured evidence: an actual original/candidate compiler sizeof/offsetof
-probe on both targets is required before approval/implementation. The original
-prototype measured context size 255520 on this native configuration. Initialization
+There are two arrays of 256 records. Original/candidate compiler probes show
+that the added bool fits padding on the measured native and WASM32 configurations:
+record sizes remain 24 and 16 bytes, and context sizes remain 255520 and 229568
+bytes respectively. The [metadata receipt](../validation/dialog-marker-metadata.json)
+records exact offsets and source hashes. This establishes zero storage-size delta
+on those two configurations, not on every ABI. The operation adds no allocation. Initialization
 adds one scalar store per submitted scope; there is no zero-runtime-cost claim.
 Previous array copies carry an unused marker byte; the query never reads it.
 

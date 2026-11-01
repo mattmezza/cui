@@ -12,7 +12,14 @@ separate concepts.
 | --- | --- | --- |
 | Base scrollbar (`src/base/cui_scroll.c`) | Actual nested close/reopen test applies old captured MOVE+UP: scroll 0 → 285.714. Reducer ignores consumed samples and retains caller-owned dragging state. | Explicit reset must clear idle/held drag and suppress cancelled samples. Prove mouse/touch, fresh DOWN recovery and unchanged no-helper trace. |
 | Resizable (`src/base/cui_resizable.c`) | Actual original nested reducer applies stale MOVE+UP: size 100 → 40 and spurious completion. It retains `active_handle`/`dragging` and ignores consumption. | Test nested old MOVE+UP, idle state, fresh input and callback counts/order; preserve legacy behavior when reset is unused. |
-| Rating (`src/base/cui_numeric.c`) | Source inspection: targeted KEY_DOWN mutates value without checking consumption. Activation cancellation alone does not cover this branch. Runtime counterexample not yet established. | Test consumed owned arrows during lifetime reset and ordinary legacy keys separately. |
+| Rating (`src/base/cui_numeric.c`) | Source inspection: targeted KEY_DOWN mutates before interaction and ignores consumption. Selective cancellation currently covers Space/Enter, so nested modal arrows need independent proof. Runtime counterexample not yet established. | Test direct and nested-modal arrows/Home/End/Delete during lifetime reset; preserve ordinary legacy keys. |
+| Basic legacy Slider (`src/base/cui_base.c`) | Source inspection: raw targeted pointer/key paths ignore consumption. Activation cancellation alone cannot protect these value mutations. Runtime counterexample not yet established. | Test direct/nested stale samples, fresh input and frozen no-helper value traces. |
+| Controlled legacy Slider (`src/base/cui_base.c`) | Source inspection: consumed samples are skipped, but caller-owned drag/preview can remain active on idle capture loss. The declared cancellation contract restores the gesture-start value. Runtime counterexample not yet established. | Prove idle reset disposition and BEGIN/UPDATE/COMMIT/CANCEL callbacks, values and ordering; preserve no-helper behavior. |
+
+The typed Slider model already contains a snapshot-ready/pressed capture-loss
+cancellation path. This source observation does not prove nested lifetime reset
+coverage; retain it as a separate runtime acceptance case. Suppressing activation,
+consuming input and cancelling a proposed value remain separate operations.
 
 ## Remaining audit
 

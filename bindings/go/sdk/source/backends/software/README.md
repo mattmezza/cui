@@ -16,6 +16,12 @@ font or text support, text commands return `false`; the text capability is unset
 Geometry-only compilation requires the C11 standard library and math library,
 without SDL, FreeType or HarfBuzz.
 
+CMake consumers should link the `cui_software` target. Manual source builds must
+include `src/core/cui_background.c` alongside the Core and Effects sources: the
+software adapter contains V2 background preparation even when the application
+uses only its V1 entry points. This is a source-link dependency, not an additional
+external library.
+
 PPM capture exports RGB and discards alpha; it is intended for opaque screenshot
 frames. No GPU acceleration or native accessibility is claimed.
 

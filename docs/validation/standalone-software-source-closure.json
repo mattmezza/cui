@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-01",
+  "scope": "Standalone software-renderer test source closures",
+  "failure": "Combined native build linked software V2 helpers without src/core/cui_background.c in four direct-source fixtures, producing unresolved cui_background_valid and cui_background_sample.",
+  "fix": "Add the Core background module to the native/distribution Dialog flex-region and scrollbar-track fixture source lists. No production implementation changed.",
+  "verification": {
+    "build": "Four targets rebuilt successfully: four background objects and four links.",
+    "headless_tests": {
+      "passed": 4,
+      "failed": 0,
+      "seconds": 0.42,
+      "names": [
+        "dialog_flex_regions_native",
+        "dialog_flex_regions_distribution",
+        "scrollbar_track_native",
+        "scrollbar_track_distribution"
+      ]
+    },
+    "logs": {
+      "standalone-software-closure-build.log": {
+        "sha256": "2a4d78a63a94a8fe1f43514f341dc099c67a5868d048382820c46cd0fab6a2ca"
+      },
+      "standalone-software-closure-tests.log": {
+        "sha256": "603402d4164dc858af8b738c3e94b8106007600df5811d616764795a507cfe19"
+      }
+    }
+  },
+  "documentation": "Manual software source-build dependency documented; canonical SDK, amalgamation and skill generators rerun.",
+  "remaining": [
+    "Full combined native build and suite are pending.",
+    "Current generated skill must pass its freshness and installed-consumer tests.",
+    "No GPU or physical platform acceptance is established."
+  ]
+}

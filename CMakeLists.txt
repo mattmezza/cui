@@ -622,7 +622,7 @@ foreach(mode native distribution)
  endif()
  add_executable(${regions_target} tests/unit/test_dialog_flex_regions.c
   tests/unit/test_scroll_regions_contract.c tests/unit/dialog_flex_probe.c src/base/cui_scroll.c
-  backends/software/cui_software.c src/effects/cui_effects.c)
+  backends/software/cui_software.c src/effects/cui_effects.c src/core/cui_background.c)
  target_include_directories(${regions_target} PRIVATE include third_party/clay src/core tests/unit)
  if(mode STREQUAL "distribution")
   target_include_directories(${regions_target} BEFORE PRIVATE dist)
@@ -642,7 +642,7 @@ add_test(NAME dialog_flex_reference_authority COMMAND ${Python3_EXECUTABLE}
 foreach(mode native distribution)
  add_executable(test_scrollbar_track_${mode} tests/unit/test_scrollbar_track_geometry.c
   tests/unit/scrollbar_track_probe.c src/base/cui_scroll.c
-  backends/software/cui_software.c src/effects/cui_effects.c)
+  backends/software/cui_software.c src/effects/cui_effects.c src/core/cui_background.c)
  target_include_directories(test_scrollbar_track_${mode} PRIVATE include third_party/clay src/core)
  if(mode STREQUAL "distribution")
   target_include_directories(test_scrollbar_track_${mode} BEFORE PRIVATE dist)

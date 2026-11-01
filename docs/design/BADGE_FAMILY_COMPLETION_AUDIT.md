@@ -199,12 +199,12 @@ typedef struct {
     uint32_t icon_flags, reserved_icon;
 } cui_bridge_badge_options_v1;
 /* Proposed signatures use existing app/node/error types. */
-cui_bridge_error cui_bridge_badge_set_options(
+cui_bridge_status cui_bridge_badge_set_options(
     cui_bridge_app *, cui_bridge_node, const cui_bridge_badge_options_v1 *);
-cui_bridge_error cui_bridge_badge_set_icon_source(
+cui_bridge_status cui_bridge_badge_set_icon_source(
     cui_bridge_app *, cui_bridge_node, uint32_t source_kind,
     const char *bytes, size_t length);
-cui_bridge_error cui_bridge_badge_reset(cui_bridge_app *, cui_bridge_node);
+cui_bridge_status cui_bridge_badge_reset(cui_bridge_app *, cui_bridge_node);
 ```
 
 This proposed record is 96 bytes by field arithmetic, NOT an ABI measurement.
@@ -266,3 +266,26 @@ style field alone does not justify inventing public Badge refinement methods.
 No production or generation is authorized by this proposed-record checkpoint.
 Full family verification still requires the preceding matrix, not just these
 new route tests or a legacy text-pill facade.
+
+
+## Integrator decision: first C slice
+
+Approve additive configured-icon C implementation and prepared meaningful tests,
+preserving `cui_badge_options`, `cui_badge` and `cui_badge_ex`. Reuse full existing
+Icon options/state, including decoration and constraints; do not duplicate SVG,
+raster or dimension-resolution logic. Force only decorative semantics and
+unprovided inherited fallbacks, preserving explicit authored settings.
+
+Validate the new call's structural requirements before composing content. The
+proposal's prepare-before-content ordering is not required if it would duplicate
+Icon's layout logic: a documented content-before-artwork order consistent with
+existing Badge composition is acceptable. Valid shell/content may remain when
+artwork reports failure; no atomic UI rollback is promised. Borrowed options and
+userdata last through synchronous submission; prepared masks follow Icon's draw-
+list lifetime. Preserve source/default color mapping explicitly.
+
+The illustrative foreign record remains proposed, not approved or implemented:
+it must use actual bridge status types and cover complete shared Icon styling
+before full-fidelity authoring is advertised. C source work does not close five-
+language, ABI, pixel, lifecycle or gallery acceptance. Worker builds and generation
+remain held while the localized TimeField bridge owns the serial validation slot.

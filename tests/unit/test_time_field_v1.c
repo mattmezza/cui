@@ -630,6 +630,7 @@ static void pixels_and_text(void) {
     size_t borders = 0;
     cui_draw_command border = {0};
     cui_rect root = cui_bounds(f.ui, 20);
+    float initial_cell_width = cui_bounds(f.ui, cui_time_segment_id(20, 0)).w;
     for (size_t i = 0; i < f.draw.count; i++) {
         cui_draw_command c = f.draw.commands[i];
         if (c.type == CUI_DRAW_TEXT && c.text.length == 2 && !memcmp(c.text.data, "09", 2))
@@ -662,6 +663,18 @@ static void pixels_and_text(void) {
             cleared = c.r == f.theme.border.r && c.g == f.theme.border.g && c.b == f.theme.border.b;
         }
     assert(cleared);
+    f.time.hour = 11;
+    frame(&f);
+    assert(fabsf(cui_bounds(f.ui, cui_time_segment_id(20, 0)).w - initial_cell_width) < .001f);
+    cui_time_locale_v1 locale;
+    cui_time_locale_init_v1(&locale);
+    const char *digits[] = {"٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"};
+    for (unsigned i = 0; i < 10; i++)
+        locale.digits[i] = cui_string(digits[i]);
+    f.options.text.locale = &locale;
+    f.options.edit_generation++;
+    frame(&f);
+    assert(fabsf(cui_bounds(f.ui, cui_time_segment_id(20, 0)).w - initial_cell_width) < .001f);
     cui_software_destroy(renderer);
     cui_destroy(f.ui);
 }

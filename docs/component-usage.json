@@ -1619,18 +1619,26 @@
       ],
       "state_types": [
         "cui_time_state",
-        "cui_time"
+        "cui_time",
+        "cui_time_field_state_v1",
+        "cui_time_field_options_v1",
+        "cui_time_field_result_v1",
+        "cui_time_handler",
+        "cui_time_change"
       ],
-      "state_ownership": "Caller retains cui_time_state and cui_time value.",
-      "interaction": "Returns true when the time value changes.",
-      "usage": "Submit segment state and time by pointer; persist accepted time in the change branch.",
+      "state_ownership": "Caller retains cui_time_state and cui_time value; additive localized route retains cui_time_field_state_v1 and immutable borrowed locale/options.",
+      "interaction": "Legacy plain functions return bool after applying edits. V1 returns cui_time_field_result_v1: changed is net value mutation, status is operation outcome and validation is edit validation; optional cui_time_change_fn observes one copied aggregate after Base semantics or Styled submission.",
+      "usage": "Choose one side-effect path: observe via cui_time_handler or branch on changed after submission, rather than applying the same side effect twice. Value mutates through its pointer; do not reapply the callback payload. Retain state/options and immutable locale resources, check status/validation, and compose during ordinary frames.",
       "docs": [
         "docs/PICKERS.md",
         "docs/TIME_FIELD_EVENTS.md",
         "docs/TIME_FIELD_TEXT.md",
-        "docs/TIME_FIELD_LOCALIZED.md"
+        "docs/TIME_FIELD_LOCALIZED.md",
+        "docs/TIME_FIELD_LOCALIZED_EXAMPLE.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_time_change_fn"
+      ],
       "scope": "styled frame component",
       "name": "TimeField",
       "public_header": "include/cui/cui_picker.h",

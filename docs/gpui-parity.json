@@ -4897,7 +4897,9 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_picker.c",
-        "tests/web/test_browser.py"
+        "tests/web/test_browser.py",
+        "tests/unit/test_time_field_v1.c",
+        "tests/unit/test_time_field_v1_headers.c"
       ],
       "status": "tested",
       "platforms": {
@@ -4906,9 +4908,9 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending.",
-        "Additive pure locale/domain text helpers are an unreleased C-only slice; localized widget editing, IME, validation appearance and all five bindings remain pending.",
-        "Additive localized C widget source is prepared; runtime verification pending. Ordinary global Tab differs from source one-root focus; localized DateTimePicker, full size/focus-ring styling, IME and five bindings remain open."
+        "Legacy controlled segmented/ASCII parser and aggregate CHANGE behavior remain unchanged. Additive C widget supports explicit UTF-8 tokens, same-day bounds and validation appearance, with focused headless proof; all five foreign facades remain legacy scalar subsets.",
+        "New route uses ordinary global segment Tab stops; source one-root focus/re-entry, full size/focus-ring styling, localized DateTimePicker, IME and physical native accessibility remain unfinished.",
+        "TimeField gallery source migrates to the new route with locale/cycle/precision/bounds/validation controls; worker strict translation-unit proof only, actual combined WASM/browser validation belongs to the integrator."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4921,7 +4923,7 @@
           ]
         },
         {
-          "name": "localized editor, validation appearance and IME integration",
+          "name": "IME, source one-root focus and full Styled integration",
           "status": "not_started",
           "evidence": []
         },
@@ -4956,7 +4958,7 @@
         },
         {
           "name": "additive localized C editing and same-day validation",
-          "status": "implemented",
+          "status": "tested",
           "evidence": [
             "tests/unit/test_time_field_v1.c",
             "docs/TIME_FIELD_LOCALIZED.md"

@@ -33,11 +33,11 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
         memcpy(buffer + a.length, b.data, b.length);
         cui_size size =
             cui_measure_text(ui, (cui_str){buffer, a.length + b.length}, theme->font_size);
-        if (size.w > width)
-            width = size.w;
+        if (size.width > width)
+            width = size.width;
     }
-    float period = cui_measure_text(ui, l->am, theme->font_size).w;
-    float pm = cui_measure_text(ui, l->pm, theme->font_size).w;
+    float period = cui_measure_text(ui, l->am, theme->font_size).width;
+    float pm = cui_measure_text(ui, l->pm, theme->font_size).width;
     if (pm > period)
         period = pm;
     bool invalid = (o->flags & CUI_TIME_FIELD_OWNER_INVALID_V1) ||

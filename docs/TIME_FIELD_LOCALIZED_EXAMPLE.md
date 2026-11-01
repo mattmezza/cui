@@ -1,8 +1,10 @@
 # Complete localized TimeField composition example
 
-**Source draft, uncompiled and unverified.** This accompanies the proposed
-`cui_time_field_v1.h` implementation in signed checkpoints62038dfa/14e18a53/
-98031868. It is not evidence that the new route works or is released. See
+**Unreleased C example, compile-tested and run headlessly in Base/Styled modes.**
+The exact code below is also [examples/time_field_localized.c](../examples/time_field_localized.c).
+Focused checks use the new widget translation units with the current cached
+engine, without rebuilding the engine. This does not establish release, browser
+or foreign-language support. See
 [widget contract](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md),
 [widget usage](TIME_FIELD_LOCALIZED.md) and [pure text helpers](TIME_FIELD_TEXT.md).
 
@@ -133,8 +135,8 @@ int main(int argc, char **argv) {
 }
 ```
 
-To reproduce **after the implementation is integrated and verified**, save the
-code as `time_field_example.c` in a consumer directory. A C11 compiler, CMake and
+To reproduce after the matching implementation is integrated, save the code as
+`time_field_example.c` in a consumer directory. A C11 compiler, CMake and
 Ninja are prerequisites; see [dependencies](DEPENDENCIES.md). With `CUI_ROOT`
 pointing to the matching CUI source checkout, the intended portable commands are:
 
@@ -147,8 +149,10 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror -I"$CUI_ROOT/include" \
 ./time_field_example base
 ```
 
-These commands and the sample have **not yet been compile-tested** in this
-checkpoint. They describe a windowless portable consumer, not a native runner
+The sample's exact C code was compiled strictly and run in both modes against
+the cached matching engine plus the new widget objects. The complete portable
+CMake rebuild recipe above was not run by this worker; the integrator validates
+the actual combined targets. This is a windowless consumer, not a native runner
 or a renderer support claim. Automated native tests still use the repository's
 private-Xvfb `scripts/test_local.py` wrapper; never use the desktop display.
 
@@ -203,16 +207,17 @@ styling, localized DateTimePicker, IME and physical accessibility are not closed
 
 | Language | New localized widget/options/typed observer |
 | --- | --- |
-| C | Source draft; validation gates pending |
+| C | Focused C widget/example checks passed; unreleased |
 | Python | Omitted; legacy scalar widget subset only |
 | JavaScript | Omitted; legacy scalar widget subset only |
 | TypeScript | Omitted; legacy scalar widget subset only |
 | Go | Omitted; legacy scalar widget subset only |
 | Rust | Omitted; legacy scalar widget subset only |
 
-Still-unexecuted gates: strict new Base/Styled fixture, split/coalesced input and
-focus-transition witnesses, UTF-8 paste/copy lifetime and atomic rejection,
-software pixels/text-poison proof, frozen legacy checks, C/C++ and selective/
-umbrella/WASM header/source closures, compiled sample in both modes, usage6,
-skill18 and final canonical freshness. No API, Core, gallery or generated file
-was changed by this guide checkpoint.
+Verified focused gates cover Base/Styled interactions and both example modes,
+split/coalesced input and actual focus transitions, copied UTF-8 paste and atomic
+range rejection, software border pixels/text-poison ownership, C++/WASM headers
+and source, and configured selective/umbrella module consumers. See the
+[receipt](validation/time-field-localized.json) for exact commands/limitations.
+Full combined engine/CMake acceptance and actual gallery WASM/browser checks
+remain integrator gates; no deployment or full-family claim is made.

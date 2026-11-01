@@ -266,11 +266,18 @@ static bool cui_tfw_text_edit(cui_time_field_state_v1 *s, cui_time *t,
     }
     cui_time full;
     cui_time_text_status_v1 parsed = cui_time_parse_v1(text, &o->text, &full);
-    if (!s->pending_length && parsed == CUI_TIME_TEXT_OK) {
+    if (parsed == CUI_TIME_TEXT_OK) {
         *t = full;
         cui_tfw_reset(s);
         s->validation = 0;
         return true;
+    }
+    if (parsed == CUI_TIME_TEXT_INVALID_VALUE || parsed == CUI_TIME_TEXT_OUT_OF_RANGE) {
+        /* Complete grammar with an invalid candidate is an atomic full-value
+         * attempt, never a segmented stream that can replace its diagnosis. */
+        s->pending_length = 0;
+        s->validation = (uint32_t)parsed;
+        return false;
     }
     cui_time_locale_v1 ascii;
     cui_time_locale_init_v1(&ascii);
@@ -623,11 +630,11 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
         memcpy(buffer + a.length, b.data, b.length);
         cui_size size =
             cui_measure_text(ui, (cui_str){buffer, a.length + b.length}, theme->font_size);
-        if (size.w > width)
-            width = size.w;
+        if (size.width > width)
+            width = size.width;
     }
-    float period = cui_measure_text(ui, l->am, theme->font_size).w;
-    float pm = cui_measure_text(ui, l->pm, theme->font_size).w;
+    float period = cui_measure_text(ui, l->am, theme->font_size).width;
+    float pm = cui_measure_text(ui, l->pm, theme->font_size).width;
     if (pm > period)
         period = pm;
     bool invalid = (o->flags & CUI_TIME_FIELD_OWNER_INVALID_V1) ||

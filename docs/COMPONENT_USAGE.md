@@ -818,11 +818,11 @@ Additional event includes: `cui/cui_multiline_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_time_state and cui_time value.
+**State:** Caller retains cui_time_state and cui_time value; additive localized route retains cui_time_field_state_v1 and immutable borrowed locale/options.
 
-**Interaction:** Returns true when the time value changes.
+**Interaction:** Legacy plain functions return bool after applying edits. V1 returns cui_time_field_result_v1: changed is net value mutation, status is operation outcome and validation is edit validation; optional cui_time_change_fn observes one copied aggregate after Base semantics or Styled submission.
 
-**Usage:** Submit segment state and time by pointer; persist accepted time in the change branch.
+**Usage:** Choose one side-effect path: observe via cui_time_handler or branch on changed after submission, rather than applying the same side effect twice. Value mutates through its pointer; do not reapply the callback payload. Retain state/options and immutable locale resources, check status/validation, and compose during ordinary frames.
 
 API: `cui_time_field`. [Public header](../include/cui/cui_picker.h); [guide](PICKERS.md).
 

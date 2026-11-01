@@ -1,7 +1,9 @@
 # Localized TimeField widget (unreleased)
 
-Source checkpoint: API/implementation and tests prepared; execution receipts are
-required before this route is described as tested. Legacy TimeField is unchanged.
+The additive C route has passed focused headless interaction/pixel and portable
+compile checks; it remains unreleased. Legacy TimeField is unchanged. See the
+[complete Base/Styled program](TIME_FIELD_LOCALIZED_EXAMPLE.md) and
+[verification receipt](validation/time-field-localized.json).
 Include `cui/cui_time_field_v1.h` for the new caller-owned state/options route.
 Use [pure text values](TIME_FIELD_TEXT.md) for the exact locale grammar and bounds.
 
@@ -76,3 +78,16 @@ unfinished. Full source size/focus-ring styling, localized DateTimePicker, IME,
 physical native accessibility and Python/JS/TS/Go/Rust options/events remain open.
 Old scalar bindings and old by-value options/aggregate callbacks retain their
 existing behavior. See [design and test contract](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md).
+
+The gallery's TimeField source uses this route by default with Arabic token,
+12-hour/seconds, inclusive-bound, readonly and invalid-appearance controls, plus
+live value/change/validation labels. Its C translation unit has been compiled;
+actual combined WASM rendering and browser interaction are integrator validation,
+not established by this worker's native proof.
+
+Choose one side-effect path: observe the copied aggregate through
+`cui_time_handler`, or branch on result.changed after submission. Doing both
+should not apply the same application side effect twice. The widget has already
+mutated the time through its pointer; do not reapply the callback payload. Check
+result.status for operation errors and result.validation for rejected-edit state.
+This does not imply uniform typed observer support in foreign bindings.

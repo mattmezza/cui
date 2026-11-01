@@ -55,6 +55,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_table.h"
 #include "cui/cui_text_view.h"
 #include "cui/cui_textarea.h"
+#include "cui/cui_time_field_v1.h"
 #include "cui/cui_toolbar.h"
 #include "cui/cui_video_controls.h"
 #include "cui/cui_virtual.h"
@@ -1744,7 +1745,19 @@ static cui_date_picker_actions_state date_actions;
 static cui_date_picker_value date_actions_value;
 
 static cui_time time_value = {9, 30, 0};
-static cui_time_state time_state;
+static cui_time_field_state_v1 time_field_state;
+static cui_time_field_options_v1 time_field_options;
+static cui_time_locale_v1 time_field_locale;
+static cui_time_field_result_v1 time_field_result;
+static bool time_field_initialized, time_field_arabic, time_field_twelve;
+static bool time_field_seconds = true, time_field_bounds, time_field_readonly, time_field_invalid;
+static size_t time_field_changes;
+static void gallery_time_changed(void *user, const cui_time_change *event) {
+    (void)user;
+    (void)event;
+    ++time_field_changes; /* External bookkeeping; active model remains borrowed. */
+    redraw = true;
+}
 static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
@@ -6506,11 +6519,84 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 41: {
-        cui_time_field(ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_state,
-                       &time_value, (cui_time_options){.seconds = true, .disabled = disabled});
-        char text[32];
-        cui_time_format(time_value, true, text, sizeof(text));
+        if (!time_field_initialized) {
+            if (cui_time_field_options_init_v1(&time_field_options) != CUI_TIME_TEXT_OK ||
+                cui_time_locale_init_v1(&time_field_locale) != CUI_TIME_TEXT_OK) {
+                cui_label(ui, &t, cui_string("Time configuration unavailable"));
+                break;
+            }
+            static const char *digits[] = {"٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"};
+            for (unsigned i = 0; i < 10; ++i)
+                time_field_locale.digits[i] = cui_string(digits[i]);
+            time_field_locale.separator = cui_string("·");
+            time_field_locale.am = cui_string("ص");
+            time_field_locale.pm = cui_string("م");
+            time_field_options.text.precision = CUI_TIME_TEXT_SECOND;
+            if (cui_time_field_state_init_v1(&time_field_state, time_value, &time_field_options) !=
+                CUI_TIME_TEXT_OK) {
+                cui_label(ui, &t, cui_string("Time state unavailable"));
+                break;
+            }
+            time_field_initialized = true;
+        }
+        bool changed = false;
+        cui_begin_box(ui, cui_id_from(ui, "time-format-controls"),
+                      (cui_box){.row = width >= 420, .gap = 4});
+        changed |= cui_checkbox(ui, cui_id_from(ui, "time-arabic"), &t, cui_string("Arabic"),
+                                &time_field_arabic, disabled);
+        changed |= cui_checkbox(ui, cui_id_from(ui, "time-twelve"), &t, cui_string("12-hour"),
+                                &time_field_twelve, disabled);
+        changed |= cui_checkbox(ui, cui_id_from(ui, "time-seconds"), &t, cui_string("Seconds"),
+                                &time_field_seconds, disabled);
+        cui_end_box(ui);
+        cui_begin_box(ui, cui_id_from(ui, "time-validation-controls"),
+                      (cui_box){.row = width >= 420, .gap = 4});
+        changed |= cui_checkbox(ui, cui_id_from(ui, "time-bounds"), &t, cui_string("Bounds"),
+                                &time_field_bounds, disabled);
+        cui_checkbox(ui, cui_id_from(ui, "time-readonly"), &t, cui_string("Read only"),
+                     &time_field_readonly, disabled);
+        cui_checkbox(ui, cui_id_from(ui, "time-invalid"), &t, cui_string("Invalid"),
+                     &time_field_invalid, disabled);
+        cui_end_box(ui);
+        if (changed) {
+            if (++time_field_options.edit_generation == 0)
+                time_field_options.edit_generation = 1;
+            /* The owner explicitly removes hidden seconds; the widget never truncates. */
+            if (!time_field_seconds)
+                time_value.second = 0;
+        }
+        time_field_options.text.locale = time_field_arabic ? &time_field_locale : NULL;
+        time_field_options.text.cycle = time_field_twelve ? CUI_TIME_TEXT_H12 : CUI_TIME_TEXT_H23;
+        time_field_options.text.precision =
+            time_field_seconds ? CUI_TIME_TEXT_SECOND : CUI_TIME_TEXT_MINUTE;
+        time_field_options.text.flags =
+            time_field_bounds ? CUI_TIME_TEXT_HAS_MINIMUM_V1 | CUI_TIME_TEXT_HAS_MAXIMUM_V1 : 0;
+        time_field_options.text.minimum = (cui_time){9, 0, 0};
+        time_field_options.text.maximum = (cui_time){17, 30, 0};
+        time_field_options.flags = (disabled ? CUI_TIME_FIELD_DISABLED_V1 : 0) |
+                                   (time_field_readonly ? CUI_TIME_FIELD_READONLY_V1 : 0) |
+                                   (time_field_invalid ? CUI_TIME_FIELD_OWNER_INVALID_V1 : 0);
+        const char *names[] = {"ساعة", "دقيقة", "ثانية", "فترة"};
+        for (unsigned i = 0; i < 4; ++i)
+            time_field_options.segment_names[i] =
+                time_field_arabic ? cui_string(names[i]) : (cui_str){0};
+        time_field_result = cui_time_field_v1(
+            ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_field_state,
+            &time_value, &time_field_options, (cui_time_handler){gallery_time_changed, NULL});
+        char text[96];
+        snprintf(text, sizeof text, "%02u:%02u:%02u · changes %zu · validation %u", time_value.hour,
+                 time_value.minute, time_value.second, time_field_changes,
+                 (unsigned)time_field_result.validation);
         cui_label(ui, &t, cui_string(text));
+        if (time_field_bounds)
+            cui_label(ui, &t, cui_string("Inclusive 09:00–17:30; rejected edits keep the value."));
+        if (time_field_result.status != CUI_TIME_TEXT_OK)
+            cui_label(ui, &t, cui_string("Time configuration error"));
+        if (cui_button(ui, cui_id_from(ui, "time-clear-validation"), &t,
+                       cui_string("Clear validation"), disabled)) {
+            if (cui_time_field_clear_validation_v1(&time_field_state) == CUI_TIME_TEXT_OK)
+                redraw = true;
+        }
         break;
     }
     case 42: {
@@ -7491,6 +7577,22 @@ double gallery_control_stats(unsigned field) {
         return control_shadow_rejections;
     case 15:
         return slider;
+    case 16:
+        return time_value.hour * 10000 + time_value.minute * 100 + time_value.second;
+    case 17:
+        return time_field_changes;
+    case 18:
+        return time_field_result.validation;
+    case 19:
+        return time_field_result.status;
+    case 20:
+        return time_field_result.rejected_count;
+    case 21:
+        return time_field_state.segment;
+    case 22:
+        return time_field_state.digit_count;
+    case 23:
+        return time_field_state.pending_length;
     default:
         return 0;
     }

@@ -45,7 +45,7 @@
     "root_source_byte_match_at_capture": true,
     "preserved_dso": "build-shadow/icon-resources/libcui_bridge_before.so",
     "dso_sha256": "3eec086861ab58dfa91cb922c90494080f080906d41bdf6c53b8a6cff5224410",
-    "libcui_a_sha256": "51b2b5d2690d013af9decb57cd86bcd4cfe03c5cc078532c323e2aaa3e30cd9f",
+    "libcui_a_sha256": "f7152b29cf3b4b26e05f2a2d38092476c03fbc304fdbefad23401d32320bc274",
     "trace_sha256": "f5607b9e1879301cbbfd9b4eddc8cf421ea572365efd12d727b9dfacf41fa9f7",
     "candidate_trace_sha256": "f5607b9e1879301cbbfd9b4eddc8cf421ea572365efd12d727b9dfacf41fa9f7",
     "trace_result": "cmp exit0, exact30145bytes",
@@ -62,7 +62,8 @@
       "calloc 32 24",
       "calloc 32 72"
     ],
-    "constructor_result": "same4 source-level malloc/calloc requests/order; only app allocation bytes+8. Unchanged cached Core/renderer internal allocations not interposed."
+    "constructor_result": "same4 source-level malloc/calloc requests/order; only app allocation bytes+8. Unchanged cached Core/renderer internal allocations not interposed.",
+    "archive_identity_note": "Taken from immutable pre-candidate capture provenance while lease held. Root rebuilt live cache after lease release; do not substitute its later hash for the archive used to link these tests."
   },
   "layout": {
     "native": {

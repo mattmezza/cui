@@ -2259,6 +2259,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 # Consumer agent resources must stay synchronized with headers/docs/examples.
 add_test(NAME agent_skill_freshness COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_agent_skill.py --check)
+add_test(NAME generator_output_writes COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_generator_writes.py)
 add_test(NAME agent_skill_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_agent_skill.py)
 
 # Shared event metadata is header-only; UTF-8 copies use existing Base validation.

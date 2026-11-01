@@ -1,0 +1,27 @@
+{
+  "audited_revision": "7d787d13",
+  "scope": "Native numeric Slider delivery source audit only; no runtime, OS or assistive-technology acceptance.",
+  "implemented_core": [
+    "Versioned double SET payload copy and claim",
+    "Per-semantic explicit numeric capabilities and completed-snapshot readiness"
+  ],
+  "native_gaps": [
+    "Legacy backend action callback, snapshot action mask, request validation and drain currently route FOCUS/ACTIVATE only.",
+    "Native value publication reads legacy float semantic value/bounds; it does not project a separately owned double numeric authority.",
+    "Numeric-enabled versioned constructor and bounded owned mailbox described in the design are not implemented.",
+    "Existing bridge host options do not opt into numeric-enabled native accessibility."
+  ],
+  "preservation": [
+    "Keep legacy constructor/options/layout/action behavior unchanged.",
+    "No pinned AccessKit dependency change.",
+    "Pinned Linux AT-SPI increment/decrement delivery is unavailable per existing audited design; SET uses a separately reviewed typed route.",
+    "Physical Linux/macOS/Windows assistive-technology delivery remains unverified."
+  ],
+  "next_gate": "Implement reviewed additive backend mode with copied typed mailbox and numeric precision authority; validate callback mapping, queue/backpressure, stale token/readiness, shutdown and legacy behavior before host/binding opt-ins.",
+  "authority_sha256": {
+    "include/cui/cui_accessibility.h": "f1dc50a7b5400986123bc0dba83b4800dcc659a2fa3a78bd077a3af0e82412de",
+    "backends/accesskit/cui_accessibility.c": "f959c5e168b6aa9d0aeffc00b364bfd8ef6facabd373c73e81d99830d7d2eaa7",
+    "include/cui/cui.h": "9f22f5c4d2640df21b81cb090bacd7d6519b4d32497b6f254e601d89e9b0bfc1",
+    "docs/design/SLIDER_ACCESSIBILITY_ACTIONS.md": "8ad3aaf6a3f9c48aec126323d936bbaa05656adad753a2f6d0dc4b041c4c4a9c"
+  }
+}

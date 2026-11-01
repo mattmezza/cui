@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-alpha.3 — unreleased
+## 0.1.0-alpha.3 — 2026-10-31
 
 - Adds opt-in Stepper indicators/connectors, bitmap icons and shared xs–9xl
   sizing, with controlled navigation and copied gallery examples. Centered and
@@ -50,8 +50,10 @@
   expose the new C observer/payload arenas, Questionnaire presentation/geometry options,
   DateTime/DatePicker action options, explicit Popover positioning or split-button
   paint refinements.
-- Release artifacts and registry publication are not yet available for alpha.3.
-  All 78 catalog families remain present; full feature parity is unfinished.
+- [GitHub release artifacts](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3)
+  and the public Go module tag/proxy are available. PyPI, npm and crates.io
+  publication remain separate work. All 78 catalog families remain present; full
+  feature parity is unfinished.
 
 ## 0.1.0-alpha.2 — 2026-10-20
 

@@ -316,3 +316,21 @@ segment TEXT between1 and2: the final owner value is unchanged12:34, so no
 callback despite applied intermediate edits. TEXT→Tab→TEXT and TEXT→pointer→TEXT
 must honor actual destination focus, plus existing forward/backward boundaries
 and two-Tab batch. These assertions await execution, not assumed proof.
+
+### Focus synchronization resolution
+
+At entry to ordinary writable composition, if the actual focused visible segment
+is different from state.segment, clear digit draft and pending token bytes before
+selecting that child. This covers host `cui_focus` and actual queued accessibility
+FOCUS. An auto-advance echo already has matching state/focus and is preserved.
+A transient foreign/consumed focus excursion returning to the original segment
+before editing does not by itself clear the draft. Tests stage Minute digit1,
+then focus Hour and type2 (must become Hour2, not12), and separately stage the
+first byte of a localized digit then change focus: its continuation must reject
+rather than complete a token from the former segment. Both host and queued
+accessibility variants are prepared for Base/Styled; no runtime claim yet.
+Final ready focus synchronization also clears draft/pending immediately when
+actual focus is outside all visible children. A TEXT digit/prefix followed by
+ordinary global Tab out in that same batch must finish with both counters0,
+not defer cleanup to the next frame or omission. Prepared tests assert actual
+neighbor focus and unchanged original targets for both variants/Base/Styled.

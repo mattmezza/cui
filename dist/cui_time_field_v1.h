@@ -409,6 +409,8 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
         for (unsigned i = 0; i < 4; i++)
             if (cui_tfw_visible(o, i) && focus == cui_time_segment_id(id, i)) {
                 focused = true;
+                if (s->segment != i)
+                    cui_tfw_reset(s);
                 s->segment = i;
             }
         if (!focused)
@@ -516,9 +518,16 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
         }
         if (ready) {
             cui_id focused_id = cui_focused(ui);
+            bool visible_focus = false;
             for (unsigned i = 0; i < 4; i++)
-                if (cui_tfw_visible(o, i) && focused_id == cui_time_segment_id(id, i))
+                if (cui_tfw_visible(o, i) && focused_id == cui_time_segment_id(id, i)) {
+                    visible_focus = true;
+                    if (s->segment != i)
+                        cui_tfw_reset(s);
                     s->segment = i;
+                }
+            if (!visible_focus)
+                cui_tfw_reset(s);
         }
         s->last_frame_sequence = frame;
         s->last_value = *t;

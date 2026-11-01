@@ -275,6 +275,86 @@ static void original_order(bool styled) {
     cui_destroy(split.ui);
     cui_destroy(joined.ui);
 }
+static void focus_transition(bool styled, bool accessibility) {
+    fixture f;
+    init(&f, styled);
+    warm(&f);
+    focus(&f, 1);
+    text(&f, cui_string("1"));
+    frame(&f);
+    assert(f.time.minute == 1 && f.state.digit_count == 1 && f.state.segment == 1);
+    if (accessibility)
+        assert(cui_queue_accessibility_action(f.ui, cui_time_segment_id(20, 0),
+                                              CUI_ACCESSIBILITY_FOCUS));
+    else
+        focus(&f, 0);
+    text(&f, cui_string("2"));
+    frame(&f);
+    assert(same(f.time, (cui_time){2, 1, 0}) && f.state.digit_count == 1 && f.state.segment == 0);
+    assert(f.raw_targets[f.raw_count - 1] == cui_time_segment_id(20, 0));
+    cui_destroy(f.ui);
+
+    init(&f, styled);
+    cui_time_locale_v1 locale;
+    cui_time_locale_init_v1(&locale);
+    locale.digits[1] = (cui_str){"١", 2};
+    f.options.text.locale = &locale;
+    f.options.edit_generation++;
+    cui_time_field_state_init_v1(&f.state, f.time, &f.options);
+    warm(&f);
+    focus(&f, 1);
+    text(&f, (cui_str){"\xd9", 1});
+    frame(&f);
+    assert(f.state.pending_length == 1 && f.state.segment == 1);
+    if (accessibility)
+        assert(cui_queue_accessibility_action(f.ui, cui_time_segment_id(20, 0),
+                                              CUI_ACCESSIBILITY_FOCUS));
+    else
+        focus(&f, 0);
+    text(&f, (cui_str){"\xa1", 1});
+    cui_time_field_result_v1 r = frame(&f);
+    assert(!r.changed && r.rejected_count == 1 && r.validation == CUI_TIME_TEXT_INVALID_SYNTAX);
+    assert(same(f.time, (cui_time){9, 30, 0}) && f.state.pending_length == 0);
+    text(&f, cui_string("2"));
+    frame(&f);
+    assert(f.time.hour == 2);
+    cui_destroy(f.ui);
+
+    /* A transient host focus excursion that ends on the original segment does
+     * not constitute a different active editor at the next reduction. */
+    init(&f, styled);
+    warm(&f);
+    focus(&f, 1);
+    text(&f, cui_string("1"));
+    frame(&f);
+    cui_focus(f.ui, 10);
+    focus(&f, 1);
+    text(&f, cui_string("2"));
+    frame(&f);
+    assert(f.time.minute == 12 && f.state.digit_count == 0);
+    cui_destroy(f.ui);
+}
+static void tab_exit_draft(bool styled, bool prefix) {
+    fixture f;
+    init(&f, styled);
+    cui_time_locale_v1 locale;
+    if (prefix) {
+        cui_time_locale_init_v1(&locale);
+        locale.digits[1] = (cui_str){"١", 2};
+        f.options.text.locale = &locale;
+        f.options.edit_generation++;
+        cui_time_field_state_init_v1(&f.state, f.time, &f.options);
+    }
+    warm(&f);
+    focus(&f, 1);
+    text(&f, prefix ? (cui_str){"\xd9", 1} : cui_string("1"));
+    key(&f, CUI_KEY_TAB, 0);
+    frame(&f);
+    assert(f.raw_count == 2 && f.raw_targets[0] == cui_time_segment_id(20, 1));
+    assert(f.raw_targets[1] == cui_time_segment_id(20, 1));
+    assert(cui_focused(f.ui) == 30 && f.state.digit_count == 0 && f.state.pending_length == 0);
+    cui_destroy(f.ui);
+}
 static void tabs(bool styled) {
     fixture f;
     init(&f, styled);
@@ -449,6 +529,10 @@ int main(void) {
     for (unsigned styled = 0; styled < 2; styled++) {
         editing(styled != 0);
         original_order(styled != 0);
+        focus_transition(styled != 0, false);
+        focus_transition(styled != 0, true);
+        tab_exit_draft(styled != 0, false);
+        tab_exit_draft(styled != 0, true);
         tabs(styled != 0);
         paste_and_bounds(styled != 0);
     }

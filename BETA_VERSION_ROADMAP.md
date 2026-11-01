@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New Slider, scroll geometry, background/text preparation and private software rendering work is **unreleased**. Local combined validation passed; broader acceptance and publication remain unfinished. |
+| Integration branch | New Slider, scroll geometry, background/text preparation and software V2 rendering work is **unreleased**. Local combined validation passed; broader acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -43,7 +43,7 @@ feature test does not establish complete component parity.
 | --- | --- |
 | Dialog and scrolling | Test-only cancellation candidate passes 38 checks, including numeric stale-key/idle fixes, bare-scope Escape and frozen compatibility. Remaining Table/Color retained-state fixtures now reproduce five Table/Color failures; the typed Slider capture-loss case passes. Corrected reset tests and production transfer and explicit scope-ID alias limitations remain open. |
 | Typed Slider | C models, gallery, C bridge and Python/JS/TS authoring are integrated with focused compatibility checks; standalone Node CMake tests pass 61/61. Go worker checks pass for authoring, legacy/optional-symbol/old-module compatibility and the default static package; root integration remains open. Rust implementation/validation and native numeric delivery remain open. These additions are unreleased. |
-| Backgrounds, shadows and text | Private software painting, transactional shadows and owned text painting are integrated with focused checks. Public software candidate now passes nine focused checks after fixing an owner-alias preflight gap; documentation, generated-source checks and root integration acceptance remain open. Finish that wrapper and the other four adapters. Public text scaling stays at 16×; private owned recording supports 64×. |
+| Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Complete the other four adapters and foreign authoring APIs. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
 
 ## Remaining beta scope

@@ -43,8 +43,8 @@ struct cui_bridge_icon_options_v1 { //256,align4
  struct cui_bridge_icon_style_v1 style;                           //88..215
  struct cui_bridge_icon_constraints_v1 constraints;               //216..247
  U32 reserved_tail[2];                                           //248..255
-}; //flags bits0..8: customWidth,customHeight,customColor,customInheritedColor,
-   //customOpacity,customTransform,decorative,hasStyle,hasConstraints
+}; //flags bits0..9: customWidth,customHeight,customColor,customInheritedColor,
+   //customOpacity,customTransform,decorative,hasStyle,hasConstraints,debugPlaceholder
 struct cui_bridge_icon_limits_v1 { //48,align8
  U32 struct_size,schema_version,reserved[2];
  U64 max_svg_bytes,max_pixels,max_cache_bytes,max_versions;
@@ -135,8 +135,20 @@ Config floats/presence follow actual Icon active-field rules and native conversi
 bounds, including opacity normalization and explicit maximum0; no NaN-as-presence.
 Inactive descriptors are canonical all-zero except initialized descriptor headers;
 inactive transforms/colors/scalars canonical zero. Strings use strict UTF8/no NUL:
-name/path/accessible/key <=4096 bytes, SVG <=configured max_svg_bytes. Empty source
-selects empty; unknown NAME returns operational NOT_FOUND, never silently PATH.
+name/path/accessible/key <=4096 bytes, SVG <=configured max_svg_bytes.
+`icon_set_source_v1` dispatches exactly to the four C setters: EMPTY requires
+byte_length0 and calls set_empty; NAME calls set_name (catalog names, paths and
+aliases accepted exactly by C lookup); PATH calls set_path with the C-owned map
+loader; DATA calls set_data. No guessed extension, name-to-path rewriting, file
+lookup or automatic fallback from unknown NAME to PATH. NAME uses C's canonical
+catalog path for loader lookup; PATH passes its supplied path unchanged to that
+loader. Empty NAME fails NOT_FOUND; empty PATH/DATA preserve their C empty-source
+behavior, rather than parsing empty SVG or looking up an empty path. Successful
+get_source copies the submitted kind/bytes; canonical internal path selection is
+not a change to the owner's source request. Unknown NAME reports bridge EMPTY,
+retains old source, and records exact Icon NOT_FOUND for get_info. Other native
+setter errors map as below. Explicit EMPTY detaches its loader as set_empty does;
+subsequent PATH/NAME installs the resource-local map loader again.
 
 No new status enum: malformed/layout/overflow=>INVALID_ARGUMENT, invalid UTF8=>
 INVALID_UTF8, stale=>STALE_HANDLE, phase/refcount=>INVALID_STATE,
@@ -196,8 +208,14 @@ header consumers; immutable old Badge/Icon bridge outputs/allocation counts;
 complete/each-missing optional symbols; full native size_t/UTF8/alias/reserved bounds;
 resource limits/copy failure/collect/reload/reference/stale/close tests and foreign
 wrapper cross-app refusal (including coincident numerical handles);
-old-mask render after source replacement; independent ordinary Icon tree RGBA for
-all Badge variants/sizes/styles/constraints/transforms/alpha; count0/max0/overflow,
+old-mask render after source replacement; exact EMPTY/NAME/PATH/DATA setter
+routing, empty NAME rejection versus empty PATH/DATA, catalog aliases/canonical
+loader path, unchanged custom path keys, embedded fallback and reload timing; independent ordinary Icon tree RGBA for
+all Badge variants/sizes/styles/constraints/transforms/alpha; debugPlaceholder
+bit9 inactive/active on missing PATH and known-unembedded NAME, with preserved
+NOT_FOUND, no placeholder for PARSE, exact inherited/explicit tint+opacity and
+unchanged layout/decorative or named semantics (Badge always decorative);
+count0/max0/overflow,
 nested interactive content once, resize/omission and separate artwork/frame errors;
 actual Node/TS app and strict declarations later. Headless private wrapper only.
 No compile, tests, generation, public declarations or production ran for this doc.

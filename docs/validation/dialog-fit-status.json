@@ -1,0 +1,55 @@
+{
+  "status": "FOCUSED_NATIVE_FIT_STATUS_FIX_PASS_BROWSER_RERUN_PENDING",
+  "parent_handoff": "2a724775",
+  "observed_browser": "Root source0fdaad43 first Dialog Panel420x298, Body63, natural106 inferred from max43; original browser assertion maximum==0 preserved.",
+  "cause": "Source defaults make Content and Body FLEX1 zero-basis peers; AUTO Panel uses their combined intrinsic demand, then equal allocation can grow short Content and shrink Body. This is reviewed source policy, not prior-frame sizing.",
+  "fix": "Only gallery Dialog case48 sets sizing.content_sizing.mode=CUI_SCROLL_REGION_FIT for its intrinsic status region. Core/public API/global defaults unchanged.",
+  "executed": {
+    "strict_native": "cc C11 O2 UNDEBUG Wall/Wextra/Wpedantic/Werror, CPU1 nice19 serial; new fixture and existing Dialog modules linked against cached current root libraries; no full engine rebuild.",
+    "runtime": "Private test_local.py wrapper6/6 PASS .14s, session94185 terminal0. New real checkbox/button/paragraph fixture sourceFLEX control: Panel296, Content62.5, Body62.5, natural106, maximum43.5. FIT first-open+narrow/wide Bodymax0, independently font-measured wrapped status height, longBody overflow+wheel/Footerfixed, current-frame short recovery/offsetclamp.",
+    "generation": "SDK\u2192amalgamation\u2192agent-skill generation; full formatcheck and all3freshness checks PASS, session63142 terminal0."
+  },
+  "initial_fixture_failures": [
+    "Compile first18546 used nonexistent cui_size.h; corrected to.height.",
+    "Runtime95628 assumed status alwayssingleline. Narrow280 has2fontlines38 vsone-line19; final oracle greedily measures whole-word candidates at actual current innerwidth. Original range0 and geometry assertions preserved."
+  ],
+  "sources": {
+    "CMakeLists.txt": "3a40e83468594024b09614d1097fbca04a4656197967263e0b993876f01c735d",
+    "tests/run_dialog_composition_probe.py": "7ecc1788036acce520f11a5e8fd0ffb32617ff944487e177e452e76bd1a52dbb",
+    "tests/unit/test_dialog_composition_intrinsic.c": "82ca82ab3c3dde34859bda622489a1a8e44b571b48c43126d1f5c5a197f3926e",
+    "web/gallery.c": "4b3792f37f9ae90029f04db935da5772a66c7200d142b3862ecbd035903398d8",
+    "docs/DIALOG_COMPOSITION.md": "938c383e4a5ecd7573f7046e6749493e21b1f969cedf2aa60a834431240bb387"
+  },
+  "logs": {
+    "dialog-fit-status-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-fit-status-build.log",
+      "sha256": "fbb9a66ad2790172af942252686eda9aecdfcf3449ea373528d07190fe0614ec"
+    },
+    "dialog-fit-status-build-fixed.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-fit-status-build-fixed.log",
+      "sha256": "09488977d6d989a1633742a751205a9f6fb17d4f370e068475b8e4ac8c160cfc"
+    },
+    "dialog-fit-status-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-fit-status-runtime.log",
+      "sha256": "e836cf195d6794584857b130242199f79a1a9ed694c7a5452058f4eeb2645cce"
+    },
+    "dialog-fit-status-final-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-fit-status-final-build.log",
+      "sha256": "09488977d6d989a1633742a751205a9f6fb17d4f370e068475b8e4ac8c160cfc"
+    },
+    "dialog-fit-status-final-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-fit-status-final-runtime.log",
+      "sha256": "86b08641ecda6dc4bc8e71be88ac7079dffda439e865c0a425916d82468637fa"
+    },
+    "dialog-fit-status-gates.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-fit-status-gates.log",
+      "sha256": "30767d1bd4ee0ea3de96d415c8dff64eb7aa465de565c9c66d4df14d9026e46b"
+    }
+  },
+  "pending": [
+    "Root exact integrated configuredsource+intrinsic/privateSDL checks and requiredskill18 (explicitly coalesced by integrator, no ownrepeat claimed).",
+    "Root fullWASM/browser rerun; worker did not rerun browser.",
+    "Existing held-input/Root/host/foreign-facade limitations remain unchanged."
+  ],
+  "ownership": "No Core/Table/default API/other gallerycontrol changes; root files not edited. Compiler/heavy lease released after63142 terminal."
+}

@@ -5956,6 +5956,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_dialog_sizing_v1 sizing;
         gallery_dialog_frame frame = {&t, width, height};
         if (cui_dialog_sizing_default_v1(options, &sizing)) {
+            /* This status line is intrinsic; do not give it a FLEX1 share that
+             * steals the short Body's natural height. Source defaults stay FLEX1. */
+            sizing.content_sizing.mode = CUI_SCROLL_REGION_FIT;
             cui_dialog_composition_v1 composition = {
                 .struct_size = sizeof composition,
                 .version = CUI_DIALOG_COMPOSITION_VERSION_1,

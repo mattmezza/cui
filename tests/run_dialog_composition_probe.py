@@ -45,10 +45,10 @@ def main():
     link = [libs / 'libcui_software.a', libs / 'libcui_text.a', libs / 'libcui.a', '-lm',
             '/usr/lib/libharfbuzz.so', '/usr/lib/libfreetype.so', libs / 'libcui_bidi.a']
     tests = [('dialog_composition_abi', prefix / 'abi', [])]
-    for case in ['contracts', 'geometry', 'actions']:
+    for case in ['contracts', 'geometry', 'actions', 'intrinsic']:
         binary = prefix / case
         run([*flags, f'tests/unit/test_dialog_composition_{case}.c', *objects, *link, '-o', binary])
-        fonts = [ROOT / 'third_party/inter/Inter-Regular.otf', ROOT / 'third_party/inter/Inter-Bold.otf'] if case == 'geometry' else []
+        fonts = [ROOT / 'third_party/inter/Inter-Regular.otf', ROOT / 'third_party/inter/Inter-Bold.otf'] if case in ['geometry', 'intrinsic'] else []
         tests.append((f'dialog_composition_{case}', binary, fonts))
     guide = (ROOT / 'docs/DIALOG_COMPOSITION.md').read_text()
     example = guide.split('```c\n', 1)[1].split('\n```', 1)[0]

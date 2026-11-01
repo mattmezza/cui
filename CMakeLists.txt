@@ -1771,7 +1771,7 @@ add_library(test_dialog_composition_abi OBJECT tests/unit/test_dialog_compositio
 target_include_directories(test_dialog_composition_abi PRIVATE include)
 cui_warnings(test_dialog_composition_abi)
 if(TARGET cui_text)
- foreach(dialog_case contracts geometry actions)
+ foreach(dialog_case contracts geometry actions intrinsic)
   add_executable(test_dialog_composition_${dialog_case}
    tests/unit/test_dialog_composition_${dialog_case}.c
    tests/unit/dialog_composition_helpers.c)
@@ -1788,6 +1788,8 @@ if(TARGET cui_text)
   C:/Windows/Fonts /System/Library/Fonts/Supplemental)
  if(CUI_DIALOG_TEST_FONT AND CUI_DIALOG_TEST_BOLD)
   add_test(NAME dialog_composition_geometry COMMAND test_dialog_composition_geometry
+   "${CUI_DIALOG_TEST_FONT}" "${CUI_DIALOG_TEST_BOLD}")
+  add_test(NAME dialog_composition_intrinsic COMMAND test_dialog_composition_intrinsic
    "${CUI_DIALOG_TEST_FONT}" "${CUI_DIALOG_TEST_BOLD}")
  endif()
 endif()

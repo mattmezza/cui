@@ -93,7 +93,17 @@ FIT or FIXED, explicit minimum policy and finite bounds. Preserve their distinct
 default minima. Content can exceed its Inner allocation and be clipped while
 Footer retains its independent position. An oversized Footer can overflow the
 bounded Panel; this source policy does not convert Outer into a scroll owner.
-Body alone scrolls. This is a bounded Y constraint route, not a general layout
+Body alone scrolls. The two FLEX1 peers use equal zero-basis allocation after
+minimum freezing. AUTO sizes the Panel from their combined intrinsic demand;
+it does not promise each peer receives its own natural height. For example, a
+short status Content can grow while a taller Body scrolls. This is the reviewed
+source policy, not stale first-frame geometry. For a status region that should
+stay intrinsic, explicitly set `sizing.content_sizing.mode = CUI_SCROLL_REGION_FIT`
+after resolving defaults, leaving Body FLEX1. The gallery Dialog uses this
+application policy: status may wrap at narrow widths, short Body fits, and long
+Body still scrolls. Do not change the global FLEX1 default to obtain that choice.
+
+This is a bounded Y constraint route, not a general layout
 solver: widths must remain independent of allocated Y. See
 [`SCROLL_LAYOUT.md`](SCROLL_LAYOUT.md) for admission and failed-frame behavior.
 

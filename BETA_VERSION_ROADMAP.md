@@ -41,8 +41,8 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Test-only candidate passes 44/47 checks. Original/current controls confirm an existing touch-reorder defect. The corrected frozen/current trace passes its focused check; the full 47-check candidate has not been rerun. Production transfer and scope-ID alias limitations stay open. |
-| Typed Slider | C/Python/JS/TS/Go authoring is integrated with focused checks. Rust passes its first worker UI tests; compatibility/integration remain open. Python copied-wire evidence checks passed focused acceptance; JS/TS/Go inactive-numeric checks and native numeric delivery remain unfinished. Unreleased. |
+| Dialog and scrolling | Latest test-only query candidate passes 46/48 checks. Both remaining touch-reorder failures trace to ancestor scroll takeover; a header drag-priority fix is drafted. The corrected frozen/current trace passes. Production transfer and scope-ID alias limitations stay open. |
+| Typed Slider | C/Python/JS/TS/Go authoring is integrated with focused checks. Rust worker dynamic/provider, default-static UI and lifetime checks pass; root integration and minimum-compiler acceptance remain open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction, the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
 
@@ -136,6 +136,8 @@ that every listed defect still reproduces.
 - [ ] Performance and memory claims have reproducible evidence and limitations.
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
+
+Node/Go wire-validation acceptance: [compatibility and malformed-record checks](docs/validation/node-go-slider-wire-integration.json).
 
 Python wire-validation acceptance: [regression and compatibility checks](docs/validation/python-slider-wire-integration.json).
 

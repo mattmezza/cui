@@ -1,0 +1,398 @@
+# Controlled typed Slider bridge v1: exact proposal
+
+Design only, `/root/hidden_windows`, 2026-11-01. Based on integrated
+`259e298a2c65ad5d1554e04360c7b74ac437d58f`, including the new typed gallery.
+No production declarations/implementation, compilation, dependency or generation
+changes here. This makes the future-bridge section of
+[SLIDER_MODEL_ABI_V1.md](SLIDER_MODEL_ABI_V1.md) concrete; its b24 immutable-current /
+evolving-requested and explicit acceptance resolution remains authoritative.
+Root decisions below precede implementation; this is not an implemented API.
+
+## Existing authority and preservation boundary
+
+- `include/cui/cui_bridge.h`: ABI_VERSION1, exact-size `cui_bridge_options`,
+  node `{uint32_t slot,generation}`, old scalar event/ex/notification layouts.
+  Keep every old struct, enum value, exported signature and constructor unchanged.
+- `src/bridge/cui_bridge.c`: `bridge_ready` checks null/closed/stepping, not a
+  portable thread identity. `bridge_node` checks full live generation.
+  `cui_bridge_node_create` retires generation UINT32_MAX slots and stops ID
+  allocation at UINT64_MAX; failed creation can consume an unpublished internal
+  ID. Preserve that monotonic/no-reuse policy, not fabricated identity reuse.
+- Legacy Slider render branch casts node doubles to float, calls `cui_slider`,
+  writes its result back and enqueues CHANGE. `set_range` requires min<max,
+  step>0 and Slider bounds/step within its existing float-safe range. Keep this
+  exact route, callbacks, precision, limits, autoaccept and notifications.
+- `bridge_change` / `poll_event_ex` / notification views share the existing FIFO.
+  New proposals must never enter it, downgrade to LEGACY, or be drained by old
+  polling. New typed requests are not scalar accepted-value notifications.
+  Existing shadow target contracts remain unchanged for legacy Slider. New kind81
+  has no implicit shadow setter support: initially reject those authoring calls
+  explicitly; named typed root/track/thumb shadow authoring needs its own facade
+  mapping review, not salt reuse or a false THUMB capability. This omission must
+  appear in all-five guidance until implemented.
+- Actual model source: `src/base/cui_base_slider_model.c` validation reserves
+  sequence space with **all** current frame events, `3*count+1`; it does not
+  expose a target-only capacity reservation. Use that conservative bound.
+- `web/gallery.c` now demonstrates synchronous C model requests, external owner
+  acceptance and passive wakes. Bridge requests instead cross an owned queue and
+  callbacks happen after step. Do not claim their acceptance repaints that frame.
+
+## New kind and exact records
+
+Propose append `CUI_BRIDGE_SLIDER_MODEL = 81`, a versioned authoring route for the
+same Slider family, not an additional catalog family. All78 stay intact. A new
+factory below creates it; old `slider()` builders still create kind9. Generic
+`node_create` with81 rejects INVALID_STATE and directs callers to the factory
+until valid config/value can be supplied atomically. Common Row/Column composition,
+label text and disabled policy are supported; legacy scalar value/range APIs
+reject kind81. No hidden upgrade of mounted kind9 nodes.
+
+Public header remains independent of Core/Base/Styled headers. All tags are
+uint32_t fields and all identities uint64_t; enums below name fixed numbers.
+Order new record headers `struct_size,schema_version`, matching current bridge
+V1 conventions (the older design's version/size order is not a shipped ABI).
+Natural C ABI, no packing, pointers, unions, size_t, platform or Clay types:
+
+```c
+#define CUI_BRIDGE_SLIDER_MODEL_V1 1u
+/* Value kind SINGLE0/RANGE1; scale LINEAR0/LOGARITHMIC1; axis H0/V1. */
+typedef struct { uint32_t kind, reserved; double start, end; }
+    cui_bridge_slider_value_v1;
+typedef struct { double minimum, maximum, step; uint32_t scale, reserved; }
+    cui_bridge_slider_domain_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, flags, orientation;
+    uint64_t source_generation;
+    cui_bridge_slider_domain_v1 domain;
+    float rem, length;
+    uint32_t layout, reserved;
+} cui_bridge_slider_config_v1;
+/* flags: REQUESTS1, READONLY2, REVERSE_FILL4, REDUCED_MOTION8, HIDE_FOCUS16.
+ * layout: FIXED0 / PARENT1. Node disabled is the existing common policy. */
+typedef struct {
+    uint32_t struct_size, schema_version, render_status, reserved;
+    double core_time, next_wake_seconds;
+} cui_bridge_slider_presentation_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, capacity, reserved;
+} cui_bridge_slider_queue_options_v1;
+typedef struct {
+    uint32_t struct_size, schema_version;
+    uint64_t app_epoch;
+    cui_bridge_node node;
+    uint64_t source_generation, configuration_revision;
+    uint64_t submission_frame, request_sequence;
+} cui_bridge_slider_receipt_v1;
+typedef struct {
+    uint32_t type, flags, key, modifiers;
+    float x, y;
+    uint32_t repeat, pointer_type, pointer_button, accessibility_action;
+    uint64_t pointer_id, pointer_device, accessibility_target;
+    double accessibility_value;
+} cui_bridge_slider_input_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, phase, reason;
+    uint32_t thumb, event_kind, event_source, event_flags;
+    cui_bridge_slider_receipt_v1 receipt;
+    uint64_t event_target, event_frame, event_index;
+    cui_bridge_slider_value_v1 current, requested;
+    cui_bridge_slider_domain_v1 domain, gesture_domain;
+    cui_bridge_slider_input_v1 input;
+} cui_bridge_slider_request_v1;
+```
+
+Expected sizes from field-layout arithmetic (not compiler proof at this static
+checkpoint): LP64 with 8-aligned double/u64, i386-style ILP32 with4 alignment, and
+wasm32 with8 alignment all give the same sizes/offsets, because preceding groups
+are deliberately multiples of8. Production must prove native and actual pinned
+wasm32 `sizeof/offsetof` with strict fixtures; no claim all ILP32 ABIs measured.
+
+| Record | Bytes on these three models | Important offsets |
+| --- | ---: | --- |
+| value |24|kind0,reserved4,start8,end16|
+| domain |32|min0,max8,step16,scale24,reserved28|
+| config |72|flags8,axis12,source16,domain24,rem56,length60,layout64,reserved68|
+| queue options |16|capacity8,reserved12|
+| presentation |32|render_status8,reserved12,Core time16,wake24|
+| receipt |56|epoch8,node16,source24,revision32,frame40,sequence48|
+| input |72|type0,flags4,key8,modifiers12,x16,y20,repeat24,type28,button32,action36,id40,device48,target56,value64|
+| request |296|phase8,reason12,thumb16,kind20,source24,flags28,receipt32,target88,frame96,index104,current112,requested136,domain160,gesture192,input224|
+
+Size query functions below return library sizes, not permission to truncate or
+reinterpret records on another ABI. Fixed nested records have no separate schema
+header; their authority is the containing v1 schema and explicit size argument.
+
+## Exact exported signatures proposed
+
+Every declaration below would carry CUI_BRIDGE_API and return existing status.
+No C foreign callback registration is added. The Base handler is a private
+bridge queue producer, not a language trampoline during Core composition.
+
+```c
+uint32_t cui_bridge_slider_model_versions(void); /* bit0 means complete v1 */
+uint32_t cui_bridge_slider_config_v1_size(void);
+uint32_t cui_bridge_slider_value_v1_size(void);
+uint32_t cui_bridge_slider_receipt_v1_size(void);
+uint32_t cui_bridge_slider_request_v1_size(void);
+uint32_t cui_bridge_slider_presentation_v1_size(void);
+cui_bridge_status cui_bridge_slider_queue_enable_v1(cui_bridge_app *,
+    uint32_t options_size, const cui_bridge_slider_queue_options_v1 *);
+cui_bridge_status cui_bridge_slider_model_create_v1(cui_bridge_app *, const char *key_utf8,
+    uint32_t config_size, const cui_bridge_slider_config_v1 *,
+    uint32_t value_size, const cui_bridge_slider_value_v1 *, cui_bridge_node *out);
+cui_bridge_status cui_bridge_slider_model_configure_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t config_size, const cui_bridge_slider_config_v1 *,
+    uint32_t value_size, const cui_bridge_slider_value_v1 *);
+cui_bridge_status cui_bridge_slider_model_get_config_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t config_size, cui_bridge_slider_config_v1 *out);
+cui_bridge_status cui_bridge_slider_model_set_value_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t value_size, const cui_bridge_slider_value_v1 *);
+cui_bridge_status cui_bridge_slider_model_get_value_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t value_size, cui_bridge_slider_value_v1 *out);
+cui_bridge_status cui_bridge_poll_slider_request_v1(cui_bridge_app *,
+    uint32_t request_size, cui_bridge_slider_request_v1 *out);
+cui_bridge_status cui_bridge_accept_slider_request_v1(cui_bridge_app *,
+    uint32_t receipt_size, const cui_bridge_slider_receipt_v1 *,
+    uint32_t value_size, const cui_bridge_slider_value_v1 *);
+cui_bridge_status cui_bridge_slider_model_get_presentation_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t presentation_size, cui_bridge_slider_presentation_v1 *out);
+cui_bridge_status cui_bridge_slider_model_part_bounds_v1(cui_bridge_app *, cui_bridge_node,
+    uint32_t part, cui_bridge_rect *out);
+```
+
+Enable is explicit before factory; no implicit allocation in old constructors.
+Queue options size/schema16/1, reserved0, capacity1..4096;0 selects4096. Re-enable
+same capacity on owner thread is idempotent, different capacity INVALID_STATE;
+no resize/shrink/receipt replay. New factory requires enabled sidecar. A readonly
+new model can exist without REQUESTS, but enabling remains explicit for common
+thread/epoch ownership. Capacity exhaustion/unsupported returns existing codes.
+Part0..4 means ROOT/TRACK/FILL/START_THUMB/END_THUMB. It queries actual last
+completed geometry; absent/inactive START/disabled omitted paint can return EMPTY
+without changing out. Getter never manufactures presence from stable IDs.
+Root geometry and semantic nodes may exist when decorative surface paint omits.
+Presentation query copies last completed render status (explicit mapped0..5),
+absolute accumulated Core time and passive next wake (0 idle). Before first
+successful submission EMPTY; failed completed frame CORE_ERROR, outputs unchanged.
+It exposes observations, never internal animation state or renderer capability.
+Manual hosts translate `next_wake_seconds-core_time` to their monotonic clock;
+accept invalidates via existing Core mechanism and needs a later host frame.
+`src/bridge/cui_bridge_sdl.c:bridge_run_frame` already continuously invalidates when
+an after-frame callback exists. Preserve that old run cadence; no claim this
+slice converts native run/all-five loops to passive scheduling. New UI examples
+can use the copied deadline in manual loops without adding a dispatcher.
+
+## Validation and atomicity
+
+- Exact top-level size/schema1, reserved0, known flags/tags, nonnull accessible
+  declared storage extents. Public callers own all extents; no buffer probing.
+- Value: reserved0, SINGLE0 ignores start even NaN and canonicalizes copied start0;
+  RANGE1 requires finite min<=start<=end<=max. End always finite. No sorting,
+  float32 casts or scalar end-only fallback. Getters return full tagged copies.
+- Domain uses actual `cui_slider_model_domain_valid_v1`: finite min<=max, finite
+  span, finite step>=0; log requires positive min<max. Do not inherit legacy
+  min<max/positive-step/float-safe limit restrictions. Off-grid pairs may be valid.
+- Config: orientation0/1; source_generation is copied opaque64, including0;
+  rem finite>0 with finite1.5*rem. FIXED requires finite length>0; PARENT ignores
+  length and canonicalizes copied length0. No palette/brush/theme pointers.
+  Owned style is resolved from current app theme via the actual facade, not
+  preset-name inference. V1 visible linear brush rejects before Base. Real V2
+  host/palette transport is deliberately absent, not flattened or advertised.
+- REQUESTS absent or READONLY set makes new model readonly. Flags remain stored
+  separately so changing the explicit observer policy is visible in config.
+  New common disabled changes invalidate receipt policy; old nodes unchanged.
+  Existing set-text copies the accessible name, with bounded copied derived
+  start/end labels; no public borrowed strings. New-kind label changes revise
+  receipt configuration. Actual visible labels remain ordinary sibling Label
+  nodes in examples. Initial source/rem/layout/domain defaults are explicit
+  wrapper config factories, not inferred from scalar legacy Value/range.
+- Config+value change validates both before commit, updates external confirmed
+  pair and increments revision, retains Base reducer for captured cancellation,
+  resets presentation as needed. Never reinitialize an active Base gesture to
+  bypass CANCEL. Direct set-value also increments revision even for equal pair;
+  successful accept does not. Revision UINT64_MAX rejects replacement atomically.
+- Invalid getters, size/version/reserved/tag/pair, wrong phase/thread or capacity
+  preserve output bytes and queues/owner/config. Public input is copied before
+  mutation, so normal caller input/output aliasing is safe. Model factory failure
+  preserves public out/queues/other nodes; existing allocator may consume an
+  unpublished internal ID, never a reusable public receipt identity.
+- REQUEST output is fieldwise mapped and canonicalized, never memcpy of Base
+  metadata/padding. phase BEGIN0/UPDATE1/COMMIT2/CANCEL3; reason0..9 follows actual
+  Base named vocabulary, thumb START0/END1. event_kind UPDATE=REQUEST1,
+  COMMIT=COMMIT3, BEGIN/CANCEL=LIFECYCLE5. SOURCE UNKNOWN0,PROGRAMMATIC1,POINTER2,
+  KEYBOARD3,ACCESSIBILITY4. event flags HAS_FRAME1/HAS_INDEX2/HAS_SOURCE4 only;
+  HAS_ACTIVATION8 never synthesized. Target is actual semantic64 ID, not node.
+- Absent event frame=0/index=UINT64_MAX; present size_t index widens checked.
+  UNKNOWN omits HAS_SOURCE. Actual input flags HAS_INPUT1/HAS_NUMERIC_VALUE2;
+  absent input is allzero. Pointer/key fields copy actual evidence only; numeric
+  SET keeps raw published-semantic double/action/target. Increment/decrement
+  inactive numeric value canonical0; no coordinate or key fabrication. Producer
+  maps supported Core constants explicitly in source; it must not assert raw
+  enum ABI equality. Proposed output tags: POINTER_MOVE0/DOWN1/UP2, KEY_DOWN3,
+  CANCEL7, ACCESSIBILITY13; key NONE0/ESCAPE4/LEFT5/RIGHT6/UP7/DOWN8/HOME9/END10/
+  PAGEUP19/PAGEDOWN20, modifier SHIFT1/CTRL2/ALT4/META8; pointer MOUSE0/TOUCH1/PEN2,
+  button PRIMARY0/SECONDARY1/MIDDLE2, accessibility INCREMENT2/DECREMENT3/SET4.
+  Inapplicable fields zero; unsupported future output vocabulary requires a
+  new schema rather than silently mapping to mouse/key/UNKNOWN evidence. New wrappers retain unknown future
+  schema as unsupported rather than guessing. Output records are copies, not
+  submitted event authority; accept reads only receipt+explicit value.
+
+## Queue, identity and receipt authority
+
+Proposed lazy private app sidecar: one pointer in private app, a bounded pointer
+index for `(max_nodes+1)` typed owners, queue and owner thread/epoch state.
+No old node-record growth, eager queue allocation or new old-constructor branch.
+Allocate sidecar/index/queue in one checked aligned block on successful enable;
+per-new-node owned model/presentation/config/value allocated independently.
+Formula is `sizeof(private_header)+aligned((max_nodes+1)*sizeof(owner_pointer))+
+capacity*sizeof(request)` plus explicit alignment padding; exact header/owner
+sizes require production `sizeof` receipt, not an invented ABI promise. Queue
+payload at default4096 is1,212,416bytes; opt-in only, retained until app destroy.
+One-node pure state160 +presentation112 observations do not imply private-owner
+allocation size. Allocation failure leaves previous state untouched.
+
+Before each writable model submission, check overflow-safe `3*frame_event_count+1`
+free request slots, using actual public `cui_frame_events`; reserve/release unused
+budget around that one synchronous reduction. Count all events, including ones
+not ultimately eligible. No allocation/overwrite/drop-oldest on callback, no
+foreign callbacks while stepping. Preflight failure occurs before this node's
+Base/state/input/callback/paint, sets bridge frame_error CAPACITY; previously
+processed nodes/events remain real. It is not whole-frame rollback. Small custom
+queues can conservatively reject even when fewer requests would have emitted.
+With current max_nodes1024 / dispatch512,4096 covers an initially empty queue's
+conservative bound plus at most one synthetic cancel per preceding model; this
+is source-derived, not a permanent public Core capacity promise. Backlog can
+still exhaust it. No new target-dispatch introspection or copied reducer logic.
+
+Epoch proposed: private process counter starts1, issued only to successful new
+sidecar opt-in, never pointer-derived or reused. Protect uint64 counter using
+C11 atomic_flag (always lock-free flag primitive), saturating at UINT64_MAX;
+exhaustion CAPACITY. No global receipt registry. Production must verify actual
+native/WASM implementation/link support before advertising versions bit0.
+Node identity remains full slot+generation plus semantic ID in evidence. Receipt
+revision starts1; source/config/owner replacement invalidates old authority.
+Record first/last **actually emitted contiguous** request sequence per current
+submission plus last accepted sequence; no sequence wrap. A receipt is an
+integrity-checked process-local snapshot, not a cryptographic capability against
+malicious in-process code. Matching an unissued guessed sequence must reject.
+
+Poll copies one record and consumes once; exact-size invalid fails before any
+cleanup. Removed/reused node origins may be pruned on valid poll, matching current
+bridge stale-origin policy; live but expired receipts remain readable snapshots.
+EMPTY preserves out. Already copied records outlive later polls/frames/app destroy;
+using a destroyed C app pointer remains invalid, never a supported accept call.
+
+Accept requires owner thread, outside stepping/Core frame (after-frame allowed),
+valid completed Core snapshot, matching nonzero epoch/live full node/source/
+revision/latest admitted painted state-frame and emitted range, sequence strictly
+larger than last accepted, valid full pair in CURRENT domain/kind and writable
+current policy. Accept updates owner +last accepted only; it schedules future
+paint using existing bridge invalidation/host wake policy, never alters prior
+commands. Owner may choose a valid pair different from proposal. In the same
+submission, accepting UPDATE does not invalidate later COMMIT. No autoaccept on
+phase, poll, input consume or callback success. Captured CANCEL is readable old
+kind/domain; explicit adjusted current-valid acceptance is possible, never blind.
+
+Invalidate windows on failed begin/end/current invalidity even after error clear;
+request copies already emitted remain readable, not acceptable. Geometry-only
+recovery must not renew: require actual model state-frame==submission frame plus
+successful completed snapshot; next healthy admitted state-frame can reopen.
+No rollback/replay of already performed callbacks or earlier owner acceptance.
+Existing b24 layout-only rule remains: no renewal or expiry solely from a
+layout-only visit. **Proposed clarification requiring root review:** ordinary
+completed omission revokes acceptance, whereas retaining a layout-only copy does
+not grant new authority. Removal/reparent/policy change invalidate regardless.
+No frame-wrap collision: sequence never reuses, emitted window empty if no new
+requests; zero-generation phase never creates a receipt.
+
+## Thread and callback policy: explicit decisions
+
+The old bridge does not enforce portable thread identity. Do not pretend existing
+`bridge_ready` already rejects wrong-thread typed calls. Proposal: capture a
+private C11 `_Thread_local` tag address on first successful enable; new API, new-kind common mutation branches and
+new-model step path require same tag (plus serialized lifetime/no concurrent
+calls). Owner OS thread stays alive through destroy, preventing thread-exit/tag
+reuse from becoming an ownership-transfer API. On wasm single-thread targets,
+one explicit constant owner is sufficient only when host cannot share it across
+threads. No portable thread dependency or platform types leak publicly.
+
+**Root decision required:** approve/probe this private TLS policy and epoch
+atomic_flag before implementation, or explicitly revise the earlier guaranteed
+wrong-thread rejection to a caller precondition. Unsupported TLS/target mode must
+advertise versions0 rather than claim enforcement. No locks around Core/callbacks,
+new dispatcher, old thread checks, thread migration or public host callback added.
+No process-race guarantee for destroying a handle concurrently with any API.
+Go already locks the creating OS thread and checks a private platform token in
+`bindings/go/cui/native.go`; Rust already documents creating-thread ownership.
+Reuse their authority rather than insert a second wrapper owner or transfer API;
+the new C check closes the current direct-C gap only.
+
+Existing C `step` never invokes foreign change callbacks. Python `step` only
+steps; dispatch is separate. JS `step` steps then `_dispatch`; step_only doesn't.
+Go Step and Rust step also only step; their Dispatch/dispatch/pump/run compose
+callbacks in existing phases. Preserve these differences and ALL legacy order.
+Propose new `dispatch_slider_requests` methods and explicitly call them after
+legacy dispatch in existing combined helpers/run callbacks. No global original
+ordering between the two queues; each queue is FIFO. Do not silently interleave
+or retime old callbacks. Manual polling never dispatches. A legacy callback
+that advances an app may expire later typed receipts; do not change old behavior
+or replay stale requests to conceal that fact.
+
+During new typed callback only, wrapper guard rejects nested step/run/typed
+dispatch, keeping accept/config operations explicit and outside active Core.
+External owner/userdata mutation and enqueueing later work are permitted. New
+request records are owned immutable copies; closure registration lives until
+removal/dispose. No C callback pointer retained. Python/JS exceptions and Rust/Go
+panic cannot cross C: callbacks are after FFI return; native after-frame trampoline
+uses existing catch/latch/rethrow/error-on-return policy. The failed callback's
+already-popped request stays consumed, no automatic accept/retry; later queue
+entries remain available. Dispose semantics remain the existing deferred native
+run contract; never use app after destroy returns.
+
+## Five authoring surfaces and real tests
+
+| Consumer | Proposed additive authoring and owned mapping |
+| --- | --- |
+| Python | `slider_model(key, config, confirmed).on_request(fn)`, frozen tagged value/domain/input/request/receipt dataclasses, `app.accept_slider_request(request.receipt, pair)`; float doubles, int identities, no ctypes storage retained. Optional symbol group allows old library loading and errors before mount on use. |
+| JS | `slider_model(key, config, confirmed).on_request(fn)`; addon fieldwise copies, frozen tagged objects; number doubles and bigint ALL64-bit identities/frame/index/source/sequence, uint32 node fields. Reject unsafe Number identity, no JSON transport. Explicit app accept and typed dispatch. |
+| TS | Match JS in both declaration entrypoints, discriminated Single/Range, bigint receipts, typed callback+explicit accept. Positive and negative compile tests plus actual JS UI runtime, not types-only closure. |
+| Go | `SliderModel(key, config, value).OnRequest(fn)`, uint32 tags,uint64 IDs,float64 complete pairs; App.AcceptSliderRequest returns error, copied cgo output, existing error latching/mount ordering retained. Optional symbols preserve old dynamic loads. |
+| Rust | Builder/owned Single/Range and config/request/receipt records using f64/u64; explicit Result accept; owned copy before callback and no RefCell/mutable App borrow held across callback. Static matching SDK; optional dynamic symbol group fails cleanly on old libraries. |
+
+Each language needs a genuinely mounted UI example (Row/Column +Single and Range,
+real callback and accept/reject policy, next-frame accepted paint), not a launcher
+or a print-only poll demo. Runtime tests use current bridge and an independently
+preserved pre-feature shared library to prove old symbols/loaders still work.
+New feature missing returns BACKEND_UNAVAILABLE without silently using Value/range.
+All existing legacy builders and callbacks keep their routes/timing.
+
+Current manual injection gaps: `cui_bridge_queue_key` accepts only keys1..8
+(Tab through Down), and `queue_pointer` carries only mouse phase/x/y. Native SDL
+can deliver richer Core events, but old foreign injection cannot prove Home/End,
+PageUp/Down or contact identity. Do not widen old validation invisibly or call a
+mouse event a touch test. Separate reviewed additive versioned key/contact input
+records forwarding existing Core queue (no dispatcher) or actual native host
+fixtures are required for those all-five tests. Their exact API is OUTSIDE this
+receipt slice; mark omitted until approved. Similarly typed SET injection helpers
+are not Linux AT-SPI delivery proof; native precision/host options remain separate.
+
+Verification plan for C slice: native/ILP32-layout/actual wasm ABI static asserts,
+old-size/default-loader/legacy trace parity, output byte snapshots on every
+failure, input aliasing, all value/domain extremes from existing pure oracle;
+actual new Styled paint/bounds/current-vs-requested pair, both axes/kinds,
+reverse/log/step/rejection/disabled/readonly, held capture config CANCEL,
+omission/recovery/current layout failure+clear, same-frame UPDATE→COMMIT ordered
+accept, foreign app/node reuse/revision/source/frame/sequence/guessed-unissued
+rejection, epoch/revision/sequence exhaustion, queue preflight/backlog/retention,
+post-failure readable-but-unacceptable snapshots, wrong-thread policy and callback
+exceptions/reentrancy in each runtime. First frames have real generation only.
+Headless native always private Xvfb; browser headless. No whole-family claim from
+C helpers: source palette/gradient consumers, real native numeric delivery,
+vertical registered-scroll admission and all-five installed UI authoring remain
+independent requirements. On implementation, update exact guide/usage metadata,
+binding coverage/source lists/SDK/dist/skill, preserve78 and run usage6/skill18.
+
+Proposed ownership: bridge worker owns header/new private model queue module,
+bridge internal sidecar/render integration and focused C tests; language workers
+own only their wrapper/runtime example/tests after C ABI approval; Core/native
+and vertical-layout owners remain independent. Integrator alone owns shared
+`tests/web/test_browser.py`/Pages workflow and canonical integration/push.

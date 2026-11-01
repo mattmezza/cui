@@ -91,3 +91,13 @@ ancestry. Where a scope ID also identifies a semantic owner, semantic ownership
 stays authoritative; contradictory aliases remain an explicit limitation. Capture,
 contact and activation ownership are unchanged. Production files remain unchanged,
 and remaining reducer coverage still gates transfer.
+
+## Table/Color candidate checkpoint
+
+The copied test-only candidate passes **44 of 47 checks** (0.81 s), including the
+prior 38 and the five original retained-state regressions. Two touch-reorder
+checks and a frozen-trace bounds assertion still fail. Original-input controls
+and a trace target correction are prepared but unexecuted at this checkpoint;
+no claim that they are fixture-only failures is made. See the
+[partial receipt](../validation/dialog-table-color-candidate-partial.json).
+Production Core/Base transfer remains gated.

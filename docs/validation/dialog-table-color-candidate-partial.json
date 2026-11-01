@@ -1,0 +1,31 @@
+{
+  "status": "partial_test_only_not_production",
+  "runtime": {
+    "session": 88557,
+    "passed": 44,
+    "total": 47,
+    "seconds": 0.81,
+    "log": "/home/matteo/.cache/cui-hover-raw-build/dialog-table-color-candidate-build-runtime.log",
+    "log_sha256": "681f169c4e44e0d68281822472c8f51522dfe764b98a12d3c9d54b10b34813c0"
+  },
+  "compile": "six TUs strict C11 O3 Wall Wextra Wpedantic Werror, CPU1 nice19; reused unchanged Core and cached archives",
+  "failures": [
+    "touch fresh reorder observer count",
+    "prior-touch initial reorder before cancellation",
+    "legacy trace requested key1 resize after key1 ceased to own authored resize leaf"
+  ],
+  "post_runtime_source_changes_unexecuted": [
+    "isolated initial-touch reorder control mode",
+    "legacy trace identical current-first-column resize target",
+    "frozen Picker calendar export rename receipt update"
+  ],
+  "source_sha256": {
+    "tests/prepare_dialog_cancel_marker_probe.py": "d049cf071342260c22ae167ccb504234925e78303f1a304a5ec282f96cacf996",
+    "tests/run_dialog_composition_probe.py": "4a4cd67f6c0aff9330fdda37ec07c56f5229ac5dcde168cf61000cf7223476d8",
+    "tests/unit/test_dialog_composition_input.c": "9eb3a88c39553d7ec4f6e0b7cd0597b0afdb404bca9aec8282596628dc00a654",
+    "tests/unit/test_dialog_cancel_table_color_legacy.c": "d0bb52347d617e139312fe894a94fa838566d4244b38725be38281eaca0bfd4b",
+    "tests/unit/dialog_frozen_table.c": "67949fa52785be02b8e75d6030647a56332e3840288f1c694d8bfdea16405d00",
+    "tests/unit/dialog_frozen_picker.c": "953fa4f4011ebf9040c292f93ea93717006fa63c2b7c9d7315842a3dc826bdf0"
+  },
+  "limits": "All prior38 and original five retained regressions + typed capture-lost passed; new touch reorder and corrected frozen trace remain unverified. No production Core/Base transfer."
+}

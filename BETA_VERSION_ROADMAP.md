@@ -29,7 +29,7 @@ feature test does not establish complete component parity.
 
 ## Next milestones, in order
 
-1. **Finish active implementation:** Dialog sizing/lifecycle and remaining Slider native/binding gaps, then complete background/shadow/text rendering support.
+1. **Finish active slices:** Table touch-drop admission, pure TimeField locale/domain helpers and the private SDL source-range preflight. Then continue Dialog lifecycle, remaining Slider gaps and renderer integration.
 2. **Close component and ecosystem gaps:** reconcile every family with the frozen
    baseline and the reported regressions below; finish bindings and documentation.
 3. **Validate the integrated revision:** compatibility, headless regressions,
@@ -40,7 +40,9 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Corrected test-only header-priority + event-coordinate candidate passes 65/65 focused checks, including reviewed modal/overlap cases. An independent production Table fix is next; broader Dialog cancellation remains open. The frozen/current legacy trace passes. Production transfer and scope-ID alias limitations stay open. |
+| Dialog and scrolling | Corrected test-only header-priority + event-coordinate candidate passes 65/65 focused checks, including reviewed modal/overlap cases. The independent production Table slice compiled and passed runtime checks; distribution allowlist corrected and offline checks pass; final integrated acceptance remains open. The inert/layout-only guard was confirmed in the existing frame-sequence dependency. Broader Dialog cancellation remains open. The frozen/current legacy trace passes. Production transfer and scope-ID alias limitations stay open. |
+| TimeField | Pure locale-aware parsing/formatting and bounds helpers passed strict source/distribution, five headless, C++ header and WASM layout checks. Legacy-consumer and metadata acceptance remain open; not yet integrated. This does not yet provide a localized editor, IME support or foreign-language bindings. |
+| SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight implementation is next; SDL V2 production rendering, compatibility measurements and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
@@ -53,6 +55,8 @@ feature test does not establish complete component parity.
 | 2 | Close interaction and binding gaps | Resolve Table touch-drop admission, transfer reviewed Dialog fixes, and validate the remaining native Slider and minimum-compiler gates. Preserve legacy behavior. |
 | 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
 | 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
+
+**Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
 **Maintainer/external gates:** package-registry ownership/authentication and actual
 macOS/Windows/GPU/assistive-technology acceptance need their own evidence. They do

@@ -69,5 +69,12 @@
     "Root fullWASM/browser rerun; no workerbrowserclaim.",
     "Originalheldinput/Root/host/foreignfacade/platform limitations unchanged."
   ],
-  "lease": "No compiler/heavy remains; released after86895terminal."
+  "lease": "No compiler/heavy remains; released after86895terminal.",
+  "combined_integration": {
+    "commit": "ef893a34",
+    "build": "PASS configured intrinsic/idle executable",
+    "headless": "6/6 PASS zero skips in41.57s; intrinsic,idle,SDLreader,SDKfreshness,skillfreshness,skillcontract",
+    "log": "dialog-idle-combined-tests.log",
+    "browser": "Pending strict rebuilt WASM rerun"
+  }
 }

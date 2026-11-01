@@ -49,7 +49,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
+| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Pages browser-tool installation now has a 20-minute failure bound after an observed prolonged stall; this does not shorten healthy test coverage. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 

@@ -33,6 +33,8 @@ def validate(text):
         install = next(step for step in steps(section) if step.startswith('name: Install pinned '))
         if 'if:' in install or 'python -m pip install uv==0.10.8 ziglang==0.16.0' not in install:
             errors.append('pinned installation must always run')
+    if 'timeout-minutes: 20' not in named(browser, 'Install pinned build and browser tools'):
+        errors.append('browser tool installation must have a bounded timeout')
     if 'uv run --with playwright==1.58.0 playwright install --with-deps chromium' not in browser:
         errors.append('browser and OS dependency installation must always run')
     if 'cache-hit' in text or 'continue-on-error' in text:
@@ -124,6 +126,12 @@ class CacheTests(unittest.TestCase):
             invocation = 'tests/web/test_' + probe + '.py --directory build/web'
             with self.subTest(probe=probe):
                 self.assertTrue(validate(source.replace(invocation, invocation.split(' --directory')[0])))
+
+    def test_stalled_installation_remains_a_bounded_failure(self):
+        source = WORKFLOW.read_text()
+        self.assertTrue(validate(source.replace('timeout-minutes: 20', '')))
+        self.assertTrue(validate(source.replace('timeout-minutes: 20',
+                                               'timeout-minutes: 20\n        continue-on-error: true')))
 
     def test_literal_shell_blocks_parse(self):
         lines = WORKFLOW.read_text().splitlines()

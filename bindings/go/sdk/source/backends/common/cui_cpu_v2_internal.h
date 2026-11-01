@@ -60,23 +60,7 @@ static inline bool cui_cpu_v2_alias_excluding(const void *a, size_t n, const voi
     return cui_cpu_v2_alias(a, n, out) &&
            cui_background_prepare_disjoint_internal(a, n, excluded, excluded_bytes);
 }
-typedef struct {
-    const void *pointer;
-    size_t bytes;
-} cui_cpu_v2_exclusion;
-static inline bool cui_cpu_v2_ranges_disjoint(const void *p, size_t bytes,
-                                              const cui_cpu_v2_exclusion *ranges, size_t count) {
-    for (size_t i = 0; i < count; ++i)
-        if (!cui_background_prepare_disjoint_internal(p, bytes, ranges[i].pointer, ranges[i].bytes))
-            return false;
-    return true;
-}
-static inline bool cui_cpu_v2_has_exclusion(const cui_cpu_v2_exclusion *ranges, size_t count) {
-    for (size_t i = 0; i < count; ++i)
-        if (ranges[i].bytes)
-            return true;
-    return false;
-}
+#include "cui_cpu_v2_sources_internal.h"
 static inline bool cui_cpu_v2_alias_ranges(const void *a, size_t n, const void *out,
                                            const cui_cpu_v2_exclusion *ranges, size_t count) {
     return cui_cpu_v2_alias(a, n, out) && cui_cpu_v2_ranges_disjoint(a, n, ranges, count);
@@ -172,8 +156,8 @@ static inline cui_error cui_cpu_v2_validate_ranges(const cui_draw_list_v2 *list,
                 b.source.w <= 0 || b.source.h <= 0 ||
                 (double)b.source.x + b.source.w > b.bitmap.width ||
                 (double)b.source.y + b.source.h > b.bitmap.height ||
-                !cui_cpu_v2_alias_ranges(b.bitmap.pixels, b.bitmap.stride * b.bitmap.height, out,
-                                         excluded, exclusion_count))
+                !cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_IMAGE, out, sizeof(*out), excluded,
+                                         exclusion_count))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (c->type == CUI_DRAW_MESH) {
             if (c->mesh.vertex_count > SIZE_MAX / sizeof(cui_mesh_vertex) ||
@@ -181,9 +165,8 @@ static inline cui_error cui_cpu_v2_validate_ranges(const cui_draw_list_v2 *list,
                                 c->mesh.vertex_count * sizeof(cui_mesh_vertex),
                                 (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
-            if (!cui_cpu_v2_alias_ranges(c->mesh.vertices,
-                                         c->mesh.vertex_count * sizeof(cui_mesh_vertex), out,
-                                         excluded, exclusion_count) ||
+            if (!cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_MESH, out, sizeof(*out), excluded,
+                                         exclusion_count) ||
                 !cui_mesh_valid(c->mesh))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (cui_shadow_type(c->type)) {
@@ -204,28 +187,28 @@ static inline cui_error cui_cpu_v2_validate_ranges(const cui_draw_list_v2 *list,
                 (cui_cpu_v2_has_exclusion(excluded, exclusion_count) &&
                  c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
                  (c->text_paint.stop_count > 8 ||
-                  !cui_cpu_v2_ranges_disjoint(
-                      c->text_paint.stops, c->text_paint.stop_count * sizeof(*c->text_paint.stops),
-                      excluded, exclusion_count))) ||
+                  !cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_TEXT_STOPS, NULL, 0, excluded,
+                                           exclusion_count))) ||
                 !cui_text_paint_valid(c->text_paint, true) ||
                 (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR && c->text_color_count) ||
                 c->text_color_count > CUI_TEXT_COLOR_SPAN_MAX ||
                 (c->text_color_count && !c->text_colors))
                 return CUI_ERROR_INVALID_ACTION;
-            size_t text_bytes =
-                c->text_source.paragraph.data ? c->text_source.paragraph.length : c->text.length;
+            cui_cpu_v2_exclusion text_source;
+            if (cui_cpu_v2_source_range(v, CUI_CPU_SOURCE_TEXT_BYTES, &text_source) != CUI_OK)
+                return CUI_ERROR_INVALID_ACTION; /* unreachable after the existing tag checks */
+            size_t text_bytes = text_source.bytes;
             if (text_bytes > 65536 ||
                 !cui_cpu_v2_add(&text_input_bytes, text_bytes, (size_t)256 * 1024) ||
                 !cui_cpu_v2_add(&plan.inspected_bytes, text_bytes, (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
             if (c->text_source.paragraph.data) {
-                if (!cui_cpu_v2_alias_ranges(c->text_source.paragraph.data, text_bytes, out,
+                if (!cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_TEXT_BYTES, out, sizeof(*out),
                                              excluded, exclusion_count) ||
                     !cui_text_line_source_valid(c->text_source))
                     return CUI_ERROR_INVALID_ACTION;
                 size_t previous = c->text_source.byte_start;
-                if (!cui_cpu_v2_alias_ranges(c->text_colors,
-                                             c->text_color_count * sizeof(*c->text_colors), out,
+                if (!cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_TEXT_SPANS, out, sizeof(*out),
                                              excluded, exclusion_count))
                     return CUI_ERROR_INVALID_ACTION;
                 for (size_t j = 0; j < c->text_color_count; ++j) {
@@ -243,13 +226,12 @@ static inline cui_error cui_cpu_v2_validate_ranges(const cui_draw_list_v2 *list,
             } else if (c->text_source.paragraph.length || c->text_source.byte_start ||
                        c->text_source.byte_end || (c->text.length && !c->text.data) ||
                        c->text_color_count ||
-                       !cui_cpu_v2_alias_ranges(c->text.data, c->text.length, out, excluded,
-                                                exclusion_count))
+                       !cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_TEXT_BYTES, out, sizeof(*out),
+                                                excluded, exclusion_count))
                 return CUI_ERROR_INVALID_ACTION;
             if (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
-                !cui_cpu_v2_alias_ranges(c->text_paint.stops,
-                                         c->text_paint.stop_count * sizeof(*c->text_paint.stops),
-                                         out, excluded, exclusion_count))
+                !cui_cpu_v2_source_alias(v, CUI_CPU_SOURCE_TEXT_STOPS, out, sizeof(*out), excluded,
+                                         exclusion_count))
                 return CUI_ERROR_INVALID_ACTION;
             plan.needs_text_preparation = true;
         }

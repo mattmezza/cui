@@ -1,0 +1,6 @@
+{
+  "source_commit": "b386ec55b907b8431339ba1897a33d497200a87d",
+  "path": "backends/common/cui_cpu_v2_internal.h",
+  "sha256": "dbd240c716dd3ff11e035f18a8827a0d3c3630ee51351bc1a19c8b639c52087b",
+  "scope": "Independent pre-source-extractor validator; compile in separate TU. No candidate recapture."
+}

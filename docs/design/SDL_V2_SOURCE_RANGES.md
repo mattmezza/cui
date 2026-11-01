@@ -38,7 +38,7 @@ Range extraction is the sole authority for these pointer/extent selections:
 
 Other selectors return NULL/0 without reading inactive payload fields. BACKGROUND
 is entirely owned by value; it must not be interpreted as legacy payload. POP has
-no active borrowed fields. SOLID/NONE text paint ignores poisoned stop fields;
+no active borrowed fields. SOLID text paint ignores poisoned stop fields;
 contextual source ignores poisoned raw text. Unsupported command kind or legacy
 tag mismatch fails without inspecting inactive unions. This is finite typed
 extraction, not a callback visitor or a generic renderer registry.
@@ -130,3 +130,17 @@ With a fake native-query hook, prove every owner alias rejects before its first
 invocation; valid inputs reach it exactly once, guard is active during callbacks,
 and a distinct-frame/same-owner attempt refuses. Then test full SDL/private-Xvfb
 output/Retina/cache/ABI gates. No production implementation before root review.
+
+
+## Private implementation checkpoint
+
+The private extractor and prequery walker now share the five active-range
+selectors. Existing full validation uses selectors only at its original alias
+checks; it does not invoke the aggregate prequery policy. The standalone test
+links without Core, text or SDL, and a separate TU compiles the immutable
+pre-extraction validator for error/output comparison. This adds no SDL entry
+point, native query, support advertisement or public ABI.
+
+The first strict build and private-Xvfb run passed both executables, including
+216 original-validator comparisons. Additional exact maximum-boundary fixtures
+are prepared but await the compiler lease; their acceptance is not yet claimed.

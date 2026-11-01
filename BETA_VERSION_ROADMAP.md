@@ -29,7 +29,7 @@ feature test does not establish complete component parity.
 
 ## Next milestones, in order
 
-1. **Finish active slices:** validate Dialog/AlertDialog gallery behavior, localized TimeField editing and the private SDL source-range preflight. Table touch and pure time-text helpers are integrated with focused checks; full regression and delivery remain open.
+1. **Finish active slices:** refresh the full native regression suite, then validate SDL V2 rendering and localized TimeField bindings. Dialog/AlertDialog and localized TimeField browser checks pass; broader lifecycle and delivery remain open.
 2. **Close component and ecosystem gaps:** reconcile every family with the frozen
    baseline and the reported regressions below; finish bindings and documentation.
 3. **Validate the integrated revision:** compatibility, headless regressions,
@@ -40,21 +40,12 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Six-slot C composition, intrinsic first-open sizing, long-body scrolling with a fixed Footer and idle quiescence now pass focused native checks and the full headless browser gate (`1f40cc5a` artifact). Table touch-drop is integrated. All42 representative touch cases, including nested modal scrolling, pass; held-input reopening, broader cancellation, foreign facades and deployment remain open. |
+| Dialog and scrolling | Six-slot C composition, intrinsic first-open sizing, long-body scrolling with a fixed Footer and idle quiescence now pass focused native checks and the full headless browser gate (`1f40cc5a` artifact). Table touch-drop is integrated. All 42 representative touch cases, including nested modal scrolling, pass; held-input reopening, broader cancellation, foreign facades and deployment remain open. |
 | TimeField | Localized C widget, Base/Styled example and pure text helpers are integrated. Source/distribution, C++/WASM, focused native and real Chromium keyboard/H12/Arabic/read-only/bounds checks pass; the full catalog browser gate also passes. One-root Tab, IME, localized foreign bindings and broader platform acceptance remain open. Binding proposal: `docs/design/TIME_FIELD_BINDING_CHECKPOINT.md`. |
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight source passed initial focused checks, including 216 frozen-validator comparisons; private extraction is integrated as `16827ec9`. Its exact-limit boundary fixtures and frozen-validator comparison now pass three combined headless checks (0.16 seconds); broader rendering regressions remain open. Compile-only native/WASM guard measurements now preserve all 37 existing offsets and alignment; native object cost is +8 bytes, WASM +0. SDL V2 production rendering, runtime compatibility and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Linux baseline `21acfca8`: **541/541 headless tests pass, zero skips** (291.67s), predating Dialog/TimeField. Later slices pass focused native/skill checks. Full headless browser gate passes on artifact `1f40cc5a`, including all78 stories and80compiledusageexcerpts. All42 representative touch cases pass. Whole-suite native refresh, platform acceptance and publication remain open. |
-
-## Immediate priorities
-
-| Priority | Deliverable | Completion condition |
-| --- | --- | --- |
-| 1 | Validate the integrated revision | Full catalog browser gate passes; refresh the whole native suite after Dialog/TimeField changes. The 541-test baseline predates both changes. |
-| 2 | Finish active component and renderer slices | Implement and verify SDL V2 over the accepted private preflight; close broader lifecycle, native Slider and minimum-compiler gates. |
-| 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
-| 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
+| Validation | Linux baseline `21acfca8`: **541/541 headless tests pass, zero skips** (291.67s), predating Dialog/TimeField. Later slices pass focused native/skill checks. Full headless browser gate passes on artifact `1f40cc5a`, including all 78 stories and 80 compiled usage excerpts. All 42 representative touch cases pass. The refreshed native build completes all 550 steps; whole-suite native tests, platform acceptance and publication remain open. |
 
 **Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
@@ -91,13 +82,13 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Timestamp-preserving generators are integrated (`3088338a`), with three offline entrypoint tests passing; canonical acceptance and measured rebuild savings remain pending. Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Consumer test harnesses request one compiler job. Rust’s embedded CMake build now follows Cargo NUM_JOBS with a conservative fallback of one; three offline job-control tests pass. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
+| [ ] | CI, performance and resources | Timestamp-preserving generators are integrated (`3088338a`), with three offline entrypoint tests passing; canonical acceptance passes across 1,170 generated files with no timestamp churn for unchanged bytes and an identical second pass; measured rebuild savings remain pending. Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Consumer test harnesses request one compiler job. Rust’s embedded CMake build now follows Cargo NUM_JOBS with a conservative fallback of one; three offline job-control tests pass. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are integrated but unreleased); consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Badge count/dot/icon-overlay audit identifies missing configurable icon styling and extended authoring in all five bindings; source-only audit is not implementation. Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are integrated but unreleased); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
 | Overlays | Close Dialog held-input reopening and broader lifecycle gaps; finish Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |

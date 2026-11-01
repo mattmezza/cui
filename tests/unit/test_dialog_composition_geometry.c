@@ -8,6 +8,13 @@ static const float expected[10][6] = {{260, 172, 44, 44, 92, 204}, {260, 172, 96
                                       {260, 172, 240, 0, 92, 204}, {202, 114, 15, 15, 92, 146},
                                       {260, 228, 72, 72, 92, 0},   {260, 0, 40, 0, 92, 32},
                                       {260, 0, 40, 0, 92, 32},     {562, 114, 15, 15, 92, 146}};
+static float current_body_range(dialog_fixture *f) {
+    const cui_semantic *body = dialog_semantic(f, cui_surface_part_id(50, 6));
+    assert(body && body->details.scrollable);
+    float maximum = fmaxf(0, f->layout.completed[6].h - f->layout.completed[5].h);
+    dialog_equal(body->details.scroll_max_y, maximum, "current semantic range");
+    return body->details.scroll_max_y;
+}
 static bool red_at(cui_software *renderer, unsigned x, unsigned y, unsigned red) {
     unsigned width, height;
     const unsigned char *pixels = cui_software_pixels(renderer, &width, &height);
@@ -138,7 +145,7 @@ static void current_font(const char *path, const char *bold_path, bool styled) {
     f.sizing.max_height = 240;
     dialog_fixture_frame(&f);
     float short_panel = f.layout.completed[0].h;
-    assert(short_panel < 240 && f.surface.body_maximum == 0);
+    assert(short_panel < 240 && current_body_range(&f) == 0);
     f.slot_text[CUI_DIALOG_BODY] =
         "Long current body with paragraphs that wrap at the current available width. "
         "Changing the viewport must change these measured lines immediately. "
@@ -150,7 +157,7 @@ static void current_font(const char *path, const char *bold_path, bool styled) {
     f.height = 300;
     f.sizing.width = 170;
     dialog_fixture_frame(&f);
-    assert(f.surface.body_maximum > 0);
+    assert(current_body_range(&f) > 0);
     assert(f.layout.completed[7].h > 0 && f.layout.completed[2].h > 0);
     assert(f.calls[CUI_DIALOG_BODY] == 1 && f.calls[CUI_DIALOG_FOOTER] == 1);
     f.slot_text[CUI_DIALOG_BODY] = "Short body.";
@@ -160,7 +167,7 @@ static void current_font(const char *path, const char *bold_path, bool styled) {
     f.sizing.width = 300;
     dialog_fixture_frame(&f);
     dialog_equal(f.layout.completed[0].h, short_panel, "current-font body/action recovery");
-    assert(f.surface.body_maximum == 0);
+    assert(current_body_range(&f) == 0);
     dialog_fixture_destroy(&f);
     cui_font_close(font);
 }
@@ -188,7 +195,7 @@ static void first_presented_regions(bool styled) {
     assert(short_height < 260 && short_height >= 96);
     assert(f.layout.completed[1].h == 10 && f.layout.completed[2].h == 20);
     assert(f.layout.completed[3].h == 12 && f.layout.completed[7].h == 24);
-    assert(f.surface.body_maximum == 0);
+    assert(current_body_range(&f) == 0);
     for (unsigned i = 0; i < CUI_DIALOG_SLOT_COUNT; ++i)
         assert(f.calls[i] == (i == CUI_DIALOG_CONTENT ? 0u : 1u));
     /* Body growth and Footer/action growth must affect this same frame. */
@@ -203,7 +210,7 @@ static void first_presented_regions(bool styled) {
     dialog_equal(f.layout.completed[0].h, 260, "long current Panel");
     dialog_equal(f.layout.completed[2].h, 36, "changed current Title");
     dialog_equal(f.layout.completed[7].h, 48, "changed current Footer");
-    assert(f.surface.body_maximum > 1000);
+    assert(current_body_range(&f) > 1000);
     assert(f.layout.completed[7].y >= f.layout.completed[5].y + f.layout.completed[5].h);
     /* Shrink content and resize back without retaining the tall old Panel. */
     f.metric[CUI_DIALOG_BODY] = 30;
@@ -215,7 +222,7 @@ static void first_presented_regions(bool styled) {
     f.sizing.max_height = 500;
     dialog_fixture_frame(&f);
     dialog_equal(f.layout.completed[0].h, short_height, "same-frame short recovery");
-    assert(f.surface.body_maximum == 0);
+    assert(current_body_range(&f) == 0);
     dialog_fixture_destroy(&f);
 }
 int main(int argc, char **argv) {

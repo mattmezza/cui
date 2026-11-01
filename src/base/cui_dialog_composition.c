@@ -424,6 +424,9 @@ cui_dialog_compose_resolved(cui_context *ui, cui_dialog_layout_v1 *l, cui_surfac
         l->surface->body_content =
             body_input_ready ? cui_bounds(ui, cui_surface_part_id(l->surface->overlay.id, 7))
                              : (cui_rect){0};
+        l->surface->body_maximum =
+            body_input_ready ? fmaxf(0, l->surface->body_content.h - l->surface->body_viewport.h)
+                             : 0;
         cui_surface_options update = o;
         if (!input_ready)
             update.no_escape_dismiss = update.no_outside_dismiss = true;

@@ -127,6 +127,12 @@ or reinitialize the active layout/surface/context, or invalidate borrowed string
 or offset storage. Remove owned storage only after `cui_end_frame`. Earlier
 callback effects are not rolled back when a later callback closes or fails.
 
+The new route uses `surface.body_viewport`, `body_content` and `body_maximum`
+only as admitted previous-input caches, refreshed before ordinary input
+reduction and cleared when not admitted. Current completed ranges come from the
+Body semantic after successful end_frame; current rectangles come from
+`layout.completed`. These state cache fields are not a current-paint oracle.
+
 Input uses the previous valid completed snapshot. The draft admits previous Body
 geometry only for an adjacent successful submission in the same open lifetime.
 It does not add an input-lifetime reset operation: **held pointer, touch or Space

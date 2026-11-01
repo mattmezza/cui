@@ -17,8 +17,11 @@ static void actions_and_reopen(bool styled) {
     dialog_fixture_frame(&f);
     const cui_semantic *action = dialog_semantic(&f, 101);
     assert(action && !action->disabled); /* first publication is enabled */
+    float published_maximum = dialog_semantic(&f, cui_surface_part_id(50, 6))->details.scroll_max_y;
+    assert(published_maximum > 0);
     wheel(&f, -2);
     dialog_fixture_frame(&f);
+    dialog_equal(f.surface.body_maximum, published_maximum, "admitted prior input maximum");
     assert(f.surface.body_scroll > 0);
     f.veto = true;
     dialog_fixture_pointer(&f, 101);

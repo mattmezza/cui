@@ -1,0 +1,57 @@
+{
+  "status": "FOCUSED_NATIVE_5_OF_5_PASS_NOT_FULL_HANDOFF",
+  "source_checkpoint": "138c3a39",
+  "guide_checkpoint": "65b0ba05",
+  "native_abi": {
+    "style": 32,
+    "refinement": 232,
+    "sizing": 96,
+    "slot": 16,
+    "composition": 152,
+    "layout": 208,
+    "completed_offset": 40,
+    "sequence_offset": 200
+  },
+  "compile": "cc -std=c11 -O2 -g0 -UNDEBUG -Wall -Wextra -Wpedantic -Werror; nice19 CPU1 serial; cached current root native libraries, no Core rebuild",
+  "runtime": "scripts/test_local.py private Xvfb, focused CTest5/5 PASS .14s",
+  "logs": {
+    "dialog-six-slot-first-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-first-build.log",
+      "sha256": "4222e5c3e14e9a91d69fbea24c6ca93fd3c689f6080ae332267fa91bd2d3b6fe"
+    },
+    "dialog-six-slot-first-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-first-runtime.log",
+      "sha256": "8716a5be1ad83a413496acd4597b3bceb6b879641079af97eb5ce27aaf35c195"
+    },
+    "dialog-six-slot-range-witness.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-range-witness.log",
+      "sha256": "bd6ed7ecbb81de088d1f54b205438d09c46629409c9151f544719085b705ae71"
+    },
+    "dialog-six-slot-cachefix-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-cachefix-build.log",
+      "sha256": "4222e5c3e14e9a91d69fbea24c6ca93fd3c689f6080ae332267fa91bd2d3b6fe"
+    },
+    "dialog-six-slot-cachefix-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-cachefix-runtime.log",
+      "sha256": "53272e28a321f39d140a963c46b234234c26ccd250cfd39e628c90ddb4e7a50a"
+    }
+  },
+  "initial_failure": "Geometry assertion read previous-input surface.body_maximum as current completed range. Diagnostic proved current semantic1118=content1200-viewport82 while old input cache0. New tests assert current semantic/tracked extents; newmodule now refreshes prior-input maximum alongside admitted priorbounds. Nextframe wheel asserts cache equals previous current semanticrange.",
+  "sources": {
+    "include/cui/cui_dialog_composition.h": "dfea3b93479496279bc1801191d447a165cf1942c09f2553b3f5c7bf38ec448b",
+    "src/base/cui_dialog_composition.c": "f5e594c169f56202d554f00807ec90a15da49909a3d17a384dd1b8d5095642cd",
+    "tests/unit/test_dialog_composition_geometry.c": "b9ff02882e4c57fe14fa760c80f7387250cd6e562843009fe3fb0ea4380a97ed",
+    "tests/unit/test_dialog_composition_actions.c": "48bacaf10c5bddbf71ba60b6971cc41e208d68915f3a2ffa25368b331993075c",
+    "docs/DIALOG_COMPOSITION.md": "9ca862e76a908b3482e1abdc12f58ffa9751045954613686239745bdd4280e42",
+    "tests/run_dialog_composition_probe.py": "b1338771d3215f74bcbe9279d569e7770a1254ef96ee07c16bee3f22fc90fb38"
+  },
+  "remaining": [
+    "WASM ABI",
+    "fade/permutation and additional current-pixel proof",
+    "configured source/distribution consumers",
+    "legacy regression wrapper run",
+    "metadata/generators/required skill18",
+    "gallery Dialog/AlertDialog migration and browser proof"
+  ],
+  "limitations": "Existing held-input capture across reopen; Root/host/five foreign facade composition not added; no complete parity claim."
+}

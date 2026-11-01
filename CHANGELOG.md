@@ -1,6 +1,26 @@
 # Changelog
 
-## 0.1.0-alpha.3 — unreleased
+## Unreleased
+
+These changes are integrated on the working branch. They are not part of the
+published alpha.3 artifacts or the deployed website. Full regression and delivery
+checks remain open.
+
+- Adds controlled typed Slider APIs and authoring support in Python, JS/TS, Go
+  and Rust, with compatibility, lifetime and malformed-record checks. Native
+  numeric accessibility delivery and broader binding coverage remain incomplete.
+- Adds opt-in public C software V2 query/render support, bounded CPU preparation
+  and owned-frame lifetimes for backgrounds, shadows and styled text. The other
+  adapters and foreign authoring APIs do not yet expose equivalent support.
+- Fixes movable Table header touch-drop admission using an additive read-only
+  event-coordinate query; legacy mouse behavior remains unchanged.
+- Adds pure C locale-aware time parsing/formatting and inclusive bounds helpers.
+  These helpers do not localize the existing TimeField widget. The new localized
+  widget and Dialog composition routes remain separate unverified worker drafts.
+- Adds the maintained [beta roadmap](BETA_VERSION_ROADMAP.md), with feature-level
+  gaps and separate implementation, validation, release and deployment status.
+
+## 0.1.0-alpha.3 — 2026-10-31
 
 - Adds opt-in Stepper indicators/connectors, bitmap icons and shared xs–9xl
   sizing, with controlled navigation and copied gallery examples. Centered and
@@ -50,8 +70,10 @@
   expose the new C observer/payload arenas, Questionnaire presentation/geometry options,
   DateTime/DatePicker action options, explicit Popover positioning or split-button
   paint refinements.
-- Release artifacts and registry publication are not yet available for alpha.3.
-  All 78 catalog families remain present; full feature parity is unfinished.
+- [GitHub release artifacts](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3)
+  and the public Go module tag/proxy are available. PyPI, npm and crates.io
+  publication remain separate work. All 78 catalog families remain present; full
+  feature parity is unfinished.
 
 ## 0.1.0-alpha.2 — 2026-10-20
 

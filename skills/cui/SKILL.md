@@ -479,3 +479,12 @@ semantic geometry, independent of consumption/capture; it does not publish
 current paint bounds or perform event propagation. Enabled movable Table headers
 own touch reorder while body/nonmovable header pan remains available. Follow
 `docs/TABLE.md`; do not infer Dialog reopen or all-consumer lifecycle completion.
+
+For Skeleton, read `docs/SKELETON_PALETTE.md`: legacy phase APIs remain distinct
+from scheduled fixed-size `cui_skeleton_ex` and owned-color `cui_skeleton_with_palette`.
+Explicit preset resolution preserves Skeleton source colors and authored alpha0;
+`from_theme` is a secondary-color fallback, never inferred preset identity.
+Focused worker native/software/WASM proof and root strict/distribution checks
+pass (17 headless checks and 18 skill tests). Own-root responsive presentation
+is test-only, and all five language
+builders still expose the legacy route. Do not invent a public responsive API.

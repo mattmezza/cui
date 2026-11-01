@@ -3,8 +3,11 @@
 Unreleased focused proof: strict native C11 and C/C++ headers, actual C38-preset
 oracle, software pixels, frozen compatibility/callback timing, and pinned WASM
 compilation passed. Responsive composition is test-only, not a public API.
-Canonical distribution/skill integration remains pending; this is not a whole-family
-or installed-package support claim.
+Root strict integration build and 17 targeted private-Xvfb checks pass, including
+selective/umbrella distributions, C/C++ include orders and the actual 38-preset
+C oracle (four methods, zero skips). All 18 consumer-skill tests and canonical
+generated-file checks pass. This is not a whole-family, deployed-gallery or
+installed-package support claim.
 
 Include `cui/cui_skeleton_palette.h` for owned values and pure resolvers, and
 `cui/cui_content.h` for `cui_skeleton_with_palette`. The existing phase API and
@@ -72,3 +75,5 @@ corrected fixture preserves its actual first sample time. An initially skipped
 C-oracle method was corrected to check its optional dumper at runtime; the final
 run executed all four oracle methods with no skips. Logs retain both earlier
 failures/limitations rather than presenting those runs as complete proof.
+
+Integrated proof: [skeleton-palette-root.json](validation/skeleton-palette-root.json).

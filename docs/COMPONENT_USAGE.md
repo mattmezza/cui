@@ -485,13 +485,13 @@ API: `cui_shimmer_text`. [Public header](../include/cui/cui_status.h); [guide](S
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns elapsed time/phase and reduced-motion preference.
+**State:** Caller owns phase for the legacy route, or persistent loading motion and an owned palette for modern fixed-size painting. Easing userdata is borrowed synchronously; omission does not reset motion.
 
-**Interaction:** Presentation only; no action callback.
+**Interaction:** Decorative presentation adds no action, focus or busy semantics. Optional easing runs synchronously during sampling; application loading semantics remain separate.
 
-**Usage:** Derive phase from elapsed time and schedule redraws while loading.
+**Usage:** Use cui_skeleton_ex with persistent motion for scheduled fixed-size painting, or cui_skeleton_with_palette for explicit preset/custom RGBA including alpha0. Schedule returned absolute wakes. Responsive presentation remains test-only; legacy phase APIs retain their behavior.
 
-API: `cui_skeleton`, `cui_loading_phase`. [Public header](../include/cui/cui_content.h); [guide](CONTENT.md).
+API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_skeleton_with_palette`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md).
 
 ## Spinner
 

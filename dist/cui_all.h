@@ -81,6 +81,7 @@
 #include "cui_styled_slider_model.h"
 #include "cui_time_text.h"
 #include "cui_time_field_v1.h"
+#include "cui_skeleton_palette.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -404,4 +405,8 @@
 #define CUI_TIME_FIELD_V1_IMPLEMENTATION
 #endif
 #include "cui_time_field_v1.h"
+#ifndef CUI_SKELETON_PALETTE_IMPLEMENTATION
+#define CUI_SKELETON_PALETTE_IMPLEMENTATION
+#endif
+#include "cui_skeleton_palette.h"
 #endif

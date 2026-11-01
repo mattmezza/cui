@@ -1,0 +1,51 @@
+{
+  "scope": "Owned Skeleton palette and additive fixed-size painter; responsive presentation remains test-only",
+  "date": "2026-11-01",
+  "base_commit": "289fa1e9",
+  "build": {
+    "result": "PASS",
+    "steps": 66,
+    "warnings": "-Wall -Wextra -Wpedantic -Werror; C11/C++11",
+    "jobs": 1,
+    "priority": "nice19 CPU1"
+  },
+  "runtime": {
+    "result": "17/17 PASS",
+    "seconds": 10.61,
+    "display": "scripts/test_local.py private Xvfb; never desktop",
+    "cases": [
+      "all 38 actual C palette records; four Python oracle methods, zero skips",
+      "software pixels and frozen phase/ex compatibility",
+      "legacy callback timing and new palette snapshot",
+      "responsive ordinary-Core prototype (not public API)",
+      "selective/umbrella distribution",
+      "C/C++ palette/content include orders",
+      "legacy content/status_motion",
+      "component usage and distribution contracts",
+      "skill freshness"
+    ]
+  },
+  "consumer_skill": "18/18 PASS 42.026s; all three canonical generator --check commands PASS",
+  "source_sha256": {
+    "CMakeLists.txt": "fcdf55b6b97ecf2bbc8ffc27377a732a0162b0fedebace5891ebb43599d3b44b",
+    "cmake/sources.json": "a23ef4f35ff4e3c3ad1400d10e844c4bc50107ea9df94832b55de36864aa63e8",
+    "scripts/amalgamate.py": "630ff5ff8c174087b0bcdab531a001f236cec00ba3c5d9517935b946ee4bb18f",
+    "include/cui/cui_skeleton_palette.h": "6a0ca1ef80ef67846291c130da5333cee945d8c9358c36d287cee32c0c1d7ca0",
+    "include/cui/cui_content.h": "153dc78f3e864bf0c4d1965a870833eb92e92536a1b404bab8e717069510edb4",
+    "src/components/cui_content.c": "b66c20351fc60eda02479cbc17174ab3ddb2430ea8660e62374c78930506e177",
+    "src/theme/cui_skeleton_palette.c": "180f35d14a54da6b29b1afe35b10b9abe85548160715d473fd2416f9315352d4",
+    "tests/distribution/skeleton_palette.c": "f2dfec69192620673c603e7c2ea2a525a21b815ad6d80337dbdf057d19402bf0",
+    "tests/fixtures/skeleton/header.cpp": "c3bb7b18620a35785caccdfd0f7ba967b94458bafdc4316a475b339ef87bd75b"
+  },
+  "logs": {
+    "/home/matteo/.cache/cui-current-validation/skeleton-root-generation.log": "83c1d6304251c59001c61a14bec0587c9c71b7794d3135686ec8b579a93513a2",
+    "/home/matteo/.cache/cui-current-validation/skeleton-root-build.log": "b7780a83071e029e4061758a2e30c0a0a43f7ed2beaec7a1ab6e1784c7756665",
+    "/home/matteo/.cache/cui-current-validation/skeleton-root-tests.log": "aa2f755be1aa7d4e353e320607766189667b44d929b488c8639f2830e3c7839f",
+    "/home/matteo/.cache/cui-current-validation/skeleton-root-LastTest.log": "465aed0d50a80ae73f7ef9a2e1bf506b035333cc5c3255eda47fcce101caf865"
+  },
+  "limitations": [
+    "No new full 592-test run; prior 581-test baseline predates this slice.",
+    "No browser deployment, new responsive production API or language binding palette options.",
+    "Native/WASM compile-only worker evidence is separate from platform runtime acceptance."
+  ]
+}

@@ -815,16 +815,30 @@
     {
       "api_symbols": [
         "cui_skeleton",
-        "cui_loading_phase"
+        "cui_loading_phase",
+        "cui_skeleton_options_default",
+        "cui_skeleton_ex",
+        "cui_loading_motion_sample",
+        "cui_skeleton_palette_from_theme",
+        "cui_skeleton_palette_preset_get",
+        "cui_skeleton_with_palette"
       ],
-      "state_types": [],
-      "state_ownership": "Caller owns elapsed time/phase and reduced-motion preference.",
-      "interaction": "Presentation only; no action callback.",
-      "usage": "Derive phase from elapsed time and schedule redraws while loading.",
+      "state_types": [
+        "cui_loading_motion",
+        "cui_loading_motion_result",
+        "cui_skeleton_options",
+        "cui_skeleton_palette"
+      ],
+      "state_ownership": "Caller owns phase for the legacy route, or persistent loading motion and an owned palette for modern fixed-size painting. Easing userdata is borrowed synchronously; omission does not reset motion.",
+      "interaction": "Decorative presentation adds no action, focus or busy semantics. Optional easing runs synchronously during sampling; application loading semantics remain separate.",
+      "usage": "Use cui_skeleton_ex with persistent motion for scheduled fixed-size painting, or cui_skeleton_with_palette for explicit preset/custom RGBA including alpha0. Schedule returned absolute wakes. Responsive presentation remains test-only; legacy phase APIs retain their behavior.",
       "docs": [
-        "docs/CONTENT.md"
+        "docs/CONTENT.md",
+        "docs/SKELETON_PALETTE.md"
       ],
-      "callback_symbols": [],
+      "callback_symbols": [
+        "cui_loading_ease_fn"
+      ],
       "scope": "styled frame component",
       "name": "Skeleton",
       "public_header": "include/cui/cui_content.h",

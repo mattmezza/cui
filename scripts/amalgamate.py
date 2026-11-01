@@ -80,6 +80,7 @@ def generate(name,sources):
         lines += ['#include "cui_table_events.h"']
     if name == "cui_content":
         lines += ['#include "cui_hover_events.h"', '#include "cui_avatar_events.h"']
+        lines += ['#ifndef CUI_SKELETON_PALETTE_IMPLEMENTATION', '#define CUI_SKELETON_PALETTE_IMPLEMENTATION', '#endif', '#include "cui_skeleton_palette.h"']
     if name == "cui_scroll":
         lines += ['#include "cui_scroll_events.h"']
     if name == "cui_virtual_scroll":
@@ -154,7 +155,7 @@ def generate(name,sources):
         lines += ['#ifndef CUI_ICON_IMPLEMENTATION','#define CUI_ICON_IMPLEMENTATION','#endif','#include "cui_icon.h"']
     if name in {"cui_base", "cui_textarea", "cui_text_overflow"}:
         lines += ['#ifndef CUI_EDIT_IMPLEMENTATION','#define CUI_EDIT_IMPLEMENTATION','#endif','#include "cui_edit.h"']
-    if name in {"cui_components", "cui_theme_registry", "cui_slider_palette"}:
+    if name in {"cui_components", "cui_theme_registry", "cui_slider_palette", "cui_skeleton_palette"}:
         lines += ['#ifndef CUI_THEME_IMPLEMENTATION','#define CUI_THEME_IMPLEMENTATION','#endif','#include "cui_theme.h"']
     if name=="cui_components":
         for module in ["cui_boolean_events", "cui_text_overflow", "cui_overlay", "cui_virtual", "cui_plot_motion", "cui_content", "cui_disclosure", "cui_choice", "cui_numeric", "cui_picker", "cui_tree", "cui_table", "cui_scroll", "cui_surface", "cui_form", "cui_otp", "cui_status", "cui_message", "cui_media", "cui_description", "cui_chrome", "cui_resizable", "cui_icon", "cui_toolbar", "cui_sidebar", "cui_textarea", "cui_settings", "cui_carousel", "cui_command", "cui_root", "cui_text_view", "cui_chart", "cui_speech", "cui_questionnaire", "cui_editor", "cui_virtual_scroll", "cui_plot_view", "cui_radio_group", "cui_button_group"]:
@@ -191,6 +192,8 @@ def generate(name,sources):
             code=code.replace('#include "cui_theme_presets.inc"',(ROOT/'src/theme/cui_theme_presets.inc').read_text(encoding='utf-8'))
         if name=='cui_slider_palette':
             code=code.replace('#include "cui_slider_palette_presets.inc"',(ROOT/'src/theme/cui_slider_palette_presets.inc').read_text(encoding='utf-8'))
+        if name=='cui_skeleton_palette':
+            code=code.replace('#include "cui_skeleton_palette_presets.inc"',(ROOT/'src/theme/cui_skeleton_palette_presets.inc').read_text(encoding='utf-8'))
         if name=='cui_icon':
             for vendor in ['nanosvg.h', 'nanosvgrast.h']:
                 code=code.replace(f'#include "../../third_party/nanosvg/{vendor}"',(ROOT/'third_party/nanosvg'/vendor).read_text(encoding="utf-8"))

@@ -324,6 +324,9 @@
     "cui_time_field_v1": [
       "src/base/cui_time_field_v1.c",
       "src/components/cui_time_field_v1.c"
+    ],
+    "cui_skeleton_palette": [
+      "src/theme/cui_skeleton_palette.c"
     ]
   },
   "native": {

@@ -5,6 +5,7 @@
 #include "cui_base.h"
 #include "cui_icon.h"
 #include "cui_theme.h"
+#include "cui_skeleton_palette.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -293,6 +294,14 @@ bool cui_spinner_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion
                     cui_spinner_options, cui_loading_motion_result *);
 bool cui_skeleton_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
                      cui_skeleton_options, cui_loading_motion_result *);
+/* Owned palette is snapshotted before easing; alpha0 is authored, not fallback.
+ * Same fixed-size/motion validation and output semantics as cui_skeleton_ex.
+ * Prevalidation failure leaves state/out/paint unchanged; callbacks may have effects.
+ * Success is submission, not completed layout/render. Caller owns clock/wake/reset.
+ * State/out must not overlap each other or borrowed inputs. No semantic/busy node. */
+bool cui_skeleton_with_palette(cui_context *, cui_id, const cui_skeleton_palette *,
+                               cui_loading_motion *, cui_skeleton_options,
+                               cui_loading_motion_result *);
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *theme, float length, bool vertical);
 /* Shared delayed lifecycle for hover cards/tooltips, independent of styling. */
 typedef struct {
@@ -339,6 +348,10 @@ void cui_end_hover_card(cui_context *ui);
 #include "cui_components.h"
 #include "cui_hover_events.h"
 #include "cui_avatar_events.h"
+#ifndef CUI_SKELETON_PALETTE_IMPLEMENTATION
+#define CUI_SKELETON_PALETTE_IMPLEMENTATION
+#endif
+#include "cui_skeleton_palette.h"
 /* src/base/cui_content.c */
 /* SPDX-License-Identifier: MIT */
 
@@ -1512,9 +1525,10 @@ bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_load
     *out = result;
     return true;
 }
-bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
-                     cui_skeleton_options o, cui_loading_motion_result *out) {
-    if (!ui || !id || !theme || !state || !out || !isfinite(o.width) || o.width <= 0 ||
+static bool cui_skeleton_color(cui_context *ui, cui_id id, const cui_color *source_color,
+                                cui_loading_motion *state, cui_skeleton_options o,
+                                cui_loading_motion_result *out) {
+    if (!ui || !id || !state || !out || !isfinite(o.width) || o.width <= 0 ||
         o.width > 4096 || !isfinite(o.height) || o.height <= 0 || o.height > 4096 ||
         !isfinite(o.radius) || o.radius < 0 || o.radius > 4096 || !isfinite(o.duration) ||
         o.duration < 0 || o.duration > 60)
@@ -1525,8 +1539,9 @@ bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loa
                                    o.reduced_motion || cui_reduced_motion(ui), true, o.ease,
                                    o.ease_user, &result))
         return false;
+    /* Legacy ex reads theme color after the synchronous easing callback. */
+    cui_color color = *source_color;
     /* The reference has no loading boolean, status role, or busy relationship. */
-    cui_color color = theme->secondary;
     color.a = (uint8_t)(color.a * result.opacity * (o.secondary ? .5f : 1));
     cui_begin_box(
         ui, id,
@@ -1535,6 +1550,20 @@ bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loa
     *state = next;
     *out = result;
     return true;
+}
+bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                     cui_loading_motion *state, cui_skeleton_options o,
+                     cui_loading_motion_result *out) {
+    return theme && cui_skeleton_color(ui, id, &theme->secondary, state, o, out);
+}
+bool cui_skeleton_with_palette(cui_context *ui, cui_id id,
+                               const cui_skeleton_palette *palette, cui_loading_motion *state,
+                               cui_skeleton_options o, cui_loading_motion_result *out) {
+    if (!palette)
+        return false;
+    /* New owned-palette route deliberately snapshots before callbacks. */
+    cui_color color = palette->background;
+    return cui_skeleton_color(ui, id, &color, state, o, out);
 }
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *t, float length, bool vertical) {
     if (!ui || !t)

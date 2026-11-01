@@ -125,4 +125,5 @@ set(CUI_SOURCES
  src/base/cui_time_text.c
  src/base/cui_time_field_v1.c
  src/components/cui_time_field_v1.c
+ src/theme/cui_skeleton_palette.c
 )

@@ -606,6 +606,13 @@
         "src/base/cui_time_field_v1.c",
         "src/components/cui_time_field_v1.c"
       ]
+    },
+    {
+      "header": "cui_skeleton_palette.h",
+      "macro": "CUI_SKELETON_PALETTE_IMPLEMENTATION",
+      "sources": [
+        "src/theme/cui_skeleton_palette.c"
+      ]
     }
   ]
 }

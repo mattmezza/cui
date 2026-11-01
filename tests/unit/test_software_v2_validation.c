@@ -36,7 +36,7 @@ static void rejects(cui_draw_list_v2 l, cui_render_v2_options o, cui_error error
     cui_software_v2_plan out, previous;
     memset(&out, 0xa7, sizeof(out));
     memcpy(&previous, &out, sizeof(out));
-    assert(cui_software_v2_validate(&l, &o, true, true, &out) == error);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &out) == error);
     assert(memcmp(&out, &previous, sizeof(out)) == 0);
 }
 static void commands(void) {
@@ -69,7 +69,7 @@ static void commands(void) {
     cui_render_v2_options o = options();
     cui_draw_list_v2 l = list(c, 10);
     cui_software_v2_plan plan;
-    assert(cui_software_v2_validate(&l, &o, true, true, &plan) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &plan) == CUI_OK);
     assert(plan.commands == 10 && plan.backgrounds == 1 && plan.background_pixels == 16);
     assert(plan.background_bytes == 64 && plan.scratch_bytes == 768);
     assert(plan.cpu_bytes == plan.scratch_bytes + plan.background_bytes + plan.shadow_bytes);
@@ -84,7 +84,7 @@ static void commands(void) {
     c[3].payload.legacy.corner_radii.top_left = NAN;
     c[8].payload.legacy.bounds = (cui_rect){NAN, NAN, NAN, NAN};
     c[9].payload.legacy.bounds = (cui_rect){NAN, NAN, NAN, NAN};
-    assert(cui_software_v2_validate(&l, &o, true, true, &plan) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &plan) == CUI_OK);
     c[7].payload.legacy.bitmap.source.w = 3;
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
     c[7].payload.legacy.bitmap.source.w = 2;
@@ -95,9 +95,11 @@ static void commands(void) {
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
     c[6].payload.legacy.text_style.letter_spacing = 0;
     cui_software_v2_plan untouched = {0};
-    assert(cui_software_v2_validate(&l, &o, false, true, &untouched) == CUI_ERROR_INVALID_ACTION);
+    assert(cui_software_v2_validate(&l, &o, false, true, true, &untouched) ==
+           CUI_ERROR_INVALID_ACTION);
     c[6].payload.legacy.text_style.letter_spacing = 1;
-    assert(cui_software_v2_validate(&l, &o, true, false, &untouched) == CUI_ERROR_INVALID_ACTION);
+    assert(cui_software_v2_validate(&l, &o, true, false, true, &untouched) ==
+           CUI_ERROR_INVALID_ACTION);
     c[6].payload.legacy.text_style.letter_spacing = 0;
     o.cpu_bytes = plan.cpu_bytes - 1;
     rejects(l, o, CUI_ERROR_CAPACITY);
@@ -123,14 +125,14 @@ static void clips_and_headers(void) {
     o.metadata_bytes = 32768;
     cui_draw_list_v2 l = list(c, 0);
     cui_software_v2_plan p;
-    assert(cui_software_v2_validate(&l, &o, false, false, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, false, false, true, &p) == CUI_OK);
     assert(!p.commands && !p.backgrounds && p.cpu_bytes == 768);
     for (size_t i = 0; i < 64; i++)
         c[i] = legacy(CUI_DRAW_CLIP_PUSH);
     for (size_t i = 64; i < 128; i++)
         c[i] = legacy(CUI_DRAW_CLIP_POP);
     l.count = 128;
-    assert(cui_software_v2_validate(&l, &o, false, false, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, false, false, true, &p) == CUI_OK);
     l.count = 127;
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
     l.count = 129;
@@ -186,18 +188,18 @@ static void aggregate_and_alias(void) {
     o.cpu_bytes = 2303;
     rejects(l, o, CUI_ERROR_CAPACITY);
     o.cpu_bytes = 2304;
-    assert(cui_software_v2_validate(&l, &o, false, false, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, false, false, true, &p) == CUI_OK);
     assert(p.cpu_bytes == 2304 && p.background_pixels == 384);
     unsigned char before[sizeof(c)];
     memcpy(before, c, sizeof(c));
-    assert(cui_software_v2_validate(&l, &o, false, false, (cui_software_v2_plan *)(void *)c) ==
-           CUI_ERROR_INVALID_ACTION);
+    assert(cui_software_v2_validate(&l, &o, false, false, true,
+                                    (cui_software_v2_plan *)(void *)c) == CUI_ERROR_INVALID_ACTION);
     assert(!memcmp(before, c, sizeof(c)));
     o = options();
     o.scale_x = 0.75f;
     o.scale_y = 1.25f;
     o.origin_x = 0.125f;
-    assert(cui_software_v2_validate(&l, &o, false, false, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, false, false, true, &p) == CUI_OK);
     cui_background_prepared_query q;
     cui_rect broad = {-FLT_MAX / 4, -FLT_MAX / 4, FLT_MAX / 2, FLT_MAX / 2};
     assert(cui_background_prepare_query(c[0].payload.background, &o, broad, &q) == CUI_OK);
@@ -213,7 +215,7 @@ static void text_resources(void) {
     cui_text_color_span spans[2] = {{0, 1, {1, 2, 3, 4}}, {1, 3, {5, 6, 7, 8}}};
     c.payload.legacy.text_colors = spans;
     c.payload.legacy.text_color_count = 2;
-    assert(cui_software_v2_validate(&l, &o, true, true, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &p) == CUI_OK);
     assert(p.inspected_bytes == 12 && p.needs_text_preparation);
     spans[1].byte_start = 2;
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
@@ -226,7 +228,7 @@ static void text_resources(void) {
         (cui_text_paint){.kind = CUI_TEXT_PAINT_LINEAR, .stops = stops, .stop_count = 2};
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
     c.payload.legacy.text_color_count = 0;
-    assert(cui_software_v2_validate(&l, &o, true, true, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &p) == CUI_OK);
     stops[1].position = -1;
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
     stops[1].position = 1;
@@ -239,10 +241,10 @@ static void text_resources(void) {
     c.payload.legacy.text_paint = (cui_text_paint){0};
     c.payload.legacy.text = (cui_str){(const char *)(uintptr_t)1, SIZE_MAX};
     c.payload.legacy.text_source = (cui_text_line_source){{"", 0}, 0, 0};
-    assert(cui_software_v2_validate(&l, &o, true, true, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &p) == CUI_OK);
     assert(p.inspected_bytes == 0);
     c.payload.legacy.text_source = (cui_text_line_source){{"ok", 2}, 0, 2};
-    assert(cui_software_v2_validate(&l, &o, true, true, &p) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, true, true, true, &p) == CUI_OK);
     assert(p.inspected_bytes == 2);
     c.payload.legacy.text = (cui_str)CUI_STR("valid inactive text");
     c.payload.legacy.text_source.byte_end = 3;
@@ -336,12 +338,38 @@ static void large_shadow_structure(void) {
     assert(!cui_effect_drop_shadow_query(c.payload.legacy.shadow, 64, 0, 0, &raster));
     cui_draw_list_v2 l = list(&c, 1);
     cui_software_v2_plan plan;
-    assert(cui_software_v2_validate(&l, &o, false, false, &plan) == CUI_OK);
+    assert(cui_software_v2_validate(&l, &o, false, false, true, &plan) == CUI_OK);
     assert(plan.needs_shadow_preparation && !plan.shadow_bytes);
     c.payload.legacy.shadow.layer.sigma = NAN;
     rejects(l, o, CUI_ERROR_INVALID_ACTION);
 }
+static void text_context_admission(void) {
+    static volatile uintptr_t poison = 1;
+    cui_draw_command_v2 c = legacy(CUI_DRAW_TEXT);
+    c.payload.legacy.font_size = 12;
+    cui_render_v2_options o = options();
+    cui_draw_list_v2 l = list(&c, 1);
+    cui_software_v2_plan out, before;
+    memset(&out, 0xa6, sizeof out);
+    memcpy(&before, &out, sizeof out);
+    for (unsigned i = 0; i < 2; ++i) {
+        c.payload.legacy.text_source =
+            (cui_text_line_source){{(const char *)poison, i ? 1 : 0}, 0, 0};
+        c.payload.legacy.text = (cui_str){(const char *)poison, SIZE_MAX};
+        c.payload.legacy.text_colors = (const cui_text_color_span *)poison;
+        c.payload.legacy.text_color_count = 1;
+        assert(cui_software_v2_validate(&l, &o, true, true, false, &out) ==
+               CUI_ERROR_INVALID_ACTION);
+        assert(!memcmp(&out, &before, sizeof out));
+    }
+    c.payload.legacy = (cui_draw_command){.type = CUI_DRAW_TEXT, .font_size = 4097};
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
+    c.payload.legacy.font_size = 12;
+    c.payload.legacy.bounds.x = nextafterf(1e6f, INFINITY);
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
+}
 int main(void) {
+    text_context_admission();
     large_shadow_structure();
     commands();
     clips_and_headers();

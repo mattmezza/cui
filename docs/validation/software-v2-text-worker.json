@@ -1,0 +1,72 @@
+{
+  "base": "bf8ad7eb",
+  "scope": "Complete private transactional with-font software V2 painting only; no public support/render entry, V1 call-site change or other-adapter/binding completion.",
+  "build": "GCC16.2.1 strict portable C11 O3 UNDEBUG Wall Wextra Wpedantic Werror; CPU0 nice19, sequential fixture TUs and copied SDK header checks; no engine/library rebuilt. Read-only current Core/Bidi archives linked.",
+  "current_tests": "Final private-Xvfb12/12 PASS0.88s, no CTest skips: three text variants, fresh nontext validator/painter/shadows, preserved q64 source/cache/density/shaping and actual golden-mutation rejection.",
+  "skill": "18/18 PASS39.256s; sole CPU0 nice19 heavy suite.",
+  "matrix": {
+    "mandatory_bidi": "14 text forms x12 transforms, plus all-kind14-command mixed frame and allocation-failure sweep/retry.",
+    "mandatory_nobidi": "9 supported text forms x12 transforms; context/spans/tracking rejection and poisoned inactive source guards.",
+    "independent_oracles": "Hand-enumerated asymmetric A8 bilinear/occupancy and anisotropic pixel tables; separate scalar four-neighbor reference from recorded source; immutable original full V1 unit/list and original public scaled-font callbacks into original V1 glyph/source-over at q1/3/16 integer phase.",
+    "actual_optional_rtl": "Both existing Noto Hebrew and Arabic fallback fonts passed3transforms each with separate original/candidate font graphs. Unavailable optional fonts print explicit deferral elsewhere; mandatory bundled-Inter cases never skip.",
+    "styles": "Regular/Bold plus explicit family7/medium/italic/monospace registration mapped to the real Bold face tests selection, not a claim of an intrinsic italic font.",
+    "negative": "All counted allocator requests swept for representative text frame; late invalid command, output-cell/CPU/metadata budgets, source/span/stop target aliases, no-text/no-Bidi poisoned sources, absent-face rejection, busy/reentry/cleanup/padding/retry. Existing source recorder negative-pitch, mode/cast/source-work/dependency failure tests retained."
+  },
+  "first_failures": {
+    "initial": "Strict3variant build passed; first runtime Bidi form8 incorrectly expected Inter to cover Hebrew without a fallback, no-Bidi form11 old full renderer rejected NaN TEXT w/h.",
+    "correction": "Fixture-only: keep mandatory Inter combining/ligature text; explicitly configure old/new Noto fallback graphs and assert missing-face rejection. Canonicalize only inactive TEXT w/h in old full-render comparison because old renderer blanket-validates all bounds; V2 NaN input and original direct scaled-font oracle retained. No production semantic correction or frozen-source/expected mutation.",
+    "corrected": "Corrected3/3 PASS0.52s before identified all-kind mixed-frame/known-range-alias strengthening; final12/12 above."
+  },
+  "memory": "Base CPU B0=commands+scratch+backgroundRGBA+shadowA8; base metadata M0=aligned command/shadow descriptors+aligned per-TEXT ranges. Counted text payload/prefixes and glyph metadata use remaining separate limits; peaks B0+owner.cpu_peak and M0+owner.metadata_peak. Existing font runtime and newly opaque FT/HB/Sheen/provider storage remain separate; no total-process/joint32MiB guarantee.",
+  "ownership": "Known active source/span/stop/image ranges checked against target. Entire opaque font graph/dependency storage disjointness/stability and no nested/concurrent same-font render are caller preconditions; the pointer-byte sentinel cannot validate opaque allocation ranges.",
+  "cMake_targets": [
+    "test_software_v2_text",
+    "test_software_v2_text_nobidi",
+    "test_software_v2_text_disabled",
+    "test_software_v2_validation",
+    "test_software_v2_paint",
+    "test_software_v2_shadows"
+  ],
+  "pending": [
+    "Root actual CMake rebuilt acceptance",
+    "Initialized public software V2 support/render contract and implementation",
+    "SDL_Renderer/SDL_GPU/Sokol/Canvas adapters and bindings",
+    "Intrinsic RGBA/color-font formats are explicitly unsupported, separate from span ink+A8"
+  ],
+  "pkg_config": [
+    "26.7.20",
+    "15.0.0"
+  ],
+  "sha256": {
+    "backends/software/cui_software_v2_internal.h": "b25919e506001272107924183d48e4b22e4892c076c046906d87e81bde12549f",
+    "backends/software/cui_software_v2_paint_internal.h": "06efe07d81839bf1f6a7a4f5c17353d9332fd324895a203cd6b6b7a4b70a1266",
+    "backends/software/cui_software_v2_text_internal.h": "4e451665f47b730e54d24dfff78545d85a74350856070e2f796338f56b21db16",
+    "src/text/cui_text.c": "edeac29fdc1d934a0178c8683c0cc095e8a5b8c890fe90709858c613da622e0e",
+    "tests/unit/test_software_v2_text.c": "389709dc5828b4b2708afd6fedbbe3720f174475f23bd2186f6dfeb9b9d8b846",
+    "tests/unit/text_prepare_original_reference.c": "be3df851aedd513bfca915074301b94bc41226fb7e150f6ef1618bc9623c791b",
+    "tests/fixtures/text_prepare_v1/records_pixels.golden": "79e4c013dc2bc3ecb57f9f3801e6163dc241b0370ad22cadcebd690fd964caf8",
+    "tests/fixtures/text_prepare_v1/records_pixels_nobidi.golden": "3cf4d175e42746a2519f44fd658ff3c2fa4c41536635df73b564e159f0f1b15c",
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+    "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d",
+    "/usr/share/fonts/noto/NotoSansHebrew-Regular.ttf": "cdefaf8efd47045f6820928eba84db5bed7557539328952b5f828315485e02ee",
+    "/usr/share/fonts/noto/NotoSansArabic-Regular.ttf": "bdff3e5659d67e67def05b33f749683b9376ae819d65d3dd62ac4640b3aaef48",
+    "/home/matteo/.cache/cui-current-validation/native/libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483",
+    "build-shadow/text_prepare_original_bidi.o": "84e817f3502ca192fff49e6692962be4be09c857dc8554aaa4d917e337524e97",
+    "build-shadow/software-v2-text-build.log": "273f34fdf2f581338113ce39ad7d8a002dc444ae090783a04f8ad702f482f7c4",
+    "build-shadow/software-v2-text-tests.log": "6537a49dc8c5aae896a0e0cb790f0ac5defdb7ab7a457810643a8144fcd505c2",
+    "build-shadow/software-v2-text-diagnostic-build.log": "273f34fdf2f581338113ce39ad7d8a002dc444ae090783a04f8ad702f482f7c4",
+    "build-shadow/software-v2-text-diagnostic-tests.log": "afc9d3800f90de3e738c3d86e4ee8a5fc05a6096381bad1d4f83e72554b58101",
+    "build-shadow/software-v2-text-corrected-build.log": "273f34fdf2f581338113ce39ad7d8a002dc444ae090783a04f8ad702f482f7c4",
+    "build-shadow/software-v2-text-corrected-tests.log": "10d3f013c1e0823f0a4e7469223655ec2779473df2501ded07138aee4857c3fc",
+    "build-shadow/software-v2-text-final-build.log": "39873d836862c905bb8e7d40fc999b1907aa58d1e515fbce62b06d8ef37e3dd8",
+    "build-shadow/software-v2-text-final-tests.log": "206fbf7b4648f5ff9028c2bb2b85565d07234ade838661dab174d1aeca7f42a5",
+    "build-shadow/software-v2-text-header-closure.log": "9276f9ab61ea1d32000a9c7948d8398ea96f43302b1141d057d276f9ee4f04ef",
+    "build-shadow/software-v2-text-skill.log": "59477577a3aa54fc358fcc536de985a64b31d62031ed0c2aa85bc5e5f8b9f477",
+    "tests/fixtures/text_prepare_v1/source/src/text/cui_text.c": "bf43eec9ee29ebd10ccf74d7d16915359d902601009c2b41972b51585261ea6a",
+    "tests/fixtures/text_prepare_v1/source/src/text/cui_bidi.c": "d62f97bd643d95c6925fb9ef7b9d40717e8d8f0b8ca0706a764d2001b29e19be",
+    "tests/fixtures/text_prepare_v1/source/backends/software/cui_software.c": "f2975fc0873a6c100f47aea8c2e5da05b39f00ac850ed77cc938a33ec34b74cb",
+    "tests/fixtures/text_prepare_v1/source/src/core/cui_text_paint_internal.h": "ce3847af20b8afe6b88121c966f63dfc58193717cfc80acf0011ee6c195a31c1"
+  },
+  "frozen_source": "All four source files match independently read Git reference f4e078610264674ed9b7e8bbb86f3a27d315e857 byte-for-byte; expected goldens unchanged."
+}

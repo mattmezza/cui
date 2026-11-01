@@ -19,12 +19,13 @@ read `docs/CORE_DRAW_V2.md` and `include/cui/cui_draw_v2.h`; no adapter currentl
 consumes that list. Private `docs/BACKGROUND_PREPARATION.md` describes an allocation-free maintainer
 building block and private software validation/workspace/partial painting slices,
 not a public renderer. `docs/SOFTWARE_V2_PAINTING.md` states the supported private
-kinds: bounded AREA DROP/INSET shadow preparation/painting is private only; text
-still rejects before allocation/publication.
+kinds: bounded AREA DROP/INSET shadows and the owned with-font per-axis text
+painter are private only. The no-font wrapper rejects text before allocation;
+there is no public software V2 renderer/support query yet.
 Validation success does not mean adapter font/shadow resources are prepared.
 `docs/TEXT_PREPARATION.md` describes private counted recording only, with owned
 source density up to64 and GRAY256 coverage; public scaled font APIs remain
-limited to16. This does not enable V2 text painting. Opaque new
+limited to16. Recording alone does not advertise V2 text rendering. Opaque new
 font/dependency temporaries are outside the transaction CPU byte envelope. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.
 
 ## Start with the project's actual integration

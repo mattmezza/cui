@@ -1,8 +1,9 @@
 # Private counted text preparation
 
 `src/text/cui_text_prepare_internal.h` is a maintainer-only recording seam, not a
-public font API or renderer. No adapter advertises V2 background support. Full
-physical glyph painting and all five adapters remain pending.
+public font API or renderer. Its private software with-font consumer is described
+in `SOFTWARE_V2_PAINTING.md`; no adapter advertises V2 background support. Public
+software integration and the other four adapters remain pending.
 
 Initialize a zero `cui_text_owner_internal` with malloc-compatible aligned,
 distinct-block allocation/free callbacks and the **remaining** transaction CPU and

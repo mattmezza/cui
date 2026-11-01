@@ -4,8 +4,9 @@
 building block. It has **no public support query/render entry or V1 call site**.
 It paints RECT, BORDER, IMAGE, MESH, explicit clips and owned BACKGROUND commands
 in array order at independent physical scales/origins. DROP/INSET shadows use
-bounded target-pixel AREA reconstruction of the unchanged source profile; TEXT
-still rejects before allocation/publication. This does not complete the
+bounded target-pixel AREA reconstruction of the unchanged source profile. The
+private with-font entry adds owned text recording and per-axis bilinear glyph
+reconstruction; the no-font wrapper still rejects TEXT before allocation. This does not complete the
 software checkpoint, any of the other four adapters, bindings or all78 parts.
 
 The private `cui_software_v2_paint(target,list,clear,options,allocate,release,user)`
@@ -14,7 +15,7 @@ width/height, actual row stride/capacity and an initialized-false busy guard.
 Viewport must match nonzero target dimensions<=16384. Checked span is
 `(height-1)*stride+width*4`; rows/padding beyond those active bytes are untouched.
 Target pixels/view must be disjoint from list/options/command records and active
-bitmap/mesh resources. Borrowed inputs, options and target fields stay stable
+bitmap/mesh resources and active text/paint/span bytes. Borrowed inputs, options and target fields stay stable
 through return, including allocation/release callbacks; callbacks cannot write
 published pixels. Reentrant paint on the same view rejects, including during free.
 A future initialized software adapter must own this guard and its allocator;
@@ -26,9 +27,9 @@ covers for shared background queries. The cover is culling only; each emitted
 physical center is checked against the exact original logical intersection.
 Copied command values, tightly packed scratch, background RGBA and shadow A8 planes charge
 CPU<=32MiB; aligned typed descriptors charge metadata<=1MiB. Aggregate prepared
-background plus shadow rectangle pixels<=8M (shadows additionally<=1M), per background<=4M, and packed background bytes also fit
+background plus shadow and glyph rectangle pixels<=8M (shadows additionally<=1M), per background<=4M, and packed background bytes also fit
 texture/transfer ceilings. Command copies do not own bitmap/mesh data. Exact
-per-call heap allocations are two distinct blocks (one for an empty list), with
+nontext heap allocations are two distinct blocks (one for an empty list), with
 no retained capacity/cache or hidden V1 shadow allocation. Fixed bounded control
 stack (64 clips plus validator stack and scalar locals) is separate from these
 heap-allocation quotas; there is no total-stack/process/time guarantee.
@@ -77,6 +78,37 @@ before skipping. The structural validator's shadow_bytes=0 is explicitly not a
 completed resource plan; the painter adds exact clipped A8/tap accounting. V1
 raster-query allocation limits are not used to admit valid clipped large-q work.
 See [the transaction contract](design/SOFTWARE_V2_SHADOW_TRANSACTION.md).
+
+The private `cui_software_v2_paint_with_font` additionally takes a borrowed font
+before allocator callbacks. It requires the actual text build; no-text builds
+reject TEXT without linking font dependencies. Actual contextual availability
+is checked separately from letter-spacing support. No-Bidi builds reject context
+(including empty non-NULL paragraphs), spans and tracking before borrowed reads.
+Font size<=4096 and line origins |x|,|y|<=1e6 are explicit V2 text limits.
+
+Text chooses q=max(1,sx,sy)<=64, shapes at logical size, and owns copied GRAY256
+coverage at q. Each target center inverse-maps both axes independently; four
+source neighbors with zero outside the bitmap form bilinear coverage, rounded
+once. Positive-weight occupancy distinguishes zero coverage from a zero-weight
+halo. Solid uses selected command/cluster ink; resolved gradients sample logical
+coordinates. Alpha is ink.a*coverage/255 truncated once, then original source-over.
+Original command and callback glyph order stay intact; clips never alter weights.
+
+An aligned per-TEXT {first,last} range charges base metadata. A counted text owner
+receives the remaining CPU/metadata envelopes after exact base reservations.
+CUI shaping/layout/Bidi payloads, prefixes and glyph copies charge CPU; glyph
+records/prefixes charge metadata. Text frames have additional counted allocations,
+not the nontext two-block guarantee. Exact peaks are baseCPU+owner.cpu_peak and
+baseMetadata+owner.metadata_peak. Existing font runtime and newly opaque
+FT/HB/Sheen/provider work remain separate; no joint process-memory guarantee.
+All records, transformed covers and joint glyph-cell quotas are prepared before
+scratch clear. Session records release before base workspace, with busy held
+through every callback. Borrowed fonts, entire graphs/FT/HB storage and paint stops must stay stable
+and disjoint from target/workspace through return. No nested/concurrent rendering
+on the same font is allowed. The pointer-byte font overlap sentinel does not
+validate opaque graph allocation ranges; those are caller preconditions, unlike
+known active text/span/stop/image ranges checked explicitly. failure does not roll back dependency/provider side effects. Intrinsic
+RGBA/color-font glyph formats remain unsupported, distinct from span ink+A8.
 
 After complete preparation/painting, active scratch rows publish by memcpy once.
 Validation, budget or allocation failure leaves published bytes unchanged,

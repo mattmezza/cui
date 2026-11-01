@@ -1,14 +1,17 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef CUI_SOFTWARE_V2_PAINT_INTERNAL_H
 #define CUI_SOFTWARE_V2_PAINT_INTERNAL_H
+#include "cui/cui_text.h"
 #include "cui_mesh.h"
 #include "cui_shape.h"
 #include "cui_software_v2_internal.h"
-/* Private incomplete painter: TEXT rejects atomically; shadows use bounded source-profile AREA
- * coverage. Not wired to a V1 renderer, public V2 entry, or capability advertisement. Inputs/target
- * view stay stable through return, including allocator callbacks. Allocators obey the workspace
+/* Private painter: owned with-font TEXT and bounded source-profile AREA shadows. Not wired to a V1
+ * renderer, public V2 entry, or capability advertisement. Inputs/target view stay stable through
+ * return, including allocator callbacks. Allocators obey the workspace
  * distinct-live-block/alignment contract. Target pixels and input records/resources must be
- * disjoint. */
+ * disjoint. Entire opaque font graphs/dependency storage must also be disjoint
+ * and stable, with no nested/concurrent render on the same font. A pointer-byte
+ * font sentinel cannot validate the opaque graph allocation ranges. */
 typedef struct {
     unsigned char *pixels;
     unsigned width, height;
@@ -105,6 +108,7 @@ static inline bool cui_software_v2_cover(cui_rect bounds, cui_software_v2_surfac
     *y1 = (int)ceil(bottom);
     return true;
 }
+#include "cui_software_v2_text_internal.h"
 /* Original absolute edges stay separate from distances to the near edge.
  * In particular (x+w)-right_inset preserves a small far-edge inset when x+w
  * cancels to a small value; x+(w-right_inset) would lose it. */
@@ -243,11 +247,11 @@ static inline void cui_software_v2_shadow_paint(cui_software_v2_surface *surface
 _Static_assert(_Alignof(cui_software_v2_shadow_descriptor) <=
                    _Alignof(cui_fundamental_alignment_internal),
                "shadow descriptor exceeds workspace alignment");
-static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
-                                              const cui_draw_list_v2 *list, cui_color clear,
-                                              const cui_render_v2_options *options,
-                                              cui_software_v2_alloc_fn allocate,
-                                              cui_software_v2_free_fn release, void *user) {
+static inline cui_error
+cui_software_v2_paint_with_font(cui_software_v2_target *target, const cui_draw_list_v2 *list,
+                                cui_color clear, const cui_render_v2_options *options,
+                                cui_font *font, cui_software_v2_alloc_fn allocate,
+                                cui_software_v2_free_fn release, void *user) {
     if (!target || target->busy || !list || !options || !allocate || !release || !target->pixels ||
         !target->width || !target->height || target->width > 16384 || target->height > 16384 ||
         options->viewport_width != target->width || options->viewport_height != target->height)
@@ -263,7 +267,18 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         !cui_software_v2_target_disjoint(target, span, list, sizeof(*list)))
         return CUI_ERROR_INVALID_ACTION;
     cui_software_v2_plan plan;
-    cui_error error = cui_software_v2_validate(list, options, false, false, &plan);
+    bool font_available = false, tracking_available = false, context_available = false;
+#ifdef CUI_HAS_TEXT
+    font_available = font != NULL;
+    if (font_available) {
+        tracking_available = (cui_font_text_capabilities() & CUI_TEXT_CAP_LETTER_SPACING) != 0;
+        context_available = cui_text_prepare_context_available_internal();
+    }
+#else
+    (void)font;
+#endif
+    cui_error error = cui_software_v2_validate(list, options, font_available, tracking_available,
+                                               context_available, &plan);
     if (error != CUI_OK)
         return error;
     if (!cui_software_v2_target_disjoint(target, span, list->commands,
@@ -271,7 +286,7 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         return CUI_ERROR_INVALID_ACTION;
     cui_software_v2_clip stack[64], clip = cui_software_v2_clip_all();
     size_t depth = 0, background_pixels = 0, background_bytes = 0;
-    size_t shadows = 0, shadow_bytes = 0, shadow_taps = 0;
+    size_t shadows = 0, shadow_bytes = 0, shadow_taps = 0, texts = 0;
     for (size_t i = 0; i < list->count; ++i) {
         const cui_draw_command_v2 *v = &list->commands[i];
         if (v->kind == CUI_DRAW_V2_BACKGROUND) {
@@ -286,8 +301,23 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                 return CUI_ERROR_CAPACITY;
         } else {
             const cui_draw_command *c = &v->payload.legacy;
-            if (c->type == CUI_DRAW_TEXT)
-                return CUI_ERROR_INVALID_ACTION;
+            if (c->type == CUI_DRAW_TEXT) {
+                ++texts;
+                const void *source =
+                    c->text_source.paragraph.data ? c->text_source.paragraph.data : c->text.data;
+                size_t bytes = c->text_source.paragraph.data ? c->text_source.paragraph.length
+                                                             : c->text.length;
+                if (!cui_software_v2_target_disjoint(target, span, source, bytes) ||
+                    !cui_software_v2_target_disjoint(target, span, c->text_colors,
+                                                     c->text_color_count *
+                                                         sizeof(*c->text_colors)) ||
+                    (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
+                     !cui_software_v2_target_disjoint(target, span, c->text_paint.stops,
+                                                      c->text_paint.stop_count *
+                                                          sizeof(*c->text_paint.stops))) ||
+                    !cui_software_v2_target_disjoint(target, span, font, 1))
+                    return CUI_ERROR_INVALID_ACTION;
+            }
             if (cui_shadow_type(c->type)) {
                 cui_software_v2_shadow_descriptor d;
                 error = cui_software_v2_shadow_query(
@@ -318,6 +348,8 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                 return CUI_ERROR_INVALID_ACTION;
         }
     }
+    if (texts && !font_available)
+        return CUI_ERROR_INVALID_ACTION;
     size_t commands_bytes = list->count * sizeof(*list->commands);
     size_t cpu_bytes = commands_bytes,
            metadata_bytes = list->count * sizeof(cui_software_v2_paint_descriptor);
@@ -333,6 +365,22 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         !cui_software_v2_add(&cpu_bytes, background_bytes, options->cpu_bytes) ||
         background_bytes > options->texture_bytes || background_bytes > options->transfer_bytes)
         return CUI_ERROR_CAPACITY;
+#ifdef CUI_HAS_TEXT
+    size_t text_metadata = texts * sizeof(cui_software_v2_text_range);
+    size_t text_alignment = _Alignof(cui_software_v2_text_range);
+    size_t text_padding =
+        texts ? (text_alignment - metadata_bytes % text_alignment) % text_alignment : 0;
+    if (!cui_software_v2_add(&metadata_bytes, text_padding, options->metadata_bytes) ||
+        !cui_software_v2_add(&metadata_bytes, text_metadata, options->metadata_bytes))
+        return CUI_ERROR_CAPACITY;
+    cui_text_owner_internal text_owner = {.allocate = allocate,
+                                          .release = release,
+                                          .user = user,
+                                          .cpu_limit = options->cpu_bytes - cpu_bytes,
+                                          .metadata_limit =
+                                              options->metadata_bytes - metadata_bytes};
+    cui_text_prepare_session text_session = {.owner = &text_owner};
+#endif
     target->busy = true;
     cui_software_v2_workspace workspace = {0};
     error = cui_software_v2_workspace_begin(&workspace, cpu_bytes, metadata_bytes, allocate,
@@ -357,6 +405,17 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         shadows
             ? cui_software_v2_workspace_take(&workspace, true, shadow_metadata, shadow_alignment)
             : NULL;
+#ifdef CUI_HAS_TEXT
+    cui_software_v2_text_range *text_ranges =
+        texts ? cui_software_v2_workspace_take(&workspace, true, text_metadata, text_alignment)
+              : NULL;
+    if (texts && !text_ranges) {
+        cui_software_v2_workspace_end(&workspace);
+        target->busy = false;
+        return CUI_ERROR_CAPACITY;
+    }
+    size_t text_index = 0;
+#endif
     if ((list->count && (!commands || !descriptors)) || !scratch ||
         (shadows && !shadow_descriptors)) {
         cui_software_v2_workspace_end(&workspace);
@@ -387,6 +446,34 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                                                   cui_software_v2_clip_cover(clip), pixels,
                                                   q.stride, q.bytes, &descriptors[i].background);
             descriptors[i].pixels = pixels;
+#ifdef CUI_HAS_TEXT
+        } else if (v->kind == CUI_DRAW_TEXT) {
+            cui_text_recorded_glyph_internal *previous = text_session.last;
+            float q = fmaxf(1, fmaxf(options->scale_x, options->scale_y));
+            if (!cui_text_prepare_line(&text_session, font, &v->payload.legacy, q)) {
+                error = text_owner.error == CUI_OK ? CUI_ERROR_INVALID_ACTION : text_owner.error;
+                break;
+            }
+            cui_software_v2_text_range range = {previous ? previous->next : text_session.first,
+                                                text_session.last};
+            if (range.last == previous)
+                range = (cui_software_v2_text_range){0};
+            text_ranges[text_index++] = range;
+            cui_software_v2_surface surface = {.options = options, .clip = clip};
+            size_t count = 0;
+            for (cui_text_recorded_glyph_internal *g = range.first; g;
+                 g = g == range.last ? NULL : g->next) {
+                cui_software_v2_glyph_cover cover;
+                if (++count > 65536 || !cui_software_v2_glyph_query(g, &surface, &cover) ||
+                    !cui_software_v2_add(&background_pixels,
+                                         (size_t)(cover.x1 - cover.x0) *
+                                             (size_t)(cover.y1 - cover.y0),
+                                         options->max_pixels)) {
+                    error = CUI_ERROR_CAPACITY;
+                    break;
+                }
+            }
+#endif
         } else if (cui_shadow_type((cui_draw_type)v->kind)) {
             cui_software_v2_shadow_descriptor *d = &shadow_descriptors[shadow_index++];
             error = cui_software_v2_shadow_query(
@@ -415,6 +502,10 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
     if (error == CUI_OK && (shadow_index != shadows || prepared_shadow_bytes != shadow_bytes ||
                             prepared_shadow_taps != shadow_taps))
         error = CUI_ERROR_INVALID_ACTION;
+#ifdef CUI_HAS_TEXT
+    if (error == CUI_OK && text_index != texts)
+        error = CUI_ERROR_INVALID_ACTION;
+#endif
     /* No pixel mutation, including scratch clear, precedes complete preparation. */
     if (error == CUI_OK) {
         for (size_t i = 0; i < plan.scratch_bytes; i += 4) {
@@ -425,6 +516,9 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         }
         cui_software_v2_surface surface = {.pixels = scratch, .options = options};
         shadow_index = 0;
+#ifdef CUI_HAS_TEXT
+        text_index = 0;
+#endif
         for (size_t i = 0; i < list->count; ++i) {
             const cui_draw_command_v2 *v = &commands[i];
             surface.clip = descriptors[i].clip;
@@ -446,7 +540,12 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                                              q->physical_y + (int)y,
                                              (cui_color){p[0], p[1], p[2], p[3]});
                     }
-            } else if (cui_shadow_type((cui_draw_type)v->kind))
+            }
+#ifdef CUI_HAS_TEXT
+            else if (v->kind == CUI_DRAW_TEXT)
+                cui_software_v2_text_paint(&surface, text_ranges[text_index++]);
+#endif
+            else if (cui_shadow_type((cui_draw_type)v->kind))
                 cui_software_v2_shadow_paint(&surface, &shadow_descriptors[shadow_index++]);
             else if (v->kind == CUI_DRAW_MESH)
                 cui_software_v2_mesh_paint(&surface, &v->payload.legacy.mesh);
@@ -457,8 +556,20 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         for (unsigned y = 0; y < target->height; ++y)
             memcpy(target->pixels + y * target->stride, scratch + (size_t)y * row, row);
     }
+#ifdef CUI_HAS_TEXT
+    cui_text_prepare_session_end(&text_session);
+#endif
     cui_software_v2_workspace_end(&workspace);
     target->busy = false;
     return error;
+}
+/* No-font wrapper retains preallocation TEXT refusal and exact nontext requests. */
+static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
+                                              const cui_draw_list_v2 *list, cui_color clear,
+                                              const cui_render_v2_options *options,
+                                              cui_software_v2_alloc_fn allocate,
+                                              cui_software_v2_free_fn release, void *user) {
+    return cui_software_v2_paint_with_font(target, list, clear, options, NULL, allocate, release,
+                                           user);
 }
 #endif

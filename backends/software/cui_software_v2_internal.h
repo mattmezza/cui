@@ -53,11 +53,12 @@ static inline bool cui_software_v2_shape(const cui_draw_command *c, bool border)
 static inline bool cui_software_v2_alias(const void *a, size_t n, const void *out) {
     return cui_background_prepare_disjoint_internal(a, n, out, sizeof(cui_software_v2_plan));
 }
-/* font_available and tracking_available describe actual host state, not inferred
+/* Font, tracking and contextual availability describe actual host state, not inferred
  * from a fabricated public support record. Font/shaping allocation is deferred. */
 static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                                                  const cui_render_v2_options *options,
                                                  bool font_available, bool tracking_available,
+                                                 bool context_available,
                                                  cui_software_v2_plan *out) {
     if (!list || !options || !out || !cui_software_v2_alias(list, sizeof(*list), out) ||
         !cui_software_v2_alias(options, sizeof(*options), out) ||
@@ -90,7 +91,7 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
     /* The shared query clips to the physical viewport itself. Avoid an inverse
      * viewport rounded to float accidentally cropping a fractional cover cell. */
     cui_rect stack[64], clip = {-FLT_MAX / 4, -FLT_MAX / 4, FLT_MAX / 2, FLT_MAX / 2};
-    size_t depth = 0;
+    size_t depth = 0, text_input_bytes = 0;
     for (size_t i = 0; i < list->count; ++i) {
         const cui_draw_command_v2 *v = &list->commands[i];
         if (v->kind == CUI_DRAW_V2_BACKGROUND) {
@@ -117,7 +118,8 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
             continue;
         }
         if (c->type == CUI_DRAW_TEXT) {
-            if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y))
+            if (!isfinite(c->bounds.x) || !isfinite(c->bounds.y) || fabsf(c->bounds.x) > 1e6f ||
+                fabsf(c->bounds.y) > 1e6f)
                 return CUI_ERROR_INVALID_ACTION;
         } else if (c->type != CUI_DRAW_MESH && !cui_shadow_type(c->type) &&
                    !cui_software_v2_rect(c->bounds))
@@ -159,8 +161,10 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 return CUI_ERROR_INVALID_ACTION;
             plan.needs_shadow_preparation = true;
         } else if (c->type == CUI_DRAW_TEXT) {
-            if (!font_available || !isfinite(c->font_size) || c->font_size <= 0 ||
-                c->font_size > 65535 || c->text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
+            if (!font_available ||
+                (!context_available && (c->text_source.paragraph.data || c->text_color_count)) ||
+                !isfinite(c->font_size) || c->font_size <= 0 || c->font_size > 4096 ||
+                c->text_style.weight < CUI_TEXT_WEIGHT_NORMAL ||
                 c->text_style.weight > CUI_TEXT_WEIGHT_BOLD ||
                 !isfinite(c->text_style.letter_spacing) ||
                 (c->text_style.letter_spacing != 0 && !tracking_available) ||
@@ -171,7 +175,8 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 return CUI_ERROR_INVALID_ACTION;
             size_t text_bytes =
                 c->text_source.paragraph.data ? c->text_source.paragraph.length : c->text.length;
-            if (text_bytes > INT32_MAX ||
+            if (text_bytes > 65536 ||
+                !cui_software_v2_add(&text_input_bytes, text_bytes, (size_t)256 * 1024) ||
                 !cui_software_v2_add(&plan.inspected_bytes, text_bytes, (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
             if (c->text_source.paragraph.data) {

@@ -1,0 +1,22 @@
+{
+  "tested_revision": "a528b975",
+  "scope": "Controlled C-only Styled Slider facade integrated with newer Core/scroll regions and private Dialog reducer. No hosted/all-binding/native numeric/V2 renderer completion.",
+  "build": "Actual CMake strict Release warnings-clean67-step source/selective/umbrella/legacy/style/example build. Initial unknown target name produced no compilation; corrected to test_base_slider_model_source and completed successfully.",
+  "runtime": "Private-Xvfb test_local.py16/16PASS0.21s; actual public facade includes160 pointer-ring and16 keyboard focus software images; Base compatibility and independent old Switch kernel/trace tests pass.",
+  "wasm": "Pinned Zig0.16 wasm32-wasi strict C11O2WallWextraWpedanticWerror actual Base and Styled facade production TUs both pass against integrated headers.",
+  "coalesced": "Skill18/18PASS97.456s, usage6/6PASS13.206s and full-tree format23.1.2PASS. Heavy checks shared one lowpriority CPU with compile; no performance comparison. Manifest78unique remains77tested/1implemented/0verified, not full parity.",
+  "other_integrated_checks": "Private Dialog surface reducer/frozen64-frame equivalence/own-route gates/reference and test-only shadow quality: separate strict13-step actual-library build, headless3/3PASS0.46s. No shadow policy approved.",
+  "remaining": "Actual gallery migration, five typed authoring bindings, native numeric delivery/precision authority, vertical registered-scroll admission and real V2 gradients/adapters remain open.",
+  "log_sha256": {
+    "styled-slider-integration-build.log": "17523a1fc70b7f010efdcca29da47f1b691cfdbb92c05ea66198738677c8f4f4",
+    "styled-slider-integration-build-corrected.log": "d9409c4590573b4b77c651a2d69a068dd591eb517e1d6bd7a33c62f39a2e1342",
+    "styled-slider-integration-tests.log": "ba2ad4b449400b2b890b242b93490e741329cbcc628fd61fcc064717e32168db",
+    "styled-slider-integration-wasm.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "styled-slider-integration-skill.log": "e8481ac0e68671b52e6a540ba033815b9f6b698302750d483cfb106b095d7341",
+    "styled-slider-integration-usage.log": "c0d08c212ed96cc4502c3555148cfdb5ca74af63d50e40ae8c0a0ccc294809d0",
+    "styled-slider-integration-format.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "surface-quality-integration-build.log": "ddc60892d8ae41cad06b074428e2244f9b367bcd16e4d7e9d8e7ac0a1f509951",
+    "surface-quality-integration-tests.log": "95448b057d5b9f4bbeb59a0a8444f1bfeaf92a02b216fe3022333e3217525471"
+  },
+  "pre_extraction_component_sha256": "651710b2dfd3a965e2ca6a910681fc1fde0904cecb912af12a6ac1599331d695"
+}

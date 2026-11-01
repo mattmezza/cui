@@ -24,7 +24,7 @@ feature test does not establish complete component parity.
 | Priority | Work | Next acceptance checkpoint |
 | --- | --- | --- |
 | 1 | Finish scroll layout and Dialog sizing | Core geometry and additive region sizing pass combined local validation. Finish Dialog composition/input and wider acceptance. |
-| 1 | Finish Slider behavior | C-only typed Base Single/Range interaction passes all four combined source/distribution/legacy checks. Finish Styled presentation, host delivery and bindings. |
+| 1 | Finish Slider delivery | C-only controlled Base/Styled Single/Range, motion and styles pass combined local checks. Finish gallery migration, native delivery, bindings and vertical registered-scroll support. |
 | 1 | Finish backgrounds and gradients | Core transport, bounded preparation and private software validation are integrated; implement painting in software, SDL_Renderer, SDL_GPU, Sokol and Canvas support. Core-only tests establish no renderer support. |
 | 1 | Resolve current validation failures | Source-package, Windows alignment and WASM32 fixes are integrated. Confirm the final Windows fieldwise-test correction and obtain a clean full run of the latest candidate. |
 | 2 | Close component and binding gaps | Reconcile every family with frozen source behavior and explicit exceptions. |
@@ -55,7 +55,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Button state/style refinement, Styled Slider ranges/themes, native numeric delivery and five builders (the typed C Base model is integrated); consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Button state/style refinement, typed Slider gallery/native delivery and five builders (C Base/Styled ranges, themes and motion are integrated); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
 | Overlays | Dialog independent header/title slots and separate Content/Body flex sizing; Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
@@ -127,7 +127,7 @@ These are **unreleased slices**, not completed beta areas:
 | Slice | Evidence / remaining gate |
 | --- | --- |
 | Scrollbar and Dialog layout | Combined geometry/region checks pass. Current-height source-placement prototype passes source/distribution tests2/2 across ten transitions; no prior-height fallback. Dialog input, actions, actual-font composition and lifecycle remain open. |
-| Typed Base Slider | Source/selective/umbrella and legacy tests pass (4/4). The controlled example, responsive/ring pixel proofs and pure C style resolver pass. Styled facade/motion and other languages remain open. |
+| Typed Slider | C Base/Styled controlled Single/Range, motion, styles and complete example pass combined source/selective/umbrella/legacy checks16/16;176 software images, strict WASM32 compilation, skill18/usage6 and full format pass. [Receipt](docs/validation/styled-slider-facade-integration.json). Gallery, bindings, native numeric delivery, vertical registered scrolling and real V2 gradients remain open. |
 | Reduced-motion scheduling | Local viewport/DPI and repeated preference-change checks pass; all browser shards passed for candidate `3636bfbc`. Confirm the newest candidate separately. |
 | Background rendering | Transport, preparation and private validator checks pass. Counted text recording passes the repository Release O3 build, seven runtime checks, mutation rejection and skill18. The negative-fixture warning and no-Bidi admission gap are fixed. Wider suite/platform acceptance remains open. This does **not** establish renderer painting support. |
 | Shadow quality | [Measured test-only report](docs/design/SOFTWARE_V2_SHADOW_QUALITY.md) rejects four-sample reconstruction for general unequal scales. Legacy unit pixels match; admitted minification aliases. A bounded footprint-filtering prototype is next; no new shadow renderer support is claimed. |

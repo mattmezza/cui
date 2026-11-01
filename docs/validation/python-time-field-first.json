@@ -1,0 +1,30 @@
+{
+  "base": "f6a3bf37",
+  "source_checkpoint": "90ebeefd",
+  "current_library_sha256": "b56c14897bc22330e6d91c3e9b0b68b6beacd988d26a452ebe6ec9e7e0fc9d32",
+  "old_library_sha256": "44a76c34ddbb75b1d1ce428bd604a6d53321ee45c8d2a0c5a9894fa8c7334afa",
+  "command": "nice -n 19 taskset -c 1 python scripts/test_local.py --build-dir build-focused/python-time-field",
+  "result": "12/12 CTest entries PASS3.92s; localized14 no skips; legacy79 methods two optional skips; authored headless example passed",
+  "initial_failure": "12/13 localized methods passed, old-provider legacy time_field factory became module; fixed by collision-free time_field_localized.py rename",
+  "logs": [
+    "build-focused/python-time-field/first.log",
+    "build-focused/python-time-field/second.log",
+    "build-focused/python-time-field/third.log",
+    "build-focused/python-time-field/final-runtime.log"
+  ],
+  "source_sha256": {
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/bindings/python/cui_bridge/time_field_localized.py": "26e17b49fe5b67f56d416c24b7e7a4ea6810ee0cf13d577a3d18c1217681afc0",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/bindings/python/cui_bridge/__init__.py": "ed70dce140f57b7e136fe79513a21125876077f2b7fbb4e2d1e3715458cc0831",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/bindings/python/test_time_field.py": "bfed6d0678929f4657b92a781482760db3469e0a9a8386beacca0d98dd51ec6f",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/bindings/bridge/examples/time_field_localized.py": "d0e2c720ab659835d4f98c05458f93533c6cbad57a5086b5ee7f0f94ee4b50ce"
+  },
+  "pending": [
+    "canonical generation",
+    "usage6",
+    "skill18",
+    "freshness",
+    "actual CMake registration acceptance",
+    "native interactive example"
+  ],
+  "limits": "No C compiler/engine rebuild, package claim, IME/physical AT or one-root Tab claim. Partial-group tests synthetic loader protocol; real old-provider separate process."
+}

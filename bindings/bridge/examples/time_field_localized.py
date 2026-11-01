@@ -1,6 +1,6 @@
 """A complete Python-authored schedule UI; windowless demo or --font interactive.
 
-SOURCE CHECKPOINT: neither path has been run for this new binding yet.
+Headless path validated locally; optional native interactive path remains untested.
 """
 import argparse
 from dataclasses import replace

@@ -1,7 +1,9 @@
 # Python localized TimeField (source checkpoint)
 
-This additive Python source is prepared but **has not been imported, compiled or
-run under its validation lease**. It is not tested package functionality yet.
+Focused local runtime validation passed: 14 localized methods, the headless
+authored example and ten existing Python regression modules. Canonical resource,
+usage and installed-skill gates remain pending; no package or native-interactive
+validation is claimed.
 The C bridge has separate focused proof; see [bridge contract and limits](BRIDGE_TIME_FIELD_LOCALIZED.md).
 Existing scalar `time_field(...).time_value(...).on_change(...)` remains unchanged
 and usable with older libraries. JS/TS, Go and Rust localized authoring remain
@@ -127,4 +129,6 @@ preflight retry, readonly/disabled, callback exception/close/removal, owner and
 app-local queue, failed-frame delivery through an actual later Slider capacity
 failure, malformed copied records and each missing optional symbol. Actual old
 module proof uses optional `CUI_TIME_FIELD_OLD_LIBRARY` in a separate process;
-without that path it skips honestly. All these new checks remain unexecuted.
+without that path it skips honestly. The local run supplied the preserved old
+module and passed all 14 localized checks without skips; existing regression
+modules retained two unrelated optional skips.

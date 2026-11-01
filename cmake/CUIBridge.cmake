@@ -259,3 +259,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUI_TIME_FIELD_FROZEN_LEGACY_EXECUTABL
   --old-library-dir ${CUI_TIME_FIELD_FROZEN_LEGACY_LIBRARY_DIR}
   --new-library-dir $<TARGET_FILE_DIR:cui_bridge>)
 endif()
+
+# Localized TimeField remains an independent optional symbol group.
+set(CUI_PYTHON_TIME_FIELD_OLD_LIBRARY "" CACHE FILEPATH "Optional pre-localized bridge for Python compatibility proof")
+add_test(NAME bridge_python_time_field COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ CUI_TIME_FIELD_OLD_LIBRARY=${CUI_PYTHON_TIME_FIELD_OLD_LIBRARY}
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_time_field.py)
+add_test(NAME bridge_python_time_field_example COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/time_field_localized.py)

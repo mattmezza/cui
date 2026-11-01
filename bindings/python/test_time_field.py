@@ -1,4 +1,4 @@
-"""Localized authored UIs; source checkpoint, runtime validation not yet executed."""
+"""Localized authored UIs; focused actual-provider runtime and protocol checks."""
 import ctypes as C
 from dataclasses import FrozenInstanceError, replace
 import gc
@@ -16,10 +16,18 @@ from cui_bridge import (App, BridgeError, column, row, label, time_field,
     localized_time_field, TimeValue, TimeLocale, TimeFieldConfig, TimeCycle,
     TimePrecision, TimeTextStatus, slider_model, SliderConfig, SliderSingle)
 
-wire = importlib.import_module('cui_bridge.time_field')
+wire = importlib.import_module('cui_bridge.time_field_localized')
 
 
 class LocalizedTime(unittest.TestCase):
+    def test_legacy_factory_survives_typed_imports(self):
+        import cui_bridge
+        importlib.import_module('cui_bridge.time_field_localized')
+        self.assertEqual(cui_bridge.time_field('before').kind, 'time_field')
+        with App() as app:
+            app.supports_time_field()
+            self.assertEqual(cui_bridge.time_field('after').kind, 'time_field')
+
     def create(self, config=None, capacity=16):
         app = App(width=760, height=640)
         self.addCleanup(app.close)

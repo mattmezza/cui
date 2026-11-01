@@ -1178,7 +1178,7 @@
     ],
     "python_source_checkpoint": {
       "implementation": "Source prepared; no Python runtime, old-library, example, package or freshness proof yet. No tested localized binding support is advertised.",
-      "module": "bindings/python/cui_bridge/time_field.py",
+      "module": "bindings/python/cui_bridge/time_field_localized.py",
       "guide": "docs/PYTHON_TIME_FIELD_LOCALIZED.md",
       "test": "bindings/python/test_time_field.py",
       "example": "bindings/bridge/examples/time_field_localized.py",

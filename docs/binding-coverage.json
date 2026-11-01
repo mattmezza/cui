@@ -1196,5 +1196,42 @@
     },
     "root_receipt": "docs/validation/localized-facades-root.json",
     "go_rust_static_receipt": "docs/validation/time-field-static-root.json"
+  },
+  "skeleton_palette_and_presentation": {
+    "scope": "Additive C palette/fixed-painter and own-root responsive APIs; focused native/distribution proof. This does not upgrade legacy builder coverage.",
+    "public_headers": [
+      "include/cui/cui_skeleton_palette.h",
+      "include/cui/cui_skeleton_presentation.h"
+    ],
+    "languages": {
+      "python": "documented_omission",
+      "javascript": "documented_omission",
+      "typescript": "documented_omission",
+      "go": "documented_omission",
+      "rust": "documented_omission"
+    },
+    "legacy": "All five language builders retain their existing phase-based Skeleton route; palette, motion/easing and responsive presentation options are not exposed.",
+    "guides": [
+      "docs/SKELETON_PALETTE.md",
+      "docs/SKELETON_RESPONSIVE.md"
+    ],
+    "receipts": [
+      "docs/validation/skeleton-palette-root.json",
+      "docs/validation/skeleton-responsive-root.json"
+    ]
+  },
+  "owned_icon_resources_v1": {
+    "scope": "Complete optional C bridge resource/utilities group, negotiated independently; no configured node rendering consumer yet.",
+    "public_header": "include/cui/cui_bridge.h",
+    "languages": {
+      "python": "documented_omission",
+      "javascript": "documented_omission",
+      "typescript": "documented_omission",
+      "go": "documented_omission",
+      "rust": "documented_omission"
+    },
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Copied resources do not imply configured Icon/Badge authoring in any language.",
+    "guide": "docs/BRIDGE_ICON_RESOURCES.md",
+    "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

@@ -263,12 +263,18 @@ pub struct TimeFieldResult {
     pub queued_change_count: u32,
 }
 fn change_read(r: ChangeRaw, app_id: u64) -> Result<TimeFieldChange> {
+    observation_read(r, app_id, true)
+}
+fn observation_read(r: ChangeRaw, app_id: u64, applied: bool) -> Result<TimeFieldChange> {
     if r.size != 64
         || r.version != 1
         || r.reserved != 0
         || r.node.slot == 0
         || r.node.generation == 0
-        || r.validation > 6
+        || !matches!(r.validation, 0 | 3 | 4 | 5)
+        || r.frame == 0
+        || r.frame_status == 1
+        || (applied && r.previous == r.value)
         || r.frame_status > 10
         || !valid_time(r.previous)
         || !valid_time(r.value)
@@ -520,37 +526,9 @@ impl App {
             ..Default::default()
         };
         check(unsafe { (a.get_result)(self.raw, raw, &mut r) })?;
-        if r.size != 80
-            || r.version != 1
-            || r.reserved != [0, 0]
-            || r.status > 6
-            || r.changed > 1
-            || r.queued > 1
-        {
-            return Err(Error(7));
-        }
-        let change = change_read(
-            ChangeRaw {
-                size: 64,
-                version: 1,
-                frame_status: r.frame_status,
-                node: r.node,
-                frame: r.frame,
-                previous: r.previous,
-                value: r.value,
-                validation: r.validation,
-                rejected: r.rejected,
-                ..Default::default()
-            },
-            self.id,
-        )?;
-        Ok(TimeFieldResult {
-            change,
-            status: r.status,
-            changed: r.changed != 0,
-            queued_change_count: r.queued,
-        })
+        result_read(r, raw, self.id)
     }
+
     /// Independent typed queue. Call even after a failed step to inspect copied
     /// already-applied records. Poll consumes only on OK; no callback or replay.
     pub fn poll_time_field_change(&mut self) -> Result<Option<TimeFieldChange>> {
@@ -678,6 +656,7 @@ mod tests {
                 generation: 2,
             },
             frame_status: 10,
+            frame: 1,
             previous: Time {
                 hour: 8,
                 minute: 0,
@@ -696,5 +675,131 @@ mod tests {
         let mut bad = r;
         bad.reserved = 1;
         assert!(change_read(bad, 99).is_err());
+    }
+}
+
+fn result_read(r: ResultRaw, expected: RawNode, app_id: u64) -> Result<TimeFieldResult> {
+    if r.size != 80
+        || r.version != 1
+        || r.reserved != [0, 0]
+        || r.status > 6
+        || r.changed > 1
+        || r.queued > r.changed
+        || r.node != expected
+        || r.frame_status != 0
+        || (r.changed != 0) != (r.previous != r.value)
+    {
+        return Err(Error(7));
+    }
+    let change = observation_read(
+        ChangeRaw {
+            size: 64,
+            version: 1,
+            frame_status: r.frame_status,
+            node: r.node,
+            frame: r.frame,
+            previous: r.previous,
+            value: r.value,
+            validation: r.validation,
+            rejected: r.rejected,
+            ..Default::default()
+        },
+        app_id,
+        false,
+    )?;
+    Ok(TimeFieldResult {
+        change,
+        status: r.status,
+        changed: r.changed != 0,
+        queued_change_count: r.queued,
+    })
+}
+#[cfg(test)]
+mod malformed_tests {
+    use super::*;
+    fn change() -> ChangeRaw {
+        ChangeRaw {
+            size: 64,
+            version: 1,
+            node: RawNode {
+                slot: 1,
+                generation: 2,
+            },
+            frame: 1,
+            previous: Time {
+                hour: 8,
+                minute: 0,
+                second: 0,
+            },
+            value: Time {
+                hour: 9,
+                minute: 0,
+                second: 0,
+            },
+            ..Default::default()
+        }
+    }
+    #[test]
+    fn invalid_applied_metadata() {
+        let r = change();
+        assert!(change_read(r, 1).is_ok());
+        let mut bad = r;
+        bad.frame = 0;
+        assert!(change_read(bad, 1).is_err());
+        bad = r;
+        bad.frame_status = 1;
+        assert!(change_read(bad, 1).is_err());
+        for v in [1, 2, 6] {
+            bad = r;
+            bad.validation = v;
+            assert!(change_read(bad, 1).is_err())
+        }
+        bad = r;
+        bad.value = bad.previous;
+        assert!(change_read(bad, 1).is_err());
+    }
+    #[test]
+    fn unchanged_latest_result_is_not_an_applied_record() {
+        let r = ResultRaw {
+            size: 80,
+            version: 1,
+            node: RawNode {
+                slot: 1,
+                generation: 2,
+            },
+            frame: 1,
+            previous: Time {
+                hour: 8,
+                minute: 0,
+                second: 0,
+            },
+            value: Time {
+                hour: 8,
+                minute: 0,
+                second: 0,
+            },
+            ..Default::default()
+        };
+        let out = result_read(r, r.node, 1).unwrap();
+        assert!(!out.changed);
+        assert_eq!(out.queued_change_count, 0);
+        let mut bad = r;
+        bad.changed = 1;
+        assert!(result_read(bad, r.node, 1).is_err());
+        bad = r;
+        bad.queued = 1;
+        assert!(result_read(bad, r.node, 1).is_err());
+        bad = r;
+        bad.frame_status = 1;
+        assert!(result_read(bad, r.node, 1).is_err());
+        assert!(result_read(
+            r,
+            RawNode {
+                slot: 2,
+                generation: 2
+            },
+            1
+        )
+        .is_err());
     }
 }

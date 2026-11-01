@@ -76,6 +76,8 @@ fn main() -> Result<()> {
         let out = commands.clone();
         app.on_click(n, move || out.borrow_mut().push(i as u8))?;
     }
+    let applied = Rc::new(RefCell::new(Vec::<TimeFieldChange>::new()));
+    let history = applied.clone();
     let mut apply = move |app: &mut App| -> Result<()> {
         for command in commands.borrow_mut().drain(..) {
             let mut next = english.clone();
@@ -110,6 +112,7 @@ fn main() -> Result<()> {
             english = next;
         }
         for c in changes.borrow_mut().drain(..) {
+            history.borrow_mut().push(c.clone());
             app.text(
                 summary,
                 &format!(
@@ -147,6 +150,38 @@ fn main() -> Result<()> {
             second: 0
         }
     );
-    println!("English applied: {:?}", app.localized_time_result(en)?);
+    assert_eq!(
+        app.localized_time_result(en)?.change.value,
+        Time {
+            hour: 10,
+            minute: 45,
+            second: 0
+        }
+    );
+    assert_eq!(applied.borrow().len(), 2);
+    assert_eq!(
+        applied.borrow()[0].value,
+        Time {
+            hour: 10,
+            minute: 45,
+            second: 0
+        }
+    );
+    assert_eq!(
+        applied.borrow()[1].value,
+        Time {
+            hour: 15,
+            minute: 20,
+            second: 0
+        }
+    );
+    assert_eq!(
+        app.editable_text(summary)?,
+        "Applied 14:15 → 15:20; frame status 0"
+    );
+    println!(
+        "English10:45 Arabic15:20 callbacks2; {}",
+        app.editable_text(summary)?
+    );
     Ok(())
 }

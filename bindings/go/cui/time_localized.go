@@ -213,13 +213,14 @@ func timeHeader(size int) []byte {
 	timePut(b, 4, 1)
 	return b
 }
-func timeChangeRead(b []byte) (TimeFieldChange, error) {
+func timeChangeRead(b []byte) (TimeFieldChange, error) { return timeObservationRead(b, true) }
+func timeObservationRead(b []byte, applied bool) (TimeFieldChange, error) {
 	c := TimeFieldChange{}
 	if len(b) != 64 || timeGet(b, 0) != 64 || timeGet(b, 4) != 1 || timeGet(b, 12) != 0 {
 		return c, errors.New("invalid TimeField change header")
 	}
 	c = TimeFieldChange{Handle: Handle{timeGet(b, 16), timeGet(b, 20)}, Frame: binary.NativeEndian.Uint64(b[24:]), Previous: timeRead(b, 32), Value: timeRead(b, 44), Validation: timeGet(b, 56), RejectedCount: timeGet(b, 60), FrameStatus: timeGet(b, 8)}
-	if c.Handle.Slot == 0 || c.Handle.Generation == 0 || c.Validation > 6 || c.FrameStatus > 10 || !timeValid(c.Previous, TimeSecond) || !timeValid(c.Value, TimeSecond) {
+	if c.Handle.Slot == 0 || c.Handle.Generation == 0 || (c.Validation != 0 && c.Validation != 3 && c.Validation != 4 && c.Validation != 5) || c.Frame == 0 || c.FrameStatus == 1 || c.FrameStatus > 10 || (applied && c.Previous == c.Value) || !timeValid(c.Previous, TimeSecond) || !timeValid(c.Value, TimeSecond) {
 		return TimeFieldChange{}, errors.New("invalid TimeField change values")
 	}
 	return c, nil
@@ -325,6 +326,12 @@ func (a *App) LocalizedTimeResult(n *Node) (TimeFieldResult, error) {
 	if _, e := a.timeCall(n, 4, 0, b); e != nil {
 		return TimeFieldResult{}, e
 	}
+	return timeResultRead(b, Handle{uint32(n.handle.slot), uint32(n.handle.generation)})
+}
+func timeResultRead(b []byte, expected Handle) (TimeFieldResult, error) {
+	if len(b) != 80 {
+		return TimeFieldResult{}, errors.New("invalid TimeField result size")
+	}
 	if timeGet(b, 0) != 80 || timeGet(b, 4) != 1 || timeGet(b, 8) != 0 || timeGet(b, 12) != 0 || timeGet(b, 32) > 6 || timeGet(b, 40) > 1 || timeGet(b, 72) > 1 {
 		return TimeFieldResult{}, errors.New("invalid TimeField result")
 	}
@@ -334,8 +341,15 @@ func (a *App) LocalizedTimeResult(n *Node) (TimeFieldResult, error) {
 	timePut(raw, 8, timeGet(b, 76))
 	timePut(raw, 56, timeGet(b, 36))
 	timePut(raw, 60, timeGet(b, 44))
-	c, e := timeChangeRead(raw)
-	return TimeFieldResult{c, timeGet(b, 32), timeGet(b, 40) != 0, timeGet(b, 72)}, e
+	c, e := timeObservationRead(raw, false)
+	if e != nil {
+		return TimeFieldResult{}, e
+	}
+	changed := timeGet(b, 40) != 0
+	if c.Handle != expected || c.FrameStatus != 0 || changed != (c.Previous != c.Value) || timeGet(b, 72) > timeGet(b, 40) {
+		return TimeFieldResult{}, errors.New("inconsistent TimeField result")
+	}
+	return TimeFieldResult{c, timeGet(b, 32), changed, timeGet(b, 72)}, nil
 }
 func (a *App) PollTimeFieldChange() (TimeFieldChange, bool, error) {
 	b := timeHeader(64)

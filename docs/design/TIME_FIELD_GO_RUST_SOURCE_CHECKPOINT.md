@@ -32,3 +32,10 @@ The final private wrapper passed9/9 checks14.66s, including actual old/partial
 providers and English/Arabic authored examples. See the hashed dynamic receipt.
 Default static, canonical regeneration, installed packages and true later-frame
 failure interop remain pending. The heavy lease was released before documentation.
+
+Final targeted followup passed9/9 private-wrapper checks14.08s after strict
+applied/latest decoder separation. Nonzero-frame/status/validation domains,
+changed/queued consistency and requested-node identity have malformed controls;
+valid unchanged latest results still pass. Both real authored examples assert
+English10:45, Arabic15:20, copiedcallbackcount2 and actual summary node text.
+The prior14.66s regression batch and all first failures remain immutable logs.

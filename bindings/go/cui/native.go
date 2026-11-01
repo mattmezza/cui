@@ -3914,6 +3914,9 @@ func (a *App) timeCall(n *Node, op uint32, capacity uint32, bytes []byte) (uint3
 	if e := a.check(); e != nil {
 		return 0, e
 	}
+	if op >= 2 && op <= 5 && n == nil {
+		return 0, errors.New("nil localized TimeField")
+	}
 	var h C.cui_bridge_node
 	if n != nil {
 		if n.app != a || n.removed || n.kind != 55 {

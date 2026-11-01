@@ -1,6 +1,7 @@
 package cui
 
 import (
+	"encoding/binary"
 	"os"
 	"reflect"
 	"testing"
@@ -107,6 +108,7 @@ func TestLocalizedTimeWrongKindAndMountRollback(t *testing.T) {
 func TestLocalizedTimeCopiedFailureProtocol(t *testing.T) {
 	b := timeHeader(64)
 	timePut(b, 8, 10)
+	binary.NativeEndian.PutUint64(b[24:], 1)
 	timePut(b, 16, 1)
 	timePut(b, 20, 2)
 	timeWrite(b, 32, Time{Hour: 8})
@@ -255,5 +257,48 @@ func TestLocalizedTimeOwnerPanicCloseLifecycle(t *testing.T) {
 	check(t, e)
 	if !a.closed || owned.Value.Hour != 11 {
 		t.Fatal(owned)
+	}
+}
+
+func TestLocalizedTimeMalformedObservationsAndUnchangedResult(t *testing.T) {
+	b := timeHeader(64)
+	timePut(b, 16, 1)
+	timePut(b, 20, 2)
+	binary.NativeEndian.PutUint64(b[24:], 1)
+	timeWrite(b, 32, Time{Hour: 8})
+	timeWrite(b, 44, Time{Hour: 9})
+	for _, poison := range []struct {
+		offset int
+		value  uint32
+	}{{24, 0}, {8, 1}, {56, 1}, {56, 2}, {56, 6}} {
+		bad := append([]byte(nil), b...)
+		timePut(bad, poison.offset, poison.value)
+		if _, e := timeChangeRead(bad); e == nil {
+			t.Fatal("malformed accepted", poison)
+		}
+	}
+	same := append([]byte(nil), b...)
+	timeWrite(same, 44, Time{Hour: 8})
+	if _, e := timeChangeRead(same); e == nil {
+		t.Fatal("unchanged applied record")
+	}
+	r := timeHeader(80)
+	copy(r[16:32], b[16:32])
+	timeWrite(r, 48, Time{Hour: 8})
+	timeWrite(r, 60, Time{Hour: 8})
+	out, e := timeResultRead(r, Handle{1, 2})
+	check(t, e)
+	if out.Changed || out.QueuedChangeCount != 0 {
+		t.Fatal(out)
+	}
+	for _, poison := range []struct {
+		offset int
+		value  uint32
+	}{{40, 1}, {72, 1}, {76, 1}, {16, 3}} {
+		bad := append([]byte(nil), r...)
+		timePut(bad, poison.offset, poison.value)
+		if _, e := timeResultRead(bad, Handle{1, 2}); e == nil {
+			t.Fatal("inconsistent result", poison)
+		}
 	}
 }

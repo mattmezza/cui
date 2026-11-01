@@ -116,7 +116,8 @@ replay occurs in either wrapper.
 fields, same-day bounds, read-only/disabled/bounds toggles, validation clearing and
 summary updates from copied callbacks. Default mode is windowless scripted input;
 `--native` uses existing host run and real input, requiring `CUI_TEST_FONT`.
-The windowless scripts ran with both actual localized values asserted. Native
+The windowless scripts assert English10:45, Arabic15:20, exactly two copied
+callback observations and the actual summary node text. Native
 interactive mode has not run. Automated native runs must use the private-Xvfb wrapper;
 never launch these examples on the maintainer desktop during validation.
 
@@ -132,3 +133,11 @@ Still required: real later-failed-frame copied observations at the facade bounda
 additional schema-poison providers, native run unwind, MSRV/installed-package and
 static source closure, canonical SDK generation and required skill tests. No full
 binding/source-family parity follows from these focused checks.
+
+
+The final decoder gate separately validates applied changes and latest results:
+applied records require a nonzero frame, non-EMPTY bridge status, validation
+OK/syntax/value/range and a genuine value difference. Latest results may be
+unchanged, but must identify the requested node, report a healthy frame, agree
+with their changed bit and never claim more queued changes than applied change.
+Malformed-wire and valid-unchanged controls passed alongside real queue tests.

@@ -85,7 +85,15 @@ func main() {
 	}
 	value, e := a.Time(en)
 	must(e)
-	fmt.Printf("English applied: %+v\n", value)
+	if value != (cui.Time{Hour: 10, Minute: 45}) {
+		panic("English edit missing")
+	}
+	summaryText, e := a.Text(summary)
+	must(e)
+	if summaryText != "Applied 14:15 → 15:20; frame status 0" {
+		panic("copied callback summary missing")
+	}
+	fmt.Printf("English applied: %+v; Arabic applied: %+v; callbacks=%d; %s\n", value, arabicValue, changes, summaryText)
 }
 func must(e error) {
 	if e != nil {

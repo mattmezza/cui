@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New component, binding and renderer work is **unreleased**. The 559-test Linux baseline predates newer slices; focused acceptance covers subsequent changes. Browser/touch evidence is tied to its artifact revision. A fresh combined regression run, platform acceptance and publication remain unfinished. |
+| Integration branch | New component, binding and renderer work is **unreleased**. Current Linux run: **580/581 passed**; its only failure was a Badge guide/metadata mismatch, repaired with the affected check passing. Browser/touch evidence remains tied to its artifact revision. Platform acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -29,7 +29,7 @@ feature test does not establish complete component parity.
 
 ## Next milestones, in order
 
-1. **Finish active slices:** refresh combined regressions after focused dynamic and bundled-source static acceptance of localized facades. Keep SDK/amalgamation/skill resources aligned. SDL V2 and Python have focused root acceptance; broader regressions, lifecycle and delivery remain open.
+1. **Finish active slices:** validate the prepared Skeleton palette/paint and owned Icon-resource slices; localized facades have focused dynamic and bundled-source static acceptance. Keep SDK/amalgamation/skill resources aligned. SDL V2 and Python have focused root acceptance; broader regressions, lifecycle and delivery remain open.
 2. **Close component and ecosystem gaps:** reconcile every family with the frozen
    baseline and the reported regressions below; finish bindings and documentation.
 3. **Validate the integrated revision:** compatibility, headless regressions,
@@ -46,7 +46,7 @@ feature test does not establish complete component parity.
 | Skeleton | Frozen-source audit confirmed missing dedicated theme background, full/fraction root sizing and modern options in all five bindings. An additive palette/paint contract is approved; implementation and acceptance are underway. Existing motion checks do not close these gaps. See `docs/design/SKELETON_PARITY_CHECKPOINT.md`. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), SDL integration is now covered by focused checks; the other three adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Linux integration `7c7ac4e0`: **559/559 headless tests pass, zero skips** (298.22s), including Dialog, localized TimeField and generated-skill checks. Full headless browser gate passes on artifact `f728908e`, including all 78 stories and 80 compiled usage excerpts. All 42 representative touch cases pass. **This baseline predates SDL V2, the localized bridge/facades and configured Badge changes.** Focused subsequent checks do not replace a new combined run; platform acceptance and publication remain open. |
+| Validation | Current integrated C runtime: **580/581** in the full private-Xvfb run (309.96s), zero CTest skips. The sole Badge ownership-guide mismatch was repaired; affected documentation check passes (1/1, six methods). No runtime code changed in that repair. Node separately passes 81/81; bundled-source Go/Rust passes 3/3. Browser artifact `f728908e` passes all 78 stories/80 excerpts; 42 touch cases pass. New isolated Skeleton/Icon production is not covered yet. |
 
 **Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
@@ -146,7 +146,7 @@ Current integration evidence (not yet on `main`):
 
 | Slice | Evidence | Still required |
 | --- | --- | --- |
-| Combined Linux regression | `7c7ac4e0`: 559/559 headless tests, zero skips (298.22s), including Dialog and localized TimeField | Repeat after newer integrated production slices; this baseline predates SDL V2, localized bridge/facades and configured Badge. |
+| Combined Linux regression | `8c155687` plus guide-only repair: full run 580/581, zero CTest skips (309.96s); repaired Badge guide check 1/1 (8.26s), six methods | Repeat applicable checks after new production slices. Preserve the original failed run; do not report a single 581/581 run. |
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `f728908e` pass | Broader lifecycle and deployment; nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and focused plus full browser gates pass | Broader touch/IME and platform coverage; C bridge/Python have focused root acceptance, Go/Rust bundled-source static acceptance passes; broader package/native acceptance remains open. |
 

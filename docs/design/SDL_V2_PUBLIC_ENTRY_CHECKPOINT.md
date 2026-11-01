@@ -164,3 +164,14 @@ warnings. This diagnostic is distinct from an actual Emscripten/SDL ABI claim.
 The constructor-byte result concerns CUI's sole opaque-object calloc request;
 SDL/runtime allocation behavior still requires the frozen paired runtime gate.
 No microgate execution occurred while root held the browser/heavy lease.
+
+## Measured guard layout (2026-11-01)
+
+The four compile-only original/candidate probes pass on native and wasm32.
+All 37 existing offsets and alignment8 are unchanged. Native size/constructor
+request grows27384→27392 bytes (+8); wasm32 remains24192 bytes (+0).
+Exact commands, frozen authority and all constants are recorded in
+`docs/validation/sdl-v2-guard-layout.json`. No SDL function was invoked.
+This supplies the requested measurement, not approval or implementation of the
+proposed public entry points. Native failure mapping, guard behavior and original
+V1 runtime differential acceptance remain required.

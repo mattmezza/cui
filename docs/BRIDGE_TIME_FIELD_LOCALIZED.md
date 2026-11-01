@@ -177,3 +177,21 @@ unshared module verification remain pending for this new route. The optional
 `CUI_TIME_FIELD_FROZEN_LEGACY_LIBRARY_DIR`; it uses the committed comparison runner
 inside the private wrapper. Worker equivalent scratch registration passed; the
 integrator must validate the durable CMake registration.
+
+
+## Geometry and deterministic headless input
+
+A newly mounted localized field needs ordinary host frames to establish current
+layout and an admitted input snapshot. Its latest-result getter can return
+INVALID_STATE before that readiness; bounds alone do not prove input admission.
+The complete examples warm ordinary frames and check the public latest result
+before injecting deterministic pointer/text input. Keep such synchronization
+bounded in tests; do not add sleeps, replay input or bypass the C reducer.
+
+The node bounds describe the compound field, including separators. A center
+click can land on a noneditable colon in minute precision. Target an actual
+editable segment when writing synthetic interaction tests. The supplied examples
+use the first text region and verify applied English/Arabic values plus copied
+callback outcomes. Native applications use the ordinary host loop and real input;
+this test setup does not authorize a new dispatch or focus policy. One-root Tab
+and IME acceptance remain explicit separate gaps.

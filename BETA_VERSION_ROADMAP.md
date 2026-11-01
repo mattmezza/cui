@@ -35,7 +35,7 @@ feature test does not establish complete component parity.
 | --- | --- |
 | Dialog and scrolling | Current-frame geometry, frozen compatibility and small-viewport proofs pass. Nested Dialog close/reopen can still retain an old routed touch scroll; finish and verify lifecycle cancellation before integration. |
 | Typed Slider | C Base/Styled models and controlled gallery are integrated. Full browser regression, 42 representative touch checks and 19 mobile navigation checks pass locally. C bridge is under review, including failed-frame authority and metadata; five language builders and native numeric delivery remain open. |
-| Backgrounds, shadows and text | Transport, counted text preparation and private ordinary software painter are integrated. Private shadow profiles pass frozen comparisons. Transactional private shadow painting passes worker tests but awaits integrator acceptance. Text painting and public support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain open. |
+| Backgrounds, shadows and text | Transport, counted text preparation and private ordinary software painter are integrated. Private shadow profiles pass frozen comparisons. Transactional private shadow painting is integrated; worker checks pass (3/3, 48 mixed frames plus legacy comparisons). Combined-source acceptance remains open. Text painting and public support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain open. |
 | Validation | Candidate `00aa1f99` passed hosted CI/native bindings; Pages still needs terminal confirmation. Those results do not cover newer integration work. A fresh combined build/test gate remains required. |
 
 ## Remaining beta scope

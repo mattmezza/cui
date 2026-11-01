@@ -37,9 +37,8 @@ cui_skeleton_presentation cui_skeleton_presentation_default(void);
  * completed frame diagnostics; later Core errors do not rollback state/effects.
  * Registered scroll percent HEIGHT remains subject to existing Core rejection.
  * No semantics/focus/busy node; applications own meaningful loading regions. */
-bool cui_skeleton_present(cui_context *, cui_id, const cui_skeleton_palette *,
-                          cui_loading_motion *, cui_skeleton_presentation,
-                          cui_loading_motion_result *);
+bool cui_skeleton_present(cui_context *, cui_id, const cui_skeleton_palette *, cui_loading_motion *,
+                          cui_skeleton_presentation, cui_loading_motion_result *);
 #ifdef __cplusplus
 }
 #endif
@@ -58,7 +57,7 @@ bool cui_skeleton_present(cui_context *, cui_id, const cui_skeleton_palette *,
 #include <math.h>
 cui_skeleton_presentation cui_skeleton_presentation_default(void) {
     return (cui_skeleton_presentation){.root = {.width = 1, .height = 16, .width_percent = true},
-                                        .duration = 2};
+                                       .duration = 2};
 }
 bool cui_skeleton_present(cui_context *ui, cui_id id, const cui_skeleton_palette *palette,
                           cui_loading_motion *state, cui_skeleton_presentation presentation,

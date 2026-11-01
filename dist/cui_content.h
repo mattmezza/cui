@@ -4,8 +4,8 @@
 #define CUI_CONTENT_H
 #include "cui_base.h"
 #include "cui_icon.h"
-#include "cui_theme.h"
 #include "cui_skeleton_palette.h"
+#include "cui_theme.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1526,12 +1526,12 @@ bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_load
     return true;
 }
 static bool cui_skeleton_color(cui_context *ui, cui_id id, const cui_color *source_color,
-                                cui_loading_motion *state, cui_skeleton_options o,
-                                cui_loading_motion_result *out) {
-    if (!ui || !id || !state || !out || !isfinite(o.width) || o.width <= 0 ||
-        o.width > 4096 || !isfinite(o.height) || o.height <= 0 || o.height > 4096 ||
-        !isfinite(o.radius) || o.radius < 0 || o.radius > 4096 || !isfinite(o.duration) ||
-        o.duration < 0 || o.duration > 60)
+                               cui_loading_motion *state, cui_skeleton_options o,
+                               cui_loading_motion_result *out) {
+    if (!ui || !id || !state || !out || !isfinite(o.width) || o.width <= 0 || o.width > 4096 ||
+        !isfinite(o.height) || o.height <= 0 || o.height > 4096 || !isfinite(o.radius) ||
+        o.radius < 0 || o.radius > 4096 || !isfinite(o.duration) || o.duration < 0 ||
+        o.duration > 60)
         return false;
     cui_loading_motion next = *state;
     cui_loading_motion_result result;
@@ -1551,14 +1551,13 @@ static bool cui_skeleton_color(cui_context *ui, cui_id id, const cui_color *sour
     *out = result;
     return true;
 }
-bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme,
-                     cui_loading_motion *state, cui_skeleton_options o,
-                     cui_loading_motion_result *out) {
+bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
+                     cui_skeleton_options o, cui_loading_motion_result *out) {
     return theme && cui_skeleton_color(ui, id, &theme->secondary, state, o, out);
 }
-bool cui_skeleton_with_palette(cui_context *ui, cui_id id,
-                               const cui_skeleton_palette *palette, cui_loading_motion *state,
-                               cui_skeleton_options o, cui_loading_motion_result *out) {
+bool cui_skeleton_with_palette(cui_context *ui, cui_id id, const cui_skeleton_palette *palette,
+                               cui_loading_motion *state, cui_skeleton_options o,
+                               cui_loading_motion_result *out) {
     if (!palette)
         return false;
     /* New owned-palette route deliberately snapshots before callbacks. */

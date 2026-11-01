@@ -71,18 +71,25 @@ static bool bridge_time_zero(cui_bridge_time t) {
 }
 static uint32_t bridge_time_status(cui_time_text_status_v1 s) {
     switch (s) {
-    case CUI_TIME_TEXT_OK: return CUI_BRIDGE_TIME_OK_V1;
-    case CUI_TIME_TEXT_INVALID_ARGUMENT: return CUI_BRIDGE_TIME_INVALID_ARGUMENT_V1;
-    case CUI_TIME_TEXT_INVALID_CONFIG: return CUI_BRIDGE_TIME_INVALID_CONFIG_V1;
-    case CUI_TIME_TEXT_INVALID_SYNTAX: return CUI_BRIDGE_TIME_INVALID_SYNTAX_V1;
-    case CUI_TIME_TEXT_INVALID_VALUE: return CUI_BRIDGE_TIME_INVALID_VALUE_V1;
-    case CUI_TIME_TEXT_OUT_OF_RANGE: return CUI_BRIDGE_TIME_OUT_OF_RANGE_V1;
-    case CUI_TIME_TEXT_BUFFER_TOO_SMALL: return CUI_BRIDGE_TIME_BUFFER_TOO_SMALL_V1;
+    case CUI_TIME_TEXT_OK:
+        return CUI_BRIDGE_TIME_OK_V1;
+    case CUI_TIME_TEXT_INVALID_ARGUMENT:
+        return CUI_BRIDGE_TIME_INVALID_ARGUMENT_V1;
+    case CUI_TIME_TEXT_INVALID_CONFIG:
+        return CUI_BRIDGE_TIME_INVALID_CONFIG_V1;
+    case CUI_TIME_TEXT_INVALID_SYNTAX:
+        return CUI_BRIDGE_TIME_INVALID_SYNTAX_V1;
+    case CUI_TIME_TEXT_INVALID_VALUE:
+        return CUI_BRIDGE_TIME_INVALID_VALUE_V1;
+    case CUI_TIME_TEXT_OUT_OF_RANGE:
+        return CUI_BRIDGE_TIME_OUT_OF_RANGE_V1;
+    case CUI_TIME_TEXT_BUFFER_TOO_SMALL:
+        return CUI_BRIDGE_TIME_BUFFER_TOO_SMALL_V1;
     }
     return UINT32_MAX;
 }
-static cui_bridge_status bridge_time_bytes(const uint8_t *bytes, uint32_t length,
-                                            uint32_t capacity, bool empty) {
+static cui_bridge_status bridge_time_bytes(const uint8_t *bytes, uint32_t length, uint32_t capacity,
+                                           bool empty) {
     if (length > capacity || (!length && !empty))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     for (uint32_t i = length; i < capacity; i++)
@@ -98,7 +105,7 @@ static cui_bridge_status bridge_time_bytes(const uint8_t *bytes, uint32_t length
 }
 /* Views borrow only the immutable owned/candidate config during this call. */
 static void bridge_time_options(const cui_bridge_time_field_config_v1 *c,
-                                  cui_time_locale_v1 *locale, cui_time_field_options_v1 *o) {
+                                cui_time_locale_v1 *locale, cui_time_field_options_v1 *o) {
     cui_time_field_options_init_v1(o);
     cui_time_locale_init_v1(locale);
     for (unsigned i = 0; i < 10; i++)
@@ -107,13 +114,19 @@ static void bridge_time_options(const cui_bridge_time_field_config_v1 *c,
     locale->period_separator = (cui_str){(const char *)c->tokens[11].bytes, c->tokens[11].length};
     locale->am = (cui_str){(const char *)c->tokens[12].bytes, c->tokens[12].length};
     locale->pm = (cui_str){(const char *)c->tokens[13].bytes, c->tokens[13].length};
-    if (c->flags & CUI_BRIDGE_TIME_FIELD_DISABLED_V1) o->flags |= CUI_TIME_FIELD_DISABLED_V1;
-    if (c->flags & CUI_BRIDGE_TIME_FIELD_READONLY_V1) o->flags |= CUI_TIME_FIELD_READONLY_V1;
-    if (c->flags & CUI_BRIDGE_TIME_FIELD_OWNER_INVALID_V1) o->flags |= CUI_TIME_FIELD_OWNER_INVALID_V1;
+    if (c->flags & CUI_BRIDGE_TIME_FIELD_DISABLED_V1)
+        o->flags |= CUI_TIME_FIELD_DISABLED_V1;
+    if (c->flags & CUI_BRIDGE_TIME_FIELD_READONLY_V1)
+        o->flags |= CUI_TIME_FIELD_READONLY_V1;
+    if (c->flags & CUI_BRIDGE_TIME_FIELD_OWNER_INVALID_V1)
+        o->flags |= CUI_TIME_FIELD_OWNER_INVALID_V1;
     o->text.cycle = c->cycle == CUI_BRIDGE_TIME_H12_V1 ? CUI_TIME_TEXT_H12 : CUI_TIME_TEXT_H23;
-    o->text.precision = c->precision == CUI_BRIDGE_TIME_SECOND_V1 ? CUI_TIME_TEXT_SECOND : CUI_TIME_TEXT_MINUTE;
-    if (c->bounds_flags & CUI_BRIDGE_TIME_HAS_MINIMUM_V1) o->text.flags |= CUI_TIME_TEXT_HAS_MINIMUM_V1;
-    if (c->bounds_flags & CUI_BRIDGE_TIME_HAS_MAXIMUM_V1) o->text.flags |= CUI_TIME_TEXT_HAS_MAXIMUM_V1;
+    o->text.precision =
+        c->precision == CUI_BRIDGE_TIME_SECOND_V1 ? CUI_TIME_TEXT_SECOND : CUI_TIME_TEXT_MINUTE;
+    if (c->bounds_flags & CUI_BRIDGE_TIME_HAS_MINIMUM_V1)
+        o->text.flags |= CUI_TIME_TEXT_HAS_MINIMUM_V1;
+    if (c->bounds_flags & CUI_BRIDGE_TIME_HAS_MAXIMUM_V1)
+        o->text.flags |= CUI_TIME_TEXT_HAS_MAXIMUM_V1;
     o->text.minimum = bridge_time_value(c->minimum);
     o->text.maximum = bridge_time_value(c->maximum);
     o->text.locale = locale;
@@ -129,27 +142,39 @@ static cui_bridge_status bridge_time_config(const cui_bridge_time_field_config_v
         return CUI_BRIDGE_INVALID_ARGUMENT;
     for (unsigned i = 0; i < 14; i++) {
         cui_bridge_status s = bridge_time_bytes(c->tokens[i].bytes, c->tokens[i].length, 16, false);
-        if (s != CUI_BRIDGE_OK) return s;
+        if (s != CUI_BRIDGE_OK)
+            return s;
     }
     for (unsigned i = 0; i < 4; i++) {
         cui_bridge_status s = bridge_time_bytes(c->names[i].bytes, c->names[i].length, 64, true);
-        if (s != CUI_BRIDGE_OK) return s;
+        if (s != CUI_BRIDGE_OK)
+            return s;
     }
     cui_time_locale_v1 locale;
     cui_time_field_options_v1 options;
     bridge_time_options(c, &locale, &options);
     cui_time_text_status_v1 s = cui_time_validate_v1((cui_time){0}, &options.text);
-    return s == CUI_TIME_TEXT_OK || s == CUI_TIME_TEXT_OUT_OF_RANGE
-               ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_ARGUMENT;
+    return s == CUI_TIME_TEXT_OK || s == CUI_TIME_TEXT_OUT_OF_RANGE ? CUI_BRIDGE_OK
+                                                                    : CUI_BRIDGE_INVALID_ARGUMENT;
 }
-uint32_t cui_bridge_time_field_versions(void) { return BRIDGE_SLIDER_SUPPORTED ? 1u : 0u; }
-uint32_t cui_bridge_time_field_config_size_v1(void) { return sizeof(cui_bridge_time_field_config_v1); }
-uint32_t cui_bridge_time_field_result_size_v1(void) { return sizeof(cui_bridge_time_field_result_v1); }
-uint32_t cui_bridge_time_field_change_size_v1(void) { return sizeof(cui_bridge_time_field_change_v1); }
+uint32_t cui_bridge_time_field_versions(void) {
+    return BRIDGE_SLIDER_SUPPORTED ? 1u : 0u;
+}
+uint32_t cui_bridge_time_field_config_size_v1(void) {
+    return sizeof(cui_bridge_time_field_config_v1);
+}
+uint32_t cui_bridge_time_field_result_size_v1(void) {
+    return sizeof(cui_bridge_time_field_result_v1);
+}
+uint32_t cui_bridge_time_field_change_size_v1(void) {
+    return sizeof(cui_bridge_time_field_change_v1);
+}
 cui_bridge_status cui_bridge_time_field_enable_v1(cui_bridge_app *app, uint32_t requested) {
-    if (requested > 4096) return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (requested > 4096)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     cui_bridge_status s = bridge_time_ready(app);
-    if (s != CUI_BRIDGE_OK) return s;
+    if (s != CUI_BRIDGE_OK)
+        return s;
     uint32_t capacity = requested ? requested : 4096;
     if (app->time_fields)
         return capacity == app->time_fields->capacity ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_STATE;
@@ -159,10 +184,12 @@ cui_bridge_status cui_bridge_time_field_enable_v1(cui_bridge_app *app, uint32_t 
     offset = (offset + alignment - 1) / alignment * alignment;
     uint64_t bytes = offset + (uint64_t)capacity * sizeof(cui_bridge_time_field_change_v1);
 #if SIZE_MAX < UINT64_MAX
-    if (bytes > SIZE_MAX) return CUI_BRIDGE_CAPACITY;
+    if (bytes > SIZE_MAX)
+        return CUI_BRIDGE_CAPACITY;
 #endif
     bridge_time_app *state = calloc(1, (size_t)bytes);
-    if (!state) return CUI_BRIDGE_OUT_OF_MEMORY;
+    if (!state)
+        return CUI_BRIDGE_OUT_OF_MEMORY;
     state->owner = bridge_slider_owner();
     state->nodes = (bridge_time_owned **)(state + 1);
     state->queue = (cui_bridge_time_field_change_v1 *)((unsigned char *)state + (size_t)offset);
@@ -172,25 +199,34 @@ cui_bridge_status cui_bridge_time_field_enable_v1(cui_bridge_app *app, uint32_t 
 }
 cui_bridge_status cui_bridge_time_field_configure_v1(cui_bridge_app *app, cui_bridge_node handle,
                                                      const cui_bridge_time_field_config_v1 *c) {
-    if (!c || c->struct_size != sizeof *c || c->version != 1) return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (!c || c->struct_size != sizeof *c || c->version != 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     cui_bridge_status s = bridge_time_ready(app);
-    if (s != CUI_BRIDGE_OK) return s;
-    if (!app->time_fields) return CUI_BRIDGE_INVALID_STATE;
+    if (s != CUI_BRIDGE_OK)
+        return s;
+    if (!app->time_fields)
+        return CUI_BRIDGE_INVALID_STATE;
     cui_bridge_node_record *node = bridge_node(app, handle);
-    if (!node) return CUI_BRIDGE_STALE_HANDLE;
-    if (node->kind != CUI_BRIDGE_TIME_FIELD) return CUI_BRIDGE_INVALID_STATE;
+    if (!node)
+        return CUI_BRIDGE_STALE_HANDLE;
+    if (node->kind != CUI_BRIDGE_TIME_FIELD)
+        return CUI_BRIDGE_INVALID_STATE;
     s = bridge_time_config(c);
-    if (s != CUI_BRIDGE_OK) return s;
+    if (s != CUI_BRIDGE_OK)
+        return s;
     bridge_time_owned *owned = app->time_fields->nodes[handle.slot];
     if (!owned) {
-        if (app->time_fields->configured == app->time_fields->capacity) return CUI_BRIDGE_CAPACITY;
+        if (app->time_fields->configured == app->time_fields->capacity)
+            return CUI_BRIDGE_CAPACITY;
         owned = calloc(1, sizeof *owned);
-        if (!owned) return CUI_BRIDGE_OUT_OF_MEMORY;
+        if (!owned)
+            return CUI_BRIDGE_OUT_OF_MEMORY;
         cui_time_locale_v1 locale;
         cui_time_field_options_v1 options;
         bridge_time_options(c, &locale, &options);
         /* Config is independent of the existing owner's domain/precision. */
-        if (cui_time_field_state_init_v1(&owned->state, (cui_time){0}, &options) != CUI_TIME_TEXT_OK) {
+        if (cui_time_field_state_init_v1(&owned->state, (cui_time){0}, &options) !=
+            CUI_TIME_TEXT_OK) {
             free(owned);
             return CUI_BRIDGE_INVALID_ARGUMENT;
         }
@@ -206,56 +242,73 @@ cui_bridge_status cui_bridge_time_field_configure_v1(cui_bridge_app *app, cui_br
 }
 cui_bridge_status cui_bridge_time_field_get_config_v1(cui_bridge_app *app, cui_bridge_node handle,
                                                       cui_bridge_time_field_config_v1 *out) {
-    if (!out || out->struct_size != sizeof *out || out->version != 1) return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (!out || out->struct_size != sizeof *out || out->version != 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     bridge_time_owned *owned;
     cui_bridge_status s = bridge_time_get(app, handle, &owned);
-    if (s == CUI_BRIDGE_OK) *out = owned->config;
+    if (s == CUI_BRIDGE_OK)
+        *out = owned->config;
     return s;
 }
 cui_bridge_status cui_bridge_time_field_get_result_v1(cui_bridge_app *app, cui_bridge_node handle,
                                                       cui_bridge_time_field_result_v1 *out) {
-    if (!out || out->struct_size != sizeof *out || out->version != 1) return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (!out || out->struct_size != sizeof *out || out->version != 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     bridge_time_owned *owned;
     cui_bridge_status s = bridge_time_get(app, handle, &owned);
-    if (s != CUI_BRIDGE_OK) return s;
-    if (app->time_fields->failed_frame) return CUI_BRIDGE_CORE_ERROR;
-    if (!owned->observed) return CUI_BRIDGE_INVALID_STATE;
+    if (s != CUI_BRIDGE_OK)
+        return s;
+    if (app->time_fields->failed_frame)
+        return CUI_BRIDGE_CORE_ERROR;
+    if (!owned->observed)
+        return CUI_BRIDGE_INVALID_STATE;
     *out = owned->result;
     return CUI_BRIDGE_OK;
 }
-cui_bridge_status cui_bridge_time_field_clear_validation_v1(cui_bridge_app *app, cui_bridge_node handle) {
+cui_bridge_status cui_bridge_time_field_clear_validation_v1(cui_bridge_app *app,
+                                                            cui_bridge_node handle) {
     bridge_time_owned *owned;
     cui_bridge_status s = bridge_time_get(app, handle, &owned);
-    if (s != CUI_BRIDGE_OK) return s;
+    if (s != CUI_BRIDGE_OK)
+        return s;
     return cui_time_field_clear_validation_v1(&owned->state) == CUI_TIME_TEXT_OK
-               ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_STATE;
+               ? CUI_BRIDGE_OK
+               : CUI_BRIDGE_INVALID_STATE;
 }
 cui_bridge_status cui_bridge_time_field_poll_change_v1(cui_bridge_app *app,
                                                        cui_bridge_time_field_change_v1 *out) {
-    if (!out || out->struct_size != sizeof *out || out->version != 1) return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (!out || out->struct_size != sizeof *out || out->version != 1)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
     cui_bridge_status s = bridge_time_ready(app);
-    if (s != CUI_BRIDGE_OK) return s;
+    if (s != CUI_BRIDGE_OK)
+        return s;
     bridge_time_app *state = app->time_fields;
-    if (!state) return CUI_BRIDGE_INVALID_STATE;
+    if (!state)
+        return CUI_BRIDGE_INVALID_STATE;
     while (state->count) {
         cui_bridge_time_field_change_v1 copy = state->queue[state->head];
         bool live = bridge_node(app, copy.node) != NULL;
         state->head = (state->head + 1) % state->capacity;
         state->count--;
-        if (live) { *out = copy; return CUI_BRIDGE_OK; }
+        if (live) {
+            *out = copy;
+            return CUI_BRIDGE_OK;
+        }
     }
     return CUI_BRIDGE_EMPTY;
 }
 static void bridge_time_remove(cui_bridge_app *app, uint32_t slot) {
     if (!app || !app->time_fields || !slot || slot > app->max_nodes ||
-        !app->time_fields->nodes[slot]) return;
+        !app->time_fields->nodes[slot])
+        return;
     free(app->time_fields->nodes[slot]);
     app->time_fields->nodes[slot] = NULL;
     app->time_fields->configured--;
 }
 static cui_bridge_status bridge_time_preflight(cui_bridge_app *app) {
     bridge_time_app *state = app->time_fields;
-    if (!state) return CUI_BRIDGE_OK;
+    if (!state)
+        return CUI_BRIDGE_OK;
     if (app->last_core_frame == UINT64_MAX || state->configured > state->capacity - state->count)
         return CUI_BRIDGE_CAPACITY;
     state->staged = 0;
@@ -275,42 +328,59 @@ static void bridge_time_observe(void *user, const cui_time_change *event) {
         return;
     }
     uint32_t index = (state->head + state->count + state->staged) % state->capacity;
-    state->queue[index] = (cui_bridge_time_field_change_v1){
-        .struct_size = sizeof(cui_bridge_time_field_change_v1), .version = 1,
-        .node = {owned->slot, owned->generation}, .frame_sequence = event->event.frame_sequence,
-        .previous = bridge_time_copy(event->previous), .value = bridge_time_copy(event->value)};
+    state->queue[index] =
+        (cui_bridge_time_field_change_v1){.struct_size = sizeof(cui_bridge_time_field_change_v1),
+                                          .version = 1,
+                                          .node = {owned->slot, owned->generation},
+                                          .frame_sequence = event->event.frame_sequence,
+                                          .previous = bridge_time_copy(event->previous),
+                                          .value = bridge_time_copy(event->value)};
     state->staged++;
 }
 static void bridge_time_render(cui_bridge_app *app, uint32_t slot) {
     bridge_time_owned *owned = app->time_fields->nodes[slot];
     cui_bridge_node_record *node = &app->nodes[slot];
-    if (owned->seen) { app->frame_error = CUI_BRIDGE_CORE_ERROR; return; }
+    if (owned->seen) {
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        return;
+    }
     owned->seen = true;
     uint64_t frame = cui_frame_sequence(app->ui);
-    bool ready = frame && cui_frame_paint_enabled(app->ui) && cui_frame_input_snapshot_ready(app->ui) &&
-                 owned->last_seen && owned->last_seen == frame - 1;
+    bool ready = frame && cui_frame_paint_enabled(app->ui) &&
+                 cui_frame_input_snapshot_ready(app->ui) && owned->last_seen &&
+                 owned->last_seen == frame - 1;
     owned->admitted = ready;
     owned->last_seen = frame;
     cui_time_locale_v1 locale;
     cui_time_field_options_v1 options;
     bridge_time_options(&owned->config, &locale, &options);
-    if (node->disabled) options.flags |= CUI_TIME_FIELD_DISABLED_V1;
+    if (node->disabled)
+        options.flags |= CUI_TIME_FIELD_DISABLED_V1;
     cui_time before = node->time;
     uint32_t staged = app->time_fields->staged;
-    cui_time_field_result_v1 r = cui_time_field_v1(app->ui, node->id, &app->theme,
-        cui_string(node->text), &owned->state, &node->time, &options,
-        (cui_time_handler){bridge_time_observe, owned});
+    cui_time_field_result_v1 r =
+        cui_time_field_v1(app->ui, node->id, &app->theme, cui_string(node->text), &owned->state,
+                          &node->time, &options, (cui_time_handler){bridge_time_observe, owned});
     uint64_t rejected = r.rejected_count;
-    if (rejected > UINT32_MAX) { app->frame_error = CUI_BRIDGE_CORE_ERROR; return; }
-    owned->result = (cui_bridge_time_field_result_v1){
-        .struct_size = sizeof(cui_bridge_time_field_result_v1), .version = 1,
-        .node = {slot, node->generation}, .frame_sequence = frame,
-        .status = bridge_time_status(r.status), .validation = bridge_time_status(r.validation),
-        .changed = r.changed ? 1u : 0u, .rejected_count = (uint32_t)r.rejected_count,
-        .previous = bridge_time_copy(before), .value = bridge_time_copy(node->time),
-        .queued_change_count = app->time_fields->staged - staged};
+    if (rejected > UINT32_MAX) {
+        app->frame_error = CUI_BRIDGE_CORE_ERROR;
+        return;
+    }
+    owned->result =
+        (cui_bridge_time_field_result_v1){.struct_size = sizeof(cui_bridge_time_field_result_v1),
+                                          .version = 1,
+                                          .node = {slot, node->generation},
+                                          .frame_sequence = frame,
+                                          .status = bridge_time_status(r.status),
+                                          .validation = bridge_time_status(r.validation),
+                                          .changed = r.changed ? 1u : 0u,
+                                          .rejected_count = (uint32_t)r.rejected_count,
+                                          .previous = bridge_time_copy(before),
+                                          .value = bridge_time_copy(node->time),
+                                          .queued_change_count = app->time_fields->staged - staged};
     if (app->time_fields->staged != staged) {
-        uint32_t index = (app->time_fields->head + app->time_fields->count + staged) % app->time_fields->capacity;
+        uint32_t index = (app->time_fields->head + app->time_fields->count + staged) %
+                         app->time_fields->capacity;
         app->time_fields->queue[index].validation = owned->result.validation;
         app->time_fields->queue[index].rejected_count = owned->result.rejected_count;
     }
@@ -319,15 +389,18 @@ static void bridge_time_render(cui_bridge_app *app, uint32_t slot) {
 }
 static void bridge_time_finish(cui_bridge_app *app, cui_bridge_status status) {
     bridge_time_app *state = app->time_fields;
-    if (!state || !state->active) return;
+    if (!state || !state->active)
+        return;
     for (uint32_t i = 0; i < state->staged; i++)
-        state->queue[(state->head + state->count + i) % state->capacity].frame_status = (uint32_t)status;
+        state->queue[(state->head + state->count + i) % state->capacity].frame_status =
+            (uint32_t)status;
     state->count += state->staged;
     state->staged = 0;
     state->active = false;
     bool valid = status == CUI_BRIDGE_OK && cui_accessibility_numeric_snapshot_ready(app->ui) &&
                  cui_last_error(app->ui) == CUI_OK;
-    if (!valid) state->failed_frame = true;
+    if (!valid)
+        state->failed_frame = true;
     bool recovered = false;
     for (uint32_t i = 1; i <= app->max_nodes; i++)
         if (state->nodes[i]) {
@@ -335,8 +408,10 @@ static void bridge_time_finish(cui_bridge_app *app, cui_bridge_status status) {
             owned->observed = valid && owned->seen && owned->admitted;
             owned->result.frame_status = (uint32_t)status;
             recovered |= owned->observed;
-            if (!owned->seen) owned->last_seen = 0;
+            if (!owned->seen)
+                owned->last_seen = 0;
         }
-    if (valid && recovered) state->failed_frame = false;
+    if (valid && recovered)
+        state->failed_frame = false;
 }
 #endif

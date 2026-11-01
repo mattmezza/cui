@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+
 #include "../fixtures/skeleton/frozen.c.inc"
 static float invalid(float t, void *user) {
     (void)t;
@@ -29,8 +30,12 @@ static void callback_timing(cui_context *ui) {
         cui_skeleton_palette palette = {theme.secondary};
         mutation m = {&theme, &palette, 0};
         cui_skeleton_options o = cui_skeleton_options_default();
-        o.width = 20; o.height = 16; o.ease = mutate; o.ease_user = &m;
-        cui_loading_motion state = {0}; cui_loading_motion_result result;
+        o.width = 20;
+        o.height = 16;
+        o.ease = mutate;
+        o.ease_user = &m;
+        cui_loading_motion state = {0};
+        cui_loading_motion_result result;
         assert(cui_begin_frame(ui, 64, 48, 0));
         if (route == 0)
             assert(frozen_skeleton_ex(ui, 1, &theme, &state, o, &result));
@@ -56,8 +61,9 @@ static void snapshot(cui_context *ui, cui_software *software, int route, cui_the
                      cui_loading_motion *state, cui_loading_motion_result *result,
                      unsigned char pixels[64 * 48 * 4], cui_draw_command *rect) {
     assert(cui_begin_frame(ui, 64, 48, 0));
-    cui_begin_box(ui, 99, (cui_box){.width = 40, .height = 32, .clip = true,
-                                  .custom_opacity = true, .opacity = .5f});
+    cui_begin_box(
+        ui, 99,
+        (cui_box){.width = 40, .height = 32, .clip = true, .custom_opacity = true, .opacity = .5f});
     if (route == 0)
         assert(frozen_skeleton_ex(ui, 1, theme, state, options, result));
     else if (route == 1)
@@ -100,7 +106,9 @@ int main(void) {
     cui_skeleton_palette palette;
     assert(cui_skeleton_palette_from_theme(&theme, &palette));
     cui_skeleton_options o = cui_skeleton_options_default();
-    o.width = 48; o.height = 24; o.radius = 8;
+    o.width = 48;
+    o.height = 24;
+    o.radius = 8;
     unsigned char reference[64 * 48 * 4], actual[64 * 48 * 4];
     const double times[] = {0, .25, .5, .75, 1, 1.25, 1.5, 1.75, 2, 4.001};
     for (unsigned secondary = 0; secondary < 2; ++secondary) {
@@ -112,37 +120,42 @@ int main(void) {
             cui_draw_command a = {0}, b = {0};
             snapshot(ui, software, 0, &theme, palette, o, &baseline, &expected, reference, &a);
             for (int route = 1; route <= 2; ++route) {
-                snapshot(ui, software, route, &theme, palette, o,
-                         route == 1 ? &current : &colored, &result, actual, &b);
+                snapshot(ui, software, route, &theme, palette, o, route == 1 ? &current : &colored,
+                         &result, actual, &b);
                 assert(!memcmp(reference, actual, sizeof actual));
                 assert(expected.phase == result.phase && expected.opacity == result.opacity &&
                        expected.active == result.active &&
                        expected.next_wake_seconds == result.next_wake_seconds);
                 assert(a.type == b.type && a.bounds.x == b.bounds.x && a.bounds.y == b.bounds.y &&
-                       a.bounds.w == b.bounds.w && a.bounds.h == b.bounds.h && a.radius == b.radius);
+                       a.bounds.w == b.bounds.w && a.bounds.h == b.bounds.h &&
+                       a.radius == b.radius);
                 same_color(a.color, b.color);
             }
             /* Independent triangular/quadratic pulse and single alpha truncation. */
             double phase = fmod(times[i], 2) / 2;
             double triangle = phase < .5 ? phase * 2 : (1 - phase) * 2;
-            double eased = triangle < .5 ? 2 * triangle * triangle
-                                         : 1 - 2 * (1 - triangle) * (1 - triangle);
+            double eased =
+                triangle < .5 ? 2 * triangle * triangle : 1 - 2 * (1 - triangle) * (1 - triangle);
             assert(fabs(result.opacity - (1 - eased * .5)) < 1e-6);
-            assert(b.color.a == (uint8_t)((uint8_t)(200 * result.opacity *
-                                                    (secondary ? .5f : 1)) * .5f));
+            assert(b.color.a ==
+                   (uint8_t)((uint8_t)(200 * result.opacity * (secondary ? .5f : 1)) * .5f));
             /* Rounded corner clear, interior painted, parent clip excludes x>=40. */
             assert(actual[0] == 0 && actual[(12 * 64 + 12) * 4] > 0);
             assert(actual[(12 * 64 + 42) * 4] == 0);
         }
     }
     for (int route = 3; route <= 4; ++route) {
-        cui_loading_motion s = {0}; cui_loading_motion_result r = {0}; cui_draw_command c = {0};
-        snapshot(ui, software, route, &theme, palette, o, &s, &r,
-                 route == 3 ? reference : actual, &c);
+        cui_loading_motion s = {0};
+        cui_loading_motion_result r = {0};
+        cui_draw_command c = {0};
+        snapshot(ui, software, route, &theme, palette, o, &s, &r, route == 3 ? reference : actual,
+                 &c);
     }
     assert(!memcmp(reference, actual, sizeof actual));
     palette.background = (cui_color){21, 34, 55, 0};
-    cui_loading_motion s = {0}; cui_loading_motion_result r = {0}; cui_draw_command c = {0};
+    cui_loading_motion s = {0};
+    cui_loading_motion_result r = {0};
+    cui_draw_command c = {0};
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
     for (size_t i = 0; i < sizeof actual; i += 4)
         assert(actual[i] == 0 && actual[i + 1] == 0 && actual[i + 2] == 0 && actual[i + 3] == 255);
@@ -154,14 +167,18 @@ int main(void) {
     assert(cui_begin_frame(ui, 64, 48, 0));
     assert(cui_end_frame(ui).count == 0);
     palette.background = (cui_color){255, 255, 255, 200};
-    o.reduced_motion = false; o.now_seconds = 7.25;
+    o.reduced_motion = false;
+    o.now_seconds = 7.25;
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
     assert(s.started == retained_start && r.opacity < 1);
     s = (cui_loading_motion){0};
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
     assert(s.started == 7.25 && r.opacity == 1);
-    o.reduced_motion = true; o.secondary = false;
-    o.width = 24; o.height = 24; o.radius = 100;
+    o.reduced_motion = true;
+    o.secondary = false;
+    o.width = 24;
+    o.height = 24;
+    o.radius = 100;
     snapshot(ui, software, 2, &theme, palette, o, &s, &r, actual, &c);
     assert(actual[0] == 0 && actual[(12 * 64 + 12) * 4] > 0);
     o.radius = 0;
@@ -169,19 +186,24 @@ int main(void) {
     assert(actual[0] > 0);
     /* Own validation, sampler failure and callback effects are separate. */
     unsigned calls = 0;
-    o.reduced_motion = false; o.ease = invalid; o.ease_user = &calls;
+    o.reduced_motion = false;
+    o.ease = invalid;
+    o.ease_user = &calls;
     unsigned char old_state[sizeof s], old_result[sizeof r];
-    memcpy(old_state, &s, sizeof s); memcpy(old_result, &r, sizeof r);
+    memcpy(old_state, &s, sizeof s);
+    memcpy(old_result, &r, sizeof r);
     assert(cui_begin_frame(ui, 64, 48, 0));
     assert(!cui_skeleton_with_palette(ui, 1, &palette, &s, o, &r));
     assert(calls == 1 && !memcmp(old_state, &s, sizeof s) && !memcmp(old_result, &r, sizeof r));
-    o.ease = NULL; o.width = NAN;
+    o.ease = NULL;
+    o.width = NAN;
     assert(!cui_skeleton_with_palette(ui, 1, &palette, &s, o, &r));
     o.width = 20;
     assert(!cui_skeleton_with_palette(ui, 0, &palette, &s, o, &r));
     assert(!cui_skeleton_with_palette(ui, 1, NULL, &s, o, &r));
     assert(cui_end_frame(ui).count == 0);
     assert(!memcmp(old_state, &s, sizeof s) && !memcmp(old_result, &r, sizeof r));
-    cui_software_destroy(software); cui_destroy(ui);
+    cui_software_destroy(software);
+    cui_destroy(ui);
     return 0;
 }

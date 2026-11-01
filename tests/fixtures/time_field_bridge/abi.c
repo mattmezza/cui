@@ -14,4 +14,6 @@ _Static_assert(offsetof(cui_bridge_time_field_config_v1, names) == 344, "names")
 _Static_assert(offsetof(cui_bridge_time_field_result_v1, frame_sequence) == 24, "frame");
 _Static_assert(offsetof(cui_bridge_time_field_result_v1, previous) == 48, "previous");
 _Static_assert(offsetof(cui_bridge_time_field_change_v1, previous) == 32, "change previous");
-int main(void) { return 0; }
+int main(void) {
+    return 0;
+}

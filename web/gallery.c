@@ -2397,9 +2397,9 @@ static void gallery_dialog_body(cui_context *context, const cui_dialog_frame *fr
             "Weekly summaries group less urgent updates into a single message.",
             "Your preferences remain available while you review these descriptions."};
         for (size_t i = 0; i < sizeof details / sizeof details[0]; ++i)
-            (void)cui_text_paragraph_colored(
-                context, cui_string(details[i]), f->theme->font_size, f->theme->text,
-                f->theme->font_size * 1.25f, (cui_text_style){0}, true, NULL, 0);
+            (void)cui_text_paragraph_colored(context, cui_string(details[i]), f->theme->font_size,
+                                             f->theme->text, f->theme->font_size * 1.25f,
+                                             (cui_text_style){0}, true, NULL, 0);
     }
 }
 static void gallery_dialog_footer(cui_context *context, const cui_dialog_frame *frame, void *user) {
@@ -2754,8 +2754,9 @@ int gallery_init(void) {
     chart_state.hovered = SIZE_MAX;
     cui_icon_state_init(&icon_state);
     cui_icon_state_init(&badge_artwork);
-    if (!cui_icon_set_data(&badge_artwork, cui_string(
-            "<svg viewBox=\"0 0 16 16\"><path d=\"M2 2h5v5h7v7H2z\"/></svg>")))
+    if (!cui_icon_set_data(
+            &badge_artwork,
+            cui_string("<svg viewBox=\"0 0 16 16\"><path d=\"M2 2h5v5h7v7H2z\"/></svg>")))
         return 0;
     toolbar_query = cui_edit_create((cui_edit_config){.buffer = toolbar_query_buffer,
                                                       .capacity = sizeof(toolbar_query_buffer)});
@@ -4925,12 +4926,15 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 options.name = cui_string("Configured artwork");
                 cui_badge_icon_content artwork = {
                     .state = &badge_artwork,
-                    .options = {.size = CUI_ICON_CUSTOM, .custom_size = 13,
-                                .custom_color = true, .color = {255, 214, 100, 220},
-                                .custom_transform = true, .transform = cui_icon_rotation(.35f)}};
-                cui_badge_result result = cui_badge_with_icon(
-                    ui, cui_id_from(ui, names[i]), &t, options, &artwork,
-                    gallery_badge_content, (void *)names[i]);
+                    .options = {.size = CUI_ICON_CUSTOM,
+                                .custom_size = 13,
+                                .custom_color = true,
+                                .color = {255, 214, 100, 220},
+                                .custom_transform = true,
+                                .transform = cui_icon_rotation(.35f)}};
+                cui_badge_result result =
+                    cui_badge_with_icon(ui, cui_id_from(ui, names[i]), &t, options, &artwork,
+                                        gallery_badge_content, (void *)names[i]);
                 if (!result.submitted || result.icon_error != CUI_ICON_OK)
                     cui_label(ui, &t, cui_string("Custom icon could not be prepared."));
             } else {

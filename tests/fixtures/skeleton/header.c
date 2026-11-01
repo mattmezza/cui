@@ -2,8 +2,10 @@
 #ifdef CUI_SKELETON_CONTENT_FIRST
 #include "cui/cui_content.h"
 #endif
+// clang-format off: intentionally exercise both public-header orders.
 #include "cui/cui_skeleton_palette.h"
 #include "cui/cui_content.h"
+// clang-format on
 int main(void) {
     cui_skeleton_palette palette = {{21, 34, 55, 0}};
     cui_skeleton_palette copy = palette;

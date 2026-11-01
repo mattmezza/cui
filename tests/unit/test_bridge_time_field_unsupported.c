@@ -18,7 +18,8 @@ int main(void) {
     assert(cui_bridge_time_field_poll_change_v1(a, &out) == CUI_BRIDGE_BACKEND_UNAVAILABLE);
     assert(memcmp(before, &out, sizeof out) == 0);
     cui_bridge_node root;
-    assert(cui_bridge_node_create(a, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(a, (cui_bridge_node){0}, CUI_BRIDGE_COLUMN, "root", &root) ==
+           CUI_BRIDGE_OK);
     assert(cui_bridge_step(a, .016f) == CUI_BRIDGE_OK);
     cui_bridge_destroy(a);
     return 0;

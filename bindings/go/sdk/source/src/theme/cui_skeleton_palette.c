@@ -9,7 +9,8 @@ bool cui_skeleton_palette_from_theme(const cui_theme *theme, cui_skeleton_palett
     return true;
 }
 bool cui_skeleton_palette_preset_get(size_t index, cui_skeleton_palette *out) {
-    if (!out || index >= sizeof(cui_skeleton_palette_records) / sizeof *cui_skeleton_palette_records)
+    if (!out ||
+        index >= sizeof(cui_skeleton_palette_records) / sizeof *cui_skeleton_palette_records)
         return false;
     *out = cui_skeleton_palette_records[index];
     return true;

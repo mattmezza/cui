@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
 #include "../../src/core/cui_text_paint_internal.h"
+/* SDL has always required the text provider for V1. Keep its V2 consumer
+ * complete in CMake, native bundles and direct-source/manual builds alike. */
+#ifndef CUI_HAS_TEXT
+#define CUI_HAS_TEXT 1
+#endif
 #include "../common/cui_cpu_v2_paint_internal.h"
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"

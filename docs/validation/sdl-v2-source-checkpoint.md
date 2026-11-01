@@ -30,3 +30,14 @@ preparation/native failures and retry, restoration faulting, and paired original
 V1 pixels/cache/allocation counts. These fixture sources have not yet compiled;
 first failures must be recorded and diagnosed without weakening expectations.
 Native hidden-window execution must use scripts/test_local.py/private Xvfb.
+
+## Source-local text capability correction
+
+Root review identified that CMake-only CUI_HAS_TEXT would leave direct-source and
+native-bundle SDL builds advertising text while compiling a no-text common painter.
+SDL's V1 source already unconditionally requires the text provider. The source now
+locally enables CUI_HAS_TEXT before its common painter include; the SDL target's
+new private CMake flag is removed. This preserves existing SDL text prerequisites
+rather than requiring undocumented manual flags. The actual SDL library target
+therefore exercises the default source path at its next strict build. Manual/native
+bundle source closure remains an explicit acceptance gate; no such build has run.

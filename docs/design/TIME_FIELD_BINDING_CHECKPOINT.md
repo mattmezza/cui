@@ -180,3 +180,35 @@ Preserve initial failures. Validate native source closure and actual wasm32 ABI
 separately; compilation does not prove shared-memory safety or native interaction.
 Only then begin Python authoring against the verified optional symbol group.
 JS/TS/Go/Rust remain required subsequent delivery, not supported by this checkpoint.
+## C source checkpoint (unverified)
+
+The first source draft adds the reviewed owned records/export group and a private
+`cui_bridge_time_internal.h` module. Slider's owner/tag/gate implementation stays
+byte-unchanged; the common readiness path additionally checks localized TimeField
+ownership. No metadata support status is promoted at this source checkpoint.
+Output getters/poll require only initialized exact size/version in the supplied
+output record; remaining old output bytes are ignored and are changed only on OK.
+Reserved-zero validation applies to input configuration and produced records.
+
+Core's public frame-sequence accessor intentionally returns0 outside submission.
+The bridge has one Core begin site, and its native runner calls bridge step.
+A private `last_core_frame` records the **actual** sequence immediately after each
+successful bridge begin, including frames before localized enable. This enables
+exhaustion admission checks before time/poll/begin without a new Core query or
+fabricated generation. Private app changes are one u64 plus one lazy state pointer
+(16 nominal bytes on LP64; actual padding/sizeof receipt still required).
+
+Prepared fixtures: `tests/unit/test_bridge_time_field.c` uses actual bridge step
+with simulated native boundaries; `test_bridge_time_field_unsupported.c` covers
+NO_TLS and unchanged legacy use; `tests/fixtures/time_field_bridge` contains ABI,
+C++ header, actual-loaded-image owner-thread, legacy trace and bounded Git-source
+freezer fixtures. The freezer pins b4cd6a8f and hashes the original public header,
+bridge TU and private headers before any candidate rebuild. The trace program uses
+only old exports and is intended to run in separate old/new-library processes
+against the same cached engine. No golden is generated from candidate output.
+
+Still unexecuted: strict compile/runtime and ABI/C++/WASM checks; independent
+old/new legacy trace capture/comparison; full interaction/config/error matrix;
+complete public C authoring example; exact private allocation/sizeof receipts;
+metadata/guide and SDK→amalgamation→skill generation/freshness/usage/skill checks.
+Python and the other four foreign localized authoring surfaces remain unimplemented.

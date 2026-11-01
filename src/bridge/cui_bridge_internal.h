@@ -25,6 +25,7 @@
 #include <stddef.h>
 
 typedef struct bridge_slider_app bridge_slider_app;
+typedef struct bridge_time_app bridge_time_app;
 typedef struct bridge_text_view_owned bridge_text_view_owned;
 typedef struct bridge_chart_owned bridge_chart_owned;
 typedef struct bridge_speech_owned bridge_speech_owned;
@@ -146,6 +147,7 @@ struct cui_bridge_app {
     cui_bridge_node_record *nodes;
     uint32_t max_nodes, root;
     uint64_t next_id;
+    uint64_t last_core_frame; /* Actual Core sequence captured inside bridge begin. */
     cui_bridge_event *events;
     cui_bridge_event_payload *event_payloads;
     uint32_t max_events, event_head, event_count;
@@ -160,6 +162,7 @@ struct cui_bridge_app {
     cui_bridge_backend backend;
     void *native;
     bridge_slider_app *slider; /* Lazy controlled route; no old node growth. */
+    bridge_time_app *time_fields; /* Lazy localized kind55 route. */
 };
 /* Native functions are implemented only in the optional SDL bridge target. */
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *, const char *, const char *,

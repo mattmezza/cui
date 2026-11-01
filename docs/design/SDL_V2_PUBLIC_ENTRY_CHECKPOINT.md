@@ -2,8 +2,10 @@
 
 Proposal only, following `SDL_V2_BASELINE_CHECKPOINT.md`, signed range checkpoint
 4ca5bbe3 and accepted private owned-frame extraction. No SDL API, object change,
-native measurement or renderer support is implemented here. Range maximum-boundary
-runtime acceptance remains pending. Preserve the frozen SDL baseline and all V1
+native measurement or renderer support is implemented here. The private range extractor is integrated (`16827ec9`); its exact-boundary and
+frozen-validator checks pass on the combined source (three tests, 0.16 seconds;
+see `docs/validation/cpu-v2-source-ranges-worker.json`). Broader rendering regression
+acceptance remains pending. Preserve the frozen SDL baseline and all V1
 function signatures/table/cache/density behavior.
 
 ## Minimal additive header

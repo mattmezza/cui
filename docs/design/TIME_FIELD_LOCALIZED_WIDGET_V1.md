@@ -157,9 +157,10 @@ An incomplete UTF-8/token prefix is kept in the owned16byte pending buffer;
 next TEXT continues it. Prefix-free locale tokens determine completion uniquely.
 A byte prefix matching no token rejects the transaction atomically and clears
 pending; any staged time/draft/selection edits from that original event are
-restored. No more than160 bytes from one event are scanned. Full-value paste
-must start at an empty pending buffer; otherwise the event is treated as stream
-input, and the owner can cancel pending with navigation/Delete/Escape. Separator
+restored. No more than160 bytes from one event are scanned. Complete full-value grammar takes precedence over a pending token prefix.
+Valid replacement clears draft and pending bytes; rejected complete numeric/domain
+values clear pending bytes but preserve confirmed value, digit draft and selected
+segment. Navigation/Delete/Escape can also cancel unfinished stream input. Separator
 moves to the next visible segment without wrapping (period_separator selects
 period in H12); a token in an inappropriate position rejects without movement.
 Period segment accepts exact locale AM/PM; ASCII a/A/p/P shortcuts exist only
@@ -334,3 +335,12 @@ actual focus is outside all visible children. A TEXT digit/prefix followed by
 ordinary global Tab out in that same batch must finish with both counters0,
 not defer cleanup to the next frame or omission. Prepared tests assert actual
 neighbor focus and unchanged original targets for both variants/Base/Styled.
+
+### Full grammar precedence clarification
+
+Root review overrides the earlier pending-empty restriction: once the pure parser
+recognizes complete grammar, it takes precedence over an unfinished token prefix.
+Successful whole-value replacement clears draft/pending; complete invalid/range
+values preserve model/digit draft/selection and discard the pending prefix while
+reporting the original status. Both actual same-focus pending→valid and pending→
+out-of-domain copied payload cases are tested; no reclassification as stream.

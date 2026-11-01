@@ -436,8 +436,23 @@ static void paste_and_bounds(bool styled) {
     f.options.text.maximum = (cui_time){12, 0, 0};
     f.options.edit_generation++;
     frame(&f);
+    /* Complete grammar takes precedence over a previously split locale token. */
+    text(&f, (cui_str){"a", 1});
+    r = frame(&f);
+    assert(!r.changed && f.state.pending_length == 1);
+    assert(cui_time_format_v1((cui_time){10, 11, 12}, &f.options.text, payload, sizeof payload,
+                              &n) == 0);
+    text(&f, (cui_str){payload, n});
+    memset(payload, '!', sizeof payload);
+    r = frame(&f);
+    assert(r.changed && r.change_count == 1 && same(f.time, (cui_time){10, 11, 12}) &&
+           f.state.pending_length == 0 && f.state.digit_count == 0);
+    text(&f, (cui_str){"a", 1});
+    r = frame(&f);
+    assert(!r.changed && f.state.pending_length == 1);
     cui_time before = f.time;
     unsigned segment = f.state.segment;
+    unsigned digit_count = f.state.digit_count, draft = f.state.draft;
     /* Formatting with unrestricted options creates an independently rejected paste. */
     cui_time_text_options_v1 free_options = f.options.text;
     free_options.flags = 0;
@@ -453,7 +468,8 @@ static void paste_and_bounds(bool styled) {
                 r.changed ? 1 : 0, r.rejected_count, (unsigned)r.validation, f.time.hour,
                 f.time.minute, f.time.second, f.state.segment, segment);
     assert(!r.changed && r.rejected_count == 1 && r.validation == CUI_TIME_TEXT_OUT_OF_RANGE &&
-           same(f.time, before) && f.state.segment == segment);
+           same(f.time, before) && f.state.segment == segment && f.state.pending_length == 0 &&
+           f.state.digit_count == digit_count && f.state.draft == draft);
     assert(cui_time_field_clear_validation_v1(&f.state) == 0);
     frame(&f);
     assert(f.state.validation == 0);

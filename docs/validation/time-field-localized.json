@@ -78,11 +78,16 @@
   },
   "source_sha256": {
     "include/cui/cui_time_field_v1.h": "c495b586c56d7699e034f0642bc4d3f4760d4581d96c71fa483522d134d3f1d8",
-    "src/base/cui_time_field_v1.c": "2c6c6258a2ae9a30b3fbd30a0b598c1998d3688cdcc59619caad8c31fd8109cf",
+    "src/base/cui_time_field_v1.c": "94043b556cc8e196c5aaee0915095877d9805dbb16d1c579c23f463e59490e05",
     "src/base/cui_time_field_v1_internal.h": "ef92855192e6f95c682b830732d704c21aa26f5f560bd968d452dab15b2e56ed",
     "src/components/cui_time_field_v1.c": "bed6e9770fb4094d7bc3e16499adca9d0522ee937f0106366854746620f4a83d",
-    "tests/unit/test_time_field_v1.c": "de3d603ba5c68678e1454829f7053f831e05a797f01a45f7963468fef4b8474c",
+    "tests/unit/test_time_field_v1.c": "c18dc20884a8c693a414f00c9d93fe72e1fe496e2f4b1e454625f513b8b91cc3",
     "tests/unit/test_time_field_v1_headers.c": "e4af0c9636697ba2db68ce47f09666d4a4822211e4d313f37faac79f643cf312",
     "examples/time_field_localized.c": "112fa76c4b747a02b5e289777280a16c4e952bbe9764c09bfbe053a65f40f411"
+  },
+  "mid_prefix_full_grammar": {
+    "result": "strict source + private1/1 PASS0.06s",
+    "log": "build-focused/time-field-v1-prefix-paste.log",
+    "policy": "Complete grammar outranks pending prefix: valid copied/poisoned payload replaces whole model and clears draft/pending; rejected complete out-of-domain payload preserves model/draft/selection, clears prefix and keeps OUT_OF_RANGE. BothBase/Styled tested."
   }
 }

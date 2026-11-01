@@ -1088,7 +1088,7 @@
   },
   "language_builder_node_kinds": 80,
   "controlled_slider_v1": {
-    "status": "c_python_node_typescript_unreleased_pending_integration",
+    "status": "c_python_node_typescript_tested_subset_unreleased",
     "node_kind": 81,
     "languages": {
       "python": "tested_subset",

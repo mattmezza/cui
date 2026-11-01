@@ -1,0 +1,33 @@
+{
+  "source_revision": "02240266063f008bfffc8d67d32f2b9b06cc6240",
+  "worker_commit": "2c964abab6e77dd9ae691e65f6b0c6d41bf3f304",
+  "scope": "Node/TypeScript bridge-owned controlled Single/Range Slider authoring subset",
+  "build": "Actual standalone bindings/node CMake Release project; native OFF; 161 steps plus four existing fixture compile/link steps; warnings enabled; CPU0 nice19 -j1",
+  "checks": {
+    "registered_node_tests": "61/61 PASS6.31s, no skips; includes actual old library, optional group/size providers, legacy protocols and compiled/executed TypeScript UI",
+    "consumer_skill": "18/18 PASS39.626s",
+    "generated_skill_freshness": "PASS"
+  },
+  "typescript": "Existing pinned 5.8.3 compiler; no installation",
+  "integration_correction": "Parent Node CMake project now explicitly finds Python3; child-scope discovery did not populate the TypeScript test interpreter. First failure log retained. Two pre-existing protocol fixture targets were also built before rerun.",
+  "logs_sha256": {
+    "node-slider-root-build.log": "4e3a910ff83f8cf5107ccf16d8594f3cfa5650181b3e5a12686cc85b86886b27",
+    "node-slider-root-tests-first.log": "261caea56e13481c8e52e1514e76c32872f63cb08fef74a5d29a07f002059721",
+    "node-slider-root-tests-final.log": "5a6ec988b8e29c6570cfea6c7db5c28c2b1dd950b5f901e155c391c75aa809c2"
+  },
+  "source_sha256": {
+    "bindings/node/CMakeLists.txt": "79a5b6c5c178a18d7b9a1e2f7762e1d9e4cae125b915ad438d002a0cad46e206",
+    "bindings/node/addon.c": "34fa2c33bbd22ea37057ae9f822242ad9e38a7176f9ee0a1a2ddd72363fea057",
+    "bindings/node/index.cjs": "78267ae922525c21284659ae521cb91790fa16ded0ceccf5ec4b35f7903b67ab",
+    "bindings/node/slider_model_internal.h": "9c502a40f401284278ac24c881153d97b1ef69816323da6151b6beda1433450c",
+    "bindings/node/slider-model.cjs": "7f8f50be05f1df038f33d1f8aa1adbdf921f88ec2d4b2fb6fd1a4a7c9e623b07",
+    "bindings/typescript/index.d.ts": "24fbba8472616be579da43d1f99f4a0c60108b957cd4fa48f914512ff461a711"
+  },
+  "limitations": [
+    "Unreleased; website not deployed from this revision",
+    "Go/Rust controlled authoring remains pending",
+    "No direct C Styled style/motion mapping, native numeric accessibility or typed SET/touch injection",
+    "No V2 renderer, vertical registered-scroll or physical OS/GPU/AT acceptance claim",
+    "Full native 483-case suite predates this slice; current checks build and test the standalone Node consumer"
+  ]
+}

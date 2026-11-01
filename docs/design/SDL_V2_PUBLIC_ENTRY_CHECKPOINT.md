@@ -91,3 +91,47 @@ CPU expected pixels independently, not native V1 equivalence assumptions.
 Only passing actual gates permits public metadata/guide/software-exception updates.
 SDL_GPU, Sokol GLCORE, Canvas and foreign bindings remain required followups;
 this proposal changes no 78-component status.
+
+## Proposed exhaustive V1 busy-access matrix (review before guard edit)
+
+Read the owner busy flag before other owner fields, input/output arguments, SDL,
+allocation or callbacks. These are only nested-V2 rules; idle V1 behavior remains
+exact. Guard internal call sites too: previously obtained platform/window/renderer
+function tables remain callable during a callback and cannot bypass the guard.
+
+| Public entry / retained callback | While owner busy | Idle owner faulted |
+| --- | --- | --- |
+| render, render_capture, save_bmp; renderer render callback | false, no reads/native calls | false (renderer state untrustworthy) |
+| destroy; renderer destroy callback | no-op; caller retries | destroy normally |
+| set_visible, is_visible, set_cursor, poll, accessibility_window, set_decorated, wait_events | false; output/state unchanged | false (conservative refusal of native access) |
+| size | no-op; both outputs unchanged | no-op; outputs unchanged |
+| driver | constant `"unavailable"`, no SDL call | same |
+| appearance | false; output unchanged | copied snapshot allowed (no SDL call) |
+| glyph_cache_stats | all-zero value | copied existing stats allowed |
+| frame_delta | zero; clock unchanged | zero; clock unchanged |
+| clipboard_interface | zero record | zero record |
+| retained clipboard_set / clipboard_get | false / empty string; no free/native call | same |
+| window_interface | zero record | zero record |
+| retained window query / perform | zero info / false | same |
+| interface | zero record; no driver query | zero record |
+
+Constructors create independent owners and retain their existing main-thread
+contract; they do not inspect another owner's busy flag. `run` retains its existing
+no-nesting contract rather than adding a global owner registry. Ownerless
+video_driver/error/wait keep existing behavior; they expose no owner resource or
+render permission (the error string remains SDL's transient diagnostic). New V2
+query/render returns LIFECYCLE for busy/faulted owners. No public raw SDL handle
+accessor exists. This matrix is proposed, not a claim of implemented guards.
+
+## Measurement fixture prepared, not executed
+
+`tests/distribution/sdl_v2_guard_layout.py` emits either immutable old declarations
+or exactly the two appended booleans, compact size/alignment/constructor-byte and
+**every** old-field offset constant. No renderer/window/init function is included.
+Use native strict C11 and pinned wasm32 clang object/assembly constants under the
+next explicit lease; installed SDL headers supply actual SDL type layouts. The
+wasm32 compile is diagnostic and may need reviewed target-header accommodation;
+do not misreport host-configured SDL headers as a supported WASM adapter.
+Constructor-byte measurement is exactly the frozen one `calloc(1,sizeof(*s))`
+request; SDL's separately owned allocations are not counted as this object.
+Report old/new bytes and actual old-offset equality before choosing growth.

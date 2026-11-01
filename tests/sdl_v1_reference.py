@@ -46,13 +46,16 @@ def layout_source(candidate=False):
         prefix = prefix.replace(tail, tail[:-3] + '    bool v2_busy, v2_faulted;\n};\n')
     fields = ['shadows', 'shadow_frame', 'appearance', 'window', 'renderer', 'font', 'ink',
               'text_paint', 'density_x', 'density_y', 'text_density', 'quit', 'glyph_ok',
+              'ime_composing', 'ime_commit_pending', 'input_suspended',
               'ime_focus', 'input_state', 'input_active', 'glyphs', 'bitmaps', 'bitmap_bytes',
-              'shadow_bytes', 'glyph_bytes', 'clock', 'frame', 'frame_clock_started',
+              'shadow_bytes', 'glyph_bytes', 'clock', 'hits', 'misses', 'frame', 'frame_ticks',
+              'frame_clock_started', 'event_pending', 'callback_mode', 'motion_pending',
               'motion', 'pending_event', 'clipboard', 'cursors']
     if candidate:
         fields += ['v2_busy', 'v2_faulted']
     constants = ['const unsigned sdl_v1_size = sizeof(cui_sdl3);',
-                 'const unsigned sdl_v1_align = _Alignof(cui_sdl3);']
+                 'const unsigned sdl_v1_align = _Alignof(cui_sdl3);',
+                 'const unsigned sdl_v1_constructor_bytes = sizeof(cui_sdl3);']
     constants += [f'const unsigned sdl_v1_offset_{f} = offsetof(cui_sdl3, {f});' for f in fields]
     keep = ('void sdl_layout_keep_bitmap_declarations(void) {\n'
             '    (void)cui_bitmap_key_make; (void)cui_bitmap_key_equal; (void)cui_bitmap_raster;\n}\n')

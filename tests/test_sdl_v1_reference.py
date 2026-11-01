@@ -26,6 +26,16 @@ class SDLV1SourceTests(unittest.TestCase):
         self.assertIn('const unsigned sdl_v1_offset_density_x', old)
         self.assertEqual(len(FROZEN), 3)
 
+    def test_measurement_includes_every_old_field_and_constructor_request(self):
+        source = layout_source()
+        fields = ['ime_composing', 'ime_commit_pending', 'input_suspended', 'hits',
+                  'misses', 'frame_ticks', 'event_pending', 'callback_mode', 'motion_pending']
+        for field in fields:
+            self.assertIn('sdl_v1_offset_' + field + ' = offsetof(cui_sdl3, ' + field + ')', source)
+        self.assertIn('sdl_v1_constructor_bytes = sizeof(cui_sdl3)', source)
+        original = (FIXTURE / 'cui_sdl3.c').read_text()
+        self.assertEqual(original.count('cui_sdl3 *s = calloc(1, sizeof(*s));'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

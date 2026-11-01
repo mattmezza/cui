@@ -18,8 +18,8 @@
   },
   "offline_authority_tests": 2,
   "pending": [
-    "Exact-max boundary test additions have not been compiled or run; root full native build holds lease.",
-    "Actual CMake registered target acceptance and combined skill suite deferred to integrator."
+    "Broader affected owned-frame/software regression suite and combined skill check.",
+    "SDL guard ABI measurements and production adapter implementation remain separate."
   ],
   "registered_targets": [
     "test_cpu_v2_sources_standalone",
@@ -37,5 +37,15 @@
     "passed": 2,
     "seconds": 0.061,
     "scope": "Frozen reference hash and SDK transitive-header closure only; no compilation or rendering claim."
+  },
+  "combined_acceptance": {
+    "source_commit": "b60ea55f",
+    "build": "PASS; configured test_cpu_v2_sources_standalone and test_cpu_v2_source_ranges; serial low priority",
+    "tests": "PASS 3/3 zero skips, 0.16s; isolated test_local.py wrapper",
+    "logs": [
+      "cpu-source-ranges-combined-build.log",
+      "cpu-source-ranges-combined-tests.log"
+    ],
+    "scope": "Exact boundary cases and frozen validator comparisons now execute on the integration source; private extraction only, not SDL V2 rendering."
   }
 }

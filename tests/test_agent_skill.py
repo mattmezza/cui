@@ -265,7 +265,7 @@ class AgentSkillTests(unittest.TestCase):
             root = Path(directory)
             expected = ['bindings/python/cui_bridge/shadows.py',
                         'bindings/python/cui_bridge/slider_model.py',
-                        'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs',
+                        'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs',
                         'bindings/go/cui/part_shadows.go', 'bindings/rust/src/part_shadows.rs']
             for name in expected + ['bindings/python/private.py',
                                     'bindings/rust/target/shadows.rs',

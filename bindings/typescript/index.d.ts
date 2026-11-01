@@ -288,3 +288,58 @@ export interface PartShadowStyled<P extends ShadowPart> {
 }
 /** ITEM authoring helper requiring a RadioGroup owner at mount; ordinary ITEM remains generic. */
 export function radio_item(key?:string,text?:string):Item&PartShadowStyled<0|1|2>;
+
+/** Unreleased bridge-owned controlled Slider subset, separate from scalar slider(). */
+export interface SliderSingle {readonly kind: 'single'; readonly end: number}
+export interface SliderRange {readonly kind: 'range'; readonly start: number; readonly end: number}
+export type SliderValue = SliderSingle | SliderRange;
+export interface SliderDomain {readonly minimum: number; readonly maximum: number; readonly step: number; readonly scale: 'linear' | 'logarithmic'}
+export interface SliderConfig {
+  readonly domain: SliderDomain; readonly orientation: 'horizontal' | 'vertical';
+  readonly layout: 'fixed' | 'parent'; readonly length: number; readonly rem: number;
+  readonly sourceGeneration: bigint; readonly requests: boolean; readonly readonly: boolean;
+  readonly reverseFill: boolean; readonly reducedMotion: boolean; readonly hideFocus: boolean;
+}
+export type SliderConfigInput = Partial<Omit<SliderConfig,'domain'>> & {domain?: Partial<SliderDomain>};
+export interface SliderReceipt {
+  readonly appEpoch: bigint; readonly node: Readonly<{slot:number;generation:number}>;
+  readonly sourceGeneration: bigint; readonly configurationRevision: bigint;
+  readonly submissionFrame: bigint; readonly requestSequence: bigint;
+}
+export interface SliderInput {
+  readonly type: number; readonly flags: number; readonly key: number; readonly modifiers: number;
+  readonly x: number; readonly y: number; readonly repeat: number; readonly pointerType: number;
+  readonly pointerButton: number; readonly accessibilityAction: number; readonly pointerId: bigint;
+  readonly pointerDevice: bigint; readonly accessibilityTarget: bigint; readonly accessibilityValue: number;
+}
+export interface SliderRequest {
+  readonly phase: 0|1|2|3; readonly reason: number; readonly thumb: 0|1;
+  readonly eventKind: 1|3|5; readonly eventSource: number; readonly eventFlags: number;
+  readonly receipt: SliderReceipt; readonly eventTarget: bigint; readonly eventFrame: bigint;
+  readonly eventIndex: bigint; readonly current: SliderValue; readonly requested: SliderValue;
+  readonly domain: SliderDomain; readonly gestureDomain: SliderDomain; readonly input: SliderInput;
+}
+export interface SliderPresentation {readonly renderStatus:number;readonly coreTime:number;readonly nextWakeSeconds:number}
+export class SliderModel implements Node {
+  constructor(key:string,config:SliderConfigInput,confirmed:SliderValue,text?:string);
+  key(value:string):this; bounds():Bounds; remove():this;
+  label(text:string):this; disabled(value?:boolean):this;
+  on_request(callback:((request:SliderRequest)=>void)|null):this;
+  configure(config:SliderConfigInput,confirmed:SliderValue):this;
+  set_value(confirmed:SliderValue):this; get_value():SliderValue; get_config():SliderConfig;
+  /** Actual completed geometry; absent part returns undefined. */
+  part_bounds(part:0|1|2|3|4):Readonly<Bounds>|undefined;
+  presentation():SliderPresentation|undefined;
+}
+export function slider_single(end:number):SliderSingle;
+export function slider_range(start:number,end:number):SliderRange;
+export function slider_config(config?:SliderConfigInput):SliderConfig;
+export function slider_model(key:string,config:SliderConfigInput,confirmed:SliderValue,text?:string):SliderModel;
+export interface App {
+  supports_slider_model():boolean;
+  enable_slider_requests(capacity?:number):this;
+  poll_slider_request():SliderRequest|undefined;
+  /** Original returned receipt required; cloned numeric fields confer no authority. */
+  accept_slider_request(receipt:SliderReceipt,value:SliderValue):void;
+  dispatch_slider_requests():number;
+}

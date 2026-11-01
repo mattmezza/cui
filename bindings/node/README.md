@@ -64,3 +64,10 @@ errors are rethrown after leaving the native runner. Unlike timer-based `start()
 it blocks JavaScript timers and I/O until closure. Do not mix the two loops or
 call `step()`/`run()` recursively from a handler. See
 [runner lifecycle](../../docs/BINDING_NATIVE_RUN.md) for ownership and errors.
+
+## Controlled Single/Range Slider (unreleased)
+
+Read [the Node/TypeScript controlled guide](../../docs/NODE_SLIDER_MODEL.md)
+and its complete authored UI examples. This is additive to the scalar `slider()`
+above: owned copied records, BigInt identities and explicit full-pair receipt
+acceptance after stepping. Direct C custom Styled state is not exposed.

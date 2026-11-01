@@ -17,9 +17,11 @@
   "files": [
     "index.cjs",
     "shadows.cjs",
+    "slider-model.cjs",
     "index.d.cts",
     "types",
     "addon.c",
+    "slider_model_internal.h",
     "packaging",
     "_source",
     "LICENSE",

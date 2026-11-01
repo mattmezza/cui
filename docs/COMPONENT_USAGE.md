@@ -746,11 +746,11 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. Optional style plans own source metrics and background brush values; the pure resolver does not render or submit a Styled widget. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. The unreleased C Styled facade owns separate ring motion and rejects visible V1 gradient thumbs before reduction; actual V2 adapters, native numeric host delivery and JavaScript/TypeScript/Go/Rust typed builders remain pending. The unreleased C bridge kind81 owns reducer/presentation state and a copied request FIFO; explicit receipt acceptance updates a full double Single/Range pair after step without legacy CHANGE. The unreleased Python controlled builder owns frozen copied requests and receipt tokens; callbacks run after legacy dispatch, with explicit full-pair acceptance.
+**State:** Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. Optional style plans own source metrics and background brush values; the pure resolver does not render or submit a Styled widget. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. The unreleased C Styled facade owns separate ring motion and rejects visible V1 gradient thumbs before reduction; actual V2 adapters, native numeric host delivery and Go/Rust typed builders remain pending. The unreleased C bridge kind81 owns reducer/presentation state and a copied request FIFO; explicit receipt acceptance updates a full double Single/Range pair after step without legacy CHANGE. The unreleased Python and Node/TypeScript controlled builders own frozen copied requests and receipt tokens; callbacks run after legacy dispatch, with explicit full-pair acceptance.
 
-**Interaction:** Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values. Python uses an independent after-step FIFO and never autoaccepts.
+**Interaction:** Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values. Python and Node/TypeScript use independent after-step FIFOs and never autoaccept.
 
-**Usage:** Pass a volume value by pointer; apply audio settings only in the change branch. The browser gallery uses the controlled Single/Range facade with explicit accept/reject, both axes, reverse/log and passive deadlines; its complete callback/init/compose copy code is in web/modules/slider_usage.js. Native typed delivery, JavaScript/TypeScript/Go/Rust typed builders and V2 gradient adapters remain pending. Python controlled authoring and its complete callback/compose example are documented in docs/PYTHON_SLIDER_MODEL.md.
+**Usage:** Pass a volume value by pointer; apply audio settings only in the change branch. The browser gallery uses the controlled Single/Range facade with explicit accept/reject, both axes, reverse/log and passive deadlines; its complete callback/init/compose copy code is in web/modules/slider_usage.js. Native typed delivery, Go/Rust typed builders and V2 gradient adapters remain pending. Python and Node/TypeScript controlled authoring and complete callback/compose examples are documented in docs/PYTHON_SLIDER_MODEL.md and docs/NODE_SLIDER_MODEL.md.
 
 API: `cui_slider`. [Public header](../include/cui/cui_components.h); [guide](CONTROLS.md).
 
@@ -773,14 +773,16 @@ render typed Sliders or add language builder APIs.
 The unreleased C-only typed Base Slider route is in
 `<cui/cui_base_slider_model.h>`; follow [Base Slider usage](BASE_SLIDER_MODEL.md).
 It owns explicit-size Single/Range geometry and emits synchronous proposals;
-Styled typed presentation, native numeric host delivery and language builders
-remain pending. Legacy scalar APIs retain their existing behavior.
+The separate [C Styled facade](STYLED_SLIDER_MODEL.md) adds source presentation
+and motion. Native numeric host delivery remains pending. Legacy scalar APIs
+retain their existing behavior.
 
 The unreleased controlled C bridge route is in `<cui/cui_bridge.h>`;
 follow [typed bridge Slider usage](BRIDGE_SLIDER_MODEL.md). It owns copied
 requests and accepts explicit full pairs after step. The [Python controlled
-builder](PYTHON_SLIDER_MODEL.md) wraps this route; JavaScript/TypeScript/Go/Rust
-typed builders, native numeric delivery and V2 adapters remain pending.
+builder](PYTHON_SLIDER_MODEL.md) and [Node/TypeScript builders](NODE_SLIDER_MODEL.md)
+wrap this route; Go/Rust typed builders, native numeric delivery and V2 adapters
+remain pending.
 
 ## Speech
 

@@ -2014,6 +2014,8 @@ static napi_value shadow_preset(napi_env env, napi_callback_info info) {
     return code == CUI_BRIDGE_OK ? shadow_array(env, &style, NULL) : status(env, code);
 }
 
+#include "slider_model_internal.h"
+
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
     if (!export_fn(env, exports, name, fn, data))                                                  \
@@ -2130,6 +2132,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("colorBounds", specialized_bounds, 1);
     EXPORT("dayBounds", specialized_bounds, 2);
     EXPORT("close", close_app, 0);
+    EXPORT("sliderModel", slider_model, 0);
 #undef EXPORT
     return exports;
 }

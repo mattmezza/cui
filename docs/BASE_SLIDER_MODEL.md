@@ -8,7 +8,7 @@ and plain Base painting, independently of legacy `cui_slider`,
 and focus rings. Direct C model/state/result structs are not foreign-language
 records; the [Python bridge-owned controlled subset](PYTHON_SLIDER_MODEL.md)
 exposes copied double Single/Range proposals and explicit receipt acceptance.
-Native numeric host delivery and JavaScript/TypeScript/Go/Rust controlled builders
+Native numeric host delivery and Go/Rust controlled builders
 remain pending. The whole Slider family remains partial.
 
 The complete, independently runnable C11 example is
@@ -121,3 +121,7 @@ semantics are invented. Invalid admission leaves UI/state/callbacks unchanged;
 late Core failure is reported separately. See exact ABI/geometry design records
 in `docs/design/SLIDER_MODEL_ABI_V1.md` and
 `docs/design/SLIDER_BASE_INTERACTION_V1.md`.
+
+The separate [Node/TypeScript bridge-owned controlled subset](NODE_SLIDER_MODEL.md)
+also supplies copied requests and explicit full-pair receipt acceptance; it does
+not bind direct C custom Styled style or motion records.

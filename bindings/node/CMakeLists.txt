@@ -6,6 +6,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(CUI_BUILD_NATIVE "Build SDL3 backend" ON)
 add_subdirectory(../bridge cui-bridge-build)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 find_program(NODE_EXECUTABLE node REQUIRED)
 get_filename_component(CUI_NODE_EXECUTABLE_REAL "${NODE_EXECUTABLE}" REALPATH)
 get_filename_component(CUI_NODE_BIN_DIR "${CUI_NODE_EXECUTABLE_REAL}" DIRECTORY)
@@ -125,3 +126,66 @@ add_test(NAME node_shadows COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME node_part_shadows COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/test/part-shadows.test.cjs)
+
+# Controlled Slider is independent of the legacy scalar route and notification queues.
+add_test(NAME node_slider_model COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/slider-model.test.cjs)
+add_test(NAME node_slider_model_protocol COMMAND ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/slider-model-protocol.test.cjs)
+foreach(mode accept reject_vertical single)
+ if(mode STREQUAL "reject_vertical")
+  set(slider_model_args --reject --vertical)
+ elseif(mode STREQUAL "single")
+  set(slider_model_args --single)
+ else()
+  set(slider_model_args)
+ endif()
+ add_test(NAME node_slider_model_example_${mode} COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/slider-model.cjs ${slider_model_args})
+endforeach()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ set(CUI_NODE_SLIDER_OLD_LIBRARY "" CACHE FILEPATH "Optional actual pre-typed-Slider bridge")
+ if(CUI_NODE_SLIDER_OLD_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_SLIDER_OLD_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_SLIDER_OLD_LIBRARY must name an existing actual older bridge")
+  endif()
+  add_library(cui_node_old_slider_bindings MODULE addon.c)
+  target_include_directories(cui_node_old_slider_bindings PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_old_slider_bindings PRIVATE "${CUI_NODE_SLIDER_OLD_LIBRARY}" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_old_slider_bindings PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_old_slider_bindings PROPERTIES PREFIX "" OUTPUT_NAME "cui_old_slider" SUFFIX ".node")
+  add_test(NAME node_slider_model_old_library COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> CUI_SLIDER_FIXTURE=missing
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/slider-model-optional.test.cjs)
+  foreach(missing RANGE 0 16)
+   add_library(cui_slider_optional_${missing} SHARED test/slider-model-provider.c)
+   target_include_directories(cui_slider_optional_${missing} PRIVATE ../../include)
+   target_compile_definitions(cui_slider_optional_${missing} PRIVATE CUI_SLIDER_OMIT=${missing})
+   target_compile_options(cui_slider_optional_${missing} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+   add_test(NAME node_slider_model_missing_${missing} COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> LD_PRELOAD=$<TARGET_FILE:cui_slider_optional_${missing}>
+    CUI_SLIDER_FIXTURE=$<IF:$<EQUAL:${missing},16>,complete,missing>
+    ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/slider-model-optional.test.cjs)
+  endforeach()
+  add_test(NAME node_slider_model_native_config COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> LD_PRELOAD=$<TARGET_FILE:cui_slider_optional_16>
+   CUI_SLIDER_FIXTURE=config_parent
+   ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/slider-model-native-config.test.cjs)
+  foreach(mode unavailable config_size value_size receipt_size request_size presentation_size)
+   add_test(NAME node_slider_model_${mode} COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> LD_PRELOAD=$<TARGET_FILE:cui_slider_optional_16>
+    CUI_SLIDER_FIXTURE=${mode}
+    ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/slider-model-optional.test.cjs)
+  endforeach()
+ endif()
+endif()
+find_program(CUI_NODE_TSC_EXECUTABLE tsc)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_slider_model_types_runtime COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-slider-model-types.py
+  --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
+  --output ${CMAKE_CURRENT_BINARY_DIR}/slider-model-types)
+endif()

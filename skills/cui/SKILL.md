@@ -414,5 +414,12 @@ are the supported modes; default/shared WASM remains versions0. The unreleased P
 keep int identities and frozen copies, dispatch after legacy events, explicitly
 accept full pairs, and never retain ctypes views across callbacks. Typed callbacks
 may mutate external owner state/enqueue later work; nested step/run/dispatch reject.
-JavaScript/TypeScript/Go/Rust typed builders, native numeric delivery and V2
-gradient adapters remain pending.
+For the matching Node/TypeScript subset read `docs/NODE_SLIDER_MODEL.md` and
+`bindings/node/slider-model.cjs`; complete UI examples are
+`bindings/node/examples/slider-model.cjs` and
+`bindings/typescript/examples/slider_model.ts`. Keep uint64 identities as BigInt,
+retain original frozen receipts (numeric clones confer no authority), and preserve
+Node close versus dispose semantics. Callbacks run after legacy dispatch with
+no C views; direct C custom Styled style/motion structs remain unbound.
+Go/Rust controlled builders, native numeric delivery and V2 gradient adapters
+remain pending.

@@ -1080,34 +1080,36 @@
     "binding_status": "direct_c_structs_not_bound_see_controlled_slider_v1",
     "guide": "docs/STYLED_SLIDER_MODEL.md",
     "limitations": [
-      "Existing scalar builders retain legacy Slider behavior. Direct C Base reducer/state, owned Styled style/presentation state and result structs are not foreign-language records; the distinct bridge-owned Python double Single/Range request/receipt subset is documented in controlled_slider_v1.",
-      "The Python bridge subset does not expose custom owned Styled style values, direct C motion state, decorative getters or arbitrary C facade options. JavaScript/TypeScript/Go/Rust controlled authoring remains pending.",
+      "Existing scalar builders retain legacy Slider behavior. Direct C Base reducer/state, owned Styled style/presentation state and result structs are not foreign-language records; the distinct bridge-owned Python/Node/TypeScript double Single/Range request/receipt subset is documented in controlled_slider_v1.",
+      "The Python/Node/TypeScript bridge subsets do not expose custom owned Styled style values, direct C motion state, decorative getters or arbitrary C facade options. Go/Rust controlled authoring remains pending.",
       "Visible V1 gradient thumbs reject atomically; current live adapters do not consume V2 backgrounds. Native numeric host/physical AT delivery remains pending."
     ],
     "bridge_subset": "controlled_slider_v1"
   },
   "language_builder_node_kinds": 80,
   "controlled_slider_v1": {
-    "status": "c_and_python_unreleased_pending_integration",
+    "status": "c_python_node_typescript_unreleased_pending_integration",
     "node_kind": 81,
     "languages": {
       "python": "tested_subset",
-      "javascript": "not_implemented",
-      "typescript": "not_implemented",
+      "javascript": "tested_subset",
+      "typescript": "tested_subset",
       "go": "not_implemented",
       "rust": "not_implemented"
     },
-    "scope": "Copied full double Single/Range proposals in an independent FIFO; explicit receipt acceptance after step. Legacy scalar float builders and CHANGE timing unchanged. Python owns frozen records and dispatches typed callbacks after legacy events; explicit whole-pair acceptance remains required.",
+    "scope": "Copied full double Single/Range proposals in an independent FIFO; explicit receipt acceptance after step. Legacy scalar float builders and CHANGE timing unchanged. Python and Node/TypeScript own frozen records and dispatches typed callbacks after legacy events; explicit whole-pair acceptance remains required.",
     "limitations": [
       "Native C11 owner TLS; default/shared WASM versions0. Explicit unshared final modules require trusted build assertion plus actual final-memory verification.",
-      "JavaScript/TypeScript/Go/Rust typed builders remain pending; no native numeric AT delivery, bridge typed SET injection, V2 gradient adapter or typed-part shadow authoring.",
+      "Go/Rust typed builders remain pending; no native numeric AT delivery, bridge typed SET injection, V2 gradient adapter or typed-part shadow authoring.",
       "Vertical parent-fill in registered scroll remains unsupported.",
       "Handles/receipts remain within the matching loaded bridge image or WASM module instance; no cross-image epoch uniqueness/security claim.",
-      "Python actual-old-library fallback test skips unless CUI_BRIDGE_OLD_LIBRARY supplies an independent binary; local proof used the preserved pre-typed runtime."
+      "Python actual-old-library fallback test skips unless CUI_BRIDGE_OLD_LIBRARY supplies an independent binary; local proof used the preserved pre-typed runtime.",
+      "Node historical optional-group tests require CUI_NODE_SLIDER_OLD_LIBRARY; TypeScript requires an existing compiler. Direct C Styled style/motion objects remain unbound."
     ],
     "docs": [
       "docs/BRIDGE_SLIDER_MODEL.md",
-      "docs/PYTHON_SLIDER_MODEL.md"
+      "docs/PYTHON_SLIDER_MODEL.md",
+      "docs/NODE_SLIDER_MODEL.md"
     ],
     "tests": [
       "bindings/bridge/tests/test_bridge_slider_model.c",
@@ -1117,8 +1119,15 @@
       "bindings/bridge/tests/test_slider_model_thread.py",
       "bindings/bridge/tests/test_slider_legacy_frozen.py",
       "bindings/python/test_slider_model.py",
-      "bindings/bridge/examples/slider_model.py"
+      "bindings/bridge/examples/slider_model.py",
+      "bindings/node/test/slider-model.test.cjs",
+      "bindings/node/test/slider-model-protocol.test.cjs",
+      "bindings/node/test/slider-model-optional.test.cjs",
+      "bindings/node/test/slider-model-native-config.test.cjs",
+      "bindings/node/test/slider-model.types.ts",
+      "bindings/node/examples/slider-model.cjs",
+      "bindings/typescript/examples/slider_model.ts"
     ]
   },
-  "language_builder_node_kinds_scope": "80 shared legacy kinds; Python additionally exposes controlled Slider kind81 when the full optional API group is available."
+  "language_builder_node_kinds_scope": "80 shared legacy kinds; Python and Node/TypeScript additionally expose controlled Slider kind81 when the full optional API group is available."
 }

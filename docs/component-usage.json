@@ -1489,9 +1489,9 @@
         "cui_bridge_slider_receipt_v1",
         "cui_bridge_slider_presentation_v1"
       ],
-      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. Optional style plans own source metrics and background brush values; the pure resolver does not render or submit a Styled widget. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. The unreleased C Styled facade owns separate ring motion and rejects visible V1 gradient thumbs before reduction; actual V2 adapters, native numeric host delivery and JavaScript/TypeScript/Go/Rust typed builders remain pending. The unreleased C bridge kind81 owns reducer/presentation state and a copied request FIFO; explicit receipt acceptance updates a full double Single/Range pair after step without legacy CHANGE. The unreleased Python controlled builder owns frozen copied requests and receipt tokens; callbacks run after legacy dispatch, with explicit full-pair acceptance.",
-      "interaction": "Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values. Python uses an independent after-step FIFO and never autoaccepts.",
-      "usage": "Pass a volume value by pointer; apply audio settings only in the change branch. The browser gallery uses the controlled Single/Range facade with explicit accept/reject, both axes, reverse/log and passive deadlines; its complete callback/init/compose copy code is in web/modules/slider_usage.js. Native typed delivery, JavaScript/TypeScript/Go/Rust typed builders and V2 gradient adapters remain pending. Python controlled authoring and its complete callback/compose example are documented in docs/PYTHON_SLIDER_MODEL.md.",
+      "state_ownership": "Caller retains float value and supplies min/max/step. Optional palette values own all colors and two gradient stops; no borrowed storage. Optional typed model values/domain/state own pointer-free doubles. Optional style plans own source metrics and background brush values; the pure resolver does not render or submit a Styled widget. The C-only Base route borrows callback/user/strings synchronously, keeps confirmed entry immutable and evolves requested intent; acceptance explicitly updates external owner storage. The unreleased C Styled facade owns separate ring motion and rejects visible V1 gradient thumbs before reduction; actual V2 adapters, native numeric host delivery and Go/Rust typed builders remain pending. The unreleased C bridge kind81 owns reducer/presentation state and a copied request FIFO; explicit receipt acceptance updates a full double Single/Range pair after step without legacy CHANGE. The unreleased Python and Node/TypeScript controlled builders own frozen copied requests and receipt tokens; callbacks run after legacy dispatch, with explicit full-pair acceptance.",
+      "interaction": "Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values. Python and Node/TypeScript use independent after-step FIFOs and never autoaccept.",
+      "usage": "Pass a volume value by pointer; apply audio settings only in the change branch. The browser gallery uses the controlled Single/Range facade with explicit accept/reject, both axes, reverse/log and passive deadlines; its complete callback/init/compose copy code is in web/modules/slider_usage.js. Native typed delivery, Go/Rust typed builders and V2 gradient adapters remain pending. Python and Node/TypeScript controlled authoring and complete callback/compose examples are documented in docs/PYTHON_SLIDER_MODEL.md and docs/NODE_SLIDER_MODEL.md.",
       "docs": [
         "docs/CONTROLS.md",
         "docs/STYLED_SLIDER_EVENTS.md",
@@ -1508,7 +1508,11 @@
         "bindings/bridge/examples/slider_model.c",
         "docs/PYTHON_SLIDER_MODEL.md",
         "bindings/bridge/examples/slider_model.py",
-        "bindings/python/cui_bridge/slider_model.py"
+        "bindings/python/cui_bridge/slider_model.py",
+        "docs/NODE_SLIDER_MODEL.md",
+        "bindings/node/examples/slider-model.cjs",
+        "bindings/typescript/examples/slider_model.ts",
+        "bindings/node/slider-model.cjs"
       ],
       "callback_symbols": [
         "cui_slider_model_request_fn_v1"

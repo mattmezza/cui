@@ -358,6 +358,7 @@ function speech(key){return new Node(77,"").key(key);}
 function settings(key,text=""){return new Node(80,text).key(key);}
 function questionnaire(key,text=""){return new Node(78,text).key(key);}
 function dock(key,text=""){return new Node(79,text).key(key);}
+const sliderModels = require('./slider-model.cjs')(native, Node, NODE, keyFor);
 class App {
   constructor(options = {}) {
     if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
@@ -377,8 +378,9 @@ class App {
     this._alive();
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
+    sliderModels.preflight(this, root);
     const attach = (node, parent) => {
-      node[NODE] = native.makeNode(this.handle, parent && parent[NODE], node.kind, node.keyValue);
+      node[NODE] = node.kind===81 ? sliderModels.mount(this,node,parent && parent[NODE]) : native.makeNode(this.handle, parent && parent[NODE], node.kind, node.keyValue);
       node.owner = this;
       const id = native.nodeId(node[NODE]); this.nodes.set(keyFor(id), node);
       if(node.kind===76)native.setRootPadding(this.handle,node[NODE],node.rootPaddingValue);
@@ -389,7 +391,7 @@ class App {
       if ([9,14].includes(node.kind)) native.setRange(this.handle,node[NODE],...node.rangeValue);
       if([42,43].includes(node.kind))native.setTotal(this.handle,node[NODE],node.totalValue);
       if (numerics.has(node.kind)) native.setValue(this.handle,node[NODE],node.numericValue);
-      if (disabledKinds.has(node.kind) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
+      if ((node.kind===81 || disabledKinds.has(node.kind)) && (node.kind!==20 || node.disabledValue)) native.setDisabled(this.handle,node[NODE],node.disabledValue ? 1 : 0);
       if(node.kind===15 || (node.kind===20 && node.openSet))native.setOpen(this.handle,node[NODE],node.openValue?1:0);
       if(detailKinds.has(node.kind))native.setDetail(this.handle,node[NODE],node.detailValue);
       if(node.kind===52)native.setAttachmentStatus(this.handle,node[NODE],node.attachmentValue);
@@ -433,7 +435,7 @@ class App {
   _remove(node) {
     this._alive();
     native.removeNode(this.handle, node[NODE]);
-    const clear = current => { this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
+    const clear = current => { if(current.kind===81)current.requestValue=null; this.nodes.delete(keyFor(native.nodeId(current[NODE]))); current.owner = null; for (const child of current.childrenValue) clear(child); };
     clear(node);
     if (node === this.root) this.root = null;
     if (node.parent) node.parent.childrenValue = node.parent.childrenValue.filter(child => child !== node);
@@ -455,12 +457,14 @@ class App {
     return this;
   }
   step(dt = 1 / 60) {
+    if(this.sliderDispatching)throw new Error('step unavailable during controlled Slider callback');
     this._alive();
     if (this.running) throw new Error("step is unavailable during run");
     native.step(this.handle, dt);
     return this._dispatch();
   }
   step_only(dt = 1 / 60) {
+    if(this.sliderDispatching)throw new Error('step_only unavailable during controlled Slider callback');
     this._alive();
     if (this.running) throw new Error("step is unavailable during run");
     native.step(this.handle, dt);
@@ -511,6 +515,7 @@ class App {
     }
   }
   _dispatch() {
+    if(this.sliderDispatching)throw new Error('nested controlled Slider dispatch unavailable');
     let event; let delivered = 0;
     while ((event = native.poll(this.handle)) !== undefined) {
       const node = this.nodes.get(keyFor(event));
@@ -519,9 +524,16 @@ class App {
       if(event.type===3 && node && node.closeValue){node.closeValue({node,frame:event.frame,result:event.value});delivered++;}
       if (this.disposed || this.closed) break;
     }
+    if(this.sliderEnabled && !this.closed && !this.disposed)delivered+=sliderModels.dispatch(this);
     return delivered;
   }
+  supports_slider_model(){this._alive();return sliderModels.supports(this);}
+  enable_slider_requests(capacity=4096){return sliderModels.enable(this,capacity);}
+  poll_slider_request(){return sliderModels.poll(this);}
+  accept_slider_request(receipt,value){sliderModels.accept(this,receipt,value);}
+  dispatch_slider_requests(){return sliderModels.dispatch(this);}
   run() {
+    if(this.sliderDispatching)throw new Error('run unavailable during controlled Slider callback');
     this._alive();
     if (this.running || this.timer) throw new Error('app is already running');
     this.running = true;
@@ -548,7 +560,9 @@ class App {
   theme_preset(index) {this._alive();if(!Number.isInteger(index)||index<0||index>0xffffffff)throw new TypeError("invalid theme index");native.setThemePreset(this.handle,index);return this;}
   current_theme_preset() {this._alive();return native.getThemePreset(this.handle);}
   stop() { if (this.timer) { clearInterval(this.timer); this.timer = null; } return this; }
-  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; return this; }
-  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; this.nodes.clear(); } }
+  close() { this._alive(); this.stop(); native.close(this.handle); this.closed = true; for(const node of this.nodes.values())if(node.kind===81)node.requestValue=null; return this; }
+  dispose() { if (!this.disposed) { this.stop(); native.dispose(this.handle); this.disposed = true; for(const node of this.nodes.values())if(node.kind===81)node.requestValue=null; this.nodes.clear(); } }
 }
 module.exports = {radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii,App,row,column,label,button,checkbox,radio,switch: switch_control,switch_control,toggle,slider,progress,badge,input,textarea,number_input,collapsible,alert,radio_group,tabs,accordion,item,select,combobox,dropdown_button,dialog,alert_dialog,sheet,popover,tooltip,hover_card,avatar,bubble,empty_view,group_box,kbd,skeleton,spinner,tag,marker,shimmer,list_view,menu,pagination,rating,stepper,description_list,scrollable,status_bar,toolbar,title_bar,icon,message,attachment,image,tree,time_field,color_picker,calendar,date_picker,otp_input,form,input_group,notification,focus_trap,message_scroller,carousel,resizable,text_view,editor,chart,table,data_table,plot,command,virtual_list,sidebar,root_view,speech,questionnaire,dock,settings};
+
+Object.assign(module.exports, sliderModels.exports);

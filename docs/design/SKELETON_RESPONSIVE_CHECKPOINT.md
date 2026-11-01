@@ -172,3 +172,28 @@ actual narrow/wide own-root fractions and loading→real-content replacement plu
 application busy/status semantics. Five modern bindings and bridge wake/copy/
 owner policies remain separate required delivery work; old constructors stay frozen.
 Metadata/SDK/skill changes wait for verified implementation under integrator ownership.
+
+## Prepared public implementation checkpoint
+
+Source-only separate `include/cui/cui_skeleton_presentation.h` and
+`src/components/cui_skeleton_presentation.c` implement the reviewed record/default/
+function without editing old content code/headers. The public header includes the
+existing portable content/palette types; the source depends only on ordinary Core
+box submission and the existing Base motion sampler. Palette/style snapshot,
+secondary→custom replacement→root opacity order and later-Core-error limits are
+explicit in the public comments. No layout/dispatcher changes were required.
+
+Prepared public fixtures: `tests/unit/test_skeleton_responsive.c` repeats the
+proven prototype's independent geometry/pixel/registered-body expectations through
+`cui_skeleton_present`; `test_skeleton_presentation_contract.c` tests15 atomic
+rejections, easing mutation/copy ordering, explicit defaults, grow/fraction/fixed/
+zero sizing and layout-only/inert sampling. Header C/C++ include-order fixture is
+`tests/fixtures/skeleton/presentation_header.c`. All remain uncompiled/unexecuted.
+
+Integrator-owned wiring needed after review/lease: add the new Components source
+and public header to module/source/SDK order (after content header), link both
+new C tests against `cui` (responsive also `cui_software`), and register four C/C++
+header-order compile/link tests. Preserve the frozen legacy palette/presentation
+fixture and rerun it against the combined object set. Strict WASM source/header
+and selective/umbrella distribution closures remain later gates. No shared CMake,
+manifest, metadata, skill, generator or generated-resource edit in this checkpoint.

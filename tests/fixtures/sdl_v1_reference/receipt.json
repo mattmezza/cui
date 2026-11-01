@@ -1,0 +1,42 @@
+{
+  "source_commit": "b386ec55b907b8431339ba1897a33d497200a87d",
+  "source_blob": "aeb9b7d43098605e12c8435f15d34b690ff1551d",
+  "source_sha256": {
+    "backends/sdl3/cui_sdl3.c": "62e1ab7726116506e80dade53c1934f3d65ee91b7e9d19ba3beec8ccba01125f",
+    "backends/sdl3/cui_sdl3_mesh.h": "41ece3b72bb3ecfdfc7f0540f066873133d05123e1525ea551bd1aeeb1852883",
+    "include/cui/cui_sdl3.h": "c59d7e1c9ee300b710d8c389ec3314f42db3572aef5f1f7f5c136d17485bad28"
+  },
+  "immutable_dependencies": {
+    "backends/software/cui_shadow.h": "cc4786f94d509d185639d680eb0d3023207d6b700821111d4faf8e12420207d8",
+    "backends/software/cui_bitmap.h": "e810b6d3fd30efb9416e28d6ba913312018a3d94e1a9340ed7cf1ca81856257c",
+    "backends/software/cui_shape.h": "98feef3aa2b5dbd65bd06c2f6cf5c02399c420b330789396ece920304b0614e1",
+    "backends/software/cui_mesh.h": "52ec6a5565116fe341a832301da41867d5da1dd59f3e09df940f2e172a03d68a",
+    "include/cui/cui_renderer.h": "1468bc922ec07de05b7f686956e6e293bd9cf7ff8852c10c3623fe96c0c0f7e5"
+  },
+  "baseline_method": "Independently compile original SDL TU with private/public type/function prefixes; own old/new backends/font objects; compare active state, allocations, native call trace and pre-Present lossless RGBA under same runtime. No candidate-derived expected pixels. Compilation/runtime capture pending lease.",
+  "state": "SOURCE FROZEN ONLY: no output/cache/allocation/layout measurements claimed",
+  "installed": {
+    "pkg_config": "3.4.18",
+    "header": "3.4.18",
+    "runtime_version": 3004018,
+    "runtime_revision": "SDL-release-3.4.18-0-g829a65d76",
+    "native_cache_version": "3.4.18"
+  },
+  "primary_sources": {
+    "7f3ae3d57459e59943a4ecfefc8f6277ec6bf540": {
+      "url": "https://raw.githubusercontent.com/libsdl-org/SDL/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/src/render/SDL_render.c",
+      "sha256": "ca7b1f600a0664f348d42f8b4cc130077855182f12aa408b8334c2a5d3fc0df7",
+      "bytes": 184354
+    },
+    "release-3.4.18": {
+      "url": "https://raw.githubusercontent.com/libsdl-org/SDL/release-3.4.18/src/render/SDL_render.c",
+      "sha256": "6338807b452872ed180b60454d4e0dd5ab645469be6545b3944b22ffdb9fc312",
+      "bytes": 209250
+    }
+  },
+  "existing_archive": {
+    "path": "/home/matteo/.cache/cui-current-validation/native/libcui_sdl3.a",
+    "sha256": "2c995e0e078090dc62ad70f64ad41ab8a0a65bffa9d5b8a43ea79770ed64cbe3",
+    "note": "Read-only existing archive; no copy/rebuild or claim of new V2 support"
+  }
+}

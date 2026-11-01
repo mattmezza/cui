@@ -11,7 +11,7 @@ separate concepts.
 | Consumer | Current evidence | Required acceptance |
 | --- | --- | --- |
 | Base scrollbar (`src/base/cui_scroll.c`) | Actual nested close/reopen test applies old captured MOVE+UP: scroll 0 → 285.714. Reducer ignores consumed samples and retains caller-owned dragging state. | Explicit reset must clear idle/held drag and suppress cancelled samples. Prove mouse/touch, fresh DOWN recovery and unchanged no-helper trace. |
-| Resizable (`src/base/cui_resizable.c`) | Source inspection: handle reducer retains `active_handle`/`dragging`, reads targeted MOVE/UP without consumption checks, and emits completion. Runtime counterexample not yet established. | Test nested old MOVE+UP, idle state, fresh input and callback counts/order; preserve legacy behavior when reset is unused. |
+| Resizable (`src/base/cui_resizable.c`) | Actual original nested reducer applies stale MOVE+UP: size 100 → 40 and spurious completion. It retains `active_handle`/`dragging` and ignores consumption. | Test nested old MOVE+UP, idle state, fresh input and callback counts/order; preserve legacy behavior when reset is unused. |
 | Rating (`src/base/cui_numeric.c`) | Source inspection: targeted KEY_DOWN mutates value without checking consumption. Activation cancellation alone does not cover this branch. Runtime counterexample not yet established. | Test consumed owned arrows during lifetime reset and ordinary legacy keys separately. |
 
 ## Remaining audit
@@ -39,3 +39,13 @@ Before production transfer: measure the proposed storage on native and WASM,
 prove scope/ancestor and invalid-phase behavior, close applicable builtin gaps,
 retain exact target/receipt evidence, and verify uncalled-helper compatibility.
 Update this inventory as consumers are tested or additional paths are found.
+
+## Current unpublished proof
+
+The copied marker/query and Scroll/Resizable candidates passed 22 headless cases
+in `dialog-marker-first-runtime.log`: scrollbar mouse/idle/touch cancellation,
+Resizable stale size/completion suppression and fresh input, scope query and prior
+Dialog lifecycle/receipt/geometry checks. Production files remain unchanged.
+Independent frozen no-helper reducer traces, additional Resizable idle/touch
+cases and remaining consumer coverage are still required. This is not approval
+to publish the Core API or a claim of all-component cancellation support.

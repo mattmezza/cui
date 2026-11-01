@@ -51,5 +51,12 @@
     "Root fullWASM/browser rerun; worker did not rerun browser.",
     "Existing held-input/Root/host/foreign-facade limitations remain unchanged."
   ],
-  "ownership": "No Core/Table/default API/other gallerycontrol changes; root files not edited. Compiler/heavy lease released after63142 terminal."
+  "ownership": "No Core/Table/default API/other gallerycontrol changes; root files not edited. Compiler/heavy lease released after63142 terminal.",
+  "combined_integration": {
+    "commit": "a9938d04",
+    "configured_intrinsic_build": "PASS",
+    "headless_tests": "7/7 PASS zero skips in41.53seconds; intrinsic, private range2, frozen authority, SDKfreshness, skillfreshness, skillcontract",
+    "log": "dialog-fit-combined-tests.log",
+    "browser": "Pending rebuilt gallery rerun; initial failure retained."
+  }
 }

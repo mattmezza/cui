@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New Slider, scroll geometry, background/text preparation and private software rendering work is **unreleased**. Combined validation is unfinished. |
+| Integration branch | New Slider, scroll geometry, background/text preparation and private software rendering work is **unreleased**. Local combined validation passed; broader acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green

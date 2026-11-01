@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-01",
+  "scope": "Integrated unreleased Rust controlled Single/Range Slider builders; no whole-family or package-publication claim",
+  "worker_commit": "6c7d409b59ad97d867d6677b8af91a73990f921f",
+  "source_authority": "All eight implementation/example/test source hashes match docs/validation/rust-slider-worker.json; root added optional CMake protocol registration and guide instructions",
+  "checks": {
+    "registered_old_provider": "Outer CTest bridge_rust_slider_protocol 1/1 PASS11.08 s; runner compiled strict provider group and43 separate actual-old/provider cases under private Xvfb",
+    "current_and_legacy": "10/10 private-Xvfb wrapper entries PASS3.04 s; includes typed14UI/3wire and existing legacy/native Inter suites, preserving separately gated historical fixture branches",
+    "compile_fail": "4/4 PASS0.20 s; App thread locality, receipt locality and restricted context",
+    "matching_default_static": "Exact integrated441-file SDK compiled through Cargo default path;6/6 private-Xvfb wrapper entries PASS0.20 s including14UI/3wire and four authored example modes; ELF has no libcui_bridge dependency, actual child CMake -j1 observed",
+    "usage": "6/6 docs tests PASS7.013 s",
+    "skill": "2/2 CTest PASS40.35 s including full18-method contract39.98 s and generated freshness",
+    "freshness": "SDK, amalgamation, generated skill passed",
+    "manifest": "78 unique entries retained:77 tested subsets,1 implemented,0 verified"
+  },
+  "toolchain": "Existing Linux Rust/Cargo1.99.1, GCC warnings enabled; Rust1.85.1 remains untested",
+  "validation_setup_finding": "Attempt to share the worker Cargo target for root default-static build failed because its embedded CMake cache named the worker source directory. Preserved failure log; used one dedicated root static target, without deleting artifacts or changing production code.",
+  "sdk_manifest_sha256": "d2111ed41fc62395ab4c3dea086458f9a2f3c0667042a7edcb88dd9501a62632",
+  "logs": [
+    "/home/matteo/.cache/cui-current-validation/rust-slider-root-configure.log",
+    "/home/matteo/.cache/cui-current-validation/rust-slider-root-protocol.log",
+    "/home/matteo/.cache/cui-current-validation/rust-slider-root-current.log",
+    "/home/matteo/.cache/cui-current-validation/rust-slider-root-skill.log",
+    "/home/matteo/.cache/cui-current-validation/rust-slider-root-static.log",
+    "/home/matteo/.cache/cui-current-validation/rust-slider-root-static-isolated.log"
+  ],
+  "limitations": [
+    "Historical notification/shadow/window optional fixture branches retain separate environment gates; worker receipt enumerates nine",
+    "MSRV1.85.1, final full native suite and exact-revision hosted delivery remain open",
+    "No native numeric accessibility delivery, direct Styled ownership/motion binding or foreign V2 gradient support",
+    "No PyPI/npm/crates.io publication inferred"
+  ]
+}

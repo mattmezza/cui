@@ -396,3 +396,102 @@ bridge internal sidecar/render integration and focused C tests; language workers
 own only their wrapper/runtime example/tests after C ABI approval; Core/native
 and vertical-layout owners remain independent. Integrator alone owns shared
 `tests/web/test_browser.py`/Pages workflow and canonical integration/push.
+
+## Review resolution and portability probe receipt (2026-11-01)
+
+Root approved kind81, fixed records, independent FIFO, explicit acceptance,
+legacy timing preservation and ordinary completed omission expiry. Native owner
+TLS plus saturating atomic_flag epoch policy is now bounded-probe verified;
+compatible bridge production still waits for root's review of this checkpoint.
+Record layout calculations above remain calculations until production ABI tests.
+
+Approved target policy is conservative and explicit, **not** an assumption that
+WASI cannot have shared memory. The pinned linker demonstrably supports it.
+Proposed private implementation guard, exercised by the test-only fixture:
+
+```c
+#if defined(CUI_BRIDGE_SLIDER_NO_TLS)
+#define OWNER_SUPPORTED 0
+#elif defined(__wasm__)
+#if defined(CUI_BRIDGE_SLIDER_WASM_UNSHARED) && CUI_BRIDGE_SLIDER_WASM_UNSHARED == 1 && \
+    !defined(__wasm_atomics__) && !defined(_REENTRANT)
+#define OWNER_SUPPORTED 1
+#else
+#define OWNER_SUPPORTED 0
+#endif
+#else
+#define OWNER_SUPPORTED 1
+#endif
+```
+
+- Native portable C11 TLS/atomic_flag: supported where these compile; actual
+  runtime proof here is Linux GCC, not Windows/macOS runtime evidence. An
+  unsupported compiler/build sets private `CUI_BRIDGE_SLIDER_NO_TLS` and keeps
+  new versions0/stubs BACKEND_UNAVAILABLE. Do not fall back to a constant owner.
+- **Default WASM versions0**. Only explicit
+  `CUI_BRIDGE_SLIDER_WASM_UNSHARED=1` opts a trusted unshared builder in, provided
+  atomics/reentrant macros are absent. This flag is a build assertion, not a
+  runtime capability query or public record field. It requires final-artifact
+  verification: memory is nonshared and no imported shared memory can replace it.
+- The C preprocessor cannot detect another translation unit's flags or a later
+  linker `--shared-memory`; compile flags alone never prove final host ownership.
+  Unverified generic WASM SDK consumers must retain versions0. Known builds
+  must run postlink verification on their actual final module before advertising
+  this opt-in. The probe's actual default module had imports[] and nonshared
+  exported memory; it used the compiler's `_Thread_local`, no replacement token.
+- Atomics/pthread/shared WASM remains versions0 even with the unshared assertion.
+  No Worker TLS initialization, thread tag uniqueness across Workers, native
+  shared-memory ownership enforcement or threads-disabled fallback is claimed.
+  The support-disabled production path must not allocate/issue epochs/enable
+  kind81; old bridge routes remain available. No more shared-Worker work is
+  required for this v1 slice.
+- The owner OS thread must stay alive until app destroy. No ownership transfer,
+  dead-thread tag reuse, concurrent API/destroy or synchronization of Core from
+  another thread is supported. Native worker threads in the probe stay alive
+  while their distinct tags are checked; it does not use recycled thread IDs.
+
+### Reproducible bounded evidence
+
+Test-only sources are `tests/fixtures/bridge_owner_primitives_probe.c` and `.cjs`.
+They include no bridge/Core implementation or public declarations. No production
+allocator/epoch test hooks are added. Native compile is strict C11/O2/warnings
+as errors with `-DPROBE_NATIVE=1 -DPROBE_EXPECT_SUPPORT=1 -pthread`; only the probe's
+C11 thread harness needs pthread linkage. The intended production primitives do
+not introduce a C11 thread-library dependency. Four simultaneously live owners,
+4000 unique epoch values and MAX-1/MAX/exhausted output-atomic behavior passed.
+Execution used the standard private-Xvfb wrapper with a CTest script invoking
+this windowless binary, not the desktop.
+
+Pinned Zig executable is the installed0.16.0, compiled with `-target wasm32-wasi
+-mexec-model=reactor -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror`. Export probe
+owner/match/epoch/seed, support and feature-epoch functions plus memory. Explicit
+unshared build adds `-DCUI_BRIDGE_SLIDER_WASM_UNSHARED=1
+-DPROBE_EXPECT_SUPPORT=1`; actual Node/WASI reactor runtime observed support1,
+nonshared memory, stable own tag, wrong-tag rejection and exact uint64 saturation.
+The default/unasserted guard compiled to an object with
+`-DPROBE_EXPECT_SUPPORT=0` and a successful static assertion. It was deliberately
+not silently opted in. Zig's `-fsyntax-only` wrapper first diagnosed an unused
+implicit `-c`; the check was rerun as a real strict object compile, without
+suppressing warnings or modifying primitive behavior.
+
+Shared characterization adds `-matomics -mbulk-memory -pthread`, the same unshared
+assertion, `-DPROBE_EXPECT_SUPPORT=0`, linker `--shared-memory --import-memory`
+and exports `__wasm_init_tls`, `__tls_size`, `__tls_align`. Strict compile/link
+succeeded. Actual Node instantiation imported shared memory with the module's
+exact257-page minimum/maximum; too-small/too-large trial import limits were
+correctly rejected first. Runtime verified SharedArrayBuffer, support0 and
+feature-epoch rejection0. It did NOT call raw shared TLS primitives or invent a
+Worker initialization protocol. Node emitted its existing experimental WASI
+warning; no C source warning was suppressed.
+
+All artifacts reuse existing `build-focused`; no new checkout/build tree,
+engine build, dependency installation or heavy skill suite. Native/default/shared
+three final cached links and the additional default-policy object terminated
+successfully. Logs and artifact/source hashes are recorded externally under
+`/home/matteo/.cache/cui-current-validation/bridge-owner-*`; the signed handoff
+receipt identifies the exact commit. No performance/benchmark claim.
+
+Future production should first implement this approved supported-target C slice,
+then prove real records/receipt rules and frozen legacy behavior. Richer bridge
+input, five foreign authoring routes, native AT precision/delivery, vertical
+registered-scroll and actual V2 gradient adapters remain separate open work.

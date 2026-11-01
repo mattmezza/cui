@@ -9,6 +9,7 @@ import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
 import {dropdownUsage} from "./modules/cui_dropdown_usage.js";
 import {controlShadowUsage} from "./modules/cui_control_shadow_usage.js";
+import {sliderUsage} from "./modules/slider_usage.js";
 import {hoverCardUsage} from "./modules/cui_hover_card_usage.js";
 let shadowRenderer;
 const meshRenderer=createCuiMeshRenderer();
@@ -26,6 +27,22 @@ controlShadowInput.addEventListener('change',requestFrame);
 controlShadowLabel.append(controlShadowInput,' Surface shadows');
 $('control-size').after(controlShadowLabel);
 function controlShadowsEnabled(){return controlShadowInput.checked&&!(selected.name==='Button'&&$('button-collection').value!=='0');}
+const sliderControls=document.createElement('span');
+sliderControls.id='slider-controls';sliderControls.hidden=true;
+for(const [key,label,choices,initial] of [
+ ['kind','Values',[[0,'Single'],[1,'Range']],0],
+ ['axis','Orientation',[[0,'Horizontal'],[1,'Vertical']],0],
+ ['reverse','Direction',[[0,'Forward'],[1,'Reverse']],0],
+ ['scale','Scale',[[0,'Linear'],[1,'Logarithmic']],0],
+ ['accept','Owner policy',[[1,'Accept proposals'],[0,'Reject proposals']],1]]) {
+ const wrapper=document.createElement('label');wrapper.textContent=label+' ';
+ const input=document.createElement('select');input.id='slider-'+key;input.setAttribute('aria-label','Slider '+label);
+ for(const [value,text] of choices){const option=document.createElement('option');option.value=value;option.textContent=text;input.append(option);}
+ input.value=initial;input.addEventListener('change',requestFrame);wrapper.append(input);sliderControls.append(wrapper,' ');
+}
+$('control-size').after(sliderControls);
+function sliderValues(){return ['kind','axis','reverse','scale','accept'].map(k=>Number($('slider-'+k).value));}
+function resetSliderControls(){for(const [k,v] of Object.entries({kind:0,axis:0,reverse:0,scale:0,accept:1}))$('slider-'+k).value=String(v);}
 const stepperControls=document.createElement('span');
 stepperControls.id='stepper-controls';stepperControls.hidden=true;
 function stepperControl(id,label,options,value){
@@ -854,7 +871,7 @@ function render(){
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Popover'&&$('popover-mode').value==='1'?520:selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):selected.name==='Popover'&&$('popover-mode').value==='1'?520:selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -898,6 +915,7 @@ function render(){
  wasm.gallery_plot_mode(Number($('plot-mode').value));
  wasm.gallery_virtual_mode(Number($('virtual-axis').value));
  wasm.gallery_design_options(($('design-size').hidden?0:Number($('design-size').value)),Number($('design-radius').value),Number($('design-spacing').value));
+ wasm.gallery_slider_options(...sliderValues());
  wasm.gallery_control_options(Number($('control-size').value),Number($('choice-required').checked),Number($('choice-invalid').checked),Number($('choice-skip-tab').checked),Number($('switch-side').checked),Number($('switch-color').checked),Number($('toggle-variant').value),Number($('toggle-segmented').checked),Number($('toggle-selection').value),Number(controlShadowsEnabled()));
  wasm.gallery_avatar_options(Number($('avatar-source').value),Number($('avatar-palette').checked),Number($('avatar-hue').value),Number($('avatar-placeholder').value),Number($('avatar-rem').value));
  wasm.gallery_message_options(Number($('message-alignment').value),Number($('message-variant').value),Number($('message-inset').value),Number($('message-avatar').checked),Number($('message-scrollbar').checked));
@@ -991,6 +1009,7 @@ function render(){
  }
  if(controlShadowsEnabled()&&['Button','Checkbox','Radio','Switch','Slider'].includes(selected.name))$('snippet').textContent=controlShadowUsage(selected.name,Number($('control-size').value),Number($('design-size').value));
  controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
+ if(selected.name==='Slider'&&!wasm.gallery_slider_stats(12))$('snippet').textContent=sliderUsage(...sliderValues(),$('disabled').checked,controlShadowsEnabled());
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
  if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value))||snippets.HoverCard;
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
@@ -1151,14 +1170,14 @@ function route(){
  if(!['Video','VideoPlayer'].includes(location.hash.slice(1)||document.body.dataset.route))videoHost.stop();
  const raw=location.hash.slice(1)||document.body.dataset.route||'home';
  if(!raw||raw==='home'){
-  stepperControls.hidden=true;resetStepperControls();selected=null;$('home-page').hidden=false;$('docs-page').hidden=true;$('gallery-page').hidden=true;$('catalog').hidden=false;$('docs-nav').hidden=true;
+  sliderControls.hidden=true;stepperControls.hidden=true;resetStepperControls();selected=null;$('home-page').hidden=false;$('docs-page').hidden=true;$('gallery-page').hidden=true;$('catalog').hidden=false;$('docs-nav').hidden=true;
   document.title='CUI · Portable C11 UI';shareRoute('', 'home',document.title,'Build portable C11 interfaces with CUI: themed components, explicit state, composable behavior, live WebAssembly examples and browsable documentation.');navigation();document.body.classList.remove('menu-open');return;
  }
  if(raw.startsWith('docs/')){
   const parts=raw.slice(5).split('/');let slug,anchor;
   try{slug=decodeURIComponent(parts[0]);anchor=decodeURIComponent(parts.slice(1).join('/'));}catch{slug='getting-started';anchor='';}
   const doc=documents.find(entry=>entry.slug===slug)||documents.find(entry=>entry.slug==='getting-started');
-  stepperControls.hidden=true;resetStepperControls();selected=null;$('home-page').hidden=true;$('docs-page').hidden=false;$('gallery-page').hidden=true;$('catalog').hidden=true;$('docs-nav').hidden=false;
+  sliderControls.hidden=true;stepperControls.hidden=true;resetStepperControls();selected=null;$('home-page').hidden=true;$('docs-page').hidden=false;$('gallery-page').hidden=true;$('catalog').hidden=true;$('docs-nav').hidden=false;
   $('docs-title').textContent=doc.title;$('docs-content').innerHTML=doc.html;$('docs-source').href=doc.source;
   $('docs-markdown').href=doc.markdown||'./llms.txt';
   $('docs-historical').hidden=!doc.historical;
@@ -1217,6 +1236,7 @@ function selectComponent(){
  $('snippet').textContent=(selected.example?'/* Retain app across frames. Include examples/composed_apps/app.h. */\ncomposed_app *app = composed_app_create(on_app_event, user);\n/* Between frames, before cui_begin_frame: */\ncomposed_app_set_theme(app, &theme);\n/* Between cui_begin_frame and cui_end_frame: */\ncomposed_app_scene(ui, app, width, height);\n/* At shutdown, after rendering the last draw list: */\ncomposed_app_destroy(app);':snippets[selected.name])||(live?`/* See the public ${selected.public_header || 'component'} API. */`:'/* No complete styled browser example yet. */');
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
 
+ sliderControls.hidden=selected.name!=='Slider';resetSliderControls();
  stepperControls.hidden=selected.name!=='Stepper';resetStepperControls();
  $('hover-policy').hidden=selected.name!=='HoverCard';
  for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing','spinner-sizing','spinner-rem'])$(id).hidden=selected.name!=='Spinner';

@@ -750,7 +750,7 @@ API: `cui_select`. [Public header](../include/cui/cui_choice.h); [guide](CHOICE.
 
 **Interaction:** Legacy scalar route returns true when the value changes; the C-only typed Base route emits ordered proposals and returns passive counts without accepting owner values.
 
-**Usage:** Pass a volume value by pointer; apply audio settings only in the change branch.
+**Usage:** Pass a volume value by pointer; apply audio settings only in the change branch. The browser gallery uses the controlled Single/Range facade with explicit accept/reject, both axes, reverse/log and passive deadlines; its complete callback/init/compose copy code is in web/modules/slider_usage.js. Native typed delivery, all five typed builders and V2 gradient adapters remain pending.
 
 API: `cui_slider`. [Public header](../include/cui/cui_components.h); [guide](CONTROLS.md).
 

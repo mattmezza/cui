@@ -118,3 +118,22 @@ support prove Core transport only. A lying host or later capacity/layout/rendere
 failure can occur after callbacks: no already delivered request/input/owner effect
 is rolled back. CORE_FAILURE returns no wake and does not publish staged motion;
 a later end failure cannot roll back earlier state. Rebuild from a healthy frame.
+
+## Browser gallery authoring
+
+The Slider gallery uses this controlled facade for Single/Range, horizontal or
+vertical, reverse and linear/log input. The owner policy control explicitly
+accepts or rejects UPDATE proposals; the preview shows confirmed owner and copied
+current/requested/phase. Mode/domain/axis changes synchronize the demo owner,
+retain the reducer for captured CANCEL delivery and reset only presentation.
+CANCEL is not blindly accepted. Progress retains its independent legacy route.
+
+The copy panel is a complete C initialization/callback/composition example:
+`web/modules/slider_usage.js`. Keep the application record across frames,
+render the completed draw list, then schedule its absolute Core-clock deadline.
+The browser maps that deadline to its monotonic host clock and coalesces it with
+other wakes; reduced motion and settled state return zero. No manual animation
+loop is required. V1 reports unsupported only when actual resolved visible paint
+is linear; a theme name alone never selects gradient capability. This gallery
+migration does not implement native numeric delivery, typed foreign builders,
+V2 gradient adapters or vertical registered-scroll admission.

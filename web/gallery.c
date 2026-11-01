@@ -49,6 +49,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_status.h"
 #include "cui/cui_stepper_navigation.h"
 #include "cui/cui_stepper_visual.h"
+#include "cui/cui_styled_slider_model.h"
 #include "cui/cui_surface.h"
 #include "cui/cui_table.h"
 #include "cui/cui_text_view.h"
@@ -1986,7 +1987,117 @@ static void disclosure_panel(cui_context *context, size_t index, void *user) {
         disclosure_actions++;
     cui_label(context, &current_theme, cui_string("Application-owned interactive content."));
 }
-static float slider = 40;
+static float slider = 40; /* Legacy Progress and compatibility fixture only. */
+static struct {
+    cui_slider_model_value_v1 confirmed;
+    cui_slider_model_state_v1 model;
+    cui_styled_slider_model_state_v1 presentation;
+    cui_slider_model_request_v1 last;
+    unsigned requests, accepted, cancels;
+    cui_slider_model_request_v1 last_cancel;
+    int kind, vertical, reverse, logarithmic, accept, legacy;
+    bool initialized, has_request;
+    uint32_t render_status;
+    double wake;
+} typed_slider = {.accept = 1};
+static void gallery_slider_request(void *user, const cui_slider_model_request_v1 *request) {
+    (void)user;
+    typed_slider.last = *request;
+    typed_slider.has_request = true;
+    typed_slider.requests++;
+    if (request->phase == CUI_SLIDER_MODEL_CANCEL) {
+        typed_slider.cancels++;
+        typed_slider.last_cancel = *request;
+    }
+    if (typed_slider.accept && request->phase == CUI_SLIDER_MODEL_UPDATE &&
+        cui_slider_model_value_valid_v1(request->domain, request->requested)) {
+        typed_slider.confirmed = request->requested;
+        typed_slider.accepted++;
+        redraw = true; /* Publish accepted external owner in the next host frame. */
+    }
+}
+static void gallery_slider_reset(void) {
+    typed_slider.confirmed = (cui_slider_model_value_v1){.kind = (uint32_t)typed_slider.kind,
+                                                         .start = typed_slider.kind ? 25 : 0,
+                                                         .end = typed_slider.kind ? 75 : 40};
+    if (!typed_slider.initialized)
+        cui_slider_model_state_init_v1(sizeof typed_slider.model, &typed_slider.model);
+    cui_styled_slider_model_state_init_v1(sizeof typed_slider.presentation,
+                                          &typed_slider.presentation);
+    typed_slider.has_request = false;
+    typed_slider.requests = typed_slider.accepted = typed_slider.cancels = 0;
+    typed_slider.wake = 0;
+    typed_slider.initialized = true;
+}
+void gallery_slider_options(int kind, int vertical, int reverse, int logarithmic, int accept) {
+    kind = kind != 0;
+    vertical = vertical != 0;
+    reverse = reverse != 0;
+    logarithmic = logarithmic != 0;
+    bool reset = !typed_slider.initialized || typed_slider.kind != kind ||
+                 typed_slider.vertical != vertical || typed_slider.reverse != reverse ||
+                 typed_slider.logarithmic != logarithmic;
+    typed_slider.kind = kind;
+    typed_slider.vertical = vertical;
+    typed_slider.reverse = reverse;
+    typed_slider.logarithmic = logarithmic;
+    typed_slider.accept = accept != 0;
+    if (reset)
+        gallery_slider_reset();
+}
+/* Internal regression fixture; never exposed as a public implementation selector. */
+void gallery_slider_legacy_fixture(int enabled) {
+    typed_slider.legacy = enabled != 0;
+}
+double gallery_slider_stats(unsigned field) {
+    switch (field) {
+    case 0:
+        return typed_slider.confirmed.start;
+    case 1:
+        return typed_slider.confirmed.end;
+    case 2:
+        return typed_slider.has_request ? typed_slider.last.current.start : 0;
+    case 3:
+        return typed_slider.has_request ? typed_slider.last.current.end : 0;
+    case 4:
+        return typed_slider.has_request ? typed_slider.last.requested.start : 0;
+    case 5:
+        return typed_slider.has_request ? typed_slider.last.requested.end : 0;
+    case 6:
+        return typed_slider.has_request ? (double)typed_slider.last.phase : -1;
+    case 7:
+        return typed_slider.requests;
+    case 8:
+        return typed_slider.accepted;
+    case 9:
+        return typed_slider.render_status;
+    case 10:
+        return typed_slider.wake;
+    case 11:
+        return cui_frame_time(ui);
+    case 12:
+        return typed_slider.legacy;
+    case 13:
+        return typed_slider.cancels;
+    case 14:
+        return typed_slider.cancels ? typed_slider.last_cancel.reason : -1.0;
+    case 15:
+        return typed_slider.cancels ? typed_slider.last_cancel.requested.kind : -1.0;
+    case 16:
+        return typed_slider.cancels ? typed_slider.last_cancel.gesture_domain.minimum : 0;
+    case 17:
+        return typed_slider.model.flags & CUI_SLIDER_MODEL_DRAGGING;
+    default:
+        return 0;
+    }
+}
+double gallery_slider_part_bounds(unsigned part, unsigned field) {
+    if (part > CUI_SLIDER_MODEL_END_THUMB || field > 3)
+        return 0;
+    cui_rect r =
+        cui_bounds(ui, cui_base_slider_model_part_id_v1(cui_id_from(ui, "typed-slider"), part));
+    return field == 0 ? r.x : field == 1 ? r.y : field == 2 ? r.w : r.h;
+}
 static char input_buffer[512] = "Hello, CUI";
 static cui_edit *edit;
 static cui_input_state input_state;
@@ -4206,13 +4317,92 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                             &radio_group_state, radio_options);
         break;
     }
-    case 5:
-        cui_slider(ui, cui_id_from(ui, "slider"), &t, cui_string("Volume"), &slider, 0, 100, 1,
-                   disabled);
-        if (control_surface_shadows)
-            gallery_control_shadow(ui, cui_slider_track_id(cui_id_from(ui, "slider")),
-                                   t.radius == 0 ? 0 : 4, true);
+    case 5: {
+        if (typed_slider.legacy) {
+            cui_slider(ui, cui_id_from(ui, "slider"), &t, cui_string("Volume"), &slider, 0, 100, 1,
+                       disabled);
+            if (control_surface_shadows)
+                gallery_control_shadow(ui, cui_slider_track_id(cui_id_from(ui, "slider")),
+                                       t.radius == 0 ? 0 : 4, true);
+            break;
+        }
+        if (!typed_slider.initialized)
+            gallery_slider_reset();
+        cui_id owner = cui_id_from(ui, "typed-slider");
+        cui_styled_slider_model_options_v1 paint;
+        if (!cui_styled_slider_model_options_from_theme_v1(
+                &t, 16,
+                typed_slider.vertical ? CUI_SLIDER_MODEL_VERTICAL : CUI_SLIDER_MODEL_HORIZONTAL,
+                &paint)) {
+            typed_slider.render_status = CUI_STYLED_SLIDER_INVALID_ARGUMENT;
+            typed_slider.wake = 0;
+            cui_label(ui, &t, cui_string("Invalid Slider theme paint."));
+            break;
+        }
+        paint.style.layout = CUI_SLIDER_STYLE_PARENT;
+        if (reduced_motion)
+            paint.flags |= CUI_STYLED_SLIDER_REDUCED_MOTION;
+        cui_slider_model_options_v1 options = {
+            .version = CUI_SLIDER_MODEL_V1,
+            .struct_size = sizeof options,
+            .flags = (disabled ? CUI_SLIDER_MODEL_DISABLED_BIT : 0) |
+                     (typed_slider.reverse ? CUI_SLIDER_MODEL_REVERSE_FILL_BIT : 0),
+            .orientation =
+                typed_slider.vertical ? CUI_SLIDER_MODEL_VERTICAL : CUI_SLIDER_MODEL_HORIZONTAL,
+            .domain = {typed_slider.logarithmic ? 1 : 0, 100, 1,
+                       typed_slider.logarithmic ? CUI_SLIDER_MODEL_LOGARITHMIC
+                                                : CUI_SLIDER_MODEL_LINEAR,
+                       0},
+            .name = cui_string("Selection"),
+            .start_name = cui_string("Selection start"),
+            .end_name = cui_string("Selection end")};
+        cui_label(ui, &t, cui_string(typed_slider.kind ? "Controlled range" : "Controlled value"));
+        cui_begin_box(ui, cui_id_from(ui, "typed-slider-area"),
+                      (cui_box){.width = typed_slider.vertical ? 48 : fmaxf(1, width - 48),
+                                .height = typed_slider.vertical ? 180 : 40,
+                                .fixed_width = true,
+                                .fixed_height = true});
+        cui_styled_slider_model_result_v1 result = cui_styled_slider_model_events_v1(
+            ui, owner, typed_slider.confirmed, &typed_slider.model, &options,
+            &typed_slider.presentation, &paint,
+            (cui_slider_model_handler_v1){gallery_slider_request, NULL});
+        typed_slider.render_status = result.render_status;
+        typed_slider.wake = result.next_wake_seconds;
+        if (control_surface_shadows && !disabled &&
+            result.render_status == CUI_STYLED_SLIDER_RENDER_OK) {
+            cui_slider_style_plan_v1 plan;
+            if (cui_slider_style_resolve_v1(&paint.style, &plan))
+                gallery_control_shadow(
+                    ui, cui_base_slider_model_part_id_v1(owner, CUI_SLIDER_MODEL_TRACK),
+                    fminf(plan.full_radius, plan.track_extent / 2), true);
+        }
+        cui_end_box(ui);
+        char status[160];
+        if (result.render_status == CUI_STYLED_SLIDER_UNSUPPORTED)
+            cui_label(ui, &t, cui_string("Resolved gradient paint requires a supported V2 host."));
+        if (typed_slider.kind)
+            snprintf(status, sizeof status, "Owner: %.0f to %.0f | accepted %u",
+                     typed_slider.confirmed.start, typed_slider.confirmed.end,
+                     typed_slider.accepted);
+        else
+            snprintf(status, sizeof status, "Owner: %.0f | accepted %u", typed_slider.confirmed.end,
+                     typed_slider.accepted);
+        cui_label(ui, &t, cui_string(status));
+        if (typed_slider.has_request) {
+            static const char *phases[] = {"BEGIN", "UPDATE", "COMMIT", "CANCEL"};
+            snprintf(status, sizeof status, "%s current %.0f / %.0f; requested %.0f / %.0f",
+                     phases[typed_slider.last.phase], typed_slider.last.current.start,
+                     typed_slider.last.current.end, typed_slider.last.requested.start,
+                     typed_slider.last.requested.end);
+            cui_label(ui, &t, cui_string(status));
+        }
+        if (typed_slider.wake > 0) {
+            double deadline = host_seconds + fmax(0, typed_slider.wake - cui_frame_time(ui));
+            if (!next_wake || deadline < next_wake)
+                next_wake = deadline;
+        }
         break;
+    }
     case 6: {
         cui_input_result result = cui_input_ex(
             ui, cui_id_from(ui, "input"), &t,

@@ -77,6 +77,9 @@ def main():
                 for name, label in (('Button', 'Run action'), ('Checkbox', 'Receive updates'),
                                     ('Radio', 'Priority'), ('Switch', 'Notifications'), ('Slider', 'Volume')):
                     a.route(name)
+                    if name == 'Slider':
+                        page.evaluate('cuiGallery.exports.gallery_slider_legacy_fixture(1)')
+                        a.configure('control-shadows', False)
                     page.mouse.move(1, 1)
                     page.wait_for_timeout(80)
                     assert not page.locator('#control-shadows').is_checked()

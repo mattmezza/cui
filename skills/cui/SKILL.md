@@ -386,3 +386,13 @@ wake deadlines. Visible V1 gradient thumbs reject atomically; copied V2 support 
 a host obligation, and current adapters do not render Aurora. Inert/layout-only/
 blocked/recovery calls never advance presentation; native numeric hosts and five
 typed builders remain pending. Do not describe this C slice as whole Slider parity.
+
+For the browser Slider demonstration, use the complete callback/init/compose
+copy panel in `web/modules/slider_usage.js` and the gallery section of
+`docs/STYLED_SLIDER_MODEL.md`. Its owned pair accepts or rejects proposals
+explicitly; it does not use the legacy float autoaccept path. Both axes and
+reverse/log are supported in ordinary flow. Keep the old reducer during config
+transitions to deliver captured CANCEL; do not accept a cancelled old-domain pair
+blindly. Convert passive Core-clock deadlines to the host monotonic clock.
+The demonstration does not confer native numeric/all-five builder/V2 adapter
+support or vertical registered-scroll admission.

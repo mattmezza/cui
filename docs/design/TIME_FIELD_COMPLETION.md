@@ -123,3 +123,159 @@ input architecture. Full TimeField remains partial after that slice.
 
 No tests or compiler were run for this documentation-only checkpoint. Source was
 read and primary-file hashes compared with the frozen documentation hash.
+
+## Header-level pure-value proposal (review gate)
+
+This section supersedes the tentative token-safe truncation suggestion above.
+It is a proposed header, **not an implemented/exported API**. Fixed-width fields
+avoid enum-width assumptions in records; enum constants define their vocabulary.
+Include `cui_picker.h` for existing `cui_time`/`cui_str` and standard integer types.
+
+```c
+#define CUI_TIME_TEXT_VERSION_V1 UINT32_C(1)
+#define CUI_TIME_TOKEN_MAX_BYTES_V1 16u
+
+typedef enum {
+    CUI_TIME_TEXT_OK = 0,
+    CUI_TIME_TEXT_INVALID_ARGUMENT = 1,
+    CUI_TIME_TEXT_INVALID_CONFIG = 2,
+    CUI_TIME_TEXT_INVALID_SYNTAX = 3,
+    CUI_TIME_TEXT_INVALID_VALUE = 4,
+    CUI_TIME_TEXT_OUT_OF_RANGE = 5,
+    CUI_TIME_TEXT_BUFFER_TOO_SMALL = 6
+} cui_time_text_status_v1;
+typedef enum {
+    CUI_TIME_TEXT_H23 = 0, CUI_TIME_TEXT_H12 = 1
+} cui_time_text_cycle_v1;
+typedef enum {
+    CUI_TIME_TEXT_MINUTE = 0, CUI_TIME_TEXT_SECOND = 1
+} cui_time_text_precision_v1;
+enum {
+    CUI_TIME_TEXT_HAS_MINIMUM_V1 = 1u << 0,
+    CUI_TIME_TEXT_HAS_MAXIMUM_V1 = 1u << 1
+};
+typedef struct {
+    uint32_t struct_size, version;
+    uint32_t reserved[2];
+    cui_str digits[10];
+    cui_str separator;
+    cui_str period_separator;
+    cui_str am, pm;
+} cui_time_locale_v1;
+typedef struct {
+    uint32_t struct_size, version;
+    uint32_t cycle, precision;
+    uint32_t flags;
+    uint32_t reserved[3];
+    cui_time minimum, maximum;
+    const cui_time_locale_v1 *locale;
+} cui_time_text_options_v1;
+
+cui_time_text_status_v1 cui_time_locale_init_v1(cui_time_locale_v1 *out);
+cui_time_text_status_v1 cui_time_text_options_init_v1(cui_time_text_options_v1 *out);
+cui_time_text_status_v1 cui_time_validate_v1(
+    cui_time value, const cui_time_text_options_v1 *options);
+cui_time_text_status_v1 cui_time_parse_v1(
+    cui_str text, const cui_time_text_options_v1 *options, cui_time *out);
+cui_time_text_status_v1 cui_time_format_v1(
+    cui_time value, const cui_time_text_options_v1 *options,
+    char *output, size_t capacity, size_t *required_bytes);
+```
+
+`struct_size == sizeof(record)` and version1 are required exactly; no prefix
+acceptance or implicit zero-size initialization. Reserved fields and unknown flag
+bits must be zero; unknown cycle/precision is invalid configuration. No public
+old record grows. Under the supported ordinary C11 ABI with 32-bit unsigned and
+`sizeof(cui_time)==12`, locale size is240 on LP64 and128 on ILP32/wasm32;
+options size64 on LP64 and60 on ILP32/wasm32. These are expected ABI receipts,
+not compiler evidence yet: implementation must prove offsets/sizes on actual
+targets before publishing. There is no pointer-free wire ABI claim for these
+borrowed C records.
+
+Initialization accepts a nonnull writable output and writes a complete record:
+ASCII digits, colon, one ASCII space, uppercase AM/PM; options H23/minute,
+flags0, bounds zero, locale NULL. The default locale strings have static lifetime;
+copying their descriptors is safe. NULL locale selects exactly this immutable
+ASCII default. NULL options is invalid argument (use initializer). No mutable
+locale singleton, OS locale, registry or allocation. Semantic names are deferred
+to the future editor record; they are not unused fields in this pure API.
+
+Every locale token has length1..16 **bytes**, nonnull data, well-formed shortest
+UTF-8 scalar encoding, no U+0000/embedded NUL, surrogate or out-of-range scalar.
+Tokens may contain multiple scalars. All14 tokens must be pairwise prefix-free:
+no equal tokens, and neither token may be the byte prefix of another. This
+intentionally rejects ambiguous grammars, even where a position-sensitive parser
+could disambiguate. Tokens may otherwise contain spaces/punctuation; there is no
+normalization, case folding, trimming or fallback. Period spacing is exactly the
+`period_separator` token (default one space), not optional whitespace. Locale
+configuration is validated completely even in H23/minute mode, so a later mode
+change cannot activate unchecked token data. Input text itself must be valid
+UTF-8 without NUL; invalid encoding is INVALID_SYNTAX.
+
+The complete grammars are:
+
+| Cycle/precision | Exact token sequence |
+| --- | --- |
+| H23/minute | D D separator D D |
+| H23/second | D D separator D D separator D D |
+| H12/minute | D D separator D D period_separator (am or pm) |
+| H12/second | D D separator D D separator D D period_separator (am or pm) |
+
+D is one of the ten configured digit tokens, always exactly two digits per
+numeric segment. H23 accepts00..23; H12 accepts01..12 and converts12AM→0,
+12PM→12, otherPM→hour+12. Minutes/seconds00..59. No ASCII alternatives when a
+custom digit set is supplied, lowercase alternatives, leading/trailing text,
+separator navigation or partial parsing. A token-structurally correct `24:00`
+is INVALID_VALUE, whereas `9:00` is INVALID_SYNTAX. Parsing minute precision
+produces second0. No time zone/date/leap-second/AMPM heuristic.
+
+All value validation first requires structurally valid full `cui_time`.
+Minute precision additionally requires second0: format/validate do **not** hide
+or truncate a nonzero second. Active bounds must be structurally valid and also
+second0 in minute mode; inactive bounds are ignored entirely. Missing minimum
+means00:00:00; missing maximum means23:59:00 in minute mode or23:59:59 in second
+mode. Inclusive comparison uses hour/minute/second arithmetic, not locale text.
+An active minimum greater than active maximum is INVALID_CONFIG; no overnight
+wrap. A structurally valid, precision-compatible value beyond bounds is
+OUT_OF_RANGE. Formatting applies the same domain checks as parsing/validation.
+Owner-only invalid appearance remains separate, not a parser option.
+
+Failure precedence: invalid mandatory pointers/illegal buffer argument pair →
+INVALID_ARGUMENT; options/locale/domain configuration → INVALID_CONFIG; parse
+encoding/grammar → INVALID_SYNTAX; numeric time/precision → INVALID_VALUE;
+bounds → OUT_OF_RANGE; finally format capacity → BUFFER_TOO_SMALL. No error is
+stored in a Core context; helpers have no UI dependency.
+
+**Atomic output convention:** parse assigns all three output fields only on OK.
+Format never partially writes or clears the output. `required_bytes` is mandatory
+and excludes the terminator. On successful validation/format sizing it is assigned
+on OK or BUFFER_TOO_SMALL only; all other failures leave it unchanged. A query
+uses `output=NULL, capacity=0`, returns OK with required length, writes no text.
+A nonnull output with capacity0 returns BUFFER_TOO_SMALL and reports length.
+NULL output with nonzero capacity is INVALID_ARGUMENT. Capacity exactly equal
+to length is insufficient: success requires length+1 and writes the entire UTF-8
+text plus NUL; excess bytes remain untouched. This deliberately differs from the
+legacy truncating formatter and avoids malformed/truncated localized labels.
+Maximum text length is160bytes (H12/second: six digits, two separators,
+one period separator and one period token, each at most16bytes); length+1 cannot overflow.
+
+All input records and token/text storage are borrowed, immutable for the whole
+call; no pointers are retained. Writable output ranges (`out`, formatted buffer,
+required length) must not overlap each other, any input record, text, or token
+storage. This is a documented caller precondition, not a promise to detect
+arbitrary C pointer aliasing. No in-place parse/format support. Independent calls
+are thread-safe when callers obey these storage rules. Initializers likewise
+require writable valid storage; no read of prior output bytes.
+
+### Contract-specific tests before production acceptance
+
+In addition to the matrix above: verify exact size/offset receipts, every enum/
+reserved/size/version rejection and failure precedence; all14 token pairs and
+prefix directions, malformed UTF-8/overlong/surrogate/out-of-range/NUL, 16/17byte
+boundaries and complete custom token grammars. Byte-snapshot outputs before each
+rejection (not struct-copy padding comparisons). Test query/NULL pairs,
+capacity0/length/length+1 with canaries, required-length unchanged on invalid
+value/config, and no-write BUFFER_TOO_SMALL. Exhaustive valid second-of-day
+roundtrips use independent arithmetic and checked literal locale vectors rather
+than roundtrip alone. Preserve old strict parser and truncation assertions
+unchanged. This does not close editor, Styled, IME, accessibility or binding gaps.

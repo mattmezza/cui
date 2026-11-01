@@ -157,3 +157,26 @@ support. Handle frame-sequence exhaustion before mutation instead of wrapping.
 Python delivery requires its own optional-symbol/ownership and real authored-UI
 checks after the C contract passes. JS/TS/Go/Rust remain required later slices.
 All advertised support and metadata remain unchanged until the matching gates pass.
+
+
+### Source review and next acceptance gate
+
+Integrator reviewed worker checkpoints `b3fad1fc`, `0513a315` and `9df44948`
+without integrating their production changes. The submitted route retains the
+existing scalar TimeField path when unconfigured, reserves copied observations
+before stepping, marks applied observations with final frame status, and reuses
+the existing opt-in owner-thread policy. This source review is permission to run
+the planned checks, not evidence that those contracts work.
+
+The authored C example now shares its actual English/Arabic node tree and dispatch
+between deterministic headless execution and an optional interactive SDL mode.
+Neither mode has been compiled or executed yet. Tracked-source packaging discovery
+includes the new private header; still verify produced consumer snapshots.
+
+Next: after the SDL microgate releases the serial build slot, compile the bridge,
+ABI/include-order/unsupported-policy fixtures and authored example with warnings;
+run meaningful headless behavior, failure, lifetime and unchanged-legacy tests.
+Preserve initial failures. Validate native source closure and actual wasm32 ABI
+separately; compilation does not prove shared-memory safety or native interaction.
+Only then begin Python authoring against the verified optional symbol group.
+JS/TS/Go/Rust remain required subsequent delivery, not supported by this checkpoint.

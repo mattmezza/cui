@@ -305,3 +305,23 @@ UNEXECUTED: compile/ABI, prepared test, software pixels versus standalone Icon,
 SVG replacement/draw-list lifetime, invalid-resource cases and frozen old-route
 regressions. Test registration, canonical generations, metadata and all five
 binding work remain pending; no runtime, freshness or full-family claim.
+
+### Prepared configured test registration and independent controls
+
+Source-only followup registers `badge_configured_icon` in CMake, linking software
+and the frozen Badge excerpt from exact b4cd6a8f. The excerpt's original byte SHA
+is embedded in `tests/reference/badge_b4cd6a8f.c`; only symbols were prefixed.
+Prepared old-control scenes cover standalone pill, count overflow, hidden zero,
+dot and named icon with equal geometry/semantic names/command counts. Existing
+`test_components` remains the more detailed unchanged old-route geometry oracle.
+The configured test constructs a separate ordinary shell/Icon tree and compares
+software RGBA under four rotations, partial alpha and numeric width constraints;
+it clears the source after both lists are finalized, before rendering their old
+masks. It requires nonempty painted coverage. No huge engine source is copied.
+Public descriptor offsets/containment are compile-time assertions; exact native
+and WASM sizeof/offsetof measurement remains a separate unexecuted gate.
+
+These tests are PREPARED, not executed. First-frame/resize/nesting, exhaustive
+invalid callbacks, actual native/WASM ABI receipts and failure allocation cases
+still need completion under the later compiler lease. No generated resources or
+status was updated in this source-only followup.

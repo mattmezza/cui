@@ -2862,3 +2862,10 @@ foreach(entry old_first new_first)
  cui_warnings(test_time_field_v1_headers_${entry})
  add_test(NAME time_field_v1_headers_${entry} COMMAND test_time_field_v1_headers_${entry})
 endforeach()
+
+# Additive Badge configured artwork and frozen legacy control.
+add_executable(test_badge_configured_icon tests/unit/test_badge_configured_icon.c
+ tests/reference/badge_b4cd6a8f.c)
+target_link_libraries(test_badge_configured_icon PRIVATE cui cui_software)
+cui_warnings(test_badge_configured_icon)
+add_test(NAME badge_configured_icon COMMAND test_badge_configured_icon)

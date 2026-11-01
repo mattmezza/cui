@@ -116,3 +116,16 @@ reason to substitute first-frame blank/lagged Body geometry.
 No new runtime result is claimed by this checkpoint. The next authorized step
 is a bounded test-only current-tree/current-font fixture against139695, not an
 arithmetic-only proof or an immediate public contract transfer.
+
+## Integrator decision (2026-11-01)
+
+Approved the current-tree/current-font witnesses and compatible additive six-slot
+implementation described above. Existing input semantics are accepted for this
+layout slice; held-stream reopening remains an explicit unfinished lifecycle
+requirement. No new dispatch, cancellation marker or stronger input guarantee is
+approved. Measure current record layouts before publishing ABI constants.
+
+After geometry and compatibility validation, migrate the gallery Dialog and
+AlertDialog demos to the new route and document it as the recommended composition
+path. Preserve old helpers and their legacy behavior tests. Production and
+browser acceptance are still required; this decision is not completion evidence.

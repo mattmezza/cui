@@ -1,0 +1,38 @@
+{
+  "scope": "focused configured Badge C proof; no full family claim",
+  "source_commit": "c7574f91",
+  "source_sha256": {
+    "include/cui/cui_components.h": "59bd3ae4b9095cc0fc3ea169e34633e93836e2be963e6b1bbb1119c05f0342b0",
+    "src/components/cui_components.c": "f0f5a7113f77600f0ebcf9c9d07953825c8b550e90deb3b40a9c2d5df61918e9",
+    "tests/unit/test_badge_configured_icon.c": "07987b2e8470cc60e068228eb9c4f442ae2f21bc277fb68a4c2a634a0ec2cb6d",
+    "tests/reference/badge_b4cd6a8f.c": "dd3b7a18dc16de2d40a9c9686cce8af778f342e2b6a1d1d0070b60013f709efe",
+    "tests/run_badge_configured_probe.py": "ecb4dd0a1010715ef7108ede01ba3c262b7473733061941dd08d49370ebe17c8"
+  },
+  "logs": {
+    "/home/matteo/.cache/cui-hover-raw-build/badge-configured/first-build.log": "ed481f5d4141a4be4a67ad6f20378682751336cc45d8cae7005607a4701ac434",
+    "/home/matteo/.cache/cui-hover-raw-build/badge-configured/strict-build.log": "3eb6c0a7ff8af213b829eb07722c4c76c2ece0e2f85ac37984e50644c9c3ad38",
+    "/home/matteo/.cache/cui-hover-raw-build/badge-configured/first-runtime.log": "3713cb479f23bddea32e213c83937cab3180a480938949a5ed2b33dc3a0d4e1f"
+  },
+  "result": "strict C11 O2 Werror PASS; private wrapper 1/1 PASS .02s",
+  "abi": {
+    "native": {
+      "descriptor": 136,
+      "options_offset": 8,
+      "result": 8,
+      "error_offset": 4
+    },
+    "wasm32": {
+      "descriptor": 104,
+      "options_offset": 4,
+      "result": 8,
+      "error_offset": 4
+    }
+  },
+  "limits": [
+    "No generation/freshness/skill run",
+    "No configured CMake target build yet; exact focused manual closure against hashed current root archives",
+    "No resize/nesting/resource-allocation-failure completion",
+    "WASM header assembly measurement only, not runtime",
+    "Zig assembly driver requires -Wno-unused-command-line-argument; C source remains Werror"
+  ]
+}

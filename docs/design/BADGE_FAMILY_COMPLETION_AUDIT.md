@@ -325,3 +325,16 @@ These tests are PREPARED, not executed. First-frame/resize/nesting, exhaustive
 invalid callbacks, actual native/WASM ABI receipts and failure allocation cases
 still need completion under the later compiler lease. No generated resources or
 status was updated in this source-only followup.
+
+### First focused execution receipt
+
+Strict C11 O2/Wall/Wextra/Wpedantic/Werror compilation of candidate components,
+fixture and frozen excerpt passed against hashed current root cached archives.
+The private-Xvfb wrapper passed `badge_configured_icon` 1/1 (.02s), including
+configured error ordering, frozen scenes and software/retained-mask comparison.
+See `docs/validation/badge-configured-c-focused.json` for exact source/log hashes
+and limitations. Reproduce compilation with `tests/run_badge_configured_probe.py`
+then run the emitted test directory only through `scripts/test_local.py`.
+Native descriptor/options offset is136/8; WASM32 is104/4. Result size/error offset
+is8/4 on both. WASM was a header assembly probe, not a runtime claim. Generation,
+configured full CMake consumption and the remaining family matrix are pending.

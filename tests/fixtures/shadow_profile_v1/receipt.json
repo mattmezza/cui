@@ -1,0 +1,20 @@
+{
+  "source_revision": "1a000a8a073f8cd60a4c1e88e82aa6d52dafbf60",
+  "files": {
+    "src/effects/cui_effects.c": "998d811b9c977fd27ca106f3058b3be0e1e7a0dee363e5ebc14c724d41488f1b",
+    "src/core/cui_drop_shadow_bounds_internal.h": "96faf61d17f3d902a487e59eaea639105d3ec205b879b8fdb1ad55bb5ffd60c2"
+  },
+  "purpose": "Immutable original Effects source; own-prefixed independent TU, no expected regeneration from candidate",
+  "flags": "cc -std=c11 -O3 -DNDEBUG -UNDEBUG -Wall -Wextra -Wpedantic -Werror -Iinclude; own-prefixed original Effects TU and new Effects TU, -lm",
+  "execution": "taskset CPU0 nice19; test_local.py private display wrapper",
+  "observed": {
+    "sample_comparisons": 19602,
+    "padded_raster_comparisons": 88,
+    "equivalence_and_copied_header_tests": "2/2 PASS0.02s",
+    "actual_new_effects_legacy_box_test": "1/1 PASS0.35s,512RGBA exact",
+    "initial_failure": "test include sorting put private value-dependent header before public types; corrected separate include groups; full failed log retained in build-shadow/shadow-profile-build.log",
+    "umbrella": "strict Effects-only implementation with all declarations and repeated selective include; private1/1 PASS0.01s",
+    "skill": "18/18 PASS38.656s"
+  },
+  "compiler": "cc (GCC) 16.2.1 20260810"
+}

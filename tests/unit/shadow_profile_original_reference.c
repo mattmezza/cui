@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: MIT */
+/* Frozen original Effects, independent translation unit and symbol ownership. */
+#define cui_effect_linear_gradient original_cui_effect_linear_gradient
+#define cui_effect_opacity original_cui_effect_opacity
+#define cui_effect_blur_scratch_floats original_cui_effect_blur_scratch_floats
+#define cui_effect_blur original_cui_effect_blur
+#define cui_effect_drop_shadow_query original_cui_effect_drop_shadow_query
+#define cui_effect_drop_shadow_sample original_cui_effect_drop_shadow_sample
+#define cui_effect_drop_shadow_raster original_cui_effect_drop_shadow_raster
+#define cui_effect_inset_shadow_query original_cui_effect_inset_shadow_query
+#define cui_effect_inset_shadow_sample original_cui_effect_inset_shadow_sample
+#define cui_effect_inset_shadow_raster original_cui_effect_inset_shadow_raster
+#include "../fixtures/shadow_profile_v1/source/src/effects/cui_effects.c"

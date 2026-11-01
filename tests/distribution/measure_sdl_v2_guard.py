@@ -24,6 +24,9 @@ def constants(assembly):
         if match:
             label = match[1]
         value = re.match(r'\s*\.(?:long|int32)\s+(\d+)', line)
+        if label and re.match(r'\s*\.(?:zero|skip)\s+4(?:\s|$)', line):
+            result[label.removeprefix('sdl_v1_')] = 0
+            label = None
         if label and value:
             result[label.removeprefix('sdl_v1_')] = int(value[1])
             label = None

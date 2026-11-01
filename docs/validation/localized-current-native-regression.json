@@ -1,0 +1,32 @@
+{
+  "scope": "Current integrated Linux native regression; isolated Skeleton/Icon source excluded",
+  "source_checkpoint": "8c155687 plus documentation-only Badge ownership guide repair",
+  "build": "session9373 exit0; warning-enabled full native plan (last printed648/649); no new dependencies",
+  "full_run": {
+    "result": "580/581 PASS; one failure; zero CTest skips",
+    "seconds": 309.96,
+    "exit": 8,
+    "failed": "component_usage_docs: Badge.state_ownership/usage metadata missing from COMPONENT_USAGE.md"
+  },
+  "repair": {
+    "files": [
+      "docs/COMPONENT_USAGE.md"
+    ],
+    "behavior": "Synchronize exact Badge ownership/usage paragraphs and configured C API index; no runtime changes",
+    "result": "1/1 CTest PASS8.26s; all6 underlying methods PASS",
+    "exit": 0
+  },
+  "interpretation": "All581 configured entries executed; the sole failure subsequently passed after a documentation-only repair. This is NOT a single581/581 run. Earlier580 runtime/check results remain valid for unchanged runtime code.",
+  "environment": "CPU1 nice19 onejob; scripts/test_local.py privateXvfb; real retained font fixtures from beta-combined-test-environment.json",
+  "logs_sha256": {
+    "/home/matteo/.cache/cui-current-validation/beta-localized-combined-build.log": "4e2f41f14f054b697e81daa3e058d8f53c2fd9bee244dc3303efc8d7e5ecb85a",
+    "/home/matteo/.cache/cui-current-validation/beta-localized-combined-tests.log": "4fafac19535cc9e0fbc744f345cf6c588cfcac4bbc9ba084818e5c3e6cf6cf02",
+    "/home/matteo/.cache/cui-current-validation/beta-localized-combined-581-LastTest.log": "7d8a689d36a5120acbc77e9a4762c79bcc8693c929075b463d68b690ede4f380",
+    "/home/matteo/.cache/cui-current-validation/beta-localized-usage-repair.log": "ab7b632a17106c0b9afaf1045526e69a2e5fcb92c259ff2098404af161f0533d"
+  },
+  "limits": [
+    "New isolated Skeleton palette/responsive prototype and Icon resource implementations not integrated or C-validated",
+    "Node81 configured checks and static/dynamic GoRust receipts are separate evidence",
+    "No physical GPU/macOS/Windows/AT/IME acceptance; no release/deployment claim"
+  ]
+}

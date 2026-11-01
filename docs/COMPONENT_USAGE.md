@@ -176,13 +176,13 @@ API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`,
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns counts, badge options and child state; callbacks compose arbitrary child content synchronously.
+**State:** Caller owns counts, options, child state and configured Icon state. Content is synchronous; Icon masks outlive rendering. Style/constraints are borrowed during submission.
 
 **Interaction:** Child controls return their own actions; corner indicators provide nonfocusable status semantics.
 
-**Usage:** Initialize options with cui_badge_defaults, select count/dot/icon and call cui_badge_ex with a content callback every frame.
+**Usage:** Use cui_badge_ex for count/dot/named-icon composition; use cui_badge_with_icon with caller-owned Icon state/options for configured artwork. Handle icon_error independently from composition admission and Core frame success.
 
-API: `cui_badge_defaults`, `cui_badge_ex`, `cui_badge`. Callback: `cui_button_content_fn`. [Public header](../include/cui/cui_components.h); [guide](BADGE.md), [guide](COMPONENTS.md).
+API: `cui_badge_defaults`, `cui_badge_ex`, `cui_badge_with_icon`, `cui_badge_icon_content`, `cui_badge_result`, `cui_badge`. Callback: `cui_button_content_fn`. [Public header](../include/cui/cui_components.h); [guide](BADGE.md), [guide](COMPONENTS.md).
 
 ## Bubble
 

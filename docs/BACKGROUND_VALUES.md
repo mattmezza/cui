@@ -9,9 +9,10 @@ provide gradient rendering. All existing V1 commands, boxes and renderers retain
 their behavior. Full background rendering across software, SDL_Renderer, SDL_GPU,
 Sokol and Canvas, all78 component coverage and foreign authoring remain pending.
 The approved transport is an explicit versioned draw/list contract. Unreleased
-[Core V2 transport](CORE_DRAW_V2.md) adds mode/storage/setters/emission; all five
-consumer implementations remain pending; [private CPU preparation](BACKGROUND_PREPARATION.md)
-is now an allocation-free building block, not renderer integration.
+[Core V2 transport](CORE_DRAW_V2.md) adds mode/storage/setters/emission and the
+[C software V2 consumer](SOFTWARE_V2.md) provides actual rendering. The other four
+adapters and bindings remain pending; [private CPU preparation](BACKGROUND_PREPARATION.md)
+is the allocation-free building block.
 
 A value is either a solid straight-linear sRGB color or a fixed two-stop linear
 gradient. There are no pointers, borrowed arrays, caches, contexts or resources.

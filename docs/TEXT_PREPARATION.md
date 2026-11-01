@@ -2,16 +2,16 @@
 
 `src/text/cui_text_prepare_internal.h` is a maintainer-only recording seam, not a
 public font API or renderer. Its private software with-font consumer is described
-in `SOFTWARE_V2_PAINTING.md`; no adapter advertises V2 background support. Public
-software integration and the other four adapters remain pending.
+in `SOFTWARE_V2_PAINTING.md` and is used by the unreleased [public C software
+V2 adapter](SOFTWARE_V2.md). The other four adapters and bindings remain pending.
 
 Initialize a zero `cui_text_owner_internal` with malloc-compatible aligned,
 distinct-block allocation/free callbacks and the **remaining** transaction CPU and
 metadata envelope; create `cui_text_prepare_session` with that owner. Call
 `cui_text_prepare_line(session,font,TEXT_command,source_density)` synchronously.
 Owned density is explicit1..64; public/NULL-owner scaled APIs retain their1..16
-limit. A future renderer chooses q from target axes; recording at64 does not
-advertise target rendering support. The private contextual-availability query
+limit. The software adapter chooses q from target axes; recording at64 alone does not
+advertise other adapter support. The private contextual-availability query
 reports the actual compiled Bidi recorder. Nonempty owned glyphs require256-level
 FreeType GRAY coverage, including hot-cache reads; other bitmap formats reject
 without changing legacy raster behavior. Checked source sizes and origins reject

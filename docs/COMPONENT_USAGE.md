@@ -1024,7 +1024,7 @@ Event API includes: `cui/cui_tabs_events.h`.
 
 **Interaction:** cui_theme_icon_loader_fn resolves icon SVG; theme selection is an application event.
 
-**Usage:** Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math; they do not apply backgrounds or enable any renderer. Unreleased V2 Core transport and private CPU preparation provide bounded opt-in building blocks; all five renderer paths and foreign authoring remain pending.
+**Usage:** Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math. For actual opt-in rendering, use cui_software_query_v2 before Core V2 composition and cui_software_render_v2 afterwards; V1 routes remain unchanged. The other four renderer paths, foreign authoring and all78 part coverage remain pending.
 
 API: `cui_theme_light`, `cui_theme_preset_get`. [Public header](../include/cui/cui_theme.h); [guide](THEME_GUIDE.md).
 

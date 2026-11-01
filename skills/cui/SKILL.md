@@ -13,20 +13,23 @@ examples; it does not include the CUI implementation or compiler toolchain.
 
 For unreleased owned background colors/two-stop values and pure sampling, read
 `docs/BACKGROUND_VALUES.md` and `include/cui/cui_background.h`. CSS and SOURCE_038
-have different alpha/geometry semantics. This C-only math API does not apply paint
-or enable gradient rendering. For unreleased opt-in Core V2 mode/setters/emission,
-read `docs/CORE_DRAW_V2.md` and `include/cui/cui_draw_v2.h`; no adapter currently
-consumes that list. Private `docs/BACKGROUND_PREPARATION.md` describes an allocation-free maintainer
-building block and private software validation/workspace/partial painting slices,
-not a public renderer. `docs/SOFTWARE_V2_PAINTING.md` states the supported private
-kinds: bounded AREA DROP/INSET shadows and the owned with-font per-axis text
-painter are private only. The no-font wrapper rejects text before allocation;
-there is no public software V2 renderer/support query yet.
-Validation success does not mean adapter font/shadow resources are prepared.
-`docs/TEXT_PREPARATION.md` describes private counted recording only, with owned
-source density up to64 and GRAY256 coverage; public scaled font APIs remain
-limited to16. Recording alone does not advertise V2 text rendering. Opaque new
-font/dependency temporaries are outside the transaction CPU byte envelope. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.
+have different alpha/geometry semantics. Pure values alone do not apply paint.
+For opt-in Core V2 mode/setters/emission read `docs/CORE_DRAW_V2.md` and
+`include/cui/cui_draw_v2.h`. The C software adapter's actual query/render route is
+in `docs/SOFTWARE_V2.md` and `include/cui/cui_software.h`: query the initialized
+renderer before composition, use its support/defaults, then render V2 explicitly.
+Never cast to V1 or fabricate consumer support. SDL_Renderer, SDL_GPU, Sokol,
+Canvas and foreign bindings remain pending; software support does not complete
+all78 parts. V1 renderer tables/default routes remain unchanged.
+`docs/SOFTWARE_V2_PAINTING.md` details the private bounded AREA shadows, per-axis
+owned text and publication contract. `docs/BACKGROUND_PREPARATION.md` describes
+allocation-free preparation, not another public adapter. `docs/TEXT_PREPARATION.md`
+describes counted recording, owned source density up to64 and GRAY256 coverage;
+public scaled font APIs remain limited to16. No-Bidi rejects contextual/spanned
+text, and no-font builds reject TEXT before borrowed bytes. Opaque font/dependency
+temporaries are outside the transaction CPU envelope; preserve borrowed graph
+lifetime and avoid recursive/concurrent same-font rendering. Existing Plot/effects/
+text gradient contracts remain distinct.
 
 ## Start with the project's actual integration
 

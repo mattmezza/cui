@@ -43,3 +43,6 @@
 #define cui_text_layout_get text_v1_cui_text_layout_get
 #define cui_text_layout_hit_test text_v1_cui_text_layout_hit_test
 #define cui_text_layout_selection text_v1_cui_text_layout_selection
+
+#define cui_software_query_v2 text_v1_cui_software_query_v2
+#define cui_software_render_v2 text_v1_cui_software_render_v2

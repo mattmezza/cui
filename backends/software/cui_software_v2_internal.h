@@ -53,15 +53,21 @@ static inline bool cui_software_v2_shape(const cui_draw_command *c, bool border)
 static inline bool cui_software_v2_alias(const void *a, size_t n, const void *out) {
     return cui_background_prepare_disjoint_internal(a, n, out, sizeof(cui_software_v2_plan));
 }
+static inline bool cui_software_v2_alias_excluding(const void *a, size_t n, const void *out,
+                                                   const void *excluded, size_t excluded_bytes) {
+    return cui_software_v2_alias(a, n, out) &&
+           cui_background_prepare_disjoint_internal(a, n, excluded, excluded_bytes);
+}
 /* Font, tracking and contextual availability describe actual host state, not inferred
  * from a fabricated public support record. Font/shaping allocation is deferred. */
-static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
-                                                 const cui_render_v2_options *options,
-                                                 bool font_available, bool tracking_available,
-                                                 bool context_available,
-                                                 cui_software_v2_plan *out) {
-    if (!list || !options || !out || !cui_software_v2_alias(list, sizeof(*list), out) ||
-        !cui_software_v2_alias(options, sizeof(*options), out) ||
+static inline cui_error cui_software_v2_validate_excluding(
+    const cui_draw_list_v2 *list, const cui_render_v2_options *options, bool font_available,
+    bool tracking_available, bool context_available, cui_software_v2_plan *out,
+    const void *excluded, size_t excluded_bytes) {
+    if (!list || !options || !out ||
+        !cui_software_v2_alias_excluding(list, sizeof(*list), out, excluded, excluded_bytes) ||
+        !cui_software_v2_alias_excluding(options, sizeof(*options), out, excluded,
+                                         excluded_bytes) ||
         list->header_size != sizeof(*list) || list->abi_version != CUI_DRAW_ABI_V2 ||
         list->command_stride != sizeof(cui_draw_command_v2) || list->error != CUI_OK ||
         list->background_output != CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1 ||
@@ -71,7 +77,8 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
     if (list->count > 16384)
         return CUI_ERROR_CAPACITY;
     if ((!list->commands && list->count) ||
-        !cui_software_v2_alias(list->commands, list->count * sizeof(*list->commands), out))
+        !cui_software_v2_alias_excluding(list->commands, list->count * sizeof(*list->commands), out,
+                                         excluded, excluded_bytes))
         return CUI_ERROR_INVALID_ACTION;
     /* Validate every common option even for an empty/legacy-only list. */
     cui_background_draw_v2 empty = {0};
@@ -141,7 +148,8 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 b.source.y < 0 || b.source.w <= 0 || b.source.h <= 0 ||
                 (double)b.source.x + b.source.w > b.bitmap.width ||
                 (double)b.source.y + b.source.h > b.bitmap.height ||
-                !cui_software_v2_alias(b.bitmap.pixels, b.bitmap.stride * b.bitmap.height, out))
+                !cui_software_v2_alias_excluding(b.bitmap.pixels, b.bitmap.stride * b.bitmap.height,
+                                                 out, excluded, excluded_bytes))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (c->type == CUI_DRAW_MESH) {
             if (c->mesh.vertex_count > SIZE_MAX / sizeof(cui_mesh_vertex) ||
@@ -149,8 +157,9 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                                      c->mesh.vertex_count * sizeof(cui_mesh_vertex),
                                      (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
-            if (!cui_software_v2_alias(c->mesh.vertices,
-                                       c->mesh.vertex_count * sizeof(cui_mesh_vertex), out) ||
+            if (!cui_software_v2_alias_excluding(c->mesh.vertices,
+                                                 c->mesh.vertex_count * sizeof(cui_mesh_vertex),
+                                                 out, excluded, excluded_bytes) ||
                 !cui_mesh_valid(c->mesh))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (cui_shadow_type(c->type)) {
@@ -168,6 +177,11 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 c->text_style.weight > CUI_TEXT_WEIGHT_BOLD ||
                 !isfinite(c->text_style.letter_spacing) ||
                 (c->text_style.letter_spacing != 0 && !tracking_available) ||
+                (excluded_bytes && c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
+                 (c->text_paint.stop_count > 8 ||
+                  !cui_background_prepare_disjoint_internal(
+                      excluded, excluded_bytes, c->text_paint.stops,
+                      c->text_paint.stop_count * sizeof(*c->text_paint.stops)))) ||
                 !cui_text_paint_valid(c->text_paint, true) ||
                 (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR && c->text_color_count) ||
                 c->text_color_count > CUI_TEXT_COLOR_SPAN_MAX ||
@@ -180,12 +194,14 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 !cui_software_v2_add(&plan.inspected_bytes, text_bytes, (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
             if (c->text_source.paragraph.data) {
-                if (!cui_software_v2_alias(c->text_source.paragraph.data, text_bytes, out) ||
+                if (!cui_software_v2_alias_excluding(c->text_source.paragraph.data, text_bytes, out,
+                                                     excluded, excluded_bytes) ||
                     !cui_text_line_source_valid(c->text_source))
                     return CUI_ERROR_INVALID_ACTION;
                 size_t previous = c->text_source.byte_start;
-                if (!cui_software_v2_alias(c->text_colors,
-                                           c->text_color_count * sizeof(*c->text_colors), out))
+                if (!cui_software_v2_alias_excluding(c->text_colors,
+                                                     c->text_color_count * sizeof(*c->text_colors),
+                                                     out, excluded, excluded_bytes))
                     return CUI_ERROR_INVALID_ACTION;
                 for (size_t j = 0; j < c->text_color_count; ++j) {
                     cui_text_line_source range = {c->text_source.paragraph,
@@ -202,12 +218,13 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
             } else if (c->text_source.paragraph.length || c->text_source.byte_start ||
                        c->text_source.byte_end || (c->text.length && !c->text.data) ||
                        c->text_color_count ||
-                       !cui_software_v2_alias(c->text.data, c->text.length, out))
+                       !cui_software_v2_alias_excluding(c->text.data, c->text.length, out, excluded,
+                                                        excluded_bytes))
                 return CUI_ERROR_INVALID_ACTION;
             if (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
-                !cui_software_v2_alias(c->text_paint.stops,
-                                       c->text_paint.stop_count * sizeof(*c->text_paint.stops),
-                                       out))
+                !cui_software_v2_alias_excluding(
+                    c->text_paint.stops, c->text_paint.stop_count * sizeof(*c->text_paint.stops),
+                    out, excluded, excluded_bytes))
                 return CUI_ERROR_INVALID_ACTION;
             plan.needs_text_preparation = true;
         }
@@ -222,6 +239,15 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
         return CUI_ERROR_CAPACITY;
     *out = plan;
     return CUI_OK;
+}
+/* Original private entry retains its previous validation/ownership route. */
+static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
+                                                 const cui_render_v2_options *options,
+                                                 bool font_available, bool tracking_available,
+                                                 bool context_available,
+                                                 cui_software_v2_plan *out) {
+    return cui_software_v2_validate_excluding(list, options, font_available, tracking_available,
+                                              context_available, out, NULL, 0);
 }
 /* Optional transaction arena. Future resource producers MUST use these counted
  * allocations; uncounted font/shadow temporaries cannot be declared prepared. */

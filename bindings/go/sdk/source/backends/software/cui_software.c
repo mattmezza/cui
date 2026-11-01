@@ -4,6 +4,7 @@
 #include "cui_mesh.h"
 #include "cui_shadow.h"
 #include "cui_shape.h"
+#include "cui_software_v2_paint_internal.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,7 @@ struct cui_software {
     cui_rect clip;
     cui_color ink;
     cui_text_paint text_paint;
+    bool v2_busy;
 };
 static cui_rect intersect(cui_rect a, cui_rect b) {
     float x = fmaxf(a.x, b.x), y = fmaxf(a.y, b.y), r = fminf(a.x + a.w, b.x + b.w),
@@ -23,7 +25,7 @@ static cui_rect intersect(cui_rect a, cui_rect b) {
     return (cui_rect){x, y, fmaxf(0, r - x), fmaxf(0, d - y)};
 }
 bool cui_software_resize(cui_software *r, unsigned w, unsigned h) {
-    if (!r || !w || !h || w > 16384 || h > 16384 || (size_t)w > SIZE_MAX / 4 / h)
+    if (!r || r->v2_busy || !w || !h || w > 16384 || h > 16384 || (size_t)w > SIZE_MAX / 4 / h)
         return false;
     if (r->width == w && r->height == h)
         return true;
@@ -48,7 +50,7 @@ cui_software *cui_software_create(unsigned w, unsigned h, cui_font *f) {
     return r;
 }
 void cui_software_destroy(cui_software *r) {
-    if (r) {
+    if (r && !r->v2_busy) {
         cui_shadow_destroy(&r->shadows);
         free(r->pixels);
         free(r);
@@ -177,7 +179,7 @@ static bool text_draw(cui_software *r, const cui_draw_command *c) {
 
 #endif
 bool cui_software_render(cui_software *r, const cui_draw_list *list, cui_color clear) {
-    if (!r || !list || (!list->commands && list->count))
+    if (!r || r->v2_busy || !list || (!list->commands && list->count))
         return false;
 #ifdef CUI_HAS_TEXT
     if (!cui_text_tracking_supported(list, cui_font_text_capabilities() != 0))
@@ -289,4 +291,118 @@ cui_renderer cui_software_interface(cui_software *r) {
 #endif
                               ,
                           render, destroy};
+}
+
+/* V2 owns no retained resources and never enters the V1 painter. */
+static bool software_v2_disjoint(const cui_software *r, const void *p, size_t bytes) {
+    return cui_background_prepare_disjoint_internal(r, sizeof(*r), p, bytes) &&
+           cui_background_prepare_disjoint_internal(r->pixels, (size_t)r->width * r->height * 4, p,
+                                                    bytes);
+}
+static size_t software_v2_commands(size_t pixels, size_t cpu, size_t metadata) {
+    if (pixels > cpu)
+        return 0;
+    size_t count = (cpu - pixels) / sizeof(cui_draw_command_v2);
+    size_t descriptors = metadata / sizeof(cui_software_v2_paint_descriptor);
+    if (count > descriptors)
+        count = descriptors;
+    return count < 16384 ? count : 16384;
+}
+cui_error cui_software_query_v2(const cui_software *r, cui_software_v2_info *out) {
+    if (!r || !out)
+        return CUI_ERROR_INVALID_ACTION;
+    if (r->v2_busy)
+        return CUI_ERROR_LIFECYCLE;
+    if (!software_v2_disjoint(r, out, sizeof(*out)) || out->size != sizeof(*out))
+        return CUI_ERROR_INVALID_ACTION;
+    const size_t cpu = (size_t)32 * 1024 * 1024, metadata = (size_t)1024 * 1024;
+    size_t commands = software_v2_commands((size_t)r->width * r->height * 4, cpu, metadata);
+    if (!commands)
+        return CUI_ERROR_CAPACITY;
+    cui_software_v2_info info = {0};
+    info.size = sizeof(info);
+    info.draw = (cui_draw_v2_support){.size = sizeof(info.draw),
+                                      .abi_version = CUI_DRAW_ABI_V2,
+                                      .background_output = CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1,
+                                      .features = CUI_DRAW_V2_FEATURE_BACKGROUNDS,
+                                      .max_commands = commands,
+                                      .max_backgrounds = commands < 4096 ? commands : 4096,
+                                      .max_pixels = (size_t)8 * 1024 * 1024,
+                                      .max_pixels_per_background = (size_t)4 * 1024 * 1024,
+                                      .cpu_bytes = cpu,
+                                      .texture_bytes = cpu,
+                                      .transfer_bytes = cpu,
+                                      .metadata_bytes = metadata};
+    info.defaults =
+        (cui_render_v2_options){.size = sizeof(info.defaults),
+                                .background_output = CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1,
+                                .viewport_width = r->width,
+                                .viewport_height = r->height,
+                                .scale_x = 1,
+                                .scale_y = 1,
+                                .cpu_bytes = cpu,
+                                .texture_bytes = cpu,
+                                .transfer_bytes = cpu,
+                                .metadata_bytes = metadata,
+                                .max_pixels = info.draw.max_pixels,
+                                .max_pixels_per_background = info.draw.max_pixels_per_background};
+#ifdef CUI_HAS_TEXT
+    if (r->font) {
+        info.text_features = CUI_SOFTWARE_V2_TEXT_A8;
+        if (cui_text_prepare_context_available_internal())
+            info.text_features |= CUI_SOFTWARE_V2_TEXT_CONTEXT;
+        if (cui_font_text_capabilities() & CUI_TEXT_CAP_LETTER_SPACING)
+            info.text_features |= CUI_SOFTWARE_V2_TEXT_TRACKING;
+    }
+#endif
+    *out = info;
+    return CUI_OK;
+}
+static void *software_v2_allocate(void *user, size_t bytes) {
+    (void)user;
+    return malloc(bytes);
+}
+static void software_v2_release(void *user, void *block) {
+    (void)user;
+    free(block);
+}
+cui_error cui_software_render_v2(cui_software *r, const cui_draw_list_v2 *list, cui_color clear,
+                                 const cui_render_v2_options *options) {
+    if (!r || !list)
+        return CUI_ERROR_INVALID_ACTION;
+    if (r->v2_busy)
+        return CUI_ERROR_LIFECYCLE;
+    /* Inspect original pointers before a local copy could hide target aliases. */
+    if (!software_v2_disjoint(r, list, sizeof(*list)) ||
+        (options && !software_v2_disjoint(r, options, sizeof(*options))))
+        return CUI_ERROR_INVALID_ACTION;
+    cui_software_v2_info info = {.size = sizeof(info)};
+    cui_error error = cui_software_query_v2(r, &info);
+    if (error != CUI_OK)
+        return error;
+    const cui_render_v2_options *o = options ? options : &info.defaults;
+    if (o->size != sizeof(*o) || o->background_output != CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1 ||
+        o->viewport_width != r->width || o->viewport_height != r->height || !o->cpu_bytes ||
+        !o->metadata_bytes || !o->texture_bytes || !o->transfer_bytes || !o->max_pixels ||
+        !o->max_pixels_per_background)
+        return CUI_ERROR_INVALID_ACTION;
+    if (o->cpu_bytes > info.draw.cpu_bytes || o->metadata_bytes > info.draw.metadata_bytes ||
+        o->texture_bytes > info.draw.texture_bytes ||
+        o->transfer_bytes > info.draw.transfer_bytes || o->max_pixels > info.draw.max_pixels ||
+        o->max_pixels_per_background > info.draw.max_pixels_per_background)
+        return CUI_ERROR_CAPACITY;
+    size_t commands =
+        software_v2_commands((size_t)r->width * r->height * 4, o->cpu_bytes, o->metadata_bytes);
+    if (!commands || list->count > commands)
+        return CUI_ERROR_CAPACITY;
+    cui_software_v2_target target = {.pixels = r->pixels,
+                                     .width = r->width,
+                                     .height = r->height,
+                                     .stride = (size_t)r->width * 4,
+                                     .capacity = (size_t)r->width * r->height * 4};
+    error = cui_software_v2_paint_with_font_excluding(&target, list, clear, o, r->font,
+                                                      software_v2_allocate, software_v2_release, r,
+                                                      r, sizeof(*r), &r->v2_busy);
+    r->v2_busy = false;
+    return error;
 }

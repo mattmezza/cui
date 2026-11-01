@@ -1,13 +1,12 @@
 # Private transactional software painting
 
-`backends/software/cui_software_v2_paint_internal.h` is an incomplete maintainer
-building block. It has **no public support query/render entry or V1 call site**.
+`backends/software/cui_software_v2_paint_internal.h` is the maintainer building
+block behind the explicit [public C software V2 entry](SOFTWARE_V2.md). It has no V1 call site.
 It paints RECT, BORDER, IMAGE, MESH, explicit clips and owned BACKGROUND commands
 in array order at independent physical scales/origins. DROP/INSET shadows use
 bounded target-pixel AREA reconstruction of the unchanged source profile. The
 private with-font entry adds owned text recording and per-axis bilinear glyph
-reconstruction; the no-font wrapper still rejects TEXT before allocation. This does not complete the
-software checkpoint, any of the other four adapters, bindings or all78 parts.
+reconstruction; the no-font wrapper still rejects TEXT before allocation. This does not complete any of the other four adapters, bindings or all78 parts.
 
 The private `cui_software_v2_paint(target,list,clear,options,allocate,release,user)`
 returns `cui_error`. The explicit target view supplies writable RGBA8 pixels,
@@ -18,7 +17,7 @@ Target pixels/view must be disjoint from list/options/command records and active
 bitmap/mesh resources and active text/paint/span bytes. Borrowed inputs, options and target fields stay stable
 through return, including allocation/release callbacks; callbacks cannot write
 published pixels. Reentrant paint on the same view rejects, including during free.
-A future initialized software adapter must own this guard and its allocator;
+The initialized software adapter owns an additional enclosing guard and its allocator;
 callers cannot fabricate public adapter support from this private helper.
 
 Whole-list active-field/clip/resource validation precedes allocation. A second

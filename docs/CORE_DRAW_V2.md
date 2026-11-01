@@ -1,14 +1,14 @@
 # Unreleased Core V2 background transport
 
 Explicit C-only opt-in in `include/cui/cui_draw_v2.h`. Core mode/storage/setters and
-emission are implemented; **no renderer, Canvas wire, bridge or foreign binding
-supports this list yet**. Software, SDL_Renderer, SDL_GPU, Sokol GLCORE and Canvas
-V2 consumption remains mandatory follow-up, not completed parity. A private
-[CPU preparation helper](BACKGROUND_PREPARATION.md) now supplies allocation-free
-query/raster building blocks; it does not consume lists or own target resources.
-Do not pass a V2 list to a V1 renderer, cast command arrays or fabricate adapter
-support in an application. There is currently no usable end-to-end background
-rendering example. The test consumer descriptor is deliberately synthetic.
+emission are implemented. The unreleased [C software adapter](SOFTWARE_V2.md)
+queries actual support before composition and consumes the V2 list. SDL_Renderer,
+SDL_GPU, Sokol GLCORE, Canvas wire and foreign bindings remain mandatory follow-up,
+not completed parity. The [CPU preparation helper](BACKGROUND_PREPARATION.md)
+supplies allocation-free building blocks. Do not pass a V2 list to a V1 renderer,
+cast command arrays or fabricate adapter support. The software guide includes the
+initialized query/begin/end/render sequence; synthetic test consumers do not
+establish any other adapter support.
 
 The [reviewed record/adapter contract](design/BACKGROUND_V2_RECORDS.md) retains the
 full five-adapter objective. Pure [background values/sampling](BACKGROUND_VALUES.md)
@@ -16,7 +16,7 @@ remain independently usable. Existing V1 APIs/config/records/enums/layout/input
 and default commands/pixels are unchanged; no V2 buffers are allocated by V1-only
 contexts. No component-wide or all78-parts coverage claim follows from setters.
 
-A future actual consumer query must precede composition. Copy its exact-sized
+An actual consumer query must precede composition. Copy its exact-sized
 `cui_draw_v2_support` into exact-sized `cui_frame_v2_options`; select required
 features explicitly, then call `cui_begin_frame_v2` and matching
 `cui_end_frame_v2`. Unknown features/record version/output policy fail

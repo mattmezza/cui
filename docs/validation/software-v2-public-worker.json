@@ -1,0 +1,86 @@
+{
+  "base": "9c44a33f + eb7293d6; private text painter690189fd already integrated/accepted root63b77c0b",
+  "scope": "Unreleased C software V2 initialized query/render only; no V1 table/paint rewrite, no other-adapter or foreign-binding V2 support claim.",
+  "prerequisites": [
+    "9c44a33f (reviewed public API/ownership plan)",
+    "eb7293d6 (signed frozen layout/allocation proof fixtures)"
+  ],
+  "build": "Strict portable C11 GCC16.2.1 O3 UNDEBUG Wall Wextra Wpedantic Werror; C++11 public runtime; CPU1 nice19 serial, existing reused worker builddir (86 MiB after bounded tests), read-only current Core/Bidi archives; no engine rebuild/new dependency.",
+  "results": {
+    "final": "Private-Xvfb12/12 PASS0.83s; no skips. Prior owner-alias/matrix gate9/9 PASS0.82s. C/C++11/umbrella actual symbol runtime and copied Go/Rust full software/header syntax closures PASS.",
+    "public": "actual initialized query -> Core begin V2 -> named background composition/end -> public render; matching current options, same-instance V1/V2/failure/V1, physical independent-axis forwarding, initialized32MiB staging-only target CAPACITY, exact one-command P+C/D success vs one-byte-short, max BG equal/+1, command cap and malformed tags, original options/list target aliases, noText/NULL-font/noBidi poison guards.",
+    "owner": "commands/resources excluded from renderer object before semantic/resource reads; raw/context/span/stops/image/mesh owner aliases leave byte-exact object and pixels unchanged with no allocation callbacks. Busy set at pure-preflight/first-workspace-callback boundary, retained through cleanup; outer query/V2/V1/resize/destroy reentry tested in allocation/free.",
+    "font": "public Bidi25 and noBidi10 counted allocation requests swept: failure atomicity/cleanup/reentry/retry; cold owned recorder leaves glyph cache empty. Opaque FT/HB/Bidi/provider class3 not counted/rollback guaranteed.",
+    "independent": "Public route reuses existing independent text reference/hand bilinear and frozen original V1 full/scaled-font oracles:14 Bidi or9 noBidi forms x12 transforms;14-command all-kind unit frame; actual old/new Noto Hebrew+Arabic fallback each3 transforms. No expected output recaptured.",
+    "legacy": "Canonical actual backend against frozen original V1:7 allocation calls/76 normalized events, pixels/caches/function table/old offsets preserved; measured object9368->9376 native and8824->8832 WASM32 (+8 one alignment unit), actual final-layout equals frozen expected constants.",
+    "skill": "18/18 PASS38.789s, sole CPU1 nice19. Root independently observed terminal result; no repeated heavy suite."
+  },
+  "first_failures": [
+    "Initial public O3 fixture w/h maybe-uninitialized warning: initialize sentinels, preserve warning/error log. No warning disabled.",
+    "Initial alias-seam compile missing three new private arguments (mechanical omission): pass owner/size/busy, original failure log retained.",
+    "Root review identified enclosing renderer object alias gap: approved shared validator exclusion + owner guard seam; old private wrapper supplies NULL/0/NULL, preserving existing route. No public ABI/dispatch architecture added."
+  ],
+  "memory": "Persistent target/font class1 separate. Per-render payload/counted CUI text class2 CPU<=32MiB, metadata<=1MiB; texture/transfer32MiB, aggregate rectangles8M, perBG4M, shadow cells/taps1M. Opaque new dependency/provider class3 outside byte budgets. No total-process cap.",
+  "pending": [
+    "Root independently rebuilt actual CMake public targets/full integration acceptance",
+    "SDL_Renderer, SDL_GPU, Sokol GLCORE, Canvas wire and foreign authoring bindings",
+    "All78 complete part/presentation parity; intrinsic RGBA/color-font unsupported"
+  ],
+  "cMake_targets": [
+    "test_software_public_v1",
+    "test_software_public_v2_disabled",
+    "test_software_public_v2",
+    "test_software_public_v2_nobidi",
+    "test_software_public_matrix",
+    "test_software_public_matrix_nobidi",
+    "test_software_v2_header",
+    "test_software_v2_umbrella",
+    "test_software_v2_header_cpp"
+  ],
+  "cMake_tests": [
+    "software_public_v1",
+    "software_public_layout_parser",
+    "software_public_v2_disabled",
+    "software_public_v2",
+    "software_public_v2_nobidi",
+    "software_public_matrix",
+    "software_public_matrix_nobidi",
+    "software_v2_header_c",
+    "software_v2_header_umbrella",
+    "software_v2_header_cpp"
+  ],
+  "sha256": {
+    "backends/software/cui_software.c": "4a6c2bf0b8d3ca58537ab4768a279ad4341b6957f04abcf4309b2dffaff97f8f",
+    "backends/software/cui_software_v2_internal.h": "95940b370c2fb09b475b7ca7869074865ef8c3351553a6fe47cb332aad36c28d",
+    "backends/software/cui_software_v2_paint_internal.h": "af402b579238ff198110dcc1e531b92ed29fac6e2f1c8bf07896bae7b863d983",
+    "include/cui/cui_software.h": "334b7dd5c70cb341e52885f6302168fa4da098fc447ebc533cd30ebeb9653156",
+    "include/cui/cui_draw_v2.h": "ed84dcc995b2a2ff51cbff7c167a195090b7622cb3dfe289d5aa688946ed8e06",
+    "tests/unit/test_software_public_v2.c": "a490f04ced07d8858cb12fdaa8b7ff32afa757afecd889e50a7ed731b6b08da0",
+    "tests/unit/test_software_v2_text.c": "7afe5b8605a98a8919749f0d67788fd8df9b5cefa4143efbf9272fa783b94248",
+    "tests/fixtures/text_prepare_v1/source/backends/software/cui_software.c": "f2975fc0873a6c100f47aea8c2e5da05b39f00ac850ed77cc938a33ec34b74cb",
+    "tests/fixtures/background_v1/frozen_abi.h": "07b6e4b58a6ee1cd827172f0a83dcf8289dc4c28239871342ac6b22c7d4e4ee7",
+    "tests/fixtures/software_v2_public_v1/layout.json": "ececa636027bd3a015080c153b7a669b127067344470c74c1e9d913e5fe586a3",
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+    "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d",
+    "/home/matteo/.cache/cui-current-validation/native/libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "logs": {
+    "build-shadow/software-public-first-build.log": "51d110b9b23922b3b01922604aee2d67ba4cce8958b48d31d7fda20ea1e67473",
+    "build-shadow/software-public-corrected-build.log": "5b7168730ab03fd254c1d9ab33fcc58239f7105f64934d250f4b2b0131ca87bd",
+    "build-shadow/software-public-final-build.log": "fc378692f1143b282ee2c85038d41611f01b808c5de150589cb41b68b8a5544d",
+    "build-shadow/software-public-alias-build.log": "af45ee867c3178eeac756e0454055a48515c7e17ae88a12b22e6b62a5812d377",
+    "build-shadow/software-public-alias-corrected-build.log": "750a3a3935f1076b09dc5e5984f3846405d6b5800877d8945b21742e224b4fd1",
+    "build-shadow/software-public-alias-tests.log": "1a74af4a2f6d4dbf48b5fd52c4b7f435dba7d9ca97cc0bb5a629709ea030c0e6",
+    "build-shadow/software-public-closure-build.log": "786a159f9b865568a554cfe1cbdc93e475000f2299aea2790b6b53347c3ede45",
+    "build-shadow/software-public-final-tests.log": "710fd7ff1f5383584c8af052e490c40ad7c92edd0c12479029eeb056df215818",
+    "build-shadow/software-public-layout-actual.json": "6e3bb89d2edefd07cfccaf5e4cd55ac13cfb306363672a634051775ce5c373cd",
+    "build-shadow/software-public-generation.log": "1e14bcee00ff48c127938a2a2e434b6bf2dc4c305adb114b766d2dbf28885edf",
+    "build-shadow/software-public-freshness.log": "bfb3fc54776ffcfcb7e559c26649a7de8dd258be01e10accd94100f4f5ea7b19",
+    "build-shadow/software-public-reference.log": "dec5673ee7ead0e86a249ea046dba60aab31a8206a43fedeb035ab8449b4e26d",
+    "build-shadow/software-public-usage.log": "a670c344e4af1f6208207f5c24a53189168105ac3638e4383dd72c20d36b55b7",
+    "build-shadow/software-public-parser.log": "feabb4add9e2ca3374e538560634d1ec97dc4f4ce89aab12f3d726e36ea9b2f6",
+    "build-shadow/software-public-skill.log": "aad0d6810dc73b6b3935e6b22e4680fa35eddfa4ef5f3bd736e9bd19d28868fd"
+  },
+  "compiler": "cc (GCC) 16.2.1 20260810"
+}

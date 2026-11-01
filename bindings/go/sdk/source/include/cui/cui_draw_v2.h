@@ -5,9 +5,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Unreleased Core transport only. No adapter or foreign-language binding yet
- * supports this list. V1 structs, enums, config and renderer routes are unchanged.
- * Query an actual future V2 consumer BEFORE composition; fabricated capability
+/* Unreleased V2 transport. The C software adapter supports this list through
+ * cui_software_query_v2/render_v2; other adapters and foreign bindings remain pending.
+ * V1 structs, enums, config and renderer routes are unchanged.
+ * Query the actual V2 consumer BEFORE composition; fabricated capability
  * values are a caller contract, not evidence of renderer support. */
 #define CUI_DRAW_ABI_V2 2u
 #define CUI_DRAW_V2_BACKGROUND 9u
@@ -20,7 +21,7 @@ typedef struct {
     cui_rect bounds;
     cui_corner_radii radii;
     cui_background brush; /* Owned; legacy resources below retain V1 borrowing. */
-    float opacity;        /* Ancestor product, applied ONCE by future preparer. */
+    float opacity;        /* Ancestor product, applied ONCE by preparer. */
 } cui_background_draw_v2;
 typedef struct {
     uint32_t kind; /* 0..8 equal V1 tags; payload.legacy.type must equal kind. */

@@ -2029,20 +2029,23 @@
     {
       "api_symbols": [
         "cui_theme_light",
-        "cui_theme_preset_get"
+        "cui_theme_preset_get",
+        "cui_software_query_v2",
+        "cui_software_render_v2"
       ],
       "state_types": [
         "cui_theme"
       ],
       "state_ownership": "Caller retains cui_theme value and any icon-loader user/backing storage.",
       "interaction": "cui_theme_icon_loader_fn resolves icon SVG; theme selection is an application event.",
-      "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math; they do not apply backgrounds or enable any renderer. Unreleased V2 Core transport and private CPU preparation provide bounded opt-in building blocks; all five renderer paths and foreign authoring remain pending.",
+      "usage": "Choose/copy a preset and pass its address to styled controls; invalidate after changing it. Unreleased cui_background values/sample helpers are pure C-only math. For actual opt-in rendering, use cui_software_query_v2 before Core V2 composition and cui_software_render_v2 afterwards; V1 routes remain unchanged. The other four renderer paths, foreign authoring and all78 part coverage remain pending.",
       "docs": [
         "docs/THEME_GUIDE.md",
         "docs/TYPOGRAPHY.md",
         "docs/BACKGROUND_VALUES.md",
         "docs/CORE_DRAW_V2.md",
-        "docs/BACKGROUND_PREPARATION.md"
+        "docs/BACKGROUND_PREPARATION.md",
+        "docs/SOFTWARE_V2.md"
       ],
       "callback_symbols": [
         "cui_theme_icon_loader_fn"
@@ -2053,7 +2056,8 @@
       "composition": "application model + frame composition",
       "additional_public_headers": [
         "include/cui/cui_background.h",
-        "include/cui/cui_draw_v2.h"
+        "include/cui/cui_draw_v2.h",
+        "include/cui/cui_software.h"
       ]
     },
     {

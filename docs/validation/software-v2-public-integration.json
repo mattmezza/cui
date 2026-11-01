@@ -1,0 +1,38 @@
+{
+  "status": "integrated_tested_subset_unreleased",
+  "worker_commit": "8671fa893e648fd08720fdc9ebb75d027c913f3a",
+  "prerequisites": [
+    "9c44a33f",
+    "eb7293d6"
+  ],
+  "integration_parent": "5b2a1fa2",
+  "scope": "Initialized C software V2 query/render; other four adapters and foreign authoring V2 APIs remain unsupported.",
+  "build": {
+    "configuration": "Existing Release Ninja cache; warnings enabled; nice 19, CPU 1, parallel 1",
+    "public_steps": 27,
+    "affected_private_steps": 17,
+    "result": "pass"
+  },
+  "tests": {
+    "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -R <software/public/header/usage/freshness selection> --output-on-failure -j 1",
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 9.53,
+    "scope": "Actual CMake public V1/V2, C/C++/umbrella, independent text/mixed matrices, rebuilt private validation/paint/text/shadows, usage and three generated-resource checks."
+  },
+  "skill": "Worker matching software slice: 18/18 pass in 38.789 s. Combined integration skill run will accompany the next binding integration.",
+  "generated": "Canonical SDK -> amalgamation -> skill regenerated after resolving only generated provenance/resources conflicts; all freshness tests pass.",
+  "limitations": [
+    "No full-suite or hosted exact-revision acceptance inferred from focused checks.",
+    "Software only; SDL_Renderer, SDL_GPU, Sokol GLCORE, Canvas wire and foreign authoring V2 APIs remain open.",
+    "Public scaled-font API ceiling remains 16; V2 per-axis transforms and owned text recording support up to 64.",
+    "Opaque font/provider allocations are outside transaction byte budgets; no intrinsic RGBA/color-font support."
+  ],
+  "logs": {
+    "/home/matteo/.cache/cui-current-validation/software-v2-public-root-configure.log": "5465cf05933812f0b48e37b266b1d4f448417e981a5d63d9bb2519cd1dd6d5ae",
+    "/home/matteo/.cache/cui-current-validation/software-v2-public-root-build.log": "108ae626e905c7d9562fd3d7f698089e8c188c219ae32552cc03d3758d71e293",
+    "/home/matteo/.cache/cui-current-validation/software-v2-public-root-private-build.log": "ef8a5f10f35d57ca6e7f6fbf86dc724f1aee5ce528f6002e4cba36ee0fc7ca17",
+    "/home/matteo/.cache/cui-current-validation/software-v2-public-root-tests.log": "89aecf35b28464cab33ae66f86792e45b838e6f261c8ca9fb3a2a1c28b9c4482"
+  }
+}

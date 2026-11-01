@@ -18,3 +18,12 @@ without SDL, FreeType or HarfBuzz.
 
 PPM capture exports RGB and discards alpha; it is intended for opaque screenshot
 frames. No GPU acceleration or native accessibility is claimed.
+
+The unreleased C-only V2 route uses `cui_software_query_v2` before composition and
+`cui_software_render_v2` for bounded transactional rendering; it is separate from
+the unchanged V1 function table. It supports owned backgrounds, AREA shadows and
+independently scaled grayscale text with explicit limits. See
+[the software V2 guide](../../docs/SOFTWARE_V2.md) for query/defaults, failures,
+resource/font ownership and busy destroy retry. Other adapters/bindings remain
+pending. The private guard adds8 bytes on measured native/WASM32 objects; V1 field
+offsets/table/pixels and ordinary allocation call counts are preserved.

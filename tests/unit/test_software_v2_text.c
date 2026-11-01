@@ -3,6 +3,9 @@
 #include "../../src/text/cui_text.c" /* Private ownership/cache/dependency proof. */
 #endif
 #include "../../backends/software/cui_software_v2_paint_internal.h"
+#ifdef CUI_TEST_PUBLIC_SOFTWARE
+#include "../../backends/software/cui_software.c"
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,6 +93,21 @@ static void unchanged_padding(const unsigned char *p) {
     for (size_t i = STRIDE * H; i < CAPACITY; ++i)
         assert(p[i] == 0xa5);
 }
+#ifdef CUI_TEST_PUBLIC_SOFTWARE
+/* Reuse independent source/pixel oracles through the initialized PUBLIC adapter,
+ * rather than generate new expectations from its private forwarding helper. */
+static void public_matches(cui_font *font, const cui_draw_list_v2 *l,
+                           const cui_render_v2_options *o, cui_color clear,
+                           const unsigned char *expected) {
+    cui_software *renderer = cui_software_create(W, H, font);
+    assert(renderer);
+    cui_software_v2_info info = {.size = sizeof(info)};
+    assert(cui_software_query_v2(renderer, &info) == CUI_OK);
+    assert(cui_software_render_v2(renderer, l, clear, o) == CUI_OK);
+    assert(!memcmp(cui_software_pixels(renderer, NULL, NULL), expected, W * H * 4));
+    cui_software_destroy(renderer);
+}
+#endif
 #ifdef CUI_HAS_TEXT
 /* Independent integer source-over oracle, never calls painter blending. */
 static void reference_blend(unsigned char *p, cui_color c) {
@@ -400,6 +418,9 @@ static void mixed_frame(cui_font *font, const char *regular, const char *bold) {
     assert(cui_test_original_render(regular, bold, &v1, clear, W, H, expected));
     for (unsigned y = 0; y < H; ++y)
         assert(!memcmp(pixels + y * STRIDE, expected + y * ROW, ROW));
+#ifdef CUI_TEST_PUBLIC_SOFTWARE
+    public_matches(font, &l, &o, clear, expected);
+#endif
     assert(!a.live && !a.used && !t.busy);
     unchanged_padding(pixels);
 }
@@ -453,6 +474,9 @@ static void fallback_fonts(cui_font *font, const char *regular, const char *bold
             assert(cui_software_v2_paint_with_font(&t, &l, clear, &o, font, allocate, release,
                                                    &a) == CUI_OK);
             reference_text(expected, font, &c, &o, clear);
+#ifdef CUI_TEST_PUBLIC_SOFTWARE
+            public_matches(font, &l, &o, clear, expected);
+#endif
             for (unsigned y = 0; y < H; ++y)
                 assert(!memcmp(pixels + y * STRIDE, expected + y * ROW, ROW));
             if (j == 0) {
@@ -556,6 +580,9 @@ static void real_fonts(cui_font *font, const char *regular, const char *bold) {
             assert(!state.live && !state.used && !t.busy);
             unchanged_padding(pixels);
             reference_text(expected, font, &c, &o, clear);
+#ifdef CUI_TEST_PUBLIC_SOFTWARE
+            public_matches(font, &l, &o, clear, expected);
+#endif
             for (unsigned y = 0; y < H; ++y)
                 assert(!memcmp(pixels + y * STRIDE, expected + y * ROW, ROW));
             if (a <= 1) {

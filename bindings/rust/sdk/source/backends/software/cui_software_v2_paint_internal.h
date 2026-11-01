@@ -5,9 +5,9 @@
 #include "cui_mesh.h"
 #include "cui_shape.h"
 #include "cui_software_v2_internal.h"
-/* Private painter: owned with-font TEXT and bounded source-profile AREA shadows. Not wired to a V1
- * renderer, public V2 entry, or capability advertisement. Inputs/target view stay stable through
- * return, including allocator callbacks. Allocators obey the workspace
+/* Private painter behind the explicit software V2 entry, never the V1 route.
+ * Owned with-font TEXT and bounded source-profile AREA shadows. Inputs/target view stay stable
+ * through return, including allocator callbacks. Allocators obey the workspace
  * distinct-live-block/alignment contract. Target pixels and input records/resources must be
  * disjoint. Entire opaque font graphs/dependency storage must also be disjoint
  * and stable, with no nested/concurrent render on the same font. A pointer-byte
@@ -247,11 +247,11 @@ static inline void cui_software_v2_shadow_paint(cui_software_v2_surface *surface
 _Static_assert(_Alignof(cui_software_v2_shadow_descriptor) <=
                    _Alignof(cui_fundamental_alignment_internal),
                "shadow descriptor exceeds workspace alignment");
-static inline cui_error
-cui_software_v2_paint_with_font(cui_software_v2_target *target, const cui_draw_list_v2 *list,
-                                cui_color clear, const cui_render_v2_options *options,
-                                cui_font *font, cui_software_v2_alloc_fn allocate,
-                                cui_software_v2_free_fn release, void *user) {
+static inline cui_error cui_software_v2_paint_with_font_excluding(
+    cui_software_v2_target *target, const cui_draw_list_v2 *list, cui_color clear,
+    const cui_render_v2_options *options, cui_font *font, cui_software_v2_alloc_fn allocate,
+    cui_software_v2_free_fn release, void *user, const void *excluded, size_t excluded_bytes,
+    bool *owner_busy) {
     if (!target || target->busy || !list || !options || !allocate || !release || !target->pixels ||
         !target->width || !target->height || target->width > 16384 || target->height > 16384 ||
         options->viewport_width != target->width || options->viewport_height != target->height)
@@ -277,8 +277,9 @@ cui_software_v2_paint_with_font(cui_software_v2_target *target, const cui_draw_l
 #else
     (void)font;
 #endif
-    cui_error error = cui_software_v2_validate(list, options, font_available, tracking_available,
-                                               context_available, &plan);
+    cui_error error =
+        cui_software_v2_validate_excluding(list, options, font_available, tracking_available,
+                                           context_available, &plan, excluded, excluded_bytes);
     if (error != CUI_OK)
         return error;
     if (!cui_software_v2_target_disjoint(target, span, list->commands,
@@ -381,6 +382,10 @@ cui_software_v2_paint_with_font(cui_software_v2_target *target, const cui_draw_l
                                               options->metadata_bytes - metadata_bytes};
     cui_text_prepare_session text_session = {.owner = &text_owner};
 #endif
+    /* All preceding capability/profile/geometry/source checks are pure: no
+     * allocator/provider callbacks. Guard the owner at the first callback boundary. */
+    if (owner_busy)
+        *owner_busy = true;
     target->busy = true;
     cui_software_v2_workspace workspace = {0};
     error = cui_software_v2_workspace_begin(&workspace, cpu_bytes, metadata_bytes, allocate,
@@ -562,6 +567,16 @@ cui_software_v2_paint_with_font(cui_software_v2_target *target, const cui_draw_l
     cui_software_v2_workspace_end(&workspace);
     target->busy = false;
     return error;
+}
+/* Legacy private callers have no additional enclosing owner range/guard. The
+ * initialized adapter supplies both; it clears owner_busy after all cleanup. */
+static inline cui_error
+cui_software_v2_paint_with_font(cui_software_v2_target *target, const cui_draw_list_v2 *list,
+                                cui_color clear, const cui_render_v2_options *options,
+                                cui_font *font, cui_software_v2_alloc_fn allocate,
+                                cui_software_v2_free_fn release, void *user) {
+    return cui_software_v2_paint_with_font_excluding(target, list, clear, options, font, allocate,
+                                                     release, user, NULL, 0, NULL);
 }
 /* No-font wrapper retains preallocation TEXT refusal and exact nontext requests. */
 static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,

@@ -22,11 +22,14 @@
     "/home/matteo/.cache/cui-current-validation/beta-localized-combined-build.log": "4e2f41f14f054b697e81daa3e058d8f53c2fd9bee244dc3303efc8d7e5ecb85a",
     "/home/matteo/.cache/cui-current-validation/beta-localized-combined-tests.log": "4fafac19535cc9e0fbc744f345cf6c588cfcac4bbc9ba084818e5c3e6cf6cf02",
     "/home/matteo/.cache/cui-current-validation/beta-localized-combined-581-LastTest.log": "7d8a689d36a5120acbc77e9a4762c79bcc8693c929075b463d68b690ede4f380",
-    "/home/matteo/.cache/cui-current-validation/beta-localized-usage-repair.log": "ab7b632a17106c0b9afaf1045526e69a2e5fcb92c259ff2098404af161f0533d"
+    "/home/matteo/.cache/cui-current-validation/beta-localized-usage-repair.log": "ab7b632a17106c0b9afaf1045526e69a2e5fcb92c259ff2098404af161f0533d",
+    "/home/matteo/.cache/cui-current-validation/beta-localized-repair-generation.log": "f714de2dc726bc9a74f5947ce8df9b38e6e0c5ebbafe5014a334292d06eceba8",
+    "/home/matteo/.cache/cui-current-validation/beta-localized-repair-freshness.log": "bfb3fc54776ffcfcb7e559c26649a7de8dd258be01e10accd94100f4f5ea7b19"
   },
   "limits": [
     "New isolated Skeleton palette/responsive prototype and Icon resource implementations not integrated or C-validated",
     "Node81 configured checks and static/dynamic GoRust receipts are separate evidence",
     "No physical GPU/macOS/Windows/AT/IME acceptance; no release/deployment claim"
-  ]
+  ],
+  "generated_consumer_acceptance": "After guide repair: SDK/amalgamation/skill regenerated;18 skill tests PASS41.807s;all3freshness checks PASS"
 }

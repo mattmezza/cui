@@ -390,6 +390,7 @@ cui_warnings(test_cpu_v2_source_ranges)
 add_test(NAME cpu_v2_source_ranges COMMAND test_cpu_v2_source_ranges)
 add_test(NAME cpu_v2_range_source_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cpu_v2_range_reference.py)
 add_test(NAME sdl_guard_measurement_reader COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_sdl_guard_measurement.py)
+add_test(NAME sdl_v1_source_contract COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_sdl_v1_reference.py)
 # Four immutable pre-common headers; adjust ONLY private relative include spelling.
 set(CUI_CPU_V2_FROZEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/cpu-v2-frozen")
 file(MAKE_DIRECTORY "${CUI_CPU_V2_FROZEN_DIR}")

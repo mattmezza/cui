@@ -1258,7 +1258,6 @@ cui_error cui_sdl3_render_v2(cui_sdl3 *s, const cui_draw_list_v2 *list, cui_colo
     if (!texture || !SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE) ||
         !SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST) ||
         !SDL_SetTextureColorMod(texture, 255, 255, 255) || !SDL_SetTextureAlphaMod(texture, 255) ||
-        !SDL_SetTextureColorScale(texture, 1) ||
         !SDL_UpdateTexture(texture, NULL, frame.pixels, (int)frame.stride))
         goto cleanup;
     changed = true; /* A failed setter may still have changed native state. */

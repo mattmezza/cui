@@ -41,3 +41,24 @@ new private CMake flag is removed. This preserves existing SDL text prerequisite
 rather than requiring undocumented manual flags. The actual SDL library target
 therefore exercises the default source path at its next strict build. Manual/native
 bundle source closure remains an explicit acceptance gate; no such build has run.
+
+## Additional source review before first compilation
+
+The installed SDL3 public renderer header exposes texture RGB/alpha modulation
+and renderer color scale, but no `SDL_SetTextureColorScale`. Removed that erroneous
+call before compilation; white RGB/alpha modulation plus renderer color-scale one
+already establish the proposed transfer semantics. This is a source-discovered
+API error, not a claimed compiler diagnostic or completed runtime correction.
+
+First configured microgate, only after the explicit lease, is:
+
+```sh
+taskset -c 1 nice -n 19 cmake --build build-shadow --target test_sdl3_v2 test_sdl3_v1_api -j1
+python scripts/test_local.py --build-dir build-shadow -R '^sdl3_v(2|1_api)$'
+```
+
+Inspect dependency dry-run first: if the reused worker configuration would rebuild
+Core/text broadly, use the already built immutable current archives for the two
+fixture TUs and public ABI fixture, recording their source identities and hashes.
+No full-engine build is authorized by this microgate. Capture initial strict
+compiler and private-Xvfb logs; neither success nor fixture acceptance is claimed.

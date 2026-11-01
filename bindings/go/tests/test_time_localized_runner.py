@@ -117,6 +117,63 @@ class RunnerTests(unittest.TestCase):
             RUNNER.provider_dir(a,'partial',self.providers[2])
         self.assertEqual((out/'libcui_bridge.so').read_text(),'keep')
 
+    def test_static_validates_without_provider_inputs(self):
+        a=RUNNER.parser().parse_args(['--language','go','--linkage','static','--build-dir',str(self.root)])
+        RUNNER.validate(a,{'CUI_TEST_VIRTUAL_DISPLAY':'1'},'linux')
+        self.assertIsNone(a.library)
+        env=RUNNER.environment(a,{'CUI_BRIDGE_LIB_DIR':'wrong','CUI_BRIDGE_LIBRARY':'wrong',
+                                  'LD_LIBRARY_PATH':'wrong','LD_PRELOAD':'wrong'})
+        for key in ('CUI_BRIDGE_LIB_DIR','CUI_BRIDGE_LIBRARY','LD_LIBRARY_PATH','LD_PRELOAD'):
+            self.assertNotIn(key,env)
+
+    def test_static_go_inspects_real_named_artifacts_without_dynamic_tags(self):
+        a=self.args('go');a.linkage='static';calls=[]
+        def run(cmd,cwd,env,**kwargs):
+            calls.append((cmd,cwd,env))
+            return types.SimpleNamespace(stdout=' 0x1 (NEEDED) Shared library: [libc.so.6]')
+        RUNNER.run_suite(a,run)
+        self.assertEqual(len(calls),6)
+        self.assertEqual(calls[0][0][1:4],['test','-c','-o'])
+        self.assertEqual(calls[1][0][:2],['readelf','-d'])
+        self.assertEqual(calls[2][0][0],calls[0][0][4])
+        self.assertEqual(calls[5][0][0],calls[3][0][3])
+        for cmd,_,env in calls:
+            self.assertNotIn('cui_dynamic',cmd)
+            self.assertNotIn('CUI_BRIDGE_LIBRARY',env)
+            self.assertNotIn('CUI_BRIDGE_LIB_DIR',env)
+            self.assertNotIn('CUI_TEST_TIME_PROVIDER',env)
+
+    def test_static_rust_inspects_each_reported_executable(self):
+        a=self.args('rust');a.linkage='static';calls=[]
+        def run(cmd,cwd,env,**kwargs):
+            calls.append((cmd,cwd,env))
+            if cmd[0]=='readelf':
+                return types.SimpleNamespace(stdout='There is no dynamic section in this file.')
+            if '--message-format=json' in cmd:
+                if '--example' in cmd:name,kind='time_field_localized','example'
+                elif '--lib' in cmd:name,kind='cui_builders','lib'
+                else:name,kind='time_localized','test'
+                exe=self.cache/name;exe.write_text('mock')
+                return types.SimpleNamespace(stdout=json.dumps({'reason':'compiler-artifact',
+                    'target':{'name':name,'kind':[kind]},'executable':str(exe)}))
+            return types.SimpleNamespace(stdout='')
+        RUNNER.run_suite(a,run)
+        self.assertEqual(len(calls),9)
+        self.assertEqual(sum(c[0][0]=='readelf' for c in calls),3)
+        for _,_,env in calls:
+            self.assertNotIn('CUI_BRIDGE_LIB_DIR',env)
+            self.assertNotIn('LD_LIBRARY_PATH',env)
+            self.assertEqual(env['CARGO_TARGET_DIR'],str(self.cache))
+
+    def test_static_shared_dependency_fails_before_executing_binary(self):
+        a=self.args('go');a.linkage='static';calls=[]
+        def run(cmd,*args,**kwargs):
+            calls.append(cmd)
+            return types.SimpleNamespace(stdout=' 0x1 (NEEDED) Shared library: [libcui_bridge.so.1]')
+        with self.assertRaisesRegex(ValueError,'depends on shared'):
+            RUNNER.run_suite(a,run)
+        self.assertEqual(len(calls),2)
+
 
 if __name__ == '__main__':
     unittest.main()

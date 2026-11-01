@@ -188,3 +188,48 @@ reported-binary reuse, malformed Cargo output, desktop rejection, fail-fast and
 non-destructive aliases. It ran6/6 without Go/Cargo or native execution. Root configured execution now passes both dynamic suites plus the offline
 harness (3/3 CTest entries, 15.94s). Earlier scratch-harness evidence is retained
 separately; default-static consumers and packages remain unverified.
+
+### Prepared default static source acceptance
+
+The same runner now accepts `--linkage dynamic|static`, defaulting to dynamic,
+so existing invocations retain their contract. In static mode no current/old/
+partial library arguments are required or used. It explicitly removes
+`CUI_BRIDGE_LIB_DIR`, `CUI_BRIDGE_LIBRARY`, `LD_LIBRARY_PATH` and preload overrides.
+Go omits `cui_dynamic`, compiles `go test -c -o` and the asserting example into
+`EXISTING_BUILD/time-localized-static/go`, then inspects and runs those exact
+artifacts. Rust's unset library override selects its bundled-source build.rs
+route using the explicitly reused static Cargo target directory. It discovers
+integration-test, wire-unit-test and example executables through Cargo JSON,
+inspects each, then runs the exact reported artifact. Both modes remain offline
+and serial. Static mode deliberately may compile bundled C sources; unlike the
+dynamic mode it is not an engine-build-free gate.
+
+Each inspected ELF must lack a `libcui_bridge` NEEDED dependency, including
+versioned shared names. `readelf` failure or such a dependency stops the runner
+before executing the artifact. A truly static ELF with no dynamic section is
+accepted. This does not claim a fully static libc, native backend support or
+package publication. No actual old/partial-provider result is claimed in static
+mode; its optional-provider test returns without that separate dynamic fixture.
+
+Proposed root CMake integration (default OFF):
+
+```sh
+cmake -S . -B EXISTING_BUILD -DCUI_BUILD_BRIDGE=ON \
+  -DCUI_TIME_FIELD_STATIC_BINDING_TESTS=ON \
+  -DCUI_TIME_FIELD_STATIC_RUST_TARGET_DIR=/absolute/existing/static-cargo-target
+python scripts/test_local.py --build-dir EXISTING_BUILD -j1 -V \
+  -R '^(bridge_go_time_localized_static|bridge_rust_time_localized_static)$'
+```
+
+Root wires the two named tests and passes `--readelf /path/to/readelf`; the tool
+is required when opted in. The retained integrator cache is
+`/home/matteo/.cache/cui-current-validation/native/rust-slider-static-target`.
+Do not create another Cargo cache or run this source-build gate without its
+coordinated compiler lease. All runtime tests require the private display marker;
+no desktop or `--native` launch is introduced.
+
+Offline runner coverage now passes10/10: static plans clear provider overrides,
+select tag-free Go commands, inspect each Cargo-reported executable, and reject a
+shared-bridge dependency before running. These tests use mocked tools only.
+The new static runner path remains **unexecuted** pending root's configured gate;
+the earlier focused dynamic receipt does not imply default static SDK acceptance.

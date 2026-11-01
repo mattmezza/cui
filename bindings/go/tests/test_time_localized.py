@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Opt-in Linux dynamic TimeField acceptance; existing tools/libraries only.
+"""Opt-in Linux TimeField acceptance; explicit dynamic or bundled-source static.
 
-Invoke through scripts/test_local.py/CTest. No native desktop, engine build,
+Invoke through scripts/test_local.py/CTest. Static mode deliberately builds bundled
+source using retained caches; dynamic mode never builds the engine. No desktop,
 SDK generation, dependency installation or fabricated provider is used.
 """
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -17,13 +19,15 @@ ROOT = Path(__file__).resolve().parents[3]
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--language', choices=('go', 'rust'), required=True)
+    p.add_argument('--linkage', choices=('dynamic','static'), default='dynamic')
     p.add_argument('--build-dir', type=Path, required=True)
-    p.add_argument('--library', type=Path, required=True)
-    p.add_argument('--old-library', type=Path, required=True)
-    p.add_argument('--partial-library', type=Path, required=True)
+    p.add_argument('--library', type=Path)
+    p.add_argument('--old-library', type=Path)
+    p.add_argument('--partial-library', type=Path)
     p.add_argument('--target-dir', type=Path)
     p.add_argument('--go', default='go')
     p.add_argument('--cargo', default='cargo')
+    p.add_argument('--readelf', default='readelf')
     return p
 
 
@@ -31,19 +35,23 @@ def validate(a, environ=None, platform=None):
     environ = os.environ if environ is None else environ
     platform = sys.platform if platform is None else platform
     if platform != 'linux':
-        raise ValueError('this dynamic provider acceptance is validated on Linux only')
+        raise ValueError('this binding acceptance is validated on Linux only')
     if environ.get('CUI_TEST_VIRTUAL_DISPLAY') != '1':
         raise ValueError('run through scripts/test_local.py private display wrapper')
     a.build_dir = a.build_dir.resolve()
     if not a.build_dir.is_dir():
         raise ValueError('reuse an existing build directory')
-    for name in ('library', 'old_library', 'partial_library'):
-        value = getattr(a, name).resolve()
-        if not value.is_file():
-            raise ValueError('actual existing provider required: ' + name)
-        setattr(a, name, value)
-    if len({a.library, a.old_library, a.partial_library}) != 3:
-        raise ValueError('current, actual-old and partial providers must be distinct')
+    if a.linkage == 'dynamic':
+        for name in ('library', 'old_library', 'partial_library'):
+            raw = getattr(a, name)
+            if raw is None:
+                raise ValueError('dynamic mode requires actual existing provider: ' + name)
+            value = raw.resolve()
+            if not value.is_file():
+                raise ValueError('actual existing provider required: ' + name)
+            setattr(a, name, value)
+        if len({a.library, a.old_library, a.partial_library}) != 3:
+            raise ValueError('current, actual-old and partial providers must be distinct')
     if a.language == 'rust':
         if a.target_dir is None or not a.target_dir.resolve().is_dir():
             raise ValueError('Rust requires an existing reusable --target-dir')
@@ -55,12 +63,13 @@ def environment(a, inherited=None):
     env = dict(os.environ if inherited is None else inherited)
     for name in ('LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'CUI_TEST_TIME_PROVIDER',
                  'CUI_BRIDGE_LIBRARY', 'CUI_BRIDGE_LIB_DIR', 'RUSTFLAGS',
-                 'CARGO_ENCODED_RUSTFLAGS', 'GOFLAGS'):
+                 'CARGO_ENCODED_RUSTFLAGS', 'GOFLAGS', 'LD_LIBRARY_PATH'):
         env.pop(name, None)
     env.update(GOMAXPROCS='1', GOFLAGS='-p=1', GOPROXY='off', GOSUMDB='off',
-               GOTOOLCHAIN='local', CARGO_BUILD_JOBS='1', CARGO_NET_OFFLINE='true',
-               CUI_BRIDGE_LIB_DIR=str(a.library.parent),
-               CUI_BRIDGE_LIBRARY=str(a.library), LD_LIBRARY_PATH=str(a.library.parent))
+               GOTOOLCHAIN='local', CARGO_BUILD_JOBS='1', CARGO_NET_OFFLINE='true')
+    if a.linkage == 'dynamic':
+        env.update(CUI_BRIDGE_LIB_DIR=str(a.library.parent),
+                   CUI_BRIDGE_LIBRARY=str(a.library), LD_LIBRARY_PATH=str(a.library.parent))
     if a.target_dir is not None:
         env['CARGO_TARGET_DIR'] = str(a.target_dir)
     return env
@@ -73,7 +82,7 @@ def invoke(command, cwd, env, capture=False):
                           stdout=subprocess.PIPE if capture else None)
 
 
-def artifact(stdout, target_dir):
+def artifact(stdout, target_dir, name="time_localized", kind="test"):
     found = set()
     for line in stdout.splitlines():
         try:
@@ -84,15 +93,15 @@ def artifact(stdout, target_dir):
         if item.get('reason') == 'compiler-message':
             print(item.get('message', {}).get('rendered', ''), end='', flush=True)
         if (item.get('reason') == 'compiler-artifact'
-                and item.get('target', {}).get('name') == 'time_localized'
-                and 'test' in item.get('target', {}).get('kind', [])
+                and item.get('target', {}).get('name') == name
+                and kind in item.get('target', {}).get('kind', [])
                 and item.get('executable')):
             path = Path(item['executable']).resolve()
             if not path.is_relative_to(target_dir.resolve()):
                 raise ValueError('Cargo executable escaped the requested reused cache')
             found.add(path)
     if len(found) != 1:
-        raise ValueError('Cargo must report exactly one time_localized test executable')
+        raise ValueError('Cargo must report exactly one ' + name + ' executable')
     path = found.pop()
     if not path.is_file():
         raise ValueError('reported executable is missing')
@@ -117,6 +126,8 @@ def provider_dir(a, name, provider):
 
 def run_suite(a, run=invoke):
     env = environment(a)
+    if a.linkage == 'static':
+        return run_static(a,env,run)
     if a.language == 'go':
         cwd = ROOT / 'bindings/go'
         base = [a.go, 'test', '-tags', 'cui_dynamic', './cui', '-count=1', '-v']
@@ -140,6 +151,45 @@ def run_suite(a, run=invoke):
     run(base + ['--lib', 'time_localized::', '--', '--test-threads=1'], cwd, env)
     run([a.cargo, 'run', '--offline', '--locked', '--no-default-features', '-j1',
          '--example', 'time_field_localized'], cwd, env)
+
+
+def check_static(a,binary,cwd,env,run):
+    result=run([a.readelf,'-d',binary],cwd,env,capture=True)
+    dependencies=re.findall(r'\(NEEDED\).*?\[([^\]]+)\]',result.stdout)
+    if any(name.startswith('libcui_bridge') for name in dependencies):
+        raise ValueError('static acceptance artifact depends on shared libcui_bridge: '+str(binary))
+    print('STATIC_NEEDED',json.dumps({'artifact':str(binary),'needed':dependencies}),flush=True)
+
+
+def run_static(a,env,run):
+    out=a.build_dir/'time-localized-static'/a.language
+    out.mkdir(parents=True,exist_ok=True)
+    if a.language=='go':
+        cwd=ROOT/'bindings/go'
+        binary=out/'go-tests'
+        run([a.go,'test','-c','-o',binary,'./cui'],cwd,env)
+        check_static(a,binary,cwd,env,run)
+        run([binary,'-test.run=^TestLocalizedTime','-test.count=1','-test.v'],cwd,env)
+        example=out/'go-example'
+        run([a.go,'build','-o',example,'./examples/time_field_localized'],cwd,env)
+        check_static(a,example,cwd,env,run)
+        run([example],cwd,env)
+        return
+    cwd=ROOT/'bindings/rust'
+    base=[a.cargo,'test','--offline','--locked','--no-default-features','-j1']
+    compiled=run(base+['--test','time_localized','--no-run','--message-format=json'],cwd,env,capture=True)
+    binary=artifact(compiled.stdout,a.target_dir)
+    check_static(a,binary,cwd,env,run)
+    run([binary,'--test-threads=1','--nocapture'],cwd,env)
+    compiled=run(base+['--lib','--no-run','--message-format=json'],cwd,env,capture=True)
+    binary=artifact(compiled.stdout,a.target_dir,'cui_builders','lib')
+    check_static(a,binary,cwd,env,run)
+    run([binary,'time_localized::','--test-threads=1','--nocapture'],cwd,env)
+    compiled=run([a.cargo,'build','--offline','--locked','--no-default-features','-j1',
+                  '--example','time_field_localized','--message-format=json'],cwd,env,capture=True)
+    binary=artifact(compiled.stdout,a.target_dir,'time_field_localized','example')
+    check_static(a,binary,cwd,env,run)
+    run([binary],cwd,env)
 
 
 def main():

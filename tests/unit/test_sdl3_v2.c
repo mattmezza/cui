@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Same-TU native failures/owner reentry; every window is hidden at creation. */
+/* Test host supplies main; neither embedded implementation emits an entry shim. */
+#define SDL_MAIN_HANDLED 1
 #include "cui/cui_software.h"
 #include "sdl_v2_reference_internal.h"
 #include <SDL3/SDL.h>
@@ -273,6 +275,7 @@ static void compare_upload(cui_sdl3 *s, cui_software *cpu, cui_draw_list_v2 *lis
 }
 int main(int argc, char **argv) {
     assert(argc == 2);
+    SDL_SetMainReady();
     assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
     cui_font *font = cui_font_open(argv[1]);
     assert(font);

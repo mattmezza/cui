@@ -62,3 +62,10 @@ Core/text broadly, use the already built immutable current archives for the two
 fixture TUs and public ABI fixture, recording their source identities and hashes.
 No full-engine build is authorized by this microgate. Capture initial strict
 compiler and private-Xvfb logs; neither success nor fixture acceptance is claimed.
+
+The paired same-TU fixtures explicitly select SDL_MAIN_HANDLED and call
+SDL_SetMainReady in their own test host. This avoids two embedded implementations
+emitting platform entry shims on targets where SDL_main.h supplies them; it does
+not alter production SDL entry handling or frozen source bytes. A second fixture
+source review corrected text gradient endpoint member names to actual x0/y0/x1/y1.
+These are precompile source corrections, not runtime passes.

@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 /* Immutable pre-V2 SDL source compiled separately; only symbols/include paths vary. */
+/* Test host supplies main; neither embedded implementation emits an entry shim. */
+#define SDL_MAIN_HANDLED 1
 #include <SDL3/SDL.h>
 #include <stdlib.h>
 static size_t original_bytes, original_calls;

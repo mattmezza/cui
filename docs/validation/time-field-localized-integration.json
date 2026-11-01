@@ -1,0 +1,36 @@
+{
+  "status": "FOCUSED_COMBINED_ACCEPTANCE_BROWSER_PENDING",
+  "date": "2026-11-01",
+  "integrated_source_commit": "49267cc4",
+  "worker_handoff": "7c0d68e7",
+  "build": {
+    "result": "PASS",
+    "targets": 6,
+    "steps": 15,
+    "parallel_jobs": 1,
+    "log": "time-field-combined-build-retry.log",
+    "initial_attempt": "Target spelling error before compilation; retained time-field-combined-build.log."
+  },
+  "tests": {
+    "result": "PASS",
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 49.25,
+    "runner": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native",
+    "selection": "time_field_v1.*, time_field_example_.*, component_usage_docs, agent_skill_freshness, agent_skill_contract",
+    "log": "time-field-combined-tests.log"
+  },
+  "generated_checks": [
+    "SDK freshness PASS",
+    "amalgamation freshness PASS",
+    "skill freshness PASS"
+  ],
+  "manifest_entries": 78,
+  "pending": [
+    "Full WASM gallery link and headless browser scenarios",
+    "Whole-suite regression after Dialog and localized TimeField integration",
+    "One-root Tab, IME and foreign authoring coverage",
+    "Release and deployed gallery verification"
+  ]
+}

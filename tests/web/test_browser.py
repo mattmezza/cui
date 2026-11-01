@@ -2377,6 +2377,32 @@ def main():
             click_semantic('Hour')
             page.keyboard.press('ArrowUp')
             page.wait_for_function(texts + '.some(s=>s.includes("10:30:00"))')
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(16)') == 103000
+            callbacks = page.evaluate('cuiGallery.exports.gallery_control_stats(17)')
+            assert callbacks == 1
+            click_semantic('12-hour', 2)
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="AM/PM"]`)')
+            click_semantic('Arabic', 2)
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="ساعة"]`)')
+            click_semantic('Read only', 2)
+            page.wait_for_function('document.querySelector(`#accessible [role=textbox][aria-label="ساعة"]`)?.getAttribute("aria-readonly")==="true"')
+            click_semantic('ساعة', 6)
+            page.keyboard.press('ArrowUp')
+            page.wait_for_timeout(40)
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(16)') == 103000
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(17)') == callbacks
+            click_semantic('Read only', 2)
+            click_semantic('12-hour', 2)
+            click_semantic('Bounds', 2)
+            click_semantic('ساعة', 6)
+            page.keyboard.press('Home')
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(18)===5')
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(16)') == 103000
+            assert page.evaluate('cuiGallery.exports.gallery_control_stats(17)') == callbacks
+            click_semantic('Clear validation', 1)
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(18)===0')
+            click_semantic('Arabic', 2)
+            click_semantic('Bounds', 2)
             page.evaluate('location.hash="ColorPicker"')
             page.wait_for_function('document.querySelector("#name").textContent==="ColorPicker" && cuiGallery.renderedComponent==="ColorPicker"')
             page.wait_for_timeout(80)

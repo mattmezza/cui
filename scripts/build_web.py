@@ -39,6 +39,7 @@ SOURCES = ["src/core/cui_background.c", "src/base/cui_slider_model.c", "src/base
            'src/base/cui_tree.c', 'src/components/cui_tree.c',
            'src/base/cui_picker.c', 'src/components/cui_picker.c',
            'src/base/cui_date_time_picker.c', 'src/components/cui_date_time_picker.c',
+           'src/base/cui_time_text.c', 'src/base/cui_time_field_v1.c', 'src/components/cui_time_field_v1.c',
            'src/base/cui_date_picker_actions.c', 'src/components/cui_date_picker_actions.c',
            'src/base/cui_numeric.c', 'src/components/cui_numeric.c',
            'src/base/cui_content.c', 'src/components/cui_content.c',

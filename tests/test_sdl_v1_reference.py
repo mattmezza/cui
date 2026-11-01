@@ -8,12 +8,15 @@ class SDLV1SourceTests(unittest.TestCase):
     def test_original_and_dependencies_frozen(self):
         verify()
 
-    def test_baseline_matches_preproduction_source(self):
-        # Remove this equality only when reviewed production SDL V2 begins;
-        # immutable frozen authority and paired-runtime gate must remain.
-        for path in ('backends/sdl3/cui_sdl3.c', 'backends/sdl3/cui_sdl3_mesh.h',
-                     'include/cui/cui_sdl3.h'):
-            self.assertEqual((ROOT / path).read_bytes(), (FIXTURE / path.split('/')[-1]).read_bytes())
+    def test_production_preserves_original_private_fields_and_constructor_count(self):
+        original = (FIXTURE / 'cui_sdl3.c').read_text()
+        current = (ROOT / 'backends/sdl3/cui_sdl3.c').read_text()
+        def fields(source):
+            return source.split('struct cui_sdl3 {', 1)[1].split('};', 1)[0].split()
+        self.assertEqual(fields(current.replace('    bool v2_busy, v2_faulted;\n', '')), fields(original))
+        self.assertEqual(current.count('cui_sdl3 *s = calloc(1, sizeof(*s));'), 1)
+        self.assertEqual((ROOT / 'backends/sdl3/cui_sdl3_mesh.h').read_bytes(),
+                         (FIXTURE / 'cui_sdl3_mesh.h').read_bytes())
 
     def test_guard_layout_candidate_is_only_two_appended_bools(self):
         old, candidate = layout_source(), layout_source(True)

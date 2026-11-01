@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New Slider, scroll geometry, background/text preparation and software V2 rendering work is **unreleased**. Local combined validation passed; broader acceptance and publication remain unfinished. |
+| Integration branch | New Slider, scroll geometry, background/text preparation and software V2 rendering work is **unreleased**. Focused combined-revision checks passed; the full combined build, acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -36,7 +36,7 @@ feature test does not establish complete component parity.
    platform evidence, generated files and exact-revision CI/browser checks.
 4. **Ship matching artifacts:** library/packages, website and reproducible examples.
 
-### Active work and known blockers
+### Active work and acceptance gaps
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
@@ -45,14 +45,14 @@ feature test does not establish complete component parity.
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight source passed initial focused checks, including 216 frozen-validator comparisons; its newest boundary tests remain uncompiled. SDL V2 production rendering, compatibility measurements and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Earlier full Linux run: 481 passes, two skips. The newer combined native build is running serially; its full-suite results are pending. Focused Table/TimeField checks pass. Pinned original theme fixtures and five distinct font files are restored for the full run; their current audit results, hosted/platform evidence and delivery remain open. |
+| Validation | Earlier full Linux run: 481 passes, two skips. The newer combined native build exposed two standalone-consumer build gaps. The Table header fix passed eight focused tests; the software background-source closure fix passed four. Resume the full build, then run the full suite; neither is complete. Focused Table/TimeField checks pass. Pinned original theme fixtures and five distinct font files are restored for the full run; their current audit results, hosted/platform evidence and delivery remain open. |
 
 ## Immediate priorities
 
 | Priority | Deliverable | Completion condition |
 | --- | --- | --- |
-| 1 | Finish in-flight integration | Shared CPU helpers, owned-frame lifecycle and Rust job control passed focused acceptance; implement and verify the next adapter. |
-| 2 | Close interaction and binding gaps | Resolve Table touch-drop admission, transfer reviewed Dialog fixes, and validate the remaining native Slider and minimum-compiler gates. Preserve legacy behavior. |
+| 1 | Complete combined regression | Finish the serial native build and full headless suite, including restored font/theme inputs; fix failures and record exact-revision evidence. |
+| 2 | Finish active component slices | Compile and verify Dialog composition and localized TimeField drafts, then update their gallery examples. Table touch is integrated; broader lifecycle, native Slider and minimum-compiler gates remain open. |
 | 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
 | 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
 
@@ -61,6 +61,16 @@ feature test does not establish complete component parity.
 **Maintainer/external gates:** package-registry ownership/authentication and actual
 macOS/Windows/GPU/assistive-technology acceptance need their own evidence. They do
 not block source work that can be validated headlessly on Linux.
+
+## Beta exit criteria
+
+Beta is ready only when all five outcomes below have evidence:
+
+1. **Components:** all 78 families audited; remaining behavior and reported demo regressions resolved or explicitly justified.
+2. **Usable APIs:** consistent events, responsive layout, styling, typography and supported language bindings documented and tested.
+3. **Reliable hosts:** native/window/media behavior and supported renderer/platform coverage verified, with deferred hardware checks labeled.
+4. **Easy adoption:** reproducible app examples, concise human/agent docs and installable packages.
+5. **Matching delivery:** integrated regressions pass and published library, packages and website match the validated source.
 
 ## Remaining beta scope
 

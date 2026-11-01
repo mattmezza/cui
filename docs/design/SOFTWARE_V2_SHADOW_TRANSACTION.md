@@ -56,3 +56,10 @@ Only after every resource plane succeeds clear scratch and paint original comman
 3. Interleave RECT/BORDER/IMAGE/MESH/BACKGROUND/DROP/INSET/CLIP and compare complete RGBA to an independently assembled reference in original command order. Include nested clips, clip-center boundaries, portal-like detached commands, shadow-only overhang, move/resize and repeated renders. Radius/opacity applied once must have nontrivial expected values, not only opaque rectangles.
 4. Capacity exactly at/below aggregate taps, cells, CPU and aligned metadata; two shadows individually below but jointly above cap; large-q1024-tap visible plan whose legacy query rejects; rotated over-budget support rejects before eval; clipped/transparent/empty work after domain validation. Instrument kernel calls and allocator requests to prove preflight has zero reads/allocations and no hidden plane/cache.
 5. Inject first/second allocation failure, unexpected preparation failure, late malformed resource/TEXT/clip, target/input/output aliases, busy/reentrancy and retry. Compare every target/padding sentinel byte after failure; assert balanced releases/no retained blocks. Strict source/selective/copied-header/umbrella tests and canonical SDK/amalgamation/skill freshness remain required. Full text/public software V2 and four other adapters remain follow-on scope.
+
+Implementation checkpoint: the private painter now follows this approved transaction
+and policy, with strict focused source/runtime evidence recorded in
+`../validation/software-v2-shadow-worker.json`. The structural validator no longer
+mistakes legacy full-raster allocation admission for clipped source-domain validity.
+No public adapter capability or TEXT support is introduced; full text/public software
+entry and the other four adapters remain mandatory follow-on work.

@@ -5,6 +5,7 @@
 #include "../../src/core/cui_background_prepare_internal.h"
 #include "../../src/core/cui_text_paint_internal.h"
 #include "cui_shadow.h"
+#include "cui_software_v2_shadow_internal.h"
 #include <limits.h>
 /* Private building block only: structural/resource validation is NOT completed
  * resource preparation or permission to publish/render. No V1 call site uses it. */
@@ -151,15 +152,11 @@ static inline cui_error cui_software_v2_validate(const cui_draw_list_v2 *list,
                 !cui_mesh_valid(c->mesh))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (cui_shadow_type(c->type)) {
-            cui_drop_shadow_raster shadow;
-            /* Value/domain validation and conservative uniform-source reservation.
-             * Anisotropic shadow reconstruction remains a later painter decision. */
-            float scale = fmaxf(options->scale_x, options->scale_y);
-            if (!cui_shadow_query(c->type, c->shadow, scale, options->origin_x, options->origin_y,
-                                  &shadow))
+            /* Structural plan only: exact clipped A8 bytes/taps belong to the
+             * painter transaction, not the legacy full-source raster query. */
+            cui_software_v2_shadow_descriptor shadow;
+            if (!cui_software_v2_shadow_profile(c->type, c->shadow, options, &shadow))
                 return CUI_ERROR_INVALID_ACTION;
-            if (!cui_software_v2_add(&plan.shadow_bytes, shadow.bytes, options->cpu_bytes))
-                return CUI_ERROR_CAPACITY;
             plan.needs_shadow_preparation = true;
         } else if (c->type == CUI_DRAW_TEXT) {
             if (!font_available || !isfinite(c->font_size) || c->font_size <= 0 ||

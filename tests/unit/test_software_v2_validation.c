@@ -75,6 +75,7 @@ static void commands(void) {
     assert(plan.cpu_bytes == plan.scratch_bytes + plan.background_bytes + plan.shadow_bytes);
     assert(plan.metadata_bytes == 10 * sizeof(cui_software_v2_descriptor));
     assert(plan.needs_text_preparation && plan.needs_shadow_preparation);
+    assert(plan.shadow_bytes == 0); /* structural only, not the painter A8 plan */
     /* Inactive resource/shape/geometry fields must never be dereferenced or validated. */
     c[3].payload.legacy.text.data = (const char *)(uintptr_t)1;
     c[3].payload.legacy.text.length = SIZE_MAX;
@@ -324,7 +325,24 @@ static void workspace(void) {
     assert(!cui_software_v2_workspace_take(&w, false, 1, 1));
     cui_software_v2_workspace_end(&w);
 }
+static void large_shadow_structure(void) {
+    cui_draw_command_v2 c = legacy(CUI_DRAW_DROP_SHADOW);
+    c.payload.legacy.shadow =
+        (cui_drop_shadow_paint){.caster = {0, 0, 16384, 2}, .layer = {.color = {10, 20, 30, 255}}};
+    cui_render_v2_options o = options();
+    o.scale_x = 64;
+    o.scale_y = 1.f / 65536;
+    cui_drop_shadow_raster raster;
+    assert(!cui_effect_drop_shadow_query(c.payload.legacy.shadow, 64, 0, 0, &raster));
+    cui_draw_list_v2 l = list(&c, 1);
+    cui_software_v2_plan plan;
+    assert(cui_software_v2_validate(&l, &o, false, false, &plan) == CUI_OK);
+    assert(plan.needs_shadow_preparation && !plan.shadow_bytes);
+    c.payload.legacy.shadow.layer.sigma = NAN;
+    rejects(l, o, CUI_ERROR_INVALID_ACTION);
+}
 int main(void) {
+    large_shadow_structure();
     commands();
     clips_and_headers();
     aggregate_and_alias();

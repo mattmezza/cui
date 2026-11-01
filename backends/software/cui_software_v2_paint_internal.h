@@ -4,11 +4,11 @@
 #include "cui_mesh.h"
 #include "cui_shape.h"
 #include "cui_software_v2_internal.h"
-/* Private incomplete painter: TEXT and both SHADOW kinds reject atomically.
- * Not wired to a V1 renderer, public V2 entry, or capability advertisement.
- * Inputs/target view stay stable through return, including allocator callbacks.
- * Allocators obey the workspace distinct-live-block/alignment contract.
- * Target pixels and input records/resources must be disjoint. */
+/* Private incomplete painter: TEXT rejects atomically; shadows use bounded source-profile AREA
+ * coverage. Not wired to a V1 renderer, public V2 entry, or capability advertisement. Inputs/target
+ * view stay stable through return, including allocator callbacks. Allocators obey the workspace
+ * distinct-live-block/alignment contract. Target pixels and input records/resources must be
+ * disjoint. */
 typedef struct {
     unsigned char *pixels;
     unsigned width, height;
@@ -224,6 +224,25 @@ static inline void cui_software_v2_mesh_paint(cui_software_v2_surface *s, const 
                               cui_software_v2_emit, s);
     }
 }
+static inline void cui_software_v2_shadow_paint(cui_software_v2_surface *surface,
+                                                const cui_software_v2_shadow_descriptor *d) {
+    const cui_render_v2_options *o = surface->options;
+    cui_color color =
+        d->inset ? d->profile.inset.paint.layer.color : d->profile.drop.paint.layer.color;
+    for (unsigned y = 0; y < d->height; ++y)
+        for (unsigned x = 0; x < d->width; ++x) {
+            double l = d->q * ((double)d->x + x - o->origin_x) / o->scale_x + d->phase_x;
+            double t = d->q * ((double)d->y + y - o->origin_y) / o->scale_y + d->phase_y;
+            if (l >= d->support.right || l + d->dx <= d->support.left || t >= d->support.bottom ||
+                t + d->dy <= d->support.top)
+                continue;
+            color.a = d->pixels[(size_t)y * d->width + x];
+            cui_software_v2_emit(surface, d->x + (int)x, d->y + (int)y, color);
+        }
+}
+_Static_assert(_Alignof(cui_software_v2_shadow_descriptor) <=
+                   _Alignof(cui_fundamental_alignment_internal),
+               "shadow descriptor exceeds workspace alignment");
 static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                                               const cui_draw_list_v2 *list, cui_color clear,
                                               const cui_render_v2_options *options,
@@ -252,6 +271,7 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
         return CUI_ERROR_INVALID_ACTION;
     cui_software_v2_clip stack[64], clip = cui_software_v2_clip_all();
     size_t depth = 0, background_pixels = 0, background_bytes = 0;
+    size_t shadows = 0, shadow_bytes = 0, shadow_taps = 0;
     for (size_t i = 0; i < list->count; ++i) {
         const cui_draw_command_v2 *v = &list->commands[i];
         if (v->kind == CUI_DRAW_V2_BACKGROUND) {
@@ -266,8 +286,21 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                 return CUI_ERROR_CAPACITY;
         } else {
             const cui_draw_command *c = &v->payload.legacy;
-            if (cui_shadow_type(c->type) || c->type == CUI_DRAW_TEXT)
+            if (c->type == CUI_DRAW_TEXT)
                 return CUI_ERROR_INVALID_ACTION;
+            if (cui_shadow_type(c->type)) {
+                cui_software_v2_shadow_descriptor d;
+                error = cui_software_v2_shadow_query(
+                    c->type, c->shadow, options,
+                    (cui_software_v2_shadow_clip){clip.left, clip.top, clip.right, clip.bottom},
+                    CUI_SOFTWARE_V2_SHADOW_CELLS - shadow_bytes,
+                    CUI_SOFTWARE_V2_SHADOW_TAPS - shadow_taps, &d);
+                if (error != CUI_OK)
+                    return error;
+                ++shadows;
+                shadow_bytes += d.bytes;
+                shadow_taps += d.taps;
+            }
             if (c->type == CUI_DRAW_CLIP_PUSH) {
                 stack[depth++] = clip;
                 clip = cui_software_v2_clip_push(clip, c->bounds);
@@ -288,7 +321,14 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
     size_t commands_bytes = list->count * sizeof(*list->commands);
     size_t cpu_bytes = commands_bytes,
            metadata_bytes = list->count * sizeof(cui_software_v2_paint_descriptor);
-    if (metadata_bytes > options->metadata_bytes ||
+    size_t shadow_metadata = shadows * sizeof(cui_software_v2_shadow_descriptor);
+    size_t shadow_alignment = _Alignof(cui_software_v2_shadow_descriptor);
+    size_t metadata_padding =
+        shadows ? (shadow_alignment - metadata_bytes % shadow_alignment) % shadow_alignment : 0;
+    if (!cui_software_v2_add(&metadata_bytes, metadata_padding, options->metadata_bytes) ||
+        !cui_software_v2_add(&metadata_bytes, shadow_metadata, options->metadata_bytes) ||
+        !cui_software_v2_add(&background_pixels, shadow_bytes, options->max_pixels) ||
+        !cui_software_v2_add(&cpu_bytes, shadow_bytes, options->cpu_bytes) ||
         !cui_software_v2_add(&cpu_bytes, plan.scratch_bytes, options->cpu_bytes) ||
         !cui_software_v2_add(&cpu_bytes, background_bytes, options->cpu_bytes) ||
         background_bytes > options->texture_bytes || background_bytes > options->transfer_bytes)
@@ -306,15 +346,28 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                                                      _Alignof(cui_draw_command_v2))
                     : NULL;
     cui_software_v2_paint_descriptor *descriptors =
-        list->count ? cui_software_v2_workspace_take(&workspace, true, metadata_bytes,
-                                                     _Alignof(cui_software_v2_paint_descriptor))
-                    : NULL;
+        list->count
+            ? cui_software_v2_workspace_take(&workspace, true,
+                                             list->count * sizeof(cui_software_v2_paint_descriptor),
+                                             _Alignof(cui_software_v2_paint_descriptor))
+            : NULL;
     unsigned char *scratch =
         cui_software_v2_workspace_take(&workspace, false, plan.scratch_bytes, 1);
+    cui_software_v2_shadow_descriptor *shadow_descriptors =
+        shadows
+            ? cui_software_v2_workspace_take(&workspace, true, shadow_metadata, shadow_alignment)
+            : NULL;
+    if ((list->count && (!commands || !descriptors)) || !scratch ||
+        (shadows && !shadow_descriptors)) {
+        cui_software_v2_workspace_end(&workspace);
+        target->busy = false;
+        return CUI_ERROR_CAPACITY;
+    }
     if (list->count)
         memcpy(commands, list->commands, commands_bytes);
     clip = cui_software_v2_clip_all();
     depth = 0;
+    size_t shadow_index = 0, prepared_shadow_bytes = 0, prepared_shadow_taps = 0;
     for (size_t i = 0; i < list->count && error == CUI_OK; ++i) {
         const cui_draw_command_v2 *v = &commands[i];
         descriptors[i] = (cui_software_v2_paint_descriptor){.clip = clip};
@@ -326,16 +379,42 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                 break;
             unsigned char *pixels =
                 q.bytes ? cui_software_v2_workspace_take(&workspace, false, q.bytes, 1) : NULL;
+            if (q.bytes && !pixels) {
+                error = CUI_ERROR_CAPACITY;
+                break;
+            }
             error = cui_background_prepare_raster(v->payload.background, options,
                                                   cui_software_v2_clip_cover(clip), pixels,
                                                   q.stride, q.bytes, &descriptors[i].background);
             descriptors[i].pixels = pixels;
+        } else if (cui_shadow_type((cui_draw_type)v->kind)) {
+            cui_software_v2_shadow_descriptor *d = &shadow_descriptors[shadow_index++];
+            error = cui_software_v2_shadow_query(
+                (cui_draw_type)v->kind, v->payload.legacy.shadow, options,
+                (cui_software_v2_shadow_clip){clip.left, clip.top, clip.right, clip.bottom},
+                CUI_SOFTWARE_V2_SHADOW_CELLS - prepared_shadow_bytes,
+                CUI_SOFTWARE_V2_SHADOW_TAPS - prepared_shadow_taps, d);
+            if (error != CUI_OK)
+                break;
+            d->command_index = i;
+            prepared_shadow_bytes += d->bytes;
+            prepared_shadow_taps += d->taps;
+            d->pixels =
+                d->bytes ? cui_software_v2_workspace_take(&workspace, false, d->bytes, 1) : NULL;
+            if (d->bytes && !d->pixels) {
+                error = CUI_ERROR_CAPACITY;
+                break;
+            }
+            error = cui_software_v2_shadow_raster(d, options, d->pixels, d->bytes);
         } else if (v->kind == CUI_DRAW_CLIP_PUSH) {
             stack[depth++] = clip;
             clip = cui_software_v2_clip_push(clip, v->payload.legacy.bounds);
         } else if (v->kind == CUI_DRAW_CLIP_POP)
             clip = stack[--depth];
     }
+    if (error == CUI_OK && (shadow_index != shadows || prepared_shadow_bytes != shadow_bytes ||
+                            prepared_shadow_taps != shadow_taps))
+        error = CUI_ERROR_INVALID_ACTION;
     /* No pixel mutation, including scratch clear, precedes complete preparation. */
     if (error == CUI_OK) {
         for (size_t i = 0; i < plan.scratch_bytes; i += 4) {
@@ -345,6 +424,7 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
             scratch[i + 3] = clear.a;
         }
         cui_software_v2_surface surface = {.pixels = scratch, .options = options};
+        shadow_index = 0;
         for (size_t i = 0; i < list->count; ++i) {
             const cui_draw_command_v2 *v = &commands[i];
             surface.clip = descriptors[i].clip;
@@ -366,7 +446,9 @@ static inline cui_error cui_software_v2_paint(cui_software_v2_target *target,
                                              q->physical_y + (int)y,
                                              (cui_color){p[0], p[1], p[2], p[3]});
                     }
-            } else if (v->kind == CUI_DRAW_MESH)
+            } else if (cui_shadow_type((cui_draw_type)v->kind))
+                cui_software_v2_shadow_paint(&surface, &shadow_descriptors[shadow_index++]);
+            else if (v->kind == CUI_DRAW_MESH)
                 cui_software_v2_mesh_paint(&surface, &v->payload.legacy.mesh);
             else if (v->kind == CUI_DRAW_RECT || v->kind == CUI_DRAW_BORDER ||
                      v->kind == CUI_DRAW_IMAGE)

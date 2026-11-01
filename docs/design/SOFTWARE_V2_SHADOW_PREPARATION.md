@@ -1,6 +1,8 @@
-# Next software V2 shadow decision — proposal only
+# Historical four-gather software V2 shadow proposal (rejected)
 
-The private shape/image/mesh/background painter rejects both shadow kinds before
+This historical proposal is superseded by the approved [AREA transaction](SOFTWARE_V2_SHADOW_TRANSACTION.md). Its four-gather policy was rejected; it is not the implemented coverage contract.
+
+At the time of this proposal, the private shape/image/mesh/background painter rejected both shadow kinds before
 allocation. The measured four-gather policy is NOT approved; see
 [quality report and per-axis proposal](SOFTWARE_V2_SHADOW_QUALITY.md). Full software/all-five support still requires them. This checkpoint
 needs review before shadow implementation; no approximation is silently enabled.

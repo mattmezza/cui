@@ -3,8 +3,9 @@
 `backends/software/cui_software_v2_paint_internal.h` is an incomplete maintainer
 building block. It has **no public support query/render entry or V1 call site**.
 It paints RECT, BORDER, IMAGE, MESH, explicit clips and owned BACKGROUND commands
-in array order at independent physical scales/origins. TEXT, DROP_SHADOW and
-INSET_SHADOW reject before allocation/publication. This does not complete the
+in array order at independent physical scales/origins. DROP/INSET shadows use
+bounded target-pixel AREA reconstruction of the unchanged source profile; TEXT
+still rejects before allocation/publication. This does not complete the
 software checkpoint, any of the other four adapters, bindings or all78 parts.
 
 The private `cui_software_v2_paint(target,list,clear,options,allocate,release,user)`
@@ -23,16 +24,16 @@ Whole-list active-field/clip/resource validation precedes allocation. A second
 bounded pass computes exact double logical clip intersections and outward float
 covers for shared background queries. The cover is culling only; each emitted
 physical center is checked against the exact original logical intersection.
-Copied command values, tightly packed scratch and prepared backgrounds charge
+Copied command values, tightly packed scratch, background RGBA and shadow A8 planes charge
 CPU<=32MiB; aligned typed descriptors charge metadata<=1MiB. Aggregate prepared
-background pixels<=8M, per background<=4M, and packed background bytes also fit
+background plus shadow rectangle pixels<=8M (shadows additionally<=1M), per background<=4M, and packed background bytes also fit
 texture/transfer ceilings. Command copies do not own bitmap/mesh data. Exact
 per-call heap allocations are two distinct blocks (one for an empty list), with
 no retained capacity/cache or hidden V1 shadow allocation. Fixed bounded control
 stack (64 clips plus validator stack and scalar locals) is separate from these
 heap-allocation quotas; there is no total-stack/process/time guarantee.
 
-All background resources are prepared before clearing scratch. Shapes/images
+All background and shadow resources are prepared before clearing scratch. Shapes/images
 map each physical center back to logical coordinates, retaining original absolute
 binary64 near/far edges. Border far insets evaluate `(x+w)-right_edge` and
 `(y+h)-bottom_edge`; they never subtract a small inset from a huge float width.
@@ -54,6 +55,28 @@ resampling or additional radius/opacity multiplication. The shared binary
 same inverse center. This occupancy test distinguishes an uncovered corner from
 a covered alpha0 fill: uncovered pixels keep even hidden clear RGB; covered
 alpha0 onto alpha0 follows V1 canonical RGB0. Ancestor clip is applied once.
+
+Shadows use q=max(1,sx,sy) with reduced float source phases, the reviewed copied
+source geometry/kernel, and exact rectangular target-footprint overlap with
+byte-quantized source cells. The full footprint area remains the denominator
+when support clips source work. Layer alpha is rounded once after averaging
+source bytes; Core has already applied ancestor opacity. Hard ancestor clips
+use inverse pixel-center membership and do not shrink that footprint. Existing
+source radii/SDF/Gaussian/empty-hole rules are preserved, not fitted to an
+unsnapped reference or claimed CSS-exact. Output blends straight original RGB
+and prepared A8 once; outside-support cells skip, while inside alpha0 follows
+the existing canonicalizing blend. Source order remains unchanged.
+
+The entire transaction admits at most1,048,576 shadow rectangle cells and
+1,048,576 source-cell evaluations, with no q reduction/fallback/cache. All plans
+are checked before kernel calls/allocations/pixel writes. CPU request is command
+copies + scratch RGBA + background RGBA + shadow A8. Metadata is existing
+per-command descriptors + checked alignment padding + copied shadow descriptors.
+Both exact requests fit the caller limits. Empty/transparent shadows are validated
+before skipping. The structural validator's shadow_bytes=0 is explicitly not a
+completed resource plan; the painter adds exact clipped A8/tap accounting. V1
+raster-query allocation limits are not used to admit valid clipped large-q work.
+See [the transaction contract](design/SOFTWARE_V2_SHADOW_TRANSACTION.md).
 
 After complete preparation/painting, active scratch rows publish by memcpy once.
 Validation, budget or allocation failure leaves published bytes unchanged,
@@ -100,3 +123,27 @@ The preserved old-negative executable SHA256 is
 `4fc87c0ba822e7d841295a7ca1dc51eea1c7cbfdeadc7a6e6387c60b0ef4dc5b`.
 Precision followup installed-skill tests passed18/18 in38.344s; final source format
 and canonical SDK/amalgamation/skill freshness checks passed.
+
+Private shadow checkpoint receipt: actual helper compilation links the integrator's
+current Effects-profile archive SHA256
+`0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97`.
+Strict O3 and private-display checks passed3/3 in0.53s after correcting the mixed
+fixture to retain IMAGE alongside all other ordinary commands. The corrected
+14-command fixture checks48 complete RGBA frames, plus8 large positive/negative
+source positions and3 exact/nextafter clip boundaries. An independent slow
+source-cell overlap oracle uses reviewed geometry and public pure Effects
+samples, without production plane/planning code. The actual private painter also
+matches4,608 frozen original-software unit pixels with layer alpha1/127/173,
+nonzero clear alpha, sigma0/positive and square/asymmetric corners. The separate
+512-pixel legacy profile gate remains exact. No expected fixture was recaptured.
+
+Tests assert both allocation requests exactly for every interleaved background/A8
+frame. A two-shadow example requests1,699 CPU bytes and720 metadata bytes for163
+A8 cells/source evaluations. Exact/below tap, cell, joint prepared-pixel, CPU and
+metadata limits; first/second allocation failures; first/late private preparation
+failure; empty/transparent/invalid shadows; large-q visible work; reentrancy and
+retry all preserve the target/padding as specified. The preparation failure hook
+exists only as a private test instrumentation macro, with no public API/callback
+or default runtime behavior. See `docs/validation/software-v2-shadow-worker.json`
+for hashes/provenance. Public software support and full transformed text remain
+pending, as do all four other adapters.

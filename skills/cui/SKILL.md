@@ -19,7 +19,8 @@ read `docs/CORE_DRAW_V2.md` and `include/cui/cui_draw_v2.h`; no adapter currentl
 consumes that list. Private `docs/BACKGROUND_PREPARATION.md` describes an allocation-free maintainer
 building block and private software validation/workspace/partial painting slices,
 not a public renderer. `docs/SOFTWARE_V2_PAINTING.md` states the supported private
-kinds; text and both shadow kinds still reject before allocation/publication.
+kinds: bounded AREA DROP/INSET shadow preparation/painting is private only; text
+still rejects before allocation/publication.
 Validation success does not mean adapter font/shadow resources are prepared.
 `docs/TEXT_PREPARATION.md` describes private counted recording only; opaque new
 font/dependency temporaries are outside the transaction CPU byte envelope. All five adapters and bindings remain pending. Existing Plot/effects/text gradient contracts remain distinct.

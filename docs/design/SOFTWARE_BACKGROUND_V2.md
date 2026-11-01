@@ -5,8 +5,8 @@ Based on approved `BACKGROUND_V2_RECORDS.md` through `638fc225`, Core V2
 production. All five adapters remain required; this specifies software only.
 Slice(a) supplies private structural validation/planning and counted arenas.
 A private [partial painter](../SOFTWARE_V2_PAINTING.md) now stages shapes, images,
-meshes and backgrounds; it rejects TEXT and both SHADOW kinds. A counted source-
-glyph recorder exists separately, but no full text/shadow painter or public
+meshes, backgrounds and bounded AREA DROP/INSET shadows; it rejects TEXT. A counted source-
+glyph recorder exists separately, but no full text painter or public
 render/support entry exists. All-five completion remains pending.
 
 ## Exact additive entry points

@@ -96,8 +96,8 @@ aggregate known workspace reservations before any target access. Its counted
 transaction arena is optional and has no V1 call site. A successful private
 validation plan is NOT a prepared/renderable frame: explicit adapter text/shadow resource
 preparation remains pending. A [private partial painter](SOFTWARE_V2_PAINTING.md)
-now stages shape/image/mesh/background transforms, but rejects text and both
-shadow kinds; every public adapter support query/render entry remains pending. See [software checkpoint](design/SOFTWARE_BACKGROUND_V2.md).
+now stages shape/image/mesh/background transforms and bounded AREA DROP/INSET
+shadows, but still rejects text; every public adapter support query/render entry remains pending. See [software checkpoint](design/SOFTWARE_BACKGROUND_V2.md).
 
 A private [counted text recorder](TEXT_PREPARATION.md) supplies source-grid glyph
 coverage and explicit CUI ownership, but is not integrated into an adapter. Opaque

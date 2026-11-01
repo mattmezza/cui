@@ -1,0 +1,44 @@
+{
+  "scope": "Private transactional V2 DROP/INSET AREA painting; TEXT and all public adapter entries remain unsupported/pending. V1 unchanged.",
+  "source_base": "61a42009447df1d26c5a4acd9b2bc0592531494e",
+  "compiler": "cc (GCC) 16.2.1 20260810",
+  "flags": "-std=c11 -O3 -DNDEBUG -UNDEBUG -Wall -Wextra -Wpedantic -Werror -Iinclude -Ibackends/software; actual integrated archive -lm; CPU0 nice19",
+  "archive_sha256": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+  "archive_provenance": "Integrator supplied actual Effects-profile archive, independently validated in docs/validation/shadow-profile-integration.json; no worker archive rebuild/mutation.",
+  "source_sha256": {
+    "backends/software/cui_software_v2_shadow_internal.h": "15740c42e5af62516b7b01e821ca36ce6bc2cd43790743b2223a62f0ae5f716b",
+    "backends/software/cui_software_v2_paint_internal.h": "71ef41a5b76e5159250c48988dc034f1f465c82fec6bd7eec74e013ae01cee4a",
+    "backends/software/cui_software_v2_internal.h": "dc4f4f54063202d057f098535078fff6fa9586b035bf9569a4923d0e0aafc878",
+    "tests/unit/test_software_v2_shadows.c": "ed717eca3d0787da6990cb027d8cff65264b43d2e867eb61993a75634e983056",
+    "tests/unit/test_software_v2_paint.c": "19e13c114f1b1e95ee3c418cdb7223bc07afb4c3c0681348d851e9541303bbfc",
+    "tests/unit/test_software_v2_validation.c": "375fb6da3e0d2e4bbea055fe41945f3aa4225c5d23988a88be0b7afc270cb8c2",
+    "tests/unit/software_v2_original_reference.c": "16d62894939180c63f3372d9fec8c8588b3c3f18982475b82d3e8cd28919369e",
+    "tests/fixtures/text_prepare_v1/source/backends/software/cui_software.c": "f2975fc0873a6c100f47aea8c2e5da05b39f00ac850ed77cc938a33ec34b74cb",
+    "tests/unit/background_sampler_v1_reference.c": "1bbf6e9a2d689e7c0ba06a1af7b8214ba66bdf7f32f6ba8dbb0a97e4cbaa3530"
+  },
+  "initial": "strict45619+84087 and validation+legacy72012, private41649 3/3 PASS0.52s. Final review found middle shadow had replaced IMAGE in mixed fixture (ordinary IMAGE baseline still tested).",
+  "corrected": "strict81234; private23819 3/3 PASS0.53s.14commands preserve all11ordinary commands/order with3interleaved/detached shadows;48fullRGBA frames +8largepositions +3clipboundaries.",
+  "compatibility": "4608actual-private-painter RGBA pixels versus immutable original V1 software route at unit integer phase, nonzero clear alpha, layer alpha1/127/173, sigma0/positive, square/asymmetric radii; separate original512boxgate passed.",
+  "bounds": "1M aggregate source taps and shadow rectangle cells, joint background/shadow max_pixels, exact2block budgets; first/second allocation and first/late preparation failure injected, balanced release/targetatomicity/retry; busy reentrancy and padded targets.",
+  "exact_example": {
+    "cpu_bytes": 1699,
+    "metadata_bytes": 720,
+    "shadow_cells": 163,
+    "source_taps": 163
+  },
+  "formula": "CPU=N*sizeof(command)+4*viewportpixels+B_RGBA+A8; metadata=N*sizeof(paintdescriptor)+checked alignment padding+S*sizeof(shadowdescriptor). Asserted across every mixed frame.",
+  "remaining": [
+    "Full transactional transformed text painting",
+    "Public initialized software V2 support/render entry",
+    "Four other adapters and bindings",
+    "Integrator actual current-library CMake acceptance"
+  ],
+  "logs_sha256": {
+    "software-v2-shadows-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "software-v2-shadow-corrected-tests.log": "d8386839085be4e249ce3fb5451b9b1f220e5a252b12afbb05e2306a3fc8071e",
+    "software-v2-shadow-validation-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "software-v2-shadow-legacy-build.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "software-v2-shadow-skill.log": "af823fa79dac7a773b151c04aace4c9141e6e1b3e94f972a88bfd8ba42b168a0"
+  },
+  "skill": "18/18 PASS38.920s; source guidance now says private AREA shadows/TEXT rejection, public adapters pending"
+}

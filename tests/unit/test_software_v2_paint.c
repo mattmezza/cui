@@ -215,6 +215,53 @@ static void mesh_reference(unsigned char *pixel, const cui_mesh_paint *m,
         over(pixel, c);
     }
 }
+/* Independent slow cell-overlap oracle: shared reviewed source geometry,
+ * public Effects samples, no production query/raster/clip/planning code. */
+static bool shadow_reference(cui_draw_type kind, cui_drop_shadow_paint p,
+                             const cui_render_v2_options *o, unsigned x, unsigned y,
+                             cui_color *out) {
+    float q = fmaxf(1, fmaxf(o->scale_x, o->scale_y));
+    double phase_x = (double)q * o->origin_x / o->scale_x;
+    double phase_y = (double)q * o->origin_y / o->scale_y;
+    float ox = (float)(phase_x - floor(phase_x)), oy = (float)(phase_y - floor(phase_y));
+    cui_shadow_profile_support_internal support;
+    if (kind == CUI_DRAW_DROP_SHADOW) {
+        cui_shadow_drop_profile_internal profile;
+        assert(cui_shadow_drop_prepare_internal(p, q, ox, oy, &profile));
+        assert(cui_shadow_drop_support_internal(&profile, &support));
+    } else {
+        cui_shadow_inset_profile_internal profile;
+        assert(cui_shadow_inset_prepare_internal(p, q, ox, oy, &profile));
+        assert(cui_shadow_inset_support_internal(&profile, &support));
+    }
+    double dx = q / (double)o->scale_x, dy = q / (double)o->scale_y;
+    double l = q * ((double)x - o->origin_x) / o->scale_x + ox;
+    double t = q * ((double)y - o->origin_y) / o->scale_y + oy;
+    bool touched = false;
+    double total = 0;
+    int64_t x0 = (int64_t)fmax(support.left, floor(l)),
+            x1 = (int64_t)fmin(support.right, ceil(l + dx));
+    int64_t y0 = (int64_t)fmax(support.top, floor(t)),
+            y1 = (int64_t)fmin(support.bottom, ceil(t + dy));
+    for (int64_t v = y0; v < y1; ++v)
+        for (int64_t u = x0; u < x1; ++u) {
+            double wx = fmin(l + dx, u + 1.) - fmax(l, (double)u);
+            double wy = fmin(t + dy, v + 1.) - fmax(t, (double)v);
+            if (wx <= 0 || wy <= 0)
+                continue;
+            touched = true;
+            float a = -1;
+            assert(kind == CUI_DRAW_DROP_SHADOW
+                       ? cui_effect_drop_shadow_sample(p, q, ox, oy, (float)(u + .5),
+                                                       (float)(v + .5), &a)
+                       : cui_effect_inset_shadow_sample(p, q, ox, oy, (float)(u + .5),
+                                                        (float)(v + .5), &a));
+            total += lroundf(255 * a) * wx * wy;
+        }
+    *out = p.layer.color;
+    out->a = (unsigned char)lroundf((float)(total / (dx * dy)) * (p.layer.color.a / 255.f));
+    return touched && p.layer.color.a;
+}
 static void reference(const cui_draw_list_v2 *l, const cui_render_v2_options *o, cui_color clear,
                       unsigned char *pixels) {
     for (unsigned py = 0; py < HEIGHT; ++py)
@@ -254,6 +301,12 @@ static void reference(const cui_draw_list_v2 *l, const cui_render_v2_options *o,
                     continue;
                 }
                 const cui_draw_command *c = &v->payload.legacy;
+                if (cui_shadow_type(c->type)) {
+                    cui_color color;
+                    if (shadow_reference(c->type, c->shadow, o, px, py, &color))
+                        over(p, color);
+                    continue;
+                }
                 if (c->type == CUI_DRAW_MESH) {
                     mesh_reference(p, &c->mesh, o, px + .5, py + .5);
                     continue;
@@ -500,12 +553,12 @@ static void failures(void) {
             c[10] = legacy(CUI_DRAW_TEXT, (cui_rect){0}, (cui_color){0});
         else if (k == 3) {
             c[10] = legacy(CUI_DRAW_DROP_SHADOW, (cui_rect){0}, (cui_color){0});
-            c[10].payload.legacy.shadow =
-                (cui_drop_shadow_paint){.caster = {1, 1, 2, 2}, .layer = {.color = {0, 0, 0, 100}}};
+            c[10].payload.legacy.shadow = (cui_drop_shadow_paint){
+                .caster = {1, 1, 2, 2}, .layer = {.sigma = NAN, .color = {0, 0, 0, 100}}};
         } else {
             c[10] = legacy(CUI_DRAW_INSET_SHADOW, (cui_rect){0}, (cui_color){0});
-            c[10].payload.legacy.shadow =
-                (cui_drop_shadow_paint){.caster = {1, 1, 2, 2}, .layer = {.color = {0, 0, 0, 100}}};
+            c[10].payload.legacy.shadow = (cui_drop_shadow_paint){
+                .caster = {1, 1, 2, 2}, .layer = {.sigma = NAN, .color = {0, 0, 0, 100}}};
         }
         a = (allocator){0};
         assert(paint(&t, &l, &o, (cui_color){0}, &a) == CUI_ERROR_INVALID_ACTION && !a.calls);

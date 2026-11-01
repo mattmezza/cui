@@ -1,29 +1,41 @@
-# Next candidate: v0.1.0-alpha.4 (unpublished)
+# Published prerelease: v0.1.0-alpha.4
 
-Version metadata is prepared as `0.1.0-alpha.4` (Python `0.1.0a4`); CMake's base
-remains `0.1.0`. No alpha.4 tag, registry release, GitHub release or website
-publication is implied. The last published release below remains alpha.3.
+[**v0.1.0-alpha.4 is published**](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.4)
+from frozen source `17533b899dd8fd179e6135dac753dd40204ddef4` on 2026-11-01. Matching Pages output,
+API/header maps and the native starter archive were independently verified.
 
-Local candidate evidence: the strict 1,214-step rebuild passes; 606/607 native
-checks pass, and the sole generated-summary failure is repaired with six affected
-checks passing. All 18 skill methods pass. See
-[the exact local receipt](validation/alpha4-local-validation.json). This is not a
-claim of a single607/607 run or hosted/installed-release acceptance.
+Download the versioned **native starter** from the release assets, or use the
+website starter download. It includes CUI source, fonts, Makefile and editable
+native dashboard/mail examples. Read [the starter guide](NATIVE_APP_STARTER.md).
 
-The candidate batches typed Slider and localized TimeField language authoring,
+The release batches typed Slider and localized TimeField authoring, six-slot C
 Dialog composition, configured C Badge artwork, software/SDL_Renderer V2,
-Skeleton palettes/responsive roots and owned bridge Icon utilities. See
-[the changelog](../CHANGELOG.md) for supported subsets and remaining omissions.
+Skeleton palettes/responsive roots and owned C bridge Icon utilities. Read the
+[changelog](../CHANGELOG.md) for supported subsets and binding omissions.
 
-Before publication, freeze the reconciled clean `main` commit, rerun exact-source
-hosted CI/native-binding/Pages browser gates, build matching release assets and
-validate installed consumers. Prepare/download/verify the draft assets before
-publishing. Keep both old repository and nested Go tags immutable. Registry
-ownership and actual physical-platform acceptance remain separate gates.
+Exact-source [CI](https://github.com/mattmezza/cui/actions/runs/41305957916),
+[native bindings](https://github.com/mattmezza/cui/actions/runs/41305957837) and
+[Pages/browser gates](https://github.com/mattmezza/cui/actions/runs/41305957995)
+pass. Installed C, native Python/Node/TypeScript, Go/Rust source consumers,
+actual-font text and the downloadable starter pass. Draft assets were downloaded
+and verified byte-for-byte before publication. Read [the release receipt](validation/alpha4-release.json)
+and uploaded ASSET_MANIFEST.json and SHA256SUMS for provenance and limits.
 
-Use `python scripts/test_release_metadata.py --tag v0.1.0-alpha.4` for this
-candidate. The alpha.3 records and examples below describe the immutable previous
-release; substitute alpha.4 only when executing the next release checklist.
+The earlier local native run was 606/607; its generated-summary mismatch was
+repaired with 6/6 affected checks. Final compiler and test-harness repairs passed
+their affected checks and the complete hosted matrix. All 19 current skill tests
+pass. Do not describe the earlier local run as a single607/607 pass.
+
+Python metadata is `0.1.0a4`; npm/Cargo/public C are `0.1.0-alpha.4`, with CMake
+base `0.1.0`. The nested Go tag `bindings/go/v0.1.0-alpha.4` points to the same
+source. All 637 public Go proxy module files match the installed-consumer-tested
+archive. PyPI/npm/crates.io publication remains separate. Linux binaries are
+host-tagged, not manylinux certified; physical GPU/OS/accessibility acceptance and
+full component parity remain unfinished. All 78 baseline families are retained.
+
+Previous release records below are historical. For future releases, freeze a new
+reviewed revision and substitute its version throughout. Keep both published
+alpha.4 tags and their asset bytes immutable.
 
 # Published prerelease: v0.1.0-alpha.3
 

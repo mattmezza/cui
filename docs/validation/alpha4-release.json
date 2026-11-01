@@ -1,0 +1,124 @@
+{
+  "release": {
+    "isDraft": false,
+    "isPrerelease": true,
+    "publishedAt": "2026-11-01T12:40:49Z",
+    "url": "https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.4"
+  },
+  "source_revision": "17533b899dd8fd179e6135dac753dd40204ddef4",
+  "hosted_gates": {
+    "ci": {
+      "conclusion": "success",
+      "headSha": "17533b899dd8fd179e6135dac753dd40204ddef4",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/41305957916"
+    },
+    "native_bindings": {
+      "conclusion": "success",
+      "headSha": "17533b899dd8fd179e6135dac753dd40204ddef4",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/41305957837"
+    },
+    "pages": {
+      "conclusion": "success",
+      "headSha": "17533b899dd8fd179e6135dac753dd40204ddef4",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/41305957995"
+    }
+  },
+  "local_validation": {
+    "installed_checks": "5/5 PASS: actual native starter, C, Python/Node/TypeScript, Go/Rust, real-font text",
+    "vendor_notices": "PASS",
+    "consumer_skill": "19/19 PASS, including forced legacy pipe encoding",
+    "native_candidate": "Full prior native606/607; docs-only summary repair6/6; final compiler repairs5affected plus shadow-equivalence1/1 pass. Exact frozen hosted matrix separately passes."
+  },
+  "native_starter": {
+    "file": "cui-0.1.0-alpha.4-native-starter.tar.gz",
+    "bytes": 2078797,
+    "sha256": "87a8cc673174d87bcf9610c2f85b05743f511e0b80426e63003dd5481f0b6239",
+    "packaging_source_revision": "17533b899dd8fd179e6135dac753dd40204ddef4"
+  },
+  "draft_asset_verification": {
+    "source_revision": "17533b899dd8fd179e6135dac753dd40204ddef4",
+    "downloaded_files_verified": 11,
+    "sha256": {
+      "cui-0.1.0-alpha.4-go-source-proxy.tar.gz": "e0212369b4838dd8791e3ce9e29bf6cf7e262b6ec319e6a8a0e45b428758c0ff",
+      "cui_bridge-0.1.0a4-py3-none-linux_x86_64.whl": "969b4c9b354b33e8a72d6b1f4ab2b632b0734ffafaffcb7da129a92f7c1f92fa",
+      "SHA256SUMS": "056e797f7118e77a1e1b21aeaa46c81d4beb826da3e76c70300bb005be54731c",
+      "cui-0.1.0-alpha.4-source.tar.gz": "18ebd48bd5607669aaccf96ba74434b7480c4d3c60583efa9df8f806cd603b6d",
+      "cui-native-0.1.0-alpha.4.tgz": "bb95c30f52953902c89e777e08ecd23fbefc84bb046580ab97ac75a928da43bc",
+      "source-artifact-inspection.json": "2a8d31effa1d122e7be1f7b629847b0f159b197d716bb36bb30792533754f526",
+      "cui-0.1.0-alpha.4-native-starter.tar.gz": "87a8cc673174d87bcf9610c2f85b05743f511e0b80426e63003dd5481f0b6239",
+      "ASSET_MANIFEST.json": "2bc0a9548444585b3432c4fecda4a9240efc331f3a307006ff6eca012b58d8f5",
+      "cui-builders-0.1.0-alpha.4.crate": "f55141c6ffd072b74cadf9adc740b554796a267e69bcc7cbc7a6b2cac0e51dd2",
+      "cui-0.1.0-alpha.4-linux-x86_64-static.tar.gz": "e38a7a4ac14b3a75aa4643d16a40701113d05f58d625a5798ac4fde81f872bd8",
+      "RELEASE_NOTES.md": "082c55220d80e32eba9831d9532024ca121f5be18bd48a0683cd51b0645535a6"
+    },
+    "checksum_entries_verified": 10,
+    "manifest_payloads_verified": 9,
+    "signed_tags_verified": {
+      "v0.1.0-alpha.4": true,
+      "bindings/go/v0.1.0-alpha.4": true
+    },
+    "result": "PASS: all draft assets downloaded and byte-for-byte identical to validated local staging"
+  },
+  "registries": "GitHub assets and Go module tag; no PyPI/npm/crates.io publication.",
+  "limitations": [
+    "Not full component or platform parity.",
+    "Physical GPU/device and assistive-technology checks remain deferred where unsupported.",
+    "No PyPI/npm/crates.io registry publication.",
+    "Native binary packages are Linux x86_64 host-tagged, not manylinux certified.",
+    "Source SDK generation provenance is historical; actual archived maps and headers are independently compared to the frozen checkout."
+  ],
+  "public_go_proxy": {
+    "result": "PASS",
+    "public_proxy_info": {
+      "Version": "v0.1.0-alpha.4",
+      "Time": "2026-11-01T12:19:30Z",
+      "Origin": {
+        "VCS": "git",
+        "URL": "https://github.com/mattmezza/cui",
+        "Subdir": "bindings/go",
+        "Hash": "17533b899dd8fd179e6135dac753dd40204ddef4",
+        "Ref": "refs/tags/bindings/go/v0.1.0-alpha.4"
+      }
+    },
+    "module_files_verified": 637,
+    "verification": "Every public module ZIP file matches the installed-consumer-tested local proxy archive; no local replace."
+  },
+  "optional_macos_speech_fixture": {
+    "run": 41307500241,
+    "conclusion": "success",
+    "scope": "Exact root tag; injected host fixtures, not physical microphone/permission/recognizer acceptance."
+  },
+  "redundant_tag_runs": {
+    "reason": "Exact same source already passed main CI/native bindings; avoid duplicate tag builds. One root-tag optional macOS Speech fixture run retained.",
+    "runs": [
+      {
+        "run": 41307500294,
+        "returncode": 0,
+        "message": "\u2713 Request to cancel workflow 41307500294 submitted."
+      },
+      {
+        "run": 41307500269,
+        "returncode": 0,
+        "message": "\u2713 Request to cancel workflow 41307500269 submitted."
+      },
+      {
+        "run": 41307500246,
+        "returncode": 0,
+        "message": "\u2713 Request to cancel workflow 41307500246 submitted."
+      },
+      {
+        "run": 41307500408,
+        "returncode": 0,
+        "message": "\u2713 Request to cancel workflow 41307500408 submitted."
+      },
+      {
+        "run": 41307500428,
+        "returncode": 0,
+        "message": "\u2713 Request to cancel workflow 41307500428 submitted."
+      }
+    ]
+  }
+}

@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased — 0.1.0-alpha.4 candidate
+## 0.1.0-alpha.4 — 2026-11-01
 
-Prepared source candidate; **not published or deployed**. Keep alpha.3 artifacts
-immutable. Exact-revision release/package/platform gates are tracked in
+Published GitHub prerelease with matching website and native starter assets. Alpha.3
+artifacts remain immutable. Evidence and remaining platform/registry gates are tracked in
 [the release checklist](docs/RELEASING.md) and [beta roadmap](BETA_VERSION_ROADMAP.md).
 
 - Adds controlled typed Slider APIs and authoring support in Python, JS/TS, Go
@@ -36,7 +36,7 @@ immutable. Exact-revision release/package/platform gates are tracked in
   bounds compiler concurrency. Rebuild/hosted-CI speedups remain unmeasured.
 - Adds a maintained beta roadmap and updated API, human and agent guidance.
 
-All 78 baseline families remain present. This candidate does not establish full
+All 78 baseline families remain present. This release does not establish full
 component parity, physical GPU/OS/assistive-technology acceptance or publication
 to PyPI/npm/crates.io. Use matching headers/libraries and consult binding omissions.
 

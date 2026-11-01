@@ -1,5 +1,7 @@
 # Build your first native CUI app
 
+Download the [versioned alpha.4 starter kit](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.4/cui-0.1.0-alpha.4-native-starter.tar.gz) from GitHub Releases. It includes the source, bundled fonts and examples described below.
+
 For the smallest standalone build, use the **native source bundle**.
 [Download the archive](https://matteo.merola.co/cui/downloads/cui-native.tar.gz)
 and its [SHA-256 checksum](https://matteo.merola.co/cui/downloads/cui-native.tar.gz.sha256). Given a C11

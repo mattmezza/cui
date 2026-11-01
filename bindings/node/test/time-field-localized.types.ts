@@ -13,3 +13,9 @@ app.mount(column().children(node));app.step_only();node.latest_result();app.poll
 localized_time_config({editGeneration:1});
 // @ts-expect-error unsupported locale guessing
 localized_time_config({cycle:'automatic'});
+
+// Only editor validation and non-EMPTY completed frame statuses are observable.
+declare const observedChange: import("../../typescript/index").LocalizedTimeChange;
+const validation:0|3|4|5=observedChange.validation;
+const frameStatus:0|2|3|4|5|6|7|8|9|10=observedChange.frameStatus;
+void validation;void frameStatus;

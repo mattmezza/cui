@@ -93,5 +93,26 @@
     "No all78 source parity promotion",
     "Only Linux private-Xvfb Node/TS worker acceptance; root CMake integration and SDK/skill generation still pending",
     "No Node dependency installation or full engine/browser/native desktop run"
-  ]
+  ],
+  "observation_decoder_followup": {
+    "reason": "Root review: validation range admitted impossible editor diagnoses, EMPTY frame status and incoherent result queue count. Only new unreleased JS facade changed.",
+    "authority": "C enum and integrated Go/Rust observation/result decoders; seven explicit result statuses retained, editor validation limited to0/3/4/5, frame EMPTY excluded, nonzero node identity, queue<=changed.",
+    "red": {
+      "session": 60339,
+      "exit": 8,
+      "log": "node-time-observation-red.log",
+      "failure": "Expected exception absent for validation1 against original decoder"
+    },
+    "green": {
+      "session": 5752,
+      "exit": 0,
+      "tests": "3/3",
+      "seconds": 2.62,
+      "log": "/home/matteo/.cache/cui-current-validation/node-time-observation-green.log",
+      "log_sha256": "22061b3bb4136806455a6dc6db4744432b52fd8d436b7b67937254ac85ed04e0",
+      "command": "taskset -c 1 nice -n 19 python scripts/test_local.py --build-dir build-shadow/node-time-field -j1 -R '^(time_protocol|time_actual|ts_time-field-localized)$'"
+    },
+    "coverage": "Malformed validation1/2/6 in both records, change EMPTY and zero slot, result invalid status7/zero slot/incoherent queue; no local model mutation on rejected change. Valid unchanged results across all7 statuses and4 editor diagnoses, changed/queue0, all4 diagnoses across all10 nonEMPTY frame statuses; real English/Arabic/failure/lifetimes and strict TS types/runtime retained.",
+    "no_rebuild": "Existing verified addon/libraries reused; no C/engine or generated resource edits."
+  }
 }

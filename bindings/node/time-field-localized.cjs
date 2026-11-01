@@ -59,13 +59,13 @@ module.exports = function localizedTimeModule(native, Node, NODE, keyFor) {
   function observation(app,raw,result=false){
     const b=wire(raw,result?80:64);
     if(b.readUInt32LE(12)||(result&&b.readUInt32LE(8)))throw new TypeError('nonzero TimeField reserved');
-    const handle=freeze({slot:uint(b.readUInt32LE(16)),generation:uint(b.readUInt32LE(20))});if(!handle.generation)throw new TypeError('invalid TimeField generation');
+    const handle=freeze({slot:uint(b.readUInt32LE(16)),generation:uint(b.readUInt32LE(20))});if(!handle.slot||!handle.generation)throw new TypeError('invalid TimeField generation');
     const frame=big(b.readBigUInt64LE(24));const at=result?48:32;
     const readTime=p=>time([b.readUInt32LE(p),b.readUInt32LE(p+4),b.readUInt32LE(p+8)]);
-    const previous=readTime(at),value=readTime(at+12),frameStatus=uint(b.readUInt32LE(result?76:8),10);
+    const previous=readTime(at),value=readTime(at+12),frameStatus=choice(b.readUInt32LE(result?76:8),[0,2,3,4,5,6,7,8,9,10]);
     if(result&&frameStatus!==0)throw new TypeError('failed frame is not a current TimeField result');
-    const record={handle,frame,node:app.nodes.get(keyFor(handle)),previous,value,validation:uint(b.readUInt32LE(result?36:56),6),rejectedCount:uint(b.readUInt32LE(result?44:60)),frameStatus};
-    if(result){record.status=uint(b.readUInt32LE(32),6);record.changed=!!uint(b.readUInt32LE(40),1);record.queuedChangeCount=uint(b.readUInt32LE(72),1);if(record.changed!==(seconds(previous)!==seconds(value)))throw new TypeError('incoherent TimeField result');}
+    const record={handle,frame,node:app.nodes.get(keyFor(handle)),previous,value,validation:choice(b.readUInt32LE(result?36:56),[0,3,4,5]),rejectedCount:uint(b.readUInt32LE(result?44:60)),frameStatus};
+    if(result){record.status=choice(b.readUInt32LE(32),[0,1,2,3,4,5,6]);record.changed=!!uint(b.readUInt32LE(40),1);record.queuedChangeCount=uint(b.readUInt32LE(72),1);if(record.queuedChangeCount>Number(record.changed)||record.changed!==(seconds(previous)!==seconds(value)))throw new TypeError('incoherent TimeField result');}
     else if(seconds(previous)===seconds(value))throw new TypeError('net-zero TimeField change');
     return freeze(record);
   }

@@ -367,8 +367,8 @@ export interface LocalizedTimeChange {
   readonly handle: Readonly<{slot: number; generation: number}>;
   readonly frame: bigint; readonly node: LocalizedTimeField | undefined;
   readonly previous: LocalizedTime; readonly value: LocalizedTime;
-  readonly validation: 0 | 1 | 2 | 3 | 4 | 5 | 6;
-  readonly rejectedCount: number; readonly frameStatus: number;
+  readonly validation: 0 | 3 | 4 | 5;
+  readonly rejectedCount: number; readonly frameStatus: 0 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 }
 export interface LocalizedTimeResult extends LocalizedTimeChange {
   readonly status: 0 | 1 | 2 | 3 | 4 | 5 | 6;

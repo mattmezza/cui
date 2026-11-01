@@ -42,7 +42,10 @@ can be discarded or mutated after return without changing future C state.
 
 `on_localized_change()` receives immutable **already applied** previous/value,
 node slot/generation, BigInt frame, validation, rejection count and actual bridge
-frameStatus. Returning a value does nothing; do not accept/reapply it. Typed
+frameStatus. Editor validation is exactly 0/3/4/5; EMPTY is never a completed
+frame status. Latest results use the seven explicit C status values and require
+queued-change count no greater than the changed flag; unchanged results are valid.
+Returning a value does nothing; do not accept/reapply it. Typed
 records use their own FIFO and do not duplicate generic time CHANGE events.
 `step()` dispatches after successful submission; `step_only()` leaves dispatch to
 the caller. After a failed step, explicitly poll/dispatch localized changes too:

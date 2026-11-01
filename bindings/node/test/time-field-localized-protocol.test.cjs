@@ -28,6 +28,30 @@ for(const mutate of [b=>b.writeUInt32LE(1,12),b=>b.writeUInt32LE(24,44),b=>b.wri
 function result(){const b=Buffer.alloc(80);b.writeUInt32LE(80);b.writeUInt32LE(1,4);b.writeUInt32LE(7,16);b.writeUInt32LE(9,20);b.writeBigUInt64LE(0xffffffffffffffffn,24);b.writeUInt32LE(1,40);b.writeUInt32LE(9,48);b.writeUInt32LE(10,60);b.writeUInt32LE(1,72);return b;}
 resultWire=result();const resultCopy=node.latest_result();resultWire.fill(0);assert.equal(resultCopy.changed,true);assert.deepEqual(resultCopy.value,[10,0,0]);
 for(const mutate of [b=>b.writeUInt32LE(1,8),b=>b.writeUInt32LE(10,76),b=>b.writeUInt32LE(2,40),b=>b.writeUInt32LE(2,72),b=>b.writeUInt32LE(8,16),b=>b.writeUInt32LE(0,40)]){resultWire=result();mutate(resultWire);assert.throws(()=>node.latest_result());}
+// Exact observation vocabulary and coherence, independent of the C parser.
+for(const validation of [1,2,6]){
+ changeWire=change();changeWire.writeUInt32LE(validation,56);
+ const before=[...node.timeValue];assert.throws(()=>api.poll(app));assert.deepEqual(node.timeValue,before);
+ resultWire=result();resultWire.writeUInt32LE(validation,36);assert.throws(()=>node.latest_result());
+}
+for(const mutate of [b=>b.writeUInt32LE(1,8),b=>b.writeUInt32LE(0,16)]){
+ changeWire=change();mutate(changeWire);const before=[...node.timeValue];assert.throws(()=>api.poll(app));assert.deepEqual(node.timeValue,before);
+}
+resultWire=result();resultWire.writeUInt32LE(0,16);assert.throws(()=>node.latest_result());
+resultWire=result();resultWire.writeUInt32LE(7,32);assert.throws(()=>node.latest_result());
+// Valid unchanged observations are results, not applied changes. A queue count
+// cannot claim an applied change when changed=false; changed=true may queue0.
+function unchanged(){const b=result();b.writeUInt32LE(0,40);b.writeUInt32LE(9,60);b.writeUInt32LE(0,72);return b;}
+for(const status of [0,1,2,3,4,5,6])for(const validation of [0,3,4,5]){
+ resultWire=unchanged();resultWire.writeUInt32LE(status,32);resultWire.writeUInt32LE(validation,36);
+ const valid=node.latest_result();assert.equal(valid.status,status);assert.equal(valid.validation,validation);assert.equal(valid.changed,false);assert.equal(valid.queuedChangeCount,0);assert.deepEqual(valid.previous,valid.value);
+}
+resultWire=unchanged();resultWire.writeUInt32LE(1,72);assert.throws(()=>node.latest_result());
+resultWire=result();resultWire.writeUInt32LE(0,72);assert.equal(node.latest_result().changed,true);assert.equal(node.latest_result().queuedChangeCount,0);
+for(const validation of [0,3,4,5])for(const frameStatus of [0,2,3,4,5,6,7,8,9,10]){
+ changeWire=change();changeWire.writeUInt32LE(validation,56);changeWire.writeUInt32LE(frameStatus,8);
+ const valid=api.poll(app);assert.equal(valid.validation,validation);assert.equal(valid.frameStatus,frameStatus);
+}
 let calls=0;node.on_localized_change(e=>{calls++;assert.equal(e.frameStatus,10);assert.throws(()=>api.dispatch(app),/nested/);throw Error('callback failed');});
 changeWire=change();assert.throws(()=>api.dispatch(app),/callback failed/);assert.equal(calls,1);assert.equal(app.localizedTimeDispatching,false);assert.equal(api.dispatch(app),0);assert.equal(calls,1);
 node.on_localized_change(()=>{app.closed=true;});changeWire=change();assert.equal(api.dispatch(app),1);assert.equal(api.dispatch(app),0);app.closed=false;

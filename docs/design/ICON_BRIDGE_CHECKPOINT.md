@@ -129,8 +129,9 @@ ordinary children and nested configured Badges, preserving each child's rules.
 
 ## Validation, bounded owners and error semantics
 
-All app operations serialize on owner thread, reject during step/render/provider
-or teardown, and validate handle generation within the supplied app before state access.
+New resource APIs serialize on owner thread and reject during step/render/provider
+or teardown; existing void app destruction retains its serialized-caller precondition.
+The resource APIs validate handle generation within the supplied app before state access.
 The proposed8-byte handle is app-scoped: native C callers must retain the matching
 app; equal slot/generation pairs from different apps are indistinguishable in C.
 Foreign opaque resource wrappers retain their owner app and reject cross-app use

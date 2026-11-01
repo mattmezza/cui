@@ -344,6 +344,7 @@ static cui_bridge_status bridge_copy(const char *s, char **out) {
 }
 static cui_bridge_status bridge_slider_thread_check(cui_bridge_app *app);
 static cui_bridge_status bridge_time_thread_check(cui_bridge_app *app);
+static cui_bridge_status bridge_icon_thread_check(cui_bridge_app *app);
 static cui_bridge_status bridge_ready(cui_bridge_app *app) {
     if (!app)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -352,7 +353,9 @@ static cui_bridge_status bridge_ready(cui_bridge_app *app) {
     if (app->stepping)
         return CUI_BRIDGE_INVALID_STATE;
     cui_bridge_status status = bridge_slider_thread_check(app);
-    return status != CUI_BRIDGE_OK ? status : bridge_time_thread_check(app);
+    if (status == CUI_BRIDGE_OK)
+        status = bridge_time_thread_check(app);
+    return status != CUI_BRIDGE_OK ? status : bridge_icon_thread_check(app);
 }
 static cui_bridge_node_record *bridge_node(cui_bridge_app *app, cui_bridge_node handle) {
     if (!handle.slot || handle.slot > app->max_nodes)
@@ -684,8 +687,11 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
         app->frame_error = CUI_BRIDGE_CORE_ERROR;
 }
 
+// clang-format off: same-TU owner helper is defined by Slider first.
 #include "cui_bridge_slider_internal.h"
 #include "cui_bridge_time_internal.h"
+#include "cui_bridge_icon_internal.h"
+// clang-format on
 
 uint32_t cui_bridge_abi_version(void) {
     return CUI_BRIDGE_ABI_VERSION;
@@ -1361,6 +1367,8 @@ cui_bridge_status cui_bridge_settings_field_bounds(cui_bridge_app *app, cui_brid
 void cui_bridge_destroy(cui_bridge_app *app) {
     if (!app)
         return;
+    if (app->icons && app->icons->busy)
+        return; /* No destruction inside a resource operation; caller retries. */
     if (app->running) {
         app->destroy_requested = true;
         app->closed = true;
@@ -1382,6 +1390,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->nodes);
     free(app->slider);
     free(app->time_fields);
+    bridge_icon_app_destroy(app);
     free(app);
 }
 cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
@@ -4740,8 +4749,8 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         if (app->time_fields && app->time_fields->nodes[slot])
             bridge_time_render(app, slot);
         else if (cui_time_field(app->ui, node->id, &app->theme, cui_string(node->text),
-                           &node->time_state, &node->time,
-                           (cui_time_options){.seconds = true, .disabled = node->disabled}))
+                                &node->time_state, &node->time,
+                                (cui_time_options){.seconds = true, .disabled = node->disabled}))
             bridge_change(app, slot);
     } else if (node->kind == CUI_BRIDGE_COLOR_PICKER) {
         if (cui_color_picker(app->ui, node->id, &app->theme, &node->color_state, &node->color,

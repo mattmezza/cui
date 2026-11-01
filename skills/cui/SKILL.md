@@ -488,3 +488,8 @@ Focused worker native/software/WASM proof and root strict/distribution checks
 pass (17 headless checks and 18 skill tests). Own-root responsive presentation
 is test-only, and all five language
 builders still expose the legacy route. Do not invent a public responsive API.
+
+For owned bridge Icon resources, read `docs/BRIDGE_ICON_RESOURCES.md` and the
+complete bridge header. The additive resource group has focused worker/root proof (15 headless checks); it copies source/map/bitmap data and requires matching app/owner
+thread and exact versioned records. It does not yet provide configured Icon/Badge
+presentation or foreign resource facades. Preserve legacy named Icon builders.

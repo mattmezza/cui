@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-01",
+  "scope": "Resource-only owned bridge Icon group; no configured node consumer or foreign facade",
+  "source_base": "5c334966",
+  "strict_build": "26/26 PASS, C11/C++11 -Wall -Wextra -Wpedantic -Werror; CPU1 nice19 -j1",
+  "runtime": "15/15 private-Xvfb CTest PASS 9.40s",
+  "skill": "18/18 PASS 42.307s; canonical SDK/amalgamation/skill freshness PASS",
+  "checks": [
+    "new resources and actual malloc-wrap OOM",
+    "public records C/C++ ABI and compile-only legacy app offsets",
+    "frozen old-header client linked current DSO",
+    "actual serialized foreign OSthread rejection",
+    "exact frozen command/text/image/nontext-pixel/event trace and constructor allocation comparison",
+    "existing bridge core/components/typedSlider/frozenSlider/Python/small-stack regressions",
+    "component usage documentation"
+  ],
+  "source_sha256": {
+    "CMakeLists.txt": "5becda5f09ea97dedc91bad73b482e771a8615a34131df9cc8a59f4a5914cdf6",
+    "tests/test_bridge_icon_legacy.py": "d1e1a757c689864a0c0fbba5466d577639e00595e47daff166f941915e7cbf28",
+    "tests/distribution/icon_bridge_resource_abi.cpp": "758505a01fc53810d0b9f8309f6cf059a55008754472e136e28ceedd72f96eb5",
+    "src/bridge/cui_bridge.c": "9a8dca09c262f483448ac8094a11fb931e5bf5650073f9bfaf54fd99d0004263",
+    "src/bridge/cui_bridge_icon_internal.h": "5ec03219854225df6afc64718fc19acb749c4b7c66ac04bc30f5a57d645e4211",
+    "include/cui/cui_bridge.h": "bca8a62f8aa550c6a95cda4bddf3d255722a7c630b6858a4ebcc5d6e03b2a902"
+  },
+  "logs": {
+    "/home/matteo/.cache/cui-current-validation/icon-resource-root-build.log": "f215bac6ef4956e30aaaa56c820a1c210dab875d23aaf36895d75f23da336c14",
+    "/home/matteo/.cache/cui-current-validation/icon-resource-root-tests.log": "3b7fcdc7416e599f2f9d94b7a71f3927776d15327d37c038669c43f67e385a34",
+    "/home/matteo/.cache/cui-current-validation/icon-resource-root-LastTest.log": "51c6528dd713c61c314961aa418062280061182034000cd37af227fe73369229"
+  },
+  "limitations": [
+    "No full current 599-test run in this slice.",
+    "Worker WASM layout evidence is compile-only; no new WASM runtime acceptance.",
+    "Configured Icon/Badge presentation and all language resource facades are pending.",
+    "Legacy text bytes are compared; NULL-font text rasterization is excluded."
+  ]
+}

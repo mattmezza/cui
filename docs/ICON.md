@@ -232,3 +232,10 @@ flex/grid/percentage constraints, automatic ambient text inheritance, full resvg
 features or a native raster-density key. DPR browser checks establish portable
 bitmap presentation, not density-aware native Icon rasterization. These remaining
 gaps preclude a full-family parity claim.
+
+## Owned bridge resources
+
+The unreleased C bridge has an additive app-owned resource group with copied
+SVG/maps/bitmap utilities and explicit size/version negotiation. See
+[the resource contract](BRIDGE_ICON_RESOURCES.md) before use. Root strict integration and 15 targeted headless checks pass. It does not yet add configured Icon/Badge rendering or
+Python, JS/TS, Go or Rust resource facades; existing named Icon builders remain.

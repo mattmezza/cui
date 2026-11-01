@@ -570,10 +570,10 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_get_config_v1(
     cui_bridge_app *, cui_bridge_node, cui_bridge_time_field_config_v1 *);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_get_result_v1(
     cui_bridge_app *, cui_bridge_node, cui_bridge_time_field_result_v1 *);
-CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_clear_validation_v1(
-    cui_bridge_app *, cui_bridge_node);
-CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_poll_change_v1(
-    cui_bridge_app *, cui_bridge_time_field_change_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_clear_validation_v1(cui_bridge_app *,
+                                                                           cui_bridge_node);
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_time_field_poll_change_v1(cui_bridge_app *, cui_bridge_time_field_change_v1 *);
 
 typedef enum {
     CUI_BRIDGE_BUTTON_PRIMARY = 0,
@@ -989,6 +989,114 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_dropdown_part_bounds(cui_bridge_app 
 CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t part,
                                                                 cui_bridge_rect *out_bounds);
+/* Unreleased optional owned Icon resources; native-endian fixed-width records.
+ * Handles are scoped to the matching app; C callers must retain that app.
+ * Foreign wrappers must additionally retain/check owner identity. No raw state,
+ * callbacks or bitmap pointers cross this interface. Zero limits select C defaults.
+ * Serialized owner thread only, outside step/render; default/shared WASM and
+ * CUI_BRIDGE_SLIDER_NO_TLS are unsupported. Same explicit unshared opt-in as Slider.
+ * Copy CAPACITY changes only required sizes; other errors leave outputs unchanged.
+ * Input/output ranges must be valid, stable and mutually disjoint, including the
+ * app/resource graph. Output records require exact size/version initialized; other prior bytes are
+ * ignored and success writes canonical zero reserved fields. INPUT reserved
+ * words reject.
+ * Destroy rejects referenced resources; no references exist until later consumers.
+ * Arbitrary C loaders, configured Badge and configured Icon presentation are NOT
+ * advertised by this resource-only group. Existing kind11/50 behavior is unchanged. */
+typedef struct {
+    uint32_t slot, generation;
+} cui_bridge_icon_handle_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, reserved[2];
+    uint64_t max_svg_bytes, max_pixels, max_cache_bytes, max_versions;
+} cui_bridge_icon_limits_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, icon_error, reference_count;
+    uint64_t parse_count, raster_count, cache_bytes, cache_versions, source_revision;
+    uint32_t source_kind, flags;
+    cui_bridge_icon_handle_v1 handle;
+    uint64_t reserved;
+} cui_bridge_icon_info_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, format, reserved;
+    uint32_t width, height, stride, reserved2;
+    uint64_t required_bytes, revision;
+    float paint_x, paint_y, paint_width, paint_height;
+} cui_bridge_icon_bitmap_v1;
+enum {
+    CUI_BRIDGE_ICON_EMPTY_V1 = 0,
+    CUI_BRIDGE_ICON_NAME_V1 = 1,
+    CUI_BRIDGE_ICON_PATH_V1 = 2,
+    CUI_BRIDGE_ICON_DATA_V1 = 3
+};
+enum {
+    CUI_BRIDGE_ICON_LIMITS_RECORD_V1 = 3,
+    CUI_BRIDGE_ICON_INFO_RECORD_V1 = 4,
+    CUI_BRIDGE_ICON_BITMAP_RECORD_V1 = 5
+};
+/* bit0: complete resource/utilities group only. Record kinds3/4/5 are limits,
+ * info, bitmap. Other/future kinds return0; no Badge capability or declarations. */
+CUI_BRIDGE_API uint32_t cui_bridge_icon_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_icon_record_size_v1(uint32_t record_kind);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_default_limits_v1(cui_bridge_icon_limits_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_create_v1(cui_bridge_app *,
+                                                           const cui_bridge_icon_limits_v1 *,
+                                                           cui_bridge_icon_handle_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_destroy_v1(cui_bridge_app *,
+                                                            cui_bridge_icon_handle_v1);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_get_info_v1(cui_bridge_app *,
+                                                             cui_bridge_icon_handle_v1,
+                                                             cui_bridge_icon_info_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_get_limits_v1(cui_bridge_app *,
+                                                               cui_bridge_icon_handle_v1,
+                                                               cui_bridge_icon_limits_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_set_limits_v1(cui_bridge_app *,
+                                                               cui_bridge_icon_handle_v1,
+                                                               const cui_bridge_icon_limits_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_set_source_v1(cui_bridge_app *,
+                                                               cui_bridge_icon_handle_v1,
+                                                               uint32_t kind, const char *,
+                                                               uint32_t byte_length);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_get_source_v1(cui_bridge_app *,
+                                                               cui_bridge_icon_handle_v1,
+                                                               uint32_t *kind, char *,
+                                                               uint32_t capacity,
+                                                               uint32_t *required);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_reload_v1(cui_bridge_app *,
+                                                           cui_bridge_icon_handle_v1);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_collect_v1(cui_bridge_app *,
+                                                            cui_bridge_icon_handle_v1);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_asset_put_v1(cui_bridge_app *,
+                                                              cui_bridge_icon_handle_v1,
+                                                              const char *path, uint32_t path_bytes,
+                                                              const char *svg, uint32_t svg_bytes);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_asset_remove_v1(cui_bridge_app *,
+                                                                 cui_bridge_icon_handle_v1,
+                                                                 const char *path,
+                                                                 uint32_t path_bytes);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_asset_clear_v1(cui_bridge_app *,
+                                                                cui_bridge_icon_handle_v1);
+CUI_BRIDGE_API uint32_t cui_bridge_icon_catalog_count_v1(void);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_catalog_entry_v1(
+    uint32_t index, uint32_t *is_default, char *name, uint32_t name_capacity,
+    uint32_t *name_required, char *path, uint32_t path_capacity, uint32_t *path_required);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_query_v1(const char *, uint32_t,
+                                                          uint32_t *availability);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_asset_copy_v1(const char *, uint32_t, char *,
+                                                               uint32_t capacity,
+                                                               uint32_t *required);
+/* Operational prepare errors return bridge OK plus exact cui_icon_error0..5.
+ * Returned bitmap is an owned copy of packed straight RGBA8 rows, never a view. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_prepare_v1(cui_bridge_app *,
+                                                            cui_bridge_icon_handle_v1, float width,
+                                                            float height, const float transform[6],
+                                                            uint32_t *icon_error);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_bitmap_copy_v1(cui_bridge_app *,
+                                                                cui_bridge_icon_handle_v1,
+                                                                cui_bridge_icon_bitmap_v1 *,
+                                                                unsigned char *, uint32_t capacity,
+                                                                uint32_t *required);
+
 CUI_BRIDGE_API cui_bridge_status cui_bridge_request_close(cui_bridge_app *app);
 
 #ifdef __cplusplus

@@ -4,8 +4,10 @@ This focused C slice provides reusable app-owned Icon state and copied resource
 utilities. Worker strict native builds and eight private-display runtime checks
 passed; native/WASM compile-only layouts preserve all 30 old app offsets and
 measure an 8-byte app increase on both targets. See the
-[worker receipt](validation/bridge-icon-resources-worker.json). Root integration,
-CMake registration, metadata and generated acceptance remain pending. Configured
+[worker receipt](validation/bridge-icon-resources-worker.json). Root strict integration build and 15 targeted headless checks pass, including
+frozen legacy trace/allocations, old-header consumers and actual owner-thread
+refusal. All 18 consumer-skill tests and canonical generated checks pass; see
+[the root receipt](validation/bridge-icon-resources-root.json). Configured
 Badge/standalone configured Icon/Spinner presentation and their five language facades remain pending. Legacy kind 11 text
 Badge and kind 50 named Icon keep their render paths. All 78 families remain.
 
@@ -86,5 +88,5 @@ record fixtures assert all offsets. Root owns CMake registration and canonical
 metadata/generation. Worker legacy checks preserve the frozen all-command/
 nontext-pixel trace,
 old-header behavior and four constructor allocation calls (only app bytes+8).
-Text bytes are compared, not text raster pixels. No root acceptance or complete
-configured Badge claim follows from this focused resource result.
+Text bytes are compared, not text raster pixels. No complete configured Badge or published-package claim follows from this
+focused resource result.

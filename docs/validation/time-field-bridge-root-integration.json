@@ -16,7 +16,13 @@
     "time-field-bridge-root-build.log": "9512c44a37f6548d5e21d4aafe5dbf746a7e9579e14ef31994333329b3e0dc02",
     "time-field-bridge-root-tests.log": "3e07003d8e4998593c3aeb5922dd55c9880d65d1f756cf37d97cf255d417a210",
     "time-field-bridge-root-examples-build.log": "a0d6707a8d57c37292bc2c0eebdf67a3c46d71c9eb10c94e0845875a6edf91d6",
-    "time-field-bridge-root-examples-tests.log": "0477f498c3a4be87e7fb6bde906a19edad0c46026085ca73d6fbf4ef990035a9"
+    "time-field-bridge-root-examples-tests.log": "0477f498c3a4be87e7fb6bde906a19edad0c46026085ca73d6fbf4ef990035a9",
+    "time-field-bridge-canonical.log": "9dd0a98349b1b1650f7efa497dbb9117e419427609c6727dde2bc72fd3d0ecc7"
   },
-  "limitations": "Focused integrated C evidence only; all five localized foreign facades, native interactive input, IME, one-root Tab, other platforms, generated-consumer/full-suite and publication remain open. Worker WASM evidence is compile-only."
+  "limitations": "Focused integrated C evidence only; all five localized foreign facades, native interactive input, IME, one-root Tab, other platforms, generated-consumer/full-suite and publication remain open. Worker WASM evidence is compile-only.",
+  "canonical_generation": "SDK, amalgamation and consumer skill PASS in canonical order",
+  "consumer_skill_tests": {
+    "passed": 18,
+    "seconds": 40.829
+  }
 }

@@ -343,6 +343,7 @@ static cui_bridge_status bridge_copy(const char *s, char **out) {
     return CUI_BRIDGE_OK;
 }
 static cui_bridge_status bridge_slider_thread_check(cui_bridge_app *app);
+static cui_bridge_status bridge_time_thread_check(cui_bridge_app *app);
 static cui_bridge_status bridge_ready(cui_bridge_app *app) {
     if (!app)
         return CUI_BRIDGE_INVALID_ARGUMENT;
@@ -350,7 +351,8 @@ static cui_bridge_status bridge_ready(cui_bridge_app *app) {
         return CUI_BRIDGE_CLOSED;
     if (app->stepping)
         return CUI_BRIDGE_INVALID_STATE;
-    return bridge_slider_thread_check(app);
+    cui_bridge_status status = bridge_slider_thread_check(app);
+    return status != CUI_BRIDGE_OK ? status : bridge_time_thread_check(app);
 }
 static cui_bridge_node_record *bridge_node(cui_bridge_app *app, cui_bridge_node handle) {
     if (!handle.slot || handle.slot > app->max_nodes)
@@ -683,6 +685,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 }
 
 #include "cui_bridge_slider_internal.h"
+#include "cui_bridge_time_internal.h"
 
 uint32_t cui_bridge_abi_version(void) {
     return CUI_BRIDGE_ABI_VERSION;
@@ -807,6 +810,7 @@ failed:
 }
 static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_slider_remove(node->owner, node->own_slot);
+    bridge_time_remove(node->owner, node->own_slot);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -1377,6 +1381,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->notifications);
     free(app->nodes);
     free(app->slider);
+    free(app->time_fields);
     free(app);
 }
 cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
@@ -4732,7 +4737,9 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     } else if (node->kind == CUI_BRIDGE_TREE) {
         bridge_render_tree(app, slot, node);
     } else if (node->kind == CUI_BRIDGE_TIME_FIELD) {
-        if (cui_time_field(app->ui, node->id, &app->theme, cui_string(node->text),
+        if (app->time_fields && app->time_fields->nodes[slot])
+            bridge_time_render(app, slot);
+        else if (cui_time_field(app->ui, node->id, &app->theme, cui_string(node->text),
                            &node->time_state, &node->time,
                            (cui_time_options){.seconds = true, .disabled = node->disabled}))
             bridge_change(app, slot);
@@ -5158,6 +5165,9 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         return CUI_BRIDGE_INVALID_ARGUMENT;
     if (!app->root)
         return CUI_BRIDGE_INVALID_STATE;
+    status = bridge_time_preflight(app);
+    if (status != CUI_BRIDGE_OK)
+        return status;
     app->now_seconds += dt;
     app->stepping = true;
     app->frame_error = CUI_BRIDGE_OK;
@@ -5170,6 +5180,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         status = CUI_BRIDGE_CORE_ERROR;
         goto done;
     }
+    app->last_core_frame = cui_frame_sequence(app->ui);
     bridge_slider_begin(app);
     for (uint32_t i = 1; i <= app->max_nodes; i++)
         if (app->nodes[i].live && app->nodes[i].speech)
@@ -5190,6 +5201,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         status = app->frame_error;
 done:
     bridge_slider_finish(app, status);
+    bridge_time_finish(app, status);
     app->stepping = false;
     if (status == CUI_BRIDGE_CLOSED)
         app->closed = true;

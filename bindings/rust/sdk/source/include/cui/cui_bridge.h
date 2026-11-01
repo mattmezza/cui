@@ -484,6 +484,97 @@ typedef struct {
 typedef struct {
     int32_t year, month, day;
 } cui_bridge_date;
+/* Additive localized kind55 route. Owned fixed-width V1 records; no borrowed
+ * pointers. All reserved/trailing bytes are zero. Version1 requires exact sizes.
+ * Legacy unconfigured TimeField rendering/setters/events remain unchanged. */
+#define CUI_BRIDGE_TIME_FIELD_VERSION_V1 UINT32_C(1)
+#define CUI_BRIDGE_TIME_TOKEN_BYTES_V1 16u
+#define CUI_BRIDGE_TIME_NAME_BYTES_V1 64u
+#define CUI_BRIDGE_TIME_TEXT_BYTES_V1 160u
+enum {
+    CUI_BRIDGE_TIME_FIELD_DISABLED_V1 = 1u,
+    CUI_BRIDGE_TIME_FIELD_READONLY_V1 = 2u,
+    CUI_BRIDGE_TIME_FIELD_OWNER_INVALID_V1 = 4u
+};
+enum { CUI_BRIDGE_TIME_H23_V1 = 0, CUI_BRIDGE_TIME_H12_V1 = 1 };
+enum { CUI_BRIDGE_TIME_MINUTE_V1 = 0, CUI_BRIDGE_TIME_SECOND_V1 = 1 };
+enum { CUI_BRIDGE_TIME_HAS_MINIMUM_V1 = 1u, CUI_BRIDGE_TIME_HAS_MAXIMUM_V1 = 2u };
+enum {
+    CUI_BRIDGE_TIME_OK_V1 = 0,
+    CUI_BRIDGE_TIME_INVALID_ARGUMENT_V1 = 1,
+    CUI_BRIDGE_TIME_INVALID_CONFIG_V1 = 2,
+    CUI_BRIDGE_TIME_INVALID_SYNTAX_V1 = 3,
+    CUI_BRIDGE_TIME_INVALID_VALUE_V1 = 4,
+    CUI_BRIDGE_TIME_OUT_OF_RANGE_V1 = 5,
+    CUI_BRIDGE_TIME_BUFFER_TOO_SMALL_V1 = 6
+};
+typedef struct {
+    uint32_t length;
+    uint8_t bytes[CUI_BRIDGE_TIME_TOKEN_BYTES_V1];
+} cui_bridge_time_token_v1;
+typedef struct {
+    uint32_t length;
+    uint8_t bytes[CUI_BRIDGE_TIME_NAME_BYTES_V1];
+} cui_bridge_time_name_v1;
+typedef struct {
+    uint32_t struct_size, version, flags, cycle, precision, bounds_flags, reserved[2];
+    cui_bridge_time minimum, maximum;
+    uint64_t edit_generation;
+    /* digits0..9, separator, period_separator, am, pm; explicit even if inactive. */
+    cui_bridge_time_token_v1 tokens[14];
+    /* Hour, Minute, Second, Period; empty selects the C default name. */
+    cui_bridge_time_name_v1 names[4];
+} cui_bridge_time_field_config_v1;
+typedef struct {
+    uint32_t struct_size, version, reserved[2];
+    cui_bridge_node node;
+    uint64_t frame_sequence;
+    uint32_t status, validation, changed, rejected_count;
+    cui_bridge_time previous, value;
+    uint32_t queued_change_count, frame_status;
+} cui_bridge_time_field_result_v1;
+typedef struct {
+    uint32_t struct_size, version, frame_status, reserved;
+    cui_bridge_node node;
+    uint64_t frame_sequence;
+    cui_bridge_time previous, value;
+    uint32_t validation, rejected_count;
+} cui_bridge_time_field_change_v1;
+/* Native owner OS thread stays alive through destroy; serialize all calls.
+ * Successful enable opts this app into the existing private owner check, without
+ * enabling Slider. Destroy is unchecked/void: no concurrent/wrong-thread destroy.
+ * Default/shared WASM and NO_TLS builds are unsupported. Explicit unshared WASM
+ * reuses CUI_BRIDGE_SLIDER_WASM_UNSHARED and requires final-module verification.
+ * Capacity1..4096 (0=>4096), immutable after enable. All configured live nodes
+ * reserve one possible observation before time/poll/begin/input changes; drain
+ * the independent FIFO to make room. No change is a controlled proposal.
+ * Tokens are strict UTF8/no NUL/prefix-free1..16 bytes; names0..64. No locale
+ * lookup/case folding. Same-day inclusive bounds; minute seconds must be zero.
+ * Output records must be initialized with exact struct_size/version; other
+ * input output-record fields are ignored. Failure leaves output unchanged.
+ * Poll copies/consumes only on OK. Removal prunes unread records. Applied changes
+ * survive later frame failure with actual frame_status, not proof of painting.
+ * Result getters reject failed/omitted/unready frames; clear-error is no recovery.
+ * No foreign callback inside step; drain after step/render, including errors.
+ * Old set_time keeps its range checks on configured nodes; owner domain errors
+ * render invalid, never clamp. Clear-validation changes only transient validation.
+ * Config/strings copy synchronously. No public draft/state borrowing is exposed. */
+CUI_BRIDGE_API uint32_t cui_bridge_time_field_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_time_field_config_size_v1(void);
+CUI_BRIDGE_API uint32_t cui_bridge_time_field_result_size_v1(void);
+CUI_BRIDGE_API uint32_t cui_bridge_time_field_change_size_v1(void);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_enable_v1(cui_bridge_app *, uint32_t);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_time_field_config_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_get_config_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_time_field_config_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_get_result_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_time_field_result_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_clear_validation_v1(
+    cui_bridge_app *, cui_bridge_node);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_time_field_poll_change_v1(
+    cui_bridge_app *, cui_bridge_time_field_change_v1 *);
+
 typedef enum {
     CUI_BRIDGE_BUTTON_PRIMARY = 0,
     CUI_BRIDGE_BUTTON_SECONDARY,

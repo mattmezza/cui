@@ -1158,7 +1158,7 @@
     "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
   },
   "localized_time_field_v1_source_checkpoint": {
-    "implementation": "Focused C worker compilation/headless/legacy/thread/static/ABI and compile-only WASM checks passed; canonical/full integration/package gates pending. Unreleased; native interactive and all foreign localized APIs remain untested/unimplemented.",
+    "implementation": "Integrated C bridge: strict root build, ten focused headless/ABI/ownership/source checks and three shared/static-example/frozen-legacy checks pass. Worker WASM evidence is compile-only. Canonical/full integration/package gates pending; unreleased. Native interactive and all five localized foreign facades remain unverified/unimplemented.",
     "public_header": "include/cui/cui_bridge.h",
     "node_kind": 55,
     "languages": {

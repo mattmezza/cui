@@ -37,5 +37,14 @@
     "coverage": "Full headless Chromium real-WASM gate, including configured Badge status and child activation; existing component interactions, 390px bounds and /cui/ hosting.",
     "wasm_sha256": "bbf9b9beba18cfd8a79a092ae7099ad8dad45a919e1f867f7b1fc65e56c34bb4",
     "log_sha256": "90ecc0d72f9d498922f3e2527e8fcfe6b8064b9f6730a5c4313cdc6ea6f435a3"
+  },
+  "touch": {
+    "result": "PASS",
+    "cases_passed": 42,
+    "stories_rendered": 78,
+    "transport": "Chromium CDP Input.dispatchTouchEvent",
+    "report_sha256": "961475139ec5694199f573bc53de3375004e1507f6660eef472d4d04953d47e4",
+    "log_sha256": "254c6949ecfc888a6126e7d00f2de3475708e58bf485e280edcbb34ab5931f75",
+    "limitation": "Representative touch coverage; text/IME and physical device behavior are not asserted."
   }
 }

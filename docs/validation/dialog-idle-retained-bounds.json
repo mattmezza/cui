@@ -86,6 +86,13 @@
     "full_gate_log": "dialog-idle-browser.log",
     "focused_time_log": "time-field-idle-revision-browser.log",
     "coverage": "Real headless Chromium; all78 catalog stories,80compiledusageexcerpts,first-frame shortDialog/AlertDialog,longBodywheel+fixedFooter,idlequiescence,TimeFieldkeyboard/H12/Arabic/readonly/bounds,otherexistingfull-suite interactions and/cui/hosting",
-    "pending": "Touch audit currently running; broader native,platform,release/deployment gates remain open."
+    "pending": "Whole native-suite refresh, platform acceptance and release/deployment.",
+    "touch": {
+      "result": "PASS 42/42 cases, all78stories rendered",
+      "log": "dialog-idle-touch.log",
+      "report": "dialog-idle-touch-report.json",
+      "transport": "Actual Chromium CDP touch contacts",
+      "included": "Nested modal blocks parent scrolling and preserves drag-versus-tap"
+    }
   }
 }

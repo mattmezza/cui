@@ -40,18 +40,18 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Six-slot C composition, intrinsic first-open sizing, long-body scrolling with a fixed Footer and idle quiescence now pass focused native checks and the full headless browser gate (`1f40cc5a` artifact). Table touch-drop is integrated. Nested-touch rerun is in progress; held-input reopening, broader cancellation, foreign facades and deployment remain open. |
+| Dialog and scrolling | Six-slot C composition, intrinsic first-open sizing, long-body scrolling with a fixed Footer and idle quiescence now pass focused native checks and the full headless browser gate (`1f40cc5a` artifact). Table touch-drop is integrated. All42 representative touch cases, including nested modal scrolling, pass; held-input reopening, broader cancellation, foreign facades and deployment remain open. |
 | TimeField | Localized C widget, Base/Styled example and pure text helpers are integrated. Source/distribution, C++/WASM, focused native and real Chromium keyboard/H12/Arabic/read-only/bounds checks pass; the full catalog browser gate also passes. One-root Tab, IME, localized foreign bindings and broader platform acceptance remain open. Binding proposal: `docs/design/TIME_FIELD_BINDING_CHECKPOINT.md`. |
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight source passed initial focused checks, including 216 frozen-validator comparisons; private extraction is integrated as `16827ec9`. Its exact-limit boundary fixtures and frozen-validator comparison now pass three combined headless checks (0.16 seconds); broader rendering regressions remain open. Compile-only native/WASM guard measurements now preserve all 37 existing offsets and alignment; native object cost is +8 bytes, WASM +0. SDL V2 production rendering, runtime compatibility and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Linux baseline `21acfca8`: **541/541 headless tests pass, zero skips** (291.67s), predating Dialog/TimeField. Later slices pass focused native/skill checks. Full headless browser gate passes on artifact `1f40cc5a`, including all78 stories and80compiledusageexcerpts. Touch rerun, whole-suite native refresh, platform acceptance and publication remain open. |
+| Validation | Linux baseline `21acfca8`: **541/541 headless tests pass, zero skips** (291.67s), predating Dialog/TimeField. Later slices pass focused native/skill checks. Full headless browser gate passes on artifact `1f40cc5a`, including all78 stories and80compiledusageexcerpts. All42 representative touch cases pass. Whole-suite native refresh, platform acceptance and publication remain open. |
 
 ## Immediate priorities
 
 | Priority | Deliverable | Completion condition |
 | --- | --- | --- |
-| 1 | Validate the integrated revision | Full catalog browser gate passes; finish touch acceptance and refresh the whole native suite after Dialog/TimeField changes. The 541-test baseline predates both changes. |
+| 1 | Validate the integrated revision | Full catalog browser gate passes; refresh the whole native suite after Dialog/TimeField changes. The 541-test baseline predates both changes. |
 | 2 | Finish active component and renderer slices | Implement and verify SDL V2 over the accepted private preflight; close broader lifecycle, native Slider and minimum-compiler gates. |
 | 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
 | 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
@@ -155,7 +155,7 @@ Current integration evidence (not yet on `main`):
 | Slice | Evidence | Still required |
 | --- | --- | --- |
 | Combined Linux baseline | `21acfca8`: 541/541 headless tests, zero skips | Repeat on the final integrated revision; this run predates Dialog and localized TimeField. |
-| Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `1f40cc5a` pass | Nested-touch rerun, broader lifecycle and deployment. |
+| Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `1f40cc5a` pass | Broader lifecycle and deployment; nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and focused plus full browser gates pass | Broader touch/IME, localized bindings and platform coverage. |
 
 Integration-only receipts must travel with their source changes; worker evidence

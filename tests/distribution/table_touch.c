@@ -11,7 +11,7 @@
 #include "cui_scroll.h"
 #define CUI_TABLE_IMPLEMENTATION
 #include "cui_table.h"
-#include "cui_table_events.h"
 #endif
+#include "cui_table_events.h"
 #define CUI_TABLE_TOUCH_DISTRIBUTION
 #include "../unit/test_table_touch_admission.c"

@@ -57,5 +57,15 @@
     "log_sha256": "340a6b2f0372d78aeed0b7b8e614e9e4d4c2cb803a389b48afe983626f71aca3",
     "source_match": "all nine recorded source/test hashes match",
     "freshness": "SDK, amalgamation and skill --check PASS; distribution_shared 4/4 PASS"
+  },
+  "configured_shared_consumer_followup": {
+    "failure": "Broad native build stopped at step665: shared umbrella consumer lacked explicit Table event declarations; standalone implementation path had provided them transitively",
+    "fix": "Move cui_table_events.h include outside selective-only preprocessor branch; no production API/behavior change",
+    "verification": "Actual configured Release target: 3/3 compile/link steps PASS; private-Xvfb table_touch_all_* 8/8 PASS in0.03s; distribution policy offline4/4PASS",
+    "fixture_sha256": "047ee3f4be451674c980026494667e1b6c9e91a5025cdd8376fe747ad3c17508",
+    "initial_log": "/home/matteo/.cache/cui-current-validation/beta-combined-native-build.log",
+    "repair_build_log": "/home/matteo/.cache/cui-current-validation/table-touch-shared-repair-build.log",
+    "repair_test_log": "/home/matteo/.cache/cui-current-validation/table-touch-shared-repair-tests.log",
+    "remaining": "Resume broader native build, then full registered suite"
   }
 }

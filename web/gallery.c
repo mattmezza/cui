@@ -23,6 +23,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_date_picker_calendar.h"
 #include "cui/cui_date_time_picker.h"
 #include "cui/cui_description.h"
+#include "cui/cui_dialog_composition_styled.h"
 #include "cui/cui_disclosure.h"
 #include "cui/cui_dock.h"
 #include "cui/cui_effects.h"
@@ -2305,6 +2306,7 @@ static cui_table_column table_columns[3];
 static char table_names[1000][24], table_sizes[1000][24];
 static cui_surface_state dialog_surface, alert_dialog_surface, sheet_surface, popover_surface,
     nested_surface;
+static cui_dialog_layout_v1 dialog_layout, alert_dialog_layout, nested_dialog_layout;
 static int surface_variant, alert_attempts;
 static bool dialog_updates = true, popover_updates;
 static cui_popover_position gallery_popover_position;
@@ -2318,6 +2320,77 @@ static bool alert_decision(void *user, cui_surface_result result) {
     (*attempts)++;
     redraw = true;
     return *attempts > 1;
+}
+/* Dialog-only demonstration callbacks; compose borrows this stack descriptor. */
+typedef struct {
+    const cui_theme *theme;
+    float width, height;
+} gallery_dialog_frame;
+static void gallery_nested_dialog_body(cui_context *context, const cui_dialog_frame *frame,
+                                       void *user) {
+    (void)frame;
+    gallery_dialog_frame *f = user;
+    cui_checkbox(context, cui_id_from(context, "nested-updates"), f->theme,
+                 cui_string("Preview releases"), &popover_updates, false);
+}
+static void gallery_dialog_header(cui_context *context, const cui_dialog_frame *frame, void *user) {
+    (void)frame;
+    gallery_dialog_frame *f = user;
+    cui_label(context, f->theme, cui_string("Workspace"));
+}
+static void gallery_dialog_content(cui_context *context, const cui_dialog_frame *frame,
+                                   void *user) {
+    (void)frame;
+    gallery_dialog_frame *f = user;
+    cui_label(context, f->theme, cui_string("Changes apply to this workspace."));
+}
+static void gallery_dialog_body(cui_context *context, const cui_dialog_frame *frame, void *user) {
+    (void)frame;
+    gallery_dialog_frame *f = user;
+    cui_checkbox(context, cui_id_from(context, "dialog-updates"), f->theme,
+                 cui_string("Product updates"), &dialog_updates, false);
+    cui_id trigger = cui_id_from(context, "nested-trigger");
+    if (cui_button(context, trigger, f->theme, cui_string("Advanced preferences"), false))
+        (void)cui_dialog_open_v1(context, &nested_dialog_layout, trigger);
+    cui_surface_options options = {
+        .viewport = {0, 0, f->width, f->height}, .margin = 16, .layer = 200};
+    cui_dialog_sizing_v1 sizing;
+    if (cui_dialog_sizing_default_v1(options, &sizing)) {
+        sizing.width = 360;
+        cui_dialog_composition_v1 composition = {
+            .struct_size = sizeof composition,
+            .version = CUI_DIALOG_COMPOSITION_VERSION_1,
+            .present = 1u << CUI_DIALOG_BODY,
+            .name = {"Advanced preferences", 20},
+            .description = {"Escape returns to the parent dialog.", 36},
+            .slots = {[CUI_DIALOG_BODY] = {gallery_nested_dialog_body, f}}};
+        (void)cui_dialog_compose_v1(context, f->theme, &nested_dialog_layout, options, &sizing,
+                                    &composition);
+    }
+    (void)cui_text_paragraph_colored(
+        context,
+        cui_string(
+            "Body content wraps at the current width and scrolls above the independent Footer."),
+        f->theme->font_size, f->theme->text, f->theme->font_size * 1.25f, (cui_text_style){0}, true,
+        NULL, 0);
+}
+static void gallery_dialog_footer(cui_context *context, const cui_dialog_frame *frame, void *user) {
+    gallery_dialog_frame *f = user;
+    (void)cui_dialog_action_v1(context, frame, f->theme, cui_id_from(context, "dialog-save"),
+                               cui_string("Save changes"), CUI_DIALOG_CONFIRM,
+                               (cui_button_options){0});
+}
+static void gallery_alert_footer(cui_context *context, const cui_dialog_frame *frame, void *user) {
+    gallery_dialog_frame *f = user;
+    (void)cui_dialog_action_v1(context, frame, f->theme,
+                               cui_surface_part_id(alert_dialog_surface.overlay.id, 3),
+                               cui_string("Keep workspace"), CUI_DIALOG_CANCEL,
+                               (cui_button_options){.variant = CUI_BUTTON_OUTLINE});
+    if (!alert_dialog_surface.overlay.open)
+        return;
+    (void)cui_dialog_action_v1(context, frame, f->theme,
+                               cui_surface_part_id(alert_dialog_surface.overlay.id, 2),
+                               cui_string("Delete"), CUI_DIALOG_CONFIRM, (cui_button_options){0});
 }
 static cui_str table_label(void *user, size_t row, cui_id column) {
     (void)user;
@@ -2813,6 +2886,10 @@ int gallery_init(void) {
     cui_surface_init(&nested_surface, cui_id_from(ui, "nested-surface"), CUI_SURFACE_DIALOG);
     cui_surface_init(&alert_dialog_surface, cui_id_from(ui, "alert-dialog-surface"),
                      CUI_SURFACE_ALERT);
+    if (!cui_dialog_layout_init_v1(&dialog_layout, &dialog_surface) ||
+        !cui_dialog_layout_init_v1(&alert_dialog_layout, &alert_dialog_surface) ||
+        !cui_dialog_layout_init_v1(&nested_dialog_layout, &nested_surface))
+        return 0;
     cui_surface_init(&sheet_surface, cui_id_from(ui, "sheet-surface"), CUI_SURFACE_SHEET);
     cui_surface_init(&popover_surface, cui_id_from(ui, "popover-surface"), CUI_SURFACE_POPOVER);
     if (!cui_carousel_state_init(&carousel_state, carousel_geometry, 4, 4))
@@ -5847,37 +5924,23 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 48: {
         cui_id trigger = cui_id_from(ui, "dialog-trigger");
         if (cui_button(ui, trigger, &t, cui_string("Edit preferences"), disabled))
-            cui_surface_open(ui, &dialog_surface, trigger);
-        cui_surface_options options = {.viewport = {0, 0, width, height},
-                                       .width = width > 520 ? 420 : width - 32,
-                                       .height = 250,
-                                       .margin = 16};
-        if (cui_surface_begin(ui, &t, &dialog_surface, cui_string("Notification preferences"),
-                              cui_string("Choose how CUI should keep you informed."), options)) {
-            cui_checkbox(ui, cui_id_from(ui, "dialog-updates"), &t, cui_string("Product updates"),
-                         &dialog_updates, false);
-            cui_id nested_trigger = cui_id_from(ui, "nested-trigger");
-            if (cui_button(ui, nested_trigger, &t, cui_string("Advanced preferences"), false))
-                cui_surface_open(ui, &nested_surface, nested_trigger);
-            if (cui_surface_begin(ui, &t, &nested_surface, cui_string("Advanced preferences"),
-                                  cui_string("Escape returns to the parent dialog."),
-                                  (cui_surface_options){.viewport = {0, 0, width, height},
-                                                        .width = options.width - 32,
-                                                        .height = 190,
-                                                        .margin = 16,
-                                                        .layer = 200})) {
-                cui_checkbox(ui, cui_id_from(ui, "nested-updates"), &t,
-                             cui_string("Preview releases"), &popover_updates, false);
-                cui_surface_end(ui);
-            }
-            cui_begin_box(ui, 0, (cui_box){.height = 300});
-            cui_label(ui, &t, cui_string("Long body content remains clipped above the footer."));
-            cui_end_box(ui);
-            cui_surface_footer_begin(ui, &t);
-            if (cui_button(ui, cui_id_from(ui, "dialog-save"), &t, cui_string("Save changes"),
-                           false))
-                cui_surface_close(ui, &dialog_surface, CUI_SURFACE_ACCEPTED);
-            cui_surface_end(ui);
+            (void)cui_dialog_open_v1(ui, &dialog_layout, trigger);
+        cui_surface_options options = {.viewport = {0, 0, width, height}, .margin = 16};
+        cui_dialog_sizing_v1 sizing;
+        gallery_dialog_frame frame = {&t, width, height};
+        if (cui_dialog_sizing_default_v1(options, &sizing)) {
+            cui_dialog_composition_v1 composition = {
+                .struct_size = sizeof composition,
+                .version = CUI_DIALOG_COMPOSITION_VERSION_1,
+                .present = (1u << CUI_DIALOG_HEADER) | (1u << CUI_DIALOG_CONTENT) |
+                           (1u << CUI_DIALOG_BODY) | (1u << CUI_DIALOG_FOOTER),
+                .name = {"Notification preferences", 24},
+                .description = {"Choose how CUI should keep you informed.", 40},
+                .slots = {[CUI_DIALOG_HEADER] = {gallery_dialog_header, &frame},
+                          [CUI_DIALOG_CONTENT] = {gallery_dialog_content, &frame},
+                          [CUI_DIALOG_BODY] = {gallery_dialog_body, &frame},
+                          [CUI_DIALOG_FOOTER] = {gallery_dialog_footer, &frame}}};
+            (void)cui_dialog_compose_v1(ui, &t, &dialog_layout, options, &sizing, &composition);
         }
         break;
     }
@@ -5885,19 +5948,28 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_id trigger = cui_id_from(ui, "alert-dialog-trigger");
         if (cui_button(ui, trigger, &t, cui_string("Delete workspace"), disabled)) {
             alert_attempts = 0;
-            cui_surface_open(ui, &alert_dialog_surface, trigger);
+            (void)cui_dialog_open_v1(ui, &alert_dialog_layout, trigger);
         }
         const char *description = alert_attempts == 1
                                       ? "Deletion was rejected once. Confirm again to proceed."
                                       : "The first confirmation is deliberately rejected.";
-        cui_alert_dialog(ui, &t, &alert_dialog_surface, cui_string("Delete workspace?"),
-                         cui_string(description), cui_string("Delete"),
-                         cui_string("Keep workspace"),
-                         (cui_surface_options){.viewport = {0, 0, width, height},
-                                               .width = width > 520 ? 420 : width - 32,
-                                               .margin = 16,
-                                               .decide = alert_decision,
-                                               .decision_user = &alert_attempts});
+        cui_surface_options options = {.viewport = {0, 0, width, height},
+                                       .margin = 16,
+                                       .decide = alert_decision,
+                                       .decision_user = &alert_attempts};
+        cui_dialog_sizing_v1 sizing;
+        gallery_dialog_frame frame = {&t, width, height};
+        if (cui_dialog_sizing_default_v1(options, &sizing)) {
+            cui_dialog_composition_v1 composition = {
+                .struct_size = sizeof composition,
+                .version = CUI_DIALOG_COMPOSITION_VERSION_1,
+                .present = 1u << CUI_DIALOG_FOOTER,
+                .name = {"Delete workspace?", 17},
+                .description = cui_string(description),
+                .slots = {[CUI_DIALOG_FOOTER] = {gallery_alert_footer, &frame}}};
+            (void)cui_dialog_compose_v1(ui, &t, &alert_dialog_layout, options, &sizing,
+                                        &composition);
+        }
         break;
     }
     case 50: {

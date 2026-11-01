@@ -34,6 +34,7 @@ SOURCES = ["src/core/cui_background.c", "src/base/cui_slider_model.c", "src/base
            'src/base/cui_otp.c', 'src/components/cui_otp.c',
            'src/base/cui_form.c', 'src/components/cui_form.c',
            'src/base/cui_surface.c', 'src/components/cui_surface.c',
+           'src/base/cui_dialog_composition.c', 'src/components/cui_dialog_composition.c',
            'src/base/cui_table.c', 'src/components/cui_table.c',
            'src/base/cui_tree.c', 'src/components/cui_tree.c',
            'src/base/cui_picker.c', 'src/components/cui_picker.c',

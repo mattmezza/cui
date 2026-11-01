@@ -225,8 +225,72 @@ static void first_presented_regions(bool styled) {
     assert(current_body_range(&f) == 0);
     dialog_fixture_destroy(&f);
 }
+static unsigned thumb_alpha(const cui_draw_list *draw) {
+    unsigned alpha = 0;
+    for (size_t i = 0; i < draw->count; ++i) {
+        cui_color c = draw->commands[i].color;
+        if (c.r == 17 && c.g == 99 && c.b == 203 && c.a > alpha)
+            alpha = c.a;
+    }
+    return alpha;
+}
+static void scrollbar_visibility(void) {
+    dialog_fixture f;
+    dialog_fixture_init(&f, true, NULL);
+    f.composition.present = (1u << CUI_DIALOG_BODY) | (1u << CUI_DIALOG_FOOTER);
+    f.action_footer = true;
+    f.metric[CUI_DIALOG_BODY] = 800;
+    f.theme.scrollbar = (cui_scrollbar_style){.visibility = CUI_SCROLLBAR_AUTO_HIDE,
+                                              .custom_thumb_color = true,
+                                              .thumb_color = {17, 99, 203, 255},
+                                              .idle_seconds = .032f,
+                                              .fade_seconds = .064f};
+    f.ancestor_opacity = .5f;
+    cui_draw_list draw = dialog_fixture_frame(&f);
+    unsigned full = thumb_alpha(&draw);
+    assert(full >= 126 && full <= 128); /* ancestor opacity exactly once */
+    cui_id bar = cui_scrollbar_id(cui_surface_part_id(50, 6), true);
+    fprintf(stderr, "fade focus witness: initial=%llu bar=%llu\n",
+            (unsigned long long)cui_focused(f.ui), (unsigned long long)bar);
+    assert(dialog_semantic(&f, bar));
+    cui_focus(f.ui, bar);
+    for (unsigned i = 0; i < 12; ++i) {
+        draw = dialog_fixture_frame(&f);
+        assert(cui_focused(f.ui) == bar && thumb_alpha(&draw) == full);
+    }
+    /* A focused scrollbar intentionally remains visible. Focus the real Footer
+     * action outside the Body before checking the idle policy. */
+    assert(dialog_semantic(&f, 101));
+    cui_focus(f.ui, 101);
+    assert(cui_focused(f.ui) == 101);
+    unsigned partial = 0;
+    for (unsigned i = 0; i < 12; ++i) {
+        draw = dialog_fixture_frame(&f);
+        unsigned alpha = thumb_alpha(&draw);
+        if (alpha > 0 && alpha < full)
+            partial = alpha;
+    }
+    assert(partial > 0 && thumb_alpha(&draw) == 0);
+    assert(f.surface.body_maximum > 0); /* admitted cache enables fade policy */
+    cui_rect b = f.layout.completed[5];
+    assert(cui_queue_event(
+        f.ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE, .x = b.x + 20, .y = b.y + 20}));
+    assert(cui_queue_event(
+        f.ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = b.x + 20, .y = b.y + 20, .dy = -2}));
+    draw = dialog_fixture_frame(&f);
+    assert(f.surface.body_scroll > 0 && thumb_alpha(&draw) == full);
+    f.theme.scrollbar.visibility = CUI_SCROLLBAR_HIDDEN;
+    float previous_scroll = f.surface.body_scroll;
+    assert(cui_queue_event(
+        f.ui, (cui_event){.type = CUI_EVENT_SCROLL, .x = b.x + 20, .y = b.y + 20, .dy = -2}));
+    draw = dialog_fixture_frame(&f);
+    assert(thumb_alpha(&draw) == 0 && f.surface.body_scroll > previous_scroll);
+    assert(!dialog_semantic(&f, cui_scrollbar_id(cui_surface_part_id(50, 6), true)));
+    dialog_fixture_destroy(&f);
+}
 int main(int argc, char **argv) {
     assert(argc == 3);
+    scrollbar_visibility();
     first_presented_regions(false);
     first_presented_regions(true);
     source_rows(false);

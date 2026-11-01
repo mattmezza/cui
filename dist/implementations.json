@@ -237,6 +237,20 @@
       ]
     },
     {
+      "header": "cui_dialog_composition.h",
+      "macro": "CUI_DIALOG_COMPOSITION_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_dialog_composition.c"
+      ]
+    },
+    {
+      "header": "cui_dialog_composition_styled.h",
+      "macro": "CUI_DIALOG_COMPOSITION_STYLED_IMPLEMENTATION",
+      "sources": [
+        "src/components/cui_dialog_composition.c"
+      ]
+    },
+    {
       "header": "cui_surface.h",
       "macro": "CUI_SURFACE_IMPLEMENTATION",
       "sources": [

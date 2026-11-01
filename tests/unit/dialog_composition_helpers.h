@@ -31,7 +31,7 @@ struct dialog_fixture {
     unsigned decisions, closes, actions, click_callbacks;
     cui_surface_result decision, closed_reason;
     cui_id focus_closed;
-    float width, height;
+    float width, height, ancestor_opacity;
     bool styled, veto, action_footer, text_title, omit_submit, inert, layout_only, poison;
 };
 void dialog_fixture_init(dialog_fixture *, bool styled, cui_font *);

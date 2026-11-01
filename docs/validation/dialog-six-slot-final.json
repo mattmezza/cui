@@ -1,0 +1,129 @@
+{
+  "status": "FOCUSED_C_DIALOG_HANDOFF_NOT_FULL_PARITY",
+  "base": "139695 (worker branch; root current library cache built at21acfca8)",
+  "ordered_commits_before_final": [
+    "138c3a39 source-only",
+    "65b0ba05 guide",
+    "db888055 verified input-cache fix"
+  ],
+  "ownership": "New Dialog Base/Styled composition headers/modules, focused tests/docs/metadata/generator registration and only gallery Dialog/AlertDialog/nested Dialog hunks. Existing Core/Table/surface helpers unchanged; no cancellation/marker/dispatcher transfer.",
+  "compile": "CPU1 nice19 serial. Source C11 O2 UNDEBUG Wall/Wextra/Wpedantic/Werror using matching public Core APIs and cached root native libraries. Configured all-header consumer O0 warnings/assertions through actual CMake/Ninja; metadata ABI object configured. No full Core/engine rebuild.",
+  "results": {
+    "focused_native": "6/6 PASS .23s: native ABI; contracts/title references/inert/layout-only/recovery; Base+Styled first-frame/source allocations/current-font growth/shrink; software clip; fade/held-focus/ancestor alpha; actions/veto/focus/deferredclose; extracted full guide example; Inter and Noto geometry",
+    "native_abi": "style32/refinement232/sizing96/slot16/composition152/layout208; completed_offset40/sequence_offset200",
+    "wasm32_abi": "actual assembly style32/refinement232/sizing96/slot8/composition84/layout200; offset assertions32/192. Zig0.16 -S requires -Wno-unused-command-line-argument for its injected -c driver argument.",
+    "portable_objects": "C++11 public headers and both Dialog wasm32-wasi C11 O2 strict objects PASS; gallery wasm32-wasi C11 O2 strict object PASS (not linked/browser executed)",
+    "configured_consumer": "actual CMake3steps PASS (whole-header consumer+ABI); private wrapper1/1 PASS",
+    "legacy": "unchanged root cached surface/Base/track/Core geometry5/5 PASS .27; independent frozen four-kind reducer64frames/private policy1/1 PASS .03",
+    "metadata": "usage6 PASS7.570s, distribution guard4 PASS, formatcheck PASS; required skill18 PASS39.857s",
+    "generated": "SDK446 source files per Go/Rust binding; canonical SDK\u2192amalgamation\u2192agent-skill generation and all three freshness checks PASS on this worker revision"
+  },
+  "first_failures": [
+    "Original geometry read previous-input state.maximum as currentrange; actual diagnostic current semantic1118=content1200-viewport82. Newmodule now refreshes priorcache; tests use currentsemantic+tracked extents.",
+    "Initial fade assumed focusedbar wouldhide; actual initialfocus=bar. Final proof separately asserts focusedbar remainsvisible then Footerfocus permits fade. Base policy unchanged.",
+    "Configured consumer fixture staticemit collided with existing video_controls staticemit; fixture callback renamed only.",
+    "Host GCC standalonegallery fails preexisting unrelated sign-compare/missing-braces/format-truncation sites. No unrelated edits; root may compare original. Actual target WASM gallery object compiled strict."
+  ],
+  "source_hashes": {
+    "CMakeLists.txt": "619ecc14b4fda308df33754c5be1a1ef797329393ff71f9353ea834b5059546b",
+    "docs/COMPONENT_USAGE.md": "4dddb66450283fbf4d5a79eafeccbc63b6490336d4e32767a43e75b61e3b84b9",
+    "docs/DIALOG_COMPOSITION.md": "08b6ecdc7ae935309ec44f8c48fe6f00a825950f025a8869025fd381289b0d27",
+    "docs/SURFACES.md": "d91def0636ede711d3c12455ece7d0c451a49478f2e9482d0014aed62a34fd80",
+    "docs/component-usage.json": "4f1222fd5579eee360882244aa72e6cf16563412143ee2cbdc763a2cd413f7f1",
+    "scripts/build_web.py": "bc3df5d21969c0c5f58328b88e4573bc07a73f03f3b16e6d7622ec8997710503",
+    "skills/cui/SKILL.md": "0d21506a4815dc2c198777ccb28385ae6b49207aebab116a2ced27a453716612",
+    "tests/distribution/dialog_composition.c": "d2ad670111bcf1d484a06ad76ac3a4f415e257a9fb00c52a6df35d40e67a56a8",
+    "tests/unit/dialog_composition_helpers.c": "4161ce39d94bb5be0a01c0253f0de0685ecc3ee277eed5ae88e2b751e4f94976",
+    "tests/unit/dialog_composition_helpers.h": "ad84c5888adb36c04ea45393fb0f205de2355277163ddcbba6ab10ba89ee9761",
+    "tests/unit/test_dialog_composition_contracts.c": "5d372748af4a8a98a817abe428fdc66baa4b0c2d8113765f0a8ed77d978ea60d",
+    "tests/unit/test_dialog_composition_geometry.c": "e83eba86ea33166de0d98a659d138057e798d9dcc87d9413897528d91606b2cb",
+    "web/gallery.c": "144046887b2c9316d75e05464b31fe3efce5263bdc8971973bd1055da4d7adbe"
+  },
+  "font_hashes": {
+    "third_party/inter/Inter-Bold.otf": "9fc6261e817d0b1b2bf1953d8799bb1c837d11aeebbf83ae352e7b4d6de6425d",
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799",
+    "third_party/inter/LICENSE.txt": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+  },
+  "logs": {
+    "dialog-six-slot-first-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-first-build.log",
+      "sha256": "4222e5c3e14e9a91d69fbea24c6ca93fd3c689f6080ae332267fa91bd2d3b6fe"
+    },
+    "dialog-six-slot-first-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-first-runtime.log",
+      "sha256": "8716a5be1ad83a413496acd4597b3bceb6b879641079af97eb5ce27aaf35c195"
+    },
+    "dialog-six-slot-range-witness.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-range-witness.log",
+      "sha256": "bd6ed7ecbb81de088d1f54b205438d09c46629409c9151f544719085b705ae71"
+    },
+    "dialog-six-slot-cachefix-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-cachefix-runtime.log",
+      "sha256": "53272e28a321f39d140a963c46b234234c26ccd250cfd39e628c90ddb4e7a50a"
+    },
+    "dialog-six-slot-phases-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-phases-runtime.log",
+      "sha256": "62a919a9c80809b94896a69120217e1b54f65b0e253296da1d4588d205f8f3d5"
+    },
+    "dialog-six-slot-fadefocus-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-fadefocus-runtime.log",
+      "sha256": "0c54241774992a125e4d8eff0e6fe2c0eb940271cf9899160efbfffb17913663"
+    },
+    "dialog-six-slot-fade-held-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-fade-held-runtime.log",
+      "sha256": "22250588f8852498b78415006e8750af51120e18ee59e87df9500660832f4cf4"
+    },
+    "dialog-six-slot-legacy-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-legacy-runtime.log",
+      "sha256": "c710233c761212c42092e5a485f955adac723d3a24d1b8640f6cb4509fe78398"
+    },
+    "dialog-six-slot-configured.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-configured.log",
+      "sha256": "3ee5286aabfe6b35bc06404fb9fcb3895a588fff4140fe56e1daa92ca293aa7e"
+    },
+    "dialog-six-slot-configured-fixed.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-configured-fixed.log",
+      "sha256": "faeabbc816898d70317058dfab0e87236891af7b88733f26e1bcb2313b25925b"
+    },
+    "dialog-six-slot-configured-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-configured-runtime.log",
+      "sha256": "47cf0ea83048a7c0e811462eccae3d16fba3d741ec772343313ee20306549ef4"
+    },
+    "dialog-six-slot-frozen-runtime.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-frozen-runtime.log",
+      "sha256": "9dd81ae08625598fec0eda7d644f38a476fd301da18557525a39b314c8655b73"
+    },
+    "dialog-six-slot-gallery-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-gallery-build.log",
+      "sha256": "2793cb434797cd3552b47eb34391d2c73f0d112528c28856d84d22e5f958a07a"
+    },
+    "dialog-six-slot-gallery-wasm32-build.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-gallery-wasm32-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "dialog-six-slot-portable.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-portable.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "dialog-six-slot-final-focused.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-final-focused.log",
+      "sha256": "ab10801ede74cbcb9fdeffd469731747718d9a9f32f8da94cc61b693f0ca317f"
+    },
+    "dialog-six-slot-final-gates.log": {
+      "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-final-gates.log",
+      "sha256": "1c54b32ae9634d0c6d95c2d81d0861d70d0451a9cf74b230cbd1a3ca0cd1153c"
+    }
+  },
+  "wasm_abi_assembly": {
+    "path": "/home/matteo/.cache/cui-hover-raw-build/dialog-six-slot-current/abi-wasm32.s",
+    "sha256": "6445415da3a051d6e04553b057dae72cf34a8a3884e9313148517256b4be3793"
+  },
+  "pending_limits": [
+    "Root combined current-source integration build and canonical regeneration/freshness; worker generated hashes prove its own revision only.",
+    "No linked gallery WASM/browser execution in this worker. Root must update old geometry expectations: Surface content\u2192Dialog body; source-top intrinsic Alert without Body/settling; explicit long-body viewport scenario for scroll assertions.",
+    "Existing held pointer/key/contact lifecycle across close/reopen remains unchanged/unfinished.",
+    "Root/native-host ownership and all five foreign composition facades remain unfinished.",
+    "No GPU/macOS/Windows runtime proof or full parity claim.",
+    "Fade test proves command alpha and software clip geometry, not a separate GPU/whole-font raster parity claim."
+  ]
+}

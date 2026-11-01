@@ -45,3 +45,14 @@ then balance a successful begin with `cui_surface_end`. Existing
 for ownership, failure, rendering and adapter limits. SDL3 and browser mesh adapters have bounded analytic coverage; exact
 reference raster antialiasing remains unfinished. This is scoped C support, not
 complete family or language-builder parity.
+
+## Additive intrinsic Dialog composition
+
+The separate C Base/Styled six-slot route is documented in
+[DIALOG_COMPOSITION.md](DIALOG_COMPOSITION.md). It resolves current-frame
+intrinsic sizing, independent Header/Title/Description, Content/Body allocation
+and Footer ownership using Core layout V2. The legacy helpers documented above
+keep their fixed or previous-measurement behavior. Retain the new layout storage
+through end_frame and use its open helper for each new lifetime. Existing held
+input capture behavior remains; this is not a universal input cancellation API.
+Root/host and all five foreign slot builders remain separate work.

@@ -89,7 +89,26 @@ static void title_references(bool styled) {
         dialog_fixture_destroy(&f);
     }
 }
+static void no_input_phases(bool styled) {
+    dialog_fixture f;
+    dialog_fixture_init(&f, styled, NULL);
+    f.composition.present = 1u << CUI_DIALOG_BODY;
+    f.metric[CUI_DIALOG_BODY] = 800;
+    for (unsigned i = 0; i < 4; ++i) {
+        f.inert = i < 2;
+        f.layout_only = i >= 2;
+        dialog_fixture_frame(&f);
+        assert(f.calls[CUI_DIALOG_BODY] == 1 && f.surface.body_scroll == 0);
+        assert(!dialog_semantic(&f, cui_surface_part_id(50, 6)));
+    }
+    f.inert = f.layout_only = false;
+    dialog_fixture_frame(&f);
+    assert(dialog_semantic(&f, cui_surface_part_id(50, 6)));
+    dialog_fixture_destroy(&f);
+}
 int main(void) {
+    no_input_phases(false);
+    no_input_phases(true);
     title_references(false);
     title_references(true);
     rejected_before_callbacks(false);

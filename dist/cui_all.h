@@ -31,6 +31,8 @@
 #include "cui_status.h"
 #include "cui_otp.h"
 #include "cui_form.h"
+#include "cui_dialog_composition.h"
+#include "cui_dialog_composition_styled.h"
 #include "cui_surface.h"
 #include "cui_table.h"
 #include "cui_scroll.h"
@@ -201,6 +203,14 @@
 #define CUI_FORM_IMPLEMENTATION
 #endif
 #include "cui_form.h"
+#ifndef CUI_DIALOG_COMPOSITION_IMPLEMENTATION
+#define CUI_DIALOG_COMPOSITION_IMPLEMENTATION
+#endif
+#include "cui_dialog_composition.h"
+#ifndef CUI_DIALOG_COMPOSITION_STYLED_IMPLEMENTATION
+#define CUI_DIALOG_COMPOSITION_STYLED_IMPLEMENTATION
+#endif
+#include "cui_dialog_composition_styled.h"
 #ifndef CUI_SURFACE_IMPLEMENTATION
 #define CUI_SURFACE_IMPLEMENTATION
 #endif

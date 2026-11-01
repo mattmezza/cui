@@ -1742,6 +1742,14 @@ add_test(NAME dialog_surface_reference_authority COMMAND ${Python3_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_dialog_surface_reference.py)
 # Additive Dialog composition uses current-frame Core constraints; old surface
 # routes retain their independent frozen trace above.
+add_executable(dist_dialog_composition tests/distribution/dialog_composition.c)
+target_include_directories(dist_dialog_composition PRIVATE dist)
+if(NOT MSVC)
+ target_compile_options(dist_dialog_composition PRIVATE -O0)
+ target_link_libraries(dist_dialog_composition PRIVATE m)
+endif()
+cui_warnings(dist_dialog_composition)
+add_test(NAME dist_dialog_composition COMMAND dist_dialog_composition)
 add_library(test_dialog_composition_abi OBJECT tests/unit/test_dialog_composition_abi.c)
 target_include_directories(test_dialog_composition_abi PRIVATE include)
 cui_warnings(test_dialog_composition_abi)

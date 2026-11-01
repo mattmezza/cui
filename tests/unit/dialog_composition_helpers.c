@@ -132,7 +132,9 @@ cui_draw_list dialog_fixture_frame(dialog_fixture *f) {
                   (cui_box){.width = f->width,
                             .height = f->height,
                             .inert = f->inert,
-                            .layout_only = f->layout_only});
+                            .layout_only = f->layout_only,
+                            .custom_opacity = f->ancestor_opacity > 0,
+                            .opacity = f->ancestor_opacity});
     cui_begin_box(f->ui, 1, (cui_box){.width = 30, .height = 20});
     cui_interact(f->ui, 1, CUI_ROLE_BUTTON, cui_string("Trigger"), false, false, 0);
     cui_end_box(f->ui);

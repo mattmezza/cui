@@ -119,15 +119,18 @@ Additional event includes: `cui/cui_disclosure_events.h`.
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_surface_state and child form/application data.
+**State:** Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.
 
 **Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
 
-**Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.
+**Usage:** For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.
 
 API: `cui_surface_init`, `cui_alert_dialog`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
 Additional event includes: `cui/cui_surface_events.h`.
+
+Additive C six-slot Base/Styled route: `cui/cui_dialog_composition.h` and
+`cui/cui_dialog_composition_styled.h`; [composition guide](DIALOG_COMPOSITION.md).
 
 ## Alert
 
@@ -857,15 +860,18 @@ API: `cui_description_list`. [Public header](../include/cui/cui_description.h); 
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.
 
-**State:** Caller retains cui_surface_state and child form/application data.
+**State:** Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.
 
 **Interaction:** cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.
 
-**Usage:** Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.
+**Usage:** For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.
 
 API: `cui_surface_init`, `cui_surface_begin`, `cui_surface_end`, `cui_surface_take_result`. [Public header](../include/cui/cui_surface.h); [guide](SURFACES.md).
 
 Additional event includes: `cui/cui_surface_events.h`.
+
+Additive C six-slot Base/Styled route: `cui/cui_dialog_composition.h` and
+`cui/cui_dialog_composition_styled.h`; [composition guide](DIALOG_COMPOSITION.md).
 
 ## Dock
 

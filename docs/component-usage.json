@@ -34,28 +34,43 @@
         "cui_surface_init",
         "cui_alert_dialog",
         "cui_surface_take_result",
-        "cui_alert_dialog_events"
+        "cui_alert_dialog_events",
+        "cui_dialog_layout_init_v1",
+        "cui_dialog_open_v1",
+        "cui_dialog_sizing_default_v1",
+        "cui_base_dialog_compose_v1",
+        "cui_dialog_compose_v1",
+        "cui_base_dialog_action_v1",
+        "cui_dialog_action_v1"
       ],
       "state_types": [
-        "cui_surface_state"
+        "cui_surface_state",
+        "cui_dialog_layout_v1",
+        "cui_dialog_composition_v1",
+        "cui_dialog_sizing_v1",
+        "cui_dialog_refinement_v1"
       ],
-      "state_ownership": "Caller retains cui_surface_state and child form/application data.",
+      "state_ownership": "Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.",
+      "usage": "For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.",
       "docs": [
         "docs/SURFACES.md",
-        "docs/SURFACE_EVENTS.md"
+        "docs/SURFACE_EVENTS.md",
+        "docs/DIALOG_COMPOSITION.md"
       ],
       "callback_symbols": [
         "cui_surface_decision_fn",
-        "cui_surface_closed_fn"
+        "cui_surface_closed_fn",
+        "cui_dialog_slot_fn"
       ],
       "scope": "styled frame component",
       "name": "AlertDialog",
       "public_header": "include/cui/cui_surface.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_surface_events.h"
+        "include/cui/cui_surface_events.h",
+        "include/cui/cui_dialog_composition.h",
+        "include/cui/cui_dialog_composition_styled.h"
       ]
     },
     {
@@ -1671,29 +1686,44 @@
         "cui_surface_begin",
         "cui_surface_end",
         "cui_surface_take_result",
-        "cui_surface_begin_events"
+        "cui_surface_begin_events",
+        "cui_dialog_layout_init_v1",
+        "cui_dialog_open_v1",
+        "cui_dialog_sizing_default_v1",
+        "cui_base_dialog_compose_v1",
+        "cui_dialog_compose_v1",
+        "cui_base_dialog_action_v1",
+        "cui_dialog_action_v1"
       ],
       "state_types": [
-        "cui_surface_state"
+        "cui_surface_state",
+        "cui_dialog_layout_v1",
+        "cui_dialog_composition_v1",
+        "cui_dialog_sizing_v1",
+        "cui_dialog_refinement_v1"
       ],
-      "state_ownership": "Caller retains cui_surface_state and child form/application data.",
+      "state_ownership": "Caller retains cui_surface_state, cui_dialog_layout_v1 and child data through end_frame; callback tokens are borrowed only during the active callback.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.",
+      "usage": "For intrinsic first-frame sizing, retain surface plus dialog layout, open with cui_dialog_open_v1, resolve current sizing, and submit six independent slots with cui_dialog_compose_v1 or its Base counterpart. Keep storage through end_frame; old surface/alert helpers remain unchanged. Held-input reset, Root/host and foreign slot builders remain separate limitations.",
       "docs": [
         "docs/SURFACES.md",
         "docs/SURFACE_EVENTS.md",
-        "docs/ELEMENT_SHADOWS.md"
+        "docs/ELEMENT_SHADOWS.md",
+        "docs/DIALOG_COMPOSITION.md"
       ],
       "callback_symbols": [
         "cui_surface_decision_fn",
-        "cui_surface_closed_fn"
+        "cui_surface_closed_fn",
+        "cui_dialog_slot_fn"
       ],
       "scope": "styled frame component",
       "name": "Dialog",
       "public_header": "include/cui/cui_surface.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_surface_events.h"
+        "include/cui/cui_surface_events.h",
+        "include/cui/cui_dialog_composition.h",
+        "include/cui/cui_dialog_composition_styled.h"
       ]
     },
     {

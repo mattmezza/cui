@@ -191,7 +191,16 @@ No implicit whole-Outer fallback. Read exact topology and input-policy limits;
 this does not install a dispatcher or Base reducers. Failed opt-in frames
 have no valid geometry/prepaint snapshot; clear the error and rebuild next frame.
 Existing Scrollable/Base/Dialog behavior and five foreign builder APIs do not
-acquire this feature automatically. Do not claim full Dialog slot parity.
+acquire this feature automatically. For the additive C six-slot route, read
+`docs/DIALOG_COMPOSITION.md`, `include/cui/cui_dialog_composition.h` and its
+`_styled.h` companion. Retain surface plus layout through end_frame, open through
+`cui_dialog_open_v1`, and resolve sizing against the current viewport each frame.
+Header/Title/Description remain independent; Content has intrinsic minimum,
+Body scrolls, Footer remains outside Inner. Present-empty differs from OMIT.
+Old helpers stay unchanged; previous-input caches are not current geometry.
+Held child input across reopen follows existing Core behavior. Root/host/five
+foreign facade slots and full lifecycle/parity remain unfinished. Read the guide's
+current validation limits before treating any example or backend as verified.
 
 For C Button phase-dependent shadows, read `docs/BUTTON_STYLES.md` and
 `include/cui/cui_button_styles.h`: the additive surface facade copies at most

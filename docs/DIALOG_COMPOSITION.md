@@ -1,13 +1,14 @@
-# Dialog composition V1 — unverified source draft
+# Dialog composition V1 — focused C implementation
 
-This guide describes the declarations and source checkpoint `138c3a39` on
-`design/dialog-height-current`. **The draft has not been compiled or run.** The
-example below has not been compiled either. Native/WASM ABI measurements,
-first-frame layout, current-font wrapping, input/callback tests, distribution
-consumers, generated-resource freshness and browser/gallery migration remain
-pending. Do not treat this as a released or verified replacement for the existing
-surface helpers. Use headers, sources, SDK and generated resources from one
-matching revision once that revision has passed validation.
+This guide describes the additive C implementation originating in source
+checkpoint `138c3a39`, with the focused native proof and cache correction in
+`db888055`. Strict C11 builds, native and WASM32 record checks, first-frame
+geometry/current-font software tests, owner actions and the complete example
+have been exercised locally. Configured distribution, canonical generated
+freshness, gallery/browser and wider compatibility checks are tracked separately;
+see the validation receipts before claiming a backend or full parity. This work is
+unreleased; Root/host and all five foreign composition facades remain unfinished. Use
+headers, sources, SDK and generated resources from one matching revision.
 
 ## API and ownership
 
@@ -153,10 +154,11 @@ owner remains open: Panel, Header, Title, Description, Content, BodyViewport,
 BodyContent, Footer, Outer, Column. These are borrowed tracking destinations,
 not an input cache to be copied back into current paint geometry.
 
-## Complete source example (not compiled)
+## Complete source example
 
 This small native headless program composes its first open frame, renders to a
-software buffer, then tears down after end_frame. A host application calls the
+software buffer, then tears down after end_frame. The extracted example passed
+a strict C11 build and a private-Xvfb headless Inter Regular/Bold run. A host application calls the
 frame code repeatedly and queues its real input before begin_frame. Pass actual
 regular and semibold font paths; the program does not download fonts or open a
 window. The example uses Header, Title and Description independently, Content,
@@ -283,7 +285,7 @@ cleanup:
 ```
 
 For AlertDialog, initialize with `CUI_SURFACE_ALERT`, provide the desired Header
-and Footer callbacks, and omit Body when there are no children. This draft does
+and Footer callbacks, and omit Body when there are no children. This route does
 not introduce an automatic AlertDialog composition adapter. Existing
 `cui_alert_dialog`, `cui_surface_begin`/footer/end and their measured-height or
 fixed-height behavior stay unchanged.
@@ -308,9 +310,9 @@ add_executable(dialog_demo dialog_demo.c)
 target_link_libraries(dialog_demo PRIVATE cui cui_text cui_software)
 ```
 
-This source consumer recipe, font execution and generated-header/SDK alternatives
-are pending validation. Do not combine this draft's header with an older installed
-library. The source metadata/guide registration still required before release is:
+The extracted C example has run with real Inter fonts. The standalone consumer
+CMake recipe and generated-header/SDK alternatives require their own validation. Do not combine this draft's header with an older installed
+library. The source metadata/guide registration to keep synchronized before release is:
 Dialog and AlertDialog entries in `docs/component-usage.json` and their matching
 human Usage paragraphs; supplemental header authority and Base/Styled limitations;
 consumer skill guidance; canonical SDK, amalgamation and skill generation; and

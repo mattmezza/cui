@@ -54,6 +54,8 @@ set(CUI_SOURCES
  src/components/cui_otp.c
  src/base/cui_form.c
  src/components/cui_form.c
+ src/base/cui_dialog_composition.c
+ src/components/cui_dialog_composition.c
  src/base/cui_surface.c
  src/components/cui_surface.c
  src/base/cui_table.c

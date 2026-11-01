@@ -18,9 +18,10 @@ For opt-in Core V2 mode/setters/emission read `docs/CORE_DRAW_V2.md` and
 `include/cui/cui_draw_v2.h`. The C software adapter's actual query/render route is
 in `docs/SOFTWARE_V2.md` and `include/cui/cui_software.h`: query the initialized
 renderer before composition, use its support/defaults, then render V2 explicitly.
-Never cast to V1 or fabricate consumer support. SDL_Renderer, SDL_GPU, Sokol,
-Canvas and foreign bindings remain pending; software support does not complete
-all78 parts. V1 renderer tables/default routes remain unchanged.
+The unreleased SDL_Renderer C route is documented in `docs/SDL_V2.md` and
+`include/cui/cui_sdl3.h`; query its actual capability before composition.
+Never cast to V1 or fabricate consumer support. SDL_GPU, Sokol, Canvas and foreign
+bindings remain pending; these C routes do not complete all78 parts. V1 renderer tables/default routes remain unchanged.
 `docs/SOFTWARE_V2_PAINTING.md` details the private bounded AREA shadows, per-axis
 owned text and publication contract. When copying backend sources, retain
 `backends/common/` alongside legacy software private forwarding headers; supplied

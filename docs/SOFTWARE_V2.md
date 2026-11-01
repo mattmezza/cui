@@ -2,7 +2,7 @@
 
 Development source only; use matching headers/implementation. The C software
 adapter has an explicit V2 query/render route in `cui/cui_software.h`; the V1
-`cui_renderer` table and `cui_software_render` route remain unchanged. SDL_Renderer,
+`cui_renderer` table and `cui_software_render` route remain unchanged. The separate unreleased C [SDL_Renderer route](SDL_V2.md) uses the shared painter.
 SDL_GPU, Sokol GLCORE, Canvas wire and foreign authoring bindings remain pending.
 This does not establish all 78 component part/presentation coverage.
 

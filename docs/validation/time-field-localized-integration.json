@@ -50,5 +50,13 @@
     "log": "time-dialog-web-build.log",
     "docs_pages": 468,
     "shareable_pages": 550
+  },
+  "browser": {
+    "result": "FAIL",
+    "artifact_source": "0fdaad43f9de95dabea3512261e5e602120cf9cd",
+    "log": "time-dialog-browser.log",
+    "usage_excerpts": 80,
+    "failure": "Default short Dialog first-open body scroll maximum is43, expected0; panel420x298 and body420x63. Browser stopped before localized TimeField scenarios.",
+    "impact": "Intrinsic Dialog geometry requires correction; TimeField browser acceptance remains unexecuted."
   }
 }

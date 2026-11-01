@@ -1,0 +1,25 @@
+{
+  "scope": "Integrator acceptance of private transactional software V2 shadows; public adapters and text painting remain unfinished",
+  "source_revision": "655691b8",
+  "worker_commit": "798fc314",
+  "build": "Release GCC, repository warnings; cmake --build /home/matteo/.cache/cui-current-validation/native --target test_software_v2_shadows test_software_v2_paint test_software_v2_validation -j1; nice19 CPU0; 8 build/link steps after CMake regeneration passed",
+  "test_command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -R '^software_v2_(shadows|paint|validation)$' -j1",
+  "tests": "3/3 PASS, 0.20 seconds; private Xvfb",
+  "source_sha256": {
+    "backends/software/cui_software_v2_shadow_internal.h": "15740c42e5af62516b7b01e821ca36ce6bc2cd43790743b2223a62f0ae5f716b",
+    "backends/software/cui_software_v2_paint_internal.h": "71ef41a5b76e5159250c48988dc034f1f465c82fec6bd7eec74e013ae01cee4a",
+    "backends/software/cui_software_v2_internal.h": "dc4f4f54063202d057f098535078fff6fa9586b035bf9569a4923d0e0aafc878",
+    "tests/unit/test_software_v2_shadows.c": "ed717eca3d0787da6990cb027d8cff65264b43d2e867eb61993a75634e983056",
+    "tests/unit/test_software_v2_paint.c": "19e13c114f1b1e95ee3c418cdb7223bc07afb4c3c0681348d851e9541303bbfc",
+    "tests/unit/test_software_v2_validation.c": "375fb6da3e0d2e4bbea055fe41945f3aa4225c5d23988a88be0b7afc270cb8c2"
+  },
+  "archive_sha256": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+  "coverage": "48 mixed 14-command RGBA frames, 8 large-position and 3 hard-clip cases, 4608 frozen V1 RGBA pixels; bounded workspace/cells/taps, allocation/preparation failures, retry and target atomicity",
+  "remaining": [
+    "Text painting",
+    "Public software V2 entry and other adapters",
+    "Full combined suite and hosted exact-revision validation",
+    "Release and deployment"
+  ],
+  "consumer_skill": "python tests/test_agent_skill.py: 18/18 PASS,39.305 seconds; canonical SDK/amalgamation/skill regenerated before check"
+}

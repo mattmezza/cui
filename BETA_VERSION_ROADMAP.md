@@ -14,7 +14,7 @@ use the checklists below to track acceptance and delivery.
 | Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New Slider, scroll geometry, background/text preparation and software V2 rendering work is **unreleased**. The combined Linux build and 541 headless tests pass; final browser/platform acceptance and publication remain unfinished. |
+| Integration branch | New Slider, scroll geometry, background/text preparation and software V2 rendering work is **unreleased**. The combined Linux build and 559 headless tests pass; the full browser gate also passes. Platform acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -29,7 +29,7 @@ feature test does not establish complete component parity.
 
 ## Next milestones, in order
 
-1. **Finish active slices:** refresh the full native regression suite, then validate SDL V2 rendering and localized TimeField bindings. Dialog/AlertDialog and localized TimeField browser checks pass; broader lifecycle and delivery remain open.
+1. **Finish active slices:** validate SDL V2 rendering and localized TimeField bindings; the refreshed full native regression suite passes. Dialog/AlertDialog and localized TimeField browser checks pass; broader lifecycle and delivery remain open.
 2. **Close component and ecosystem gaps:** reconcile every family with the frozen
    baseline and the reported regressions below; finish bindings and documentation.
 3. **Validate the integrated revision:** compatibility, headless regressions,
@@ -45,7 +45,7 @@ feature test does not establish complete component parity.
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight source passed initial focused checks, including 216 frozen-validator comparisons; private extraction is integrated as `16827ec9`. Its exact-limit boundary fixtures and frozen-validator comparison now pass three combined headless checks (0.16 seconds); broader rendering regressions remain open. Compile-only native/WASM guard measurements now preserve all 37 existing offsets and alignment; native object cost is +8 bytes, WASM +0. SDL V2 production rendering, runtime compatibility and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
-| Validation | Linux baseline `21acfca8`: **541/541 headless tests pass, zero skips** (291.67s), predating Dialog/TimeField. Later slices pass focused native/skill checks. Full headless browser gate passes on artifact `1f40cc5a`, including all 78 stories and 80 compiled usage excerpts. All 42 representative touch cases pass. The refreshed native build completes all 550 steps; whole-suite native tests, platform acceptance and publication remain open. |
+| Validation | Linux integration `7c7ac4e0`: **559/559 headless tests pass, zero skips** (298.22s), including Dialog, localized TimeField and generated-skill checks. Full headless browser gate passes on artifact `1f40cc5a`, including all 78 stories and 80 compiled usage excerpts. All 42 representative touch cases pass. The refreshed native build and 559/559 headless tests pass, zero skips (298.22s); platform acceptance and publication remain open. |
 
 **Resource rule:** reuse existing build directories, serialize heavy builds, and keep automated windows off the desktop. Remove only confirmed disposable artifacts; preserve source and independently landed work.
 
@@ -145,7 +145,7 @@ Current integration evidence (not yet on `main`):
 
 | Slice | Evidence | Still required |
 | --- | --- | --- |
-| Combined Linux baseline | `21acfca8`: 541/541 headless tests, zero skips | Repeat on the final integrated revision; this run predates Dialog and localized TimeField. |
+| Combined Linux regression | `7c7ac4e0`: 559/559 headless tests, zero skips (298.22s), including Dialog and localized TimeField | Repeat after new production slices; excludes unintegrated SDL V2 and localized TimeField bridge. |
 | Dialog composition | `ef893a34` idle fix; focused native checks and full browser gate on artifact `1f40cc5a` pass | Broader lifecycle and deployment; nested-touch checks pass. |
 | Localized TimeField | Integrated `49267cc4`; native/source/ABI checks and focused plus full browser gates pass | Broader touch/IME, localized bindings and platform coverage. |
 

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "scope": "Unreleased additive C localized TimeField widget; no Core dispatch or legacy widget changes",
+  "baseline": "63f0b5e7",
+  "source_checkpoints": [
+    "b42eed0e",
+    "62038dfa",
+    "14e18a53",
+    "98031868",
+    "46d68713"
+  ],
+  "policy": "CPU1 nice19 sequential; cached actual engine/software/text; private-Xvfb native wrapper; no engine rebuild/new dependencies",
+  "initial_failures": [
+    {
+      "log": "build-focused/time-field-v1-first.log",
+      "finding": "Base strict compile PASS; Styled draft used nonexistent cui_size.w. Corrected to width."
+    },
+    {
+      "log": "build-focused/time-field-v1-runtime-first.log",
+      "finding": "Complete example both modes PASS, widget rejected full formatted out-of-domain paste atomically but returned INVALID_SYNTAX instead of OUT_OF_RANGE."
+    },
+    {
+      "log": "build-focused/time-field-paste-diagnostic.log",
+      "finding": "Actual changed0/rejected1/validation3/value11:22:33/segment0; completegrammar INVALID_VALUE/OUT_OF_RANGE now exits before segmented fallback."
+    },
+    {
+      "log": "build-focused/time-field-v1-extended.log",
+      "finding": "Fixture rawtarget assertion ran inside inert ancestry, where Core cui_event_target deliberately returns0. Invariant remains exact outside inert/layout-only; all ordinary input evidence assertions retained."
+    }
+  ],
+  "verified": {
+    "strict": "GCC C11 O2 Wall/Wextra/Wpedantic/Werror new Base/Styled/fixture and exact guide example PASS",
+    "runtime": "private7/7PASS0.16s source/selective/umbrella configured module, old/new headers, complete example Styled/Base",
+    "cpp": "C++11 strict old/new include order compile/run PASS",
+    "wasm": "Pinned Zig0.16 wasm32-wasi O2 strict Base/Styled/header compile PASS",
+    "ABI": {
+      "native64": {
+        "options": 152,
+        "state": 96,
+        "result": 32
+      },
+      "wasm32": {
+        "options": 120,
+        "state": 96,
+        "result": 20
+      }
+    },
+    "coverage": [
+      "split4TEXT vs coalesced1234=12:34; rawtargets unchanged; one aggregate callback",
+      "foreign/consumed genuinefocus excursions preserve draft; netzero callback0",
+      "host and accessibility visible-child focus clears digit/prefix",
+      "ordinary globalTab forward/back boundaries,twoTab,Tab/pointer interleaving,Tabexitclears draft",
+      "copied queued fullUTF8paste>64bytes after source overwrite; atomic range rejection",
+      "splitUTF8prefix across frames; generation reset and localized semantic names",
+      "disabled/readonly/inert/layout/modal statefreeze and recovery",
+      "invalidportal Core diagnosticclear cannot authorize input; healthygeometrypass then freshkey",
+      "actual software dangerborder pixel and clear; submittedtext survives stackpoison"
+    ],
+    "log": "build-focused/time-field-v1-portability.log"
+  },
+  "pending": [
+    "final legacy cached regression gate",
+    "final human/metadata/skill canonical freshness and requiredskill18",
+    "TimeField-only gallery source migration then ROOT combinedWASM/headlessbrowser proof"
+  ],
+  "omissions": [
+    "allfiveforeign localized facade/options/events",
+    "IME/preedit and clipboard shortcut integration",
+    "source one-root focus/reentry; uses ordinary globalTab",
+    "source complete size/focus-ring styling, localizedDateTime and physicalAT",
+    "selective/umbrella configured module links cached Core/legacy/pure helpers; not full CUI_IMPLEMENTATION_ALL engine rebuild"
+  ],
+  "cached_library_sha256": {
+    "libcui.a": "1bbba6821b44b97279205cf5e1a25cb93a12c4ed1cb5e9b4e59ec093bab28dc1",
+    "libcui_software.a": "b042e4f39fa33664f13e3988a70892e21d43752a88b3b2c7e5446ca976883fdd",
+    "libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+    "libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "source_sha256": {
+    "include/cui/cui_time_field_v1.h": "c495b586c56d7699e034f0642bc4d3f4760d4581d96c71fa483522d134d3f1d8",
+    "src/base/cui_time_field_v1.c": "2c6c6258a2ae9a30b3fbd30a0b598c1998d3688cdcc59619caad8c31fd8109cf",
+    "src/base/cui_time_field_v1_internal.h": "ef92855192e6f95c682b830732d704c21aa26f5f560bd968d452dab15b2e56ed",
+    "src/components/cui_time_field_v1.c": "bed6e9770fb4094d7bc3e16499adca9d0522ee937f0106366854746620f4a83d",
+    "tests/unit/test_time_field_v1.c": "de3d603ba5c68678e1454829f7053f831e05a797f01a45f7963468fef4b8474c",
+    "tests/unit/test_time_field_v1_headers.c": "e4af0c9636697ba2db68ce47f09666d4a4822211e4d313f37faac79f643cf312",
+    "examples/time_field_localized.c": "112fa76c4b747a02b5e289777280a16c4e952bbe9764c09bfbe053a65f40f411"
+  }
+}

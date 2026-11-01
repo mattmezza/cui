@@ -1,6 +1,15 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_software.h"
+#if defined(CUI_TIME_FIELD_DISTRIBUTION)
+#define CUI_TIME_FIELD_V1_IMPLEMENTATION
+#if defined(CUI_TIME_FIELD_UMBRELLA)
+#include "cui_all.h"
+#else
+#include "cui_time_field_v1.h"
+#endif
+#else
 #include "cui/cui_time_field_v1.h"
+#endif
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -15,7 +24,7 @@ typedef struct {
     cui_time_field_state_v1 state;
     cui_draw_list draw;
     size_t calls, measurements;
-    bool styled, inert, layout, omit, handler;
+    bool styled, inert, layout, omit, handler, modal;
     cui_time_change copy;
     cui_id raw_targets[16];
     size_t raw_count;
@@ -83,6 +92,11 @@ static cui_time_field_result_v1 frame(fixture *f) {
     }
     cui_begin_box(f->ui, 1000, (cui_box){.inert = f->inert, .layout_only = f->layout});
     neighbor(f->ui, 10);
+    if (f->modal) {
+        assert(cui_begin_focus_scope(f->ui, 900, true));
+        neighbor(f->ui, 900);
+        cui_end_focus_scope(f->ui);
+    }
     cui_time_field_result_v1 r = {0};
     if (!f->omit) {
         cui_time_handler h = {.on_change = f->handler ? observe : NULL, .user = f};
@@ -103,8 +117,11 @@ static cui_time_field_result_v1 frame(fixture *f) {
             cui_end_box(f->ui);
         }
     }
-    for (size_t i = 0; i < event_count; ++i)
-        assert(f->raw_targets[i] == cui_event_target(f->ui, i));
+    /* The Core target accessor deliberately returns0 under current inert
+     * ancestry. Outside that policy, routing evidence remains unchanged. */
+    if (!f->inert && !f->layout)
+        for (size_t i = 0; i < event_count; ++i)
+            assert(f->raw_targets[i] == cui_event_target(f->ui, i));
     neighbor(f->ui, 30);
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
@@ -428,6 +445,13 @@ static void paste_and_bounds(bool styled) {
            0);
     text(&f, (cui_str){payload, n});
     r = frame(&f);
+    if (r.changed || r.rejected_count != 1 || r.validation != CUI_TIME_TEXT_OUT_OF_RANGE ||
+        !same(f.time, before) || f.state.segment != segment)
+        fprintf(stderr,
+                "paste rejection: changed=%d rejected=%zu validation=%u value=%u:%u:%u segment=%u "
+                "expected=%u\n",
+                r.changed ? 1 : 0, r.rejected_count, (unsigned)r.validation, f.time.hour,
+                f.time.minute, f.time.second, f.state.segment, segment);
     assert(!r.changed && r.rejected_count == 1 && r.validation == CUI_TIME_TEXT_OUT_OF_RANGE &&
            same(f.time, before) && f.state.segment == segment);
     assert(cui_time_field_clear_validation_v1(&f.state) == 0);
@@ -452,6 +476,106 @@ static void paste_and_bounds(bool styled) {
     text(&f, (cui_str){"\xa1", 1});
     frame(&f);
     assert(f.time.minute == 1 && f.state.pending_length == 0 && f.state.digit_count == 1);
+    cui_destroy(f.ui);
+}
+static void inactive_and_generation(bool styled) {
+    for (unsigned mode = 0; mode < 5; ++mode) {
+        fixture f;
+        init(&f, styled);
+        warm(&f);
+        focus(&f, 1);
+        text(&f, cui_string("1"));
+        frame(&f);
+        unsigned char state[sizeof f.state];
+        memcpy(state, &f.state, sizeof state);
+        size_t calls = f.calls;
+        if (mode == 0)
+            f.options.flags = CUI_TIME_FIELD_DISABLED_V1;
+        else if (mode == 1)
+            f.options.flags = CUI_TIME_FIELD_READONLY_V1;
+        else if (mode == 2)
+            f.inert = true;
+        else if (mode == 3)
+            f.layout = true;
+        else
+            f.modal = true;
+        key(&f, CUI_KEY_UP, 0);
+        cui_time_field_result_v1 r = frame(&f);
+        assert(!r.changed && !r.change_count && f.calls == calls && f.time.minute == 1);
+        assert(!memcmp(state, &f.state, sizeof state));
+        f.options.flags = 0;
+        f.inert = false;
+        f.layout = false;
+        f.modal = false;
+        frame(&f);
+        frame(&f);
+        focus(&f, 1);
+        key(&f, CUI_KEY_UP, 0);
+        r = frame(&f);
+        assert(r.changed && r.change_count == 1 && f.time.minute == 2);
+        cui_destroy(f.ui);
+    }
+    fixture f;
+    init(&f, styled);
+    warm(&f);
+    focus(&f, 1);
+    text(&f, cui_string("1"));
+    frame(&f);
+    assert(f.state.digit_count == 1);
+    f.options.edit_generation++;
+    f.options.segment_names[0] = cui_string("ساعة");
+    text(&f, cui_string("2"));
+    frame(&f);
+    assert(f.time.minute == 2 && f.state.digit_count == 1);
+    size_t n;
+    const cui_semantic *semantics = cui_semantics(f.ui, &n);
+    bool named = false;
+    for (size_t i = 0; i < n; i++)
+        if (semantics[i].id == cui_time_segment_id(20, 0)) {
+            cui_str name = semantics[i].name;
+            named = name.length == strlen("ساعة") && !memcmp(name.data, "ساعة", name.length);
+        }
+    assert(named);
+    cui_destroy(f.ui);
+}
+static void readiness_recovery(bool styled) {
+    fixture f;
+    init(&f, styled);
+    unsigned char initial[sizeof f.state];
+    memcpy(initial, &f.state, sizeof initial);
+    cui_time_field_result_v1 outside =
+        cui_base_time_field_v1(f.ui, 20, cui_string("Time"), &f.state, &f.time, &f.options,
+                               (cui_time_handler){observe, &f});
+    assert(outside.status == CUI_TIME_TEXT_INVALID_ARGUMENT &&
+           !memcmp(initial, &f.state, sizeof initial));
+    key(&f, CUI_KEY_UP, 0);
+    frame(&f);
+    assert(f.time.minute == 30 && !f.calls);
+    frame(&f);
+    focus(&f, 1);
+    key(&f, CUI_KEY_UP, 0);
+    assert(cui_begin_frame(f.ui, 1200, 400, .016f));
+    cui_begin_portal(f.ui, 999, (cui_box){0}, (cui_rect){.w = -1}, 1);
+    cui_end_box(f.ui);
+    assert(cui_last_error(f.ui) == CUI_ERROR_LAYOUT);
+    cui_clear_error(f.ui);
+    assert(!cui_frame_input_snapshot_ready(f.ui));
+    cui_time_field_result_v1 r =
+        styled ? cui_time_field_v1(f.ui, 20, &f.theme, cui_string("Time"), &f.state, &f.time,
+                                   &f.options, (cui_time_handler){observe, &f})
+               : cui_base_time_field_v1(f.ui, 20, cui_string("Time"), &f.state, &f.time, &f.options,
+                                        (cui_time_handler){observe, &f});
+    assert(!r.changed && !r.change_count && f.time.minute == 30 && !f.calls &&
+           !cui_event_consumed(f.ui, 0));
+    cui_end_frame(f.ui);
+    cui_clear_error(f.ui);
+    key(&f, CUI_KEY_UP, 0);
+    r = frame(&f);
+    assert(!r.changed && !r.change_count && f.time.minute == 30);
+    focus(&f, 1);
+    key(&f, CUI_KEY_UP, 0);
+    r = frame(&f);
+    assert(r.changed && r.change_count == 1 && f.time.minute == 31);
     cui_destroy(f.ui);
 }
 static void atomic_preflight(void) {
@@ -535,9 +659,13 @@ int main(void) {
         tab_exit_draft(styled != 0, true);
         tabs(styled != 0);
         paste_and_bounds(styled != 0);
+        inactive_and_generation(styled != 0);
+        readiness_recovery(styled != 0);
     }
     atomic_preflight();
     pixels_and_text();
-    puts("localized TimeField: PASS");
+    printf("localized TimeField: PASS state=%zu options=%zu result=%zu\n",
+           sizeof(cui_time_field_state_v1), sizeof(cui_time_field_options_v1),
+           sizeof(cui_time_field_result_v1));
     return 0;
 }

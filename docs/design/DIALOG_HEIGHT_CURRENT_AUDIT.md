@@ -129,3 +129,48 @@ After geometry and compatibility validation, migrate the gallery Dialog and
 AlertDialog demos to the new route and document it as the recommended composition
 path. Preserve old helpers and their legacy behavior tests. Production and
 browser acceptance are still required; this decision is not completion evidence.
+
+## Implementation delta after review
+
+Reuse the corrected six-slot contract, rather than introduce a new layout
+architecture. The new files are `cui_dialog_composition.h`, the Styled companion
+header, and Base/Styled composition modules. Existing public surface records and
+old helpers remain unchanged. The new route accepts existing Core held-input
+semantics; it does not promise cancellation across close/reopen. No unpublished
+scoped cancellation, marker, event-query or dispatch code is transferred.
+
+Candidate records retain the prior reviewed field layout: slot style32,
+refinement232, sizing96 (two24-byte region policies and explicit placement),
+composition152/84 on LP64/ILP32, layout208/200 with ten borrowed tracked rectangles.
+These are prior measurements and current expectations, not a fresh compiler
+measurement. Exact current native/WASM sizes and offsets must pass the metadata
+oracle before publication. No numeric byte constants are introduced publicly.
+
+The retained source golden cases and current-font fixture will run through the
+actual new functions. First-frame and changed text/viewport/content/action cases
+must pass without warm-up frames. Gallery Dialog/AlertDialog call sites are
+assigned to this worker only after geometry proof; surrounding gallery controls
+remain outside this slice. Root owns combined browser execution.
+
+## Source-only preservation checkpoint
+
+Status: **SOURCE ONLY, UNVERIFIED**. This checkpoint preserves the isolated draft
+before runtime validation or possible reboot. It is not a tested production
+handoff. The exact source hashes and pending checks are recorded in
+`docs/validation/dialog-six-slot-source-checkpoint.json`.
+
+Owned changes are the new Dialog Base/Styled headers/modules and focused
+fixtures, plus narrow CMake/source-metadata/amalgamation registration. Existing
+Core, Table, old surface helpers, bindings and gallery are untouched. The draft
+corrects `labelled_by` to reference only an actually admitted Title wrapper;
+fixtures inspect empty, omitted, fallback, custom and authored-empty Title cases.
+
+Only static whitespace, Python syntax, JSON syntax and module-path existence
+checks ran. No C/C++ compile, native/WASM ABI measurement, runtime, current-font
+layout, software pixels, callbacks, configured distribution, generated freshness,
+skill suite or browser test ran for this draft. Canonical generated outputs are
+intentionally not refreshed in this source-only checkpoint, per integrator
+instruction; regeneration and required checks remain mandatory before handoff.
+The ABI assertions encode prior expectations and can still fail on this base.
+Gallery migration waits for geometry proof. The held-input lifecycle limitation
+and separate Root/host/five-facade scope remain open.

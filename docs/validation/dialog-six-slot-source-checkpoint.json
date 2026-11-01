@@ -1,0 +1,44 @@
+{
+  "status": "SOURCE_ONLY_UNVERIFIED",
+  "base": "139695",
+  "branch": "design/dialog-height-current",
+  "ownership": "New Dialog Base/Styled composition headers/modules, focused Dialog fixtures, and narrow build/amalgamation registration only. Existing Core, Table, surface helpers, bindings and gallery are unchanged.",
+  "executed_checks": [
+    "git diff --check",
+    "Python AST parse of scripts/amalgamate.py",
+    "JSON parse and new module source existence checks for cmake/sources.json"
+  ],
+  "not_executed": [
+    "C/C++ compilation",
+    "native or WASM ABI measurement",
+    "native runtime / private-Xvfb CTest",
+    "first-frame/current-font geometry or software pixels",
+    "actions/veto/focus callback timing",
+    "configured distribution consumers",
+    "SDK/amalgamation/agent-skill generation and freshness",
+    "usage/skill test suites",
+    "gallery migration and browser tests"
+  ],
+  "abi": "32/232/96-byte common records and LP64 composition152/layout208, ILP32 composition84/layout200 are prior expectations encoded in assertions, NOT current-base measurements.",
+  "limitations": [
+    "Held pointer/key/contact across close/reopen retains existing Core semantics; no scoped cancellation/marker is included.",
+    "Root/native-host and all five foreign facade composition remain separate unfinished work.",
+    "No production readiness, parity or test success is claimed."
+  ],
+  "sources": {
+    "CMakeLists.txt": "4b6fb74ae8d1a4930aeaea6358c1fa9d079d361edd70e3729bd32c9d6864060b",
+    "cmake/sources.json": "361a3084af0cb7a76ef38ed7e9f9cf4e00ba678cc1232154538727a2fa4a2ca2",
+    "scripts/amalgamate.py": "a173f6ee8ee7251e58f980dc17a8366fe56391c666bf7d4bc055ef390c00dc4e",
+    "include/cui/cui_dialog_composition.h": "84280caa758fc430c7365656fd9911ad6d7bc992587a67b7d2d33936ec43bb5a",
+    "include/cui/cui_dialog_composition_styled.h": "46672598c507fb1e0c4b90fb21e804ddb1f0497e629f0086f57314f620424d04",
+    "src/base/cui_dialog_composition.c": "5ff1de04653f59f8b7cec53b1087e83bd5d18468f511a6bccf784aa9c2c1de2e",
+    "src/base/cui_dialog_composition_private.h": "706f31ac750418b731f707197d1958b5b29577903436ad3a4bf4aabb0bd57922",
+    "src/components/cui_dialog_composition.c": "40f9f5b29d5d140504ea22adfc8fc51bfe890ffd2f9aa499a7c29858b45c576d",
+    "tests/unit/dialog_composition_helpers.c": "7419a2916f5c975c1c7c74d5e5af522526bf82916a43833811774f87f89623e6",
+    "tests/unit/dialog_composition_helpers.h": "bd94aab75fd5f57d9f7f9efbba70304f428d74e964f3d41d404ac7993f317b47",
+    "tests/unit/test_dialog_composition_abi.c": "36b986d1a607609b80ead5b70923fe14e13769b243291c8132e9c25a92cb825f",
+    "tests/unit/test_dialog_composition_actions.c": "28e52a56468e879d610c8b388d4bb3ec2ae0564b90fc5cbc1daaf47a390cfa1e",
+    "tests/unit/test_dialog_composition_contracts.c": "63bc4693e040d82ffa0622ac76f73b2aa42109ff82ef44230f3d7acca3e252d8",
+    "tests/unit/test_dialog_composition_geometry.c": "f56e2e8fe38edeb52878be394e77d6d9b768f74135d6a26c695c43542d23c64e"
+  }
+}

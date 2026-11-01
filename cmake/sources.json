@@ -117,6 +117,12 @@
       "src/base/cui_form.c",
       "src/components/cui_form.c"
     ],
+    "cui_dialog_composition": [
+      "src/base/cui_dialog_composition.c"
+    ],
+    "cui_dialog_composition_styled": [
+      "src/components/cui_dialog_composition.c"
+    ],
     "cui_surface": [
       "src/base/cui_surface.c",
       "src/components/cui_surface.c"

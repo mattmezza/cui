@@ -1740,6 +1740,32 @@ add_test(NAME dialog_surface_legacy_trace COMMAND test_dialog_surface_legacy)
 set_tests_properties(dialog_surface_legacy_trace PROPERTIES TIMEOUT 60)
 add_test(NAME dialog_surface_reference_authority COMMAND ${Python3_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_dialog_surface_reference.py)
+# Additive Dialog composition uses current-frame Core constraints; old surface
+# routes retain their independent frozen trace above.
+add_library(test_dialog_composition_abi OBJECT tests/unit/test_dialog_composition_abi.c)
+target_include_directories(test_dialog_composition_abi PRIVATE include)
+cui_warnings(test_dialog_composition_abi)
+if(TARGET cui_text)
+ foreach(dialog_case contracts geometry actions)
+  add_executable(test_dialog_composition_${dialog_case}
+   tests/unit/test_dialog_composition_${dialog_case}.c
+   tests/unit/dialog_composition_helpers.c)
+  target_link_libraries(test_dialog_composition_${dialog_case} PRIVATE cui cui_text cui_software)
+  cui_warnings(test_dialog_composition_${dialog_case})
+ endforeach()
+ add_test(NAME dialog_composition_contracts COMMAND test_dialog_composition_contracts)
+ add_test(NAME dialog_composition_actions COMMAND test_dialog_composition_actions)
+ find_file(CUI_DIALOG_TEST_FONT NAMES NotoSans-Regular.ttf DejaVuSans.ttf Arial.ttf
+  PATHS /usr/share/fonts/noto /usr/share/fonts/truetype/dejavu /usr/share/fonts/TTF
+  C:/Windows/Fonts /System/Library/Fonts/Supplemental)
+ find_file(CUI_DIALOG_TEST_BOLD NAMES NotoSans-Bold.ttf DejaVuSans-Bold.ttf "Arial Bold.ttf"
+  PATHS /usr/share/fonts/noto /usr/share/fonts/truetype/dejavu /usr/share/fonts/TTF
+  C:/Windows/Fonts /System/Library/Fonts/Supplemental)
+ if(CUI_DIALOG_TEST_FONT AND CUI_DIALOG_TEST_BOLD)
+  add_test(NAME dialog_composition_geometry COMMAND test_dialog_composition_geometry
+   "${CUI_DIALOG_TEST_FONT}" "${CUI_DIALOG_TEST_BOLD}")
+ endif()
+endif()
 add_executable(test_surface_base tests/unit/test_surface.c src/core/cui.c src/base/cui_models.c src/base/cui_overlay.c src/base/cui_surface.c)
 target_include_directories(test_surface_base PRIVATE include third_party/clay)
 target_compile_definitions(test_surface_base PRIVATE CUI_SURFACE_BASE_ONLY=1)

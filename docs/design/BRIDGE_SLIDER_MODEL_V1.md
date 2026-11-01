@@ -137,7 +137,7 @@ uint32_t cui_bridge_slider_request_v1_size(void);
 uint32_t cui_bridge_slider_presentation_v1_size(void);
 cui_bridge_status cui_bridge_slider_queue_enable_v1(cui_bridge_app *,
     uint32_t options_size, const cui_bridge_slider_queue_options_v1 *);
-cui_bridge_status cui_bridge_slider_model_create_v1(cui_bridge_app *, const char *key_utf8,
+cui_bridge_status cui_bridge_slider_model_create_v1(cui_bridge_app *, cui_bridge_node parent, const char *key_utf8,
     uint32_t config_size, const cui_bridge_slider_config_v1 *,
     uint32_t value_size, const cui_bridge_slider_value_v1 *, cui_bridge_node *out);
 cui_bridge_status cui_bridge_slider_model_configure_v1(cui_bridge_app *, cui_bridge_node,
@@ -495,3 +495,36 @@ Future production should first implement this approved supported-target C slice,
 then prove real records/receipt rules and frozen legacy behavior. Richer bridge
 input, five foreign authoring routes, native AT precision/delivery, vertical
 registered-scroll and actual V2 gradient adapters remain separate open work.
+
+### Production admission (2026-11-01)
+
+Root approved the supported-target compatible C slice after the guard probes.
+Factory signature is corrected before shipping: explicit full parent handle
+follows app and precedes key. There is no public attach/reparent API; implicit
+root would break nested composition. Factory validates actual Row/Column parent
+and retains existing key/ancestry/allocation atomicity. Other records/signatures
+and all old ABIs stay unchanged. Required proof includes nested Row/Column UI.
+The unshared runtime fixture now asserts memoryShared==false, rather than merely
+logging it. Actual final-module postlink verification must enforce that condition.
+
+The unshipped CMake helper from the ABI checkpoint is removed before
+implementation: defining a feature on a shared bridge target while verifying
+one consumer cannot certify every other final consumer. No shared-WASM CMake
+linkage/automatic capability claim is made. Instead the trusted opt-in recipe is
+explicit and applies to EACH final module: compile the actual bridge TU with
+`-DCUI_BRIDGE_SLIDER_WASM_UNSHARED=1` and no atomics/reentrant flags, link a valid
+wasm32 final module, run the normal engine/link validation, then run
+`python scripts/verify_slider_unshared_wasm.py FINAL.wasm` before delivery, and
+independently inspect actual runtime Memory.buffer in the host proof. Re-linking,
+embedding in another final host or transforming requires repeating those checks.
+Do not distribute a pre-opted-in archive/shared bridge as if unrelated consumers
+were already verified; generic SDKs remain default versions0. A dedicated build
+variant/automation requires separate review rather than global compile policy.
+
+`scripts/verify_slider_unshared_wasm.py` inspects imported and defined memory
+descriptors, rejects shared/memory64/multiple/missing/ambiguous memory and malformed
+descriptor data; it is a memory-policy checker, not a full module validator.
+Successful normal final-module validation is a prerequisite. Four offline tests
+pass, actual pinned unshared artifact passes and actual shared artifact fails.
+The runtime fixture additionally asserts actual Memory.buffer is not shared.
+No renderer negotiation or automatic supported-host discovery is inferred.

@@ -40,6 +40,7 @@ const {WASI} = require('node:wasi');
   const memory = e.memory;
   assert(memory instanceof WebAssembly.Memory);
   const shared = memory.buffer instanceof SharedArrayBuffer;
+  assert.equal(shared, false, "opted-in final module must have unshared memory");
   console.log(JSON.stringify({status: 'passed', imports,
     exports: WebAssembly.Module.exports(module), memoryShared: shared,
     policySupported: e.probe_supported(), ownerStable: true, wrongOwnerRejected: true, saturatingEpoch: true,

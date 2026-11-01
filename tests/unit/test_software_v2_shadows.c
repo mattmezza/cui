@@ -162,7 +162,8 @@ static void large_position_pixels(void) {
             }
 }
 static void exact_clip_centers(void) {
-    unsigned char actual[CAPACITY];
+    /* The allocator compares the complete pre-paint buffer, including padding. */
+    unsigned char actual[CAPACITY] = {0};
     cui_draw_command_v2 c[3] = {
         legacy(CUI_DRAW_CLIP_PUSH, (cui_rect){.5f, .5f, 1, 1}, (cui_color){0}),
         shadow(CUI_DRAW_DROP_SHADOW), legacy(CUI_DRAW_CLIP_POP, (cui_rect){0}, (cui_color){0})};

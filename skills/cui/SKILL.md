@@ -8,7 +8,8 @@ description: Build and debug CUI user interfaces in C11, Python, JavaScript, Typ
 Use the Python 3.9+ standard-library helper beside this file. Resolve its absolute
 path from this skill's location; do not assume the skill is in the app checkout.
 In commands below, `HELPER` means that absolute `scripts/cui.py` path. No pip
-packages are required. The skill includes offline documentation, headers and
+packages are required. The CLI writes UTF-8 to stdout/stderr, including redirected
+Windows pipes; consumers should decode its output as UTF-8. The skill includes offline documentation, headers and
 examples; it does not include the CUI implementation or compiler toolchain.
 
 For unreleased owned background colors/two-stop values and pure sampling, read

@@ -322,7 +322,8 @@ static void compare_upload(cui_sdl3 *s, cui_software *cpu, cui_draw_list_v2 *lis
 int main(int argc, char **argv) {
     assert(argc == 2);
     SDL_SetMainReady();
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    /* Headless hosts may already select software through a higher-priority env hint. */
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
     cui_font *font = cui_font_open(argv[1]);
     assert(font);
     object_calls = object_bytes = 0;

@@ -99,7 +99,8 @@ def prepare(cache, network):
             raise SystemExit('Engine Rust source changed')
         delta = ''.join(difflib.unified_diff(original.splitlines(True), reduced.splitlines(True),
                                            fromfile='upstream/Cargo.toml', tofile='local/Cargo.toml'))
-        (directory / 'MANIFEST_DELTA.patch').write_text(delta)
+        # Hash and write identical UTF-8/LF bytes on Windows as well as POSIX.
+        (directory / 'MANIFEST_DELTA.patch').write_bytes(delta.encode('utf-8'))
         provenance['crates'][name] = {'version': version, 'archive_sha256': sha,
                                       'rust_source_sha256': before,
                                       'manifest_delta_sha256': digest(delta.encode())}

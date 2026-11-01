@@ -3,6 +3,7 @@
 Headless path validated locally; optional native interactive path remains untested.
 """
 import argparse
+import sys
 from dataclasses import replace
 from cui_bridge import (App, BridgeError, button, column, label, row, localized_time_field,
     TimeValue, TimeLocale, TimeFieldConfig, TimeCycle, TimePrecision, TimeTextStatus)
@@ -83,4 +84,5 @@ def main():
 
 
 if __name__ == '__main__':
+    sys.stdout.reconfigure(encoding='utf-8')
     main()

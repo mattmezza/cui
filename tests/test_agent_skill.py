@@ -5,6 +5,7 @@ import io
 import contextlib
 import shlex
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -32,6 +33,13 @@ class AgentSkillTests(unittest.TestCase):
         with mock.patch.object(cui, 'resources', return_value=data or self.data), contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = cui.main(arguments)
         return code, out.getvalue(), err.getvalue()
+
+    def test_cli_preserves_unicode_with_legacy_pipe_encoding(self):
+        resource = 'bindings/go/cui/time_localized.go'
+        result = subprocess.run([sys.executable, str(SCRIPTS / 'cui.py'), 'read', resource],
+                                capture_output=True, env=dict(os.environ, PYTHONIOENCODING='cp1252'))
+        self.assertEqual(result.returncode, 0, result.stderr.decode('utf-8'))
+        self.assertEqual(result.stdout.decode('utf-8'), (ROOT / resource).read_text(encoding='utf-8') + '\n')
 
     def test_presentation_preserves_json_full_and_read(self):
         for name in ('Select', 'Input'):
@@ -166,7 +174,7 @@ class AgentSkillTests(unittest.TestCase):
     def test_live_packaged_and_installed_presentation(self):
         # Live resources and packaged native-bundle data take different loading paths.
         command = [sys.executable, str(SCRIPTS / 'cui.py')]
-        live = subprocess.run(command + ['component', 'Select', '--source', str(ROOT)], capture_output=True, text=True)
+        live = subprocess.run(command + ['component', 'Select', '--source', str(ROOT)], capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(live.returncode, 0, live.stderr)
         live_data = agent_resources.collect(ROOT)
         self.assertIn(json.dumps(cui.component(live_data, 'Select', 'limitations')['status'], indent=2, ensure_ascii=False), live.stdout)
@@ -178,12 +186,12 @@ class AgentSkillTests(unittest.TestCase):
             installed_command = [sys.executable, str(installed / 'scripts/cui.py')]
             for args in (['component', 'Select'], ['component', 'Input', '--show', 'examples'],
                          ['api', 'cui_begin_frame'], ['read', 'docs/START_HERE.md', '--headings']):
-                result = subprocess.run(installed_command + args + ['--source', str(target)], cwd=target, capture_output=True, text=True)
+                result = subprocess.run(installed_command + args + ['--source', str(target)], cwd=target, capture_output=True, text=True, encoding="utf-8")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertTrue(result.stdout)
-            result = subprocess.run(installed_command + ['api', 'cui_begin_frame', '--source', str(target)], capture_output=True, text=True)
+            result = subprocess.run(installed_command + ['api', 'cui_begin_frame', '--source', str(target)], capture_output=True, text=True, encoding="utf-8")
             read_line = next(line.strip() for line in result.stdout.splitlines() if ' read ' in line)
-            followup = subprocess.run(shlex.split(read_line), cwd=target, capture_output=True, text=True)
+            followup = subprocess.run(shlex.split(read_line), cwd=target, capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(followup.returncode, 0, followup.stderr)
             self.assertIn('cui_begin_frame', followup.stdout)
 
@@ -226,10 +234,10 @@ class AgentSkillTests(unittest.TestCase):
             for arguments in (['list', '--json'], ['search', 'searchable dropdown', '--json'],
                               ['component', 'Input', '--show', 'usage', '--json'],
                               ['api', 'cui_begin_frame'], ['read', 'docs/TYPOGRAPHY.md']):
-                result = subprocess.run(command + arguments, cwd=root, capture_output=True, text=True)
+                result = subprocess.run(command + arguments, cwd=root, capture_output=True, text=True, encoding="utf-8")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertTrue(result.stdout)
-            result = subprocess.run(command + ['api', 'cui_not_a_real_api'], cwd=root, capture_output=True, text=True)
+            result = subprocess.run(command + ['api', 'cui_not_a_real_api'], cwd=root, capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(result.returncode, 2)
 
     def test_doctor_reports_missing_tools_without_installing(self):
@@ -292,12 +300,12 @@ class AgentSkillTests(unittest.TestCase):
                     exact = (ROOT / name).read_text(encoding='utf-8')
                     self.assertEqual(self.data['documents'][name], exact)
                     result = subprocess.run([sys.executable, str(helper), 'read', name],
-                                            cwd=directory, capture_output=True, text=True)
+                                            cwd=directory, capture_output=True, text=True, encoding="utf-8")
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(result.stdout, exact + '\n')
             for symbol in ('cui_bridge_set_box_shadows_v1', 'cui_bridge_set_target_box_shadows_v1'):
                 result = subprocess.run([sys.executable, str(helper), 'api', symbol],
-                                        cwd=directory, capture_output=True, text=True)
+                                        cwd=directory, capture_output=True, text=True, encoding="utf-8")
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn('include/cui/cui_bridge.h', result.stdout)
 
@@ -345,7 +353,7 @@ class AgentSkillTests(unittest.TestCase):
             shutil.copytree(ROOT / 'skills/cui', installed)
             helper = installed / 'scripts/cui.py'
             def invoke(*args):
-                return subprocess.run([sys.executable, str(helper), *map(str, args)], cwd=root, capture_output=True, text=True)
+                return subprocess.run([sys.executable, str(helper), *map(str, args)], cwd=root, capture_output=True, text=True, encoding="utf-8")
             dest = root / 'vendor'
             result = invoke('vendor', '--source', ROOT, '--dest', dest)
             self.assertEqual(result.returncode, 0, result.stderr)

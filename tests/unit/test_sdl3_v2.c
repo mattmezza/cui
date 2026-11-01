@@ -410,10 +410,10 @@ int main(int argc, char **argv) {
     all[n] = all[8];
     all[n].payload.legacy.bounds.x = 9;
     all[n].payload.legacy.text_paint = (cui_text_paint){.kind = CUI_TEXT_PAINT_LINEAR,
-                                                        .x1 = 2,
-                                                        .y1 = 3,
-                                                        .x2 = 24,
-                                                        .y2 = 18,
+                                                        .x0 = 2,
+                                                        .y0 = 3,
+                                                        .x1 = 24,
+                                                        .y1 = 18,
                                                         .stops = stops,
                                                         .stop_count = 2};
     ++n;

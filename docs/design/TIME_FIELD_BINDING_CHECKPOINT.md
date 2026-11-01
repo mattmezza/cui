@@ -260,3 +260,18 @@ native nor headless example has compiled/run yet. uint32/u64 output uses inttype
 PRI macros; the application-owned unsigned counter retains %u. This changes no
 bridge API/queue/owner behavior. No generated file or canonical source snapshot
 was updated; all validation gates remain pending.
+
+
+## First focused C evidence
+
+See docs/validation/time-field-bridge-first.json. Production strict C/C++ compile
+was clean; initial private9 ran8PASS/1exampleFAIL because a convenience helper
+tried empty text on a structural Column. Only the example helper was corrected;
+production stayed unchanged. Current example/static/wrapped frozen comparison
+then passed3/3. Example now also authors actual disabled and bounds-toggle buttons.
+Private LP64 app size measured1288→1304 (+16); no legacy lazy resource allocations.
+Pinned WASM ABI/default/unshared/shared-unsupported compiled4strict objects; this
+is not runtime/final-memory proof. Native interactive and remaining integration
+matrix/generation/package gates remain open. The durable optional wrapped
+comparison runner/CMake flags are committed for integrator registration proof;
+worker equivalent scratch registration ran under the private wrapper.

@@ -9,7 +9,8 @@
 #define CHECK(e) do { if (!(e)) { fprintf(stderr, "line%d: %s\n", __LINE__, #e); goto failed; } } while (0)
 
 typedef struct {
-    cui_bridge_node english, arabic, summary, clear, readonly_button;
+    cui_bridge_node english, arabic, summary, clear, readonly_button, disabled_button, bounds_button;
+    uint32_t english_disabled;
     cui_bridge_time_field_config_v1 english_config, arabic_config;
     cui_bridge_time latest;
     unsigned changes;
@@ -17,7 +18,7 @@ typedef struct {
 static int node(cui_bridge_app *app, cui_bridge_node parent, cui_bridge_kind kind,
                 const char *key, const char *text, cui_bridge_node *out) {
     return cui_bridge_node_create(app,parent,kind,key,out)==CUI_BRIDGE_OK &&
-           cui_bridge_set_text(app,*out,text)==CUI_BRIDGE_OK;
+           (!*text || cui_bridge_set_text(app,*out,text)==CUI_BRIDGE_OK);
 }
 static int token(cui_bridge_time_token_v1 *out, const char *s) {
     size_t length=strlen(s);
@@ -59,6 +60,18 @@ static int dispatch(cui_bridge_app *app, appointments *owner) {
         } else if(generic.node.slot==owner->readonly_button.slot &&
                   generic.node.generation==owner->readonly_button.generation) {
             owner->english_config.flags ^= CUI_BRIDGE_TIME_FIELD_READONLY_V1;
+            if(cui_bridge_time_field_configure_v1(app,owner->english,&owner->english_config)!=CUI_BRIDGE_OK) return 0;
+        } else if(generic.node.slot==owner->disabled_button.slot &&
+                  generic.node.generation==owner->disabled_button.generation) {
+            owner->english_disabled ^= 1u;
+            if(cui_bridge_set_disabled(app,owner->english,owner->english_disabled)!=CUI_BRIDGE_OK) return 0;
+        } else if(generic.node.slot==owner->bounds_button.slot &&
+                  generic.node.generation==owner->bounds_button.generation) {
+            if(owner->english_config.edit_generation==UINT64_MAX) return 0;
+            owner->english_config.edit_generation++;
+            owner->english_config.bounds_flags ^= CUI_BRIDGE_TIME_HAS_MINIMUM_V1|CUI_BRIDGE_TIME_HAS_MAXIMUM_V1;
+            owner->english_config.minimum=owner->english_config.bounds_flags?(cui_bridge_time){8,0,0}:(cui_bridge_time){0};
+            owner->english_config.maximum=owner->english_config.bounds_flags?(cui_bridge_time){18,0,0}:(cui_bridge_time){0};
             if(cui_bridge_time_field_configure_v1(app,owner->english,&owner->english_config)!=CUI_BRIDGE_OK) return 0;
         }
     }
@@ -131,6 +144,9 @@ int main(int argc, char **argv) {
     CHECK(node(app,root,CUI_BRIDGE_ROW,"controls","",&controls));
     CHECK(node(app,controls,CUI_BRIDGE_BUTTON,"clear","Clear validation",&owner.clear));
     CHECK(node(app,controls,CUI_BRIDGE_BUTTON,"readonly","Toggle English read-only",&owner.readonly_button));
+    CHECK(node(app,root,CUI_BRIDGE_ROW,"more-controls","",&controls));
+    CHECK(node(app,controls,CUI_BRIDGE_BUTTON,"disabled","Toggle English disabled",&owner.disabled_button));
+    CHECK(node(app,controls,CUI_BRIDGE_BUTTON,"bounds","Toggle English bounds",&owner.bounds_button));
     if(native) {
         /* Same nodes, values, controls and copied-observation dispatch; no scripted
          * input/step inside the runner callback. Existing host polls real input. */

@@ -1,0 +1,76 @@
+{
+  "status": "focused_c_worker_checks_passed_unreleased",
+  "production_source_commit": "b3fad1fc",
+  "source_checkpoints": [
+    "b3fad1fc",
+    "0513a315",
+    "9df44948"
+  ],
+  "engine": {
+    "base": "b4cd6a8f",
+    "cached_engine_source": "eb6a3c6b",
+    "libraries": {
+      "libcui.a": {
+        "sha256": "55dc10cbef55df647327197455831b42c7ad548491d858a6b66de5636b469566",
+        "immutable_copy": "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/time-field-bridge/baseline-libcui.a"
+      },
+      "libcui_bridge.so": {
+        "sha256": "34293f4b99f3259bf13c31c19669dc26e216eaffbbab504d125adf419cda1d12",
+        "immutable_copy": "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/time-field-bridge/baseline-libcui_bridge.so"
+      }
+    },
+    "engine_source_diff": [
+      "include/cui/cui_sdl3.h"
+    ]
+  },
+  "wrapped": {
+    "source_revision": "9df44948 plus example-only uncommitted fixes",
+    "example_sha256": "ac2104d7c844539af23982c26fa26f317fb70312514b916aefb0159939055092",
+    "example_binary_sha256": "eb767dfc2fc41bcef9474b36c980722cc2e08587b8ad104f9725801b21c266fc",
+    "example_compiled_after_source": true,
+    "legacy_images": {
+      "old": {
+        "binary": "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/time-field-bridge/legacy-old",
+        "search": "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/time-field-bridge/old-library",
+        "trace_sha256": "5e03d6a4f831b838bfd616da5bc6edcee78e1f9b8dae3ec13bd3bdba5e83195c"
+      },
+      "new": {
+        "binary": "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/test_bridge_time_field_legacy",
+        "search": "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused",
+        "trace_sha256": "5e03d6a4f831b838bfd616da5bc6edcee78e1f9b8dae3ec13bd3bdba5e83195c"
+      }
+    },
+    "app_sizeof": {
+      "old": 1288,
+      "new": 1304
+    },
+    "app_delta": 16,
+    "legacy_new_lazy_allocations": 0,
+    "scope": "Actual private-Xvfb separate-process legacy comparison and measured LP64 private app growth; no desktop/nativeinteractive."
+  },
+  "first_result": "Strict O2 C/C++ production/fixtures compiled warnings-clean; private9 tests8PASS1exampleFAIL. Example helper wrongly set empty text on structural Column/Row; fixed helper, no production behavior change.",
+  "final_results": [
+    "Corrected current headless example PASS1/1",
+    "Matching Linux static example PASS1/1; ldd has no bridge DSO",
+    "Final private currentexample/static/wrappedlegacy3/3PASS .08s",
+    "Initial actual native fixture/unsupported/ABI/thread/closure/C++orders8PASS",
+    "Pinned Zig0.16.0 strict wasm32-wasi compile-only ABI/default/unshared/shared-unsupported4objectsPASS"
+  ],
+  "logs": {
+    "configure-first.log": "c3175257e33ac0904ae23373a59676d1bee053c35140e2fab7a2f639cb94809f",
+    "dry-run-first.log": "28cc64248c50c45067f31615dfbc380de70f7c93cf5031e47c64aa411c5fe3ce",
+    "first.log": "b643a0a1b07e4cdf70a3228afd68a3f62dd515ef33200616d040c30350dd162a",
+    "second.log": "f3cb06dc467674b0b4b606f06edd462e302c398b3e9f87f3489215b5a4f3b80e",
+    "final-focused.log": "765248367bc8ebe8f5ca84393fb2413cb12d621496e90ea20d7a9b1be13c7675"
+  },
+  "workflow_correction": "Initial windowless legacy comparison ran directly; repeated both trace processes under private wrapper before claiming native workflow proof. No SDL/desktop window opened.",
+  "limits": [
+    "No native interactive launch or physical hardware proof",
+    "WASM compile-only; no new runtime/shared-memory/final-module support proof",
+    "No native ILP32 receipt",
+    "No full cycle/precision/omission/geometry-recovery matrix yet",
+    "Durable optional legacy_compare.py/CMake registration added after equivalent wrapped scratch proof; integrator must run registered path",
+    "No SDK/amalgamation/skill generation, usage/skill/fullsuite or installed-package gate authorized in this lease",
+    "All five localized language builders remain unimplemented"
+  ]
+}

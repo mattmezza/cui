@@ -1,9 +1,12 @@
-# Localized TimeField bridge (source checkpoint, unvalidated)
+# Localized TimeField bridge (focused C proof, unreleased)
 
-The additive C bridge source is prepared; its compile, runtime, ABI, old-library
-comparison and canonical generation gates have **not run**. Do not treat this
-checkpoint as supported package functionality. The existing tested scalar
-TimeField builders in Python, JavaScript, TypeScript, Go and Rust remain unchanged;
+The additive C bridge has passed focused strict C/C++ compilation, headless UI,
+thread/queue/failure fixtures and matching Linux static example checks. The
+independent frozen legacy trace matches exactly under private Xvfb. Pinned WASM
+checks are compile-only. See the [first receipt](validation/time-field-bridge-first.json)
+for initial failures and exact limits. Canonical generation, complete integration
+and package gates remain pending; this is not released package functionality.
+The existing tested scalar builders in all five languages remain unchanged;
 none yet exposes this localized bridge mode. See the
 [reviewed contract](design/TIME_FIELD_BINDING_CHECKPOINT.md) and
 [direct C widget guide](TIME_FIELD_LOCALIZED.md).
@@ -11,13 +14,14 @@ none yet exposes this localized bridge mode. See the
 The [complete C program](../bindings/bridge/examples/time_field_localized.c)
 authors two real TimeFields inside Row/Column UI, English24-hour and Arabic12-hour,
 with independent state, explicit same-day08:00–18:00 bounds, a summary label,
-clear-validation and read-only buttons. It queues deterministic host pointer/text
+clear-validation, read-only, disabled and bounds-toggle buttons. It queues deterministic host pointer/text
 input and drains copied changes after step, updating sibling text from application
 state. Its default backend is windowless. Optional `--native` uses the same authored tree
 and dispatch through the existing SDL bridge runner, with real host input and no
-scripted edits. Both paths are awaiting separate compile/runtime proof.
+scripted edits. The headless path passed focused compile/runtime checks. Native interactive
+launch remains untested.
 
-Once a validation lease is available, the intended reproducible invocation is:
+When reproducing the focused gate, the intended reproducible invocation is:
 
 ```sh
 cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
@@ -41,8 +45,8 @@ The native callback drains owned observations and handles real button clicks
 without nesting step/run. Headless success will not imply native proof.
 
 Use existing build directories/caches where possible. CMake, Ninja, Python3 and a
-C11 toolchain are required; see [dependencies](DEPENDENCIES.md). These commands
-have not been executed for this source checkpoint. Native automated checks always
+C11 toolchain are required; see [dependencies](DEPENDENCIES.md). The worker used equivalent strict cached-engine compilation to avoid a139-step
+engine rebuild; the exact CMake target commands remain integrator acceptance. Native automated checks always
 use the private-display wrapper, never the maintainer desktop.
 
 Include `cui/cui_bridge.h`. Check `cui_bridge_time_field_versions()` bit0 and all
@@ -165,4 +169,11 @@ python tests/fixtures/time_field_bridge/portable.py --zig /absolute/path/to/pinn
 It checks Zig0.16.0 and compiles ABI plus actual bridge TUs for default, asserted
 unshared and atomics/shared-unsupported policies, sequentially with strict C11
 warnings. It does not link/run, verify final memory or claim shared-memory support.
-All these newly prepared checks remain unexecuted at this source checkpoint.
+The worker ran the closure fixture, both C++ orders, Linux static example and all
+four pinned WASM compile objects. Native ILP32, installed SDK rebuild and final
+unshared module verification remain pending for this new route. The optional
+`bridge_time_field_frozen_wrapped` CMake test requires
+`CUI_TIME_FIELD_FROZEN_LEGACY_EXECUTABLE` and
+`CUI_TIME_FIELD_FROZEN_LEGACY_LIBRARY_DIR`; it uses the committed comparison runner
+inside the private wrapper. Worker equivalent scratch registration passed; the
+integrator must validate the durable CMake registration.

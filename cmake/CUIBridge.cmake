@@ -245,3 +245,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
  cui_warnings(bridge_time_field_example_static)
  add_test(NAME bridge_time_field_example_static COMMAND bridge_time_field_example_static)
 endif()
+# Optional independent pre-feature trace: build from the bounded freezer first.
+set(CUI_TIME_FIELD_FROZEN_LEGACY_EXECUTABLE "" CACHE FILEPATH "Pre-localized bridge legacy trace executable")
+set(CUI_TIME_FIELD_FROZEN_LEGACY_LIBRARY_DIR "" CACHE PATH "Directory of matching old libcui_bridge.so")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUI_TIME_FIELD_FROZEN_LEGACY_EXECUTABLE)
+ if(NOT EXISTS "${CUI_TIME_FIELD_FROZEN_LEGACY_EXECUTABLE}" OR NOT EXISTS "${CUI_TIME_FIELD_FROZEN_LEGACY_LIBRARY_DIR}/libcui_bridge.so")
+  message(FATAL_ERROR "Frozen TimeField trace needs existing old executable and matching library directory")
+ endif()
+ add_test(NAME bridge_time_field_frozen_wrapped COMMAND ${Python3_EXECUTABLE}
+  ${CUI_BRIDGE_ROOT}/tests/fixtures/time_field_bridge/legacy_compare.py
+  --old-executable ${CUI_TIME_FIELD_FROZEN_LEGACY_EXECUTABLE}
+  --new-executable $<TARGET_FILE:test_bridge_time_field_legacy>
+  --old-library-dir ${CUI_TIME_FIELD_FROZEN_LEGACY_LIBRARY_DIR}
+  --new-library-dir $<TARGET_FILE_DIR:cui_bridge>)
+endif()

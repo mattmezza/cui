@@ -138,3 +138,22 @@ Freeze the actual pre-change bridge TU/private headers at the integration base a
 The new C fixture must show: capacity1 with two configure attempts rejects the second unchanged; two queued changes block the next frame before app time/native poll/input/state changes; draining permits that same queued input once; omitted/disabled nodes still count conservatively; removal and slot reuse never deliver to a replacement; later unrelated node failure and simulated native-render failure retain real earlier value/draft mutations plus frame-status-marked observations; diagnostic clear and geometry-only recovery cannot refresh result; a healthy ordinary frame can. Actual native poll/render link-time stubs test bridge control flow, not hardware success. Wrong-thread tests keep the owner thread alive, prove no allocation/publication on failure and preserve unrelated legacy behavior. Test enable order both with and without Slider; unsupported native-no-TLS/default/shared-WASM paths must not advertise support.
 
 C and Python complete authored examples must construct real nested UI with independent English/H12 and Arabic fields, a current-value label, read-only/disabled/bounds controls and clear-validation button. The typed callback copies a previous/final pair and updates external application state/sibling text **after** Core step, including a retained failed-frame record. Cover >64-byte copied full paste, pending-prefix replacement, out-of-range rejection, edit-generation reset, omission/reappearance, net-zero aggregate, close/removal/exception, no second callback after close and callback-owned data surviving teardown. There is no accept/reject owner proposal API: validation rejects edits before mutation, while successful edits have already applied. Python must test actual old/partial symbol groups without touching legacy support. All five localized binding rows remain pending until their individual source/runtime delivery; no full-family, physical AT, IME or one-root Tab closure follows from this first slice.
+
+## Integrator decision (2026-11-01)
+
+Approve the additive C-bridge slice and the subsequent Python authoring slice,
+using the reviewed owner, whole-frame preflight and failed-frame observation
+rules above. Applied-change records must retain final frame status after a later
+submission failure; they are observations of model changes, not proof of painting
+or accepted proposals. Legacy rendering, scalar setters/events and dispatch timing
+remain unchanged when localized mode is off. Opt-in owner-thread restrictions are
+explicit; wrong-thread rejection must not write diagnostics or allocate.
+
+Begin with the C header/private module and meaningful source/ABI/legacy fixtures.
+Do not implement a new input dispatcher, transaction rollback, controlled-value
+receipt protocol or foreign callback inside Core submission. Reuse the existing
+private owner-policy mechanism without enabling Slider or broadening its platform
+support. Handle frame-sequence exhaustion before mutation instead of wrapping.
+Python delivery requires its own optional-symbol/ownership and real authored-UI
+checks after the C contract passes. JS/TS/Go/Rust remain required later slices.
+All advertised support and metadata remain unchanged until the matching gates pass.

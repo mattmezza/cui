@@ -273,3 +273,14 @@ applied aggregate, never a controlled proposal/acceptance protocol.
 
 No compiler or test execution for this source-only proposal. All names/signatures
 and the ordinary-global-Tab exception require review before production.
+
+## Integrator decision (2026-11-01)
+
+Approved the additive implementation and test scope above. Retain the explicit
+ordinary-global-Tab exception; source one-root focus behavior remains unfinished.
+`changed` reports net value change independently of handler presence;
+`change_count` preserves the existing observer convention of counting actual
+callback invocations, not accepted edits. Existing entry points remain unchanged.
+
+Source implementation may proceed in isolation. Runtime, ABI, generated-resource
+and gallery acceptance remain required; approval is not implementation evidence.

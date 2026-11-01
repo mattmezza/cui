@@ -28,9 +28,27 @@
   ],
   "manifest_entries": 78,
   "pending": [
-    "Full WASM gallery link and headless browser scenarios",
+    "Headless browser runtime scenarios (full WASM build passed)",
     "Whole-suite regression after Dialog and localized TimeField integration",
     "One-root Tab, IME and foreign authoring coverage",
     "Release and deployed gallery verification"
-  ]
+  ],
+  "wasm_gallery": {
+    "result": "PASS",
+    "source_revision": "0fdaad43f9de95dabea3512261e5e602120cf9cd",
+    "toolchain": "Zig 0.16.0",
+    "flags": [
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Werror"
+    ],
+    "sha256": "09b6982d47e470fc1a9bae78f5cf2f8efa01cac6ee12434f5d488569c5ce638b",
+    "bytes": 8173269,
+    "log": "time-dialog-web-build.log",
+    "docs_pages": 468,
+    "shareable_pages": 550
+  }
 }

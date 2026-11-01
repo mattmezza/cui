@@ -598,6 +598,14 @@
       "sources": [
         "src/base/cui_time_text.c"
       ]
+    },
+    {
+      "header": "cui_time_field_v1.h",
+      "macro": "CUI_TIME_FIELD_V1_IMPLEMENTATION",
+      "sources": [
+        "src/base/cui_time_field_v1.c",
+        "src/components/cui_time_field_v1.c"
+      ]
     }
   ]
 }

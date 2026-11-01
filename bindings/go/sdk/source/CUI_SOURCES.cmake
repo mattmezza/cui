@@ -123,4 +123,6 @@ set(CUI_SOURCES
  src/components/cui_slider_style.c
  src/components/cui_styled_slider_model.c
  src/base/cui_time_text.c
+ src/base/cui_time_field_v1.c
+ src/components/cui_time_field_v1.c
 )

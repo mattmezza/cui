@@ -2784,3 +2784,9 @@ foreach(entry old_first new_first)
  cui_warnings(test_time_text_headers_${entry})
  add_test(NAME time_text_headers_${entry} COMMAND test_time_text_headers_${entry})
 endforeach()
+
+# Additive localized TimeField widget; legacy picker routes remain separate.
+add_executable(test_time_field_v1 tests/unit/test_time_field_v1.c)
+target_link_libraries(test_time_field_v1 PRIVATE cui cui_software)
+cui_warnings(test_time_field_v1)
+add_test(NAME time_field_v1 COMMAND test_time_field_v1)

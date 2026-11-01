@@ -156,6 +156,8 @@ def generate(name,sources):
             lines += [f'#ifndef {macro_dependency}',f'#define {macro_dependency}', '#endif',f'#include "{module}.h"']
     for source in sources:
         code=(ROOT/source).read_text(encoding="utf-8")
+        for include in ['#include "cui_time_field_v1_internal.h"', '#include "../base/cui_time_field_v1_internal.h"']:
+            code=code.replace(include, (ROOT/'src/base/cui_time_field_v1_internal.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_unicode_grapheme.h"', (ROOT/'src/core/cui_unicode_grapheme.h').read_text(encoding='utf-8'))
         code=code.replace('#include "cui_shadow_profile_internal.h"', (ROOT/'src/effects/cui_shadow_profile_internal.h').read_text(encoding='utf-8'))
         for private_include in ['#include "cui_drop_shadow_bounds_internal.h"', '#include "../core/cui_drop_shadow_bounds_internal.h"']:

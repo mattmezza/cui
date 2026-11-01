@@ -4907,7 +4907,8 @@
       },
       "limitations": [
         "Controlled 12/24-hour segmented hour/minute/optional-second model, persistent digit drafts, AM/PM, strict ASCII parsing and readonly/disabled behavior tested. Min/max times, typed separators, localization and IME remain pending.",
-        "Additive pure locale/domain text helpers are an unreleased C-only slice; localized widget editing, IME, validation appearance and all five bindings remain pending."
+        "Additive pure locale/domain text helpers are an unreleased C-only slice; localized widget editing, IME, validation appearance and all five bindings remain pending.",
+        "Additive localized C widget source is prepared; runtime verification pending. Ordinary global Tab differs from source one-root focus; localized DateTimePicker, full size/focus-ring styling, IME and five bindings remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -4951,6 +4952,14 @@
           "evidence": [
             "tests/unit/test_time_text.c",
             "docs/TIME_FIELD_TEXT.md"
+          ]
+        },
+        {
+          "name": "additive localized C editing and same-day validation",
+          "status": "implemented",
+          "evidence": [
+            "tests/unit/test_time_field_v1.c",
+            "docs/TIME_FIELD_LOCALIZED.md"
           ]
         }
       ],

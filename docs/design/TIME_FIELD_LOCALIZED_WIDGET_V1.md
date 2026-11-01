@@ -284,3 +284,15 @@ callback invocations, not accepted edits. Existing entry points remain unchanged
 
 Source implementation may proceed in isolation. Runtime, ABI, generated-resource
 and gallery acceptance remain required; approval is not implementation evidence.
+
+## Approved source checkpoint
+
+Root approved this additive slice including the ordinary-global-Tab exception.
+`changed` remains a net final value difference even with no handler;
+`change_count` counts actual copied aggregate callback invocations0/1, not accepted
+edits. Initial implementation/test source is prepared with separate Base/Styled
+composition, copied token/paste input and measured localized cells. No shared
+legacy picker implementation was edited. Canonical source/distribution/SDK/skill
+outputs accompany the checkpoint. **No compilation or runtime evidence yet**;
+fixtures, pixel assertions and exact state/option ABI still await the allocated
+focused lease. Gallery migration follows geometry proof, not this source commit.

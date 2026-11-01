@@ -1610,7 +1610,12 @@
         "cui_time_text_options_init_v1",
         "cui_time_validate_v1",
         "cui_time_parse_v1",
-        "cui_time_format_v1"
+        "cui_time_format_v1",
+        "cui_time_field_options_init_v1",
+        "cui_time_field_state_init_v1",
+        "cui_time_field_clear_validation_v1",
+        "cui_base_time_field_v1",
+        "cui_time_field_v1"
       ],
       "state_types": [
         "cui_time_state",
@@ -1622,7 +1627,8 @@
       "docs": [
         "docs/PICKERS.md",
         "docs/TIME_FIELD_EVENTS.md",
-        "docs/TIME_FIELD_TEXT.md"
+        "docs/TIME_FIELD_TEXT.md",
+        "docs/TIME_FIELD_LOCALIZED.md"
       ],
       "callback_symbols": [],
       "scope": "styled frame component",
@@ -1632,7 +1638,8 @@
       "additional_public_headers": [
         "include/cui/cui_picker_events.h",
         "include/cui/cui_time_types.h",
-        "include/cui/cui_time_text.h"
+        "include/cui/cui_time_text.h",
+        "include/cui/cui_time_field_v1.h"
       ]
     },
     {

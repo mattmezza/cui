@@ -675,7 +675,7 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "Existing scalar widget subset only. Pure cui_time_text.h locale/domain parse-format records and typed C aggregate observer remain unbound in all five languages."
+        "Existing scalar widget subset only. Pure cui_time_text.h locale/domain records, additive cui_time_field_v1.h localized widget options/state, and typed C aggregate observers remain unbound in all five languages."
       ]
     },
     {

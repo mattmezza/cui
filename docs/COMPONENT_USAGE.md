@@ -832,6 +832,10 @@ Pure locale/domain text helpers use `cui/cui_time_text.h`; the unchanged `cui_ti
 value is declared in `cui/cui_time_types.h`. See [TimeField text values](TIME_FIELD_TEXT.md).
 These unreleased C-only helpers do not localize the existing widget.
 
+The additive `cui/cui_time_field_v1.h` route uses caller-owned
+`cui_time_field_state_v1` and explicit locale/domain options; see
+[localized widget](TIME_FIELD_LOCALIZED.md). Legacy options and state stay unchanged.
+
 ## Carousel
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.

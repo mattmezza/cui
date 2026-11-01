@@ -80,6 +80,7 @@
 #include "cui_slider_style.h"
 #include "cui_styled_slider_model.h"
 #include "cui_time_text.h"
+#include "cui_time_field_v1.h"
 #endif
 #if defined(CUI_IMPLEMENTATION_ALL) && !defined(CUI_IMPLEMENTATION_ALL_ONCE)
 #define CUI_IMPLEMENTATION_ALL_ONCE
@@ -399,4 +400,8 @@
 #define CUI_TIME_TEXT_IMPLEMENTATION
 #endif
 #include "cui_time_text.h"
+#ifndef CUI_TIME_FIELD_V1_IMPLEMENTATION
+#define CUI_TIME_FIELD_V1_IMPLEMENTATION
+#endif
+#include "cui_time_field_v1.h"
 #endif

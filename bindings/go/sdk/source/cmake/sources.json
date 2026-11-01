@@ -320,6 +320,10 @@
     "cui_time_types": [],
     "cui_time_text": [
       "src/base/cui_time_text.c"
+    ],
+    "cui_time_field_v1": [
+      "src/base/cui_time_field_v1.c",
+      "src/components/cui_time_field_v1.c"
     ]
   },
   "native": {

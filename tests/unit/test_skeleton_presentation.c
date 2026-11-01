@@ -10,6 +10,44 @@ static float invalid(float t, void *user) {
     (*(unsigned *)user)++;
     return NAN;
 }
+typedef struct {
+    cui_theme *theme;
+    cui_skeleton_palette *palette;
+    unsigned calls;
+} mutation;
+static float mutate(float t, void *user) {
+    mutation *m = user;
+    m->theme->secondary = (cui_color){13, 57, 91, 200};
+    m->palette->background = (cui_color){111, 122, 133, 244};
+    m->calls++;
+    return t;
+}
+static void callback_timing(cui_context *ui) {
+    for (unsigned route = 0; route < 3; ++route) {
+        cui_theme theme = cui_theme_light();
+        theme.secondary = (cui_color){21, 34, 55, 128};
+        cui_skeleton_palette palette = {theme.secondary};
+        mutation m = {&theme, &palette, 0};
+        cui_skeleton_options o = cui_skeleton_options_default();
+        o.width = 20; o.height = 16; o.ease = mutate; o.ease_user = &m;
+        cui_loading_motion state = {0}; cui_loading_motion_result result;
+        assert(cui_begin_frame(ui, 64, 48, 0));
+        if (route == 0)
+            assert(frozen_skeleton_ex(ui, 1, &theme, &state, o, &result));
+        else if (route == 1)
+            assert(cui_skeleton_ex(ui, 1, &theme, &state, o, &result));
+        else
+            assert(cui_skeleton_with_palette(ui, 1, &palette, &state, o, &result));
+        cui_draw_list list = cui_end_frame(ui);
+        assert(m.calls == 1 && palette.background.r == 111);
+        assert(list.count == 1 && list.commands[0].type == CUI_DRAW_RECT);
+        cui_color c = list.commands[0].color;
+        if (route < 2)
+            assert(c.r == 13 && c.g == 57 && c.b == 91 && c.a == 200);
+        else
+            assert(c.r == 21 && c.g == 34 && c.b == 55 && c.a == 128);
+    }
+}
 static void same_color(cui_color a, cui_color b) {
     assert(a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a);
 }
@@ -56,6 +94,7 @@ int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 64, .height = 48});
     cui_software *software = cui_software_create(64, 48, NULL);
     assert(ui && software);
+    callback_timing(ui);
     cui_theme theme = cui_theme_light();
     theme.secondary = (cui_color){255, 255, 255, 200};
     cui_skeleton_palette palette;

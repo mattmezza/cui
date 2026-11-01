@@ -23,7 +23,8 @@ def generate():
              'static const cui_skeleton_palette cui_skeleton_palette_records[] = {']
     for theme in ordered:
         colors = theme['colors']
-        value = colors.get('skeleton.background', colors['secondary.background'])
+        value = (colors['skeleton.background'] if 'skeleton.background' in colors
+                 else colors['secondary.background'])
         value = source['named_colors'].get(value, value)
         if not re.fullmatch(r'#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?', value):
             raise ValueError('Unsupported Skeleton source color: ' + value)

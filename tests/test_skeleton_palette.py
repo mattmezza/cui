@@ -1,5 +1,6 @@
 """Offline independent Skeleton source-token oracle; optional actual C dumper."""
 import argparse
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -69,6 +70,30 @@ class SkeletonPalette(unittest.TestCase):
                 raw.write_bytes(raw.read_bytes() + b' ')
                 with self.assertRaises(ValueError): generator.generate()
             finally: generator.ROOT = old
+
+    def test_explicit_token_does_not_eagerly_require_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / 'third_party/gpui_themes'
+            folder.mkdir(parents=True)
+            source = json.loads((ROOT / 'third_party/gpui_themes/palettes.json').read_text())
+            explicit = next(t for t in source['themes'] if 'skeleton.background' in t['colors'])
+            del explicit['colors']['secondary.background']
+            raw = json.dumps(source).encode()
+            (folder / 'palettes.json').write_bytes(raw)
+            (folder / 'presets.json').write_bytes((ROOT / 'third_party/gpui_themes/presets.json').read_bytes())
+            old_root, old_pin = generator.ROOT, generator.PIN
+            generator.ROOT, generator.PIN = root, hashlib.sha256(raw).hexdigest()
+            try:
+                self.assertEqual(generator.generate(), (ROOT / 'src/theme/cui_skeleton_palette_presets.inc').read_text())
+                fallback = next(t for t in source['themes'] if 'skeleton.background' not in t['colors'])
+                del fallback['colors']['secondary.background']
+                raw = json.dumps(source).encode()
+                (folder / 'palettes.json').write_bytes(raw)
+                generator.PIN = hashlib.sha256(raw).hexdigest()
+                with self.assertRaises(KeyError): generator.generate()
+            finally:
+                generator.ROOT, generator.PIN = old_root, old_pin
 
     @unittest.skipUnless(DUMPER, 'actual C dumper path not supplied')
     def test_actual_c_records(self):

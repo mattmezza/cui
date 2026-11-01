@@ -297,3 +297,16 @@ Integrator wiring required (worker intentionally does not edit shared lists):
   palette/painter and caller-owned state/wake semantics while preserving all78
   and explicit responsive/Styled/five-binding omissions. Canonical SDK→amalgamation
   →skill and required installed-skill/freshness checks remain integrator-owned.
+
+### Pre-validation review correction: legacy callback color timing
+
+The frozen ex reads `theme->secondary` after synchronous custom easing. The
+private helper therefore accepts a color pointer and reads it only after sampling;
+old ex passes the original theme member. New palette route snapshots its color
+at entry then passes that local address, as its new contract specifies. Prepared
+independent frozen/current callback mutation tests assert old post-callback RGBA
+and new call-entry snapshot RGBA explicitly. No Core/input change. Generator
+selection now accesses secondary fallback only when no explicit Skeleton token
+exists; offline synthetic source tests prove explicit-only success and required
+missing fallback failure (with test-local pin update, production pin unchanged).
+C compilation and callback runtime tests remain pending the serial lease.

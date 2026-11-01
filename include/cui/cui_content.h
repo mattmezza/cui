@@ -293,7 +293,7 @@ bool cui_spinner_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion
                     cui_spinner_options, cui_loading_motion_result *);
 bool cui_skeleton_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
                      cui_skeleton_options, cui_loading_motion_result *);
-/* Owned palette is borrowed only through submission; alpha0 is authored, not fallback.
+/* Owned palette is snapshotted before easing; alpha0 is authored, not fallback.
  * Same fixed-size/motion validation and output semantics as cui_skeleton_ex.
  * Prevalidation failure leaves state/out/paint unchanged; callbacks may have effects.
  * Success is submission, not completed layout/render. Caller owns clock/wake/reset.

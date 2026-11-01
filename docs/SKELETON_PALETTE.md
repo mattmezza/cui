@@ -45,7 +45,8 @@ Custom color is simply `cui_skeleton_palette p = {{21,34,55,0}};`.
 Transparent color is authored, never an absent override. Source secondary
 multiplies alpha by .5; pulse opacity1→.5→1 then a single byte truncation matches
 existing ex. Parent opacity/clip remains the existing Core layer. Palette input
-is borrowed through submission only; copies need no source lifetime.
+is snapshotted before easing (unlike the preserved legacy ex post-callback theme
+read), and borrowed through submission only; copies need no source lifetime.
 
 Nulls/invalid index leave pure resolver output unchanged. Painter requires nonzero
 ID, positive finite dimensions<=4096, radius0..4096 and duration0..60 (zero uses2s).

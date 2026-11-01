@@ -20,6 +20,13 @@ use the checklists below to track acceptance and delivery.
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
 feature test does not establish complete component parity.
 
+## How to read this roadmap
+
+- **Integrated:** accepted on the working integration branch; may be unreleased.
+- **Test-only / drafted:** exploratory or worker changes, not supported production APIs.
+- **Open checkbox:** acceptance or delivery is still required, even if a subset works.
+- **Released / deployed:** verified published artifacts, tracked separately from source.
+
 ## Next milestones, in order
 
 1. **Finish active implementation:** Dialog sizing/lifecycle, typed Slider bridge
@@ -34,10 +41,10 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Test-only cancellation candidate passes 38 checks, including numeric stale-key/idle fixes, bare-scope Escape and frozen compatibility. Production transfer still needs remaining reducer coverage and explicit scope-ID alias limitations. |
-| Typed Slider | C models, gallery, C bridge and Python/JS/TS authoring are integrated with focused compatibility checks; standalone Node CMake tests pass 61/61. Finish Go/Rust and native numeric delivery. These additions are unreleased. |
-| Backgrounds, shadows and text | Private software painting, transactional shadows and owned text painting are integrated; current-build renderer and skill checks pass. Finish public software support and the other four adapters. Public text scaling stays at 16×; private owned recording supports 64×. |
-| Validation | Combined warning-enabled build passed (945 steps). Full Linux suite: 481 passed, two skipped; typography rerun passed, optional original-theme fixture audit remains skipped. Focused Python integration checks also pass. Hosted exact-revision checks and delivery remain open. |
+| Dialog and scrolling | Test-only cancellation candidate passes 38 checks, including numeric stale-key/idle fixes, bare-scope Escape and frozen compatibility. Remaining Table/Color retained-state fixtures are prepared but unexecuted; production transfer and explicit scope-ID alias limitations remain open. |
+| Typed Slider | C models, gallery, C bridge and Python/JS/TS authoring are integrated with focused compatibility checks; standalone Node CMake tests pass 61/61. Go/Rust design is approved, implementation/validation and native numeric delivery remain open. These additions are unreleased. |
+| Backgrounds, shadows and text | Private software painting, transactional shadows and owned text painting are integrated with focused checks. Public software wrapper is drafted and entering validation; it is not accepted support yet. Finish that wrapper and the other four adapters. Public text scaling stays at 16×; private owned recording supports 64×. |
+| Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
 
 ## Remaining beta scope
 

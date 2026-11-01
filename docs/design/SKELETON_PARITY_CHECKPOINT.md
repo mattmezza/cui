@@ -265,3 +265,35 @@ NOT deliver source full-parent/fraction/flex root sizing, own Styled border/layo
 refinement, richer gallery compositions or any modern Skeleton binding options.
 All five legacy constructors remain unchanged and their omissions remain visible.
 Family completion, full renderer/platform parity and all78 closure remain open.
+
+### Prepared production checkpoint and integrator-owned wiring
+
+Implementation now prepared in the worker tree, not C-compiled/runtime-verified.
+The narrow offline `python tests/test_skeleton_palette.py` run passed two tests;
+actual C dumper check skipped until a binary is supplied. Source generator
+repairs missing/changed table, checks its pin/order and preserves identical bytes.
+No canonical SDK/amalgamation/skill generation was run.
+
+Integrator wiring required (worker intentionally does not edit shared lists):
+
+* Register public `include/cui/cui_skeleton_palette.h` with theme/value header
+  authority and before `cui_content.h` in amalgamation; add
+  `src/theme/cui_skeleton_palette.c` and its private table to the theme source
+  manifest/SDK closure. No new external dependency or Components→platform edge.
+* `test_skeleton_palette`: `tests/unit/test_skeleton_palette.c`, link `cui`.
+  Register `python tests/test_skeleton_palette.py --dumper <target-file>` and
+  narrow generator `--check`; the C dumper uses actual exported functions while
+  expected bytes come independently from normalized pinned presets.
+* `test_skeleton_presentation`: `tests/unit/test_skeleton_presentation.c`, link
+  `cui` and `cui_software` (same dependencies as existing status motion test).
+  Frozen `tests/fixtures/skeleton/frozen.c.inc` records exact old functions from
+  `956a853c` with macro name remapping and their unchanged positive-size helper;
+  it is independent of candidate painter helper.
+* Compile `tests/fixtures/skeleton/header.c` in C11/C++11 with/without
+  `CUI_SKELETON_CONTENT_FIRST`, then selective/umbrella consumers. Compile the new
+  source and affected Components TU under pinned WASM strict flags separately.
+  All native executions use `scripts/test_local.py`; no desktop window tests.
+* After actual proof, update source usage/coverage/skill metadata to index the new
+  palette/painter and caller-owned state/wake semantics while preserving all78
+  and explicit responsive/Styled/five-binding omissions. Canonical SDK→amalgamation
+  →skill and required installed-skill/freshness checks remain integrator-owned.

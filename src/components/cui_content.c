@@ -991,9 +991,10 @@ bool cui_spinner_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_load
     *out = result;
     return true;
 }
-bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loading_motion *state,
-                     cui_skeleton_options o, cui_loading_motion_result *out) {
-    if (!ui || !id || !theme || !state || !out || !isfinite(o.width) || o.width <= 0 ||
+static bool cui_skeleton_color(cui_context *ui, cui_id id, cui_color color,
+                                cui_loading_motion *state, cui_skeleton_options o,
+                                cui_loading_motion_result *out) {
+    if (!ui || !id || !state || !out || !isfinite(o.width) || o.width <= 0 ||
         o.width > 4096 || !isfinite(o.height) || o.height <= 0 || o.height > 4096 ||
         !isfinite(o.radius) || o.radius < 0 || o.radius > 4096 || !isfinite(o.duration) ||
         o.duration < 0 || o.duration > 60)
@@ -1005,7 +1006,6 @@ bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loa
                                    o.ease_user, &result))
         return false;
     /* The reference has no loading boolean, status role, or busy relationship. */
-    cui_color color = theme->secondary;
     color.a = (uint8_t)(color.a * result.opacity * (o.secondary ? .5f : 1));
     cui_begin_box(
         ui, id,
@@ -1014,6 +1014,16 @@ bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme, cui_loa
     *state = next;
     *out = result;
     return true;
+}
+bool cui_skeleton_ex(cui_context *ui, cui_id id, const cui_theme *theme,
+                     cui_loading_motion *state, cui_skeleton_options o,
+                     cui_loading_motion_result *out) {
+    return theme && cui_skeleton_color(ui, id, theme->secondary, state, o, out);
+}
+bool cui_skeleton_with_palette(cui_context *ui, cui_id id,
+                               const cui_skeleton_palette *palette, cui_loading_motion *state,
+                               cui_skeleton_options o, cui_loading_motion_result *out) {
+    return palette && cui_skeleton_color(ui, id, palette->background, state, o, out);
 }
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *t, float length, bool vertical) {
     if (!ui || !t)

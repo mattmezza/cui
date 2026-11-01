@@ -4,6 +4,7 @@
 #include "cui_base.h"
 #include "cui_icon.h"
 #include "cui_theme.h"
+#include "cui_skeleton_palette.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -292,6 +293,14 @@ bool cui_spinner_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion
                     cui_spinner_options, cui_loading_motion_result *);
 bool cui_skeleton_ex(cui_context *, cui_id, const cui_theme *, cui_loading_motion *,
                      cui_skeleton_options, cui_loading_motion_result *);
+/* Owned palette is borrowed only through submission; alpha0 is authored, not fallback.
+ * Same fixed-size/motion validation and output semantics as cui_skeleton_ex.
+ * Prevalidation failure leaves state/out/paint unchanged; callbacks may have effects.
+ * Success is submission, not completed layout/render. Caller owns clock/wake/reset.
+ * State/out must not overlap each other or borrowed inputs. No semantic/busy node. */
+bool cui_skeleton_with_palette(cui_context *, cui_id, const cui_skeleton_palette *,
+                               cui_loading_motion *, cui_skeleton_options,
+                               cui_loading_motion_result *);
 void cui_divider(cui_context *ui, cui_id id, const cui_theme *theme, float length, bool vertical);
 /* Shared delayed lifecycle for hover cards/tooltips, independent of styling. */
 typedef struct {

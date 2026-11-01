@@ -142,6 +142,9 @@ jobs:
           uv run tests/web/test_video_gallery.py --offline
           uv run tests/web/test_video_gallery.py --directory build/web
           uv run tests/web/test_video_player_gallery.py --directory build/web
+      - name: Verify controlled Single and Range Slider input paint and idle scheduling
+        if: ${{ matrix.shard == 2 }}
+        run: uv run tests/web/test_typed_slider_gallery.py --directory build/web --compile-usage
       - name: Verify typed shortcut hints and owner-validated Stepper navigation
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_kbd_stepper_gallery.py --directory build/web

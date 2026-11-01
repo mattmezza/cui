@@ -2740,9 +2740,17 @@ def main():
             page.wait_for_timeout(60)
             canvas.focus()
             page.keyboard.press('Tab')
-            initial = page.evaluate('cuiGallery.exports.gallery_semantic(0,8)')
+            # Typed Single has a Group before its thumb; assert the actual
+            # controlled owner and rendered slider, rather than a semantic index.
+            initial = page.evaluate('cuiGallery.exports.gallery_slider_stats(1)')
+            thumb = page.locator('#accessible [role=slider][aria-label="Selection end"]')
+            rendered = float(thumb.get_attribute('aria-valuenow'))
             page.keyboard.press('ArrowRight')
-            page.wait_for_function('(initial)=>cuiGallery.exports.gallery_semantic(0,8)>initial', arg=initial)
+            page.wait_for_function("""([owner, painted]) => {
+                const thumb = document.querySelector('#accessible [role=slider][aria-label="Selection end"]');
+                return cuiGallery.exports.gallery_slider_stats(1) === owner + 1 && thumb &&
+                    Number(thumb.getAttribute('aria-valuenow')) > painted;
+            }""", arg=[initial, rendered])
             page.evaluate('location.hash="Input"')
             page.wait_for_function('document.querySelector("#name").textContent==="Input" && cuiGallery.renderedComponent==="Input"')
             page.wait_for_timeout(60)

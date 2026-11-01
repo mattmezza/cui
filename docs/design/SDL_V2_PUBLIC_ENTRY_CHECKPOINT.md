@@ -175,3 +175,24 @@ Exact commands, frozen authority and all constants are recorded in
 This supplies the requested measurement, not approval or implementation of the
 proposed public entry points. Native failure mapping, guard behavior and original
 V1 runtime differential acceptance remain required.
+
+## Integrator implementation decision (2026-11-01)
+
+Approve the additive SDL-specific query/render slice above, including the measured
+native opaque-object increase of eight bytes (WASM zero). Keep the constructor's
+single allocation count and every old field offset; no new V1 cache or allocation
+path is approved. This private object cost is explicit, not a public ABI change.
+
+Use existing typed errors: busy/faulted owner → `CUI_ERROR_LIFECYCLE`;
+invalid arguments/aliases or unsupported native target/format/colorspace →
+`CUI_ERROR_INVALID_ACTION`; explicit limits or counted allocation failure →
+`CUI_ERROR_CAPACITY`. Preserve common preparation errors. Native query/create/
+upload/draw/Flush failure → `CUI_ERROR_INVALID_ACTION`. A restoration failure
+also poisons the owner; idle destruction must remain possible. Keep the exhaustive
+busy-access matrix, pure exclusion checks before mutation/native calls, and busy
+ownership through cleanup. Present remains an attempt, not a display guarantee.
+
+Implementation may proceed in isolation. Public support stays unadvertised until
+frozen V1 runtime differentials, all-command V2 output, native failure injection,
+reentry/aliasing and state restoration checks pass. This decision introduces no
+new input dispatch or application state-ownership architecture.

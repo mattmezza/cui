@@ -8,7 +8,7 @@
     "taffy_tree",
     "content_size"
   ],
-  "engine_receipt_sha256": "6d1d9c30eaf58ff1af1143256fa1d86fb2547a0e964c0453e2af277c1413c628",
+  "engine_receipt_sha256": "519ff8e39c74265573179f6d36349d6c00416bd74ee5cd1445b6108e2a68027b",
   "frozen28_output_sha256": "477e1574d376a8e2338d49e32c84693fce140e161e5d6dd9f1c2d12691042c5a",
   "driver_sha256": "3979fd50036f980f75f908d55499e9e62c6570c86ad8771e4972b59815b654ba",
   "output_sha256": "c4946bca08a25a418ec7f5882a1d488c250a1a56feca8ed05c72927d80cafb9a",
@@ -23,5 +23,5 @@
     "-C debuginfo=0",
     "-C codegen-units=1"
   ],
-  "method": "Separate Rust TU, exact existing verified engine rlib; no engine rebuild, network or dependency setup. Frozen28 driver/output/receipt unchanged."
+  "method": "Separate Rust TU recaptured offline against the verified pinned engine rlib after the portable fixture writer update; frozen28 and small-viewport outputs remain byte-identical."
 }

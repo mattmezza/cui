@@ -303,3 +303,24 @@ if(CUI_TIME_FIELD_BINDING_TESTS)
 endif()
 add_test(NAME bridge_time_localized_runner_offline COMMAND ${Python3_EXECUTABLE}
  ${CUI_BRIDGE_ROOT}/bindings/go/tests/test_time_localized_runner.py)
+
+option(CUI_TIME_FIELD_STATIC_BINDING_TESTS "Validate Go/Rust localized TimeField bundled source consumers" OFF)
+set(CUI_TIME_FIELD_STATIC_RUST_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-time-field-static-target" CACHE PATH "Reusable Cargo cache for bundled static localized consumers")
+if(CUI_TIME_FIELD_STATIC_BINDING_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Static localized facade acceptance currently supports Linux only")
+ endif()
+ find_program(CUI_TIME_FIELD_GO go REQUIRED)
+ find_program(CUI_TIME_FIELD_CARGO cargo REQUIRED)
+ find_program(CUI_TIME_FIELD_READELF readelf REQUIRED)
+ file(MAKE_DIRECTORY "${CUI_TIME_FIELD_STATIC_RUST_TARGET_DIR}")
+ foreach(language go rust)
+  add_test(NAME bridge_${language}_time_localized_static COMMAND ${Python3_EXECUTABLE}
+   ${CUI_BRIDGE_ROOT}/bindings/go/tests/test_time_localized.py
+   --language ${language} --linkage static --build-dir ${CMAKE_BINARY_DIR}
+   --target-dir ${CUI_TIME_FIELD_STATIC_RUST_TARGET_DIR}
+   --go ${CUI_TIME_FIELD_GO} --cargo ${CUI_TIME_FIELD_CARGO}
+   --readelf ${CUI_TIME_FIELD_READELF})
+  set_tests_properties(bridge_${language}_time_localized_static PROPERTIES RUN_SERIAL TRUE TIMEOUT 600)
+ endforeach()
+endif()

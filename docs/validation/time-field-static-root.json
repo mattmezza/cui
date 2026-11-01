@@ -1,0 +1,81 @@
+{
+  "scope": "Root Linux bundled-source localized TimeField acceptance; unreleased",
+  "source_checkpoint": "e67cec24 plus static CMake registration",
+  "build": {
+    "full_native": "existing full native build session9373 exit0; runtime suite pending",
+    "go": "Cgo bundled-source build; no cui_dynamic tag",
+    "rust": "existing reused rust-slider-static-target; CUI_BRIDGE_LIB_DIR absent; default portable feature set"
+  },
+  "ctest": {
+    "result": "3/3 PASS299.16s",
+    "go_seconds": 201.24,
+    "rust_seconds": 97.76,
+    "offline_methods": 10,
+    "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 -R ^bridge_(go_time_localized_static|rust_time_localized_static|time_localized_runner_offline)$ --output-on-failure"
+  },
+  "artifacts": [
+    {
+      "artifact": "/home/matteo/.cache/cui-current-validation/native/time-localized-static/go/go-tests",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "sha256": "823b66f49b6ec91f49ee42499e621541718cfd9544e7ac2574c6a2b4c2017438"
+    },
+    {
+      "artifact": "/home/matteo/.cache/cui-current-validation/native/time-localized-static/go/go-example",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "sha256": "f3e16e94c1cef37cc1fcf131d70874ab066b7f58f18d7850836c26d294cf9028"
+    },
+    {
+      "artifact": "/home/matteo/.cache/cui-current-validation/native/rust-slider-static-target/debug/deps/time_localized-e8a5b67b8a25cc1c",
+      "needed": [
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "sha256": "93ec1b0499026b1a40e8f4ba9d314e1b687ca507aded0d321fe29dacc3a8f83c"
+    },
+    {
+      "artifact": "/home/matteo/.cache/cui-current-validation/native/rust-slider-static-target/debug/deps/cui_builders-3de1e20d5bb1f5bf",
+      "needed": [
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "sha256": "27711057546f7b49857eaf8bfe9eac92b2e2d867187886819a72266e55182bdf"
+    },
+    {
+      "artifact": "/home/matteo/.cache/cui-current-validation/native/rust-slider-static-target/debug/examples/time_field_localized",
+      "needed": [
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "sha256": "427fb6d55040cdebcc78b1d3dfd521f34e3811f85f928206e867f8ff55e426eb"
+    }
+  ],
+  "artifact_selection": "Only real retained binaries under validation cache; offline mocked temporary artifact logs excluded",
+  "logs_sha256": {
+    "/home/matteo/.cache/cui-current-validation/beta-localized-combined-build.log": "4e2f41f14f054b697e81daa3e058d8f53c2fd9bee244dc3303efc8d7e5ecb85a",
+    "/home/matteo/.cache/cui-current-validation/time-static-root-configure.log": "5465cf05933812f0b48e37b266b1d4f448417e981a5d63d9bb2519cd1dd6d5ae",
+    "/home/matteo/.cache/cui-current-validation/time-static-root-tests.log": "83c24768d20e004f65280d6716e1b7c9e6079d86c90b16b9d5b02f1f4f559cef",
+    "/home/matteo/.cache/cui-current-validation/time-static-root-LastTest.log": "743205038d9799b8e3770aac6c8f24583ae8b234446e96a1d2b1d5bebb820bc0"
+  },
+  "limits": [
+    "No fully static system-library claim; ELF retains libc/libm and Rust runtime dependencies",
+    "No native interactive/macOS/Windows/GPU/AT/IME acceptance",
+    "MSRV1.85.1 unavailable; installed package and registry publication remain open",
+    "Old/partial providers are dynamic-only evidence, not exercised by this static mode",
+    "Go/Rust later-failed-frame facade transport remains separate from strict decoder tests",
+    "No full78 component or whole-binding parity claim"
+  ]
+}

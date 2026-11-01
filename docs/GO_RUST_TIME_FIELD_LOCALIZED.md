@@ -4,7 +4,7 @@ This additive authoring slice is based on root `8a402c2b`. Focused Linux dynamic
 Go/Rust compile, private-wrapper tests and both authored examples passed; see
 [the exact receipt](validation/time-field-go-rust-dynamic.json). Root configured dynamic acceptance now passes for current/old/partial providers
 and both actual authored examples; see the [root receipt](validation/localized-facades-root.json).
-Default static and installed-package gates remain open.
+Bundled-source static acceptance now also passes; installed-package gates remain open.
 The authoritative C contract is [BRIDGE_TIME_FIELD_LOCALIZED.md](BRIDGE_TIME_FIELD_LOCALIZED.md)
 and `include/cui/cui_bridge.h`. Existing scalar TimeField APIs stay unchanged.
 This does not bind direct Base/Styled options, drafts, clipboard/IME policy or
@@ -132,7 +132,7 @@ input first completes two ordinary frames and checks result admission; a minute-
 field center is a separator, so the script clicks its first-quarter textbox.
 Still required: real later-failed-frame copied observations at the facade boundary,
 additional schema-poison providers, native run unwind, MSRV/installed-package and
-static source closure and fresh generated-consumer acceptance after further API changes. No full
+installed-package acceptance and fresh generated-consumer checks after further API changes. No full
 binding/source-family parity follows from these focused checks.
 
 
@@ -180,14 +180,14 @@ required linker filename; no engine/DSO copy is made. Existing nonmatching files
 or aliases are never overwritten. Rust then executes strict wire units and the
 asserting English/Arabic example; Go executes its matching tests and example.
 All command failures stop the suite immediately. This is dynamic acceptance only;
-static SDK/package acceptance remains a separate pending gate.
+bundled-source static acceptance is recorded separately below; package installation remains pending.
 
 `bindings/go/tests/test_time_localized_runner.py` is an offline six-test harness
 proof: it mocks all tools and checks provider selection, offline/serial flags,
 reported-binary reuse, malformed Cargo output, desktop rejection, fail-fast and
 non-destructive aliases. It ran6/6 without Go/Cargo or native execution. Root configured execution now passes both dynamic suites plus the offline
 harness (3/3 CTest entries, 15.94s). Earlier scratch-harness evidence is retained
-separately; default-static consumers and packages remain unverified.
+separately; bundled-source static consumers now pass the separate root gate; packages remain unverified.
 
 ### Prepared default static source acceptance
 
@@ -231,5 +231,9 @@ no desktop or `--native` launch is introduced.
 Offline runner coverage now passes10/10: static plans clear provider overrides,
 select tag-free Go commands, inspect each Cargo-reported executable, and reject a
 shared-bridge dependency before running. These tests use mocked tools only.
-The new static runner path remains **unexecuted** pending root's configured gate;
-the earlier focused dynamic receipt does not imply default static SDK acceptance.
+Root configured static acceptance now passes **3/3 CTest entries (299.16s)**:
+offline harness10/10, Go201.24s and Rust97.76s, including compilation, owned wire
+and real authored UI tests/examples. ELF dependency inspection found no shared
+CUI bridge in any of the five artifacts. System libraries remain dynamic.
+See [root static receipt](validation/time-field-static-root.json). Native
+interactive, MSRV and installed-package acceptance remain open.

@@ -1158,7 +1158,7 @@
     "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
   },
   "localized_time_field_v1_source_checkpoint": {
-    "implementation": "Integrated unreleased C/Python/JS/TS/Go/Rust localized authoring has focused root proof: C bridge thirteen checks; Python sixteen configured checks; Node eighty-one configured checks including twenty localized; dynamic Go/Rust and offline runner three configured entries. Full integration, default-static consumers, packages and broader platform/IME/focus acceptance remain open.",
+    "implementation": "Integrated unreleased C/Python/JS/TS/Go/Rust localized authoring has focused root proof: C bridge thirteen checks; Python sixteen configured checks; Node eighty-one configured checks including twenty localized; dynamic Go/Rust and offline runner three configured entries. Bundled-source Go/Rust static consumers also pass three root checks. Full integration, packages and broader platform/IME/focus acceptance remain open.",
     "public_header": "include/cui/cui_bridge.h",
     "node_kind": 55,
     "languages": {
@@ -1172,7 +1172,7 @@
     "example": "bindings/bridge/examples/time_field_localized.c",
     "scope": "Owned localized config/state/value and copied applied aggregate time changes; no controlled receipts, no callbacks inside Core. Default legacy scalar route unchanged.",
     "limitations": [
-      "Focused root receipts cover C/Python/Node and dynamic Go/Rust. Full-suite regression, default-static Go/Rust, packages and native interactive acceptance remain open.",
+      "Focused root receipts cover C/Python/Node and dynamic Go/Rust. Full-suite regression, installed packages and native interactive acceptance remain open.",
       "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
       "Global segment Tab remains a source-focus parity exception; IME/clipboard and physical AT remain pending."
     ],
@@ -1187,13 +1187,14 @@
     "go_rust_dynamic_checkpoint": {
       "guide": "docs/GO_RUST_TIME_FIELD_LOCALIZED.md",
       "receipt": "docs/validation/time-field-go-rust-dynamic.json",
-      "scope": "Integrated source and durable runner pass root configured current/old/partial dynamic provider checks, strict copied records, callbacks and actual authored examples. Static/package/MSRV/native/true-failed-frame facade gates remain open."
+      "scope": "Integrated source and durable runner pass root configured current/old/partial dynamic provider checks, strict copied records, callbacks and actual authored examples. Bundled-source static consumers also pass separately. Package/MSRV/native/true-failed-frame facade gates remain open."
     },
     "node_typescript_checkpoint": {
       "guide": "docs/NODE_TIME_FIELD_LOCALIZED.md",
       "receipt": "docs/validation/node-localized-time-field-worker.json",
       "scope": "Integrated unreleased source passes strict root build and all81 configured Node entries, including20 localized checks and strict TS runtime; packages and native interactive acceptance remain open."
     },
-    "root_receipt": "docs/validation/localized-facades-root.json"
+    "root_receipt": "docs/validation/localized-facades-root.json",
+    "go_rust_static_receipt": "docs/validation/time-field-static-root.json"
   }
 }

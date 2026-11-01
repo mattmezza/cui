@@ -279,3 +279,24 @@ value/config, and no-write BUFFER_TOO_SMALL. Exhaustive valid second-of-day
 roundtrips use independent arithmetic and checked literal locale vectors rather
 than roundtrip alone. Preserve old strict parser and truncation assertions
 unchanged. This does not close editor, Styled, IME, accessibility or binding gaps.
+
+### Approved implementation clarifications
+
+Root approved slice1 after header review. Add named public
+`CUI_TIME_TEXT_MAX_BYTES_V1 160u` alongside the16byte token limit. Parsing validates
+mandatory arguments and configuration first, then rejects text length>160 as
+INVALID_SYNTAX before scanning token/text bytes. `{NULL,0}` is a valid empty
+string view and yields INVALID_SYNTAX; `{NULL,nonzero}` is INVALID_ARGUMENT.
+`cui_time` continues using portable existing unsigned fields: do not impose a
+32-bit-unsigned requirement in public headers. LP64/wasm32 layout expectations
+are measured target tests/receipts, not universal language requirements.
+
+Implementation ownership: new `include/cui/cui_time_text.h`,
+`src/base/cui_time_text.c`, focused `tests/unit/test_time_text.c`, matching
+TimeField guide/metadata and canonical distribution/skill outputs. Build wiring
+only as necessary for these independent targets; no old reducer/record behavior
+changes. Before compile, prepare independent valid-time arithmetic/exhaustive
+roundtrips, literal locale vectors, all failure categories/precedence and byte
+snapshot atomicity/canaries, plus legacy parser/formatter regressions. A separate
+strict portable target and wasm32 header-layout probe establish actual ABI
+receipts. Compilation remains held pending checkpoint/test-plan review and lease.

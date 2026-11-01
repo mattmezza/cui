@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-01",
+  "source_revision": "21acfca8690629b67d494c0d7e7169c918bca745",
+  "status": "FULL_CONFIGURED_LINUX_SUITE_PASSED",
+  "build": {
+    "result": "Final resume completed all 190 remaining link steps with exit 0. Earlier failed builds retained; three fixture-only source closure repairs documented separately.",
+    "configuration": "Existing Release native Ninja configuration; warnings enabled; serial nice19 CPU1 builds."
+  },
+  "tests": {
+    "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 --output-on-failure",
+    "display": "Private Xvfb; no desktop display",
+    "passed": 541,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 291.67,
+    "inputs": "Five distinct installed typography faces, real Inter test font, and original pinned theme fixtures.",
+    "includes": [
+      "native typography",
+      "pinned theme source import",
+      "distribution consumers",
+      "language bridge regressions",
+      "SDK freshness",
+      "agent skill freshness and contract"
+    ]
+  },
+  "logs": {
+    "beta-combined-native-build-resume2.log": {
+      "sha256": "94805391178a13400216b449e4e8512dd2136cac1c27390d815aa541eb657db9"
+    },
+    "beta-combined-native-build-resume3.log": {
+      "sha256": "a55868b9656315c95cf50d5afceadedaa17b9644e43cdd5862d81bc637e90483"
+    },
+    "beta-combined-native-tests.log": {
+      "sha256": "efae30853b1cc9e7fee632b3d753baf10a8f38c2974c13559016ac0f3924d4eb"
+    },
+    "beta-combined-native-541-LastTest.log": {
+      "sha256": "1dd5e56798a6356ab72f8f72c9b2bb91f2991769dd1d72354c3f8f3e0828ce48"
+    }
+  },
+  "remaining": [
+    "Uncompiled worker Dialog and localized TimeField drafts are not covered.",
+    "Private SDL source-range newest fixtures and SDL V2 production are not covered.",
+    "This Linux run establishes no macOS, Windows, physical GPU or assistive-technology acceptance.",
+    "Browser/WASM final acceptance, publication and full 78-family parity remain unfinished."
+  ]
+}

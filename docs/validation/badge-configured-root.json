@@ -26,6 +26,16 @@
     "warnings": "C11 O2 Wall Wextra Wpedantic Werror",
     "documentation_pages": 473,
     "shareable_pages": 555,
-    "limitation": "Headless browser acceptance is still running; no deployment claim."
+    "limitation": "Local artifact only; touch refresh and deployment tracked separately."
+  },
+  "browser": {
+    "result": "PASS",
+    "artifact_source_revision": "f728908e",
+    "catalog_entries": 78,
+    "extension": "Video",
+    "displayed_excerpts_compiled": 80,
+    "coverage": "Full headless Chromium real-WASM gate, including configured Badge status and child activation; existing component interactions, 390px bounds and /cui/ hosting.",
+    "wasm_sha256": "bbf9b9beba18cfd8a79a092ae7099ad8dad45a919e1f867f7b1fc65e56c34bb4",
+    "log_sha256": "90ecc0d72f9d498922f3e2527e8fcfe6b8064b9f6730a5c4313cdc6ea6f435a3"
   }
 }

@@ -88,7 +88,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Configured Badge artwork now has an additive C route with root software/frozen-legacy/nesting/resize/resource checks passing. Gallery source is prepared; browser acceptance and extended authoring in all five bindings remain open. Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are integrated but unreleased); consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Configured Badge artwork now has an additive C route with root software/frozen-legacy/nesting/resize/resource checks passing. The strict WASM build and full headless browser gate pass on artifact `f728908e`, including configured artwork and child activation. Extended authoring in all five bindings and deployment remain open. Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are integrated but unreleased); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
 | Overlays | Close Dialog held-input reopening and broader lifecycle gaps; finish Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |

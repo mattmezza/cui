@@ -41,7 +41,7 @@ feature test does not establish complete component parity.
 | Work | Landed evidence / next requirement |
 | --- | --- |
 | Dialog and scrolling | Table touch-drop admission is integrated with source/distribution runtime evidence and skill18 passing. Dialog/AlertDialog first-open sizing, six-slot composition and gallery migration are integrated at `b234adeb`. Combined native build and eight focused checks pass; worker C++/WASM and scrollbar checks pass. Compact/long-body browser scenarios and first-frame/nested-touch checks are prepared; their runtime acceptance remains open. Held-input reopening, broader cancellation and gallery acceptance remain open; earlier lifecycle prototypes are not production support. |
-| TimeField | Pure locale-aware parsing/formatting and bounds helpers passed strict source/distribution, five headless, C++ header and WASM layout checks. Six legacy-consumer tests, usage6 and skill18 also pass in the worker tree. Integrated as `173e5d48`; combined-revision five headless tests and skill18 pass. Full regression and hosted validation remain open. Localized widget and the complete Base/Styled example now pass strict worker builds and focused runtime checks, including batching/focus, rejection, inactive phases, generation reset and recovery. Final C++/WASM/distribution and browser acceptance remain pending. Source one-root Tab behavior, IME and foreign-language bindings remain open. |
+| TimeField | Pure locale-aware parsing/formatting and bounds helpers passed strict source/distribution, five headless, C++ header and WASM layout checks. Six legacy-consumer tests, usage6 and skill18 also pass in the worker tree. Integrated as `173e5d48`; combined-revision five headless tests and skill18 pass. Full regression and hosted validation remain open. Localized widget and the complete Base/Styled example now pass strict worker builds and focused runtime checks, including batching/focus, rejection, inactive phases, generation reset and recovery. Worker C++/WASM/distribution checks, seven new tests, six legacy tests, usage6 and skill18 now pass (signed handoff `7c0d68e7`). The localized widget still needs integration, combined native checks and full WASM/browser acceptance. Source one-root Tab behavior, IME and foreign-language bindings remain open. |
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight source passed initial focused checks, including 216 frozen-validator comparisons; its newest boundary tests remain uncompiled. SDL V2 production rendering, compatibility measurements and failure validation remain open. Software V2 support does not imply SDL support. |
 | Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), the other four adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
@@ -51,8 +51,8 @@ feature test does not establish complete component parity.
 
 | Priority | Deliverable | Completion condition |
 | --- | --- | --- |
-| 1 | Validate active component drafts | Combined Linux build and 541 headless tests pass. Next compile and verify Dialog composition and localized TimeField against that baseline, then update their gallery examples. |
-| 2 | Finish active component slices | Compile and verify Dialog composition and localized TimeField drafts, then update their gallery examples. Table touch is integrated; broader lifecycle, native Slider and minimum-compiler gates remain open. |
+| 1 | Validate active component drafts | Combined Linux build and 541 headless tests pass. Dialog now passes eight combined focused checks; integrate the verified TimeField worker slice, then run the prepared gallery scenarios. The 541-test baseline predates both changes. |
+| 2 | Finish active component slices | Finish first-frame Dialog/AlertDialog and localized TimeField gallery runtime acceptance; validate the private SDL preflight boundary tests. Table touch is integrated; broader lifecycle, native Slider and minimum-compiler gates remain open. |
 | 3 | Complete advertised rendering | Extend V2 support beyond software, then reconcile component and foreign-language styling coverage. A shared helper alone is not adapter support. |
 | 4 | Consolidate and publish | Run final integrated checks, reconcile the 78-family ledger, and publish matching source, packages and website artifacts. |
 
@@ -99,7 +99,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | --- | --- |
 | Controls | Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are integrated but unreleased); consistent size, text alignment, icons, rounding and shadows across controls. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
-| Overlays | Dialog independent header/title slots and separate Content/Body flex sizing; Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
+| Overlays | Accept the integrated Dialog six-slot composition in the browser and close held-input reopening gaps; finish Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
 | App structure | Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services; verify composed apps. |
@@ -150,17 +150,16 @@ that every listed defect still reproduces.
 - [ ] Exact release artifacts, provenance, checksums, installed examples and
   deployed website revision verified before declaring delivery complete.
 
-Owned-frame acceptance: [lifecycle, frozen references and WASM layout](docs/validation/cpu-v2-owned-frame-integration.json).
+Current integration evidence (not yet on `main`):
 
-TimeField acceptance: [combined-revision source/distribution and consumer checks](docs/validation/time-field-text-integration.json).
+| Slice | Evidence | Still required |
+| --- | --- | --- |
+| Combined Linux baseline | `21acfca8`: 541/541 headless tests, zero skips | Repeat on the final integrated revision; this run predates Dialog and localized TimeField. |
+| Dialog composition | `8cffe75e`: combined build and eight focused checks pass | Prepared first-frame, long-body and nested-touch browser checks. |
+| Localized TimeField | Worker `7c0d68e7`: seven new and six legacy tests, C++/WASM, usage6 and skill18 pass | Integrate, link the full WASM gallery and run browser checks. |
 
-Rust acceptance: [dynamic, default-static and lifetime checks](docs/validation/rust-slider-integration.json).
-
-Node/Go wire-validation acceptance: [compatibility and malformed-record checks](docs/validation/node-go-slider-wire-integration.json).
-
-Python wire-validation acceptance: [regression and compatibility checks](docs/validation/python-slider-wire-integration.json).
-
-Latest integration receipt: [CPU helper relocation and Rust job control](docs/validation/cpu-v2-common-integration.json).
+Integration-only receipts must travel with their source changes; worker evidence
+must not be presented as validation of `main`.
 
 Detailed validation receipts live in [docs/validation](docs/validation).
 Older green runs do not cover newer source; worker checks do not establish

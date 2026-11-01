@@ -35,7 +35,7 @@ features, evidence, and full limitations. Regenerate with `--write-summary`.
 | Radio | tested | [cui_components.h](../include/cui/cui_components.h) |
 | Rating | tested | [cui_numeric.h](../include/cui/cui_numeric.h) |
 | Shimmer | tested | [cui_status.h](../include/cui/cui_status.h) |
-| Skeleton | tested | [cui_content.h](../include/cui/cui_content.h) |
+| Skeleton | tested | [cui_skeleton_presentation.h](../include/cui/cui_skeleton_presentation.h) |
 | Spinner | tested | [cui_content.h](../include/cui/cui_content.h) |
 | Stepper | tested | [cui_numeric.h](../include/cui/cui_numeric.h) |
 | Switch | tested | [cui_components.h](../include/cui/cui_components.h) |

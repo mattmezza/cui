@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-01",
+  "tested_source_commit": "8597916f222da7affee89bba5dd7452ca0eac8a7",
+  "strict_build": {
+    "result": "PASS",
+    "steps": 1214,
+    "warnings": "-Wall -Wextra -Wpedantic -Werror",
+    "configuration": "existing Release cache; CPU1 nice19 -j1"
+  },
+  "full_ctest": {
+    "passed": 606,
+    "total": 607,
+    "skipped_ctest_entries": 0,
+    "seconds": 619.03,
+    "failure": "component_status_summary: generated Skeleton header link was stale"
+  },
+  "repair": {
+    "runtime_code_changed": false,
+    "change": "Regenerated docs/COMPONENT_STATUS.md; only Skeleton header link changes. Canonical SDK/amalgamation/skill refresh follows.",
+    "affected_checks": "6/6 PASS9.85s: summary, status CLI, usage docs, SDK/distribution/skill freshness",
+    "full_run_repeated": false,
+    "reporting": "Do not report a single607/607 run; preserve original failure and targeted repair."
+  },
+  "consumer_skill": "Full native run executed18 methods PASS41.955s; final generator checks PASS",
+  "bundled_consumers": {
+    "go": "PASS203.49s",
+    "rust": "PASS99.65s"
+  },
+  "display": "scripts/test_local.py private Xvfb; no desktop windows",
+  "logs": {
+    "/home/matteo/.cache/cui-current-validation/alpha4-full-build.log": "ff7d08d85239a48f32f6117d55da092394559600bd3c2925d001460b06c63520",
+    "/home/matteo/.cache/cui-current-validation/alpha4-full-tests.log": "39f4f7b698d6fb5dfd650e13f22717b9ac21260aec83af56fbc9b9bcc0819317",
+    "/home/matteo/.cache/cui-current-validation/alpha4-full-LastTest.log": "d0629026c1a70e635b01b8bef9dd26826d0a84fc62e046b0faad05dcd40906ed",
+    "/home/matteo/.cache/cui-current-validation/alpha4-summary-repair.log": "a9698758131874448ebdab2151cab56d72880f2316cfba229c17f32c0db15e04",
+    "/home/matteo/.cache/cui-current-validation/alpha4-summary-repair-LastTest.log": "52cec6f3adc58f91070f9cc97f50be6f987abbea409aa8c80c5d4267edb7a170"
+  },
+  "limitations": [
+    "Exact-source hosted CI/native-binding/Pages gates, staged release assets and installed-package publication acceptance remain separate gates.",
+    "Physical macOS/Windows/GPU/assistive-technology acceptance remains explicitly deferred.",
+    "All78 families remain; tested subsets do not establish full parity."
+  ]
+}

@@ -4,6 +4,12 @@ Version metadata is prepared as `0.1.0-alpha.4` (Python `0.1.0a4`); CMake's base
 remains `0.1.0`. No alpha.4 tag, registry release, GitHub release or website
 publication is implied. The last published release below remains alpha.3.
 
+Local candidate evidence: the strict 1,214-step rebuild passes; 606/607 native
+checks pass, and the sole generated-summary failure is repaired with six affected
+checks passing. All 18 skill methods pass. See
+[the exact local receipt](validation/alpha4-local-validation.json). This is not a
+claim of a single607/607 run or hosted/installed-release acceptance.
+
 The candidate batches typed Slider and localized TimeField language authoring,
 Dialog composition, configured C Badge artwork, software/SDL_Renderer V2,
 Skeleton palettes/responsive roots and owned bridge Icon utilities. See

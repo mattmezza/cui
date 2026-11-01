@@ -59,3 +59,19 @@ The separate numeric trace passes, but five stale-key/idle counterexamples fail
 (`dialog-numeric-original-runtime.log`). Those policies and remaining consumer
 coverage still gate production transfer. This is not approval
 to publish the Core API or a claim of all-component cancellation support.
+
+## Numeric and bare-scope candidate result
+
+The copied candidate passes 38 checks in
+`dialog-numeric-fallback-corrected-runtime.log` (0.24 seconds). These include the
+five formerly failing numeric cases, one synchronous controlled Slider CANCEL
+with the gesture-start value, fresh-input recovery and bare-scope Escape routing.
+The unrelated-input fixture uses supported Textbox accessibility FOCUS; the first
+run's unsupported ACTIVATE setup failure remains recorded. Existing Button
+ACTIVATE preservation is independently covered.
+
+Routed keys without current/prior semantics can use validated full-ID focus-scope
+ancestry. Where a scope ID also identifies a semantic owner, semantic ownership
+stays authoritative; contradictory aliases remain an explicit limitation. Capture,
+contact and activation ownership are unchanged. Production files remain unchanged,
+and remaining reducer coverage still gates transfer.

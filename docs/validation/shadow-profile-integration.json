@@ -1,0 +1,17 @@
+{
+  "tested_revision": "b5ea9ed0",
+  "scope": "Private shared Effects shadow geometry/kernel extraction; no public ABI, Core dispatch or V2 painter changes.",
+  "build": "Integrated strict Release CMake build, 12 scheduled steps; actual new Effects in libcui.a and all four focused targets built successfully.",
+  "headless": "Private test_local.py 4/4 PASS0.36s: shadow_profile_equivalence, shadow_profile_distribution, shadow_profile_umbrella, shadow_v2_box_quality.",
+  "comparison": "Frozen independent original source hashes verified; 19602 finite sample comparisons,88 padded-raster comparisons and512legacyRGBA fixture retained.",
+  "worker_additional": "Copied two-header standalone and umbrella Effects-only strict fixtures; skill18/18 PASS38.656s; formatting/generated freshness pass.",
+  "remaining": [
+    "V2 pixel-footprint policy and bounded transactional painter integration",
+    "Public software/native/Canvas adapter support",
+    "Full integrated native/hosted release acceptance"
+  ],
+  "logs_sha256": {
+    "shadow-profile-integration-build.log": "f571bd2e6bbd53fdd75de216f132146cc9eaacfb464eedccf959c01444149629",
+    "shadow-profile-integration-tests.log": "70d6274024374576ecdfc9e179d0938f2ee6a9ab94e237a02e2567d2cf15d14b"
+  }
+}

@@ -1080,39 +1080,41 @@
     "binding_status": "direct_c_structs_not_bound_see_controlled_slider_v1",
     "guide": "docs/STYLED_SLIDER_MODEL.md",
     "limitations": [
-      "Existing scalar builders retain legacy Slider behavior. Direct C Base reducer/state, owned Styled style/presentation state and result structs are not foreign-language records; the distinct bridge-owned Python/Node/TypeScript/Go double Single/Range request/receipt subset is documented in controlled_slider_v1.",
-      "The Python/Node/TypeScript/Go bridge subsets do not expose custom owned Styled style values, direct C motion state, decorative getters or arbitrary C facade options. Rust controlled authoring remains pending.",
+      "Existing scalar builders retain legacy Slider behavior. Direct C Base reducer/state, owned Styled style/presentation state and result structs are not foreign-language records; the distinct bridge-owned Python/Node/TypeScript/Go/Rust double Single/Range request/receipt subset is documented in controlled_slider_v1.",
+      "The Python/Node/TypeScript/Go/Rust bridge subsets do not expose custom owned Styled style values, direct C motion state, decorative getters or arbitrary C facade options. Rust has Linux dynamic and matching bundled-static proof on1.99.1; MSRV1.85.1 remains untested.",
       "Visible V1 gradient thumbs reject atomically; bridge/gallery V1 routes do not consume V2 backgrounds. The separate C software V2 route does not provide a foreign authoring binding. Native numeric host/physical AT delivery remains pending."
     ],
     "bridge_subset": "controlled_slider_v1"
   },
   "language_builder_node_kinds": 80,
   "controlled_slider_v1": {
-    "status": "c_python_node_typescript_go_tested_subset_unreleased",
+    "status": "all_five_bridge_subsets_tested_unreleased",
     "node_kind": 81,
     "languages": {
       "python": "tested_subset",
       "javascript": "tested_subset",
       "typescript": "tested_subset",
       "go": "tested_subset",
-      "rust": "not_implemented"
+      "rust": "tested_subset"
     },
-    "scope": "Copied full double Single/Range proposals in an independent FIFO; explicit receipt acceptance after step. Legacy scalar float builders and CHANGE timing unchanged. Python and Node/TypeScript own frozen records; Go owns value copies and private receipt authority and dispatches typed callbacks after legacy events; explicit whole-pair acceptance remains required.",
+    "scope": "Copied full double Single/Range proposals in an independent FIFO; explicit receipt acceptance after step. Legacy scalar float builders and CHANGE timing unchanged. Python and Node/TypeScript own frozen records; Go owns value copies and private receipt authority and dispatches typed callbacks after legacy events; explicit whole-pair acceptance remains required. Rust owns copies and local receipt tokens, dispatching a restricted borrowed HRTB callback context after legacy callbacks; App close remains request-only and Drop owns destruction.",
     "limitations": [
       "Native C11 owner TLS; default/shared WASM versions0. Explicit unshared final modules require trusted build assertion plus actual final-memory verification.",
-      "Rust typed builders remain pending; no native numeric AT delivery, bridge typed SET injection, V2 gradient adapter or typed-part shadow authoring.",
+      "No native numeric AT delivery, bridge typed SET injection, V2 gradient adapter or typed-part shadow authoring.",
       "Vertical parent-fill in registered scroll remains unsupported.",
       "Handles/receipts remain within the matching loaded bridge image or WASM module instance; no cross-image epoch uniqueness/security claim.",
       "Python actual-old-library fallback test skips unless CUI_BRIDGE_OLD_LIBRARY supplies an independent binary; local proof used the preserved pre-typed runtime.",
       "Node historical optional-group tests require CUI_NODE_SLIDER_OLD_LIBRARY; TypeScript requires an existing compiler. Direct C Styled style/motion objects remain unbound.",
       "Go tests cover dynamic current/actual-old modules and matching default embedded-source closure on Linux. Existing historical notification/shadow/visibility fixture skips are separate; first legacy run missing FontPath was retained and recovered with bundled Inter.",
-      "Copied-wire conformance is partial: Python now rejects noncanonical absent-input/repeat/nonfinite/source/inactive-numeric evidence and missing receipt authority; Go/JS/TS now reject inactive numeric evidence before publishing copied request authority; the broader inactive type-field matrix remains open. See docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md and focused validation receipts."
+      "Copied-wire conformance is partial: Python now rejects noncanonical absent-input/repeat/nonfinite/source/inactive-numeric evidence and missing receipt authority; Go/JS/TS now reject inactive numeric evidence before publishing copied request authority; the broader inactive type-field matrix remains open. See docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md and focused validation receipts.",
+      "Rust Linux dynamic current/actual-old group, copied-provider, authored UI and matching default bundled-static source closure passed on1.99.1; MSRV1.85.1 remains a required follow-up. Historical optional Rust fixture branches are separately environment-gated; no package-release claim."
     ],
     "docs": [
       "docs/BRIDGE_SLIDER_MODEL.md",
       "docs/PYTHON_SLIDER_MODEL.md",
       "docs/NODE_SLIDER_MODEL.md",
-      "docs/GO_SLIDER_MODEL.md"
+      "docs/GO_SLIDER_MODEL.md",
+      "docs/RUST_SLIDER_MODEL.md"
     ],
     "tests": [
       "bindings/bridge/tests/test_bridge_slider_model.c",
@@ -1134,7 +1136,12 @@
       "bindings/go/cui/slider_model_protocol_test.go",
       "bindings/go/cui/slider_model_static_test.go",
       "bindings/go/tests/slider-model-provider.c",
-      "bindings/go/examples/slider_model/main.go"
+      "bindings/go/examples/slider_model/main.go",
+      "bindings/rust/tests/slider_model.rs",
+      "bindings/rust/tests/slider_model_protocol.rs",
+      "bindings/rust/tests/fixtures/slider_model_provider.c",
+      "bindings/rust/tests/test_slider_protocol.py",
+      "bindings/rust/examples/slider_model.rs"
     ]
   },
   "language_builder_node_kinds_scope": "80 shared legacy kinds; Python, Node/TypeScript and Go additionally expose controlled Slider kind81 when the full optional API group is available.",

@@ -438,8 +438,15 @@ in `bindings/go/cui/slider_model.go`, and the complete UI in
 `bindings/go/examples/slider_model/main.go`. Keep float64 values/uint64 identities,
 explicit receipt acceptance and the existing creating-goroutine OS-thread lock
 through Close. RequestClose only requests shutdown; copied records retain no App.
-Rust controlled builders, native numeric delivery and V2 gradient adapters
-remain pending.
+For the Rust subset read `docs/RUST_SLIDER_MODEL.md`, owned definitions
+in `bindings/rust/src/slider_model.rs` and the complete UI in
+`bindings/rust/examples/slider_model.rs`. Keep f64 values/u64 identities, local
+issued receipt tokens and explicit full-pair acceptance. The HRTB callback context
+forwards only approved UI/owner operations, never App/step/run/dispatch or owned
+destruction. App remains !Send/!Sync; close only requests shutdown, Drop destroys.
+Linux1.99.1 dynamic and matching bundled-static checks passed; MSRV1.85.1
+remains a required follow-up. Source closure proof is not package publication. Native numeric delivery and V2
+gradient adapters remain pending.
 
 For controlled Python Slider provider records, absent input fields and inactive
 numeric evidence must be zero, coordinates/numeric evidence finite, repeat 0/1,

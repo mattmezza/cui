@@ -1,7 +1,7 @@
 //! Bounded semantic paint-part authoring. Query reports capability, not presence.
-use super::{
-    check, App, Builder, CornerRadii, Error, Node, RawNode, Result, ShadowPreset, ShadowStyle,
-};
+#[cfg(not(cui_bridge_static))]
+use super::Error;
+use super::{check, App, Builder, CornerRadii, Node, RawNode, Result, ShadowPreset, ShadowStyle};
 use std::ffi::c_void;
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -1,6 +1,12 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod shadows;
-pub use shadows::{BoxShadow,ShadowStyle,ShadowKind,ShadowPreset,CornerRadii};
+mod slider_model;
+pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};
+pub use slider_model::{
+    SliderConfig, SliderDomain, SliderInput, SliderLayout, SliderOrientation, SliderPart,
+    SliderPhase, SliderPresentation, SliderReceipt, SliderReceiptInfo, SliderRequest,
+    SliderRequestContext, SliderScale, SliderValue,
+};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -923,11 +929,22 @@ pub struct Node {
 }
 static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 type Callback = Box<dyn FnMut(&ChangeEvent)>;
+/// UI owner storage remains local to its creating OS thread.
+///
+/// ```compile_fail
+/// fn require_send<T: Send>() {}
+/// require_send::<cui_builders::App>();
+/// ```
+/// ```compile_fail
+/// fn require_sync<T: Sync>() {}
+/// require_sync::<cui_builders::App>();
+/// ```
 pub struct App {
     raw: *mut c_void,
     id: u64,
     callbacks: HashMap<(RawNode, u32), Rc<RefCell<Callback>>>,
     running: bool,
+    slider: Option<slider_model::State>,
     _local: PhantomData<Rc<()>>,
 }
 type NativeRunner =
@@ -1117,6 +1134,7 @@ impl App {
             id,
             callbacks: HashMap::new(),
             running: false,
+            slider: None,
             _local: PhantomData,
         })
     }
@@ -1150,6 +1168,7 @@ impl App {
         let raw = self.valid(n)?;
         check(unsafe { cui_bridge_node_remove(self.raw, raw) })?;
         self.callbacks.retain(|(node, _), _| *node != raw);
+        self.slider_removed(raw);
         Ok(())
     }
     pub fn text(&mut self, n: Node, value: &str) -> Result<&mut Self> {
@@ -1842,7 +1861,7 @@ impl App {
         })
     }
     pub fn step(&mut self, dt: f32) -> Result<()> {
-        if self.running {
+        if self.running || self.slider_dispatching() {
             return Err(Error(8));
         }
         check(unsafe { cui_bridge_step(self.raw, dt) })
@@ -2104,6 +2123,9 @@ impl App {
         })
     }
     pub fn dispatch(&mut self) -> Result<usize> {
+        if self.slider_dispatching() {
+            return Err(Error(8));
+        }
         let mut count = 0;
         loop {
             let mut e = EventEx::default();
@@ -2143,7 +2165,7 @@ impl App {
                 count += 1;
             }
         }
-        Ok(count)
+        Ok(count + self.dispatch_slider_requests()?)
     }
     /// Own the native event loop, including live resize. Panics from callbacks
     /// resume only after the native runner has returned and released its host.
@@ -2152,7 +2174,7 @@ impl App {
     }
     /// Optional after-frame hook for app updates or requesting close.
     pub fn run_with(&mut self, mut after_frame: impl FnMut(&mut App) -> Result<()>) -> Result<()> {
-        if self.running {
+        if self.running || self.slider_dispatching() {
             return Err(Error(8));
         }
         let runner = native_runner().ok_or(Error(9))?;
@@ -2231,7 +2253,9 @@ impl App {
         Ok(self)
     }
     pub fn close(&mut self) -> Result<()> {
-        check(unsafe { cui_bridge_request_close(self.raw) })
+        check(unsafe { cui_bridge_request_close(self.raw) })?;
+        self.slider_close_requested();
+        Ok(())
     }
 }
 /// A fluent, app-borrowed node builder. `finish` releases the mutable app borrow.

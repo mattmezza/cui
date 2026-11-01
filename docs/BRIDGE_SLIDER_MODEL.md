@@ -1,10 +1,11 @@
 # Controlled typed Slider through the C bridge
 
-Unreleased C bridge, Python, Node/TypeScript and Go subsets. Include `<cui/cui_bridge.h>` from the same revision as
+Unreleased C bridge, Python, Node/TypeScript, Go and Rust subsets. Include `<cui/cui_bridge.h>` from the same revision as
 the library. `cui_bridge_slider_model_versions() & 1` advertises this independent
 schema; old libraries lack this symbol. Foreign loaders must resolve the entire
 optional symbol group before use. The [Python controlled builder](PYTHON_SLIDER_MODEL.md) wraps this route; [Node/TypeScript](NODE_SLIDER_MODEL.md) uses the same copied C records; [Go](GO_SLIDER_MODEL.md) owns value copies with explicit acceptance.
-Rust typed builders remain pending. Existing `slider()` builders keep their scalar
+The [Rust subset](RUST_SLIDER_MODEL.md) uses a restricted callback context;
+Linux dynamic and matching bundled-static checks passed on1.99.1, with MSRV1.85.1 pending. Existing `slider()` builders keep their scalar
 float precision, autoacceptance and CHANGE timing.
 
 Enable the owned request queue once, then create kind81 with

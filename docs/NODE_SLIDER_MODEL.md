@@ -3,9 +3,9 @@
 Unreleased bridge-owned subset over [C V1](BRIDGE_SLIDER_MODEL.md). Legacy
 `slider()` keeps scalar float autoacceptance and original CHANGE timing. This
 route does not export direct C Base/Styled state, arbitrary owned styles or
-motion structs. Rust controlled builders, native numeric AT, typed SET/touch
-injection, V2 gradient adapters and vertical registered-scroll admission remain
-pending. Full Slider and all-language closure remain open.
+motion structs. The [Rust subset](RUST_SLIDER_MODEL.md) has separate dynamic and matching
+bundled-static Linux1.99.1 proof; MSRV1.85.1 remains untested. Native numeric AT, typed SET/touch injection,
+V2 gradient adapters and vertical registered-scroll admission remain pending. Full Slider and all-language closure remain open.
 
 ## Complete authored applications
 

@@ -177,3 +177,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUI_GO_SLIDER_OLD_LIBRARY)
   --old-library ${CUI_GO_SLIDER_OLD_LIBRARY}
   --go ${CUI_GO_SLIDER_EXECUTABLE} --cc ${CMAKE_C_COMPILER})
 endif()
+
+# Optional actual-old-module Rust protocol proof; uses existing tools offline.
+set(CUI_RUST_SLIDER_OLD_LIBRARY "" CACHE FILEPATH "Actual pre-typed-Slider library for optional Rust protocol checks")
+set(CUI_RUST_SLIDER_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-slider-target" CACHE PATH "Reused Cargo target directory for optional Rust protocol checks")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUI_RUST_SLIDER_OLD_LIBRARY)
+ if(NOT EXISTS "${CUI_RUST_SLIDER_OLD_LIBRARY}")
+  message(FATAL_ERROR "CUI_RUST_SLIDER_OLD_LIBRARY must name an existing actual older bridge")
+ endif()
+ find_program(CUI_RUST_SLIDER_CARGO cargo REQUIRED)
+ file(MAKE_DIRECTORY "${CUI_RUST_SLIDER_TARGET_DIR}")
+ add_test(NAME bridge_rust_slider_protocol COMMAND ${Python3_EXECUTABLE}
+  ${CUI_BRIDGE_ROOT}/bindings/rust/tests/test_slider_protocol.py
+  --build-dir ${CMAKE_BINARY_DIR} --target-dir ${CUI_RUST_SLIDER_TARGET_DIR}
+  --old-library ${CUI_RUST_SLIDER_OLD_LIBRARY}
+  --cargo ${CUI_RUST_SLIDER_CARGO} --cc ${CMAKE_C_COMPILER})
+endif()

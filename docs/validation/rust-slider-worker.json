@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "scope": "Unreleased controlled Rust bridge subset; actual Linux dynamic and matching default bundled-static proof, not package publication or whole Slider closure.",
+  "source_base": "0b75d70b456216a96a611936e67a043a1c72b388",
+  "design": "3974ab98b4c7d8f7b57577d199e6a85724110df3",
+  "toolchain": "Rust/Cargo1.99.1; MSRV1.85.1 not tested",
+  "resource_policy": "nice19 CPU1 one Cargo job offline/locked, reused build-focused/visibility-rust-target; native tests through private Xvfb, no desktop/dependencies.",
+  "source_files_sha256": {
+    "bindings/rust/src/lib.rs": "785af9aac006faee4ce03e5976a45ecf0f5199aa2a9abf8c9b9ea3d0b0578e8b",
+    "bindings/rust/src/slider_model.rs": "eb45051e74e569157505461a0b34cd82b51473e807f624b873ff4cb504032d27",
+    "bindings/rust/src/part_shadows.rs": "80485e11e069a17460fa22d34cba0005ff2da19ddbb18c3d0751cad7a8aef1a4",
+    "bindings/rust/tests/slider_model.rs": "9ccf3ba4ee5717d8e988f885ff9628aaeecf2f4ccd415a4fee61a97e394c547e",
+    "bindings/rust/tests/slider_model_protocol.rs": "646751ea5d05c6b317fef493d3e4831774e43c0d0b6f385db883480f3ead5e9d",
+    "bindings/rust/tests/fixtures/slider_model_provider.c": "7196adb30591eb6fb6c0e6eec2b2670d2a18bfbde6cd722be96d735fa9e3a77c",
+    "bindings/rust/tests/test_slider_protocol.py": "1e13bdf0ae4c600c267b52cb7d02fbbb979ad9134d05fb460a1d7c7de8766dd5",
+    "bindings/rust/examples/slider_model.rs": "1fbba36e1de7dcf7b3ae8ebe9b54788380ccaf5c3034fd82804259d3416ed244"
+  },
+  "bridge": {
+    "current_path": "/home/matteo/.cache/cui-current-validation/native/libcui_bridge.so",
+    "current_sha256": "886a7d615ccf6ec4417b8447c14d0ac0df1c1538be872e9d7b0e0633b4aac717",
+    "old_path": "/home/matteo/.cache/cui-current-validation/pre-typed-slider/libcui_bridge.so",
+    "old_sha256": "44a76c34ddbb75b1d1ce428bd604a6d53321ee45c8d2a0c5a9894fa8c7334afa",
+    "old_source_revision": "unknown; independent actual pre-feature runtime only",
+    "versions": {
+      "cui_bridge_abi_version": 1,
+      "cui_bridge_slider_model_versions": 1,
+      "cui_bridge_slider_config_v1_size": 72,
+      "cui_bridge_slider_value_v1_size": 24,
+      "cui_bridge_slider_receipt_v1_size": 56,
+      "cui_bridge_slider_request_v1_size": 296,
+      "cui_bridge_slider_presentation_v1_size": 32
+    }
+  },
+  "results": {
+    "first_dynamic": {
+      "session": 18052,
+      "wrapper_entries": 6,
+      "ui_methods": 12,
+      "wire_methods": 3,
+      "example_modes": 4,
+      "result": "PASS"
+    },
+    "second_dynamic": {
+      "session": 61819,
+      "actual_old_provider_processes": 43,
+      "current_wrapper_entries": 10,
+      "current_rust_harness_methods": 83,
+      "typed_ui_methods": 14,
+      "wire_methods": 3,
+      "compile_fail_docs": 4,
+      "result": "PASS; environment-gated historical methods listed separately"
+    },
+    "static": {
+      "initial_session": 26565,
+      "initial_failure": "-Dwarnings unused legacy Error import under static cfg; minimally cfg-gated, no suppression",
+      "retry_session": 27668,
+      "retry_compile": "PASS actual static cfg, static=cui_rust_bridge/static=cui/m; no dynamic bridge ELF dependency",
+      "scratch_driver_failure": "PosixPath JSON serialization after successful compile/dependency inspection, before runtime; preserved, converted structured strings and reused artifacts",
+      "runtime_session": 95437,
+      "wrapper_entries": 6,
+      "ui_methods": 14,
+      "wire_methods": 3,
+      "example_modes": 4,
+      "result": "PASS"
+    },
+    "final_light": {
+      "session": 94624,
+      "usage_tests": 6,
+      "installed_export_tests": 1,
+      "canonical_freshness": "PASS",
+      "sdk_freshness": "PASS",
+      "format": "PASS",
+      "rustfmt": "PASS",
+      "full_skill18": "pending ROOT combined integration acceptance; no second worker heavy run"
+    }
+  },
+  "sdk": {
+    "manifest_sha256": "1aaa5aec49edd00cd91a9ed60c103a59c1355aba1dfd1d248cf0987f0232ac86",
+    "generator_source_provenance": {
+      "source_revision": "dd4cef95f462326d9f464b8b963e23f0ff9d6690",
+      "canonical_tracked_sources_dirty": true,
+      "tracked_diff_sha256": "6708420bbe907764aec06801c92781eb16db5048bf2c090dc933bf58e26b9d98",
+      "snapshot_manifest_sha256": "1aaa5aec49edd00cd91a9ed60c103a59c1355aba1dfd1d248cf0987f0232ac86"
+    },
+    "archive_sha256": {
+      "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/visibility-rust-target/debug/build/cui-builders-a50ebe5a2fc34d01/out/cui-native/libcui_rust_bridge.a": "e8af72ad4555c2a4926487307752c6b533ce1869f716eeffab2a0a3b4e79aa14",
+      "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/visibility-rust-target/debug/build/cui-builders-a50ebe5a2fc34d01/out/cui-native/cui_source/libcui.a": "b96d289631d3b3b224eb37a771435e8b8a2aacc5090970543a291eff3d980d97"
+    },
+    "actual_child_cmake_argv": [
+      {
+        "pid": 636292,
+        "argv": [
+          "/home/matteo/.local/share/uv/tools/cmake/lib/python3.11/site-packages/cmake/data/bin/cmake",
+          "--build",
+          "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/visibility-rust-target/debug/build/cui-builders-a50ebe5a2fc34d01/out/cui-native",
+          "--target",
+          "cui_rust_bridge",
+          "-j1"
+        ]
+      }
+    ],
+    "interpretation": "Manifest/SDK bytes checked against this worker canonical source; provenance is the retained generator-source receipt, not a newly invented release-checkout identity."
+  },
+  "historical_branches_not_exercised": [
+    "notifications_v1::injected_protocol (CUI_NOTIFICATION_FIXTURE)",
+    "notifications_v1::unavailable_old_library (CUI_NOTIFICATION_UNAVAILABLE)",
+    "value_notifications_v1::real_scalar_precision_silence_and_lifetime (CUI_VALUE_REAL)",
+    "value_notifications_v1::real_text_fifo_or_older_library_no_drain (CUI_VALUE_REAL/CUI_VALUE_OLD)",
+    "value_notifications_v1::real_selection_remove_reuse_full_generation (CUI_VALUE_REAL)",
+    "value_notifications_v1::real_initial_boolean_and_table_views (CUI_VALUE_REAL)",
+    "value_notifications_v1::synthetic_protocol (CUI_VALUE_FIXTURE)",
+    "shadows::optional_old_library_defaults (CUI_TEST_OLD_SHADOW_BRIDGE)",
+    "part_shadows::optional_old_library_defaults (CUI_TEST_OLD_SHADOW_BRIDGE)"
+  ],
+  "remaining": [
+    "MSRV1.85.1 validation",
+    "ROOT combined skill18/integration acceptance",
+    "native numeric AT and typed SET/touch injection",
+    "V2 adapters and arbitrary direct C style/motion binding",
+    "vertical registered-scroll admission",
+    "package/registry publication"
+  ],
+  "logs_sha256": {
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/rust-slider-first.log": "c8b6a2431b3f84d69c0a4bdc9faf3faeed251d8cbc146c2cefa9c43db4b2af08",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/rust-slider-second.log": "d16041f9e36e514edc9b774953f7084ddb45b30515da5b4b8224c0e6fc43e312",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/rust-slider-static.log": "1ed07989aa66e2ac1dc8f8fa06dfe09f16047b427acb1c5f158a0c79ffd02a45",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/rust-slider-static-retry.log": "e27c6df75d6677a6f7300f27810a36032dd44f0c42acd2958b55559828b3bb67",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/rust-slider-static-runtime.log": "61ee4fd5955e2fac31cdb7b9c890738023ab185289c55f96bcf237862a138f2d",
+    "/home/matteo/.cache/cui-worktrees/initially-hidden/build-focused/rust-slider-final-light.log": "8697afe38e8d59848a7015d58ffbc829832bfcbc367ffc88ae41992755109524"
+  }
+}

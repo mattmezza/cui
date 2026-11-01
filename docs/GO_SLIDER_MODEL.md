@@ -3,7 +3,8 @@
 Unreleased bridge-owned V1 subset, separate from legacy `Slider(key)` scalar
 float/autocommit behavior and CHANGE timing. This does not bind arbitrary direct
 C Styled style/motion records, native numeric AT, typed SET/touch injection, V2
-gradient adapters or vertical registered-scroll admission. Rust remains pending;
+gradient adapters or vertical registered-scroll admission. The [Rust
+subset](RUST_SLIDER_MODEL.md) is separate, with MSRV1.85.1 validation pending;
 full Slider closure remains open. Read the [C contract](BRIDGE_SLIDER_MODEL.md).
 
 ## Complete authored UI

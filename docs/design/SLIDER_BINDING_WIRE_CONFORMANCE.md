@@ -16,32 +16,33 @@ frame0/indexUINT64_MAX and inactive numeric value0. The actual producer is
 does not itself repeat all canonical-zero prose. Treat the signed schema plus
 actual producer as evidence, not a guessed metadata rule.
 
-| Copied output invariant | Python `_copy_request` | JS/TS `copyRequest` | Go `sliderReadRequest` | Rust candidate `read_request/read_input` |
+| Copied output invariant | Python `_copy_request` | JS/TS `copyRequest` | Go `sliderReadRequest` | Rust `read_request/read_input` |
 |---|---|---|---|---|
 | Exact request/receipt schema+sizes, reserved value/domain fields | Rejects | Native addon rejects before copied JS arrays | Rejects | Rejects; static size/offset assertions |
 | Unknown request/input vocabularies and masks | Rejects active vocabularies and nonzero absent input (Python follow-up) | Rejects | Rejects active input; absent-input allzero guard | Rejects active input; absent-input allzero guard |
 | HAS_INPUT absent ⇒ every input field0 | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | repeat only0/1, finite x/y | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | finite numeric value even without numeric flag | Rejects nonfinite (Python follow-up) | Rejects | Rejects | Rejects |
-| HAS_NUMERIC_VALUE absent ⇒ numeric value0 | Rejects (Python follow-up) | Rejects (Node/TS follow-up) | Rejects (Go follow-up) | Rejects; `inactive_numeric` provider/private test prepared |
+| HAS_NUMERIC_VALUE absent ⇒ numeric value0 | Rejects (Python follow-up) | Rejects (Node/TS follow-up) | Rejects (Go follow-up) | Rejects; `inactive_numeric` provider/private tests passed |
 | Numeric flag ⇒ input present, typeACCESSIBILITY, actionSET_VALUE | Rejects | Rejects | Rejects | Rejects |
 | HAS_SOURCE absent ⇒ sourceUNKNOWN0 | Rejects (Python follow-up) | Rejects | Rejects | Rejects |
 | Absent frame0 / indexUINT64_MAX | Rejects | Rejects | Rejects | Rejects |
 | Queue namespace established before publishing a receipt | Python real C poll rejects before enable; copied conversion rejects None namespace (Python follow-up) | `appNamespaces.has` rejects before publication | Explicit queue namespace guard before C poll | Explicit queue namespace guard before C poll |
-| Full u64 identities and no C views over callbacks | Python int / frozen copies | BigInt / frozen copied arrays+records | uint64 / value copies | u64 / owned copies; pending actual runtime |
+| Full u64 identities and no C views over callbacks | Python int / frozen copies | BigInt / frozen copied arrays+records | uint64 / value copies | u64 / owned copies; dynamic/static tests passed |
 
 Exact decoder seams: `bindings/python/cui_bridge/slider_model.py`:325–343;
 `bindings/node/slider-model.cjs`:73–88 with native layout checks in
 `bindings/node/slider_model_internal.h`:336–343;
 `bindings/go/cui/native.go`:3775–3822. TS shares the JS runtime, rather than having
-an independent decoder. Rust's candidate uses the same complete optional group;
-its records and tests remain unverified until the allocated compile/runtime gate.
+an independent decoder. Rust uses the same complete optional group; integrated actual-old/provider,
+current UI/legacy and default-static checks passed, with minimum-compiler proof
+still open. See docs/validation/rust-slider-integration.json.
 
 All domain adapters must also enforce the actual portable math contract in
 `src/base/cui_slider_model.c`:6–10: finite maximum-minus-minimum, with logarithmic
 minimum>0 and maximum>minimum. Merely finite individual bounds or positive equal
 log bounds are insufficient. Root has aligned Python, JS/TS and Go domain validation with this contract;
-Rust candidate validates both authoring and copied domains before C use, pending runtime acceptance.
+Rust validates both authoring and copied domains before C use, with integrated dynamic/static runtime acceptance.
 
 ## Python follow-up status
 
@@ -77,8 +78,8 @@ this does not establish the broader inactive type-field matrix below.
    distinct processes, plus existing affected legacy suites. Preserve unknown
    metadata as unavailable; never normalize it to mouse/key or synthesize values.
 
-Rust candidate already contains the inactive-numeric check and negative mode;
-all runtime claims await its own proof. The follow-up table should be revised
+Rust contains the inactive-numeric check and negative mode; its integrated
+dynamic/provider and matching default-static checks passed. The follow-up table should be revised
 from actual landed/tested source, not checked complete because tests were drafted.
 
 ## Deliberately not inferred

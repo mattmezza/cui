@@ -8,8 +8,9 @@ and plain Base painting, independently of legacy `cui_slider`,
 and focus rings. Direct C model/state/result structs are not foreign-language
 records; the [Python bridge-owned controlled subset](PYTHON_SLIDER_MODEL.md)
 exposes copied double Single/Range proposals and explicit receipt acceptance.
-Native numeric host delivery and Rust controlled builders
-remain pending. The whole Slider family remains partial.
+The [Rust bridge subset](RUST_SLIDER_MODEL.md) adds owned copied requests and
+a restricted callback context; Linux dynamic and matching bundled-static checks
+passed on1.99.1, with MSRV1.85.1 pending. Native numeric host delivery remains pending. The whole Slider family remains partial.
 
 The complete, independently runnable C11 example is
 [`examples/slider_model_controlled.c`](../examples/slider_model_controlled.c).

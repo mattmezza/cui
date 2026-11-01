@@ -33,18 +33,9 @@
     }
   },
   "driver_sha256": "0bd56ecd91da2f829cd37615f86f58bd23a5bd44fc25163227a24ec791558e23",
-  "helper_sha256": "c537c8c606d4ab30bbf580e25700fbab096e62a5cee1e85c3e93862a95c10b5a",
+  "helper_sha256": "c095e07c17bcc8ad6ac0cb81caa39f1cfce76e6ed3f8ce74666a2a8d4c81e488",
   "source_bytes": 1564076,
   "output_sha256": "477e1574d376a8e2338d49e32c84693fce140e161e5d6dd9f1c2d12691042c5a",
-  "compiled_artifact_bytes": 7879576,
-  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)",
-  "binary_sha256": "385bcd643ced6439e2bf421c8e017f1b0bfa92cc1301db6ea9f234e20b5163fe",
-  "execution": "private-Xvfb via scripts/test_local.py; Taffy-only driver, no GPUI or CUI execution",
-  "profile": {
-    "optimization": 1,
-    "debug": 0,
-    "incremental": false,
-    "codegen_units": 1,
-    "jobs": 1
-  }
+  "compiled_artifact_bytes": 7879573,
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Arch Linux rust 1:1.99.1-1)"
 }

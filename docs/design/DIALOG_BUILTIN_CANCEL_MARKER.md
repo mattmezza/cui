@@ -1,8 +1,9 @@
 # Dialog lifetime cancellation: builtin reducer checkpoint
 
 Status: **unpublished prototype; no production marker/query or Base change**.
-The candidate passes 22 headless checks; frozen legacy traces and broader reducer
-coverage still gate transfer. See [the consumer audit](SCOPE_INPUT_CANCEL_CONSUMERS.md).
+The candidate passes 26 headless checks, including frozen Scroll/Resizable traces.
+Confirmed numeric stale-key and idle-drag failures plus broader reducer coverage
+still gate transfer. See [the consumer audit](SCOPE_INPUT_CANCEL_CONSUMERS.md).
 
 ## Actual counterexample
 

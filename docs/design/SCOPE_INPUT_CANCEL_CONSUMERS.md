@@ -12,9 +12,9 @@ separate concepts.
 | --- | --- | --- |
 | Base scrollbar (`src/base/cui_scroll.c`) | Actual nested close/reopen test applies old captured MOVE+UP: scroll 0 → 285.714. Reducer ignores consumed samples and retains caller-owned dragging state. | Explicit reset must clear idle/held drag and suppress cancelled samples. Prove mouse/touch, fresh DOWN recovery and unchanged no-helper trace. |
 | Resizable (`src/base/cui_resizable.c`) | Actual original nested reducer applies stale MOVE+UP: size 100 → 40 and spurious completion. It retains `active_handle`/`dragging` and ignores consumption. | Test nested old MOVE+UP, idle state, fresh input and callback counts/order; preserve legacy behavior when reset is unused. |
-| Rating (`src/base/cui_numeric.c`) | Source inspection: targeted KEY_DOWN mutates before interaction and ignores consumption. Selective cancellation currently covers Space/Enter, so nested modal arrows need independent proof. Runtime counterexample not yet established. | Test direct and nested-modal arrows/Home/End/Delete during lifetime reset; preserve ordinary legacy keys. |
-| Basic legacy Slider (`src/base/cui_base.c`) | Source inspection: raw targeted pointer/key paths ignore consumption. Activation cancellation alone cannot protect these value mutations. Runtime counterexample not yet established. | Test direct/nested stale samples, fresh input and frozen no-helper value traces. |
-| Controlled legacy Slider (`src/base/cui_base.c`) | Source inspection: consumed samples are skipped, but caller-owned drag/preview can remain active on idle capture loss. The declared cancellation contract restores the gesture-start value. Runtime counterexample not yet established. | Prove idle reset disposition and BEGIN/UPDATE/COMMIT/CANCEL callbacks, values and ordering; preserve no-helper behavior. |
+| Rating (`src/base/cui_numeric.c`) | Actual queued stale arrow changes 2 → 3: direct case is already consumed; nested-modal case remains unconsumed. Target identity stays intact. Activation cancellation does not cover this raw value path. | Test direct and nested-modal arrows/Home/End/Delete during lifetime reset; preserve ordinary legacy keys. |
+| Basic legacy Slider (`src/base/cui_base.c`) | Actual queued stale arrow changes 2 → 3 in direct (consumed) and nested-modal (unconsumed) cases. Raw targeted processing bypasses activation cancellation. | Test direct/nested stale samples, fresh input and frozen no-helper value traces. |
+| Controlled legacy Slider (`src/base/cui_base.c`) | Actual idle capture-loss fixture leaves caller-owned dragging active. The declared cancellation contract restores the gesture-start value; disposition and callback ordering need an explicit reviewed fix. | Prove idle reset disposition and BEGIN/UPDATE/COMMIT/CANCEL callbacks, values and ordering; preserve no-helper behavior. |
 
 The typed Slider model already contains a snapshot-ready/pressed capture-loss
 cancellation path. This source observation does not prove nested lifetime reset
@@ -49,10 +49,13 @@ Update this inventory as consumers are tested or additional paths are found.
 
 ## Current unpublished proof
 
-The copied marker/query and Scroll/Resizable candidates passed 22 headless cases
+The copied marker/query and Scroll/Resizable candidates passed an initial 22 headless cases
 in `dialog-marker-first-runtime.log`: scrollbar mouse/idle/touch cancellation,
 Resizable stale size/completion suppression and fresh input, scope query and prior
 Dialog lifecycle/receipt/geometry checks. Production files remain unchanged.
-Independent frozen no-helper reducer traces, additional Resizable idle/touch
-cases and remaining consumer coverage are still required. This is not approval
+The final driver passes 26 checks, including Resizable idle/touch and a frozen
+27-frame no-helper Scroll/Resizable trace (`dialog-marker-final-build-runtime.log`).
+The separate numeric trace passes, but five stale-key/idle counterexamples fail
+(`dialog-numeric-original-runtime.log`). Those policies and remaining consumer
+coverage still gate production transfer. This is not approval
 to publish the Core API or a claim of all-component cancellation support.

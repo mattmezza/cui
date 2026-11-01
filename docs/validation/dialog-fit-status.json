@@ -58,5 +58,23 @@
     "headless_tests": "7/7 PASS zero skips in41.53seconds; intrinsic, private range2, frozen authority, SDKfreshness, skillfreshness, skillcontract",
     "log": "dialog-fit-combined-tests.log",
     "browser": "Pending rebuilt gallery rerun; initial failure retained."
+  },
+  "browser_rerun": {
+    "artifact_source": "dba5043e",
+    "build": "PASS strict Zig0.16.0 full gallery",
+    "result": "FAIL later idle gate",
+    "log": "dialog-fit-browser.log",
+    "passed_before_failure": [
+      "First-open short Body maximum0",
+      "Intrinsic panel height",
+      "Long Body overflow and wheel scroll",
+      "Footer remains fixed"
+    ],
+    "failure": "gallery_redraw remained1 for30seconds; browser stopped before TimeField",
+    "targeted_probe": {
+      "log": "dialog-idle-probe.log",
+      "result": "Confirmed continuous~60fps redraw withwake0 and Productupdates focused, including after pointer leaves canvas",
+      "not_proven": "Root cause; no idle fix accepted yet"
+    }
   }
 }

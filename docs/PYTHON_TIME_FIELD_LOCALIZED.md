@@ -1,7 +1,8 @@
-# Python localized TimeField (source checkpoint)
+# Unreleased Python localized TimeField
 
-Focused local runtime validation passed: 14 localized methods, the headless
-authored example and ten existing Python regression modules. Canonical resource,
+Focused worker validation and sixteen configured root CTest entries pass,
+including fifteen localized methods against actual current, old and partial
+providers, the headless authored example and existing Python regressions. Canonical resource,
 usage and installed-skill gates remain pending; no package or native-interactive
 validation is claimed.
 The C bridge has separate focused proof; see [bridge contract and limits](BRIDGE_TIME_FIELD_LOCALIZED.md).

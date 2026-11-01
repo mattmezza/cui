@@ -1,0 +1,12 @@
+{
+  "implementation_revision": "1d69a314",
+  "configured_root_result": "PASS",
+  "ctest_entries": 16,
+  "ctest_seconds": 3.59,
+  "localized_methods": 15,
+  "localized_method_skips": 0,
+  "compatibility": "Actual current, older and missing-one-symbol partial providers; separate process loads preserve legacy factory and mount rollback.",
+  "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 -R ^bridge_python --output-on-failure",
+  "log_sha256": "b114a4fee01c696b80c364d7cb773a1ddbf420241cdeb250f796756f8e40b371",
+  "limitations": "Focused Python evidence only. Other four localized facades, native interactive execution, package delivery, complete focus/IME/AT and wider platforms remain open. Canonical freshness updated in a subsequent batch."
+}

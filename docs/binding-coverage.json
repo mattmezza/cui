@@ -1158,11 +1158,11 @@
     "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
   },
   "localized_time_field_v1_source_checkpoint": {
-    "implementation": "Integrated C bridge: strict root build, ten focused headless/ABI/ownership/source checks and three shared/static-example/frozen-legacy checks pass. Worker WASM evidence is compile-only. Canonical/full integration/package gates pending; unreleased. Native interactive and all five localized foreign facades remain unverified/unimplemented.",
+    "implementation": "Integrated unreleased C bridge and Python localized facade have focused root proof. C bridge: thirteen checks; Python: sixteen configured root entries, including fifteen localized methods/current-old-partial providers and authored example. Remaining four localized facades, package publication and broader platform/IME/focus acceptance remain open.",
     "public_header": "include/cui/cui_bridge.h",
     "node_kind": 55,
     "languages": {
-      "python": "not_implemented",
+      "python": "tested_partial",
       "javascript": "not_implemented",
       "typescript": "not_implemented",
       "go": "not_implemented",
@@ -1172,12 +1172,12 @@
     "example": "bindings/bridge/examples/time_field_localized.c",
     "scope": "Owned localized config/state/value and copied applied aggregate time changes; no controlled receipts, no callbacks inside Core. Default legacy scalar route unchanged.",
     "limitations": [
-      "Prepared source fixtures have focused worker proof recorded in docs/validation/time-field-bridge-first.json; full integration/generation/package and native interactive proof remain pending. No language support promotion.",
+      "Focused C/Python evidence is recorded in validation receipts. Broad integration, package and native interactive acceptance remain open; other four localized facades remain pending.",
       "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
       "Global segment Tab remains a source-focus parity exception; IME/clipboard and physical AT remain pending."
     ],
     "python_source_checkpoint": {
-      "implementation": "Source prepared; no Python runtime, old-library, example, package or freshness proof yet. No tested localized binding support is advertised.",
+      "implementation": "Integrated Python facade passes sixteen configured root CTest entries, including fifteen localized methods with actual current/old/partial DSOs and the authored headless example. Canonical/installed-skill refresh and publication remain pending; native interactive execution unverified.",
       "module": "bindings/python/cui_bridge/time_field_localized.py",
       "guide": "docs/PYTHON_TIME_FIELD_LOCALIZED.md",
       "test": "bindings/python/test_time_field.py",

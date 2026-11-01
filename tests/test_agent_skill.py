@@ -263,7 +263,7 @@ class AgentSkillTests(unittest.TestCase):
     def test_typed_definition_modules_are_discoverable_offline(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            expected = ['bindings/python/cui_bridge/shadows.py',
+            expected = ['bindings/rust/build.rs', 'bindings/python/cui_bridge/shadows.py',
                         'bindings/python/cui_bridge/slider_model.py',
                         'bindings/rust/src/shadows.rs', 'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs',
                         'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs']

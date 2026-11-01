@@ -15,7 +15,7 @@ def snapshot():
     tracked = subprocess.check_output(["git", "ls-files", "--cached", "-z"], cwd=ROOT).decode().split("\0")
     files = {}
     for name in tracked:
-        if name and (name.startswith(("src/", "include/", "backends/sdl3/", "backends/software/")) or name == "LICENSE"):
+        if name and (name.startswith(("src/", "include/", "backends/sdl3/", "backends/software/", "backends/common/")) or name == "LICENSE"):
             files[name] = (ROOT / name).read_bytes()
     dependencies = [entry for entry in json.loads((ROOT / "third_party/dependencies.json").read_text())
                     if entry["name"] in DEPENDENCIES]
@@ -147,7 +147,7 @@ def main():
             target = SDK / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-        canonical = ["src", "include", "backends/sdl3", "backends/software", "third_party", "cmake", "scripts/generate_go_sdk.py", "CMakeLists.txt", "LICENSE"]
+        canonical = ["src", "include", "backends/sdl3", "backends/software", "backends/common", "third_party", "cmake", "scripts/generate_go_sdk.py", "CMakeLists.txt", "LICENSE"]
         diff = subprocess.check_output(["git", "diff", "HEAD", "--", *canonical], cwd=ROOT)
         receipt = {"source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                    "canonical_tracked_sources_dirty": bool(diff), "tracked_diff_sha256": hashlib.sha256(diff).hexdigest(),

@@ -1,7 +1,12 @@
 # Private transactional software painting
 
-`backends/software/cui_software_v2_paint_internal.h` is the maintainer building
+`backends/common/cui_cpu_v2_paint_internal.h` is the maintainer building
 block behind the explicit [public C software V2 entry](SOFTWARE_V2.md). It has no V1 call site.
+The old `backends/software/cui_software_v2_*` private headers/names forward to the
+same implementation. Pure V1 bitmap/shape/mesh/shadow utilities remain unchanged;
+common headers temporarily include those private pure utilities without linking
+another adapter. This mechanical relocation adds no owned-frame lifecycle or SDL
+support. SDK source closures include `backends/common/`.
 It paints RECT, BORDER, IMAGE, MESH, explicit clips and owned BACKGROUND commands
 in array order at independent physical scales/origins. DROP/INSET shadows use
 bounded target-pixel AREA reconstruction of the unchanged source profile. The

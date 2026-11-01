@@ -1,0 +1,66 @@
+/* SPDX-License-Identifier: MIT */
+#ifndef CUI_SOFTWARE_V2_COMPAT_INTERNAL_H
+#define CUI_SOFTWARE_V2_COMPAT_INTERNAL_H
+/* Private source compatibility only. Define instrumentation before the FIRST
+ * matching legacy entry include; as before, a hook cannot rewrite prior includes. */
+#if defined(CUI_SOFTWARE_V2_SHADOW_SAMPLE_HOOK) && !defined(CUI_CPU_V2_SHADOW_SAMPLE_HOOK)
+#define CUI_CPU_V2_SHADOW_SAMPLE_HOOK() CUI_SOFTWARE_V2_SHADOW_SAMPLE_HOOK()
+#endif
+#define cui_software_v2_add cui_cpu_v2_add
+#define cui_software_v2_alias cui_cpu_v2_alias
+#define cui_software_v2_alias_excluding cui_cpu_v2_alias_excluding
+#define cui_software_v2_alloc_fn cui_cpu_v2_alloc_fn
+#define cui_software_v2_arc cui_cpu_v2_arc
+#define cui_software_v2_blend cui_cpu_v2_blend
+#define cui_software_v2_clip cui_cpu_v2_clip
+#define cui_software_v2_clip_all cui_cpu_v2_clip_all
+#define cui_software_v2_clip_cover cui_cpu_v2_clip_cover
+#define cui_software_v2_clip_push cui_cpu_v2_clip_push
+#define cui_software_v2_cover cui_cpu_v2_cover
+#define cui_software_v2_descriptor cui_cpu_v2_descriptor
+#define cui_software_v2_emit cui_cpu_v2_emit
+#define cui_software_v2_floor_sum cui_cpu_v2_floor_sum
+#define cui_software_v2_free_fn cui_cpu_v2_free_fn
+#define cui_software_v2_glyph_cover cui_cpu_v2_glyph_cover
+#define cui_software_v2_glyph_query cui_cpu_v2_glyph_query
+#define cui_software_v2_glyph_sample cui_cpu_v2_glyph_sample
+#define cui_software_v2_glyph_source_sample cui_cpu_v2_glyph_source_sample
+#define cui_software_v2_intersection cui_cpu_v2_intersection
+#define cui_software_v2_mesh_paint cui_cpu_v2_mesh_paint
+#define cui_software_v2_paint cui_cpu_v2_paint
+#define cui_software_v2_paint_descriptor cui_cpu_v2_paint_descriptor
+#define cui_software_v2_paint_with_font cui_cpu_v2_paint_with_font
+#define cui_software_v2_paint_with_font_excluding cui_cpu_v2_paint_with_font_excluding
+#define cui_software_v2_pixel_inside cui_cpu_v2_pixel_inside
+#define cui_software_v2_plan cui_cpu_v2_plan
+#define cui_software_v2_rect cui_cpu_v2_rect
+#define cui_software_v2_shadow_cell cui_cpu_v2_shadow_cell
+#define cui_software_v2_shadow_cell_query cui_cpu_v2_shadow_cell_query
+#define cui_software_v2_shadow_clip cui_cpu_v2_shadow_clip
+#define cui_software_v2_shadow_descriptor cui_cpu_v2_shadow_descriptor
+#define cui_software_v2_shadow_paint cui_cpu_v2_shadow_paint
+#define cui_software_v2_shadow_phase cui_cpu_v2_shadow_phase
+#define cui_software_v2_shadow_profile cui_cpu_v2_shadow_profile
+#define cui_software_v2_shadow_query cui_cpu_v2_shadow_query
+#define cui_software_v2_shadow_raster cui_cpu_v2_shadow_raster
+#define cui_software_v2_shape cui_cpu_v2_shape
+#define cui_software_v2_shape_paint cui_cpu_v2_shape_paint
+#define cui_software_v2_span cui_cpu_v2_span
+#define cui_software_v2_surface cui_cpu_v2_surface
+#define cui_software_v2_target cui_cpu_v2_target
+#define cui_software_v2_target_disjoint cui_cpu_v2_target_disjoint
+#define cui_software_v2_texel cui_cpu_v2_texel
+#define cui_software_v2_text_paint cui_cpu_v2_text_paint
+#define cui_software_v2_text_range cui_cpu_v2_text_range
+#define cui_software_v2_validate cui_cpu_v2_validate
+#define cui_software_v2_validate_excluding cui_cpu_v2_validate_excluding
+#define cui_software_v2_workspace cui_cpu_v2_workspace
+#define cui_software_v2_workspace_begin cui_cpu_v2_workspace_begin
+#define cui_software_v2_workspace_end cui_cpu_v2_workspace_end
+#define cui_software_v2_workspace_take cui_cpu_v2_workspace_take
+#define CUI_SOFTWARE_V2_SHADOW_TAPS CUI_CPU_V2_SHADOW_TAPS
+#define CUI_SOFTWARE_V2_SHADOW_CELLS CUI_CPU_V2_SHADOW_CELLS
+#ifndef CUI_SOFTWARE_V2_SHADOW_SAMPLE_HOOK
+#define CUI_SOFTWARE_V2_SHADOW_SAMPLE_HOOK() CUI_CPU_V2_SHADOW_SAMPLE_HOOK()
+#endif
+#endif

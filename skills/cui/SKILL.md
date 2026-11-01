@@ -22,7 +22,9 @@ Never cast to V1 or fabricate consumer support. SDL_Renderer, SDL_GPU, Sokol,
 Canvas and foreign bindings remain pending; software support does not complete
 all78 parts. V1 renderer tables/default routes remain unchanged.
 `docs/SOFTWARE_V2_PAINTING.md` details the private bounded AREA shadows, per-axis
-owned text and publication contract. `docs/BACKGROUND_PREPARATION.md` describes
+owned text and publication contract. When copying backend sources, retain
+`backends/common/` alongside legacy software private forwarding headers; supplied
+SDK/native source bundles carry both. `docs/BACKGROUND_PREPARATION.md` describes
 allocation-free preparation, not another public adapter. `docs/TEXT_PREPARATION.md`
 describes counted recording, owned source density up to64 and GRAY256 coverage;
 public scaled font APIs remain limited to16. No-Bidi rejects contextual/spanned
@@ -154,6 +156,13 @@ Read these with `read PATH --source CUI_SOURCE`:
 | Optional regex provider | `backends/regex/README.md`, `docs/INPUT_PATTERN_FORMATTING.md` |
 | Package/release provenance | `docs/PACKAGING.md`, `docs/RELEASING.md` |
 | Platform prerequisites and evidence | `docs/DEPENDENCIES.md`, `docs/PLATFORM_MATRIX.md`, `docs/V1_READINESS.md` |
+
+For matching Rust source builds, Cargo's positive `NUM_JOBS` controls the child
+CMake `-j` count; use `CARGO_BUILD_JOBS=1` or Cargo `-j1` for serial builds. A
+missing/invalid standalone value falls back to1. `CUI_BRIDGE_LIB_DIR` uses an
+existing library and skips that CMake build. Read `docs/RUST_BUILDERS.md` and
+`bindings/rust/build.rs`; do not assume a separate CMake parallelism environment
+variable overrides an explicit Cargo-selected count.
 
 Configure a real font and assets for the selected host. Keep measuring and
 painting font configuration consistent; arrange fallback/shaping for the scripts

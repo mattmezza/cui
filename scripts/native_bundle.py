@@ -31,8 +31,9 @@ def bundle_files():
                     add(sibling.relative_to(ROOT).as_posix())
     for path in sorted((ROOT / 'include/cui').glob('*.h')):
         add(path.relative_to(ROOT).as_posix())
-    for path in sorted((ROOT / 'backends/software').glob('*.h')):
-        add(path.relative_to(ROOT).as_posix())
+    for directory in ('backends/software', 'backends/common'):
+        for path in sorted((ROOT / directory).glob('*.h')):
+            add(path.relative_to(ROOT).as_posix())
     for directory in ('clay', 'nanosvg', 'sheenbidi', 'gpui_icons', 'gpui_themes'):
         for path in sorted((ROOT / 'third_party' / directory).rglob('*')):
             if path.is_file():

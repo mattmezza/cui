@@ -55,11 +55,18 @@ fn main() {
             "-DCMAKE_BUILD_TYPE={}",
             env::var("CUI_PACKAGE_BUILD_TYPE").unwrap_or_else(|_| "Release".into())
         )));
-    run(Command::new("cmake").arg("--build").arg(&build).args([
-        "--target",
-        "cui_rust_bridge",
-        "-j2",
-    ]));
+    // Cargo owns parallelism. Invalid/missing values fail conservatively for
+    // standalone invocations of this script rather than creating extra jobs.
+    let jobs = env::var("NUM_JOBS")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|jobs| *jobs > 0)
+        .unwrap_or(1);
+    run(Command::new("cmake")
+        .arg("--build")
+        .arg(&build)
+        .args(["--target", "cui_rust_bridge"])
+        .arg(format!("-j{jobs}")));
     println!("cargo:rerun-if-changed={}", source.display());
     println!("cargo:rustc-link-search=native={}", build.display());
     println!(

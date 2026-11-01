@@ -1,0 +1,45 @@
+{
+  "scope": "Shared CPU V2 mechanical relocation and Rust embedded build job control; no SDL V2 production support",
+  "date": "2026-11-01",
+  "integration_parent": "38f7ea61",
+  "worker_commits": [
+    "0b75d70b456216a96a611936e67a043a1c72b388",
+    "84f63603",
+    "98b42b6b",
+    "9ee20d6fd8bfc21c1c2209d03f46243dd00826f3"
+  ],
+  "checks": {
+    "warning_enabled_Release_build": "38/38 steps passed, single compiler job, CPU1 nice19",
+    "initial_private_Xvfb_run": "21/23 passed; two legacy-first instrumentation assertions failed",
+    "fixture_correction": "Legacy fixture branch incorrectly included common before software after final formatting. Changed only fixture order, protected against formatting; offline source test now asserts actual branch order. No production hook/pixel behavior changed.",
+    "corrected_build": "9/9 steps passed",
+    "corrected_private_Xvfb_run": "4/4 relocation checks passed, 0.64 s",
+    "unchanged_passes": "The 21 passing checks from the initial run remain recorded, including software public/private/header regressions, common source/new-first, Rust job control and skill checks; no claim of a new full 23/23 run.",
+    "agent_skill_contract": "18 methods passed within CTest agent_skill_contract, 39.66 s",
+    "rust_build_parallelism": "3 offline actual-build.rs tests passed within CTest, 0.83 s; no SDK build/native window",
+    "offline_common_source_contract": "7 checks passed in corrected CTest",
+    "SDK": "441 minimal source files per binding, freshness passed",
+    "generated_distributions_and_skill": "regenerated through canonical generators; freshness passed"
+  },
+  "source_sha256": {
+    "backends/common/cui_cpu_v2_internal.h": "30a8b6ea447f2e9971d5410b7b9c56a50c72e977cc2290de9913b8296b195f09",
+    "backends/common/cui_cpu_v2_paint_internal.h": "1b29c40f3b38c8d13d86163ea3d060a7f63fa52fb19466814424a6f54676bf3e",
+    "backends/common/cui_cpu_v2_text_internal.h": "d0b35d9ce7953fb6654618ef12132ac83cccec00400fd3f8c2c2ffc426f581ac",
+    "backends/common/cui_cpu_v2_shadow_internal.h": "94e00c06e4cf12066149a50ab77e68487fbad070ff944d5f73c6b95fbba63359",
+    "bindings/rust/build.rs": "639163aea886fecf1338a2be754e3f4dd50786e0331b377c0ce19a7c7e31014f",
+    "tests/unit/test_cpu_v2_common.c": "d772e3ed23d61f8f1d596e1bc13ca2a77ddff81493553ea111e27a91ce46d53c",
+    "tests/test_cpu_v2_common_reference.py": "b202b1fcae524229876e3635396e16891b312e9a4fad1321dd8167cda799f47f"
+  },
+  "logs": [
+    "/home/matteo/.cache/cui-current-validation/common-configure.log",
+    "/home/matteo/.cache/cui-current-validation/common-build.log",
+    "/home/matteo/.cache/cui-current-validation/common-runtime.log",
+    "/home/matteo/.cache/cui-current-validation/common-fixture-build.log",
+    "/home/matteo/.cache/cui-current-validation/common-fixture-runtime.log"
+  ],
+  "limitations": [
+    "Focused checks only; consolidated full suite and exact-revision hosted delivery remain open",
+    "No owned-frame extraction, SDL adapter API, foreign V2 binding or physical GPU/OS acceptance",
+    "Rust tests used existing installed compiler, not proof of MSRV support"
+  ]
+}

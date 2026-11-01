@@ -1,0 +1,47 @@
+{
+  "scope": "Mechanical private CPU V2 relocation only; no owned-frame extraction or SDL adapter support",
+  "source_baseline": "8671fa893e648fd08720fdc9ebb75d027c913f3a",
+  "proposal_commits": [
+    "84f6360390598f40dffe2b2af8623abea16d344c",
+    "98b42b6b"
+  ],
+  "frozen_authority": "tests/fixtures/cpu_v2_common_v1/receipt.json",
+  "normalization": "Private software/cpu identifier prefixes and explicit include paths only; token comparison ignores inert comments/formatting while preserving literals/operators/directive boundaries",
+  "strict_flags": "cc -std=c11 -O3 -UNDEBUG -Wall -Wextra -Wpedantic -Werror; CPU1 nice19; existing archives, no engine rebuild",
+  "libraries": {
+    "/home/matteo/.cache/cui-current-validation/native/libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "checks": {
+    "offline_authority_and_packaging": "7/7 PASS",
+    "strict_old_first_new_first_text": "PASS",
+    "strict_frozen_public_V1": "PASS",
+    "copied_Go_Rust_SDK_software_translation_units": "PASS",
+    "private_Xvfb": "4/4 PASS, 0.08 s; scripts/test_local.py --build-dir build-shadow -R ^(cpu_v2_common_.*_focused|software_public_v1_focused)$",
+    "format23": "PASS",
+    "SDK_amalgamation_agent_skill_freshness": "PASS",
+    "agent_skill_18": "Explicitly deferred to root combined mechanical integration acceptance; not run for this worker slice"
+  },
+  "oracles": [
+    "Separate frozen original implementation TU; own prefix and original hook",
+    "Exact sizeof/align vectors and legacy alias identity",
+    "Five physical transforms; lossless full RGBA and padded-row comparison",
+    "Allocation request vectors, peak/live bytes, callback busy state, all counted allocation failure positions",
+    "Frozen original public V1 constructor/resize allocation and pixels"
+  ],
+  "initial_findings": [
+    "Offline token proof caught formatter include-order change; restored original implementation include order",
+    "Root review caught compatibility include after common implementation and false old-first fixture ordering before first compile. Corrected all four forwarders, protected order from formatter, added explicit offline ordering assertion; actual legacy-first hook count oracle passed."
+  ],
+  "limitations": [
+    "No new common frame state machine or SDL API implemented",
+    "No GPU/hardware checks",
+    "Dependency/font session allocations remain existing separately documented class 3"
+  ],
+  "logs": [
+    "build-shadow/cpu-v2-common-build.log",
+    "build-shadow/cpu-v2-common-runtime.log",
+    "build-shadow/cpu-v2-common-final-offline.log"
+  ]
+}

@@ -14,6 +14,18 @@ cmake --build build-bridge --target cui_bridge test_bridge_core
 CUI_BRIDGE_LIB_DIR="$PWD/build-bridge" cargo test --manifest-path bindings/rust/Cargo.toml -- --test-threads=1
 ```
 
+Matching bundled-source builds pass Cargo's positive `NUM_JOBS` count to the
+child CMake build. Use `CARGO_BUILD_JOBS=1` or Cargo `-j1` to keep both phases
+serial; missing/invalid standalone NUM_JOBS falls back to1. Setting only
+CMAKE_BUILD_PARALLEL_LEVEL does not replace this explicit Cargo-selected count.
+`CUI_BRIDGE_LIB_DIR` selects an existing dynamic library and skips that CMake
+source build. The offline build-script fixture uses fake CMake/pkg-config and
+never builds an SDK or opens a window:
+
+```sh
+python bindings/rust/tests/test_build_parallelism.py
+```
+
 Serialize all calls across all apps, including apps created on separate threads: the current core uses a process-global Clay context. The crate tests enforce this contract with a process mutex. `build.rs` adds `CUI_BRIDGE_LIB_DIR` to the native linker path and Linux runtime path; use an absolute path. On other platforms, place the shared library on the platform dynamic library search path. The crate checks the bridge ABI version and `cui_bridge_options` size at creation. The C library itself needs its pinned SDL3 dependencies as configured by CMake. Native SDL rendering needs a TTF file. Run the example only on a display you intend to use:
 
 ```sh

@@ -51,6 +51,7 @@ def source_files(root):
                  'bindings/python/cui_bridge/slider_model.py',
                  'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs', 'bindings/rust/src/shadows.rs',
                  'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs'))
+    paths.add(root / 'bindings/rust/build.rs')
     for path in ('web/gallery.c', 'web/gallery.js', 'cmake/sources.json', 'CMakeLists.txt',
                  'scripts/build_web.py', 'scripts/native_bundle.py', 'scripts/test_local.py',
                  'third_party/dependencies.json'):

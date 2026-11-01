@@ -1137,5 +1137,13 @@
       "bindings/go/examples/slider_model/main.go"
     ]
   },
-  "language_builder_node_kinds_scope": "80 shared legacy kinds; Python, Node/TypeScript and Go additionally expose controlled Slider kind81 when the full optional API group is available."
+  "language_builder_node_kinds_scope": "80 shared legacy kinds; Python, Node/TypeScript and Go additionally expose controlled Slider kind81 when the full optional API group is available.",
+  "rust_source_build": {
+    "scope": "Matching bundled Linux source SDK build; dynamic library override skips CMake source compilation.",
+    "parallelism": "Positive Cargo NUM_JOBS selects explicit CMake -j count; invalid/missing standalone value falls back to1. Use Cargo -j1 or CARGO_BUILD_JOBS=1 for serial work.",
+    "source": "bindings/rust/build.rs",
+    "guide": "docs/RUST_BUILDERS.md",
+    "offline_fixture": "bindings/rust/tests/test_build_parallelism.py",
+    "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
+  }
 }

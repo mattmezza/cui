@@ -1,0 +1,35 @@
+{
+  "scope": "Unreleased focused root localized facade acceptance, Linux headless",
+  "source_checkpoint": "fa61db07 plus root CMake/metadata acceptance changes",
+  "node": {
+    "strict_build_steps": 152,
+    "localized_ctest": "20/20 PASS 3.34s",
+    "all_configured_node_ctest": "81/81 PASS 9.66s",
+    "typescript": "cached5.8.3; strict authored runtime"
+  },
+  "go_rust": {
+    "ctest": "3/3 PASS15.94s",
+    "runner": "bindings/go/tests/test_time_localized.py",
+    "offline_runner_methods": 6,
+    "providers": "actual current/old/partial; existing libraries, no engine rebuild for Go/Rust",
+    "scope": "Go localized tests and actual example; Rust6 integration tests,5 wire tests, actual example; old/partial fresh processes"
+  },
+  "generation": {
+    "first_pass": "SDK + amalgamation + skill;18 skill tests PASS41.908s",
+    "note": "Guide/metadata changed after first pass; final regeneration still required."
+  },
+  "limitations": [
+    "No full current native suite or default-static Go/Rust consumer acceptance",
+    "No native interactive/physical GPU/macOS/Windows/AT/IME acceptance",
+    "Not released, deployed or package-published; no full component parity claim",
+    "Go/Rust true later failed-frame facade observations remain a separate gap"
+  ],
+  "logs_sha256": {
+    "/home/matteo/.cache/cui-current-validation/node-time-root-build.log": "f8171e68690c525187ca304028529800d254ec6352fb5a1f9d923919546a8cd5",
+    "/home/matteo/.cache/cui-current-validation/node-time-root-tests.log": "f84f963a00958222412153936048d04f9e8153526a2883940baed438ff7cd1e2",
+    "/home/matteo/.cache/cui-current-validation/node-time-root-regressions.log": "ee0830772ea87538bc4aaa1bd7bda9f13a9e90b0729a58559631c4ff44838adc",
+    "/home/matteo/.cache/cui-current-validation/time-go-rust-root-configure.log": "5465cf05933812f0b48e37b266b1d4f448417e981a5d63d9bb2519cd1dd6d5ae",
+    "/home/matteo/.cache/cui-current-validation/time-go-rust-root-tests.log": "bec9cb0a4c25fdf08901911ca84840b8f3b5a0f52d074efb8a995b13e10e39ab",
+    "/home/matteo/.cache/cui-current-validation/time-facades-generation.log": "db3625fa7f5447eddd84159dc5f8a48e5dd8d0d7dc9ed8ae691893357a0bbd9e"
+  }
+}

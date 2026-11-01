@@ -50,7 +50,8 @@ def source_files(root):
     paths.update(root / path for path in ('bindings/python/cui_bridge/shadows.py',
                  'bindings/python/cui_bridge/slider_model.py',
                  'bindings/python/cui_bridge/time_field_localized.py',
-                 'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs', 'bindings/rust/src/shadows.rs', 'bindings/rust/src/slider_model.rs',
+                 'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs',
+                 'bindings/node/time-field-localized.cjs', 'bindings/node/time_field_localized_internal.h', 'bindings/rust/src/shadows.rs', 'bindings/rust/src/slider_model.rs',
                  'bindings/go/cui/time_localized.go', 'bindings/go/cui/time_localized_ffi.h',
                  'bindings/rust/src/time_localized.rs',
                  'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs'))

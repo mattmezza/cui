@@ -2,8 +2,9 @@
 
 This additive authoring slice is based on root `8a402c2b`. Focused Linux dynamic
 Go/Rust compile, private-wrapper tests and both authored examples passed; see
-[the exact receipt](validation/time-field-go-rust-dynamic.json). Default static,
-canonical generation and installed-package gates have not run.
+[the exact receipt](validation/time-field-go-rust-dynamic.json). Root configured dynamic acceptance now passes for current/old/partial providers
+and both actual authored examples; see the [root receipt](validation/localized-facades-root.json).
+Default static and installed-package gates remain open.
 The authoritative C contract is [BRIDGE_TIME_FIELD_LOCALIZED.md](BRIDGE_TIME_FIELD_LOCALIZED.md)
 and `include/cui/cui_bridge.h`. Existing scalar TimeField APIs stay unchanged.
 This does not bind direct Base/Styled options, drafts, clipboard/IME policy or
@@ -131,7 +132,7 @@ input first completes two ordinary frames and checks result admission; a minute-
 field center is a separator, so the script clicks its first-quarter textbox.
 Still required: real later-failed-frame copied observations at the facade boundary,
 additional schema-poison providers, native run unwind, MSRV/installed-package and
-static source closure, canonical SDK generation and required skill tests. No full
+static source closure and fresh generated-consumer acceptance after further API changes. No full
 binding/source-family parity follows from these focused checks.
 
 
@@ -184,6 +185,6 @@ static SDK/package acceptance remains a separate pending gate.
 `bindings/go/tests/test_time_localized_runner.py` is an offline six-test harness
 proof: it mocks all tools and checks provider selection, offline/serial flags,
 reported-binary reuse, malformed Cargo output, desktop rejection, fail-fast and
-non-destructive aliases. It ran6/6 without Go/Cargo or native execution. The new
-runner itself has not yet been executed; prior dynamic evidence used the retained
-scratch harness, and root's configured acceptance remains required.
+non-destructive aliases. It ran6/6 without Go/Cargo or native execution. Root configured execution now passes both dynamic suites plus the offline
+harness (3/3 CTest entries, 15.94s). Earlier scratch-harness evidence is retained
+separately; default-static consumers and packages remain unverified.

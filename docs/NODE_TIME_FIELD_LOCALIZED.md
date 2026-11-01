@@ -1,13 +1,15 @@
 # JavaScript/TypeScript localized TimeField
 
-Unreleased authoring over the integrated localized C bridge. Focused Linux worker
-validation passed 37/37 private-display checks, including strict C11 addon builds
-and cached TypeScript 5.8.3 compilation/runtime. Root integration and generated
-SDK/skill acceptance remain pending; see the
-[verification receipt](validation/node-localized-time-field-worker.json). The existing `time_field()` remains legacy kind 55.
-`localized_time_field()` is a distinct subclass using that same kind and the
-bridge-owned localized editor. Python/Go/Rust localized authoring remains pending;
-these focused results establish no all 78 parity or other-language acceptance.
+Unreleased authoring over the integrated localized C bridge. Strict root C11
+build and all 81 configured Node checks pass, including 20 localized checks,
+actual old/missing providers, real English/Arabic UI and TypeScript 5.8.3.
+See the [root receipt](validation/localized-facades-root.json) and retained
+[worker history](validation/node-localized-time-field-worker.json).
+The existing `time_field()` remains legacy kind 55. `localized_time_field()` is a
+distinct subclass using that same kind and the bridge-owned localized editor.
+Python and dynamic Go/Rust also have focused root acceptance. Static/package,
+native interactive and broader platform acceptance remain separate; these
+results establish no full 78-family parity.
 
 Complete authored UI sources are
 [JavaScript](../bindings/node/examples/time-field-localized.cjs) and

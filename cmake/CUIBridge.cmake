@@ -271,3 +271,35 @@ add_test(NAME bridge_python_time_field COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_time_field_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/time_field_localized.py)
+
+# Opt-in localized facade acceptance: supplied historical/partial providers only.
+# Builds language consumers offline, never another C engine or a desktop window.
+option(CUI_TIME_FIELD_BINDING_TESTS "Validate Go/Rust localized TimeField against existing providers" OFF)
+set(CUI_TIME_FIELD_OLD_LIBRARY "" CACHE FILEPATH "Actual pre-localized-TimeField bridge")
+set(CUI_TIME_FIELD_PARTIAL_LIBRARY "" CACHE FILEPATH "Actual bridge with incomplete localized optional group")
+set(CUI_TIME_FIELD_RUST_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-time-field-target" CACHE PATH "Reusable Cargo target directory")
+if(CUI_TIME_FIELD_BINDING_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Localized facade provider acceptance currently supports Linux only")
+ endif()
+ foreach(provider CUI_TIME_FIELD_OLD_LIBRARY CUI_TIME_FIELD_PARTIAL_LIBRARY)
+  if(NOT EXISTS "${${provider}}" OR IS_DIRECTORY "${${provider}}")
+   message(FATAL_ERROR "${provider} must name an existing provider; no download is performed")
+  endif()
+ endforeach()
+ find_program(CUI_TIME_FIELD_GO go REQUIRED)
+ find_program(CUI_TIME_FIELD_CARGO cargo REQUIRED)
+ foreach(language go rust)
+  add_test(NAME bridge_${language}_time_localized COMMAND ${Python3_EXECUTABLE}
+   ${CUI_BRIDGE_ROOT}/bindings/go/tests/test_time_localized.py
+   --language ${language} --build-dir ${CMAKE_BINARY_DIR}
+   --library $<TARGET_FILE:cui_bridge>
+   --old-library ${CUI_TIME_FIELD_OLD_LIBRARY}
+   --partial-library ${CUI_TIME_FIELD_PARTIAL_LIBRARY}
+   --target-dir ${CUI_TIME_FIELD_RUST_TARGET_DIR}
+   --go ${CUI_TIME_FIELD_GO} --cargo ${CUI_TIME_FIELD_CARGO})
+  set_tests_properties(bridge_${language}_time_localized PROPERTIES RUN_SERIAL TRUE TIMEOUT 300)
+ endforeach()
+endif()
+add_test(NAME bridge_time_localized_runner_offline COMMAND ${Python3_EXECUTABLE}
+ ${CUI_BRIDGE_ROOT}/bindings/go/tests/test_time_localized_runner.py)

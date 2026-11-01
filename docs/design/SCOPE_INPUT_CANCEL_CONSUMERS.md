@@ -101,3 +101,10 @@ and a trace target correction are prepared but unexecuted at this checkpoint;
 no claim that they are fixture-only failures is made. See the
 [partial receipt](../validation/dialog-table-color-candidate-partial.json).
 Production Core/Base transfer remains gated.
+
+A later same-input control confirms that both the frozen original Table and the
+candidate fail initial touch reordering **before any lifetime reset**. This is
+an existing touch-drop defect, not evidence of a cancellation regression. The
+corrected trace passes its earlier bounds/model/callback comparisons but still
+fails a blocked-transition capture precondition. That setup remains under
+investigation; the assertion and original logs remain intact.

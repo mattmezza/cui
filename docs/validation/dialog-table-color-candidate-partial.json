@@ -27,5 +27,21 @@
     "tests/unit/dialog_frozen_table.c": "67949fa52785be02b8e75d6030647a56332e3840288f1c694d8bfdea16405d00",
     "tests/unit/dialog_frozen_picker.c": "953fa4f4011ebf9040c292f93ea93717006fa63c2b7c9d7315842a3dc826bdf0"
   },
-  "limits": "All prior38 and original five retained regressions + typed capture-lost passed; new touch reorder and corrected frozen trace remain unverified. No production Core/Base transfer."
+  "limits": "All prior38 and original five retained regressions + typed capture-lost passed; new touch reorder and corrected frozen trace remain unverified. No production Core/Base transfer.",
+  "followup": {
+    "session": 22936,
+    "strict_fixture_tus": 2,
+    "runtime_cases": 3,
+    "runtime_seconds": 0.48,
+    "log": "/home/matteo/.cache/cui-hover-raw-build/dialog-table-color-followup.log",
+    "log_sha256": "9012e3981429ec8fa8905ea71914481f7cf6ca33d6442e0f458e125b9dece5dd",
+    "results": {
+      "frozen_initial_touch_reorder": "fails same strict assertion before lifetime cancellation",
+      "candidate_initial_touch_reorder": "fails same strict assertion before lifetime cancellation",
+      "corrected_frozen_trace": "bounds and comparisons pass; blocked-transition simultaneous-held-state setup assertion fails"
+    },
+    "frozen_control": "objcopy --redefine-sym cui_table_reduce_events=dialog_frozen_cui_table_reduce_events on a separate fixture object, linked byte-frozen original wrapper; current submission and identical gesture retained"
+  },
+  "worker_checkpoint": "3acb54752bb5e26028c02f6ab317b2b9c2d91714",
+  "production_status": "Not transferred; original/current touch baseline failure and blocked trace precondition remain open."
 }

@@ -40,8 +40,8 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Test-only candidate passes 44/47 checks, including the prior 38 and five Table/Color retained-state fixes. Touch-reorder controls and frozen Table/Color traces remain unresolved; production transfer and scope-ID alias limitations stay open. |
-| Typed Slider | C models, gallery and Python/JS/TS/Go authoring are integrated with focused checks; root Go protocol checks pass 42/42, JS/TS checks 31/31, and authored examples run headlessly. Domain validation now matches C. Rust, remaining copied-wire conformance and native numeric delivery remain open. Unreleased. |
+| Dialog and scrolling | Test-only candidate passes 44/47 checks. Original/current controls confirm an existing touch-reorder defect; frozen Table/Color trace setup remains unresolved. Production transfer and scope-ID alias limitations stay open. |
+| Typed Slider | C/Python/JS/TS/Go authoring is integrated with focused checks. Rust passes its first worker UI tests; compatibility/integration remain open. Remaining copied-wire checks and native numeric delivery are unfinished. Unreleased. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; it is unreleased. Complete the other four adapters and foreign authoring APIs. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Earlier combined warning-enabled build passed (945 steps): full Linux suite had 481 passes and two skips; typography rerun passed, original-theme fixture audit remains skipped. Newer Python/Node/private renderer slices have focused checks; the full suite must be rerun after integration. Hosted exact-revision checks and delivery remain open. |
 
@@ -64,7 +64,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 | [ ] | Package-manager delivery | Finish PyPI/npm/crates.io ownership/authentication/publication gates and clean installation checks; maintain verified Go module delivery and native dependency guidance. |
 | [ ] | Human and agent docs | Keep build/compiler/linker prerequisites, quickstarts, state/events, immediate/retained distinctions, language examples and professional app recipes reproducible. Update metadata and generated skill together; keep discovery concise. |
 | [ ] | Website and media | Keep gallery behavior, system/theme selection, search, copyable code, navigation scroll preservation, docs, version display, README media and OG coverage aligned with shipped APIs. |
-| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Package tests default to one local compiler job. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
+| [ ] | CI, performance and resources | Reduce redundant builds/gate cost without weakening coverage; measure performance/memory. Consumer test harnesses request one compiler job; Rust’s embedded CMake build still uses two and needs correction. Portable hosted CI now allows two test processes and bounded nested builds; savings remain unmeasured. Keep laptop load and artifacts bounded. |
 
 ### Component gaps to close
 

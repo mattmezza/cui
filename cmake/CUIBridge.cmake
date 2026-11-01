@@ -163,3 +163,17 @@ add_test(NAME bridge_python_shadows COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_part_shadows COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_part_shadows.py)
+
+# Optional actual-old-module proof. No historical binary is downloaded or vendored.
+set(CUI_GO_SLIDER_OLD_LIBRARY "" CACHE FILEPATH "Actual pre-typed-Slider library for optional Go protocol checks")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUI_GO_SLIDER_OLD_LIBRARY)
+ if(NOT EXISTS "${CUI_GO_SLIDER_OLD_LIBRARY}")
+  message(FATAL_ERROR "CUI_GO_SLIDER_OLD_LIBRARY must name an existing actual older bridge")
+ endif()
+ find_program(CUI_GO_SLIDER_EXECUTABLE go REQUIRED)
+ add_test(NAME bridge_go_slider_protocol COMMAND ${Python3_EXECUTABLE}
+  ${CUI_BRIDGE_ROOT}/bindings/go/tests/test_slider_protocol.py
+  --build-dir ${CMAKE_BINARY_DIR} --library $<TARGET_FILE:cui_bridge>
+  --old-library ${CUI_GO_SLIDER_OLD_LIBRARY}
+  --go ${CUI_GO_SLIDER_EXECUTABLE} --cc ${CMAKE_C_COMPILER})
+endif()

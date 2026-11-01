@@ -18,6 +18,17 @@ wire = importlib.import_module("cui_bridge.slider_model")
 
 
 class ControlledSlider(unittest.TestCase):
+    def test_domain_boundaries_match_c_before_authoring(self):
+        for low, high, scale in ((-1e308, 1e308, SliderScale.LINEAR),
+                                  (1, 1, SliderScale.LOGARITHMIC)):
+            with self.subTest(low=low, high=high, scale=scale):
+                with self.assertRaises(ValueError):
+                    SliderDomain(low, high, scale=scale)
+        self.assertEqual(SliderDomain(1, 1).maximum, 1)
+        self.assertGreater(SliderDomain(1, math.nextafter(1, 2),
+                           scale=SliderScale.LOGARITHMIC).maximum, 1)
+        self.assertEqual(SliderDomain(-1e307, 1e307).maximum, 1e307)
+
     def create(self, value=None, axis=SliderOrientation.HORIZONTAL, callback=None, **kw):
         app = App(width=640, height=480, **kw)
         self.addCleanup(app.close)

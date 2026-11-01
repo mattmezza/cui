@@ -400,6 +400,7 @@ static int bridge_same_thread(bridge_thread_token t) {
  return pthread_equal(t, pthread_self());
 #endif
 }
+#include "slider_model_ffi.h"
 */
 import "C"
 
@@ -418,12 +419,14 @@ import (
 )
 
 type App struct {
-	ptr     *C.cui_bridge_app
-	thread  C.bridge_thread_token
-	root    *Node
-	nodes   map[uint64]*Node
-	closed  bool
-	running bool
+	sliderNamespace                  *sliderNamespace
+	sliderDispatching, sliderClosing bool
+	ptr                              *C.cui_bridge_app
+	thread                           C.bridge_thread_token
+	root                             *Node
+	nodes                            map[uint64]*Node
+	closed                           bool
+	running                          bool
 }
 type Options struct {
 	InitiallyHidden          bool
@@ -434,6 +437,7 @@ type Options struct {
 	MaxNodes, MaxEvents      uint32
 }
 type Node struct {
+	slider                               *sliderNode
 	kind                                 int
 	key, text                            string
 	children                             []*Node
@@ -1094,6 +1098,12 @@ func (a *App) Close() error {
 		return err
 	}
 	C.go_destroy(a.ptr)
+	for _, n := range a.nodes {
+		if n.slider != nil {
+			n.slider.callback = nil
+		}
+	}
+	a.sliderClosing = true
 	a.ptr = nil
 	a.closed = true
 	if !a.running {
@@ -1105,7 +1115,11 @@ func (a *App) RequestClose() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	return result(C.go_request_close(a.ptr))
+	e := result(C.go_request_close(a.ptr))
+	if e == nil && a.sliderNamespace != nil {
+		a.sliderClosing = true
+	}
+	return e
 }
 
 // SetFontFallbacks replaces the SDL font chain; an empty list clears it.
@@ -1420,6 +1434,20 @@ func (n *Node) Rounding(v Rounding, r float32) *Node {
 }
 func (n *Node) RoundedMD() *Node { return n.Rounding(Theme, 0) }
 func (n *Node) Disabled(v bool) *Node {
+	if n.kind == 81 {
+		if e := n.sliderCheck(); e != nil {
+			n.err = e
+			return n
+		}
+		if n.app != nil {
+			if e := result(C.go_set_disabled(n.app.ptr, n.handle, C.uint32_t(btoi(v)))); e != nil {
+				n.err = e
+				return n
+			}
+		}
+		n.disabled = v
+		return n
+	}
 	if n.err != nil {
 		return n
 	}
@@ -1581,13 +1609,23 @@ func (a *App) Mount(root *Node) error {
 	if err := visit(root, 1); err != nil {
 		return err
 	}
+	if e := a.sliderPreflight(root); e != nil {
+		return e
+	}
 	var add func(*Node, C.cui_bridge_node) error
 	add = func(n *Node, p C.cui_bridge_node) error {
 		key := cs(n.key)
 		defer C.free(unsafe.Pointer(key))
 		var h C.cui_bridge_node
-		if err := result(C.go_node_create(a.ptr, p, C.cui_bridge_kind(n.kind), key, &h)); err != nil {
-			return err
+		if n.kind == 81 {
+			c, v := sliderWireConfig(n.slider.config), sliderWireValue(n.slider.confirmed)
+			if e := result(C.go_slider_create(a.ptr, p, key, &c, &v, &h)); e != nil {
+				return e
+			}
+		} else {
+			if err := result(C.go_node_create(a.ptr, p, C.cui_bridge_kind(n.kind), key, &h)); err != nil {
+				return err
+			}
 		}
 		n.app = a
 		n.handle = h
@@ -1757,7 +1795,7 @@ func (a *App) Mount(root *Node) error {
 				return err
 			}
 		}
-		if ((n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
+		if (n.kind == 81 || (n.kind >= 5 && n.kind <= 9) || (n.kind >= 12 && n.kind <= 15) || ((n.kind >= 17 && n.kind <= 23) || n.kind == 28 || n.kind == 29 || (n.kind >= 40 && n.kind <= 44) || n.kind == 48 || (n.kind >= 54 && n.kind <= 61) || (n.kind >= 65 && n.kind <= 69) || n.kind == 71 || n.kind == 73 || n.kind == 74 || n.kind == 75 || n.kind == 77 || n.kind == 78 || n.kind == 79)) && n.disabled {
 			if err := result(C.go_set_disabled(a.ptr, h, 1)); err != nil {
 				return err
 			}
@@ -1872,6 +1910,9 @@ func (a *App) Mount(root *Node) error {
 	return nil
 }
 func (a *App) Step(dt float32) error {
+	if a != nil && a.sliderDispatching {
+		return errors.New("Step unavailable during controlled Slider dispatch")
+	}
 	if a != nil && a.running {
 		return errors.New("Step is unavailable during Run")
 	}
@@ -2198,6 +2239,9 @@ func (a *App) PollValueNotificationV1() (ValueNotificationV1, bool, error) {
 }
 
 func (a *App) Dispatch() (int, error) {
+	if a != nil && a.sliderDispatching {
+		return 0, errors.New("nested controlled Slider dispatch")
+	}
 	count := 0
 	for {
 		e, ok, err := a.PollEvent()
@@ -2205,6 +2249,10 @@ func (a *App) Dispatch() (int, error) {
 			return count, err
 		}
 		if !ok {
+			if a.sliderNamespace != nil && !a.closed && !a.sliderClosing {
+				n, e := a.DispatchSliderRequests()
+				return count + n, e
+			}
 			return count, nil
 		}
 		count++
@@ -2226,6 +2274,9 @@ func (a *App) Dispatch() (int, error) {
 // Run owns native event pumping, including live resize. dt is retained for
 // compatibility; native scheduling supplies actual frame timing.
 func (a *App) Run(dt float32) error {
+	if a != nil && a.sliderDispatching {
+		return errors.New("Run unavailable during controlled Slider dispatch")
+	}
 	if err := a.check(); err != nil {
 		return err
 	}
@@ -2274,6 +2325,9 @@ func (n *Node) Remove() error {
 	mark = func(x *Node) {
 		delete(x.app.nodes, keyID(x.handle))
 		x.removed = true
+		if x.slider != nil {
+			x.slider.callback = nil
+		}
 		for _, ch := range x.children {
 			mark(ch)
 		}
@@ -3641,4 +3695,188 @@ func (n *Node) ShadowTarget(part ShadowPart) (ShadowTargetInfo, error) {
 		return ShadowTargetInfo{}, e
 	}
 	return ShadowTargetInfo{ShadowPart(info.canonical_role), uint32(info.flags)}, nil
+}
+
+func sliderWireValue(v SliderValue) C.cui_bridge_slider_value_v1 {
+	return C.cui_bridge_slider_value_v1{kind: C.uint32_t(v.kind), start: C.double(v.start), end: C.double(v.end)}
+}
+func sliderWireConfig(c SliderConfig) C.cui_bridge_slider_config_v1 {
+	flags := btoi(c.Requests) | btoi(c.Readonly)<<1 | btoi(c.ReverseFill)<<2 | btoi(c.ReducedMotion)<<3 | btoi(c.HideFocus)<<4
+	return C.cui_bridge_slider_config_v1{struct_size: C.sizeof_cui_bridge_slider_config_v1, schema_version: 1, flags: C.uint32_t(flags), orientation: C.uint32_t(c.Orientation), source_generation: C.uint64_t(c.SourceGeneration), domain: C.cui_bridge_slider_domain_v1{minimum: C.double(c.Domain.Minimum), maximum: C.double(c.Domain.Maximum), step: C.double(c.Domain.Step), scale: C.uint32_t(c.Domain.Scale)}, rem: C.float(c.Rem), length: C.float(c.Length), layout: C.uint32_t(c.Layout)}
+}
+func sliderReadValue(v C.cui_bridge_slider_value_v1) (SliderValue, error) {
+	if v.reserved != 0 {
+		return SliderValue{}, errors.New("invalid Slider reserved value")
+	}
+	value := SliderValue{uint32(v.kind), float64(v.start), float64(v.end)}
+	return value, value.validate()
+}
+func sliderReadDomain(d C.cui_bridge_slider_domain_v1) (SliderDomain, error) {
+	if d.reserved != 0 {
+		return SliderDomain{}, errors.New("invalid Slider reserved domain")
+	}
+	domain := SliderDomain{float64(d.minimum), float64(d.maximum), float64(d.step), SliderScale(d.scale)}
+	return domain, domain.validate()
+}
+func (a *App) SupportsSliderModel() (bool, error) {
+	if e := a.check(); e != nil {
+		return false, e
+	}
+	return C.go_slider_supported() != 0, nil
+}
+func (a *App) EnableSliderRequests(capacity uint32) error {
+	if e := a.check(); e != nil {
+		return e
+	}
+	if capacity > 4096 {
+		return errors.New("Slider capacity exceeds4096")
+	}
+	if e := result(C.go_slider_enable(a.ptr, C.uint32_t(capacity))); e != nil {
+		return e
+	}
+	if a.sliderNamespace == nil {
+		a.sliderNamespace = &sliderNamespace{nonzero: 1}
+	}
+	return nil
+}
+func (a *App) AcceptSliderRequest(receipt SliderReceipt, value SliderValue) error {
+	if e := a.check(); e != nil {
+		return e
+	}
+	if a.sliderNamespace == nil || receipt.namespace != a.sliderNamespace {
+		return errors.New("foreign or unissued Slider receipt")
+	}
+	if e := value.validate(); e != nil {
+		return e
+	}
+	i := receipt.info
+	r := C.cui_bridge_slider_receipt_v1{struct_size: C.sizeof_cui_bridge_slider_receipt_v1, schema_version: 1, app_epoch: C.uint64_t(i.AppEpoch), node: C.cui_bridge_node{slot: C.uint32_t(i.Slot), generation: C.uint32_t(i.Generation)}, source_generation: C.uint64_t(i.SourceGeneration), configuration_revision: C.uint64_t(i.ConfigurationRevision), submission_frame: C.uint64_t(i.SubmissionFrame), request_sequence: C.uint64_t(i.RequestSequence)}
+	v := sliderWireValue(value)
+	return result(C.go_slider_accept(a.ptr, &r, &v))
+}
+func (a *App) PollSliderRequest() (SliderRequest, bool, error) {
+	if e := a.check(); e != nil {
+		return SliderRequest{}, false, e
+	}
+	if a.sliderNamespace == nil {
+		return SliderRequest{}, false, errors.New("Slider queue not enabled")
+	}
+	var raw C.cui_bridge_slider_request_v1
+	code := C.go_slider_poll(a.ptr, &raw)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return SliderRequest{}, false, nil
+	}
+	if e := result(code); e != nil {
+		return SliderRequest{}, false, e
+	}
+	r, e := a.sliderReadRequest(raw)
+	return r, e == nil, e
+}
+func (a *App) sliderReadRequest(w C.cui_bridge_slider_request_v1) (SliderRequest, error) {
+	bad := func() (SliderRequest, error) { return SliderRequest{}, errors.New("invalid Slider request copy") }
+	if a.sliderNamespace == nil || w.struct_size != C.sizeof_cui_bridge_slider_request_v1 || w.schema_version != 1 || w.phase > 3 || w.reason > 9 || w.thumb > 1 || (w.event_kind != 1 && w.event_kind != 3 && w.event_kind != 5) || w.event_source > 4 || w.event_flags&^7 != 0 {
+		return bad()
+	}
+	r := w.receipt
+	if r.struct_size != C.sizeof_cui_bridge_slider_receipt_v1 || r.schema_version != 1 {
+		return bad()
+	}
+	if w.event_flags&4 == 0 && w.event_source != 0 {
+		return bad()
+	}
+	if w.event_flags&1 == 0 && w.event_frame != 0 || w.event_flags&2 == 0 && uint64(w.event_index) != ^uint64(0) {
+		return bad()
+	}
+	current, e := sliderReadValue(w.current)
+	if e != nil {
+		return bad()
+	}
+	requested, e := sliderReadValue(w.requested)
+	if e != nil {
+		return bad()
+	}
+	domain, e := sliderReadDomain(w.domain)
+	if e != nil {
+		return bad()
+	}
+	gesture, e := sliderReadDomain(w.gesture_domain)
+	if e != nil {
+		return bad()
+	}
+	i := w.input
+	if i.flags&^3 != 0 || i.modifiers&^15 != 0 {
+		return bad()
+	}
+	if i.flags&1 == 0 && (i._type != 0 || i.flags != 0 || i.key != 0 || i.modifiers != 0 || i.x != 0 || i.y != 0 || i.repeat != 0 || i.pointer_type != 0 || i.pointer_button != 0 || i.accessibility_action != 0 || i.pointer_id != 0 || i.pointer_device != 0 || i.accessibility_target != 0 || i.accessibility_value != 0) {
+		return bad()
+	}
+	if i.flags&1 != 0 {
+		if !(i._type == 0 || i._type == 1 || i._type == 2 || i._type == 3 || i._type == 7 || i._type == 13) || !(i.key == 0 || i.key == 4 || i.key == 5 || i.key == 6 || i.key == 7 || i.key == 8 || i.key == 9 || i.key == 10 || i.key == 19 || i.key == 20) || i.repeat > 1 || i.pointer_type > 2 || i.pointer_button > 2 || !(i.accessibility_action == 0 || i.accessibility_action == 2 || i.accessibility_action == 3 || i.accessibility_action == 4) {
+			return bad()
+		}
+	}
+	if !finite(float32(i.x)) || !finite(float32(i.y)) || !sliderFinite(float64(i.accessibility_value)) || i.flags&2 != 0 && (i.flags&1 == 0 || i._type != 13 || i.accessibility_action != 4) {
+		return bad()
+	}
+	out := SliderRequest{Phase: SliderPhase(w.phase), Reason: uint32(w.reason), Thumb: uint32(w.thumb), EventKind: uint32(w.event_kind), EventSource: uint32(w.event_source), EventFlags: uint32(w.event_flags), Receipt: SliderReceipt{SliderReceiptInfo{uint64(r.app_epoch), uint32(r.node.slot), uint32(r.node.generation), uint64(r.source_generation), uint64(r.configuration_revision), uint64(r.submission_frame), uint64(r.request_sequence)}, a.sliderNamespace}, EventTarget: uint64(w.event_target), EventFrame: uint64(w.event_frame), EventIndex: uint64(w.event_index), Current: current, Requested: requested, Domain: domain, GestureDomain: gesture, Input: SliderInput{uint32(i._type), uint32(i.flags), uint32(i.key), uint32(i.modifiers), float32(i.x), float32(i.y), uint32(i.repeat), uint32(i.pointer_type), uint32(i.pointer_button), uint32(i.accessibility_action), uint64(i.pointer_id), uint64(i.pointer_device), uint64(i.accessibility_target), float64(i.accessibility_value)}}
+	return out, nil
+}
+func (a *App) sliderConfigureNative(n *Node, c SliderConfig, value SliderValue) error {
+	config, v := sliderWireConfig(c), sliderWireValue(value)
+	return result(C.go_slider_configure(a.ptr, n.handle, &config, &v))
+}
+func (a *App) sliderSetNative(n *Node, value SliderValue) error {
+	v := sliderWireValue(value)
+	return result(C.go_slider_set(a.ptr, n.handle, &v))
+}
+func (a *App) sliderGetNative(n *Node) (SliderValue, error) {
+	var v C.cui_bridge_slider_value_v1
+	if e := result(C.go_slider_get(a.ptr, n.handle, &v)); e != nil {
+		return SliderValue{}, e
+	}
+	return sliderReadValue(v)
+}
+func (a *App) sliderConfigNative(n *Node) (SliderConfig, error) {
+	var w C.cui_bridge_slider_config_v1
+	if e := result(C.go_slider_config(a.ptr, n.handle, &w)); e != nil {
+		return SliderConfig{}, e
+	}
+	if w.struct_size != C.sizeof_cui_bridge_slider_config_v1 || w.schema_version != 1 || w.reserved != 0 || w.flags&^31 != 0 || (w.layout == 1 && w.length != 0) {
+		return SliderConfig{}, errors.New("invalid Slider config copy")
+	}
+	d, e := sliderReadDomain(w.domain)
+	if e != nil {
+		return SliderConfig{}, e
+	}
+	return sliderConfig(SliderConfig{Domain: d, SourceGeneration: uint64(w.source_generation), Orientation: SliderOrientation(w.orientation), Layout: SliderLayout(w.layout), Rem: float32(w.rem), Length: float32(w.length), Requests: w.flags&1 != 0, Readonly: w.flags&2 != 0, ReverseFill: w.flags&4 != 0, ReducedMotion: w.flags&8 != 0, HideFocus: w.flags&16 != 0})
+}
+func (a *App) sliderBoundsNative(n *Node, part SliderPart) (Rect, bool, error) {
+	var r C.cui_bridge_rect
+	code := C.go_slider_bounds(a.ptr, n.handle, C.uint32_t(part), &r)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return Rect{}, false, nil
+	}
+	if e := result(code); e != nil {
+		return Rect{}, false, e
+	}
+	out := Rect{float32(r.x), float32(r.y), float32(r.width), float32(r.height)}
+	if !finite(out.X) || !finite(out.Y) || !finite(out.Width) || !finite(out.Height) || out.Width < 0 || out.Height < 0 {
+		return Rect{}, false, errors.New("invalid Slider bounds")
+	}
+	return out, true, nil
+}
+func (a *App) sliderPresentationNative(n *Node) (SliderPresentation, bool, error) {
+	var p C.cui_bridge_slider_presentation_v1
+	code := C.go_slider_presentation(a.ptr, n.handle, &p)
+	if code == C.CUI_BRIDGE_EMPTY {
+		return SliderPresentation{}, false, nil
+	}
+	if e := result(code); e != nil {
+		return SliderPresentation{}, false, e
+	}
+	out := SliderPresentation{uint32(p.render_status), float64(p.core_time), float64(p.next_wake_seconds)}
+	if p.struct_size != C.sizeof_cui_bridge_slider_presentation_v1 || p.schema_version != 1 || p.reserved != 0 || out.RenderStatus > 5 || !sliderFinite(out.CoreTime) || !sliderFinite(out.NextWakeSeconds) || out.CoreTime < 0 || out.NextWakeSeconds < 0 {
+		return SliderPresentation{}, false, errors.New("invalid Slider presentation")
+	}
+	return out, true, nil
 }

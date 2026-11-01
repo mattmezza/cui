@@ -3,7 +3,7 @@
 Unreleased Python subset over the matching [C bridge V1](BRIDGE_SLIDER_MODEL.md).
 Legacy `slider()` remains scalar/float/autocommit with its original CHANGE timing.
 The separate [Node/TypeScript subset](NODE_SLIDER_MODEL.md) uses the same bridge.
-Go and Rust controlled builders remain pending, alongside
+Rust controlled builders remain pending, alongside
 native numeric accessibility delivery, typed touch/SET injection and V2 gradient
 adapters. This does not complete the Slider family or all language bindings.
 

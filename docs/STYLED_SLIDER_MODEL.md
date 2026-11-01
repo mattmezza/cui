@@ -5,7 +5,7 @@ controlled [Base model](BASE_SLIDER_MODEL.md) and the owned
 [style resolver](SLIDER_STYLE_VALUES.md). Legacy float/double Slider APIs and all
 old records remain unchanged. Full family closure is still open: visible Aurora
 Light gradients need actual V2 adapters, vertical registered-scroll layout is
-still rejected, native numeric hosts and Go/Rust typed builders remain pending; the
+still rejected, native numeric hosts and Rust typed builders remain pending; the
 [Python controlled bridge subset](PYTHON_SLIDER_MODEL.md) is available unreleased.
 
 Start with the complete, windowless
@@ -139,7 +139,7 @@ loop is required. V1 reports unsupported only when actual resolved visible paint
 is linear; a theme name alone never selects gradient capability. This gallery
 migration does not implement native numeric delivery, V2 gradient adapters or
 vertical registered-scroll admission. The separate Python and Node/TypeScript bridge subsets do not
-expose arbitrary C Styled style/state objects; Go/Rust controlled builders
+expose arbitrary C Styled style/state objects; Rust controlled builders
 remain pending.
 
 The separate [Node/TypeScript bridge-owned controlled subset](NODE_SLIDER_MODEL.md)

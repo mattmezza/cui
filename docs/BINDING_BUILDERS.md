@@ -497,10 +497,15 @@ The unreleased additive `slider_model(key, config, confirmed)` builder owns froz
 double Single/Range request records and uses explicit receipt acceptance after
 step. Read [the exact Python contract and complete authored UI](PYTHON_SLIDER_MODEL.md).
 The old `slider()` examples above preserve scalar float/autocommit CHANGE behavior.
-Go/Rust controlled builders remain pending.
+Rust controlled builders remain pending.
 
 The matching [Node/TypeScript controlled subset](NODE_SLIDER_MODEL.md) adds
 owned frozen records, exact BigInt identities and explicit receipt acceptance.
 Its JS and compiled TS examples author actual nested control UIs; close requests
 shutdown while dispose destroys the App. Direct C custom Styled state remains
-unbound. Go/Rust controlled builders remain pending.
+unbound. Rust controlled builders remain pending.
+
+The [Go controlled subset](GO_SLIDER_MODEL.md) adds owned double value copies,
+uint64 identities and private receipt authority. Its complete authored UI accepts
+or rejects whole pairs after Dispatch; existing Step/Close/RequestClose OS-thread
+semantics remain. Rust controlled authoring remains pending.

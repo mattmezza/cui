@@ -1,0 +1,39 @@
+{
+  "status": "c_python_javascript_typescript_go_tested_subset_unreleased",
+  "worker_commit": "b4f66a31e6707aa4ff6c31bae54a062f8a35c5d7",
+  "design": "3974ab98",
+  "integration_parent": "479f3908",
+  "build": "Actual current cui_bridge target rebuilt in two warning-enabled Release Ninja steps; serial CPU 1 / nice 19.",
+  "validation": {
+    "registered_protocol": "Root durable runner: 42/42 cases; outer five checks passed in 23.58 s before the domain fix. Final six checks including Python and all freshness passed in 23.66 s after the fix.",
+    "legacy_examples": "Root four checks passed in 1.37 s: existing legacy Go suite with explicit Inter font plus accept, reject/vertical and single authored examples. Nine existing historical fixture subtests skipped.",
+    "python": "Final current-module Python controlled Slider: 15 methods, one old-module fixture skip.",
+    "node": "Final affected JS/TS Slider CMake checks: 31/31 pass in 3.90 s.",
+    "skill": "Combined current source consumer skill: 18/18 pass in 39.783 s; metadata-only conformance notes regenerated and freshness checked afterward.",
+    "static": "Worker matching b4 default static package closure passed in 99.88 s. Exact final integrated static/full/hosted delivery acceptance remains open."
+  },
+  "domain_regression": {
+    "authority": "src/base/cui_slider_model.c: finite maximum-minus-minimum; logarithmic minimum > 0 and maximum > minimum.",
+    "initial_observation": "Mount-only probe passed because existing rollback cleans up; no persistent partial-tree claim.",
+    "actual_failures": "Stronger Go pending ConfigureSlider test failed for overflow and constant-log domains. Python constructor and JS config rejection tests also failed before correction.",
+    "fix": "Validate those C constraints before storing pending configs in Go/Python/JS/TS; preserve prior config on rejection. Valid constant linear, tiny positive logarithmic and wide finite ranges remain accepted."
+  },
+  "limitations": [
+    "Rust controlled authoring pending runtime acceptance.",
+    "Copied-wire conformance gaps are explicitly tracked in docs/design/SLIDER_BINDING_WIRE_CONFORMANCE.md.",
+    "Native numeric AT, typed SET/touch injection, arbitrary direct Styled records and foreign V2 rendering remain unfinished.",
+    "No release, website deployment, complete family parity or exact final static/full-suite claim from these focused checks."
+  ],
+  "logs": {
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-configure.log": "5465cf05933812f0b48e37b266b1d4f448417e981a5d63d9bb2519cd1dd6d5ae",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-build.log": "682b76334c7c35c7d8e73309f52397cf9a77be387ffe03dffb5a6a974b153de1",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-tests.log": "ecb56c24a2a785a4341de246a0e63d71fe3aa849ced03917a7401daae7bb2b0b",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-tests-final.log": "f2229516154810bff05e8e817a4935b85472576d3a5e64c535fc0679a7fda7fc",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-legacy-examples.log": "cf772d825ee549a9af94009537d5f2b79f8ffcb09381fab609ea9a8c60d8274e",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-domain-red.log": "379a081f6fe7b6bc9c6bc2f80d8afe467c98e31e4010e19fd2873b94cc20ae34",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-domain-config-red.log": "941ea5a3b0986c817ba2542478a03d2b9ac284242abb73f8296c72617551ee5e",
+    "/home/matteo/.cache/cui-current-validation/slider-root-domain-python-node-red.log": "a8a68ac25520b09f4c54114583db7229f6e17189959215332b26ebaa76cffeab",
+    "/home/matteo/.cache/cui-current-validation/slider-root-node-domain-final.log": "0dbbe9a6badeef4f0177b852789ae6d7241412a6d89da72b8554891cc7a7ad67",
+    "/home/matteo/.cache/cui-current-validation/go-slider-root-skill-final.log": "9e61aa9e20ef1aa10c6b4a89ac010b62710cad8cd1f3bcce732cdf23a76531bf"
+  }
+}

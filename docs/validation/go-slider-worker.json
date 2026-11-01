@@ -1,0 +1,71 @@
+{
+  "status": "source-ready; final skill18 delegated to ROOT combined integration",
+  "dynamic_typed": "PASS private1/1 5.71s",
+  "initial_legacy": "FAIL only missing FontPath existingnative fixtures; preserved log",
+  "legacy_recovery": "PASS with absolute bundledInter;9explicit existinglegacy fixture skips",
+  "dynamic_protocol": "PASS42/42 5.19s actualold+16missing+support/sizes+malformedreceipts/input",
+  "static": "PASS default matching embeddedsource actualtypedUI+all16support private1/1 99.88s",
+  "example": "default Go-authored UI PASS [20,61]; otherflags compiled notseparatelyrun",
+  "light": "usage6/6PASS6.953s; final canonicalfreshnessPASS; Go/RustSDKsource freshness+pinnedchecksumsPASS",
+  "durable_runner": "bindings/go/tests/test_slider_protocol.py; optional CMake CUI_GO_SLIDER_OLD_LIBRARY; sourceASTvalid, actualrunner invocation pending ROOT acceptance (same42underlyingcommandsalreadyproved)",
+  "skips": [
+    "TestNotificationV1ProtocolFixture",
+    "TestNotificationV1Unavailable",
+    "TestPartShadowOldLibraryDefaults",
+    "TestShadowOldLibraryDefaults",
+    "TestValueNotificationV1RealQueue",
+    "TestValueNotificationV1TextFIFO",
+    "TestValueNotificationV1Selection",
+    "TestValueNotificationV1Protocol",
+    "TestWindowVisibilityLegacyLibrary"
+  ],
+  "logs": {
+    "build-focused/go-slider-first.log": "5fc4d4c42f77d4bdd0c6747d89402fe5fd000475468e1138a0c326391bf7343c",
+    "build-focused/go-slider-first-legacy.log": "d6a1b25196a3c3a72b974dd00eae72117c3d984ec8ad51c480bb9c71d990e654",
+    "build-focused/go-slider-second.log": "e17020cb8d6b79e447a5aed3b22283a8058aef48152b0af5ea61294c2c2416e9",
+    "build-focused/go-slider-static.log": "b2ed941878891be4f5479b2f1fecebd970f0f1232818164a09ecb488b02ca555",
+    "build-focused/go-slider-final-light.log": "9cc926188b623aedea7811366c85818b139ef466c4aa132c5b76bf0ad21e5559"
+  },
+  "commit": "b4f66a31e6707aa4ff6c31bae54a062f8a35c5d7",
+  "prerequisite_design": "3974ab98b4c7d8f7b57577d199e6a85724110df3",
+  "pending": [
+    "ROOT combined skill18 (explicitly delegated)",
+    "ROOT actual CMake registered durable runner acceptance",
+    "remaining example flags compiled but not separately executed"
+  ],
+  "sources": {
+    "bindings/go/cui/native.go": "8860381662f87b5dd78258fc7b94c1d7d6054b2e2f72c707a5674051d4533429",
+    "bindings/go/cui/slider_model.go": "40cc4bdbbe331e76e0279779d15343ae8b779e9d314893e1f6f7953c3aec3867",
+    "bindings/go/cui/slider_model_ffi.h": "1905a12e928efba3f76d2f83b128611b5dc2b3d255fba84f692efcb445dd8971",
+    "bindings/go/cui/slider_model_protocol_test.go": "92a88e013957d5e535927c3de9627d65c4f221d7d45e08439ff957a87740415a",
+    "bindings/go/cui/slider_model_static_test.go": "295d9739ca3ac5bca182a31d0432918c02ebfbf79e4a4991f00eae907f7b922a",
+    "bindings/go/cui/slider_model_test.go": "bff8125e3eb72f3abd53adfba4f6a19a4bd869561aaf67259350280fddd61a04",
+    "bindings/go/examples/slider_model/main.go": "7a0adbe912af933bb127e4878af6b8407bb4374d90a2a6654877041027d88609",
+    "bindings/go/tests/slider-model-provider.c": "849c70e832d26ecb7891004d878b1fb3e3dca49ca311c18146e3571d42178d49",
+    "bindings/go/tests/test_slider_protocol.py": "0111e982665319822b0e47b870cce2e0cfb8f42e284a4b5c4b2dc3eb71bb0759",
+    "cmake/CUIBridge.cmake": "3f33f56a1d3ae7bc1171ad9bc2bfe2995e70e497fa580f5955b5aab750ca4f34",
+    "docs/BASE_SLIDER_MODEL.md": "8012432d9175b4ae4f8fa24f47153b0dd88e8e88cc02a26b01b85ba3b89085d3",
+    "docs/BINDING_BUILDERS.md": "b08fd83b928c81afb1c94dbfb2f1520a8621ee93d4af94732252ade3238d85bc",
+    "docs/BRIDGE_COMPONENTS.md": "01e02feed270a4833c4206c1999d0fc52112daa7711c424af474eb3c33ba57e6",
+    "docs/BRIDGE_SLIDER_MODEL.md": "50ef1d4aae657148a3ac07a93bf747bb91f231aa9969c3bce19f8b3870287a51",
+    "docs/COMPONENT_EVENTS.md": "25f63f04b4460fbeb7781e050837d4f2809034f927d35ce0a29417c0fc976ef7",
+    "docs/COMPONENT_USAGE.md": "e322585337d9cb3cf9dc2d94b252005d5fb7b330c207576b1640c15a2db46c9f",
+    "docs/GO_SLIDER_MODEL.md": "58af4e6333c626102f6c308f61fe9a366af25cf1f2d54e944e15304a0eff514c",
+    "docs/NODE_SLIDER_MODEL.md": "0d543369345eeebf5c468ad28d0df934a4fd625655ea324ae2a9d9ace5a20e0e",
+    "docs/PYTHON_SLIDER_MODEL.md": "23e513da297a722ad3c55e8f19f257c1883a56fb0ddaf1d5037fd0c2abac7650",
+    "docs/STYLED_SLIDER_MODEL.md": "1e444503aeab820cd3f28d873f87d493062c1dd8f592ac5ed67050f1e80f1386",
+    "docs/binding-coverage.json": "8f7943a3583bcb6682ec730cf54b2d8abcbdaba0c1c867542ea7f8c31b6d154c",
+    "docs/component-usage.json": "982c5b857b14c504a7ea0b5330bbaab152108f8d6c30e4a6f62b7e9e02a96b1d",
+    "docs/design/GO_RUST_SLIDER_MODEL_V1.md": "bfb7a6b4db4bb49ab6c570e7c68354b62154899a24b268e3d01590ba3f1e08a8",
+    "scripts/agent_resources.py": "3822a27df8a18cc0b80d3920d53b3a56de2a15f135d51efd89e8262936ac422b",
+    "skills/cui/SKILL.md": "5d8078540ff0b008303984378af5eade281b1747ff055d71daf3b5c27338220c",
+    "skills/cui/data/resources.json": "b0a608c2719bf7cabfb0adb894b77af7500555a8299365237ffa28fc89e7e067",
+    "skills/cui/scripts/agent_resources.py": "3822a27df8a18cc0b80d3920d53b3a56de2a15f135d51efd89e8262936ac422b",
+    "tests/test_agent_skill.py": "4f4414d7c5239669b648b21b0cc07b0627b34583981bb2b0e66b23ae853f8ae7"
+  },
+  "artifacts": {
+    "build-focused/go-slider-checks/slider-tests": "ec9513d485ee678515eefb5f0c2c66403ac39878011fdda76d57e705068f8b74",
+    "/home/matteo/.cache/cui-current-validation/python-slider-native-pinned.so": "5e53aeb2075ec8050c5ee065c13bf4e106c5bdcbf3f8dc8b2d52574871483a41",
+    "/home/matteo/.cache/cui-current-validation/pre-typed-slider/libcui_bridge.so": "44a76c34ddbb75b1d1ce428bd604a6d53321ee45c8d2a0c5a9894fa8c7334afa"
+  }
+}

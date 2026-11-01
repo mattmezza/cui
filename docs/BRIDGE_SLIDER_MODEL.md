@@ -1,10 +1,10 @@
 # Controlled typed Slider through the C bridge
 
-Unreleased C bridge, Python and Node/TypeScript subsets. Include `<cui/cui_bridge.h>` from the same revision as
+Unreleased C bridge, Python, Node/TypeScript and Go subsets. Include `<cui/cui_bridge.h>` from the same revision as
 the library. `cui_bridge_slider_model_versions() & 1` advertises this independent
 schema; old libraries lack this symbol. Foreign loaders must resolve the entire
-optional symbol group before use. The [Python controlled builder](PYTHON_SLIDER_MODEL.md) wraps this route; [Node/TypeScript](NODE_SLIDER_MODEL.md) uses the same copied C records.
-Go and Rust typed builders remain pending. Existing `slider()` builders keep their scalar
+optional symbol group before use. The [Python controlled builder](PYTHON_SLIDER_MODEL.md) wraps this route; [Node/TypeScript](NODE_SLIDER_MODEL.md) uses the same copied C records; [Go](GO_SLIDER_MODEL.md) owns value copies with explicit acceptance.
+Rust typed builders remain pending. Existing `slider()` builders keep their scalar
 float precision, autoacceptance and CHANGE timing.
 
 Enable the owned request queue once, then create kind81 with
@@ -129,3 +129,21 @@ These direct executions are windowless. Other native automated checks use
 `python scripts/test_local.py --build-dir build`; never substitute the desktop
 display. The example demonstrates this C ABI, not an already implemented foreign
 builder or native accessibility adapter.
+
+### Binding domain validation
+
+Python, JS/TS and Go validate the C domain contract before storing a builder
+configuration: endpoints and step must be finite, the span `maximum - minimum`
+must remain finite, and step must be nonnegative. Linear domains allow equal
+endpoints. Logarithmic domains require `0 < minimum < maximum`. Rejected pending
+configuration changes leave the prior configuration unchanged; valid domains
+retain their existing behavior. Rust controlled authoring remains pending.
+
+### Remaining copied-wire checks
+
+The matching C producer emits canonical owned records, but malformed-provider
+rejection is not yet uniform across bindings. Python still lacks some absent
+input, repeat, coordinate and source-evidence checks; Go and JS/TS still lack the
+inactive numeric-value check. See the [conformance audit](design/SLIDER_BINDING_WIRE_CONFORMANCE.md).
+These remain explicit follow-up work; existing UI tests do not prove complete
+wire conformance or native accessibility delivery.

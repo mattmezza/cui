@@ -102,7 +102,9 @@ class SliderDomain:
             object.__setattr__(self, name, _double(getattr(self, name)))
         if not isinstance(self.scale, SliderScale):
             raise TypeError("expected SliderScale")
-        if self.minimum > self.maximum or self.step < 0 or (self.scale == SliderScale.LOGARITHMIC and self.minimum <= 0):
+        if (self.minimum > self.maximum or not math.isfinite(self.maximum - self.minimum) or
+                self.step < 0 or (self.scale == SliderScale.LOGARITHMIC and
+                                  (self.minimum <= 0 or self.maximum <= self.minimum))):
             raise ValueError("invalid Slider domain")
 
 

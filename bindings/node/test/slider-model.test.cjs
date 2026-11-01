@@ -2,6 +2,14 @@
 const assert=require('node:assert/strict');
 const c=require('..');
 const source=0xfedcba9876543210n;
+// Reject C-invalid domains before any app/node is created; keep valid boundaries.
+for (const domain of [{minimum:-1e308,maximum:1e308},
+ {minimum:1,maximum:1,scale:'logarithmic'}]) {
+ assert.throws(()=>c.slider_config({domain}), /invalid Slider domain/);
+}
+assert.equal(c.slider_config({domain:{minimum:1,maximum:1}}).domain.maximum,1);
+assert.ok(c.slider_config({domain:{minimum:1,maximum:1+Number.EPSILON,scale:'logarithmic'}}).domain.maximum>1);
+assert.equal(c.slider_config({domain:{minimum:-1e307,maximum:1e307}}).domain.maximum,1e307);
 function make(single=false,vertical=false) {
  const app=new c.App({width:420,height:360});
  const node=c.slider_model('typed',c.slider_config({sourceGeneration:source,orientation:vertical?'vertical':'horizontal',length:200}),single?c.slider_single(60):c.slider_range(20,60));

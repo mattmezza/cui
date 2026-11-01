@@ -29,7 +29,7 @@ module.exports = function sliderModelModule(native, Node, NODE, keyFor) {
   }
   function domain(v = {}) {
     const d = {minimum: number((v.minimum === undefined ? 0 : v.minimum)), maximum: number((v.maximum === undefined ? 100 : v.maximum)), step: number((v.step === undefined ? 1 : v.step)), scale: enumValue((v.scale === undefined ? 'linear' : v.scale), ['linear','logarithmic'])};
-    if (d.minimum > d.maximum || d.step < 0 || (d.scale === 'logarithmic' && d.minimum <= 0)) throw new RangeError('invalid Slider domain');
+    if (d.minimum > d.maximum || !Number.isFinite(d.maximum-d.minimum) || d.step < 0 || (d.scale === 'logarithmic' && (d.minimum <= 0 || d.maximum <= d.minimum))) throw new RangeError('invalid Slider domain');
     return freeze(d);
   }
   function slider_config(v = {}) {

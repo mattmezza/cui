@@ -1,0 +1,34 @@
+{
+  "source_revision": "dc209c54a874e7f7697af51c533335d269594961",
+  "worker_commit": "05babd754f63e95e4d3f2e81e025afe292f1b6a8",
+  "scope": "Integrated Python controlled Slider bridge-owned Single/Range authoring subset",
+  "configuration": "Current native CMake configuration regenerated successfully; no C source changed",
+  "checks": {
+    "typed_slider_and_examples": "4/4 PASS0.81s, including 14-method suite with actual pretyped library fallback",
+    "legacy_python": "10/10 PASS2.20s",
+    "consumer_skill": "18/18 PASS39.69s",
+    "generated_skill_freshness": "PASS0.37s"
+  },
+  "display": "private Xvfb via scripts/test_local.py; CPU0 nice19; no desktop windows",
+  "log_sha256": "783cae28cb3264c33534c6e09c3844ed74bbc7343c78f1eeedd32d6c0933a13f",
+  "source_sha256": {
+    "bindings/python/cui_bridge/__init__.py": "97f31ead9a3862a9aa75336c48c3206859c4bfcbedb84d8e70e78374ea4e40a2",
+    "bindings/python/cui_bridge/slider_model.py": "70afbddb7725fa396a665ad6781369eb119b3856a1ac18de6a7805a0b2ff9779",
+    "bindings/python/test_slider_model.py": "bb40db91e12ca4baaed7f189723d9e998c1176ab94de90d8895f19361ba884d4",
+    "bindings/bridge/examples/slider_model.py": "35ecdab713e7a099e875d11d0d12ea61f0c6d791c3d2e090df6c8bced2cd5aa9"
+  },
+  "compatibility": [
+    "Legacy scalar Slider remains unchanged",
+    "Legacy callbacks dispatch before independent typed FIFO",
+    "Copied immutable request values and app-local receipt authority",
+    "Explicit full-pair acceptance; no automatic owner mutation",
+    "Callback close/removal, exceptions and reentrancy regression coverage"
+  ],
+  "limitations": [
+    "Unreleased; website not deployed from this revision",
+    "JS/TS/Go/Rust controlled builders remain unfinished",
+    "No direct C Styled struct/motion mapping or native numeric accessibility delivery",
+    "Full 483-case suite passed before this Python slice; current integration used focused new and legacy Python tests plus skill checks",
+    "Historical pre-value-notification fallback fixture remains absent; distinct pretyped Slider fallback is covered"
+  ]
+}

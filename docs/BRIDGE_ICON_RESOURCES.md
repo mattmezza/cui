@@ -1,39 +1,43 @@
-# Owned bridge Icon resources (unreleased source checkpoint)
+# Owned bridge Icon resources (unreleased)
 
-This source-only slice provides reusable app-owned Icon state and copied resource
-utilities. It has not been compiled or run. ABI sizes/offsets, constructor-byte
-change, allocation behavior and native/WASM compatibility remain prepared tests,
-not measured claims. Configured Badge/standalone configured Icon/Spinner
-presentation and their five language facades remain pending. Legacy kind11 text
-Badge and kind50 named Icon keep their render paths. All 78 families remain.
+This focused C slice provides reusable app-owned Icon state and copied resource
+utilities. Worker strict native builds and eight private-display runtime checks
+passed; native/WASM compile-only layouts preserve all 30 old app offsets and
+measure an 8-byte app increase on both targets. See the
+[worker receipt](validation/bridge-icon-resources-worker.json). Root integration,
+CMake registration, metadata and generated acceptance remain pending. Configured
+Badge/standalone configured Icon/Spinner presentation and their five language facades remain pending. Legacy kind 11 text
+Badge and kind 50 named Icon keep their render paths. All 78 families remain.
 
-`cui_bridge_icon_versions()` bit0 advertises the complete resource group on the
+`cui_bridge_icon_versions()` bit 0 advertises the complete resource group on the
 existing supported owner-thread build. Default/shared WASM and NO_TLS are not
 supported; explicit unshared WASM uses the existing Slider opt-in and needs final
-module validation. `icon_record_size_v1` exposes only LIMITS3/INFO4/BITMAP5.
-Future style/options/Badge record kinds return0; those declarations and Badge
+module validation. `icon_record_size_v1` exposes only LIMITS (3), INFO (4) and BITMAP (5).
+Future style/options/Badge record kinds return 0; those declarations and Badge
 capability await their real parser/render consumer, including debug-placeholder.
 
 Create an app-scoped slot/generation handle with `icon_create_v1` and an initialized
 limits record. Zero limits normalize to the C defaults **before** reservation:
-256 KiB SVG, 1M pixels, 8 MiB cache,16 versions. The C ceilings remain1 MiB SVG,
-16M pixels,64 MiB cache,128 versions. A lazy pool starts with8 slots and grows to128.
+256 KiB SVG, 1M pixels, 8 MiB cache, 16 versions. The C ceilings remain 1 MiB SVG,
+16M pixels, 64 MiB cache, 128 versions. A lazy pool starts with 8 slots and grows to 128.
 No pool allocation occurs on old routes; the opaque app gains one appended pointer
-whose native/WASM byte cost still requires measurement. Native C callers must use
+whose byte cost is measured as +8 on native and WASM32. Native C callers must use
 the matching app; coincident handles from different apps cannot be distinguished.
 Foreign wrappers must strongly retain/check app identity before C calls.
 
 Limits, info and copied-bitmap records are native-endian fixed-width records with
-exact size/version1. No C struct is implicitly a little-endian network wire.
-Getters require initialized headers and leave outputs unchanged on error. Strings
-and SVG are copied strict UTF8 without embedded NUL; name/path <=4096 bytes, data
+exact size/version 1. No C struct is implicitly a little-endian network wire.
+Getters require only initialized size/version headers; other prior output bytes
+are ignored, and success writes canonical zero reserved fields. INPUT reserved
+words reject. All errors except documented CAPACITY preserve outputs. Strings
+and SVG are copied strict UTF8 without embedded NUL; name/path <= 4096 bytes, data
 <=max_svg_bytes. EMPTY calls set_empty; NAME uses C catalog/alias lookup and its
 canonical loader path; PATH retains its exact supplied key; DATA copies raw bytes.
 Empty NAME reports EMPTY with exact NOT_FOUND in info and preserves old source;
 empty PATH/DATA preserve C's empty behavior. No guessed name/path conversion.
 
 The C-owned resource-local path map overrides embedded assets, with copied keys
-and SVG, max128 entries. Put/remove/clear invalidate preparation and advance the
+and SVG, max 128 entries. Put/remove/clear invalidate preparation and advance the
 nonzero source revision. No foreign callback, file or network access occurs during
 Core. Arbitrary deferred C loader callbacks are not exposed. Reload keeps the
 source and marks it dirty. Prepare returns bridge OK plus the exact Icon error;
@@ -42,7 +46,7 @@ After a failed prepare the C state can still expose its earlier active mask;
 callers must check prepare's error before treating a bitmap as new artwork.
 
 `icon_bitmap_copy_v1` copies packed straight RGBA8 rows and paint bounds; empty
-state is canonical0. No returned pixel pointer borrows native storage. Catalog
+state is canonical zero. No returned pixel pointer borrows native storage. Catalog
 name/path/default and embedded SVG utilities likewise copy. String required sizes
 include NUL; bitmap required is pixels only. CAPACITY writes only required sizes
 (both for catalog), never partial destinations. Known input/output ranges have
@@ -61,7 +65,8 @@ map replacement likewise needs old+new payload headroom. This bounds admitted
 payload reservations, not parser/document/rasterizer/allocator overhead or total
 process memory. Native allocation failure preserves prior owned source/map.
 
-All app calls serialize on the original owner thread and outside step/render;
+Caller precondition: serialize all app calls, including existing void destruction,
+on the original owner thread. New resource APIs reject step/render phases;
 resource operations hold an owner busy guard. Destroy rejects references; current
 resource-only clients cannot attach node references yet. Generations advance on
 slot reuse and retire on wrap. Collect frees inactive masks only after the caller
@@ -71,12 +76,15 @@ synchronous bridge rendering has returned. No asynchronous borrowed-list consume
 contract is added. `cui_bridge_destroy` during a resource operation is a no-op and
 must be retried, consistent with retaining the outer operation's storage.
 
-Prepared source fixtures cover independent ordinary Icon pixels, copied-source
+Executed focused fixtures cover independent ordinary Icon pixels, copied-source
 replacement/old masks, catalog authority, map fallback/reload/parse error, zero
-normalization, actual retained-source shrink and exact8 MiB boundaries, temporary
+normalization, actual retained-source shrink and exact 8 MiB boundaries, temporary
 replacement headroom, stale/refcount/phase/busy/close, allocation failures and
 known-range aliases/overflow on success and capacity paths. Compile-only native/
 WASM app layout compares every old field with frozen `dbfb7945`; C/C++ public
 record fixtures assert all offsets. Root owns CMake registration and canonical
-metadata/generation. Acceptance must include unchanged legacy ABI/pixels/allocation
-counts; no acceptance or complete configured Badge claim follows from this draft.
+metadata/generation. Worker legacy checks preserve the frozen all-command/
+nontext-pixel trace,
+old-header behavior and four constructor allocation calls (only app bytes+8).
+Text bytes are compared, not text raster pixels. No root acceptance or complete
+configured Badge claim follows from this focused resource result.

@@ -1,0 +1,133 @@
+{
+  "source_checkpoint": "b4ac344f",
+  "capability_split": "c58f45cf",
+  "scope": "C bridge owned Icon resource/utilities only, no configured Badge/Icon/Spinner rendering or foreign facade",
+  "root_integration": "pending; root owns CMake, source metadata and generated acceptance",
+  "resource_build": {
+    "session": 22395,
+    "native_result": "all native resources/nativeOOM/legacy/C/C++/layout strict commands passed",
+    "overall_exit": 1,
+    "failure": "Final zig cc -S driver reports unused internal -c under Werror; no warning disabled",
+    "log": "/home/matteo/.cache/cui-current-validation/icon-resource-first-build.log",
+    "sha256": "28815a087aa0ad0ac3cd411ba36cc42014cfe02445f8e4638f25171daec57bad"
+  },
+  "wasm_recovery": {
+    "compiler": "Pinned Zig0.16.0 zig clang21.1.0, explicit WASI headers, -std=c11 -O1 -UNDEBUG -Wall -Wextra -Wpedantic -Werror",
+    "result": "exit0 compile-only; no WASM runtime claim",
+    "log": "/home/matteo/.cache/cui-current-validation/icon-resource-wasm-clang.log"
+  },
+  "runtime": [
+    {
+      "session": 98787,
+      "result": "5/5PASS0.11s",
+      "log": "/home/matteo/.cache/cui-current-validation/icon-resource-first-tests.log",
+      "sha256": "45e2c032ac700e709ca2605d5b6e5faf8d2c921050e0ded4d774afa75db7851b"
+    },
+    {
+      "session": 89590,
+      "result": "3/3PASS0.01s",
+      "log": "/home/matteo/.cache/cui-current-validation/icon-resource-owner-oldheader-tests.log",
+      "sha256": "24268cbf0ca9171a1a16f4f6d8dfbbc88f8daf60f3770906594236346bb4ad6e"
+    }
+  ],
+  "strict_flags": "/usr/bin/cc GCC16.2.1 C11 -O3 -UNDEBUG -Wall -Wextra -Wpedantic -Werror; C++17 same warnings; CPU1 nice19 serial; existing cached engine only",
+  "owner_oldheader_build": {
+    "session": 64220,
+    "result": "exit0",
+    "log": "/home/matteo/.cache/cui-current-validation/icon-resource-owner-oldheader-build.log",
+    "sha256": "c2d1a73fe99864ae9be0cde668c4cbee7a37ca4101e1d239a62c5def09e5082a"
+  },
+  "baseline_before_candidate": {
+    "session": 35378,
+    "result": "private1/1PASS0.01s BEFORE candidate compilation",
+    "source_revision": "dbfb7945",
+    "source_sha256": "26369d6058176cbb8c24845b247617d8727e8cc65ce0911be4645ab479fab1a4",
+    "root_source_byte_match_at_capture": true,
+    "preserved_dso": "build-shadow/icon-resources/libcui_bridge_before.so",
+    "dso_sha256": "3eec086861ab58dfa91cb922c90494080f080906d41bdf6c53b8a6cff5224410",
+    "libcui_a_sha256": "51b2b5d2690d013af9decb57cd86bcd4cfe03c5cc078532c323e2aaa3e30cd9f",
+    "trace_sha256": "f5607b9e1879301cbbfd9b4eddc8cf421ea572365efd12d727b9dfacf41fa9f7",
+    "candidate_trace_sha256": "f5607b9e1879301cbbfd9b4eddc8cf421ea572365efd12d727b9dfacf41fa9f7",
+    "trace_result": "cmp exit0, exact30145bytes",
+    "trace_scope": "All active command fields and pointed text/image bytes; lossless nontext RGBA and events. TEXT excluded only from NULL-font pixel pass, no text-raster claim.",
+    "constructor_old": [
+      "calloc 1 1304",
+      "calloc 33 73136",
+      "calloc 32 24",
+      "calloc 32 72"
+    ],
+    "constructor_candidate": [
+      "calloc 1 1312",
+      "calloc 33 73136",
+      "calloc 32 24",
+      "calloc 32 72"
+    ],
+    "constructor_result": "same4 source-level malloc/calloc requests/order; only app allocation bytes+8. Unchanged cached Core/renderer internal allocations not interposed."
+  },
+  "layout": {
+    "native": {
+      "old_bytes": 1304,
+      "new_bytes": 1312,
+      "align": 8,
+      "delta": 8,
+      "new_pointer_offset": 1304
+    },
+    "wasm32": {
+      "old_bytes": 1160,
+      "new_bytes": 1168,
+      "align": 8,
+      "delta": 8,
+      "new_pointer_offset": 1160
+    },
+    "all_old_app_fields": 30,
+    "old_offsets_result": "all30 staticassertions pass native/WASM",
+    "records": {
+      "handle": {
+        "size": 8,
+        "align": 4
+      },
+      "limits": {
+        "size": 48,
+        "align": 8
+      },
+      "info": {
+        "size": 80,
+        "align": 8
+      },
+      "bitmap": {
+        "size": 64,
+        "align": 8
+      }
+    },
+    "all_public_offsets": "strict C11/C++ and WASM app-layout record declarations compiled"
+  },
+  "initial_failures": [
+    {
+      "log": "icon-legacy-before-build.log",
+      "failure": "New legacy harness typo used nonexistent CUI_BRIDGE_CLICK; fixed to existing EVENT_CLICK."
+    },
+    {
+      "log": "icon-legacy-before-tests.log",
+      "failure": "NULL-font software render rejects TEXT; zero-byte trace discarded. Corrected established V1 policy preserves every text active field/byte and filters TEXT only in pixel pass before old capture."
+    }
+  ],
+  "tests": [
+    "Canonical poisoned OUTPUT headers vs INPUT reserved validation; no partial writes on error/CAPACITY",
+    "Catalog authority/aliases/availability/assets and copied RGBA versus independent ordinary Icon state",
+    "All source kinds/empty NAME vs PATH/DATA, replacement and old-mask lifetime",
+    "C-owned map override/embedded fallback/reload/parse/error recovery",
+    "Zero limits normalize before quota; three retained1MiB sources remain charged after shrink; 4096-byte PATH separate native reservation; exact8MiB cap and old+new peak refusal/retry",
+    "Scoped bridge allocation failure and actual native Icon source malloc failure via GNU --wrap=malloc; owned previous source preserved",
+    "Known input/output pairwise aliases and uintptr wrap rejection before writes, including capacity paths",
+    "Stale/generation/refcount/phase/busy/close and actual serialized foreign OSthread refusal",
+    "Exact frozen pre-resource public-header consumer executes against matching originalDSO and candidateobject, identical handles and Badge/Icon bounds"
+  ],
+  "limitations": [
+    "No configured Badge/standalone configured Icon/Spinner presentation or language wrapper",
+    "No arbitrary foreign loader callbacks/file/network I/O",
+    "Opaque graph storage disjointness remains caller precondition; no arbitrary pointer validator claim",
+    "Reserved payload quota is not total parser/document/rasterizer/allocator/process memory cap",
+    "No big-endian/WASM-runtime/desktop/hardware/browser claim",
+    "No SDK/generation/skill/fullsuite run; root integration acceptance pending"
+  ]
+}

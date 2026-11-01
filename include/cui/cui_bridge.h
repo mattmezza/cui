@@ -997,7 +997,9 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *
  * CUI_BRIDGE_SLIDER_NO_TLS are unsupported. Same explicit unshared opt-in as Slider.
  * Copy CAPACITY changes only required sizes; other errors leave outputs unchanged.
  * Input/output ranges must be valid, stable and mutually disjoint, including the
- * app/resource graph. Output records require exact size/version initialized.
+ * app/resource graph. Output records require exact size/version initialized; other prior bytes are
+ * ignored and success writes canonical zero reserved fields. INPUT reserved
+ * words reject.
  * Destroy rejects referenced resources; no references exist until later consumers.
  * Arbitrary C loaders, configured Badge and configured Icon presentation are NOT
  * advertised by this resource-only group. Existing kind11/50 behavior is unchanged. */

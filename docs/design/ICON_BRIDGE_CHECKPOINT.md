@@ -12,7 +12,9 @@ Below U32/U64/F32 denote uint32_t/uint64_t/float; RGBA is U32 with R in bits0–
 G8–15, B16–23, A24–31. Native scalar endianness applies; foreign LE encodings must
 convert every scalar individually. No struct contains pointers, size_t, C enums
 or bool. All records start exact `struct_size,schema_version=1`; getters require
-those initialized headers. Unknown flags and reserved words reject. Proposed
+those initialized headers. INPUT records reject unknown flags/reserved words.
+OUTPUT records require only exact size/version; other incoming bytes are ignored
+and successful output is canonical, including zero reserved fields. Proposed
 sizes/offsets are derived, **not measured**; strict native/WASM32 assertions and
 old-header ABI probes are required before approval to publish declarations.
 

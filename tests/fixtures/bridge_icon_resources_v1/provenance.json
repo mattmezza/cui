@@ -1,0 +1,18 @@
+{
+  "source_revision": "dbfb7945",
+  "matching_root_bridge_source_sha256": "26369d6058176cbb8c24845b247617d8727e8cc65ce0911be4645ab479fab1a4",
+  "source_matches_root_before_candidate": true,
+  "preserved_dso_sha256": "3eec086861ab58dfa91cb922c90494080f080906d41bdf6c53b8a6cff5224410",
+  "libcui_a_sha256": "f7152b29cf3b4b26e05f2a2d38092476c03fbc304fdbefad23401d32320bc274",
+  "compiler": "/usr/bin/cc",
+  "flags": "-std=c11 -O3 -UNDEBUG -Wall -Wextra -Wpedantic -Werror; cached same-runtime libraries",
+  "capture_session": 35378,
+  "result": "private-Xvfb1/1PASS0.01s BEFORE candidate compilation",
+  "trace": "Every active draw field/pointed text and image byte, nontext straightRGBA lossless runs, event types/slot/generation; no pointer addresses/padding",
+  "text_raster": "TEXT commands preserved in command trace but filtered only from NULL-font software pixel pass; no text-raster claim",
+  "allocation_scope": "Exact bridge-source malloc/calloc request sequence during constructor; unchanged Core/renderer/dependency internal allocations not interposed",
+  "files": {
+    "legacy.trace": "f5607b9e1879301cbbfd9b4eddc8cf421ea572365efd12d727b9dfacf41fa9f7",
+    "constructor.alloc": "c92e24ec5ad5677d90231e8adb1e230c09f785c75551714a082af50816fa9a2a"
+  }
+}

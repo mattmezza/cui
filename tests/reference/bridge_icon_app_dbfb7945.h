@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
-/* Frozen app layout authority dbfb7945, original snippet SHA256 7c703d8dcfb666f7c15a254aec461f00e2ff8247d67a2e27bb76e32f5278f415.
- * Only the struct tag is renamed; no full bridge source copy. */
+/* Frozen app layout authority dbfb7945, original snippet SHA256
+ * 7c703d8dcfb666f7c15a254aec461f00e2ff8247d67a2e27bb76e32f5278f415. Only the struct tag is renamed;
+ * no full bridge source copy. */
+// clang-format off
 struct bridge_icon_old_app_layout {
     cui_context *ui;
     cui_theme theme;
@@ -26,3 +28,4 @@ struct bridge_icon_old_app_layout {
     bridge_slider_app *slider; /* Lazy controlled route; no old node growth. */
     bridge_time_app *time_fields; /* Lazy localized kind55 route. */
 };
+// clang-format on

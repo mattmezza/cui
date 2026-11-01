@@ -291,6 +291,49 @@ static void quotas_and_lazy(void) {
     assert(cui_bridge_icon_set_limits_v1(a, h[0], &l) == CUI_BRIDGE_INVALID_ARGUMENT);
     cui_bridge_destroy(a);
 }
+static void canonical_outputs(void) {
+    cui_bridge_app *a = create();
+    cui_bridge_icon_handle_v1 h;
+    cui_bridge_icon_limits_v1 l = limits();
+    assert(cui_bridge_icon_create_v1(a, &l, &h) == CUI_BRIDGE_OK);
+    memset(&l, 0xa5, sizeof l);
+    l.struct_size = sizeof l;
+    l.schema_version = 1;
+    assert(cui_bridge_icon_get_limits_v1(a, h, &l) == CUI_BRIDGE_OK && !l.reserved[0] &&
+           !l.reserved[1]);
+    assert(l.max_svg_bytes == 256 * 1024 && l.max_pixels == 1024 * 1024 &&
+           l.max_cache_bytes == 8 * 1024 * 1024 && l.max_versions == 16);
+    memset(&l, 0xa5, sizeof l);
+    l.struct_size = sizeof l;
+    l.schema_version = 1;
+    assert(cui_bridge_icon_default_limits_v1(&l) == CUI_BRIDGE_OK && !l.reserved[0] &&
+           !l.reserved[1]);
+    cui_bridge_icon_info_v1 i;
+    memset(&i, 0xa5, sizeof i);
+    i.struct_size = sizeof i;
+    i.schema_version = 1;
+    assert(cui_bridge_icon_get_info_v1(a, h, &i) == CUI_BRIDGE_OK && !i.reserved && !i.flags &&
+           !i.icon_error && !i.reference_count && !i.parse_count && !i.raster_count &&
+           !i.cache_bytes && !i.cache_versions && i.source_revision == 1 &&
+           i.handle.slot == h.slot && i.handle.generation == h.generation);
+    cui_bridge_icon_bitmap_v1 b;
+    memset(&b, 0xa5, sizeof b);
+    b.struct_size = sizeof b;
+    b.schema_version = 1;
+    uint32_t required = 99;
+    assert(cui_bridge_icon_bitmap_copy_v1(a, h, &b, NULL, 0, &required) == CUI_BRIDGE_OK);
+    assert(!b.format && !b.reserved && !b.reserved2 && !b.width && !b.height && !b.stride &&
+           !b.required_bytes && !b.revision && !b.paint_x && !b.paint_y && !b.paint_width &&
+           !b.paint_height && !required);
+    memset(&b, 0xa5, sizeof b);
+    b.struct_size = sizeof b;
+    b.schema_version = 2;
+    cui_bridge_icon_bitmap_v1 saved = b;
+    assert(cui_bridge_icon_bitmap_copy_v1(a, h, &b, NULL, 0, &required) ==
+               CUI_BRIDGE_INVALID_ARGUMENT &&
+           !memcmp(&b, &saved, sizeof b));
+    cui_bridge_destroy(a);
+}
 static void retained_source_budget(void) {
     const uint32_t mib = 1024 * 1024;
     char *data = malloc(mib);
@@ -411,6 +454,7 @@ static void aliases(void) {
     cui_bridge_destroy(a);
 }
 int main(void) {
+    canonical_outputs();
     retained_source_budget();
     aliases();
     public_records();

@@ -2,8 +2,7 @@
 
 Base: exact integrated32dfddb3, branch `feat/table-touch-admission` in the reused
 worker tree. Historical Dialog/lifecycle proof remains preserved separately at
-`feat/dialog-composition-current` / c0dc4b96. This checkpoint is uncompiled and
-not a verified production handoff.
+`feat/dialog-composition-current` / c0dc4b96. The original checkpoint was uncompiled; subsequent verification is recorded below.
 
 Only production changes: additive read-only `cui_event_hovered` in Core/header;
 existing `touch_drag_priority = !disabled && column.movable` on Table headers;
@@ -60,6 +59,7 @@ cases passed39: only the offline shared-umbrella guard lacked the new approved
 consumer allowlist entry. The exact two-line guard/fixture-list repair passed4/4
 without recompilation or production edits. Other offline usage/header/V1 ABI
 checks passed. Canonical SDK/dist/skill generation and freshness checks passed.
-The required18-test installed skill suite remains queued behind TimeField;
-integrator may own it on the actual merged revision. See the validation receipt.
+The integrator ran the required 18-test installed skill suite on revision
+139695bc: all passed in 42.274 seconds. All nine recorded source/test hashes
+match the compiled worker receipt. See the validation receipt.
 No CMake full-library rebuild, desktop window, dependency install or second tree.

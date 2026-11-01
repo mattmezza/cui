@@ -1,0 +1,37 @@
+{
+  "revision": "7269c45b",
+  "status": "focused_integrated_verified_full_suite_pending",
+  "build": "Existing native Release Ninja cache; four focused targets, nine warning-enabled compile/link steps; full library not rebuilt",
+  "umbrella": "Actual combined dist/cui_all.h, C11 O0 Wall Wextra Wpedantic Werror assertions enabled; CPU1 nice19",
+  "tests": "private Xvfb wrapper: five TimeField source/distribution/header tests PASS, 1.05s",
+  "consumer_skill": "18/18 PASS, 39.940s",
+  "documentation_followup": "Restored reviewed contract via 2503342e/bbe9a128/f69e5b5e; skill freshness still passes",
+  "logs": {
+    "time-text-root-configure.log": {
+      "path": "/home/matteo/.cache/cui-current-validation/time-text-root-configure.log",
+      "sha256": "5465cf05933812f0b48e37b266b1d4f448417e981a5d63d9bb2519cd1dd6d5ae"
+    },
+    "time-text-root-build.log": {
+      "path": "/home/matteo/.cache/cui-current-validation/time-text-root-build.log",
+      "sha256": "60c96696752460f880335b68bc7ae1338d0ecc9df24f1e0fa7ec864eeb280c79"
+    },
+    "time-text-root-umbrella.log": {
+      "path": "/home/matteo/.cache/cui-current-validation/time-text-root-umbrella.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "time-text-root-tests.log": {
+      "path": "/home/matteo/.cache/cui-current-validation/time-text-root-tests.log",
+      "sha256": "77f6fe6d48605b8b3febd733514bacb9bb105bbc5f5563c190d656704732e33c"
+    },
+    "time-text-root-skill.log": {
+      "path": "/home/matteo/.cache/cui-current-validation/time-text-root-skill.log",
+      "sha256": "f81080d3c453a86c1fe7c0dd9a4abd9539c3faed4c95d570ff5e03beb9f1ba55"
+    }
+  },
+  "remaining": [
+    "Full integrated native regression suite",
+    "Hosted platform gates",
+    "Localized widget/Styled/DateTime/IME and foreign bindings",
+    "Release and website deployment"
+  ]
+}

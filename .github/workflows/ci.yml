@@ -242,6 +242,9 @@ jobs:
         env:
           CUI_BRIDGE_LIBRARY: ${{ github.workspace }}/build/libcui_bridge.so
         run: go test -v ./...
+      - name: Matching bundled Slider symbols in a separate static process
+        working-directory: bindings/go
+        run: go test -v ./cui -run '^TestSliderStaticClosure$' -count=1
       - run: cd bindings/go && go vet ./...
       - name: Real Rust component state and callback tests
         env:

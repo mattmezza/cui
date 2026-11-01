@@ -2,12 +2,17 @@
 
 package cui
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 // Run separately without CUI_BRIDGE_LIBRARY: the matching bundled bridge object
 // must actually be extracted despite the optional weak references.
 func TestSliderStaticClosure(t *testing.T) {
-	t.Setenv("CUI_BRIDGE_LIBRARY", "")
+	if os.Getenv("CUI_BRIDGE_LIBRARY") != "" {
+		t.Skip("static closure requires a separate process without a dynamic library override")
+	}
 	a := app(t)
 	yes, e := a.SupportsSliderModel()
 	check(t, e)

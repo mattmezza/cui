@@ -125,3 +125,143 @@ gap to repair with the eventual verified slice, not evidence ex is absent.
 
 No tests were added merely to assert current known gaps, and none were executed
 for this audit. No status promotion or all78 ledger edit belongs to this checkpoint.
+
+## Exact additive palette/presentation proposal (review required)
+
+This is a proposed next slice, not shipped declarations. Keep the existing
+`cui_theme`, `cui_skeleton_options`, phase API, ex API and shared sampler ABI and
+behavior untouched. No version/size/reserved fields or new retained object are
+needed for a new plain owned C value. No common brush/style framework is justified
+by this single-color family.
+
+Proposed new portable header `include/cui/cui_skeleton_palette.h` includes only
+`cui_theme.h`; C/C++ linkage guards follow existing headers:
+
+```c
+typedef struct {
+    cui_color background;
+} cui_skeleton_palette;
+
+/* Fallback adaptation, never infer identity from equal theme bytes. */
+bool cui_skeleton_palette_from_theme(const cui_theme *, cui_skeleton_palette *out);
+/* Index and lifetime/order authority: existing cui_theme_preset_count/name. */
+bool cui_skeleton_palette_preset_get(size_t index, cui_skeleton_palette *out);
+```
+
+Proposed additive declaration in `cui_content.h` (includes the new value header):
+
+```c
+bool cui_skeleton_with_palette(cui_context *ui, cui_id id,
+                              const cui_skeleton_palette *palette,
+                              cui_loading_motion *state,
+                              cui_skeleton_options options,
+                              cui_loading_motion_result *out);
+```
+
+### Pure resolution, source interpretation and ownership
+
+* `cui_skeleton_palette` owns one encoded RGBA8 CUI paint color; no pointer,
+  context, preset index, color identity tag, hidden allocation or source lifetime.
+  Its layout is the layout of its sole `cui_color` member (target ABI tests, not a
+  new hardcoded platform-width assertion). All channel combinations are valid.
+* `from_theme` copies exactly `theme->secondary`, including alpha and hidden RGB
+  at alpha0. Null theme/output returns false without changing output. Other
+  theme fields are irrelevant and need not be validated. Custom theme changes
+  do not discover a preset; no registry search, name guessing or matching bytes.
+* Custom authored color uses an explicit value, for example
+  `cui_skeleton_palette p = {.background = {21, 34, 55, 0}};`.
+  There is no "unset" zero sentinel: alpha0 is authored transparent paint, never
+  replaced by theme fallback. A separate bool/override mask is unnecessary when
+  the whole supplied palette is active. Callers wanting fallback explicitly call
+  `from_theme` first, then optionally overwrite the owned member.
+* All four CUI builtins are covered by `from_theme(&builtin, &out)` using the
+  actual existing light/dark/high-contrast/terminal constructors. They are CUI
+  adaptations, not aliases of similarly named upstream presets. No new builtin
+  enum or four duplicated selection functions.
+* `preset_get` uses precisely the existing38-preset `cui_theme_preset_get` index
+  order; out-of-range/null output returns false unchanged. Resolve pinned raw
+  `palettes.json` values: `skeleton.background` if present, else
+  `secondary.background` (schema's `tokens.secondary`), then named-color lookup.
+  Inspection of the exact retained source found secondary.background in all38
+  and only solid hex values for the selected Skeleton/fallback tokens. Preserve
+  explicit alpha; #RRGGBB means255, #RRGGBBAA copies all four bytes. Do not use
+  current theme adaptation output as the source oracle, synthesize border blends,
+  or silently accept a future unsupported token/brush syntax. Generator must fail
+  on changed pin/order/missing fallback or unreviewed syntax. No gradient renderer
+  requirement is introduced by this pinned source.
+* "Exact source token" here means exact selected token/channel bytes and fallback,
+  not GPUI shader floating-Hsla/linear compositing bit identity. This entrypoint
+  deliberately uses existing CUI RGBA8 rectangle rendering and inherited-opacity
+  conversion. It must not claim source GPU pixels or introduce a new color-space
+  transport. A future float pipeline would be a separate reviewed API.
+* Pure resolver writes only after resolution succeeds; no allocation, locale,
+  global mutation, context diagnostic or renderer access. Output is immediately
+  copyable; no loader/library record pointers are returned.
+
+### Presentation and compatibility
+
+The new painter snapshots `palette->background` and reuses the existing Skeleton
+validation, sampler and box emission implementation through a private color-value
+helper. Existing ex still supplies `theme->secondary`; legacy phase API still
+supplies border/cosine/invalidation exactly. No public old record gains fields.
+No global theme.secondary replacement, switch to source preset from theme bytes,
+Core query, dispatch, native transport or bridge ABI change.
+
+* Mandatory nonnull ui/palette/state/out and nonzero id. Dimensions/radius/duration,
+  clock/state/easing validity and reduced-motion resolution are exactly existing
+  `cui_skeleton_ex` rules: positive width/height<=4096, radius0..4096,
+  duration0 selects2 else finite0..60, sampler now0..1e12. Reuse its actual
+  validation; no new divergent reducer. All options remain by-value and easing
+  userdata is borrowed only during synchronous sampling, never retained.
+* Palette color is multiplied by `(options.secondary ? .5f : 1)` and sampler
+  opacity using the existing float calculation/order, then a single uint8_t
+  truncation as current ex. Do not quantize secondary first. Alpha0 remains0,
+  RGB is preserved. Source component's Hsla secondary opacity multiplies alpha;
+  inherited parent Core opacity remains a separate existing layer, not a palette
+  rewrite. Out result describes motion, not effective post-parent alpha.
+* Same caller ID, single box, width/height/radius, clip/ancestor opacity and draw
+  ordering as existing ex; no semantic node, busy region or extra focus stop.
+  A transparent rectangle may be culled by existing rendering; do not invent a
+  visible paint/presence guarantee. Custom palette is active even when invisible.
+* Prevalidation/sampler failure returns false with state/out and draw stream
+  unchanged (easing callback side effects cannot be rolled back). Success means
+  accepted component submission as with existing ex, not completed Core layout,
+  renderer success, native presentation or physical accessibility delivery. A
+  later Core/frame failure does not roll back sampling or already performed
+  application effects. Caller still checks existing Core error/frame result.
+* Caller owns persistent motion state; state/out must be distinct valid writable
+  objects, not overlapping each other or borrowed inputs. No general alias/in-place
+  support is promised. Palette need live only through this call; snapshots/copies
+  may be kept indefinitely. Start/reset/omission/reinsertion remain explicit caller
+  policy; the new palette does not create a new animation owner.
+* Caller schedules absolute `out->next_wake_seconds` in the same clock units as
+  options.now_seconds. Reduced motion suppresses easing and returns static/no wake
+  exactly as existing Skeleton sampler. No implicit perpetual invalidation.
+
+### Implementation, proof and deliberate boundaries
+
+Proposed ownership after review: new header/source `src/theme/cui_skeleton_palette.c`,
+pinned generated color table and narrow generator/data oracle; additive content
+header/Components helper+painter; focused new tests/docs and canonical metadata
+when granted. Theme resolver remains portable data; Components depends on that
+value and Base sampler, never Base→Components/platform. Reuse registry ordering
+and pinned source manifests; avoid a second independently sorted registry.
+
+Required proof: independent raw JSON/name resolution for all38, byte-exact selected
+colors plus explicit Default Light/Aurora Light/Default Dark counterexamples;
+all4 builtin fallbacks, custom themes with identical preset-looking bytes but
+no inferred identity, alpha0 hidden RGB, invalid indices/nulls with output byte
+snapshots. Painter: actual software pixels for translucent/transparent/secondary
+colors at quarter/interior/boundary times, clipping/inherited opacity and corner
+geometry; fieldwise command equivalence of existing ex versus new painter using
+`from_theme` under fixed clocks, independent states and callback traces. Freeze
+legacy phase output separately before helper extraction. Invalid options/ease
+and zero id leave outputs/state/commands unchanged; reduced and omission/reset
+scheduling tested without native desktop windows. Verify strict C11, standalone/
+selective/umbrella C/C++ and WASM compilation under a later bounded lease.
+
+This step fixes source color selection and explicit custom paint only. It does
+NOT deliver source full-parent/fraction/flex root sizing, own Styled border/layout
+refinement, richer gallery compositions or any modern Skeleton binding options.
+All five legacy constructors remain unchanged and their omissions remain visible.
+Family completion, full renderer/platform parity and all78 closure remain open.

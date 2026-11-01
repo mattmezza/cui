@@ -1,6 +1,12 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_sdl3.h"
 #include "../../src/core/cui_text_paint_internal.h"
+/* SDL has always required the text provider for V1. Keep its V2 consumer
+ * complete in CMake, native bundles and direct-source/manual builds alike. */
+#ifndef CUI_HAS_TEXT
+#define CUI_HAS_TEXT 1
+#endif
+#include "../common/cui_cpu_v2_paint_internal.h"
 #include "../software/cui_bitmap.h"
 #include "../software/cui_shadow.h"
 #include "cui_sdl3_mesh.h"
@@ -50,7 +56,11 @@ struct cui_sdl3 {
     SDL_Event pending_event;
     char *clipboard;
     SDL_Cursor *cursors[CUI_CURSOR_HELP + 1];
+    bool v2_busy, v2_faulted;
 };
+static bool sdl_v2_blocked(const cui_sdl3 *s) {
+    return s && (s->v2_busy || s->v2_faulted);
+}
 static cui_system_appearance system_appearance(void) {
     switch (SDL_GetSystemTheme()) {
     case SDL_SYSTEM_THEME_LIGHT:
@@ -62,6 +72,8 @@ static cui_system_appearance system_appearance(void) {
     }
 }
 bool cui_sdl3_appearance(cui_sdl3 *s, cui_platform_appearance *out) {
+    if (s && s->v2_busy)
+        return false;
     if (!s || !out)
         return false;
     *out = s->appearance;
@@ -97,14 +109,20 @@ cui_sdl3 *cui_sdl3_create_with_options(const char *title, int w, int h, cui_font
     return s;
 }
 bool cui_sdl3_set_visible(cui_sdl3 *s, bool visible) {
+    if (sdl_v2_blocked(s))
+        return false;
     if (!s || !s->window)
         return false;
     return visible ? SDL_ShowWindow(s->window) : SDL_HideWindow(s->window);
 }
 bool cui_sdl3_is_visible(cui_sdl3 *s) {
+    if (sdl_v2_blocked(s))
+        return false;
     return s && s->window && !(SDL_GetWindowFlags(s->window) & SDL_WINDOW_HIDDEN);
 }
 void cui_sdl3_destroy(cui_sdl3 *s) {
+    if (s && s->v2_busy)
+        return;
     if (!s)
         return;
     cui_shadow_destroy(&s->shadows);
@@ -169,6 +187,8 @@ static cui_key key(SDL_Keycode k) {
     }
 }
 bool cui_sdl3_set_cursor(cui_sdl3 *s, cui_cursor cursor) {
+    if (sdl_v2_blocked(s))
+        return false;
     static const SDL_SystemCursor kinds[] = {
         SDL_SYSTEM_CURSOR_DEFAULT,     SDL_SYSTEM_CURSOR_POINTER,   SDL_SYSTEM_CURSOR_TEXT,
         SDL_SYSTEM_CURSOR_EW_RESIZE,   SDL_SYSTEM_CURSOR_NS_RESIZE, SDL_SYSTEM_CURSOR_MOVE,
@@ -202,6 +222,8 @@ static void flush_motion(cui_sdl3 *s, cui_context *ui) {
     }
 }
 static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided, bool pump) {
+    if (sdl_v2_blocked(s))
+        return false;
     if (!s || !ui)
         return false;
     bool reset_input = false;
@@ -433,9 +455,13 @@ static bool poll_events(cui_sdl3 *s, cui_context *ui, const SDL_Event *provided,
     return !s->quit;
 }
 bool cui_sdl3_poll(cui_sdl3 *s, cui_context *ui) {
+    if (sdl_v2_blocked(s))
+        return false;
     return poll_events(s, ui, NULL, s && !s->callback_mode);
 }
 void cui_sdl3_size(cui_sdl3 *s, float *w, float *h) {
+    if (sdl_v2_blocked(s))
+        return;
     int x, y;
     SDL_GetWindowSize(s->window, &x, &y);
     *w = (float)x;
@@ -443,6 +469,8 @@ void cui_sdl3_size(cui_sdl3 *s, float *w, float *h) {
     SDL_SetRenderLogicalPresentation(s->renderer, x, y, SDL_LOGICAL_PRESENTATION_STRETCH);
 }
 bool cui_sdl3_accessibility_window(cui_sdl3 *s, cui_accessibility_window *out) {
+    if (sdl_v2_blocked(s))
+        return false;
     if (!s || !out)
         return false;
     int width = 0, height = 0, x = 0, y = 0, top = 0, left = 0, bottom = 0, right = 0;
@@ -847,6 +875,8 @@ static bool sdl_mesh_list_valid(const cui_draw_list *list, bool has_font) {
 }
 bool cui_sdl3_render_capture(cui_sdl3 *s, const cui_draw_list *list, cui_color clear,
                              const char *path) {
+    if (sdl_v2_blocked(s))
+        return false;
     if (!s || !list || (!list->commands && list->count) || !isfinite(list->width) ||
         !isfinite(list->height) || list->width < 0 || list->height < 0 || list->width > 16384 ||
         list->height > 16384)
@@ -1027,10 +1057,261 @@ failure:
     cui_sdl_mesh_release(&mesh_frame);
     return false;
 }
+/* V2: one unpublished CPU frame, one transient native texture; no V1 cache use. */
+static bool sdl_v2_disjoint(const cui_sdl3 *s, const void *p, size_t bytes) {
+    return cui_background_prepare_disjoint_internal(s, sizeof(*s), p, bytes);
+}
+static size_t sdl_v2_commands(size_t pixels, size_t cpu, size_t metadata) {
+    if (pixels > cpu)
+        return 0;
+    size_t n = (cpu - pixels) / sizeof(cui_draw_command_v2);
+    size_t descriptors = metadata / sizeof(cui_cpu_v2_paint_descriptor);
+    if (n > descriptors)
+        n = descriptors;
+    return n < 16384 ? n : 16384;
+}
+/* SDL promises a terminated format array. Bound inspection without inventing
+ * conversion support; output remains untouched when no exact transfer exists. */
+static cui_error sdl_v2_format(const SDL_PixelFormat *formats, SDL_PixelFormat *out) {
+    if (!formats || !out)
+        return CUI_ERROR_INVALID_ACTION;
+    bool rgba = false, bgra = false;
+    for (size_t i = 0; i < 256; ++i) {
+        if (formats[i] == SDL_PIXELFORMAT_UNKNOWN) {
+            if (!rgba && !bgra)
+                return CUI_ERROR_INVALID_ACTION;
+            *out = rgba ? SDL_PIXELFORMAT_RGBA32 : SDL_PIXELFORMAT_BGRA32;
+            return CUI_OK;
+        }
+        rgba |= formats[i] == SDL_PIXELFORMAT_RGBA32;
+        bgra |= formats[i] == SDL_PIXELFORMAT_BGRA32;
+    }
+    return CUI_ERROR_INVALID_ACTION;
+}
+/* Caller holds busy before the first SDL call. No input/source reads here. */
+static cui_error sdl_v2_query_locked(cui_sdl3 *s, cui_sdl3_v2_info *info,
+                                     SDL_PixelFormat *native_format) {
+    int logical_w, logical_h, width, height;
+    if (SDL_GetRenderTarget(s->renderer) || !SDL_GetWindowSize(s->window, &logical_w, &logical_h) ||
+        !SDL_GetRenderOutputSize(s->renderer, &width, &height))
+        return CUI_ERROR_INVALID_ACTION;
+    if (logical_w <= 0 || logical_h <= 0 || width <= 0 || height <= 0)
+        return CUI_ERROR_INVALID_ACTION;
+    if (width > 16384 || height > 16384)
+        return CUI_ERROR_CAPACITY;
+    SDL_PropertiesID props = SDL_GetRendererProperties(s->renderer);
+    if (!props ||
+        SDL_GetNumberProperty(props, SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
+                              SDL_COLORSPACE_SRGB) != SDL_COLORSPACE_SRGB ||
+        SDL_GetBooleanProperty(props, SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN, false))
+        return CUI_ERROR_INVALID_ACTION;
+    SDL_PropertyType maximum_type =
+        SDL_GetPropertyType(props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER);
+    if (maximum_type != SDL_PROPERTY_TYPE_INVALID && maximum_type != SDL_PROPERTY_TYPE_NUMBER)
+        return CUI_ERROR_INVALID_ACTION;
+    Sint64 maximum = SDL_GetNumberProperty(props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+    if (maximum < 0)
+        return CUI_ERROR_INVALID_ACTION;
+    /* SDL uses absent/zero as no reported maximum, not unsupported. CUI's
+     * side/byte limits still apply; native creation remains checked. */
+    if (maximum && (width > maximum || height > maximum))
+        return CUI_ERROR_CAPACITY;
+    const SDL_PixelFormat *formats =
+        SDL_GetPointerProperty(props, SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER, NULL);
+    SDL_PixelFormat selected;
+    if (sdl_v2_format(formats, &selected) != CUI_OK)
+        return CUI_ERROR_INVALID_ACTION;
+    const size_t cpu = (size_t)32 * 1024 * 1024, metadata = (size_t)1024 * 1024;
+    size_t count = sdl_v2_commands((size_t)width * (size_t)height * 4, cpu, metadata);
+    if (!count)
+        return CUI_ERROR_CAPACITY;
+    *info = (cui_sdl3_v2_info){.size = sizeof(*info)};
+    info->draw = (cui_draw_v2_support){.size = sizeof(info->draw),
+                                       .abi_version = CUI_DRAW_ABI_V2,
+                                       .background_output = CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1,
+                                       .features = CUI_DRAW_V2_FEATURE_BACKGROUNDS,
+                                       .max_commands = count,
+                                       .max_backgrounds = count < 4096 ? count : 4096,
+                                       .max_pixels = (size_t)8 * 1024 * 1024,
+                                       .max_pixels_per_background = (size_t)4 * 1024 * 1024,
+                                       .cpu_bytes = cpu,
+                                       .metadata_bytes = metadata,
+                                       .texture_bytes = cpu,
+                                       .transfer_bytes = cpu};
+    info->defaults =
+        (cui_render_v2_options){.size = sizeof(info->defaults),
+                                .background_output = CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1,
+                                .viewport_width = (unsigned)width,
+                                .viewport_height = (unsigned)height,
+                                .scale_x = (float)width / (float)logical_w,
+                                .scale_y = (float)height / (float)logical_h,
+                                .cpu_bytes = cpu,
+                                .metadata_bytes = metadata,
+                                .texture_bytes = cpu,
+                                .transfer_bytes = cpu,
+                                .max_pixels = info->draw.max_pixels,
+                                .max_pixels_per_background = info->draw.max_pixels_per_background};
+    if (info->defaults.scale_x < 1.0f / 65536 || info->defaults.scale_x > 64 ||
+        info->defaults.scale_y < 1.0f / 65536 || info->defaults.scale_y > 64)
+        return CUI_ERROR_INVALID_ACTION;
+    if (s->font) {
+        info->text_features = CUI_SDL3_V2_TEXT_A8;
+        if (cui_text_prepare_context_available_internal())
+            info->text_features |= CUI_SDL3_V2_TEXT_CONTEXT;
+        if (cui_font_text_capabilities() & CUI_TEXT_CAP_LETTER_SPACING)
+            info->text_features |= CUI_SDL3_V2_TEXT_TRACKING;
+    }
+    if (native_format)
+        *native_format = selected;
+    return CUI_OK;
+}
+cui_error cui_sdl3_query_v2(const cui_sdl3 *owner, cui_sdl3_v2_info *out) {
+    if (!owner || !out)
+        return CUI_ERROR_INVALID_ACTION;
+    if (sdl_v2_blocked(owner))
+        return CUI_ERROR_LIFECYCLE;
+    if (!sdl_v2_disjoint(owner, out, sizeof(*out)) || out->size != sizeof(*out))
+        return CUI_ERROR_INVALID_ACTION;
+    cui_sdl3 *s = (cui_sdl3 *)owner;
+    s->v2_busy = true;
+    cui_sdl3_v2_info info;
+    cui_error error = sdl_v2_query_locked(s, &info, NULL);
+    s->v2_busy = false;
+    if (error == CUI_OK)
+        *out = info;
+    return error;
+}
+static void *sdl_v2_allocate(void *user, size_t bytes) {
+    (void)user;
+    return malloc(bytes);
+}
+static void sdl_v2_release(void *user, void *p) {
+    (void)user;
+    free(p);
+}
+typedef struct {
+    int logical_w, logical_h;
+    SDL_RendererLogicalPresentation logical_mode;
+    float scale_x, scale_y, color_scale;
+    SDL_Rect viewport, clip;
+    bool viewport_set, clip_enabled;
+} sdl_v2_state;
+static bool sdl_v2_snapshot(SDL_Renderer *r, sdl_v2_state *state) {
+    if (!SDL_GetRenderLogicalPresentation(r, &state->logical_w, &state->logical_h,
+                                          &state->logical_mode) ||
+        !SDL_GetRenderScale(r, &state->scale_x, &state->scale_y) ||
+        !SDL_GetRenderViewport(r, &state->viewport) || !SDL_GetRenderClipRect(r, &state->clip) ||
+        !SDL_GetRenderColorScale(r, &state->color_scale))
+        return false;
+    /* False is a valid unset/disabled value, not a failed bool-returning getter. */
+    state->viewport_set = SDL_RenderViewportSet(r);
+    state->clip_enabled = SDL_RenderClipEnabled(r);
+    return true;
+}
+static bool sdl_v2_restore(SDL_Renderer *r, const sdl_v2_state *state) {
+    bool ok = SDL_SetRenderLogicalPresentation(r, state->logical_w, state->logical_h,
+                                               state->logical_mode);
+    /* Do not short-circuit: attempt every restoration even after one failure. */
+    ok = SDL_SetRenderScale(r, state->scale_x, state->scale_y) && ok;
+    ok = SDL_SetRenderViewport(r, state->viewport_set ? &state->viewport : NULL) && ok;
+    ok = SDL_SetRenderClipRect(r, state->clip_enabled ? &state->clip : NULL) && ok;
+    ok = SDL_SetRenderColorScale(r, state->color_scale) && ok;
+    return ok;
+}
+cui_error cui_sdl3_render_v2(cui_sdl3 *s, const cui_draw_list_v2 *list, cui_color clear,
+                             const cui_render_v2_options *options) {
+    if (!s || !list)
+        return CUI_ERROR_INVALID_ACTION;
+    if (sdl_v2_blocked(s))
+        return CUI_ERROR_LIFECYCLE;
+    cui_cpu_v2_exclusion owner = {s, sizeof(*s)};
+    cui_error error = cui_cpu_v2_sources_exclude(list, options, &owner, 1);
+    if (error != CUI_OK)
+        return error;
+    /* NULL defaults require fresh native dimensions; known inputs were excluded
+     * before this temporary guard can mutate any caller byte. */
+    s->v2_busy = true;
+    cui_sdl3_v2_info info;
+    SDL_PixelFormat native_format = SDL_PIXELFORMAT_UNKNOWN;
+    error = sdl_v2_query_locked(s, &info, &native_format);
+    s->v2_busy = false;
+    if (error != CUI_OK)
+        return error;
+    const cui_render_v2_options *o = options ? options : &info.defaults;
+    if (o->size != sizeof(*o) || o->background_output != CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1 ||
+        o->viewport_width != info.defaults.viewport_width ||
+        o->viewport_height != info.defaults.viewport_height || !o->cpu_bytes ||
+        !o->metadata_bytes || !o->texture_bytes || !o->transfer_bytes || !o->max_pixels ||
+        !o->max_pixels_per_background)
+        return CUI_ERROR_INVALID_ACTION;
+    if (o->cpu_bytes > info.draw.cpu_bytes || o->metadata_bytes > info.draw.metadata_bytes ||
+        o->texture_bytes > info.draw.texture_bytes ||
+        o->transfer_bytes > info.draw.transfer_bytes || o->max_pixels > info.draw.max_pixels ||
+        o->max_pixels_per_background > info.draw.max_pixels_per_background)
+        return CUI_ERROR_CAPACITY;
+    size_t pixels = (size_t)o->viewport_width * o->viewport_height * 4;
+    if (pixels > o->texture_bytes || pixels > o->transfer_bytes ||
+        !sdl_v2_commands(pixels, o->cpu_bytes, o->metadata_bytes) ||
+        list->count > sdl_v2_commands(pixels, o->cpu_bytes, o->metadata_bytes))
+        return CUI_ERROR_CAPACITY;
+    cui_cpu_v2_frame frame = {0};
+    cui_cpu_v2_frame_request request = {.width = o->viewport_width,
+                                        .height = o->viewport_height,
+                                        .excluded = {{s, sizeof(*s)}},
+                                        .exclusion_count = 1,
+                                        .owner_busy = &s->v2_busy};
+    error = cui_cpu_v2_frame_prepare(&frame, &request, list, clear, o, s->font, sdl_v2_allocate,
+                                     sdl_v2_release, s);
+    if (error != CUI_OK) {
+        s->v2_busy = false;
+        return error;
+    }
+    SDL_Texture *texture = NULL;
+    sdl_v2_state state;
+    bool saved = sdl_v2_snapshot(s->renderer, &state), changed = false;
+    error = CUI_ERROR_INVALID_ACTION;
+    if (!saved)
+        goto cleanup;
+    if (native_format == SDL_PIXELFORMAT_BGRA32) {
+        /* Exact byte permutation in the already owned plane, after complete
+         * common painting. Preserve G/A including transparent hidden RGB. */
+        for (size_t i = 0; i < frame.bytes; i += 4) {
+            unsigned char red = frame.pixels[i];
+            frame.pixels[i] = frame.pixels[i + 2];
+            frame.pixels[i + 2] = red;
+        }
+    }
+    texture = SDL_CreateTexture(s->renderer, native_format, SDL_TEXTUREACCESS_STATIC,
+                                (int)frame.width, (int)frame.height);
+    if (!texture || !SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE) ||
+        !SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST) ||
+        !SDL_SetTextureColorMod(texture, 255, 255, 255) || !SDL_SetTextureAlphaMod(texture, 255) ||
+        !SDL_UpdateTexture(texture, NULL, frame.pixels, (int)frame.stride))
+        goto cleanup;
+    changed = true; /* A failed setter may still have changed native state. */
+    if (!SDL_SetRenderLogicalPresentation(s->renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED) ||
+        !SDL_SetRenderScale(s->renderer, 1, 1) || !SDL_SetRenderViewport(s->renderer, NULL) ||
+        !SDL_SetRenderClipRect(s->renderer, NULL) || !SDL_SetRenderColorScale(s->renderer, 1) ||
+        !SDL_RenderTexture(s->renderer, texture, NULL, NULL) || !SDL_FlushRenderer(s->renderer))
+        goto cleanup;
+    error = SDL_RenderPresent(s->renderer) ? CUI_OK : CUI_ERROR_INVALID_ACTION;
+cleanup:
+    if (changed && !sdl_v2_restore(s->renderer, &state)) {
+        s->v2_faulted = true;
+        error = CUI_ERROR_INVALID_ACTION;
+    }
+    SDL_DestroyTexture(texture);
+    cui_cpu_v2_frame_release(&frame);
+    s->v2_busy = false;
+    return error;
+}
+
 bool cui_sdl3_render(cui_sdl3 *s, const cui_draw_list *list, cui_color clear) {
     return cui_sdl3_render_capture(s, list, clear, NULL);
 }
 bool cui_sdl3_save_bmp(cui_sdl3 *s, const char *path) {
+    if (sdl_v2_blocked(s))
+        return false;
     SDL_Surface *surface = SDL_RenderReadPixels(s->renderer, NULL);
     if (!surface)
         return false;
@@ -1039,6 +1320,8 @@ bool cui_sdl3_save_bmp(cui_sdl3 *s, const char *path) {
     return ok;
 }
 const char *cui_sdl3_driver(cui_sdl3 *s) {
+    if (sdl_v2_blocked(s))
+        return "unavailable";
     return s ? SDL_GetRendererName(s->renderer) : "unavailable";
 }
 const char *cui_sdl3_video_driver(void) {
@@ -1048,6 +1331,8 @@ const char *cui_sdl3_error(void) {
     return SDL_GetError();
 }
 cui_sdl3_cache_stats cui_sdl3_glyph_cache_stats(cui_sdl3 *s) {
+    if (s && s->v2_busy)
+        return (cui_sdl3_cache_stats){0};
     cui_sdl3_cache_stats stats = {0};
     if (!s)
         return stats;
@@ -1059,6 +1344,8 @@ cui_sdl3_cache_stats cui_sdl3_glyph_cache_stats(cui_sdl3 *s) {
     return stats;
 }
 static bool clipboard_set(void *user, cui_str text) {
+    if (sdl_v2_blocked(user))
+        return false;
     if (!user || (!text.data && text.length) || text.length > 16u * 1024u * 1024u ||
         (text.length && memchr(text.data, 0, text.length)))
         return false;
@@ -1073,6 +1360,8 @@ static bool clipboard_set(void *user, cui_str text) {
     return ok;
 }
 static cui_str clipboard_get(void *user) {
+    if (sdl_v2_blocked(user))
+        return (cui_str){0};
     cui_sdl3 *s = user;
     if (!s)
         return (cui_str){NULL, 0};
@@ -1081,6 +1370,8 @@ static cui_str clipboard_get(void *user) {
     return (cui_str){s->clipboard, s->clipboard ? strlen(s->clipboard) : 0};
 }
 cui_platform cui_sdl3_clipboard_interface(cui_sdl3 *s) {
+    if (sdl_v2_blocked(s))
+        return (cui_platform){0};
     return (cui_platform){.user = s,
                           .capabilities = s ? CUI_PLATFORM_CLIPBOARD : 0,
                           .clipboard_set = clipboard_set,
@@ -1096,6 +1387,8 @@ static void destroy(void *s) {
     cui_sdl3_destroy(s);
 }
 cui_renderer cui_sdl3_interface(cui_sdl3 *s) {
+    if (sdl_v2_blocked(s))
+        return (cui_renderer){0};
     const char *name = cui_sdl3_driver(s);
     return (cui_renderer){s, name,
                           (s && s->font ? CUI_RENDER_TEXT | CUI_RENDER_TEXT_LINEAR_GRADIENT : 0) |
@@ -1106,6 +1399,8 @@ cui_renderer cui_sdl3_interface(cui_sdl3 *s) {
 }
 
 static cui_window_info cui_sdl3_window_query(void *user) {
+    if (sdl_v2_blocked(user))
+        return (cui_window_info){0};
     cui_sdl3 *s = user;
     if (!s || !s->window)
         return (cui_window_info){0};
@@ -1132,6 +1427,8 @@ static cui_window_info cui_sdl3_window_query(void *user) {
     return info;
 }
 static bool cui_sdl3_window_perform(void *user, cui_window_action action, float x, float y) {
+    if (sdl_v2_blocked(user))
+        return false;
     (void)x;
     (void)y;
     cui_sdl3 *s = user;
@@ -1157,9 +1454,13 @@ static bool cui_sdl3_window_perform(void *user, cui_window_action action, float 
     }
 }
 cui_window_host cui_sdl3_window_interface(cui_sdl3 *s) {
+    if (sdl_v2_blocked(s))
+        return (cui_window_host){0};
     return (cui_window_host){s, cui_sdl3_window_query, cui_sdl3_window_perform};
 }
 bool cui_sdl3_set_decorated(cui_sdl3 *s, bool decorated) {
+    if (sdl_v2_blocked(s))
+        return false;
     const char *driver = SDL_GetCurrentVideoDriver();
     if (!s || !s->window || !driver || !strcmp(driver, "dummy") || !strcmp(driver, "offscreen"))
         return false;
@@ -1167,6 +1468,8 @@ bool cui_sdl3_set_decorated(cui_sdl3 *s, bool decorated) {
 }
 
 float cui_sdl3_frame_delta(cui_sdl3 *s) {
+    if (sdl_v2_blocked(s))
+        return 0;
     if (!s)
         return 0;
     Uint64 now = SDL_GetTicksNS();
@@ -1176,6 +1479,8 @@ float cui_sdl3_frame_delta(cui_sdl3 *s) {
     return dt;
 }
 bool cui_sdl3_wait_events(cui_sdl3 *s, int timeout_ms) {
+    if (sdl_v2_blocked(s))
+        return false;
     if (!s)
         return false;
     /* Retain the wakeup event for the ordinary input/IME dispatcher. Passing
@@ -1207,13 +1512,13 @@ static SDL_AppResult SDLCALL app_event(void *state, SDL_Event *event) {
     callback_app *app = state;
     /* SDL lifecycle events may originate on worker threads. Leave lifecycle
      * termination to SDL itself; never mutate Core or paint on that thread. */
-    if (!SDL_IsMainThread())
+    if (!SDL_IsMainThread() || sdl_v2_blocked(app->host))
         return SDL_APP_CONTINUE;
     return poll_events(app->host, app->ui, event, false) ? SDL_APP_CONTINUE : SDL_APP_SUCCESS;
 }
 static SDL_AppResult SDLCALL app_frame(void *state) {
     callback_app *app = state;
-    if (app->iterating || !SDL_IsMainThread())
+    if (!SDL_IsMainThread() || app->iterating || sdl_v2_blocked(app->host))
         return SDL_APP_CONTINUE;
     app->iterating = true;
     flush_motion(app->host, app->ui);

@@ -86,3 +86,9 @@ Sokol and SDL_GPU adapters do not own windows: their host must request hidden
 creation. Bridge and language builder native runners expose opt-in hidden creation
 through independent window options; see [binding builders](../../docs/BINDING_BUILDERS.md). Linux X11/private-Xvfb validation does not
 establish Wayland, Windows or macOS behavior.
+
+## Opt-in V2 painting
+
+The unreleased C query/render route is described in [SDL V2](../../docs/SDL_V2.md).
+It uses bounded shared CPU painting and explicit native transfer; it does not
+change the V1 renderer table or imply SDL_GPU/foreign-binding support.

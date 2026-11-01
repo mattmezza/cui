@@ -1,0 +1,28 @@
+{
+  "implementation_revision": "e05071c1",
+  "documentation_revision": "e5ddd09e",
+  "configured_build": "PASS; test_sdl3_v2 and test_sdl3_v1_api; serial nice19 CPU1",
+  "headless_tests": {
+    "passed": 3,
+    "failed": 0,
+    "elapsed_seconds": 0.62,
+    "names": [
+      "cpu_v2_source_ranges",
+      "sdl3_v2",
+      "sdl3_v1_api"
+    ],
+    "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 -R ^(sdl3_v2|sdl3_v1_api|sdl_v1_reference|cpu_v2_source_ranges|cpu_v2_range_reference)$ --output-on-failure",
+    "limitation": "Only three names match; unselected reference-source tests are not claimed."
+  },
+  "generation": "SDK, amalgamation, consumer skill PASS in canonical order",
+  "consumer_skill_tests": {
+    "passed": 18,
+    "elapsed_seconds": 40.848
+  },
+  "logs": {
+    "sdl-v2-root-build.log": "41512d446a4ff912a1faa1215bc4a99797cefd862e62e5c9b6f80e8fd4439548",
+    "sdl-v2-root-tests.log": "9fecb985170e983412186ad9851e4dde09a48f3f1d4ff0071ead58951f250447",
+    "sdl-v2-canonical.log": "ec84f77de6706d9d8deea890d4aa8d729ef642660c053267c3086dbd0651b71c"
+  },
+  "limits": "Linux private-Xvfb software renderer only. Broader regression, generated-consumer build/runtime, physical GPU, other operating systems and delivery remain open. Prior full559 suite predates this SDL integration."
+}

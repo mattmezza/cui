@@ -97,3 +97,12 @@ bars, with fieldwise state comparison. Rerun the existing lifecycle, action,
 gesture, drag, failure/recovery and legacy surface proofs. Only then propose public
 Core/query and Base transfer plus metadata/generation. Full Dialog composition,
 Root/native-host and all five foreign facades remain open.
+
+## Independently checked metadata
+
+The integrator extracted original/candidate compiler constants and checked their
+values directly; [the receipt](../validation/dialog-marker-metadata.json) records
+assembly hashes and sizes. Native scope/context stay 24/255520 bytes (marker at
+18); WASM32 stay 16/229568 bytes (marker at 14). Scope-array offsets also match.
+These two measured layouts do not establish portability to every ABI or runtime
+correctness. Query/reducer compatibility and consumer coverage remain open.

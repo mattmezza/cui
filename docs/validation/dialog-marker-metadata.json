@@ -1,0 +1,61 @@
+{
+  "scope": "Compiler-emitted metadata only; no runtime/query/portable ABI completion claim",
+  "worker_checkpoint": "2baadc20",
+  "targets": {
+    "native": {
+      "original": {
+        "layout_values": [
+          24,
+          255520,
+          16,
+          17,
+          176,
+          6320
+        ],
+        "assembly_sha256": "3826bdc9d321a60ad7e46c4ed8deb604d51e302b6fdd4f46870533ddc67d02c4",
+        "assembly_bytes": 1780675
+      },
+      "candidate": {
+        "layout_values": [
+          24,
+          255520,
+          16,
+          17,
+          176,
+          6320
+        ],
+        "assembly_sha256": "a7bbfa70cd677b4dde2bee5b41b0f7fa8f449c699e4a3cf50c956864ab4ad8bb",
+        "assembly_bytes": 1780976,
+        "marker_offset": 18
+      }
+    },
+    "wasm32": {
+      "original": {
+        "layout_values": [
+          16,
+          229568,
+          12,
+          13,
+          152,
+          4248
+        ],
+        "assembly_sha256": "c8c73fa3b3a5a78fc57335c1950515ef3737cc8805c35d60a44d2bca7a3ba9c5",
+        "assembly_bytes": 30050686
+      },
+      "candidate": {
+        "layout_values": [
+          16,
+          229568,
+          12,
+          13,
+          152,
+          4248
+        ],
+        "assembly_sha256": "e2144dda2ae01c05a51baace6aa498ef37bb6feb104481226e92c64e2c2f71f8",
+        "assembly_bytes": 31450507,
+        "marker_offset": 14
+      }
+    }
+  },
+  "warning": "Zig driver emitted unused -c argument with -S; not a warning-clean runtime check"
+}

@@ -1,0 +1,21 @@
+{
+  "scope": "Owned density64 admission; public density16 and V1 unchanged; no V2 painter support claim",
+  "source_revision": "bf8ad7eb",
+  "worker_commit": "5793ba5f",
+  "build": "Actual current CMake Release GCC warning-enabled14compile/link steps; text_prepare/text_prepare_nobidi/cache/density/shaping targets; CPU0 nice19 -j1",
+  "runtime_command": "CUI_TEST_FONT=third_party/inter/Inter-Regular.otf python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -R '^(text_prepare|text_prepare_nobidi|text_prepare_reference_contract|text_raster_cache|text_density|text_shaping)$' -j1",
+  "runtime": "6/6 PASS0.16s, private Xvfb; explicit bundled font",
+  "skill": "18/18 PASS39.166s after canonical SDK/amalgamation/skill regeneration",
+  "source_sha256": {
+    "src/text/cui_text.c": "edeac29fdc1d934a0178c8683c0cc095e8a5b8c890fe90709858c613da622e0e",
+    "src/text/cui_text_prepare_internal.h": "0e68d2ad7c03671b9cd0dd1a7f9548dd1198f74a6e8a61106d413d0599936fe5",
+    "tests/unit/test_text_prepare.c": "5d1d890724a8a5e9a2baaac779391865b876007df7eb021b81d054acad8ce25a",
+    "tests/unit/text_prepare_original_reference.c": "a6e594373fe217ff07e8b4e485c9b3b0307f5049eb32d6a86f305c0ac10e29b6"
+  },
+  "text_archive_sha256": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+  "remaining": [
+    "Full transformed private text painter",
+    "Public renderer support across all adapters",
+    "Full integrated suite/hosted checks/release/deployment"
+  ]
+}

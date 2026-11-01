@@ -14,11 +14,16 @@
   "log_sha256": {
     "typed-gallery-integration-build.log": "e1b054964aaf210fc4a985e09288c09ce9bdac00259b655130c4e53f06f8be8a",
     "typed-gallery-integration-browser.log": "17ece8e789b373bfd25b8566e7ba7914ac584c4317b7170d0ea4c2508c347fe9",
-    "typed-gallery-integration-broad-browser.log": "4783000c05ad5083ef2a77acfad7c5abd75af1bc916bfa2f5e5f352ed7101d41"
+    "typed-gallery-integration-broad-browser.log": "4783000c05ad5083ef2a77acfad7c5abd75af1bc916bfa2f5e5f352ed7101d41",
+    "typed-gallery-touch-components.log": "058e79232934a3a4b5a08b9c707076e404b5991fd0be26843a5410632752c0e6",
+    "typed-gallery-touch-navigation.log": "b60a3e4e7b4b862957cce172a213c32e827c1b23ffd35b37f7ac0b589bb6a91d",
+    "typed-gallery-touch-components.json": "42554bd4132e93b1041a45fbf9e6f84e9d5b1e998ebe81432927ddea2bd068d1",
+    "typed-gallery-touch-navigation.json": "fd64c476992260b4315d8455c0e55308ba3fa0e049e8074fd7b0295f1180c1a8"
   },
   "artifact_sha256": {
     "build-info.json": "6cf5fdcaba7fc01ed9b4834751462c221ada8c7e7a48a93d681c5b043bda20c9",
     "gallery.wasm": "c72184233bc56332124079139cf84d108246377b104a3876c0ca6aa2a533ed8a",
     "gallery.js": "55455f36aece948d8c5b41d480795b7158c8ef9899c7a72541c294dd94e09512"
-  }
+  },
+  "representative_touch": "Actual Chromium CDP contacts: test_touch_components.py42/42 PASS and all78 stories rendered; test_touch_page_navigation.py19/19 PASS, including internal scrolling/browser boundary handoff, owned Slider/Resizable/Plot drags, modal gating, cancellation and fresh input after loss. Representative coverage, not full touch parity."
 }

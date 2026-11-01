@@ -13,7 +13,7 @@ No completion percentage or beta date is asserted.
 | Public release | **v0.1.0-alpha.3**; [release assets](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.3) available. |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
 | Public website | Interactive WASM gallery, docs and API index. Last independently verified deployment: `c8e222bb50f79ad6faa3195295bb6d4dc604e384`. |
-| Integration branch | New Slider, scroll geometry, background/text preparation and private software rendering work is **unreleased**. Combined validation is unfinished. |
+| Integration branch | New Slider, scroll geometry, background/text preparation and private software rendering work is **unreleased**. Local combined validation passed; broader acceptance and publication remain unfinished. |
 | Packages | Go alpha.3 tag/proxy verified; PyPI, npm and crates.io publication remains open. |
 
 **Implemented ≠ tested ≠ merged ≠ released ≠ deployed.** A gallery entry or green
@@ -35,8 +35,8 @@ feature test does not establish complete component parity.
 | --- | --- |
 | Dialog and scrolling | Geometry and compatibility checks pass. A test-only cancellation candidate passes 22 checks; frozen legacy traces and broader reducer coverage still gate production integration. Audit newly identified direct-key paths in Rating/legacy Slider and idle drag cancellation. |
 | Typed Slider | Typed C models, gallery and C bridge are integrated with focused headless/browser checks. Python passes 14 new tests and 10 legacy/example wrapper cases (one historical-library subcase skipped); final checks and integration remain open. Finish JS/TS, Go, Rust and native numeric delivery. |
-| Backgrounds, shadows and text | Transport, counted text preparation and private ordinary software painter are integrated. Private shadow profiles pass frozen comparisons. Transactional private shadow painting is integrated; worker checks pass (3/3, 48 mixed frames plus legacy comparisons). Combined-source strict build and isolated runtime checks pass (3/3); full-suite acceptance remains open. Owned q64 recording is integrated (six headless text checks and skill18 pass), while public scaling stays at 16×. Text painting and public support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain open. |
-| Validation | Candidate `00aa1f99` passed hosted CI/native bindings; Pages still needs terminal confirmation. Those results do not cover newer integration work. A fresh combined build/test gate remains required. |
+| Backgrounds, shadows and text | Transport, counted text preparation and private ordinary software painter are integrated. Private shadow profiles pass frozen comparisons. Transactional private shadow painting is integrated; worker checks pass (3/3, 48 mixed frames plus legacy comparisons). Combined-source strict build and isolated runtime checks pass (3/3); the full integrated Linux suite now passes with explicit skips; renderer coverage remains incomplete. Owned q64 recording is integrated (six headless text checks and skill18 pass), while public scaling stays at 16×. Text painting and public support in software, SDL_Renderer, SDL_GPU, Sokol and Canvas remain open. |
+| Validation | Combined warning-enabled build passed (945 steps). Full Linux suite: 481 passed, two skipped; typography rerun passed, optional original-theme fixture audit remains skipped. Hosted exact-revision checks and delivery remain open. |
 
 ## Remaining beta scope
 

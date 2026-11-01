@@ -1,0 +1,49 @@
+{
+  "source_revision": "dcc68994bd95f6dd4f192bc940551a69ac5af14e",
+  "scope": "Integrated native Release build and complete registered Linux test suite; not full component parity",
+  "build": {
+    "result": "PASS",
+    "steps": 945,
+    "warnings_enabled": true,
+    "command": "nice -n19 taskset -c0 cmake --build /home/matteo/.cache/cui-current-validation/native -j1"
+  },
+  "suite": {
+    "result": "PASS_WITH_EXPLICIT_SKIPS",
+    "registered": 483,
+    "passed": 481,
+    "skipped": 2,
+    "failed": 0,
+    "seconds": 261.59,
+    "command": "CUI_TEST_FONT=third_party/inter/Inter-Regular.otf CMAKE_BUILD_PARALLEL_LEVEL=1 CARGO_BUILD_JOBS=1 GOMAXPROCS=1 nice -n19 taskset -c0 python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1",
+    "display": "private Xvfb",
+    "terminal_session": 88854
+  },
+  "skips": [
+    {
+      "name": "typography_example_native",
+      "reason": "Five explicit font-role environment variables absent in full run",
+      "followup": "PASS 1/1, 0.02 seconds, isolated wrapper with installed explicit body/heading/bold/italic/monospace fonts",
+      "terminal_session": 67281
+    },
+    {
+      "name": "theme_registry_source",
+      "reason": "Optional pinned themes/ayu.json and themes/aurora.json fixture missing from /tmp/cui-gpui-reference",
+      "followup": "Deferred; generated preset data is not substituted for original source files"
+    }
+  ],
+  "evidence_notes": [
+    "Terminal tool results establish build and suite results. Full CTest text log was replaced by the focused typography rerun; no claim of an archived complete suite log.",
+    "Source metadata/SDK/distribution/consumer skill checks are included in the complete suite."
+  ],
+  "limitations": [
+    "No public release or website deployment",
+    "No full-family parity claim",
+    "Does not validate unintegrated Python/JS/TS, Dialog cancellation prototype or private with-font painter changes",
+    "Physical macOS/Windows/GPU/assistive-technology acceptance remains separate"
+  ],
+  "artifacts_sha256": {
+    "libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "libcui_bridge.so": "886a7d615ccf6ec4417b8447c14d0ac0df1c1538be872e9d7b0e0633b4aac717",
+    "libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff"
+  }
+}

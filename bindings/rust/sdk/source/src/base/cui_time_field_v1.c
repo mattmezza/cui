@@ -165,6 +165,7 @@ static cui_str cui_tfw_text(const cui_event *e) {
 static bool cui_tfw_text_edit(cui_time_field_state_v1 *s, cui_time *t,
                               const cui_time_field_options_v1 *o, cui_str text) {
     if (!text.length || text.length > 160 || !text.data) {
+        s->pending_length = 0;
         s->validation = CUI_TIME_TEXT_INVALID_SYNTAX;
         return false;
     }
@@ -319,6 +320,8 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
             cui_tfw_reset(s);
         size_t count = 0;
         const cui_event *events = cui_frame_events(ui, &count);
+        cui_id source = 0;
+        const cui_id dispatched_focus = focus;
         for (size_t e = 0; ready && e < count; e++) {
             if (!cui_frame_input_snapshot_ready(ui) || cui_last_error(ui) != CUI_OK) {
                 r.status = CUI_TIME_TEXT_INVALID_ARGUMENT;
@@ -340,16 +343,37 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
             if (event->type == CUI_EVENT_POINTER_DOWN &&
                 event->pointer_button == CUI_POINTER_PRIMARY) {
                 s->segment = segment;
+                source = target;
                 cui_tfw_reset(s);
+                cui_focus(ui, target);
                 cui_consume_event(ui, e);
                 continue;
             }
             if (event->type != CUI_EVENT_TEXT && event->type != CUI_EVENT_KEY_DOWN)
                 continue;
-            if (s->segment != segment) {
+            if (event->type == CUI_EVENT_KEY_DOWN) {
+                if (event->key == CUI_KEY_TAB) {
+                    /* Core already performed global traversal; preserve its focus
+                     * after any earlier local auto-advance, without retargeting. */
+                    cui_tfw_reset(s);
+                    cui_focus(ui, dispatched_focus);
+                    continue;
+                }
+                if (event->modifiers ||
+                    (event->key != CUI_KEY_LEFT && event->key != CUI_KEY_RIGHT &&
+                     event->key != CUI_KEY_ESCAPE && event->key != CUI_KEY_UP &&
+                     event->key != CUI_KEY_DOWN && event->key != CUI_KEY_HOME &&
+                     event->key != CUI_KEY_END && event->key != CUI_KEY_BACKSPACE &&
+                     event->key != CUI_KEY_DELETE))
+                    continue;
+            }
+            /* Dispatch targets are immutable evidence, not the evolving editor
+             * selection. Consecutive TEXT events may all target the entry Hour. */
+            if (source != target && (source || s->segment != segment)) {
                 s->segment = segment;
                 cui_tfw_reset(s);
             }
+            source = target;
             if (event->type == CUI_EVENT_TEXT) {
                 if (!cui_tfw_text_edit(s, t, o, cui_tfw_text(event)))
                     r.rejected_count++;

@@ -296,3 +296,23 @@ legacy picker implementation was edited. Canonical source/distribution/SDK/skill
 outputs accompany the checkpoint. **No compilation or runtime evidence yet**;
 fixtures, pixel assertions and exact state/option ABI still await the allocated
 focused lease. Gallery migration follows geometry proof, not this source commit.
+
+### Same-batch original-target resolution
+
+Core stamps each TEXT target from focus during pre-reducer dispatch (`cui.c:1731`);
+four separately queued digits can all retain the entry Hour target. New editing
+tracks the last **handled original target**, following the legacy reducer's
+pattern: consecutive events with that same target retain evolving local segment/
+draft; genuine target transitions and primary pointer selection reset it.
+Consumed, foreign or unsupported events do not alter this tracking. No event
+is rewritten or retargeted. For an owned Tab, preserve the Core-dispatched focus
+captured at entry after any earlier local auto-advance, clear pending draft,
+and leave the Tab unconsumed. Later original events still determine edits.
+
+Source-only fixtures now compare four separate TEXT events1/2/3/4 against one
+TEXT1234 (both12:34, one aggregate callback), with raw Core targets asserted
+unchanged. Actual focus-action witnesses insert foreign or consumed visible-
+segment TEXT between1 and2: the final owner value is unchanged12:34, so no
+callback despite applied intermediate edits. TEXT→Tab→TEXT and TEXT→pointer→TEXT
+must honor actual destination focus, plus existing forward/backward boundaries
+and two-Tab batch. These assertions await execution, not assumed proof.

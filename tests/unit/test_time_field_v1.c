@@ -17,6 +17,9 @@ typedef struct {
     size_t calls, measurements;
     bool styled, inert, layout, omit, handler;
     cui_time_change copy;
+    cui_id raw_targets[16];
+    size_t raw_count;
+    uint32_t consume_mask;
 } fixture;
 static bool same(cui_time a, cui_time b) {
     return a.hour == b.hour && a.minute == b.minute && a.second == b.second;
@@ -69,6 +72,15 @@ static void neighbor(cui_context *ui, cui_id id) {
 }
 static cui_time_field_result_v1 frame(fixture *f) {
     assert(cui_begin_frame(f->ui, 1200, 400, .016f));
+    size_t event_count;
+    (void)cui_frame_events(f->ui, &event_count);
+    assert(event_count <= 16);
+    f->raw_count = event_count;
+    for (size_t i = 0; i < event_count; ++i) {
+        f->raw_targets[i] = cui_event_target(f->ui, i);
+        if (f->consume_mask & (UINT32_C(1) << i))
+            assert(cui_consume_event(f->ui, i));
+    }
     cui_begin_box(f->ui, 1000, (cui_box){.inert = f->inert, .layout_only = f->layout});
     neighbor(f->ui, 10);
     cui_time_field_result_v1 r = {0};
@@ -91,6 +103,8 @@ static cui_time_field_result_v1 frame(fixture *f) {
             cui_end_box(f->ui);
         }
     }
+    for (size_t i = 0; i < event_count; ++i)
+        assert(f->raw_targets[i] == cui_event_target(f->ui, i));
     neighbor(f->ui, 30);
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
@@ -118,6 +132,8 @@ static void editing(bool styled) {
     init(&f, styled);
     warm(&f);
     focus(&f, 1);
+    f.measurements = 0;
+    f.theme.font_size = 17; /* New font key proves Styled measurements precede callback. */
     text(&f, cui_string("7"));
     cui_time_field_result_v1 r = frame(&f);
     assert(r.changed && r.change_count == 1 && f.time.minute == 7 &&
@@ -182,6 +198,82 @@ static void editing(bool styled) {
     cui_time_change saved = f.copy;
     cui_destroy(f.ui);
     assert(saved.event.target == 20);
+}
+static void original_order(bool styled) {
+    fixture split, joined;
+    init(&split, styled);
+    init(&joined, styled);
+    warm(&split);
+    warm(&joined);
+    focus(&split, 0);
+    focus(&joined, 0);
+    const char *digits[] = {"1", "2", "3", "4"};
+    for (size_t i = 0; i < 4; ++i)
+        text(&split, cui_string(digits[i]));
+    text(&joined, cui_string("1234"));
+    cui_time_field_result_v1 a = frame(&split), b = frame(&joined);
+    assert(split.raw_count == 4 && joined.raw_count == 1);
+    for (size_t i = 0; i < 4; ++i)
+        assert(split.raw_targets[i] == cui_time_segment_id(20, 0));
+    assert(joined.raw_targets[0] == cui_time_segment_id(20, 0));
+    assert(same(split.time, (cui_time){12, 34, 0}) && same(split.time, joined.time));
+    assert(a.changed && b.changed && a.change_count == 1 && b.change_count == 1);
+    assert(!a.rejected_count && !b.rejected_count);
+    assert(split.state.segment == 1 && joined.state.segment == 1);
+    assert(cui_focused(split.ui) == cui_time_segment_id(20, 1));
+    /* Foreign TEXT between genuine focus actions must not reset the draft. */
+    focus(&split, 0);
+    size_t calls = split.calls;
+    text(&split, cui_string("1"));
+    assert(cui_queue_accessibility_action(split.ui, 10, CUI_ACCESSIBILITY_FOCUS));
+    text(&split, cui_string("9"));
+    assert(cui_queue_accessibility_action(split.ui, cui_time_segment_id(20, 0),
+                                          CUI_ACCESSIBILITY_FOCUS));
+    text(&split, cui_string("2"));
+    a = frame(&split);
+    assert(split.raw_count == 5 && split.raw_targets[2] == 10);
+    assert(split.raw_targets[0] == cui_time_segment_id(20, 0) &&
+           split.raw_targets[4] == split.raw_targets[0]);
+    assert(same(split.time, (cui_time){12, 34, 0}) && !a.changed && !a.change_count &&
+           split.calls == calls);
+    /* Consumed TEXT at another visible segment also leaves last target intact. */
+    focus(&split, 0);
+    text(&split, cui_string("1"));
+    assert(cui_queue_accessibility_action(split.ui, cui_time_segment_id(20, 1),
+                                          CUI_ACCESSIBILITY_FOCUS));
+    text(&split, cui_string("9"));
+    assert(cui_queue_accessibility_action(split.ui, cui_time_segment_id(20, 0),
+                                          CUI_ACCESSIBILITY_FOCUS));
+    text(&split, cui_string("2"));
+    split.consume_mask = UINT32_C(1) << 2;
+    a = frame(&split);
+    split.consume_mask = 0;
+    assert(split.raw_targets[2] == cui_time_segment_id(20, 1));
+    assert(same(split.time, (cui_time){12, 34, 0}) && !a.changed && !a.change_count &&
+           split.calls == calls);
+    focus(&split, 0);
+    text(&split, cui_string("1"));
+    key(&split, CUI_KEY_TAB, 0);
+    text(&split, cui_string("2"));
+    frame(&split);
+    assert(split.raw_count == 3 && split.raw_targets[0] == cui_time_segment_id(20, 0));
+    assert(split.raw_targets[1] == cui_time_segment_id(20, 0));
+    assert(split.raw_targets[2] == cui_time_segment_id(20, 1));
+    assert(same(split.time, (cui_time){1, 2, 0}) && split.state.segment == 1);
+    focus(&joined, 0);
+    cui_rect minute = cui_bounds(joined.ui, cui_time_segment_id(20, 1));
+    text(&joined, cui_string("1"));
+    assert(cui_queue_event(joined.ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                                                  .x = minute.x + minute.w * .5f,
+                                                  .y = minute.y + minute.h * .5f}));
+    text(&joined, cui_string("2"));
+    frame(&joined);
+    assert(joined.raw_count == 3 && joined.raw_targets[0] == cui_time_segment_id(20, 0));
+    assert(joined.raw_targets[1] == cui_time_segment_id(20, 1));
+    assert(joined.raw_targets[2] == cui_time_segment_id(20, 1));
+    assert(same(joined.time, (cui_time){1, 2, 0}) && joined.state.segment == 1);
+    cui_destroy(split.ui);
+    cui_destroy(joined.ui);
 }
 static void tabs(bool styled) {
     fixture f;
@@ -356,6 +448,7 @@ static void pixels_and_text(void) {
 int main(void) {
     for (unsigned styled = 0; styled < 2; styled++) {
         editing(styled != 0);
+        original_order(styled != 0);
         tabs(styled != 0);
         paste_and_bounds(styled != 0);
     }

@@ -34,7 +34,7 @@ feature test does not establish complete component parity.
 
 | Work | Landed evidence / next requirement |
 | --- | --- |
-| Dialog and scrolling | Geometry and compatibility checks pass. A test-only cancellation candidate passes 22 checks; frozen legacy traces and broader reducer coverage still gate production integration. Audit newly identified direct-key paths in Rating/legacy Slider and idle drag cancellation. |
+| Dialog and scrolling | Test-only cancellation candidate passes 26 checks, including frozen Scroll/Resizable compatibility. Five confirmed failures remain in Rating/legacy Slider stale keys and controlled Slider idle drag; review and verify those fixes before production integration. |
 | Typed C models, gallery and C bridge are integrated with focused headless/browser checks. Python has preliminary tests but is not integrated. Finish all language builders and native numeric delivery. |
 | Private software painting, transactional shadows and owned 64× text recording are integrated with focused checks. Finish text painting and public renderer support; combined acceptance remains open. Public text scaling remains limited to 16×. |
 | Older candidate `00aa1f99` passed hosted CI/native bindings, with Pages unconfirmed. Newer combined build is running; full headless tests and exact-revision hosted checks remain open. |

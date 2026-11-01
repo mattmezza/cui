@@ -1,0 +1,112 @@
+{
+  "scope": "Compile-only private owned-frame layout proposal; no production extraction or SDL API",
+  "base_revision": "8d245db2",
+  "source_sha256": {
+    "tests/unit/cpu_v2_frame_layout_proposal.h": "4d0c7996800225f033fc13229764d11039061535e8e0f1da39e73c0f2f57cba7",
+    "tests/unit/test_cpu_v2_frame_layout.c": "ca4b92de5201272fefd3b62776dac1172aecdea42872ea6a03db62c790d1e53c"
+  },
+  "layouts": {
+    "native": {
+      "plan_size": 80,
+      "clip_stack_size": 2048,
+      "workspace_size": 72,
+      "bytes_offset": 112,
+      "stride_offset": 104,
+      "width_offset": 96,
+      "pixels_offset": 88,
+      "workspace_offset": 16,
+      "self_offset": 8,
+      "state_offset": 0,
+      "request_size": 72,
+      "frame_alignment": 8,
+      "frame_size": 120,
+      "bounded_named_local_owner_bytes": 2320
+    },
+    "native-text": {
+      "text_session_size": 32,
+      "text_owner_size": 656,
+      "text_session_offset": 776,
+      "text_owner_offset": 120,
+      "plan_size": 80,
+      "clip_stack_size": 2048,
+      "workspace_size": 72,
+      "bytes_offset": 112,
+      "stride_offset": 104,
+      "width_offset": 96,
+      "pixels_offset": 88,
+      "workspace_offset": 16,
+      "self_offset": 8,
+      "state_offset": 0,
+      "request_size": 72,
+      "frame_alignment": 8,
+      "frame_size": 808,
+      "bounded_named_local_owner_bytes": 3008
+    },
+    "wasm": {
+      "frame_size": 64,
+      "frame_alignment": 4,
+      "request_size": 40,
+      "state_offset": 0,
+      "self_offset": 4,
+      "workspace_offset": 8,
+      "pixels_offset": 44,
+      "width_offset": 48,
+      "stride_offset": 56,
+      "bytes_offset": 60,
+      "workspace_size": 36,
+      "clip_stack_size": 2048,
+      "plan_size": 40,
+      "bounded_named_local_owner_bytes": 2192
+    },
+    "wasm-text": {
+      "frame_size": 412,
+      "frame_alignment": 4,
+      "request_size": 40,
+      "state_offset": 0,
+      "self_offset": 4,
+      "workspace_offset": 8,
+      "pixels_offset": 44,
+      "width_offset": 48,
+      "stride_offset": 56,
+      "bytes_offset": 60,
+      "workspace_size": 36,
+      "clip_stack_size": 2048,
+      "plan_size": 40,
+      "text_owner_offset": 64,
+      "text_session_offset": 396,
+      "text_owner_size": 332,
+      "text_session_size": 16,
+      "bounded_named_local_owner_bytes": 2540
+    }
+  },
+  "native_tool": "GCC 16.2.1 20260810",
+  "wasm_tool": "Zig 0.16.0 clang --no-default-config",
+  "wasm_tool_path": "/home/matteo/.cache/uv/archive-v0/ojEW1eDmRncg8rGG3ub31/lib/python3.11/site-packages/ziglang/zig",
+  "common_flags": [
+    "-std=c11",
+    "-O2",
+    "-UNDEBUG",
+    "-Wall",
+    "-Wextra",
+    "-Wpedantic",
+    "-Werror",
+    "-Iinclude",
+    "-S"
+  ],
+  "variants": "Without/with -DCUI_HAS_TEXT=1 for native and wasm32-unknown-wasi",
+  "wasm_flags": [
+    "-nostdinc",
+    "-isystem <pinned-zig>/lib/include",
+    "-isystem <pinned-zig>/lib/libc/include/wasm-wasi-musl",
+    "-isystem <pinned-zig>/lib/libc/include/generic-musl"
+  ],
+  "commands": "cc <common_flags> [text] tests/unit/test_cpu_v2_frame_layout.c -o <assembly>; pinned-zig clang --no-default-config -target wasm32-unknown-wasi <wasm_flags> <common_flags> [text] tests/unit/test_cpu_v2_frame_layout.c -o <assembly>",
+  "measurement": "Object integer constants read from assembly .long/.int32/.zero directives; 13 constants no-text and 17 text; no linking/execution",
+  "initial_failure": "System Zig 0.17.0 cc -S rejects generated unused -c under Werror; retained log; pinned Clang explicit include driver succeeds without diagnostic suppression",
+  "logs": [
+    "build-shadow/cpu-frame-layout-build.log",
+    "build-shadow/cpu-frame-layout-wasm-build.log",
+    "build-shadow/cpu-frame-layout-tools.log"
+  ],
+  "limits": "Named owner subtotal is not total stack; validator/dependency call frames, scalar locals and compiler spills remain additional. Production extraction and behavior tests not implemented."
+}

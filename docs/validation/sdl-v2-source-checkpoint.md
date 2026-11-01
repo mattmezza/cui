@@ -69,3 +69,14 @@ emitting platform entry shims on targets where SDL_main.h supplies them; it does
 not alter production SDL entry handling or frozen source bytes. A second fixture
 source review corrected text gradient endpoint member names to actual x0/y0/x1/y1.
 These are precompile source corrections, not runtime passes.
+
+
+## Actual first worker gate
+
+Session62968 is terminal0: corrected strict batch and private-Xvfb two tests pass
+(0.65 seconds). See `sdl-v2-first-worker.json` for immutable source/archive/font
+hashes, commands, all initial failures and explicit exclusions. The software
+renderer actually uses native BGRA32; the verified adapter swaps R/B in its owned
+plane without extra allocation and preserves alpha. Native RGBA preference has
+a pure selector oracle, not a falsely claimed native-driver run. Root configured
+integration and consumer metadata/generation acceptance remain pending.

@@ -25,7 +25,10 @@ enum {
 static int failure;
 static size_t native_calls, presents, allocation_calls, fail_allocation, live, object_calls,
     object_bytes;
-static bool recurse, capture_enabled, reject_format;
+static bool recurse, capture_enabled, reject_format, invalid_max_type, absent_colorspace;
+static Sint64 maximum_override = INT64_MIN;
+static SDL_PixelFormat upload_format;
+static unsigned char raw_uploaded[32 * 24 * 4];
 static void *allocated[512];
 static unsigned char uploaded[32 * 24 * 4];
 static cui_sdl3 *active;
@@ -62,9 +65,32 @@ static void *test_pointer_property(SDL_PropertiesID props, const char *name, voi
         return refused;
     return SDL_GetPointerProperty(props, name, fallback);
 }
+static Sint64 test_number_property(SDL_PropertiesID props, const char *name, Sint64 fallback) {
+    if (!strcmp(name, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER) && maximum_override != INT64_MIN)
+        return maximum_override;
+    if (absent_colorspace && !strcmp(name, SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER))
+        return fallback;
+    return SDL_GetNumberProperty(props, name, fallback);
+}
+static SDL_PropertyType test_property_type(SDL_PropertiesID props, const char *name) {
+    if (!strcmp(name, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER)) {
+        if (invalid_max_type)
+            return SDL_PROPERTY_TYPE_STRING;
+        if (maximum_override != INT64_MIN)
+            return SDL_PROPERTY_TYPE_NUMBER;
+    }
+    return SDL_GetPropertyType(props, name);
+}
 static bool test_size(SDL_Window *w, int *x, int *y) {
-    if (fail(FAIL_SIZE))
+    if (fail(FAIL_SIZE)) {
+        /* The injected failure has defined outputs; V2 must reject its false
+         * result regardless. Avoid poisoning unrelated legacy void-size code. */
+        if (x)
+            *x = 0;
+        if (y)
+            *y = 0;
         return false;
+    }
     if (recurse)
         busy_probe();
     return SDL_GetWindowSize(w, x, y);
@@ -73,6 +99,7 @@ static SDL_Texture *test_create(SDL_Renderer *r, SDL_PixelFormat f, SDL_TextureA
                                 int h) {
     if (fail(FAIL_CREATE))
         return NULL;
+    upload_format = f;
     return SDL_CreateTexture(r, f, a, w, h);
 }
 static bool test_upload(SDL_Texture *t, const SDL_Rect *r, const void *p, int pitch) {
@@ -80,7 +107,15 @@ static bool test_upload(SDL_Texture *t, const SDL_Rect *r, const void *p, int pi
         return false;
     if (capture_enabled) {
         assert(pitch == 32 * 4);
+        memcpy(raw_uploaded, p, sizeof raw_uploaded);
         memcpy(uploaded, p, sizeof uploaded);
+        assert(upload_format == SDL_PIXELFORMAT_RGBA32 || upload_format == SDL_PIXELFORMAT_BGRA32);
+        if (upload_format == SDL_PIXELFORMAT_BGRA32)
+            for (size_t i = 0; i < sizeof uploaded; i += 4) {
+                unsigned char b = uploaded[i];
+                uploaded[i] = uploaded[i + 2];
+                uploaded[i + 2] = b;
+            }
     }
     return SDL_UpdateTexture(t, r, p, pitch);
 }
@@ -135,6 +170,8 @@ static void *test_calloc(size_t n, size_t bytes) {
     object_bytes = n * bytes;
     return calloc(n, bytes);
 }
+#define SDL_GetNumberProperty test_number_property
+#define SDL_GetPropertyType test_property_type
 #define SDL_GetPointerProperty test_pointer_property
 #define SDL_GetWindowSize test_size
 #define SDL_CreateTexture test_create
@@ -152,6 +189,8 @@ static void *test_calloc(size_t n, size_t bytes) {
 #undef calloc
 #undef free
 #undef malloc
+#undef SDL_GetNumberProperty
+#undef SDL_GetPropertyType
 #undef SDL_GetPointerProperty
 #undef SDL_GetWindowSize
 #undef SDL_CreateTexture
@@ -266,6 +305,13 @@ static void compare_upload(cui_sdl3 *s, cui_software *cpu, cui_draw_list_v2 *lis
     assert(cui_software_render_v2(cpu, list, clear, &options) == CUI_OK);
     assert(cui_sdl3_render_v2(s, list, clear, &options) == CUI_OK);
     const unsigned char *expected = cui_software_pixels(cpu, NULL, NULL);
+    for (size_t i = 0; i < 32 * 24; ++i) {
+        bool bgra = upload_format == SDL_PIXELFORMAT_BGRA32;
+        assert(raw_uploaded[i * 4] == expected[i * 4 + (bgra ? 2 : 0)]);
+        assert(raw_uploaded[i * 4 + 2] == expected[i * 4 + (bgra ? 0 : 2)]);
+        assert(raw_uploaded[i * 4 + 1] == expected[i * 4 + 1]);
+        assert(raw_uploaded[i * 4 + 3] == expected[i * 4 + 3]);
+    }
     assert(!memcmp(uploaded, expected, sizeof uploaded)); /* Full RGBA at native upload. */
     for (size_t i = 0; i < 32 * 24; ++i) {
         /* A window backbuffer may discard alpha; RGB must still be copied unblended. */
@@ -290,11 +336,53 @@ int main(int argc, char **argv) {
     retained_window = cui_sdl3_window_interface(s);
     retained_renderer = cui_sdl3_interface(s);
     cui_sdl3_v2_info info = {.size = sizeof(info)};
-    assert(cui_sdl3_query_v2(s, &info) == CUI_OK);
+    cui_error initial_query = cui_sdl3_query_v2(s, &info);
+    if (initial_query != CUI_OK) {
+        SDL_PropertiesID properties = SDL_GetRendererProperties(s->renderer);
+        fprintf(stderr,
+                "query=%d driver=%s max_present=%d max=%lld colorspace=%lld hdr=%d error=%s\n",
+                (int)initial_query, SDL_GetRendererName(s->renderer),
+                SDL_HasProperty(properties, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER),
+                (long long)SDL_GetNumberProperty(properties,
+                                                 SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, -1),
+                (long long)SDL_GetNumberProperty(properties,
+                                                 SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER, -1),
+                SDL_GetBooleanProperty(properties, SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN, false),
+                SDL_GetError());
+        const SDL_PixelFormat *formats =
+            SDL_GetPointerProperty(properties, SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER, NULL);
+        for (size_t i = 0; formats && i < 32 && formats[i] != SDL_PIXELFORMAT_UNKNOWN; ++i)
+            fprintf(stderr, "format[%zu]=%s (%u), RGBA32=%u\n", i,
+                    SDL_GetPixelFormatName(formats[i]), (unsigned)formats[i],
+                    (unsigned)SDL_PIXELFORMAT_RGBA32);
+    }
+    assert(initial_query == CUI_OK);
     assert(info.defaults.viewport_width == 32 && info.defaults.viewport_height == 24 &&
            info.draw.max_commands && info.draw.max_backgrounds &&
            (info.text_features & CUI_SDL3_V2_TEXT_A8));
     assert(info.defaults.scale_x == 1 && info.defaults.scale_y == 1);
+    SDL_PixelFormat selected = SDL_PIXELFORMAT_INDEX8;
+    const SDL_PixelFormat bgra[] = {SDL_PIXELFORMAT_BGRA32, SDL_PIXELFORMAT_UNKNOWN};
+    const SDL_PixelFormat prefer[] = {SDL_PIXELFORMAT_BGRA32, SDL_PIXELFORMAT_RGBA32,
+                                      SDL_PIXELFORMAT_UNKNOWN};
+    const SDL_PixelFormat refused[] = {SDL_PIXELFORMAT_INDEX8, SDL_PIXELFORMAT_UNKNOWN};
+    assert(sdl_v2_format(bgra, &selected) == CUI_OK && selected == SDL_PIXELFORMAT_BGRA32);
+    assert(sdl_v2_format(prefer, &selected) == CUI_OK && selected == SDL_PIXELFORMAT_RGBA32);
+    assert(sdl_v2_format(refused, &selected) == CUI_ERROR_INVALID_ACTION &&
+           selected == SDL_PIXELFORMAT_RGBA32);
+    maximum_override = 0;
+    absent_colorspace = true;
+    assert(cui_sdl3_query_v2(s, &info) == CUI_OK);
+    absent_colorspace = false;
+    maximum_override = 16;
+    assert(cui_sdl3_query_v2(s, &info) == CUI_ERROR_CAPACITY);
+    maximum_override = -1;
+    assert(cui_sdl3_query_v2(s, &info) == CUI_ERROR_INVALID_ACTION);
+    maximum_override = INT64_MIN;
+    invalid_max_type = true;
+    assert(cui_sdl3_query_v2(s, &info) == CUI_ERROR_INVALID_ACTION);
+    invalid_max_type = false;
+    assert(cui_sdl3_query_v2(s, &info) == CUI_OK);
     cui_draw_command_v2 c = legacy((cui_draw_command){
         .type = CUI_DRAW_RECT, .bounds = {2, 3, 4, 5}, .color = {17, 29, 41, 255}});
     cui_draw_list_v2 list = make_list(&c, 1);

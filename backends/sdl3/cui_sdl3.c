@@ -1070,8 +1070,27 @@ static size_t sdl_v2_commands(size_t pixels, size_t cpu, size_t metadata) {
         n = descriptors;
     return n < 16384 ? n : 16384;
 }
+/* SDL promises a terminated format array. Bound inspection without inventing
+ * conversion support; output remains untouched when no exact transfer exists. */
+static cui_error sdl_v2_format(const SDL_PixelFormat *formats, SDL_PixelFormat *out) {
+    if (!formats || !out)
+        return CUI_ERROR_INVALID_ACTION;
+    bool rgba = false, bgra = false;
+    for (size_t i = 0; i < 256; ++i) {
+        if (formats[i] == SDL_PIXELFORMAT_UNKNOWN) {
+            if (!rgba && !bgra)
+                return CUI_ERROR_INVALID_ACTION;
+            *out = rgba ? SDL_PIXELFORMAT_RGBA32 : SDL_PIXELFORMAT_BGRA32;
+            return CUI_OK;
+        }
+        rgba |= formats[i] == SDL_PIXELFORMAT_RGBA32;
+        bgra |= formats[i] == SDL_PIXELFORMAT_BGRA32;
+    }
+    return CUI_ERROR_INVALID_ACTION;
+}
 /* Caller holds busy before the first SDL call. No input/source reads here. */
-static cui_error sdl_v2_query_locked(cui_sdl3 *s, cui_sdl3_v2_info *info) {
+static cui_error sdl_v2_query_locked(cui_sdl3 *s, cui_sdl3_v2_info *info,
+                                     SDL_PixelFormat *native_format) {
     int logical_w, logical_h, width, height;
     if (SDL_GetRenderTarget(s->renderer) || !SDL_GetWindowSize(s->window, &logical_w, &logical_h) ||
         !SDL_GetRenderOutputSize(s->renderer, &width, &height))
@@ -1083,27 +1102,24 @@ static cui_error sdl_v2_query_locked(cui_sdl3 *s, cui_sdl3_v2_info *info) {
     SDL_PropertiesID props = SDL_GetRendererProperties(s->renderer);
     if (!props ||
         SDL_GetNumberProperty(props, SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
-                              SDL_COLORSPACE_UNKNOWN) != SDL_COLORSPACE_SRGB ||
+                              SDL_COLORSPACE_SRGB) != SDL_COLORSPACE_SRGB ||
         SDL_GetBooleanProperty(props, SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN, false))
         return CUI_ERROR_INVALID_ACTION;
-    Sint64 maximum = SDL_GetNumberProperty(props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
-    if (maximum <= 0)
+    SDL_PropertyType maximum_type =
+        SDL_GetPropertyType(props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER);
+    if (maximum_type != SDL_PROPERTY_TYPE_INVALID && maximum_type != SDL_PROPERTY_TYPE_NUMBER)
         return CUI_ERROR_INVALID_ACTION;
-    if (width > maximum || height > maximum)
+    Sint64 maximum = SDL_GetNumberProperty(props, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+    if (maximum < 0)
+        return CUI_ERROR_INVALID_ACTION;
+    /* SDL uses absent/zero as no reported maximum, not unsupported. CUI's
+     * side/byte limits still apply; native creation remains checked. */
+    if (maximum && (width > maximum || height > maximum))
         return CUI_ERROR_CAPACITY;
     const SDL_PixelFormat *formats =
         SDL_GetPointerProperty(props, SDL_PROP_RENDERER_TEXTURE_FORMATS_POINTER, NULL);
-    bool native_rgba = false, terminated = false;
-    if (!formats)
-        return CUI_ERROR_INVALID_ACTION;
-    for (size_t i = 0; i < 256; ++i) {
-        if (formats[i] == SDL_PIXELFORMAT_UNKNOWN) {
-            terminated = true;
-            break;
-        }
-        native_rgba |= formats[i] == SDL_PIXELFORMAT_RGBA32;
-    }
-    if (!terminated || !native_rgba)
+    SDL_PixelFormat selected;
+    if (sdl_v2_format(formats, &selected) != CUI_OK)
         return CUI_ERROR_INVALID_ACTION;
     const size_t cpu = (size_t)32 * 1024 * 1024, metadata = (size_t)1024 * 1024;
     size_t count = sdl_v2_commands((size_t)width * (size_t)height * 4, cpu, metadata);
@@ -1145,6 +1161,8 @@ static cui_error sdl_v2_query_locked(cui_sdl3 *s, cui_sdl3_v2_info *info) {
         if (cui_font_text_capabilities() & CUI_TEXT_CAP_LETTER_SPACING)
             info->text_features |= CUI_SDL3_V2_TEXT_TRACKING;
     }
+    if (native_format)
+        *native_format = selected;
     return CUI_OK;
 }
 cui_error cui_sdl3_query_v2(const cui_sdl3 *owner, cui_sdl3_v2_info *out) {
@@ -1157,7 +1175,7 @@ cui_error cui_sdl3_query_v2(const cui_sdl3 *owner, cui_sdl3_v2_info *out) {
     cui_sdl3 *s = (cui_sdl3 *)owner;
     s->v2_busy = true;
     cui_sdl3_v2_info info;
-    cui_error error = sdl_v2_query_locked(s, &info);
+    cui_error error = sdl_v2_query_locked(s, &info, NULL);
     s->v2_busy = false;
     if (error == CUI_OK)
         *out = info;
@@ -1214,7 +1232,8 @@ cui_error cui_sdl3_render_v2(cui_sdl3 *s, const cui_draw_list_v2 *list, cui_colo
      * before this temporary guard can mutate any caller byte. */
     s->v2_busy = true;
     cui_sdl3_v2_info info;
-    error = sdl_v2_query_locked(s, &info);
+    SDL_PixelFormat native_format = SDL_PIXELFORMAT_UNKNOWN;
+    error = sdl_v2_query_locked(s, &info, &native_format);
     s->v2_busy = false;
     if (error != CUI_OK)
         return error;
@@ -1253,7 +1272,16 @@ cui_error cui_sdl3_render_v2(cui_sdl3 *s, const cui_draw_list_v2 *list, cui_colo
     error = CUI_ERROR_INVALID_ACTION;
     if (!saved)
         goto cleanup;
-    texture = SDL_CreateTexture(s->renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC,
+    if (native_format == SDL_PIXELFORMAT_BGRA32) {
+        /* Exact byte permutation in the already owned plane, after complete
+         * common painting. Preserve G/A including transparent hidden RGB. */
+        for (size_t i = 0; i < frame.bytes; i += 4) {
+            unsigned char red = frame.pixels[i];
+            frame.pixels[i] = frame.pixels[i + 2];
+            frame.pixels[i + 2] = red;
+        }
+    }
+    texture = SDL_CreateTexture(s->renderer, native_format, SDL_TEXTUREACCESS_STATIC,
                                 (int)frame.width, (int)frame.height);
     if (!texture || !SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE) ||
         !SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST) ||

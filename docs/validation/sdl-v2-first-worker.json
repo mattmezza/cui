@@ -1,0 +1,171 @@
+{
+  "scope": "First worker strict/native microgate only; root configured integration, consumer metadata and other backends remain pending",
+  "archive_source_revision": "7c7ac4e0ff30cc26b3642e3e05da37cb39d5f8db (root beta-combined-native-559 receipt)",
+  "archives_sha256": {
+    "/home/matteo/.cache/cui-current-validation/native/libcui_software.a": "5da8eb0343355c70852941306817e4bef030c10261d3ce226c3a5e920a9cde5c",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+    "/home/matteo/.cache/cui-current-validation/native/libcui.a": "55dc10cbef55df647327197455831b42c7ad548491d858a6b66de5636b469566",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "source_sha256": {
+    "backends/sdl3/cui_sdl3.c": "f2c7e0913cab2eddab814b227d6f4bb54c64556df657f517adc230ed4433363c",
+    "include/cui/cui_sdl3.h": "254792b24a6a2f0cd5253d21a3630f3488abb91907edb8b448847e6e83be2850",
+    "tests/unit/test_sdl3_v2.c": "03666ebb1e69645412fb7e8f55de5867be5cdf5acf5261f0c5f83abc204e0393",
+    "tests/unit/sdl_v1_original_reference.c": "ac3eb469aae28aa70abf6133efff0d52e789d269e29e6255dc0b535ab73c8f61",
+    "tests/unit/sdl_v2_reference_internal.h": "34fc37b3533ed2e39ea337a1462d376f39ee10c63e2f5456d67b87b15114ff55",
+    "tests/fixtures/sdl_v1_reference/cui_sdl3.c": "62e1ab7726116506e80dade53c1934f3d65ee91b7e9d19ba3beec8ccba01125f",
+    "tests/fixtures/sdl_v1_reference/cui_sdl3.h": "c59d7e1c9ee300b710d8c389ec3314f42db3572aef5f1f7f5c136d17485bad28",
+    "tests/fixtures/sdl_v1_reference/cui_sdl3_mesh.h": "41ece3b72bb3ecfdfc7f0540f066873133d05123e1525ea551bd1aeeb1852883",
+    "third_party/inter/Inter-Regular.otf": "d4f2b9e148059a15f014cb0f0b8fea8cd11bfa447dd483bedf1b0adc0e2ba799"
+  },
+  "compiler": "GCC16.2.1 20260810; strict C11/O3/-UNDEBUG/-Wall/-Wextra/-Wpedantic/-Werror; serial CPU1 nice19",
+  "dependency_pkgconfig_versions": [
+    "3.4.18",
+    "26.7.20",
+    "15.0.0"
+  ],
+  "commands": [
+    [
+      "cc",
+      "-std=c11",
+      "-O3",
+      "-UNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Werror",
+      "-I/home/matteo/.cache/cui-worktrees/element-shadow-audit/include",
+      "-I/usr/include/harfbuzz",
+      "-I/usr/include/freetype2",
+      "-I/usr/include/libpng16",
+      "-I/usr/include/glib-2.0",
+      "-I/usr/lib/glib-2.0/include",
+      "-I/usr/include/sysprof-6",
+      "-pthread",
+      "-DCUI_SDL_V1_FROZEN_HEADER=\"/home/matteo/.cache/cui-worktrees/element-shadow-audit/build-shadow/sdl-v1-frozen/cui_sdl3.c\"",
+      "tests/unit/test_sdl3_v2.c",
+      "tests/unit/sdl_v1_original_reference.c",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_software.a",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_text.a",
+      "/home/matteo/.cache/cui-current-validation/native/libcui.a",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a",
+      "-lSDL3",
+      "-lharfbuzz",
+      "-lfreetype",
+      "-lm",
+      "-o",
+      "/home/matteo/.cache/cui-worktrees/element-shadow-audit/build-shadow/test_sdl3_v2"
+    ],
+    [
+      "cc",
+      "-std=c11",
+      "-O3",
+      "-UNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Werror",
+      "-I/home/matteo/.cache/cui-worktrees/element-shadow-audit/include",
+      "-I/usr/include/harfbuzz",
+      "-I/usr/include/freetype2",
+      "-I/usr/include/libpng16",
+      "-I/usr/include/glib-2.0",
+      "-I/usr/lib/glib-2.0/include",
+      "-I/usr/include/sysprof-6",
+      "-pthread",
+      "-c",
+      "backends/sdl3/cui_sdl3.c",
+      "-o",
+      "/home/matteo/.cache/cui-worktrees/element-shadow-audit/build-shadow/sdl-v2-current.o"
+    ],
+    [
+      "cc",
+      "-std=c11",
+      "-O3",
+      "-UNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Werror",
+      "-I/home/matteo/.cache/cui-worktrees/element-shadow-audit/include",
+      "-I/usr/include/harfbuzz",
+      "-I/usr/include/freetype2",
+      "-I/usr/include/libpng16",
+      "-I/usr/include/glib-2.0",
+      "-I/usr/lib/glib-2.0/include",
+      "-I/usr/include/sysprof-6",
+      "-pthread",
+      "tests/distribution/sdl_v1_api.c",
+      "/home/matteo/.cache/cui-worktrees/element-shadow-audit/build-shadow/sdl-v2-current.o",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_software.a",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_text.a",
+      "/home/matteo/.cache/cui-current-validation/native/libcui.a",
+      "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a",
+      "-lSDL3",
+      "-lharfbuzz",
+      "-lfreetype",
+      "-lm",
+      "-o",
+      "/home/matteo/.cache/cui-worktrees/element-shadow-audit/build-shadow/test_sdl3_v1_api"
+    ]
+  ],
+  "runtime_command": "taskset -c 1 nice -n 19 python scripts/test_local.py --build-dir build-shadow -R '^sdl3_v(2|1_api)$'",
+  "history": [
+    {
+      "session": 26697,
+      "result": "FAIL compile",
+      "detail": "Fake GetWindowSize failure left outputs undefined, exposing existing legacy void-size code to O3 maybe-uninitialized. Fixture failure outputs now defined zero; returns false unchanged. No V1 production correction or warning suppression."
+    },
+    {
+      "session": 75695,
+      "result": "PASS strict corrected build"
+    },
+    {
+      "session": 53008,
+      "result": "FAIL runtime 1/2",
+      "detail": "Real SDL software query rejected absent maximum and lack of native RGBA32; old public ABI passed."
+    },
+    {
+      "session": 8152,
+      "result": "FAIL diagnostic runtime",
+      "detail": "Actual driver software: absent max property, native ARGB8888/XRGB8888/INDEX8 only. No fabricated capability or skipped test."
+    },
+    {
+      "session": 62968,
+      "result": "PASS strict and runtime2/2",
+      "elapsed_runtime_seconds": 0.65,
+      "detail": "Integrator4bd amendment: prefer nativeRGBA32 elseBGRA32 with exact in-place R/B permutation; absent/zero max unreported, CUI bounds retained; sRGB documented fallback."
+    }
+  ],
+  "log_sha256": {
+    "sdl-v2-first-dry-run.log": "6ad1ae4b3a8ea20e42aa81171d446a291a0391e6f0acacc4d5d105e4c2530c28",
+    "sdl-v2-first-build.log": "db0ebac5634df6676e06a8ec9d0531926f4d9a1a78e8235093cee4eebebfb550",
+    "sdl-v2-corrected-build.log": "612fb4ba62ea00b712663388b71c7b51a110fc37bca86053bda15994cf089dd0",
+    "sdl-v2-first-runtime.log": "feb9d44fa193ec7358029334e96528e04bc09df7a97b18c3353601ed526d25b9",
+    "sdl-v2-diagnostic-build.log": "f7234ccf3d70a2eed31613fc05c5419ab4c5b845ec6065789d6bb50a341a9542",
+    "sdl-v2-diagnostic-runtime.log": "7e77e7beda0b0b6a8f7d3a501fbe6806999014421199751e85f28450661eb306",
+    "sdl-v2-bgra-build.log": "612fb4ba62ea00b712663388b71c7b51a110fc37bca86053bda15994cf089dd0",
+    "sdl-v2-bgra-runtime.log": "8b25619210d01eb3251eb7dfb9265b1fbf3136ef198cd2211e742e74ac252d65"
+  },
+  "coverage": [
+    "Analytic rectangle RGBA",
+    "All-kind interleaved complete RGBA at native upload and RGB at possibly opaque window backbuffer versus accepted CPU renderer",
+    "Pure RGBA/BGRA preference and refused-format policy; actual software BGRA positive upload/readback",
+    "Independent raw-native channel order, unchanged green/alpha including transparent destinations",
+    "Fractional and independent-axis scales including64 and1/64",
+    "Owner aliases before native/allocator callbacks; query/allocate/free reentry and retained interfaces",
+    "Late invalid/no-font/capacity rejection before allocation/presentation",
+    "Native query/create/upload/draw/Flush/Present/snapshot/logical failures, retry and state restoration",
+    "Restoration failure faults owner, idle destruction remains possible",
+    "Separately compiled immutable original V1 pixels/cache/constructor allocation count plus frozen public records/functions",
+    "Default direct-source SDL compilation with source-local text enable"
+  ],
+  "exclusions": [
+    "No physical GPU/Windows/macOS/browser/bindings claim",
+    "Real RGBA-native driver branch not executed; pure selector only, actual software nativeBGRA exercised",
+    "No fresh CMake configured target build: worker cache nativeOFF; used existing current immutable archives, local CTest registration and publicABI direct compile",
+    "No canonical generation/fullskill/broadsuite in worker microgate; root combined acceptance pending",
+    "No universal V1/V2 pixel equivalence claim; old V1 paired original and V2 CPU-policy transport are separate oracles",
+    "SDL Present is an attempt; no physical presentation or GPU completion guarantee"
+  ]
+}

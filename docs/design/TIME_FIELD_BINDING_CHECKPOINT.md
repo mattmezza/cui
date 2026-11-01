@@ -288,3 +288,13 @@ the new unreleased typed route only: existing scalar kind55 constructors and
 legacy seconds behavior stay unchanged. Python's initial source-only second-
 precision default is corrected before delivery rather than becoming an implicit
 language-specific exception. Generation zero is rejected, not normalized.
+
+
+Typed facade dispatch counts consumed copied observations, including those with
+no installed handler. It does not count only callback invocations. A callback
+exception/panic consumes its current record once and leaves later records for
+the next supported dispatch; resetting the dispatch guard must not replay the
+current record. Reading latest results dispatches nothing. Terminal teardown
+stops delivery and frees pending application-owned resources under each facade's
+existing lifetime contract. These conventions apply only to the additive typed
+route; legacy event timing and dispatch interfaces remain unchanged.

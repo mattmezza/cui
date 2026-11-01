@@ -8,5 +8,13 @@
   "compatibility": "Actual current, older and missing-one-symbol partial providers; separate process loads preserve legacy factory and mount rollback.",
   "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 -R ^bridge_python --output-on-failure",
   "log_sha256": "b114a4fee01c696b80c364d7cb773a1ddbf420241cdeb250f796756f8e40b371",
-  "limitations": "Focused Python evidence only. Other four localized facades, native interactive execution, package delivery, complete focus/IME/AT and wider platforms remain open. Canonical freshness updated in a subsequent batch."
+  "limitations": "Focused Python evidence only. Other four localized facades, native interactive execution, package delivery, complete focus/IME/AT and wider platforms remain open. Canonical freshness updated in a subsequent batch.",
+  "default_alignment_revision": "7f83dfb3",
+  "default_alignment_result": {
+    "ctest_entries": 16,
+    "seconds": 3.5,
+    "result": "PASS",
+    "scope": "New typed H23/minute/generation1 defaults, explicit seconds examples and unchanged legacy scalar seconds."
+  },
+  "default_alignment_log_sha256": "159eb530ee8773bfcc4d23202d81a9c0a9107059250d91c65520c74fdc64d7f6"
 }

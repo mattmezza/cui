@@ -1,0 +1,12 @@
+{
+  "audited_revision": "d6be1adf",
+  "manifest_sha256": "b715bb25b7042045f495ac68aaecdb3a2162c88f757fb1261ad342a02420304c",
+  "unique_families": 78,
+  "family_status_counts": {
+    "tested": 77,
+    "implemented": 1
+  },
+  "interpretation": "Tested is partial feature evidence, not full-family parity. No family is verified.",
+  "cleanup_check": "rg --files --hidden -g !.git -g *impeccable* found no named artifacts; targeted source scan found no .impeccable or impeccable/ references. Git history is outside this workspace check.",
+  "limitations": "This structural check does not validate all family behavior or prove a release/deployment."
+}

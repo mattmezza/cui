@@ -6,6 +6,11 @@ Updated: **2026-11-01** · Status: **working alpha; beta scope unfinished**.
 requested native, language-binding, documentation and website capabilities.
 No completion percentage or beta date is asserted.
 
+**Family ledger:** 77 `tested` (partial evidence), 1 `implemented`, **0 fully
+verified**. All 78 entries are preserved. [Structural audit](docs/validation/beta-manifest-audit.json)
+also found no Impeccable-named artifacts or active configuration references; it
+does not establish behavioral parity.
+
 ## Current delivery status
 
 | Stage | Status |

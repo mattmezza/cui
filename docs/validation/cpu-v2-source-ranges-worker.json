@@ -30,5 +30,12 @@
     "cpu_v2_source_ranges",
     "cpu_v2_range_source_contract"
   ],
-  "generation": "amalgamate.py, generate_go_sdk.py, generate_agent_skill.py completed exit0; no generated resources hand edited"
+  "generation": "amalgamate.py, generate_go_sdk.py, generate_agent_skill.py completed exit0; no generated resources hand edited",
+  "integrator_source_contract": {
+    "source_commit": "16827ec9",
+    "command": "python tests/test_cpu_v2_range_reference.py",
+    "passed": 2,
+    "seconds": 0.061,
+    "scope": "Frozen reference hash and SDK transitive-header closure only; no compilation or rendering claim."
+  }
 }

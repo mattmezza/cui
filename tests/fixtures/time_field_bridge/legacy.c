@@ -2,20 +2,21 @@
 /* Old ABI only; unchanged program runs in separate processes against old/new DSOs. */
 #include "cui/cui_bridge.h"
 #include <assert.h>
+#include <inttypes.h>
 #include <stdio.h>
 static void snapshot(cui_bridge_app *a, cui_bridge_node n, const char *phase) {
     cui_bridge_time t;
     cui_bridge_rect r;
     assert(cui_bridge_get_time(a,n,&t)==CUI_BRIDGE_OK);
     assert(cui_bridge_node_bounds(a,n,&r)==CUI_BRIDGE_OK);
-    printf("%s node=%u:%u value=%u:%u:%u bounds=%a,%a,%a,%a\n",phase,n.slot,n.generation,
+    printf("%s node=%" PRIu32 ":%" PRIu32 " value=%" PRIu32 ":%" PRIu32 ":%" PRIu32 " bounds=%a,%a,%a,%a\n",phase,n.slot,n.generation,
         t.hour,t.minute,t.second,(double)r.x,(double)r.y,(double)r.width,(double)r.height);
     cui_bridge_event_ex e;
     char text[32]; uint32_t required;
     cui_bridge_status s;
     while((s=cui_bridge_poll_event_ex(a,&e,text,sizeof text,&required))==CUI_BRIDGE_OK)
-        printf("event=%u node=%u:%u frame=%llu text=%u:%s\n",e.type,e.node.slot,e.node.generation,
-            (unsigned long long)e.frame_sequence,required,text);
+        printf("event=%" PRIu32 " node=%" PRIu32 ":%" PRIu32 " frame=%" PRIu64 " text=%" PRIu32 ":%s\n",e.type,e.node.slot,e.node.generation,
+            e.frame_sequence,required,text);
     assert(s==CUI_BRIDGE_EMPTY);
 }
 int main(void) {

@@ -241,3 +241,22 @@ fixture only against actual published semantics. Geometry-only recovery, full
 omission/reappearance, all cycle/precision combinations, malformed-wire matrix,
 independent frozen legacy comparison and complete example runtime proof remain
 explicit upcoming gates, alongside the previously listed ABI/portable checks.
+
+
+## Source packaging/native companion audit (unexecuted)
+
+The private helper is already covered by the tracked-src SDK/package producers;
+no generator whitelist or portable engine source-manifest edit is required.
+Prepared mini-source closure assertions inspect actual producer bytes/manifests,
+with no canonical regeneration. C++ include-order and matching Linux static
+example targets are registered; pinned WASM compile-only driver remains separate
+from final-module memory verification/runtime support. Exact consumer commands
+and these limitations are in BRIDGE_TIME_FIELD_LOCALIZED.md.
+
+The complete authored C tree now has an optional --native path: explicit SDL
+backend/font and existing cui_bridge_run after-frame dispatch, without scripted
+edits or nested step. Default headless scripted checks remain intact. Neither
+native nor headless example has compiled/run yet. uint32/u64 output uses inttypes
+PRI macros; the application-owned unsigned counter retains %u. This changes no
+bridge API/queue/owner behavior. No generated file or canonical source snapshot
+was updated; all validation gates remain pending.

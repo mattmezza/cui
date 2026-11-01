@@ -13,7 +13,9 @@ authors two real TimeFields inside Row/Column UI, English24-hour and Arabic12-ho
 with independent state, explicit same-day08:00–18:00 bounds, a summary label,
 clear-validation and read-only buttons. It queues deterministic host pointer/text
 input and drains copied changes after step, updating sibling text from application
-state. Its default backend is windowless; it is awaiting compile/runtime proof.
+state. Its default backend is windowless. Optional `--native` uses the same authored tree
+and dispatch through the existing SDL bridge runner, with real host input and no
+scripted edits. Both paths are awaiting separate compile/runtime proof.
 
 Once a validation lease is available, the intended reproducible invocation is:
 
@@ -22,6 +24,21 @@ cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
 cmake --build build --target bridge_time_field_example --parallel 1
 python scripts/test_local.py --build-dir build -R '^bridge_time_field_example$'
 ```
+
+For an intentional interactive launch after validation, the prepared native path
+uses the existing SDL/text adapters and an explicit font (no headless fallback):
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=ON -DCUI_REQUIRE_NATIVE=ON -DCUI_BUILD_BRIDGE=ON
+cmake --build build --target bridge_time_field_example --parallel 1
+CUI_TEST_FONT=/absolute/path/font.ttf ./build/bridge_time_field_example --native
+```
+
+This is a manual interactive invocation, **not** an automated desktop test. It has
+not been executed. Automated native validation must remain under the private
+Xvfb wrapper and needs its own bounded close/input fixture before registration.
+The native callback drains owned observations and handles real button clicks
+without nesting step/run. Headless success will not imply native proof.
 
 Use existing build directories/caches where possible. CMake, Ninja, Python3 and a
 C11 toolchain are required; see [dependencies](DEPENDENCIES.md). These commands
@@ -106,3 +123,46 @@ Still required: matching C target/runtime/failure/legacy proof, Python delivery
 with complete actual UI and optional-symbol fallback, then JS/TS, Go and Rust;
 direct foreign Base/Styled state/style bindings, IME/clipboard integration,
 source one-root focus parity and physical native accessibility remain separate.
+
+## Source packaging and portable closure (audit, not validation)
+
+The new private `src/bridge/cui_bridge_time_internal.h` is included by the bridge
+translation unit. It is a tracked `src/` file: `scripts/generate_go_sdk.py` includes
+it automatically in both Go and Rust SDK snapshots and their SHA256 manifests.
+No new portable engine module or standalone `.c` source-list entry is needed.
+The Go bridge wrapper includes the bridge TU; matching Rust packaging compiles
+that same TU against its staged SDK. This does not expose localized APIs through
+those language builders. Regenerate SDKs only at the authorized canonical gate;
+currently committed SDK copies intentionally remain stale relative to this draft.
+
+Python/Node source package snapshots include tracked `src/`, `include/`, tests,
+examples and CMake files, and their source manifest hashes every copied file.
+The new header and fixture/example paths must be committed before generation or
+packaging; untracked files are intentionally omitted. Go/Rust package staging
+runs SDK `--check` and therefore must not claim closure before regeneration and
+matching-source checks. Provenance remains generated, not edited by hand.
+
+Bridge is separately compiled/linked and is not an amalgamation module in
+`cmake/sources.json`. Do not add this private helper to the distribution umbrella
+or claim a standalone header-only bridge. The landed localized widget's portable
+sources are already in the canonical module list; source bridge tests link that
+actual implementation, rather than introduce another state/layout copy.
+
+Prepared durable checks: `bridge_time_field_source_closure` exercises actual SDK
+snapshot and Python/Node source-copy producers on a bounded temporary tracked-file
+fixture and checks the real private-header bytes/hash. CMake registers source
+header C++11 consumers in both include orders when C++ is already enabled.
+`bridge_time_field_example_static` separately links the actual bridge TU and C
+example with the engine on Linux, without SDL; it is not Go/Rust installed-package
+proof. Native ILP32 ABI remains an explicit target probe, not inferred from LP64.
+
+The intended pinned WASM compile-only probe is:
+
+```sh
+python tests/fixtures/time_field_bridge/portable.py --zig /absolute/path/to/pinned/zig --build-dir build
+```
+
+It checks Zig0.16.0 and compiles ABI plus actual bridge TUs for default, asserted
+unshared and atomics/shared-unsupported policies, sequentially with strict C11
+warnings. It does not link/run, verify final memory or claim shared-memory support.
+All these newly prepared checks remain unexecuted at this source checkpoint.

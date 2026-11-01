@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MIT */
-/* Complete windowless authored UI. SOURCE ONLY: awaiting compile/runtime proof. */
+/* Complete shared authored UI: windowless test or optional interactive SDL host.
+ * SOURCE ONLY: both paths await compile/runtime proof. */
 #include "cui/cui_bridge.h"
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,11 +67,12 @@ static int dispatch(cui_bridge_app *app, appointments *owner) {
     while((status=cui_bridge_time_field_poll_change_v1(app,&event))==CUI_BRIDGE_OK) {
         owner->latest=event.value; owner->changes++;
         char label[160];
-        snprintf(label,sizeof label,"Applied %02u:%02u:%02u; observations %u; frame status %u",
+        snprintf(label,sizeof label,"Applied %02" PRIu32 ":%02" PRIu32 ":%02" PRIu32 "; observations %u; frame status %" PRIu32,
                  event.value.hour,event.value.minute,event.value.second,owner->changes,event.frame_status);
         if(cui_bridge_set_text(app,owner->summary,label)!=CUI_BRIDGE_OK) return 0;
-        printf("node=%u:%u frame=%llu previous=%u:%u:%u value=%u:%u:%u frame_status=%u\n",
-            event.node.slot,event.node.generation,(unsigned long long)event.frame_sequence,
+        printf("node=%" PRIu32 ":%" PRIu32 " frame=%" PRIu64 " previous=%" PRIu32 ":%" PRIu32 ":%" PRIu32
+            " value=%" PRIu32 ":%" PRIu32 ":%" PRIu32 " frame_status=%" PRIu32 "\n",
+            event.node.slot,event.node.generation,event.frame_sequence,
             event.previous.hour,event.previous.minute,event.previous.second,
             event.value.hour,event.value.minute,event.value.second,event.frame_status);
     }
@@ -88,11 +91,26 @@ static int paste(cui_bridge_app *app,cui_bridge_node field,const char *text) {
         cui_bridge_queue_pointer(app,CUI_BRIDGE_POINTER_UP,bounds.x+bounds.width/2,bounds.y+bounds.height/2)==CUI_BRIDGE_OK &&
         cui_bridge_queue_text(app,text)==CUI_BRIDGE_OK;
 }
-int main(void) {
+typedef struct { cui_bridge_app *app; appointments *owner; } interactive;
+static cui_bridge_status after_frame(void *user) {
+    interactive *run=user;
+    return dispatch(run->app,run->owner)?CUI_BRIDGE_OK:CUI_BRIDGE_CORE_ERROR;
+}
+int main(int argc, char **argv) {
+    int native=argc==2 && strcmp(argv[1],"--native")==0;
+    if(argc>2 || (argc==2 && !native)) {
+        fprintf(stderr,"usage: %s [--native]\n",argv[0]); return EXIT_FAILURE;
+    }
+    const char *font=native?getenv("CUI_TEST_FONT"):NULL;
+    if(native && (!font || !*font)) {
+        fputs("--native requires CUI_TEST_FONT=/absolute/path/font.ttf\n",stderr); return EXIT_FAILURE;
+    }
     cui_bridge_app *app=NULL;
     appointments owner={0};
     cui_bridge_options options={.struct_size=sizeof options,.abi_version=CUI_BRIDGE_ABI_VERSION,
-        .width=760,.height=500,.max_nodes=32,.max_events=32};
+        .width=760,.height=500,.max_nodes=32,.max_events=32,
+        .backend=native?CUI_BRIDGE_BACKEND_SDL:CUI_BRIDGE_BACKEND_NONE,
+        .title_utf8="Localized appointments",.font_path_utf8=font};
     cui_bridge_status status;
     CHECK(cui_bridge_time_field_versions()&1u);
     app=cui_bridge_create(&options,&status); CHECK(app && status==CUI_BRIDGE_OK);
@@ -113,6 +131,14 @@ int main(void) {
     CHECK(node(app,root,CUI_BRIDGE_ROW,"controls","",&controls));
     CHECK(node(app,controls,CUI_BRIDGE_BUTTON,"clear","Clear validation",&owner.clear));
     CHECK(node(app,controls,CUI_BRIDGE_BUTTON,"readonly","Toggle English read-only",&owner.readonly_button));
+    if(native) {
+        /* Same nodes, values, controls and copied-observation dispatch; no scripted
+         * input/step inside the runner callback. Existing host polls real input. */
+        interactive run={app,&owner};
+        status=cui_bridge_run(app,after_frame,&run);
+        CHECK(status==CUI_BRIDGE_CLOSED || status==CUI_BRIDGE_OK);
+        cui_bridge_destroy(app); return EXIT_SUCCESS;
+    }
     CHECK(frame(app,&owner) && frame(app,&owner));
     CHECK(paste(app,owner.english,"11:45:30") && frame(app,&owner));
     CHECK(paste(app,owner.arabic,"٠١:٢٠:٠٠ م") && frame(app,&owner));

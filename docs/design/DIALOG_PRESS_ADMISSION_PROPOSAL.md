@@ -246,3 +246,12 @@ Before production: turn the actual nested failure into success, verify fresh
 child input after UP/CANCEL, add nested captured pointer drag and gesture cases,
 then rerun all previous strict receipts/phase/atomicity/legacy gates. Report any
 remaining one-shot-input/independent nested-owner policy limit explicitly.
+
+### Integrator decision on the pending-stream extension
+
+The bounded extension above is approved for the unpublished prototype only.
+Selective raw-input consumption and pending activation cancellation are separate
+operations; neither constitutes value acceptance, callback rollback or platform
+default prevention. Preserve all delivered receipt evidence and unrelated input.
+The actual nested failure, fresh-contact recovery and previous compatibility gates
+must pass before any production Core/API publication is approved.

@@ -2105,8 +2105,9 @@ cui_id cui_badge_indicator_id(cui_id id) {
 cui_badge_options cui_badge_defaults(void) {
     return (cui_badge_options){.maximum = 99, .size = CUI_CONTROL_MEDIUM};
 }
-bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_options o,
-                  cui_button_content_fn content, void *user) {
+static bool cui_badge_compose(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_options o,
+                              cui_button_content_fn content, void *user,
+                              const cui_badge_icon_content *configured, cui_icon_error *error) {
     if (!ui || !id || !t || !cui_design_valid(o.design_size) || o.variant < CUI_BADGE_COUNT ||
         o.variant > CUI_BADGE_ICON || o.size < CUI_CONTROL_MEDIUM || o.size > CUI_CONTROL_XSMALL ||
         (o.name.length && !o.name.data) || (o.icon.length && !o.icon.data))
@@ -2174,7 +2175,20 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
         if (o.variant == CUI_BADGE_COUNT)
             cui_text_with_line_height(ui, cui_string(number), badge_font,
                                       (cui_color){255, 255, 255, 255}, badge_font);
-        else if (o.variant == CUI_BADGE_ICON)
+        else if (o.variant == CUI_BADGE_ICON && configured) {
+            cui_icon_options artwork = configured->options;
+            artwork.decorative = true;
+            if (artwork.inherited_text_size == 0)
+                artwork.inherited_text_size = o.size == CUI_CONTROL_LARGE    ? 14
+                                              : o.size == CUI_CONTROL_MEDIUM ? 10
+                                                                             : 8;
+            if (!artwork.custom_inherited_color) {
+                artwork.custom_inherited_color = true;
+                artwork.inherited_color = (cui_color){255, 255, 255, 255};
+            }
+            *error = cui_icon(ui, indicator ^ UINT64_C(0x2c38f42991a75e63), t, configured->state,
+                              artwork);
+        } else if (o.variant == CUI_BADGE_ICON)
             cui_icon_named(ui, indicator ^ UINT64_C(0x2c38f42991a75e63), t, o.icon,
                            (cui_icon_options){.custom_size = extent - 2,
                                               .size = CUI_ICON_CUSTOM,
@@ -2185,6 +2199,22 @@ bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_opti
     }
     cui_end_box(ui);
     return true;
+}
+bool cui_badge_ex(cui_context *ui, cui_id id, const cui_theme *t, cui_badge_options o,
+                  cui_button_content_fn content, void *user) {
+    return cui_badge_compose(ui, id, t, o, content, user, NULL, NULL);
+}
+cui_badge_result cui_badge_with_icon(cui_context *ui, cui_id id, const cui_theme *t,
+                                     cui_badge_options o, const cui_badge_icon_content *icon,
+                                     cui_button_content_fn content, void *user) {
+    cui_badge_result result = {.icon_error = CUI_ICON_INVALID};
+    if (!icon || !icon->state || o.variant != CUI_BADGE_ICON)
+        return result;
+    result.icon_error = CUI_ICON_OK;
+    result.submitted = cui_badge_compose(ui, id, t, o, content, user, icon, &result.icon_error);
+    if (!result.submitted)
+        result.icon_error = CUI_ICON_INVALID;
+    return result;
 }
 cui_progress_options cui_progress_defaults(void) {
     return (cui_progress_options){.source_motion = true, .duration = .18f};

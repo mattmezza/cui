@@ -492,6 +492,27 @@ cui_id cui_badge_indicator_id(cui_id);
  * UI and invoke no callback. Legacy cui_badge remains a standalone text pill. */
 bool cui_badge_ex(cui_context *, cui_id, const cui_theme *, cui_badge_options,
                   cui_button_content_fn content, void *user);
+/* Additive configured artwork; published cui_badge_options is unchanged. */
+typedef struct {
+    cui_icon_state *state;
+    cui_icon_options options;
+} cui_badge_icon_content;
+typedef struct {
+    bool submitted;
+    cui_icon_error icon_error;
+} cui_badge_result;
+/* Requires ICON variant and a nonnull state/descriptor. Structural rejection
+ * submits nothing and invokes no content callback. Content and shell precede
+ * artwork validation/preparation; artwork errors retain them and are reported
+ * separately. submitted denotes composition admission, not Core frame success.
+ * Configured size/style/color/transform are honored by the ordinary Icon painter.
+ * Only decorative=true and missing inherited size/color fallbacks are supplied.
+ * style/constraints/options are borrowed synchronously; state masks must survive
+ * rendering, and collect/destroy obey cui_icon_state's draw-list lifetime.
+ * Default shell danger is CUI's mapping of source theme.red, not a literal red. */
+cui_badge_result cui_badge_with_icon(cui_context *, cui_id, const cui_theme *, cui_badge_options,
+                                     const cui_badge_icon_content *, cui_button_content_fn,
+                                     void *user);
 typedef struct {
     bool indeterminate, reduced_motion;
     double now_seconds; /* Monotonic host clock; source cycle1s, legacy cycle1.6s. */

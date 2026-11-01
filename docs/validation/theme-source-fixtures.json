@@ -1,0 +1,22 @@
+{
+  "repository": "longbridge/gpui-kit",
+  "revision": "87d10ae5e1299d1be18670a37570c5402f952e34",
+  "files": [
+    {
+      "path": "ayu.json",
+      "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/87d10ae5e1299d1be18670a37570c5402f952e34/themes/ayu.json",
+      "bytes": 13593,
+      "sha256": "422137ac96704d6333f8e3a4f7b1b94f8fa7cb7e3bfda5ab75b712bb662cb92d"
+    },
+    {
+      "path": "aurora.json",
+      "url": "https://raw.githubusercontent.com/longbridge/gpui-kit/87d10ae5e1299d1be18670a37570c5402f952e34/themes/aurora.json",
+      "bytes": 10045,
+      "sha256": "40176b7179352ade81371d7ebb27b1ad0144a0c506fd5637b5d8c3f58aee8b1f"
+    }
+  ],
+  "status": "Original pinned inputs restored; registered native audit not yet rerun",
+  "scope": "Optional import audit of two original theme JSON documents; not complete theme parity",
+  "fixture_root": "/tmp/cui-gpui-reference",
+  "distribution": "Original JSON stays in local validation cache; repository records provenance only"
+}

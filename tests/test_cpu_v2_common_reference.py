@@ -5,7 +5,7 @@ from cpu_v2_common_reference import RECEIPT, ROOT, renamed, tokens, verify
 
 
 class CommonSourceTests(unittest.TestCase):
-    def test_frozen_source_and_mechanical_namespace_only(self):
+    def test_frozen_source_and_unextracted_helpers(self):
         verify()
 
     def test_literals_operators_and_directive_boundaries_are_not_erased(self):

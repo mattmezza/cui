@@ -1,0 +1,73 @@
+{
+  "scope": "Private owned CPU frame extraction only; no SDL API or new backend support",
+  "base_revision": "8d245db2",
+  "measurement_checkpoint": "fb4c3958",
+  "source_sha256": {
+    "backends/common/cui_cpu_v2_internal.h": "dbd240c716dd3ff11e035f18a8827a0d3c3630ee51351bc1a19c8b639c52087b",
+    "backends/common/cui_cpu_v2_paint_internal.h": "7ee3e4f253d75f5b32f574d4e7f69b91ccfb04c8ca674bfd134105c8e6016835",
+    "tests/unit/test_cpu_v2_frame.c": "2236b5ee7a5ec02d7532d3b1aabcbbdaeb57e1a50b33c6d92ea44fb1575fc621"
+  },
+  "strict_flags": "GCC16.2.1 cc -std=c11 -O3 -UNDEBUG -Wall -Wextra -Wpedantic -Werror, CPU1 nice19 serial; C++11 matching warnings for public header; no engine build",
+  "libraries": {
+    "/home/matteo/.cache/cui-current-validation/native/libcui.a": "0535906e874ffda405e9c7b3cc0b0b2063b5bd0ef76e88294c236a38ada68f97",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_text.a": "3e1915c23f7f3f3e4051fd01312f2073d9d6cadb4c9130776304d34ea89947ff",
+    "/home/matteo/.cache/cui-current-validation/native/libcui_bidi.a": "b9547903a688685b9f99a10b51bdc88b90f5ca3ac65b111bba7bfcaf386f9483"
+  },
+  "original_objects": {
+    "build-shadow/software-v2-text-bidi-original.o": "5203adf212c88b3f14e22ffd11b762691cb484f96f7954703127620c0e72d632",
+    "build-shadow/software-v2-text-nobidi-original.o": "ea4450d2ad3a3adf3656a0df108be1fa7b6df8d8311d0d7b7f73061f448d943f",
+    "build-shadow/text_prepare_original_bidi.o": "84e817f3502ca192fff49e6692962be4be09c857dc8554aaa4d917e337524e97"
+  },
+  "checks": {
+    "first_strict": "6/6 targets PASS, warning-clean",
+    "first_private_Xvfb": "6/6 PASS 0.09s",
+    "broader_strict": "public disabled/Bidi/noBidi, public2/private2 text matrices, private validation/paint/shadows, C/C++/umbrella and copied Go/Rust SDK source/API closures PASS",
+    "broader_private_Xvfb": "15/15 PASS 1.69s",
+    "offline_frozen_authority_and_packaging": "7/7 PASS",
+    "format23": "PASS",
+    "SDK_amalgamation_agent_skill_freshness": "PASS",
+    "skill18": "Explicitly deferred by root to combined integration; not run for this slice"
+  },
+  "ownership": [
+    "Actual production frame/request sizeof/align/all retained offsets statically match separately measured native/WASM proposal",
+    "Frame retains one existing workspace plus one counted owner/session; session.owner stays at final embedded address",
+    "READY pixels compared to separately compiled immutable original TU before candidate prepare; no candidate-derived expected image",
+    "Old-prefix tests compare exact allocation requests/counts/peak, full pixels/padding, sample hooks, active ABI layouts across five transforms and every counted failure",
+    "PREPARING/RELEASING release/init/reprepare and distinct-frame same-owner reentry reject without callbacks",
+    "All workspace teardown, including failed second-block reservation, starts RELEASING; original workspace_begin restores/unwinds exactly as before",
+    "Counted recorder-local temporaries can free PREPARING within text preparation; frame-owned session/workspace teardown is RELEASING",
+    "Known frame/request/owner/busy/source aliases reject before any control mutation; opaque font graph stability remains caller precondition",
+    "Internal secondary busy pointer preserves old simultaneous target/owner first-callback boundary and is never cleared by frame release"
+  ],
+  "fixed_control": {
+    "native_no_text_size": 120,
+    "native_text_size": 808,
+    "native_align": 8,
+    "wasm_no_text_size": 64,
+    "wasm_text_size": 412,
+    "wasm_align": 4,
+    "frame_guard": 2048,
+    "additional_exclusion_array_bytes_native": 112,
+    "additional_exclusion_array_bytes_wasm": 56,
+    "secondary_pointer_bytes_native": 8,
+    "secondary_pointer_bytes_wasm": 4,
+    "stack_limit_statement": "These named fixed locals are separate from CPU/metadata heap budgets. Request, clip/validator/profile/query locals, scalar/compiler/dependency frames are additional; no total-stack bound claimed."
+  },
+  "frozen_authority": "All four original8671 headers and legacy source/pixel receipts retain exact SHA256. Token-equality guard applies only untouched text/shadow sampling helpers after intentional validator/paint extraction; changed paths retain separately compiled original runtime oracle. No frozen expected outputs recaptured.",
+  "quality_gate": "Unchanged existing source-profile/512-RGBA binary reused in broader15; extraction changes neither Effects nor shadow sampling headers. Current private/public shadow painters were rebuilt and independently compared.",
+  "limitations": [
+    "No SDL native texture/presentation support, GPU, SDL_GPU, Sokol or Canvas changes",
+    "No new public frame API, font ABI, V1 route/object or input architecture",
+    "Class3 opaque dependency/provider allocations and callback side effects remain separate/nonrollbackable",
+    "Root actual CMake integration/combined skill18 acceptance remains pending"
+  ],
+  "logs": [
+    "build-shadow/cpu-frame-first-build.log",
+    "build-shadow/cpu-frame-first-runtime.log",
+    "build-shadow/cpu-frame-regressions-build.log",
+    "build-shadow/cpu-frame-regressions-runtime.log",
+    "build-shadow/cpu-frame-final-offline.log",
+    "build-shadow/cpu-frame-final-format.log",
+    "build-shadow/cpu-frame-freshness.log"
+  ]
+}

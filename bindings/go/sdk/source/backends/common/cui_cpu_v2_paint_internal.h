@@ -244,26 +244,84 @@ static inline void cui_cpu_v2_shadow_paint(cui_cpu_v2_surface *surface,
 _Static_assert(_Alignof(cui_cpu_v2_shadow_descriptor) <=
                    _Alignof(cui_fundamental_alignment_internal),
                "shadow descriptor exceeds workspace alignment");
-static inline cui_error
-cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_list_v2 *list,
-                                     cui_color clear, const cui_render_v2_options *options,
-                                     cui_font *font, cui_cpu_v2_alloc_fn allocate,
-                                     cui_cpu_v2_free_fn release, void *user, const void *excluded,
-                                     size_t excluded_bytes, bool *owner_busy) {
-    if (!target || target->busy || !list || !options || !allocate || !release || !target->pixels ||
-        !target->width || !target->height || target->width > 16384 || target->height > 16384 ||
-        options->viewport_width != target->width || options->viewport_height != target->height)
+typedef enum {
+    CUI_CPU_V2_FRAME_EMPTY,
+    CUI_CPU_V2_FRAME_PREPARING,
+    CUI_CPU_V2_FRAME_READY,
+    CUI_CPU_V2_FRAME_RELEASING
+} cui_cpu_v2_frame_state;
+typedef struct cui_cpu_v2_frame {
+    cui_cpu_v2_frame_state state;
+    const struct cui_cpu_v2_frame *self;
+    cui_cpu_v2_workspace workspace;
+    unsigned char *pixels;
+    unsigned width, height;
+    size_t stride, bytes;
+#ifdef CUI_HAS_TEXT
+    cui_text_owner_internal text_owner;
+    cui_text_prepare_session text_session;
+#endif
+} cui_cpu_v2_frame;
+typedef struct {
+    unsigned width, height;
+    cui_cpu_v2_exclusion excluded[3];
+    size_t exclusion_count;
+    bool *owner_busy;
+} cui_cpu_v2_frame_request;
+_Static_assert(sizeof(cui_cpu_v2_frame) <= 2048, "fixed CPU frame control exceeds guard");
+/* Zero initialization is required. Init never retires a live/copy-owned frame. */
+static inline void cui_cpu_v2_frame_init(cui_cpu_v2_frame *f) {
+    if (f && f->state == CUI_CPU_V2_FRAME_EMPTY && (!f->self || f->self == f))
+        *f = (cui_cpu_v2_frame){.self = f};
+}
+/* Internal cleanup owns PREPARING failure as well as READY release. Claim the
+ * teardown state before any dependency/allocator callback can recurse. */
+static inline void cui_cpu_v2_frame_dispose(cui_cpu_v2_frame *f) {
+    f->state = CUI_CPU_V2_FRAME_RELEASING;
+#ifdef CUI_HAS_TEXT
+    cui_text_prepare_session_end(&f->text_session);
+#endif
+    cui_cpu_v2_workspace_end(&f->workspace);
+    *f = (cui_cpu_v2_frame){.self = f};
+}
+static inline void cui_cpu_v2_frame_release(cui_cpu_v2_frame *f) {
+    if (f && f->self == f && f->state == CUI_CPU_V2_FRAME_READY)
+        cui_cpu_v2_frame_dispose(f);
+}
+static inline cui_error cui_cpu_v2_frame_prepare_internal(
+    cui_cpu_v2_frame *frame, const cui_cpu_v2_frame_request *request, const cui_draw_list_v2 *list,
+    cui_color clear, const cui_render_v2_options *options, cui_font *font,
+    cui_cpu_v2_alloc_fn allocate, cui_cpu_v2_free_fn release, void *user, bool *secondary_busy) {
+    if (!frame)
         return CUI_ERROR_INVALID_ACTION;
-    size_t row = (size_t)target->width * 4;
-    if (target->stride < row || target->height - 1 > (SIZE_MAX - row) / target->stride)
-        return CUI_ERROR_CAPACITY;
-    size_t span = (target->height - 1) * target->stride + row;
-    if (span > target->capacity)
-        return CUI_ERROR_CAPACITY;
-    if (!cui_background_prepare_disjoint_internal(target->pixels, span, target, sizeof(*target)) ||
-        !cui_cpu_v2_target_disjoint(target, span, options, sizeof(*options)) ||
-        !cui_cpu_v2_target_disjoint(target, span, list, sizeof(*list)))
+    if (frame->state != CUI_CPU_V2_FRAME_EMPTY || (frame->self && frame->self != frame))
+        return CUI_ERROR_LIFECYCLE;
+    if (!request || !list || !options || !allocate || !release || !request->width ||
+        !request->height || request->width > 16384 || request->height > 16384 ||
+        options->viewport_width != request->width || options->viewport_height != request->height ||
+        request->exclusion_count > 3 ||
+        !cui_background_prepare_disjoint_internal(frame, sizeof(*frame), request,
+                                                  sizeof(*request)) ||
+        (request->owner_busy &&
+         (!cui_background_prepare_disjoint_internal(frame, sizeof(*frame), request->owner_busy,
+                                                    sizeof(*request->owner_busy)) ||
+          !cui_background_prepare_disjoint_internal(request, sizeof(*request), request->owner_busy,
+                                                    sizeof(*request->owner_busy)))))
         return CUI_ERROR_INVALID_ACTION;
+    if (secondary_busy && (!cui_background_prepare_disjoint_internal(
+                               frame, sizeof(*frame), secondary_busy, sizeof(*secondary_busy)) ||
+                           !cui_background_prepare_disjoint_internal(
+                               request, sizeof(*request), secondary_busy, sizeof(*secondary_busy))))
+        return CUI_ERROR_INVALID_ACTION;
+    cui_cpu_v2_exclusion ranges[7] = {{frame, sizeof(*frame)}, {request, sizeof(*request)}};
+    size_t range_count = 2;
+    for (size_t i = 0; i < request->exclusion_count; ++i)
+        ranges[range_count++] = request->excluded[i];
+    if (request->owner_busy)
+        ranges[range_count++] =
+            (cui_cpu_v2_exclusion){request->owner_busy, sizeof(*request->owner_busy)};
+    if (secondary_busy)
+        ranges[range_count++] = (cui_cpu_v2_exclusion){secondary_busy, sizeof(*secondary_busy)};
     cui_cpu_v2_plan plan;
     bool font_available = false, tracking_available = false, context_available = false;
 #ifdef CUI_HAS_TEXT
@@ -275,14 +333,10 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
 #else
     (void)font;
 #endif
-    cui_error error =
-        cui_cpu_v2_validate_excluding(list, options, font_available, tracking_available,
-                                      context_available, &plan, excluded, excluded_bytes);
+    cui_error error = cui_cpu_v2_validate_ranges(list, options, font_available, tracking_available,
+                                                 context_available, &plan, ranges, range_count);
     if (error != CUI_OK)
         return error;
-    if (!cui_cpu_v2_target_disjoint(target, span, list->commands,
-                                    list->count * sizeof(*list->commands)))
-        return CUI_ERROR_INVALID_ACTION;
     cui_cpu_v2_clip stack[64], clip = cui_cpu_v2_clip_all();
     size_t depth = 0, background_pixels = 0, background_bytes = 0;
     size_t shadows = 0, shadow_bytes = 0, shadow_taps = 0, texts = 0;
@@ -302,18 +356,7 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
             const cui_draw_command *c = &v->payload.legacy;
             if (c->type == CUI_DRAW_TEXT) {
                 ++texts;
-                const void *source =
-                    c->text_source.paragraph.data ? c->text_source.paragraph.data : c->text.data;
-                size_t bytes = c->text_source.paragraph.data ? c->text_source.paragraph.length
-                                                             : c->text.length;
-                if (!cui_cpu_v2_target_disjoint(target, span, source, bytes) ||
-                    !cui_cpu_v2_target_disjoint(target, span, c->text_colors,
-                                                c->text_color_count * sizeof(*c->text_colors)) ||
-                    (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
-                     !cui_cpu_v2_target_disjoint(target, span, c->text_paint.stops,
-                                                 c->text_paint.stop_count *
-                                                     sizeof(*c->text_paint.stops))) ||
-                    !cui_cpu_v2_target_disjoint(target, span, font, 1))
+                if (!cui_cpu_v2_ranges_disjoint(font, 1, ranges, range_count))
                     return CUI_ERROR_INVALID_ACTION;
             }
             if (cui_shadow_type(c->type)) {
@@ -334,14 +377,6 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
                 clip = cui_cpu_v2_clip_push(clip, c->bounds);
             } else if (c->type == CUI_DRAW_CLIP_POP)
                 clip = stack[--depth];
-            else if (c->type == CUI_DRAW_IMAGE &&
-                     !cui_cpu_v2_target_disjoint(target, span, c->bitmap.bitmap.pixels,
-                                                 c->bitmap.bitmap.stride * c->bitmap.bitmap.height))
-                return CUI_ERROR_INVALID_ACTION;
-            else if (c->type == CUI_DRAW_MESH &&
-                     !cui_cpu_v2_target_disjoint(target, span, c->mesh.vertices,
-                                                 c->mesh.vertex_count * sizeof(*c->mesh.vertices)))
-                return CUI_ERROR_INVALID_ACTION;
         }
     }
     if (texts && !font_available)
@@ -369,53 +404,62 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
     if (!cui_cpu_v2_add(&metadata_bytes, text_padding, options->metadata_bytes) ||
         !cui_cpu_v2_add(&metadata_bytes, text_metadata, options->metadata_bytes))
         return CUI_ERROR_CAPACITY;
-    cui_text_owner_internal text_owner = {.allocate = allocate,
-                                          .release = release,
-                                          .user = user,
-                                          .cpu_limit = options->cpu_bytes - cpu_bytes,
-                                          .metadata_limit =
-                                              options->metadata_bytes - metadata_bytes};
-    cui_text_prepare_session text_session = {.owner = &text_owner};
+    cui_text_owner_internal *text_owner = &frame->text_owner;
+    cui_text_prepare_session *text_session = &frame->text_session;
 #endif
     /* All preceding capability/profile/geometry/source checks are pure: no
      * allocator/provider callbacks. Guard the owner at the first callback boundary. */
-    if (owner_busy)
-        *owner_busy = true;
-    target->busy = true;
-    cui_cpu_v2_workspace workspace = {0};
-    error =
-        cui_cpu_v2_workspace_begin(&workspace, cpu_bytes, metadata_bytes, allocate, release, user);
+    /* Guard ranges and all source extents have been validated before reading
+     * either flag. A different EMPTY frame cannot recurse on the same owner. */
+    if ((request->owner_busy && *request->owner_busy) || (secondary_busy && *secondary_busy))
+        return CUI_ERROR_LIFECYCLE;
+    frame->state = CUI_CPU_V2_FRAME_PREPARING;
+    frame->self = frame;
+    if (request->owner_busy)
+        *request->owner_busy = true;
+    if (secondary_busy)
+        *secondary_busy = true;
+#ifdef CUI_HAS_TEXT
+    *text_owner =
+        (cui_text_owner_internal){.allocate = allocate,
+                                  .release = release,
+                                  .user = user,
+                                  .cpu_limit = options->cpu_bytes - cpu_bytes,
+                                  .metadata_limit = options->metadata_bytes - metadata_bytes};
+    *text_session = (cui_text_prepare_session){.owner = text_owner};
+#endif
+    cui_cpu_v2_workspace *workspace = &frame->workspace;
+    error = cui_cpu_v2_workspace_reserve(workspace, cpu_bytes, metadata_bytes, allocate, release,
+                                         user, true);
     if (error != CUI_OK) {
-        target->busy = false;
+        cui_cpu_v2_frame_dispose(frame);
         return error;
     }
     cui_draw_command_v2 *commands =
-        list->count ? cui_cpu_v2_workspace_take(&workspace, false, commands_bytes,
+        list->count ? cui_cpu_v2_workspace_take(workspace, false, commands_bytes,
                                                 _Alignof(cui_draw_command_v2))
                     : NULL;
     cui_cpu_v2_paint_descriptor *descriptors =
-        list->count ? cui_cpu_v2_workspace_take(&workspace, true,
+        list->count ? cui_cpu_v2_workspace_take(workspace, true,
                                                 list->count * sizeof(cui_cpu_v2_paint_descriptor),
                                                 _Alignof(cui_cpu_v2_paint_descriptor))
                     : NULL;
-    unsigned char *scratch = cui_cpu_v2_workspace_take(&workspace, false, plan.scratch_bytes, 1);
+    unsigned char *scratch = cui_cpu_v2_workspace_take(workspace, false, plan.scratch_bytes, 1);
     cui_cpu_v2_shadow_descriptor *shadow_descriptors =
-        shadows ? cui_cpu_v2_workspace_take(&workspace, true, shadow_metadata, shadow_alignment)
+        shadows ? cui_cpu_v2_workspace_take(workspace, true, shadow_metadata, shadow_alignment)
                 : NULL;
 #ifdef CUI_HAS_TEXT
     cui_cpu_v2_text_range *text_ranges =
-        texts ? cui_cpu_v2_workspace_take(&workspace, true, text_metadata, text_alignment) : NULL;
+        texts ? cui_cpu_v2_workspace_take(workspace, true, text_metadata, text_alignment) : NULL;
     if (texts && !text_ranges) {
-        cui_cpu_v2_workspace_end(&workspace);
-        target->busy = false;
+        cui_cpu_v2_frame_dispose(frame);
         return CUI_ERROR_CAPACITY;
     }
     size_t text_index = 0;
 #endif
     if ((list->count && (!commands || !descriptors)) || !scratch ||
         (shadows && !shadow_descriptors)) {
-        cui_cpu_v2_workspace_end(&workspace);
-        target->busy = false;
+        cui_cpu_v2_frame_dispose(frame);
         return CUI_ERROR_CAPACITY;
     }
     if (list->count)
@@ -433,7 +477,7 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
             if (error != CUI_OK)
                 break;
             unsigned char *pixels =
-                q.bytes ? cui_cpu_v2_workspace_take(&workspace, false, q.bytes, 1) : NULL;
+                q.bytes ? cui_cpu_v2_workspace_take(workspace, false, q.bytes, 1) : NULL;
             if (q.bytes && !pixels) {
                 error = CUI_ERROR_CAPACITY;
                 break;
@@ -444,14 +488,14 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
             descriptors[i].pixels = pixels;
 #ifdef CUI_HAS_TEXT
         } else if (v->kind == CUI_DRAW_TEXT) {
-            cui_text_recorded_glyph_internal *previous = text_session.last;
+            cui_text_recorded_glyph_internal *previous = text_session->last;
             float q = fmaxf(1, fmaxf(options->scale_x, options->scale_y));
-            if (!cui_text_prepare_line(&text_session, font, &v->payload.legacy, q)) {
-                error = text_owner.error == CUI_OK ? CUI_ERROR_INVALID_ACTION : text_owner.error;
+            if (!cui_text_prepare_line(text_session, font, &v->payload.legacy, q)) {
+                error = text_owner->error == CUI_OK ? CUI_ERROR_INVALID_ACTION : text_owner->error;
                 break;
             }
-            cui_cpu_v2_text_range range = {previous ? previous->next : text_session.first,
-                                           text_session.last};
+            cui_cpu_v2_text_range range = {previous ? previous->next : text_session->first,
+                                           text_session->last};
             if (range.last == previous)
                 range = (cui_cpu_v2_text_range){0};
             text_ranges[text_index++] = range;
@@ -481,7 +525,7 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
             d->command_index = i;
             prepared_shadow_bytes += d->bytes;
             prepared_shadow_taps += d->taps;
-            d->pixels = d->bytes ? cui_cpu_v2_workspace_take(&workspace, false, d->bytes, 1) : NULL;
+            d->pixels = d->bytes ? cui_cpu_v2_workspace_take(workspace, false, d->bytes, 1) : NULL;
             if (d->bytes && !d->pixels) {
                 error = CUI_ERROR_CAPACITY;
                 break;
@@ -546,13 +590,62 @@ cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_l
                      v->kind == CUI_DRAW_IMAGE)
                 cui_cpu_v2_shape_paint(&surface, &v->payload.legacy);
         }
+        frame->pixels = scratch;
+        frame->width = request->width;
+        frame->height = request->height;
+        frame->stride = (size_t)request->width * 4;
+        frame->bytes = plan.scratch_bytes;
+        frame->state = CUI_CPU_V2_FRAME_READY;
+    } else
+        cui_cpu_v2_frame_dispose(frame);
+    return error;
+}
+/* Address-stable private ownership handle; all borrowed resources/font graphs
+ * remain valid through release. EMPTY/READY state is never caller-writable. */
+static inline cui_error cui_cpu_v2_frame_prepare(cui_cpu_v2_frame *frame,
+                                                 const cui_cpu_v2_frame_request *request,
+                                                 const cui_draw_list_v2 *list, cui_color clear,
+                                                 const cui_render_v2_options *options,
+                                                 cui_font *font, cui_cpu_v2_alloc_fn allocate,
+                                                 cui_cpu_v2_free_fn release, void *user) {
+    return cui_cpu_v2_frame_prepare_internal(frame, request, list, clear, options, font, allocate,
+                                             release, user, NULL);
+}
+static inline cui_error
+cui_cpu_v2_paint_with_font_excluding(cui_cpu_v2_target *target, const cui_draw_list_v2 *list,
+                                     cui_color clear, const cui_render_v2_options *options,
+                                     cui_font *font, cui_cpu_v2_alloc_fn allocate,
+                                     cui_cpu_v2_free_fn release, void *user, const void *excluded,
+                                     size_t excluded_bytes, bool *owner_busy) {
+    if (!target || target->busy || !list || !options || !allocate || !release || !target->pixels ||
+        !target->width || !target->height || target->width > 16384 || target->height > 16384 ||
+        options->viewport_width != target->width || options->viewport_height != target->height)
+        return CUI_ERROR_INVALID_ACTION;
+    size_t row = (size_t)target->width * 4;
+    if (target->stride < row || target->height - 1 > (SIZE_MAX - row) / target->stride)
+        return CUI_ERROR_CAPACITY;
+    size_t span = (target->height - 1) * target->stride + row;
+    if (span > target->capacity)
+        return CUI_ERROR_CAPACITY;
+    if (!cui_background_prepare_disjoint_internal(target->pixels, span, target, sizeof(*target)) ||
+        !cui_cpu_v2_target_disjoint(target, span, options, sizeof(*options)) ||
+        !cui_cpu_v2_target_disjoint(target, span, list, sizeof(*list)))
+        return CUI_ERROR_INVALID_ACTION;
+    cui_cpu_v2_frame frame = {0};
+    cui_cpu_v2_frame_request request = {
+        .width = target->width,
+        .height = target->height,
+        .excluded = {{excluded, excluded_bytes}, {target->pixels, span}, {target, sizeof(*target)}},
+        .exclusion_count = 3,
+        .owner_busy = owner_busy};
+    /* Both guards are claimed only after all pure source preflight. */
+    cui_error error = cui_cpu_v2_frame_prepare_internal(
+        &frame, &request, list, clear, options, font, allocate, release, user, &target->busy);
+    if (error == CUI_OK) {
         for (unsigned y = 0; y < target->height; ++y)
-            memcpy(target->pixels + y * target->stride, scratch + (size_t)y * row, row);
+            memcpy(target->pixels + y * target->stride, frame.pixels + (size_t)y * row, row);
+        cui_cpu_v2_frame_release(&frame);
     }
-#ifdef CUI_HAS_TEXT
-    cui_text_prepare_session_end(&text_session);
-#endif
-    cui_cpu_v2_workspace_end(&workspace);
     target->busy = false;
     return error;
 }

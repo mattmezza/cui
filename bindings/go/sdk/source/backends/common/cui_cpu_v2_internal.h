@@ -60,16 +60,38 @@ static inline bool cui_cpu_v2_alias_excluding(const void *a, size_t n, const voi
     return cui_cpu_v2_alias(a, n, out) &&
            cui_background_prepare_disjoint_internal(a, n, excluded, excluded_bytes);
 }
+typedef struct {
+    const void *pointer;
+    size_t bytes;
+} cui_cpu_v2_exclusion;
+static inline bool cui_cpu_v2_ranges_disjoint(const void *p, size_t bytes,
+                                              const cui_cpu_v2_exclusion *ranges, size_t count) {
+    for (size_t i = 0; i < count; ++i)
+        if (!cui_background_prepare_disjoint_internal(p, bytes, ranges[i].pointer, ranges[i].bytes))
+            return false;
+    return true;
+}
+static inline bool cui_cpu_v2_has_exclusion(const cui_cpu_v2_exclusion *ranges, size_t count) {
+    for (size_t i = 0; i < count; ++i)
+        if (ranges[i].bytes)
+            return true;
+    return false;
+}
+static inline bool cui_cpu_v2_alias_ranges(const void *a, size_t n, const void *out,
+                                           const cui_cpu_v2_exclusion *ranges, size_t count) {
+    return cui_cpu_v2_alias(a, n, out) && cui_cpu_v2_ranges_disjoint(a, n, ranges, count);
+}
 /* Font, tracking and contextual availability describe actual host state, not inferred
  * from a fabricated public support record. Font/shaping allocation is deferred. */
-static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *list,
-                                                      const cui_render_v2_options *options,
-                                                      bool font_available, bool tracking_available,
-                                                      bool context_available, cui_cpu_v2_plan *out,
-                                                      const void *excluded, size_t excluded_bytes) {
-    if (!list || !options || !out ||
-        !cui_cpu_v2_alias_excluding(list, sizeof(*list), out, excluded, excluded_bytes) ||
-        !cui_cpu_v2_alias_excluding(options, sizeof(*options), out, excluded, excluded_bytes) ||
+static inline cui_error cui_cpu_v2_validate_ranges(const cui_draw_list_v2 *list,
+                                                   const cui_render_v2_options *options,
+                                                   bool font_available, bool tracking_available,
+                                                   bool context_available, cui_cpu_v2_plan *out,
+                                                   const cui_cpu_v2_exclusion *excluded,
+                                                   size_t exclusion_count) {
+    if (!list || !options || !out || exclusion_count > 7 || (!excluded && exclusion_count) ||
+        !cui_cpu_v2_alias_ranges(list, sizeof(*list), out, excluded, exclusion_count) ||
+        !cui_cpu_v2_alias_ranges(options, sizeof(*options), out, excluded, exclusion_count) ||
         list->header_size != sizeof(*list) || list->abi_version != CUI_DRAW_ABI_V2 ||
         list->command_stride != sizeof(cui_draw_command_v2) || list->error != CUI_OK ||
         list->background_output != CUI_BACKGROUND_OUTPUT_SRGBA8_CENTER_V1 ||
@@ -79,8 +101,8 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
     if (list->count > 16384)
         return CUI_ERROR_CAPACITY;
     if ((!list->commands && list->count) ||
-        !cui_cpu_v2_alias_excluding(list->commands, list->count * sizeof(*list->commands), out,
-                                    excluded, excluded_bytes))
+        !cui_cpu_v2_alias_ranges(list->commands, list->count * sizeof(*list->commands), out,
+                                 excluded, exclusion_count))
         return CUI_ERROR_INVALID_ACTION;
     /* Validate every common option even for an empty/legacy-only list. */
     cui_background_draw_v2 empty = {0};
@@ -150,8 +172,8 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
                 b.source.w <= 0 || b.source.h <= 0 ||
                 (double)b.source.x + b.source.w > b.bitmap.width ||
                 (double)b.source.y + b.source.h > b.bitmap.height ||
-                !cui_cpu_v2_alias_excluding(b.bitmap.pixels, b.bitmap.stride * b.bitmap.height, out,
-                                            excluded, excluded_bytes))
+                !cui_cpu_v2_alias_ranges(b.bitmap.pixels, b.bitmap.stride * b.bitmap.height, out,
+                                         excluded, exclusion_count))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (c->type == CUI_DRAW_MESH) {
             if (c->mesh.vertex_count > SIZE_MAX / sizeof(cui_mesh_vertex) ||
@@ -159,9 +181,9 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
                                 c->mesh.vertex_count * sizeof(cui_mesh_vertex),
                                 (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
-            if (!cui_cpu_v2_alias_excluding(c->mesh.vertices,
-                                            c->mesh.vertex_count * sizeof(cui_mesh_vertex), out,
-                                            excluded, excluded_bytes) ||
+            if (!cui_cpu_v2_alias_ranges(c->mesh.vertices,
+                                         c->mesh.vertex_count * sizeof(cui_mesh_vertex), out,
+                                         excluded, exclusion_count) ||
                 !cui_mesh_valid(c->mesh))
                 return CUI_ERROR_INVALID_ACTION;
         } else if (cui_shadow_type(c->type)) {
@@ -179,11 +201,12 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
                 c->text_style.weight > CUI_TEXT_WEIGHT_BOLD ||
                 !isfinite(c->text_style.letter_spacing) ||
                 (c->text_style.letter_spacing != 0 && !tracking_available) ||
-                (excluded_bytes && c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
+                (cui_cpu_v2_has_exclusion(excluded, exclusion_count) &&
+                 c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
                  (c->text_paint.stop_count > 8 ||
-                  !cui_background_prepare_disjoint_internal(
-                      excluded, excluded_bytes, c->text_paint.stops,
-                      c->text_paint.stop_count * sizeof(*c->text_paint.stops)))) ||
+                  !cui_cpu_v2_ranges_disjoint(
+                      c->text_paint.stops, c->text_paint.stop_count * sizeof(*c->text_paint.stops),
+                      excluded, exclusion_count))) ||
                 !cui_text_paint_valid(c->text_paint, true) ||
                 (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR && c->text_color_count) ||
                 c->text_color_count > CUI_TEXT_COLOR_SPAN_MAX ||
@@ -196,14 +219,14 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
                 !cui_cpu_v2_add(&plan.inspected_bytes, text_bytes, (size_t)32 * 1024 * 1024))
                 return CUI_ERROR_CAPACITY;
             if (c->text_source.paragraph.data) {
-                if (!cui_cpu_v2_alias_excluding(c->text_source.paragraph.data, text_bytes, out,
-                                                excluded, excluded_bytes) ||
+                if (!cui_cpu_v2_alias_ranges(c->text_source.paragraph.data, text_bytes, out,
+                                             excluded, exclusion_count) ||
                     !cui_text_line_source_valid(c->text_source))
                     return CUI_ERROR_INVALID_ACTION;
                 size_t previous = c->text_source.byte_start;
-                if (!cui_cpu_v2_alias_excluding(c->text_colors,
-                                                c->text_color_count * sizeof(*c->text_colors), out,
-                                                excluded, excluded_bytes))
+                if (!cui_cpu_v2_alias_ranges(c->text_colors,
+                                             c->text_color_count * sizeof(*c->text_colors), out,
+                                             excluded, exclusion_count))
                     return CUI_ERROR_INVALID_ACTION;
                 for (size_t j = 0; j < c->text_color_count; ++j) {
                     cui_text_line_source range = {c->text_source.paragraph,
@@ -220,13 +243,13 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
             } else if (c->text_source.paragraph.length || c->text_source.byte_start ||
                        c->text_source.byte_end || (c->text.length && !c->text.data) ||
                        c->text_color_count ||
-                       !cui_cpu_v2_alias_excluding(c->text.data, c->text.length, out, excluded,
-                                                   excluded_bytes))
+                       !cui_cpu_v2_alias_ranges(c->text.data, c->text.length, out, excluded,
+                                                exclusion_count))
                 return CUI_ERROR_INVALID_ACTION;
             if (c->text_paint.kind == CUI_TEXT_PAINT_LINEAR &&
-                !cui_cpu_v2_alias_excluding(c->text_paint.stops,
-                                            c->text_paint.stop_count * sizeof(*c->text_paint.stops),
-                                            out, excluded, excluded_bytes))
+                !cui_cpu_v2_alias_ranges(c->text_paint.stops,
+                                         c->text_paint.stop_count * sizeof(*c->text_paint.stops),
+                                         out, excluded, exclusion_count))
                 return CUI_ERROR_INVALID_ACTION;
             plan.needs_text_preparation = true;
         }
@@ -241,6 +264,16 @@ static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *li
         return CUI_ERROR_CAPACITY;
     *out = plan;
     return CUI_OK;
+}
+/* Original one-range entry retains its validation/ownership route. */
+static inline cui_error cui_cpu_v2_validate_excluding(const cui_draw_list_v2 *list,
+                                                      const cui_render_v2_options *options,
+                                                      bool font_available, bool tracking_available,
+                                                      bool context_available, cui_cpu_v2_plan *out,
+                                                      const void *excluded, size_t excluded_bytes) {
+    const cui_cpu_v2_exclusion range = {excluded, excluded_bytes};
+    return cui_cpu_v2_validate_ranges(list, options, font_available, tracking_available,
+                                      context_available, out, &range, 1);
 }
 /* Original private entry retains its previous validation/ownership route. */
 static inline cui_error cui_cpu_v2_validate(const cui_draw_list_v2 *list,
@@ -285,10 +318,11 @@ static inline void cui_cpu_v2_workspace_end(cui_cpu_v2_workspace *w) {
         w->release(w->user, w->metadata);
     *w = (cui_cpu_v2_workspace){0};
 }
-static inline cui_error cui_cpu_v2_workspace_begin(cui_cpu_v2_workspace *w, size_t cpu_bytes,
-                                                   size_t metadata_bytes,
-                                                   cui_cpu_v2_alloc_fn allocate,
-                                                   cui_cpu_v2_free_fn release, void *user) {
+static inline cui_error cui_cpu_v2_workspace_reserve(cui_cpu_v2_workspace *w, size_t cpu_bytes,
+                                                     size_t metadata_bytes,
+                                                     cui_cpu_v2_alloc_fn allocate,
+                                                     cui_cpu_v2_free_fn release, void *user,
+                                                     bool retain_partial) {
     if (!w || w->active || w->busy || !allocate || !release)
         return CUI_ERROR_INVALID_ACTION;
     if (cpu_bytes > (size_t)32 * 1024 * 1024 || metadata_bytes > (size_t)1024 * 1024)
@@ -301,16 +335,26 @@ static inline cui_error cui_cpu_v2_workspace_begin(cui_cpu_v2_workspace *w, size
                                  .user = user,
                                  .active = true};
     if (cpu_bytes && !(next.cpu = allocate(user, cpu_bytes))) {
-        *w = previous;
+        *w = retain_partial ? next : previous;
         return CUI_ERROR_CAPACITY;
     }
     if (metadata_bytes && !(next.metadata = allocate(user, metadata_bytes))) {
-        cui_cpu_v2_workspace_end(&next);
-        *w = previous;
+        if (!retain_partial)
+            cui_cpu_v2_workspace_end(&next);
+        *w = retain_partial ? next : previous;
         return CUI_ERROR_CAPACITY;
     }
     *w = next;
     return CUI_OK;
+}
+/* Compatibility route preserves immediate partial-failure unwind/restoration.
+ * A frame retains partial blocks until it claims RELEASING before callbacks. */
+static inline cui_error cui_cpu_v2_workspace_begin(cui_cpu_v2_workspace *w, size_t cpu_bytes,
+                                                   size_t metadata_bytes,
+                                                   cui_cpu_v2_alloc_fn allocate,
+                                                   cui_cpu_v2_free_fn release, void *user) {
+    return cui_cpu_v2_workspace_reserve(w, cpu_bytes, metadata_bytes, allocate, release, user,
+                                        false);
 }
 static inline void *cui_cpu_v2_workspace_take(cui_cpu_v2_workspace *w, bool metadata, size_t bytes,
                                               size_t alignment) {

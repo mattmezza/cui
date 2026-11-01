@@ -5,13 +5,40 @@ block behind the explicit [public C software V2 entry](SOFTWARE_V2.md). It has n
 The old `backends/software/cui_software_v2_*` private headers/names forward to the
 same implementation. Pure V1 bitmap/shape/mesh/shadow utilities remain unchanged;
 common headers temporarily include those private pure utilities without linking
-another adapter. This mechanical relocation adds no owned-frame lifecycle or SDL
-support. SDK source closures include `backends/common/`.
+another adapter. The private owned-frame lifecycle below adds no SDL support.
+SDK source closures include `backends/common/`.
 It paints RECT, BORDER, IMAGE, MESH, explicit clips and owned BACKGROUND commands
 in array order at independent physical scales/origins. DROP/INSET shadows use
 bounded target-pixel AREA reconstruction of the unchanged source profile. The
 private with-font entry adds owned text recording and per-axis bilinear glyph
 reconstruction; the no-font wrapper still rejects TEXT before allocation. This does not complete any of the other four adapters, bindings or all78 parts.
+
+The private `cui_cpu_v2_frame_prepare` fully prepares and paints an unpublished,
+tightly packed RGBA image. A zero-initialized, address-stable frame owns its two
+workspace blocks and optional embedded counted text owner/session until release.
+Its control size is 120/808 bytes without/with text on measured native LP64,
+64/412 on wasm32; the fixed guard is 2048 bytes. Request, bounded exclusion array,
+clip stack, scalar locals and dependency/compiler frames are additional stack
+storage, not heap-budget charges or a total stack bound.
+
+Prepare requires EMPTY and publishes READY only after the entire image is painted.
+It validates frame/request/owner and known source ranges before any control
+mutation or allocator callback. PREPARING and RELEASING reject nested prepare;
+release/init during either phase do nothing. READY release enters RELEASING
+before text/free callbacks and becomes EMPTY only after cleanup; copied live
+handles cannot release another handle's blocks. No operation clears the caller's
+owner-busy flag. Caller keeps borrowed inputs/font graphs stable through release,
+including cleanup callbacks. Failure before allocation preserves control bytes;
+failure after claiming preparation cleans to EMPTY without a partial READY view.
+No allocation/provider side effect is rolled back.
+
+The old target helper is prepare -> active-row copy -> release. It retains old
+signatures, allocation request/count/order, target padding, source exclusions and
+both target/optional enclosing-owner busy timing. An internal optional second
+busy pointer preserves that boundary without changing the measured request or
+frame layout; its scalar pointer and bounded exclusion entry add fixed local
+storage. Neither V1 rendering nor any public software ABI changes. See
+[the extraction checkpoint](design/CPU_V2_OWNED_FRAME_EXTRACTION.md).
 
 The private `cui_software_v2_paint(target,list,clear,options,allocate,release,user)`
 returns `cui_error`. The explicit target view supplies writable RGBA8 pixels,
@@ -181,5 +208,6 @@ failure; empty/transparent/invalid shadows; large-q visible work; reentrancy and
 retry all preserve the target/padding as specified. The preparation failure hook
 exists only as a private test instrumentation macro, with no public API/callback
 or default runtime behavior. See `docs/validation/software-v2-shadow-worker.json`
-for hashes/provenance. Public software support and full transformed text remain
-pending, as do all four other adapters.
+for hashes/provenance. That shadow-only checkpoint preceded the now-supported
+public C software V2 entry and full transformed text described above; the other
+four adapters remain pending.

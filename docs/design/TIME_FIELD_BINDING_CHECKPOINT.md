@@ -212,3 +212,32 @@ old/new legacy trace capture/comparison; full interaction/config/error matrix;
 complete public C authoring example; exact private allocation/sizeof receipts;
 metadata/guide and SDK→amalgamation→skill generation/freshness/usage/skill checks.
 Python and the other four foreign localized authoring surfaces remain unimplemented.
+
+## Source-only fixture/example expansion
+
+A follow-up prepares a complete C Row/Column example with separate English/H23
+and Arabic/H12 configurations, real host-event queueing, same-day bounds, typed
+post-step copied observations and sibling-label updates, clear-validation and
+read-only buttons. `docs/BRIDGE_TIME_FIELD_LOCALIZED.md` provides exact intended
+CMake/private-wrapper commands and explicitly labels the example uncompiled.
+Source agent metadata indexes exact public declarations but retains all five
+foreign localized rows as unimplemented; tested legacy scalar rows stay intact.
+No generated resources are edited or regenerated during the root build hold.
+
+Expanded native source fixture witnesses include scoped bridge allocation failure,
+disabled-node conservative reservation, original-order four-TEXT progression,
+net-zero aggregate, read-only freeze, a98-byte multiscalar-token copied paste
+replacing a pending prefix, complete out-of-range paste validation, explicit clear
+and edit-generation reset. A real public later Slider node with queue capacity1
+exercises its existing conservative preflight failure after the earlier TimeField
+edit; this tests retained applied observations with final CAPACITY status and
+latest-result rejection after diagnostic clear. The simulated native-render
+failure remains distinct from physical SDL/hardware evidence.
+
+These are **prepared assertions, not observed results**. No compiler, runtime,
+usage/skill test or canonical generation has run for this expansion. Strict
+compilation may identify fixture mistakes; preserve initial logs and correct the
+fixture only against actual published semantics. Geometry-only recovery, full
+omission/reappearance, all cycle/precision combinations, malformed-wire matrix,
+independent frozen legacy comparison and complete example runtime proof remain
+explicit upcoming gates, alongside the previously listed ABI/portable checks.

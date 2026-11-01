@@ -675,7 +675,8 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "Existing scalar widget subset only. Pure cui_time_text.h locale/domain records, additive cui_time_field_v1.h localized widget options/state, and typed C aggregate observers remain unbound in all five languages."
+        "Existing scalar widget subset only. Pure cui_time_text.h locale/domain records, additive cui_time_field_v1.h localized widget options/state, and typed C aggregate observers remain unbound in all five languages.",
+        "Additive localized C bridge source is prepared but unvalidated; no localized foreign builder support is advertised. See localized_time_field_v1_source_checkpoint. Existing tested scalar subsets remain unchanged."
       ]
     },
     {
@@ -1155,5 +1156,25 @@
     "guide": "docs/RUST_BUILDERS.md",
     "offline_fixture": "bindings/rust/tests/test_build_parallelism.py",
     "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
+  },
+  "localized_time_field_v1_source_checkpoint": {
+    "implementation": "C source prepared; compiler/runtime/ABI/legacy and canonical freshness gates pending. Not supported package functionality.",
+    "public_header": "include/cui/cui_bridge.h",
+    "node_kind": 55,
+    "languages": {
+      "python": "not_implemented",
+      "javascript": "not_implemented",
+      "typescript": "not_implemented",
+      "go": "not_implemented",
+      "rust": "not_implemented"
+    },
+    "guide": "docs/BRIDGE_TIME_FIELD_LOCALIZED.md",
+    "example": "bindings/bridge/examples/time_field_localized.c",
+    "scope": "Owned localized config/state/value and copied applied aggregate time changes; no controlled receipts, no callbacks inside Core. Default legacy scalar route unchanged.",
+    "limitations": [
+      "Source fixtures and example have not yet compiled or run. No language support promotion follows from their presence.",
+      "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
+      "Global segment Tab remains a source-focus parity exception; IME/clipboard and physical AT remain pending."
+    ]
   }
 }

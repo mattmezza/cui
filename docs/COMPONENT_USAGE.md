@@ -836,6 +836,11 @@ The additive `cui/cui_time_field_v1.h` route uses caller-owned
 `cui_time_field_state_v1` and explicit locale/domain options; see
 [localized widget](TIME_FIELD_LOCALIZED.md). Legacy options and state stay unchanged.
 
+The additive [localized bridge source checkpoint](BRIDGE_TIME_FIELD_LOCALIZED.md)
+is unvalidated; existing foreign builders still expose only the scalar subset.
+Its owned records are declared in `cui/cui_bridge.h`, independently of direct C
+borrowed widget state. No new bridge/binding support is advertised yet.
+
 ## Carousel
 
 **Composition:** application model + frame composition. **Scope:** styled frame component.

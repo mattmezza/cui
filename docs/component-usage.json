@@ -1615,7 +1615,17 @@
         "cui_time_field_state_init_v1",
         "cui_time_field_clear_validation_v1",
         "cui_base_time_field_v1",
-        "cui_time_field_v1"
+        "cui_time_field_v1",
+        "cui_bridge_time_field_versions",
+        "cui_bridge_time_field_config_size_v1",
+        "cui_bridge_time_field_result_size_v1",
+        "cui_bridge_time_field_change_size_v1",
+        "cui_bridge_time_field_enable_v1",
+        "cui_bridge_time_field_configure_v1",
+        "cui_bridge_time_field_get_config_v1",
+        "cui_bridge_time_field_get_result_v1",
+        "cui_bridge_time_field_clear_validation_v1",
+        "cui_bridge_time_field_poll_change_v1"
       ],
       "state_types": [
         "cui_time_state",
@@ -1624,7 +1634,10 @@
         "cui_time_field_options_v1",
         "cui_time_field_result_v1",
         "cui_time_handler",
-        "cui_time_change"
+        "cui_time_change",
+        "cui_bridge_time_field_config_v1",
+        "cui_bridge_time_field_result_v1",
+        "cui_bridge_time_field_change_v1"
       ],
       "state_ownership": "Caller retains cui_time_state and cui_time value; additive localized route retains cui_time_field_state_v1 and immutable borrowed locale/options.",
       "interaction": "Legacy plain functions return bool after applying edits. V1 returns cui_time_field_result_v1: changed is net value mutation, status is operation outcome and validation is edit validation; optional cui_time_change_fn observes one copied aggregate after Base semantics or Styled submission.",
@@ -1634,7 +1647,8 @@
         "docs/TIME_FIELD_EVENTS.md",
         "docs/TIME_FIELD_TEXT.md",
         "docs/TIME_FIELD_LOCALIZED.md",
-        "docs/TIME_FIELD_LOCALIZED_EXAMPLE.md"
+        "docs/TIME_FIELD_LOCALIZED_EXAMPLE.md",
+        "docs/BRIDGE_TIME_FIELD_LOCALIZED.md"
       ],
       "callback_symbols": [
         "cui_time_change_fn"
@@ -1647,7 +1661,8 @@
         "include/cui/cui_picker_events.h",
         "include/cui/cui_time_types.h",
         "include/cui/cui_time_text.h",
-        "include/cui/cui_time_field_v1.h"
+        "include/cui/cui_time_field_v1.h",
+        "include/cui/cui_bridge.h"
       ]
     },
     {

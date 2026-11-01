@@ -215,3 +215,7 @@ add_executable(test_bridge_time_field_legacy ${CUI_BRIDGE_ROOT}/tests/fixtures/t
 target_link_libraries(test_bridge_time_field_legacy PRIVATE cui_bridge)
 cui_warnings(test_bridge_time_field_legacy)
 add_test(NAME bridge_time_field_legacy COMMAND test_bridge_time_field_legacy)
+add_executable(bridge_time_field_example ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/time_field_localized.c)
+target_link_libraries(bridge_time_field_example PRIVATE cui_bridge)
+cui_warnings(bridge_time_field_example)
+add_test(NAME bridge_time_field_example COMMAND bridge_time_field_example)

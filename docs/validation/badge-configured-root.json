@@ -1,0 +1,17 @@
+{
+  "implementation_revision": "681ad155",
+  "configured_build": "PASS; serial Release target test_badge_configured_icon",
+  "headless_test": {
+    "passed": 1,
+    "seconds": 0.04,
+    "command": "python scripts/test_local.py --build-dir /home/matteo/.cache/cui-current-validation/native -- -j1 -R ^badge_configured_icon$ --output-on-failure"
+  },
+  "coverage": "Independent ordinary Icon software RGBA comparison across rotations/alpha/constraints; frozen five-scene legacy control; retained old masks; nested child activation; first-frame and narrow/wide sizing; omission/reappearance; resource rejection/recovery.",
+  "logs": {
+    "badge-configured-root-build.log": "92ff57bd505f8dcb9d10d33a05ecc266ad14e68e645cecb94c3b314e6cb10713",
+    "badge-configured-root-tests.log": "755a6ffe6b5661fcb5eb3f1c5babcf0e75b04e1fe231895d56b6d9f4ac702772",
+    "badge-expanded-root-build.log": "3ae089b4c57ad568dd8f30345b1de8d7127b4165d1c727cf3eefbb47b06c1e41",
+    "badge-expanded-root-tests.log": "af674dc51cd35a9ea558fb01a38677d3df76d331232d1943e4f91810fcfaa659"
+  },
+  "limitations": "No full-family claim. All five configured Badge facades, exhaustive allocation failure, generated consumers, browser/gallery, physical platforms and delivery remain pending."
+}

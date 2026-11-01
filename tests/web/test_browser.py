@@ -649,8 +649,12 @@ def main():
             wait_semantic('Notification', 19)
             wait_semantic('Status', 19)
             wait_semantic('Quiet', 1)
+            wait_semantic('Custom icon', 1)
+            wait_semantic('Configured artwork', 19)
             click_semantic('Inbox', 1)
             wait_semantic('8', 19)
+            click_semantic('Custom icon', 1)
+            wait_semantic('9', 19)
             for size, extent in [('0', 16), ('1', 14), ('2', 18), ('3', 12)]:
                 control_change('control-size', size)
                 page.wait_for_function('({i,extent})=>Math.abs(cuiGallery.exports.gallery_semantic(i,3)-extent)<0.01',

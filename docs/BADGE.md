@@ -93,7 +93,9 @@ cui_badge_result result = cui_badge_with_icon(
 The first focused worker C11 strict compile and private-Xvfb test passed. It
 compared software pixels with an independent ordinary Icon tree and checked
 frozen old-route scenes and retained old-mask rendering. Descriptor sizes were
-measured as136 bytes native/104 WASM32; WASM was a header probe only. Broader
-resize/nesting/failure additions remain prepared, not executed; configured
-consumer and canonical freshness checks remain pending. Foreign configured Badge authoring is still unavailable;
+measured as 136 bytes native/104 WASM32; WASM was a header probe only. The root
+configured build and expanded headless fixture also pass: nested interactive
+children, narrow/wide resize, omission/reappearance and resource-error recovery.
+Exhaustive allocation failures, generated consumers and browser acceptance remain
+open. Foreign configured Badge authoring is still unavailable;
 this does not complete the frozen family.

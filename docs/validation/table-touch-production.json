@@ -1,5 +1,5 @@
 {
-  "status": "production_source_native_verified_skill_suite_pending_integrator",
+  "status": "integrated_focused_verified_full_suite_pending",
   "branch": "feat/table-touch-admission",
   "base": "32dfddb3",
   "source_checkpoint": "f179c8a0",
@@ -29,7 +29,6 @@
   ],
   "canonical": "Go/Rust SDK441files each, amalgamation and agent resources generated; all --check freshness PASS; all78manifest entries retained",
   "pending": [
-    "required tests/test_agent_skill.py suite scheduled after TimeField; integrator may run on integrated revision",
     "registered CMake targets not built locally: approved bounded direct compilation avoided unrelated stale-cache rebuilds",
     "hosted Windows/macOS/WASM actual integration gates not executed by this worker"
   ],
@@ -50,5 +49,13 @@
     "table-touch-production-build-runtime.log": "0c71e57da61a77a0566e9a0024eb276baf90eb70e148a63d6f1fd7881fc94f64",
     "table-touch-production-commands.json": "4270403f624f595231f1e3a15a76dec16d4280f5cd07884151a017364b503d4d"
   },
-  "limitations": "No full Dialog/allconsumer/binding/GPU parity claim. Mouse cui_hovered function byte-exact to base. No production edits after native proof."
+  "limitations": "No full Dialog/allconsumer/binding/GPU parity claim. Mouse cui_hovered function byte-exact to base. No production edits after native proof.",
+  "integrator": {
+    "revision": "139695bc",
+    "skill_suite": "18/18 PASS; actual integrated revision",
+    "log": "/home/matteo/.cache/cui-current-validation/table-touch-root-skill.log",
+    "log_sha256": "340a6b2f0372d78aeed0b7b8e614e9e4d4c2cb803a389b48afe983626f71aca3",
+    "source_match": "all nine recorded source/test hashes match",
+    "freshness": "SDK, amalgamation and skill --check PASS; distribution_shared 4/4 PASS"
+  }
 }

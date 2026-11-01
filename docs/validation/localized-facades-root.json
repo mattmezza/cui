@@ -16,7 +16,8 @@
   },
   "generation": {
     "first_pass": "SDK + amalgamation + skill;18 skill tests PASS41.908s",
-    "note": "Guide/metadata changed after first pass; final regeneration still required."
+    "note": "Generated source metadata matches source checkpoint5329412c. No generated resources hand-edited.",
+    "final_pass": "SDK + amalgamation + skill;18 skill tests PASS41.881s after final docs/metadata; all three --check commands PASS"
   },
   "limitations": [
     "No full current native suite or default-static Go/Rust consumer acceptance",
@@ -30,6 +31,8 @@
     "/home/matteo/.cache/cui-current-validation/node-time-root-regressions.log": "ee0830772ea87538bc4aaa1bd7bda9f13a9e90b0729a58559631c4ff44838adc",
     "/home/matteo/.cache/cui-current-validation/time-go-rust-root-configure.log": "5465cf05933812f0b48e37b266b1d4f448417e981a5d63d9bb2519cd1dd6d5ae",
     "/home/matteo/.cache/cui-current-validation/time-go-rust-root-tests.log": "bec9cb0a4c25fdf08901911ca84840b8f3b5a0f52d074efb8a995b13e10e39ab",
-    "/home/matteo/.cache/cui-current-validation/time-facades-generation.log": "db3625fa7f5447eddd84159dc5f8a48e5dd8d0d7dc9ed8ae691893357a0bbd9e"
+    "/home/matteo/.cache/cui-current-validation/time-facades-generation.log": "db3625fa7f5447eddd84159dc5f8a48e5dd8d0d7dc9ed8ae691893357a0bbd9e",
+    "/home/matteo/.cache/cui-current-validation/time-facades-final-generation.log": "3dc33868f0b7a2edb666911a77a70c606de6fe4987afc95b0762e40064585d29",
+    "/home/matteo/.cache/cui-current-validation/time-facades-freshness.log": "bfb3fc54776ffcfcb7e559c26649a7de8dd258be01e10accd94100f4f5ea7b19"
   }
 }

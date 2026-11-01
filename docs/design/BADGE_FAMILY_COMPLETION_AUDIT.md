@@ -289,3 +289,19 @@ it must use actual bridge status types and cover complete shared Icon styling
 before full-fidelity authoring is advertised. C source work does not close five-
 language, ABI, pixel, lifecycle or gallery acceptance. Worker builds and generation
 remain held while the localized TimeField bridge owns the serial validation slot.
+
+### Unvalidated additive C source checkpoint
+
+Prepared `cui_badge_with_icon`, descriptor/result declarations and a standalone
+`tests/unit/test_badge_configured_icon.c`. Both old public routes use the same
+unchanged Badge painter branch; only the new configured path invokes ordinary
+`cui_icon` with copied options/decorative and missing inherited fallbacks.
+Content-before-artwork validation is explicit. No raster/layout math duplicated.
+Prepared assertions cover first-frame shell/content/artwork dimensions with
+constraints/style/rotation/color, sole STATUS, caller descriptor immutability,
+structural callback isolation and later artwork-invalid error ordering.
+
+UNEXECUTED: compile/ABI, prepared test, software pixels versus standalone Icon,
+SVG replacement/draw-list lifetime, invalid-resource cases and frozen old-route
+regressions. Test registration, canonical generations, metadata and all five
+binding work remain pending; no runtime, freshness or full-family claim.

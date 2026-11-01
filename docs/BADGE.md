@@ -56,3 +56,41 @@ Headless tests cover first-frame layout, all sizes/variants, overflow text,
 custom colors, icon draw commands, nonfocusable status semantics, zero-count
 content preservation and invalid-input callback isolation. Arbitrary child
 styles remain ordinary Core composition; there is no global text-style scope.
+
+## Configured artwork route (unvalidated source checkpoint)
+
+`cui_badge_with_icon` is an additive C route for ICON markers. Its
+`cui_badge_icon_content` borrows an initialized `cui_icon_state` and full
+`cui_icon_options`, including style, constraints, dimensions, color and affine
+transform. The shell keeps Badge corner geometry; artwork uses the ordinary Icon
+painter rather than the legacy named-icon extent-minus-two sizing. Missing
+inherited text size uses source 14/10/8px fallback; missing inherited color uses
+white. Explicit artwork configuration wins. Artwork is decorative; the shell
+retains the Badge STATUS semantic. The descriptor is not modified.
+
+Structural invalidity returns `submitted=false` without calling content. Content
+and shell are submitted before Icon validates/prepares artwork; an artwork error
+returns `submitted=true` with `icon_error` and keeps that composition. This is not
+an atomic rollback or a promise that the Core frame succeeded. State masks must
+survive rendering; collect/destroy only after returned draw lists are no longer
+used. Options/style/constraints are read synchronously. The default shell maps
+source `theme.red` to CUI `theme.danger`; custom color remains explicit.
+
+```c
+cui_badge_options badge = cui_badge_defaults();
+badge.variant = CUI_BADGE_ICON;
+cui_badge_icon_content artwork = {
+    .state = &caller_owned_icon,
+    .options = {.size = CUI_ICON_CUSTOM, .custom_size = 20,
+                .custom_color = true, .color = {240, 120, 30, 255},
+                .custom_transform = true,
+                .transform = {0, 1, -1, 0, 0, 0}}};
+cui_badge_result result = cui_badge_with_icon(
+    ui, badge_id, &theme, badge, &artwork, child_content, child_user);
+/* Handle result.icon_error separately from Core frame completion. */
+```
+
+This source checkpoint has not been compiled or executed. Native/WASM ABI,
+software pixel equivalence, old-route compatibility and configured consumer
+checks remain pending. Foreign configured Badge authoring is still unavailable;
+this does not complete the frozen family.

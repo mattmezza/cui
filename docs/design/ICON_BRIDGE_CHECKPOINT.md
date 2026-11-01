@@ -124,7 +124,13 @@ ordinary children and nested configured Badges, preserving each child's rules.
 ## Validation, bounded owners and error semantics
 
 All app operations serialize on owner thread, reject during step/render/provider
-or teardown, and validate handle generation/app ownership before state access.
+or teardown, and validate handle generation within the supplied app before state access.
+The proposed8-byte handle is app-scoped: native C callers must retain the matching
+app; equal slot/generation pairs from different apps are indistinguishable in C.
+Foreign opaque resource wrappers retain their owner app and reject cross-app use
+before C. A C-level guarantee against coincident foreign pairs would require an
+additional owner nonce/registry and changed record sizes; that is not claimed or
+smuggled into this proposal. Root may choose that alternative before freezing ABI.
 Config floats/presence follow actual Icon active-field rules and native conversion
 bounds, including opacity normalization and explicit maximum0; no NaN-as-presence.
 Inactive descriptors are canonical all-zero except initialized descriptor headers;
@@ -133,7 +139,7 @@ name/path/accessible/key <=4096 bytes, SVG <=configured max_svg_bytes. Empty sou
 selects empty; unknown NAME returns operational NOT_FOUND, never silently PATH.
 
 No new status enum: malformed/layout/overflow=>INVALID_ARGUMENT, invalid UTF8=>
-INVALID_UTF8, stale=>STALE_HANDLE, cross-app/phase/refcount=>INVALID_STATE,
+INVALID_UTF8, stale=>STALE_HANDLE, phase/refcount=>INVALID_STATE,
 allocation=>OUT_OF_MEMORY, resource budget=>CAPACITY, closed=>CLOSED. Catalog
 out-of-range=>INVALID_ARGUMENT; unembedded/unknown asset copy=>EMPTY. Operational
 prepare returns OK plus exact Icon error (including NOT_FOUND/PARSE/LIMIT/ALLOCATION);
@@ -157,7 +163,8 @@ to embedded. Put/remove/clear increments source_revision and calls reload. No JS
 callback or implicit file/network access. Arbitrary deferred C loader callbacks
 remain unsupported; pre-frame service is a future separately reviewed extension.
 
-Each configured node retains one handle ref, source/state reusable across nodes.
+Each configured node retains one handle ref, source/state reusable across nodes
+within its app. Foreign cross-app wrappers reject before native calls.
 Successful config replacement transfers refs once; node removal drops once;
 destroy rejects reference_count>0 without invalidating handle. App closes release
 nodes then resources after renderer consumption; a destroyed slot increments its
@@ -187,7 +194,8 @@ facades remain individually pending; no source-family completion claim.
 Required gates: native/WASM record offsets/size/alignment, strict C11/C++ and old
 header consumers; immutable old Badge/Icon bridge outputs/allocation counts;
 complete/each-missing optional symbols; full native size_t/UTF8/alias/reserved bounds;
-resource limits/copy failure/collect/reload/reference/cross-app/stale/close tests;
+resource limits/copy failure/collect/reload/reference/stale/close tests and foreign
+wrapper cross-app refusal (including coincident numerical handles);
 old-mask render after source replacement; independent ordinary Icon tree RGBA for
 all Badge variants/sizes/styles/constraints/transforms/alpha; count0/max0/overflow,
 nested interactive content once, resize/omission and separate artwork/frame errors;

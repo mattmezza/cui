@@ -485,13 +485,13 @@ API: `cui_shimmer_text`. [Public header](../include/cui/cui_status.h); [guide](S
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.
 
-**State:** Caller owns phase for the legacy route, or one persistent loading motion per placeholder and an owned palette for fixed and responsive painting. Easing userdata is borrowed synchronously. Reset motion explicitly to restart.
+**State:** Caller owns phase for the legacy route, or one persistent loading motion per placeholder and an owned palette for fixed and responsive painting. Easing userdata is borrowed synchronously. Reset motion explicitly to restart. The retained C bridge copies configuration and owns motion per configured node.
 
 **Interaction:** Decorative presentation adds no action, focus or busy semantics. Optional easing runs synchronously during sampling; application loading semantics remain separate.
 
 **Usage:** Use cui_skeleton_present for full/fraction/flex sizing. The profile demo combines a fixed circle, fractional text bars and a full-width block. Retain independent motion, schedule the earliest absolute wake and replace placeholders with content when the application finishes loading. For fixed-size painting, use cui_skeleton_ex or cui_skeleton_with_palette.
 
-API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_skeleton_with_palette`, `cui_skeleton_presentation_default`, `cui_skeleton_present`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_skeleton_presentation.h); [legacy header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md).
+API: `cui_skeleton`, `cui_loading_phase`, `cui_skeleton_options_default`, `cui_skeleton_ex`, `cui_loading_motion_sample`, `cui_skeleton_palette_from_theme`, `cui_skeleton_palette_preset_get`, `cui_skeleton_with_palette`, `cui_skeleton_presentation_default`, `cui_skeleton_present`. Callback: `cui_loading_ease_fn`. [Public header](../include/cui/cui_skeleton_presentation.h); [legacy header](../include/cui/cui_content.h); [palette header](../include/cui/cui_skeleton_palette.h); [guide](SKELETON_PALETTE.md); [retained C bridge](BRIDGE_SKELETON.md).
 
 ## Spinner
 

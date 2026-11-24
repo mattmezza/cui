@@ -18,8 +18,9 @@ version bits and both record sizes before wiring an optional language facade.
   accepts (0, 16384], max width and radius accept [0, 16384], and duration
   accepts [0, 60] seconds, where zero requests the source default of two.
   Width and height are logical pixels except for the fractional width. Zero
-  max width leaves sizing unconstrained. Inactive color must be zero. Flags
-  select secondary, custom color, and reduced motion.
+  max width leaves sizing unconstrained. Fractional mode requires zero max
+  width because Core gives fractional sizing precedence over caps. Inactive
+  color must be zero. Flags select secondary, custom color, and reduced motion.
 - Presentation has the actual Core frame sequence at offset 8, Core frame time
   and absolute wake deadline at offsets 16 and 24, then sampled phase and
   opacity at offsets 32 and 36. Zero deadline means no wake requested by this
@@ -35,7 +36,7 @@ table until app destruction. Configuring a reused slot starts a new animation.
 
 A successful configure invalidates the previous presentation query. Changing
 period or reduced-motion policy restarts the pulse; restyling preserves the
-clock. An omitted frame restarts the next submitted pulse. A failed UI step
+clock. An omitted frame restarts the next submitted pulse. A failed frame
 makes presentation unavailable, even if composition had sampled motion before
 a later host rendering failure. A read copies the latest successfully stepped
 and submitted sample; it never advances time or runs application code. Omitted

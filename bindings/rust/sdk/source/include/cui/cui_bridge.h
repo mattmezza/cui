@@ -172,6 +172,51 @@ typedef enum {
     CUI_BRIDGE_SETTINGS,
     CUI_BRIDGE_SLIDER_MODEL = 81 /* Additive controlled route; use versioned factory. */
 } cui_bridge_kind;
+/* Optional responsive presentation for the existing Skeleton kind35.
+ * Without explicit configuration, legacy construction and visual size apply. */
+#define CUI_BRIDGE_SKELETON_V1 1u
+enum {
+    CUI_BRIDGE_SKELETON_FIXED,
+    CUI_BRIDGE_SKELETON_FRACTION,
+    CUI_BRIDGE_SKELETON_GROW
+};
+enum {
+    CUI_BRIDGE_SKELETON_SECONDARY = 1u,
+    CUI_BRIDGE_SKELETON_CUSTOM_COLOR = 2u,
+    CUI_BRIDGE_SKELETON_REDUCED_MOTION = 4u
+};
+typedef struct {
+    uint32_t struct_size, schema_version, flags, width_mode;
+    /* FIXED: (0,16384], FRACTION: (0,1], GROW: 0. Height: (0,16384].
+     * Max width/radius: [0,16384]; FRACTION requires zero max width.
+     * Duration: [0,60] seconds; zero selects two. */
+    float width, height, max_width, radius, duration;
+    uint32_t background_rgba; /* Numeric 0xRRGGBBAA; zero if CUSTOM_COLOR is unset. */
+} cui_bridge_skeleton_config_v1;
+typedef struct {
+    uint32_t struct_size, schema_version;
+    uint64_t frame_sequence;
+    double core_time, next_wake_seconds; /* Absolute Core clock; zero deadline means static. */
+    float phase, opacity;
+} cui_bridge_skeleton_presentation_v1;
+CUI_BRIDGE_API uint32_t cui_bridge_skeleton_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_skeleton_config_size_v1(void);
+CUI_BRIDGE_API uint32_t cui_bridge_skeleton_presentation_size_v1(void);
+/* Existing Skeleton node, owner thread, outside step. Configuration is copied.
+ * Period or reduced-motion changes restart motion; replacement styling preserves it.
+ * The legacy visual-size setter rejects configured nodes. */
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_skeleton_configure_v1(cui_bridge_app *, cui_bridge_node,
+                                 const cui_bridge_skeleton_config_v1 *);
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_skeleton_get_config_v1(cui_bridge_app *, cui_bridge_node,
+                                  cui_bridge_skeleton_config_v1 *);
+/* Read-only sample from the latest successful step. EMPTY until sampled, after
+ * reconfiguration, omission, or a failed frame. All read errors leave output
+ * untouched. The deadline does not change the native runner's cadence. */
+CUI_BRIDGE_API cui_bridge_status
+cui_bridge_skeleton_get_presentation_v1(cui_bridge_app *, cui_bridge_node,
+                                        cui_bridge_skeleton_presentation_v1 *);
 /* Unreleased controlled Slider V1. Independent request FIFO; old Slider scalar
  * setters/events/CHANGE/autocommit are unchanged. All records own their values,
  * contain no pointers and require exact size/schema1/reserved0. New language

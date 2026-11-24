@@ -22,11 +22,11 @@ class IconLegacy(unittest.TestCase):
             self.assertEqual(trace.read_bytes(), (frozen / "legacy.trace").read_bytes())
             before = (frozen / "constructor.alloc").read_text().splitlines()
             after = allocations.read_text().splitlines()
-            # The sole permitted legacy allocation change is the appended app
-            # resource-pool pointer. No allocation call is added or reordered.
+            # The appended Icon and Skeleton app pointers change only the app
+            # record size. Legacy paths allocate neither sidecar.
             self.assertEqual(before, ["calloc 1 1304", "calloc 33 73136",
                                       "calloc 32 24", "calloc 32 72"])
-            self.assertEqual(after, ["calloc 1 1312", *before[1:]])
+            self.assertEqual(after, ["calloc 1 1320", *before[1:]])
 
 
 if __name__ == "__main__":

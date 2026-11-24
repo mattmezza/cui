@@ -356,7 +356,29 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_bridge.h",
+          "languages": [
+            "python",
+            "javascript",
+            "typescript",
+            "go",
+            "rust"
+          ],
+          "types": [
+            "cui_bridge_skeleton_config_v1",
+            "cui_bridge_skeleton_presentation_v1"
+          ],
+          "symbols": [
+            "cui_bridge_skeleton_configure_v1",
+            "cui_bridge_skeleton_get_config_v1",
+            "cui_bridge_skeleton_get_presentation_v1"
+          ],
+          "note": "The optional C bridge route owns responsive sizing, theme paint and motion. The language facades still construct legacy Skeleton nodes."
+        }
+      ]
     },
     {
       "name": "Spinner",

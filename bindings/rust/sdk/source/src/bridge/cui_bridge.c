@@ -691,6 +691,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_slider_internal.h"
 #include "cui_bridge_time_internal.h"
 #include "cui_bridge_icon_internal.h"
+#include "cui_bridge_skeleton_internal.h"
 // clang-format on
 
 uint32_t cui_bridge_abi_version(void) {
@@ -817,6 +818,7 @@ failed:
 static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_slider_remove(node->owner, node->own_slot);
     bridge_time_remove(node->owner, node->own_slot);
+    bridge_skeleton_remove(node->owner, node->own_slot);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -1391,6 +1393,7 @@ void cui_bridge_destroy(cui_bridge_app *app) {
     free(app->slider);
     free(app->time_fields);
     bridge_icon_app_destroy(app);
+    free(app->skeletons);
     free(app);
 }
 cui_bridge_status cui_bridge_node_create(cui_bridge_app *app, cui_bridge_node parent,
@@ -2271,6 +2274,8 @@ cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *app, cui_bridge_nod
     if (!isfinite(width) || !isfinite(height) || width < 0 || height < 0 || width > 4096 ||
         height > 4096 || (node->kind == CUI_BRIDGE_CHART && (width > 512 || height > 512)))
         return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (node->kind == CUI_BRIDGE_SKELETON && bridge_skeleton_node(app, handle.slot))
+        return CUI_BRIDGE_INVALID_STATE;
     node->visual_width = width;
     node->visual_height = height;
     return CUI_BRIDGE_OK;
@@ -4945,10 +4950,16 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
         if (!result.valid)
             app->frame_error = CUI_BRIDGE_CORE_ERROR;
     } else if (node->kind == CUI_BRIDGE_SKELETON) {
-        float phase = cui_loading_phase(cui_frame_time(app->ui), 2);
-        cui_skeleton(app->ui, node->id, &app->theme,
-                     node->visual_width > 0 ? node->visual_width : 120,
-                     node->visual_height > 0 ? node->visual_height : 16, 4, phase, false, false);
+        bridge_skeleton_owned *owned = bridge_skeleton_node(app, slot);
+        if (owned)
+            bridge_skeleton_render(app, node->id, owned);
+        else {
+            float phase = cui_loading_phase(cui_frame_time(app->ui), 2);
+            cui_skeleton(app->ui, node->id, &app->theme,
+                         node->visual_width > 0 ? node->visual_width : 120,
+                         node->visual_height > 0 ? node->visual_height : 16, 4, phase, false,
+                         false);
+        }
     } else if (node->kind == CUI_BRIDGE_SPINNER) {
         float phase = cui_loading_phase(cui_frame_time(app->ui), .8f);
         cui_spinner(app->ui, node->id, &app->theme,
@@ -5211,6 +5222,8 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
 done:
     bridge_slider_finish(app, status);
     bridge_time_finish(app, status);
+    if (app->skeletons)
+        app->skeletons->step_ok = status == CUI_BRIDGE_OK;
     app->stepping = false;
     if (status == CUI_BRIDGE_CLOSED)
         app->closed = true;

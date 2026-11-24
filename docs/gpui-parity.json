@@ -2685,7 +2685,8 @@
         "tests/unit/test_skeleton_palette.c",
         "tests/unit/test_skeleton_presentation.c",
         "tests/unit/test_skeleton_responsive_prototype.c",
-        "tests/test_skeleton_palette.py"
+        "tests/test_skeleton_palette.py",
+        "tests/unit/test_bridge_skeleton.c"
       ],
       "status": "tested",
       "platforms": {
@@ -2694,7 +2695,7 @@
       },
       "limitations": [
         "Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition.",
-        "Alpha.4 ships owned palette and responsive C presentation. The subsequent profile gallery uses preset, secondary and custom colors and replaces decorative shapes with loaded content. Native binding builders retain legacy Skeleton options. See docs/SKELETON_RESPONSIVE.md."
+        "Alpha.4 ships owned palette and responsive C presentation. The subsequent profile gallery uses preset, secondary and custom colors and replaces decorative shapes with loaded content. The optional retained C bridge supports responsive presentation. Language builders retain legacy options. See docs/SKELETON_RESPONSIVE.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2705,7 +2706,8 @@
           "evidence": [
             "tests/unit/test_content.c",
             "tests/unit/test_skeleton_responsive.c",
-            "tests/web/test_status_motion.py"
+            "tests/web/test_status_motion.py",
+            "tests/unit/test_bridge_skeleton.c"
           ]
         },
         {

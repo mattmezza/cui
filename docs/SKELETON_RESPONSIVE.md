@@ -103,3 +103,6 @@ failed geometry valid; rebuild a fresh healthy frame. No Core admission widening
 GPU/native accessibility or full Styled/platform parity is claimed. The gallery
 browser test separately verifies responsive dimensions at desktop and mobile
 width, preset/secondary/accent pixels and busy/loaded semantics.
+
+The [retained C bridge](BRIDGE_SKELETON.md) exposes a copied configuration and
+owns the per-node pulse. It keeps the direct frame API separate.

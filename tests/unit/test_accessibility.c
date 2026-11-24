@@ -43,6 +43,127 @@ static int request_thread(void *opaque) {
             ++p->successes;
     return 0;
 }
+typedef struct {
+    cui_accessibility_numeric_input_v1 inputs[4];
+    size_t count;
+} numeric_log;
+static numeric_log numeric_scene(cui_context *ui, bool present, uint32_t mask) {
+    numeric_log log = {0};
+    assert(cui_begin_frame(ui, 300, 200, .016f));
+    if (present) {
+        cui_begin_box(ui, 42, (cui_box){.width = 100, .height = 30});
+        assert(!cui_interact(ui, 42, CUI_ROLE_SLIDER, cui_string("Slider"), false, false, .25f)
+                    .activated);
+        assert(cui_set_accessibility_numeric_actions(ui, 42, mask));
+        size_t count = 0;
+        (void)cui_frame_events(ui, &count);
+        for (size_t i = 0; i < count; ++i) {
+            cui_accessibility_numeric_input_v1 input;
+            if (cui_claim_accessibility_numeric_input_v1(ui, 42, i, sizeof(input), &input)) {
+                assert(log.count < sizeof(log.inputs) / sizeof(log.inputs[0]));
+                log.inputs[log.count++] = input;
+            }
+        }
+        cui_end_box(ui);
+    }
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return log;
+}
+static void test_numeric_mailbox(void) {
+    cui_accessibility_config config = {.max_actions = 2};
+    cui_accessibility_options_v1 options = {.version = 1};
+    assert(!cui_accessibility_create_with_options_v1(config, sizeof(options), NULL));
+    assert(!cui_accessibility_create_with_options_v1(config, sizeof(options) - 1, &options));
+    options.flags = 2;
+    assert(!cui_accessibility_create_with_options_v1(config, sizeof(options), &options));
+    options.flags = 0;
+    options.reserved[1] = 1;
+    assert(!cui_accessibility_create_with_options_v1(config, sizeof(options), &options));
+    options.reserved[1] = 0;
+    cui_accessibility *legacy =
+        cui_accessibility_create_with_options_v1(config, sizeof(options), &options);
+    options.flags = CUI_ACCESSIBILITY_ENABLE_NUMERIC;
+    cui_accessibility *a =
+        cui_accessibility_create_with_options_v1(config, sizeof(options), &options);
+    assert(legacy && a);
+    cui_context *ui = make();
+    assert(!cui_accessibility_update(a, ui, window()));
+    uint32_t mask = CUI_ACCESSIBILITY_NUMERIC_INCREMENT | CUI_ACCESSIBILITY_NUMERIC_DECREMENT |
+                    CUI_ACCESSIBILITY_NUMERIC_SET_VALUE;
+    assert(numeric_scene(ui, true, mask).count == 0);
+    assert(cui_accessibility_update(legacy, ui, window()));
+    assert(!cui_accessibility_request(legacy, cui_accessibility_token(legacy, 42),
+                                      CUI_ACCESSIBILITY_INCREMENT));
+    cui_accessibility_destroy(legacy);
+    assert(cui_accessibility_update(a, ui, window()));
+    uint64_t token = cui_accessibility_token(a, 42);
+    assert(token);
+    const double copied = nextafter(.5, 1);
+    cui_accessibility_set_value_v1 value = {.version = 1, .value = NAN};
+    assert(!cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    assert(!cui_accessibility_request(a, token, CUI_ACCESSIBILITY_SET_VALUE));
+    value.value = copied;
+    assert(cui_accessibility_request(a, token, CUI_ACCESSIBILITY_INCREMENT));
+    assert(cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    value.value = .8;
+    assert(!cui_accessibility_request(a, token, CUI_ACCESSIBILITY_DECREMENT));
+    for (size_t i = 0; i < 255; ++i)
+        assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_POINTER_MOVE}));
+    assert(cui_accessibility_drain(a, ui) == 1);
+    assert(cui_last_error(ui) == CUI_ERROR_CAPACITY);
+    assert(cui_accessibility_get_stats(a).pending == 1);
+    cui_clear_error(ui);
+    numeric_log log = numeric_scene(ui, true, mask);
+    assert(log.count == 1 && log.inputs[0].action == CUI_ACCESSIBILITY_INCREMENT &&
+           log.inputs[0].flags == 0 && log.inputs[0].value == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(cui_accessibility_request(a, token, CUI_ACCESSIBILITY_DECREMENT));
+    assert(cui_accessibility_drain(a, ui) == 2);
+    log = numeric_scene(ui, true, mask);
+    assert(log.count == 2 && log.inputs[0].action == CUI_ACCESSIBILITY_SET_VALUE &&
+           log.inputs[0].flags == CUI_ACCESSIBILITY_NUMERIC_HAS_VALUE &&
+           log.inputs[0].value == copied && log.inputs[1].action == CUI_ACCESSIBILITY_DECREMENT &&
+           !log.inputs[1].flags && log.inputs[1].value == 0);
+    assert(!cui_focused(ui) && !cui_accessibility_drain(a, ui));
+
+    assert(cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    assert(cui_accessibility_request(a, token, CUI_ACCESSIBILITY_FOCUS));
+    cui_report_diagnostic(ui, &(cui_diagnostic){.error = CUI_ERROR_LAYOUT});
+    assert(!cui_accessibility_update(a, ui, window()));
+    assert(cui_accessibility_token(a, 42) == token && cui_accessibility_get_stats(a).pending == 1);
+    assert(!cui_accessibility_request(a, token, CUI_ACCESSIBILITY_INCREMENT));
+    cui_clear_error(ui);
+    assert(numeric_scene(ui, true, mask).count == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(cui_accessibility_drain(a, ui) == 1);
+    assert(numeric_scene(ui, true, mask).count == 0 && cui_focused(ui) == 42);
+
+    assert(cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    assert(numeric_scene(ui, true, 0).count == 0);
+    assert(cui_accessibility_drain(a, ui) == 0); /* Revoked even before republishing. */
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(!cui_accessibility_request(a, token, CUI_ACCESSIBILITY_INCREMENT));
+    assert(numeric_scene(ui, true, mask).count == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    assert(numeric_scene(ui, true, 0).count == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(numeric_scene(ui, true, mask).count == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(!cui_accessibility_drain(a, ui)); /* Restoring capability does not revive intent. */
+    assert(cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    assert(numeric_scene(ui, false, 0).count == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    assert(numeric_scene(ui, true, mask).count == 0);
+    assert(cui_accessibility_update(a, ui, window()));
+    uint64_t replacement = cui_accessibility_token(a, 42);
+    assert(replacement != token && !cui_accessibility_drain(a, ui));
+    assert(!cui_accessibility_request_set_value_v1(a, token, sizeof(value), &value));
+    assert(cui_accessibility_request_set_value_v1(a, replacement, sizeof(value), &value));
+    cui_accessibility_destroy(a); /* Destroy with a copied value pending. */
+    cui_destroy(ui);
+}
 int main(void) {
     assert(!cui_accessibility_create((cui_accessibility_config){.max_nodes = SIZE_MAX}));
     cui_context *ui = make();
@@ -189,11 +310,12 @@ int main(void) {
         assert(a);
         cui_accessibility_destroy(a);
     }
+    test_numeric_mailbox();
     for (unsigned i = 0; i < 1000 && cui_accessibility_test_live(); ++i) {
         struct timespec t = {0, 5000000};
         thrd_sleep(&t, NULL);
     }
-    assert(cui_accessibility_test_live() == 0 && cui_accessibility_test_released() == 102);
+    assert(cui_accessibility_test_live() == 0 && cui_accessibility_test_released() == 104);
     puts("accessibility snapshot/generation/mailbox tests passed");
     return 0;
 }

@@ -1,4 +1,4 @@
-# Typed Base Slider (unreleased, C only)
+# Typed Base Slider in C
 
 Include `<cui/cui_base_slider_model.h>`. This additive route owns its fixed-size
 root, track, fill and thumb boxes. It implements Single/Range double-valued input
@@ -10,7 +10,9 @@ records; the [Python bridge-owned controlled subset](PYTHON_SLIDER_MODEL.md)
 exposes copied double Single/Range proposals and explicit receipt acceptance.
 The [Rust bridge subset](RUST_SLIDER_MODEL.md) adds owned copied requests and
 a restricted callback context; Linux dynamic and matching bundled-static checks
-passed on1.99.1, with MSRV1.85.1 pending. Native numeric host delivery remains pending. The whole Slider family remains partial.
+passed on 1.99.1, with MSRV 1.85.1 pending. The
+[optional Linux adapter](NATIVE_ACCESSIBILITY.md#numeric-slider-actions) forwards
+AT-SPI Value requests to typed Slider thumbs.
 
 The complete, independently runnable C11 example is
 [`examples/slider_model_controlled.c`](../examples/slider_model_controlled.c).

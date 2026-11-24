@@ -1086,7 +1086,7 @@
     "limitations": [
       "Existing scalar builders retain legacy Slider behavior. Direct C Base reducer/state, owned Styled style/presentation state and result structs are not foreign-language records; the distinct bridge-owned Python/Node/TypeScript/Go/Rust double Single/Range request/receipt subset is documented in controlled_slider_v1.",
       "The Python/Node/TypeScript/Go/Rust bridge subsets do not expose custom owned Styled style values, direct C motion state, decorative getters or arbitrary C facade options. Rust has Linux dynamic and matching bundled-static proof on1.99.1; MSRV1.85.1 remains untested.",
-      "Visible V1 gradient thumbs reject atomically; bridge/gallery V1 routes do not consume V2 backgrounds. The separate C software V2 route does not provide a foreign authoring binding. Native numeric host/physical AT delivery remains pending."
+      "Visible V1 gradient thumbs reject atomically; bridge/gallery V1 routes do not consume V2 backgrounds. The separate C software V2 route does not provide a foreign authoring binding. The optional C Linux adapter supports AT-SPI Set Value on typed Slider thumbs. The five language runners do not expose its numeric-mode option. Physical AT acceptance remains open."
     ],
     "bridge_subset": "controlled_slider_v1"
   },

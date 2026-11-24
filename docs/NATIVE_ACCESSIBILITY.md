@@ -1,7 +1,8 @@
-# Optional Linux native accessibility, phase 1
+# Optional Linux native accessibility
 
 This backend publishes completed CUI semantic snapshots through pinned AccessKit
 and executes targeted Focus/Click through Core's accessibility action queue.
+The opt-in numeric mode also forwards Value requests to typed Slider thumbs.
 The automated Linux X11 test uses a real SDL3 window and independent libAT-SPI
 client over DBus. This is transport and action coverage, **not** full native
 accessibility, editable-text support, or an Orca/physical screen-reader claim.
@@ -16,8 +17,8 @@ Rust 1.85+/Cargo, then enable the optional Linux adapter:
 ```sh
 python3 scripts/build_accesskit.py
 cmake -S . -B build -G Ninja -DCUI_BUILD_ACCESSIBILITY=ON
-cmake --build build --parallel 6
-ctest --test-dir build --output-on-failure -R accessibility
+cmake --build build
+python scripts/test_local.py --build-dir build -R accessibility
 cmake --install build --prefix /your/local/prefix
 ```
 
@@ -89,8 +90,9 @@ Skipping removal snapshots would also erase this distinction. Public token and
 request helpers use the same bounded mailbox as native callbacks, useful for
 portable host adapters and tests.
 
-Foreign-thread AccessKit handlers only read the locked copied snapshot and enqueue
-Focus/Click tokens. They never call Core or SDL. The optional wake callback must
+Foreign-thread AccessKit handlers read the locked copied snapshot and enqueue
+tokens with their supported actions and any numeric scalar. They never call Core
+or SDL. The optional wake callback must
 be thread safe, must not reenter this backend/wait for the UI thread, and must not
 call Core/SDL. Main-thread drain revalidates token and Core capability, discards
 stale/disabled/modal-obscured requests, and preserves unqueued requests on Core
@@ -104,6 +106,49 @@ removal is asynchronous: the private Rust Arc ownership wrapper retains C storag
 until the last activation/action/deactivation handler drops, then releases it once
 on that thread. Callers may destroy Core/window/wake userdata after public destroy
 returns. No process-lifetime tombstone pool or dangling frame strings are used.
+
+## Numeric Slider actions
+
+Create the optional adapter with numeric mode enabled. Submit a typed Base or
+Styled Slider model with a request handler in each frame. The existing
+drain-before-frame and update-after-frame loop applies.
+
+```c
+cui_accessibility_options_v1 options = {
+    .version = CUI_ACCESSIBILITY_OPTIONS_V1,
+    .flags = CUI_ACCESSIBILITY_ENABLE_NUMERIC,
+};
+cui_accessibility *a = cui_accessibility_create_with_options_v1(
+    (cui_accessibility_config){0}, sizeof(options), &options);
+/* Check a before using the adapter. */
+```
+
+The adapter advertises the numeric actions supported by each completed Core
+semantic. Increment and Decrement use the ordinary request API. The typed
+`cui_accessibility_request_set_value_v1` API copies a finite double into the
+same bounded FIFO as Focus and Activate. Numeric mode adds
+`max_actions * sizeof(double)` bytes for these copies, 1 KiB at the default
+capacity on Linux x86-64. Neither constructor adds per-request allocation.
+The old constructor and V1 options with zero flags use the Focus/Activate policy.
+
+Pinned AT-SPI exposes the Value setter. Typed Slider publishes a linear fraction
+in **[0, 1]**, including logarithmic visual Sliders. The reducer maps this to the
+application's domain, applies step and neighbor constraints, and delivers a
+synchronous request on the UI thread. Each Range thumb is a separate target.
+The application decides whether to accept the value and submits the confirmed
+value in its next frame. A successful mailbox or native setter call confirms
+transport only. The pinned AT-SPI adapter has no Increment or Decrement action
+entry. Those actions are exercised through the C mailbox.
+
+Numeric mode projects Sliders without a writable Set Value capability as
+read-only. Failed publication keeps the last visible tree, suspends new numeric
+admission and drops queued numeric requests while preserving Focus/Activate.
+Publishing a revoked capability drops requests for it even if the same token
+later regains that capability. Drain also checks Core readiness and current
+capability. If drain encounters
+Core queue capacity, acknowledge its Core error with `cui_clear_error` before
+starting the frame, publish that completed frame, then drain again. The remaining
+request stays in order with its original copied scalar.
 
 ## Mapping and limits
 
@@ -120,13 +165,13 @@ metadata: the navigation tree retains behind-modal nodes and full semantic bound
 Core suppresses their actions. OS modal tree hiding/precise clipping need a later
 portable semantic extension.
 
-Only Core-supported Focus/Activate are advertised. Focus changes Core focus;
+Focus/Activate and opted-in numeric actions require explicit Core support.
+Focus changes Core focus;
 OS window focus remains host metadata, and this bridge does not raise windows. Button, Checkbox, Switch,
 Radio, Link and eligible menu items use the ordinary activation path. Tab/Option/
 Tree/table compound reducers have conservative Focus-only support; merely showing
-a role does not enable its domain action. There is no SetValue, editable text,
-selection/caret, document text ranges, scroll action, or increment/decrement bridge.
-Read-only scalar/static-label metadata does not imply native Value/Text editing.
+a role does not enable its domain action. Editable text, selection/caret,
+document text ranges and scroll actions remain future work.
 See [Core action contract](ACCESSIBILITY_ACTIONS.md).
 
 Pinned `accesskit_atspi_common` 0.20.0 exports `controls` as ControllerFor; its
@@ -152,6 +197,11 @@ state; requests Component Focus/Action Click and observes actual Core effects;
 checks disabled actions and removed/reintroduced nodes. It holds a real native
 action pending during destruction and verifies wake runs off the UI thread. The frame label is
 intentionally overwritten immediately after snapshot publication.
+The same client sets the Value of a typed Slider thumb, verifies the normalized
+request and confirmed domain value, and checks that an owner rejection leaves the
+published value unchanged. A passive Slider exposes read-only state in numeric
+mode. The headless mailbox fixture covers exact double copying across queue
+backpressure, order, stale tokens, revocation, failed publication and shutdown.
 
 ```sh
 cmake -S backends/accesskit -B build-accesskit-asan -G Ninja -DCUI_SANITIZE=ON

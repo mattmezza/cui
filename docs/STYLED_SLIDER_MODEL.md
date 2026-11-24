@@ -1,12 +1,13 @@
-# Typed Styled Slider (unreleased, C only)
+# Typed Styled Slider in C
 
 Include `cui/cui_styled_slider_model.h`. This additive facade uses the existing
 controlled [Base model](BASE_SLIDER_MODEL.md) and the owned
 [style resolver](SLIDER_STYLE_VALUES.md). Legacy float/double Slider APIs and all
-old records remain unchanged. Full family closure is still open: visible Aurora
-Light gradients need actual V2 adapters, vertical registered-scroll layout is
-still rejected and native numeric hosts remain pending; the
-[Python controlled bridge subset](PYTHON_SLIDER_MODEL.md) is available unreleased.
+old records remain unchanged. Visible Aurora Light gradients require V2 painting,
+and vertical registered-scroll layout remains unsupported. The
+[optional Linux adapter](NATIVE_ACCESSIBILITY.md#numeric-slider-actions) exposes
+typed Slider values to AT-SPI. Python has a
+[controlled bridge subset](PYTHON_SLIDER_MODEL.md) with its own records.
 
 Start with the complete, windowless
 [controlled application](../examples/styled_slider_model_controlled.c). It contains
@@ -136,9 +137,8 @@ render the completed draw list, then schedule its absolute Core-clock deadline.
 The browser maps that deadline to its monotonic host clock and coalesces it with
 other wakes; reduced motion and settled state return zero. No manual animation
 loop is required. V1 reports unsupported only when actual resolved visible paint
-is linear; a theme name alone never selects gradient capability. This gallery
-migration does not implement native numeric delivery, V2 gradient adapters or
-vertical registered-scroll admission. The separate Python and Node/TypeScript bridge subsets do not
+is linear. The gallery uses V1 and does not offer vertical registered-scroll
+admission. The separate Python and Node/TypeScript bridge subsets do not
 expose arbitrary C Styled style/state objects. The [Rust subset](RUST_SLIDER_MODEL.md)
 uses copied bridge records with the same limitation; dynamic and matching
 bundled-static Linux1.99.1 checks passed, with MSRV1.85.1 pending.

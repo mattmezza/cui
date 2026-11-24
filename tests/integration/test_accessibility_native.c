@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #define _POSIX_C_SOURCE 200809L
 #include "cui/cui_accessibility.h"
+#include "cui/cui_base_slider_model.h"
 #include "cui/cui_sdl3.h"
 #include "cui_accessibility_test.h"
 #include <SDL3/SDL.h>
@@ -22,6 +23,8 @@ typedef struct {
     bool checked;
     cui_id focus;
     size_t pending;
+    unsigned slider_requests;
+    double slider_value, slider_request;
 } report;
 typedef struct {
     thrd_t ui_thread;
@@ -51,6 +54,16 @@ static void node(cui_context *ui, cui_id id, cui_role role, const char *name, cu
         cui_update_semantic(ui, id, *checked, 0);
     cui_end_box(ui);
 }
+static void slider_update(void *opaque, const cui_slider_model_request_v1 *event) {
+    report *state = opaque;
+    assert(event->input.accessibility_action == CUI_ACCESSIBILITY_SET_VALUE);
+    if (event->phase != CUI_SLIDER_MODEL_UPDATE)
+        return;
+    ++state->slider_requests;
+    state->slider_request = event->input.accessibility_value;
+    if (event->requested.end != 50) /* Application rejects one value. */
+        state->slider_value = event->requested.end;
+}
 static int provider(int commands, int output) {
     assert(SDL_Init(SDL_INIT_VIDEO));
     cui_sdl3 *backend = cui_sdl3_create("CUI native accessibility fixture", 320, 200, NULL);
@@ -66,11 +79,15 @@ static int provider(int commands, int output) {
     assert(ui);
     wake_probe probe = {.ui_thread = thrd_current()};
     atomic_init(&probe.calls, 0);
-    cui_accessibility *bridge =
-        cui_accessibility_create((cui_accessibility_config){.wake = wake, .user = &probe});
+    cui_accessibility_options_v1 options = {
+        CUI_ACCESSIBILITY_OPTIONS_V1, CUI_ACCESSIBILITY_ENABLE_NUMERIC, {0, 0}};
+    cui_accessibility *bridge = cui_accessibility_create_with_options_v1(
+        (cui_accessibility_config){.wake = wake, .user = &probe}, sizeof(options), &options);
     assert(bridge);
     assert(fcntl(commands, F_SETFL, O_NONBLOCK) != -1);
-    report state = {0};
+    report state = {.slider_value = 30};
+    cui_slider_model_state_v1 slider;
+    assert(cui_slider_model_state_init_v1(sizeof(slider), &slider));
     bool running = true, disabled = false, present = true, hold = false;
     for (unsigned frame = 0; running && frame < 3000; ++frame) {
         char cmd;
@@ -111,6 +128,23 @@ static int provider(int commands, int output) {
             ui, 43,
             (cui_semantic_details){
                 .labelled_by = 44, .controls = 44, .description = {"Checkbox description", 20}});
+        cui_base_slider_model_layout_v1 layout = {.version = 1,
+                                                  .struct_size = sizeof(layout),
+                                                  .length = 160,
+                                                  .cross_extent = 28,
+                                                  .track_extent = 4,
+                                                  .thumb_extent = 16};
+        cui_slider_model_options_v1 model = {.version = 1,
+                                             .struct_size = sizeof(model),
+                                             .domain = {10, 90, 10, CUI_SLIDER_MODEL_LINEAR, 0},
+                                             .name = {"Audio", 5},
+                                             .end_name = {"Native volume", 13}};
+        cui_slider_model_result_v1 result = cui_base_slider_model_events_v1(
+            ui, 45, (cui_slider_model_value_v1){.end = state.slider_value}, &slider, &model,
+            &layout, (cui_slider_model_handler_v1){slider_update, &state});
+        assert(result.status == CUI_SLIDER_MODEL_OK);
+        node(ui, 46, CUI_ROLE_SLIDER, "Passive slider", (cui_rect){170, 120, 100, 30}, false, NULL,
+             NULL);
         cui_end_box(ui);
         cui_end_frame(ui);
         assert(cui_last_error(ui) == CUI_OK);
@@ -126,7 +160,7 @@ static int provider(int commands, int output) {
             assert(write(output, &state, sizeof(state)) == (ssize_t)sizeof(state));
         sleep_ms(10);
     }
-    assert(atomic_load(&probe.calls) >= 5 && state.pending == 1);
+    assert(atomic_load(&probe.calls) >= 7 && state.pending == 1);
     cui_accessibility_destroy(bridge);
     cui_destroy(ui);
     cui_sdl3_destroy(backend);
@@ -273,6 +307,31 @@ int main(int argc, char **argv) {
     }
     assert(controller);
     g_array_unref(relations);
+    AtspiAccessible *volume = find(desktop, "Native volume", 0);
+    AtspiAccessible *passive = find(desktop, "Passive slider", 0);
+    assert(volume && passive);
+    AtspiValue *value = atspi_accessible_get_value_iface(volume);
+    assert(value);
+    assert(atspi_value_get_minimum_value(value, &error) == 0 && !error);
+    assert(atspi_value_get_maximum_value(value, &error) == 1 && !error);
+    assert(atspi_value_get_current_value(value, &error) == .25 && !error);
+    states = atspi_accessible_get_state_set(passive);
+    assert(atspi_state_set_contains(states, ATSPI_STATE_READ_ONLY));
+    g_object_unref(states);
+    assert(atspi_value_set_current_value(value, .75, &error) && !error);
+    sleep_ms(150);
+    state = latest(output[0]);
+    assert(state.slider_requests == 1 && state.slider_request == .75 && state.slider_value == 70);
+    assert(state.focus == 42 && state.clicks == 1);
+    assert(atspi_value_get_current_value(value, &error) == .75 && !error);
+    assert(atspi_value_set_current_value(value, .5, &error) && !error);
+    sleep_ms(150);
+    state = latest(output[0]);
+    assert(state.slider_requests == 2 && state.slider_request == .5 && state.slider_value == 70);
+    assert(atspi_value_get_current_value(value, &error) == .75 && !error);
+    g_object_unref(value);
+    g_object_unref(passive);
+    g_object_unref(volume);
     assert(write(command[1], "d", 1) == 1);
     sleep_ms(150);
     AtspiAction *actions = atspi_accessible_get_action_iface(button);

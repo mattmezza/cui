@@ -35,8 +35,20 @@ typedef struct {
     cui_accessibility_status status;
 } cui_accessibility_stats;
 cui_accessibility *cui_accessibility_create(cui_accessibility_config);
+#define CUI_ACCESSIBILITY_OPTIONS_V1 1u
+#define CUI_ACCESSIBILITY_ENABLE_NUMERIC 1u
+typedef struct {
+    uint32_t version, flags, reserved[2];
+} cui_accessibility_options_v1;
+/* Exact V1 size, version, known flags and zero reserved fields required.
+ * Flags zero selects the legacy Focus/Activate policy. Numeric mode forwards
+ * only actions the completed Core snapshot explicitly supports. */
+cui_accessibility *cui_accessibility_create_with_options_v1(cui_accessibility_config,
+                                                            uint32_t options_size,
+                                                            const cui_accessibility_options_v1 *);
 /* Only after cui_end_frame. Copies all frame-borrowed strings; errors preserve
- * the last snapshot and token generation. No text/value editing actions. */
+ * the last snapshot and token generation. In numeric mode a failed update
+ * suspends numeric admission and discards queued numeric requests. */
 bool cui_accessibility_update(cui_accessibility *, cui_context *, cui_accessibility_window);
 /* Main thread, before begin_frame; returns number queued into Core. Core event
  * backpressure retains remaining requests for a later drain. */
@@ -46,6 +58,11 @@ size_t cui_accessibility_drain(cui_accessibility *, cui_context *);
  * replacement with identical role; Core has no stronger identity information. */
 uint64_t cui_accessibility_token(cui_accessibility *, cui_id);
 bool cui_accessibility_request(cui_accessibility *, uint64_t, cui_accessibility_action);
+/* Numeric mode only. Copies the finite V1 value before returning. Use the
+ * ordinary request function for Increment/Decrement. Admission is independent
+ * of whether the UI later accepts and applies the requested value. */
+bool cui_accessibility_request_set_value_v1(cui_accessibility *, uint64_t, uint32_t payload_size,
+                                            const cui_accessibility_set_value_v1 *);
 cui_accessibility_stats cui_accessibility_get_stats(cui_accessibility *);
 /* Disables callbacks/wake, drops native adapter, releases public handle now.
  * Private callback storage is reclaimed by its final native handler owner. */

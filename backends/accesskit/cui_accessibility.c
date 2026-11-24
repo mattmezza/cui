@@ -36,6 +36,24 @@ typedef struct {
     uint64_t token;
     cui_accessibility_action action;
 } request;
+static const struct {
+    cui_accessibility_action core;
+    accesskit_action native;
+    bool numeric;
+} actions[] = {
+    {CUI_ACCESSIBILITY_FOCUS, ACCESSKIT_ACTION_FOCUS, false},
+    {CUI_ACCESSIBILITY_ACTIVATE, ACCESSKIT_ACTION_CLICK, false},
+    {CUI_ACCESSIBILITY_INCREMENT, ACCESSKIT_ACTION_INCREMENT, true},
+    {CUI_ACCESSIBILITY_DECREMENT, ACCESSKIT_ACTION_DECREMENT, true},
+    {CUI_ACCESSIBILITY_SET_VALUE, ACCESSKIT_ACTION_SET_VALUE, true},
+};
+#define ACTION_COUNT (sizeof(actions) / sizeof(actions[0]))
+static size_t action_index(cui_accessibility_action kind) {
+    for (size_t i = 0; i < ACTION_COUNT; ++i)
+        if (actions[i].core == kind)
+            return i;
+    return ACTION_COUNT;
+}
 struct cui_accessibility {
     mtx_t mutex;
     atomic_uint references;
@@ -45,6 +63,8 @@ struct cui_accessibility {
     unsigned live;
     uint64_t next_token;
     request *requests;
+    double *numeric_values; /* Optional sidecar. The request action identifies SET slots. */
+    bool numeric_published;
     size_t head, count;
     cui_accessibility_stats stats;
     accesskit_unix_adapter *adapter;
@@ -62,6 +82,7 @@ static void release(void *opaque) {
     free(a->banks[0].strings);
     free(a->banks[1].strings);
     free(a->requests);
+    free(a->numeric_values);
     mtx_destroy(&a->mutex);
     free(a);
 }
@@ -234,10 +255,9 @@ static accesskit_tree_update *make_tree(void *opaque) {
         for (size_t j = 0; j < s->count; ++j)
             if (s->nodes[j].parent == r->token)
                 accesskit_node_push_child(n, s->nodes[j].token);
-        if (r->actions & 1u)
-            accesskit_node_add_action(n, ACCESSKIT_ACTION_FOCUS);
-        if (r->actions & 2u)
-            accesskit_node_add_action(n, ACCESSKIT_ACTION_CLICK);
+        for (size_t j = 0; j < ACTION_COUNT; ++j)
+            if (r->actions & (1u << j))
+                accesskit_node_add_action(n, actions[j].native);
         accesskit_tree_update_push_node(tree, r->token, n);
     }
     mtx_unlock(&a->mutex);
@@ -245,10 +265,22 @@ static accesskit_tree_update *make_tree(void *opaque) {
 }
 static void action(accesskit_action_request *r, void *opaque) {
     cui_accessibility *a = opaque;
-    if (r->action == ACCESSKIT_ACTION_FOCUS || r->action == ACCESSKIT_ACTION_CLICK)
-        cui_accessibility_request(a, r->target_node,
-                                  r->action == ACCESSKIT_ACTION_FOCUS ? CUI_ACCESSIBILITY_FOCUS
-                                                                      : CUI_ACCESSIBILITY_ACTIVATE);
+    for (size_t i = 0; i < ACTION_COUNT; ++i) {
+        if (r->action != actions[i].native)
+            continue;
+        if (actions[i].numeric && !a->numeric_values)
+            break;
+        if (actions[i].core == CUI_ACCESSIBILITY_SET_VALUE) {
+            if (r->data.has_value && r->data.value.tag == ACCESSKIT_ACTION_DATA_NUMERIC_VALUE) {
+                cui_accessibility_set_value_v1 value = {.version = 1,
+                                                        .value = r->data.value.numeric_value};
+                cui_accessibility_request_set_value_v1(a, r->target_node, sizeof(value), &value);
+            }
+        } else {
+            cui_accessibility_request(a, r->target_node, actions[i].core);
+        }
+        break;
+    }
     accesskit_action_request_free(r);
 }
 static void deactivate(void *opaque) {
@@ -257,14 +289,15 @@ static void deactivate(void *opaque) {
     a->stats.native_active = false;
     mtx_unlock(&a->mutex);
 }
-cui_accessibility *cui_accessibility_create(cui_accessibility_config c) {
+static cui_accessibility *create(cui_accessibility_config c, bool numeric) {
     if (!c.max_nodes)
         c.max_nodes = 2048;
     if (!c.string_bytes)
         c.string_bytes = 65536;
     if (!c.max_actions)
         c.max_actions = 128;
-    if (c.max_nodes > SIZE_MAX / sizeof(record) || c.max_actions > SIZE_MAX / sizeof(request))
+    if (c.max_nodes > SIZE_MAX / sizeof(record) || c.max_actions > SIZE_MAX / sizeof(request) ||
+        (numeric && c.max_actions > SIZE_MAX / sizeof(double)))
         return NULL;
     cui_accessibility *a = calloc(1, sizeof(*a));
     if (!a)
@@ -290,13 +323,26 @@ cui_accessibility *cui_accessibility_create(cui_accessibility_config c) {
         a->banks[i].window.title = (cui_str){a->banks[i].strings, 0};
     }
     a->requests = calloc(c.max_actions, sizeof(request));
-    if (!a->requests) {
+    if (numeric)
+        a->numeric_values = calloc(c.max_actions, sizeof(double));
+    if (!a->requests || (numeric && !a->numeric_values)) {
         release(a);
         return NULL;
     }
     atomic_fetch_add_explicit(&a->references, 1, memory_order_relaxed);
     a->adapter = cui_accesskit_unix_adapter_new_owned(make_tree, action, deactivate, a, release);
     return a;
+}
+cui_accessibility *cui_accessibility_create(cui_accessibility_config c) {
+    return create(c, false);
+}
+cui_accessibility *cui_accessibility_create_with_options_v1(cui_accessibility_config c,
+                                                            uint32_t size,
+                                                            const cui_accessibility_options_v1 *o) {
+    if (!o || size != sizeof(*o) || o->version != CUI_ACCESSIBILITY_OPTIONS_V1 ||
+        (o->flags & ~CUI_ACCESSIBILITY_ENABLE_NUMERIC) || o->reserved[0] || o->reserved[1])
+        return NULL;
+    return create(c, (o->flags & CUI_ACCESSIBILITY_ENABLE_NUMERIC) != 0);
 }
 /* Reject invalid UTF-8/NUL instead of panicking inside AccessKit's FFI. */
 static bool valid_string(cui_str s) {
@@ -409,10 +455,46 @@ static bool same_snapshot(snapshot *a, snapshot *b) {
     }
     return true;
 }
+/* Keep Focus/Activate and their order. Once a published numeric capability
+ * disappears, restoring it must not revive requests from before the change. */
+static void prune_numeric_requests(cui_accessibility *a, snapshot *published) {
+    if (!a->numeric_values)
+        return;
+    size_t kept = 0;
+    for (size_t i = 0; i < a->count; ++i) {
+        size_t from = (a->head + i) % a->config.max_actions;
+        request q = a->requests[from];
+        double value = a->numeric_values[from];
+        a->numeric_values[from] = 0;
+        size_t index = action_index(q.action);
+        if (actions[index].numeric) {
+            record *r = published ? find_token(published, q.token) : NULL;
+            if (!r || !(r->actions & (1u << index))) {
+                ++a->stats.rejected;
+                continue;
+            }
+        }
+        size_t to = (a->head + kept++) % a->config.max_actions;
+        a->requests[to] = q;
+        a->numeric_values[to] = value;
+    }
+    a->count = kept;
+}
+static void suspend_numeric(cui_accessibility *a) {
+    a->numeric_published = false;
+    prune_numeric_requests(a, NULL);
+}
 bool cui_accessibility_update(cui_accessibility *a, cui_context *ui,
                               cui_accessibility_window window) {
     if (!a || !ui)
         return false;
+    if (a->numeric_values && !cui_accessibility_numeric_snapshot_ready(ui)) {
+        mtx_lock(&a->mutex);
+        suspend_numeric(a);
+        a->stats.status = CUI_A11Y_INVALID;
+        mtx_unlock(&a->mutex);
+        return false;
+    }
     size_t count = 0;
     const cui_semantic *sem = cui_semantics(ui, &count);
     cui_accessibility_status error = cui_last_error(ui) == CUI_OK ? CUI_A11Y_OK : CUI_A11Y_INVALID;
@@ -439,6 +521,7 @@ bool cui_accessibility_update(cui_accessibility *a, cui_context *ui,
     if (a->closed)
         error = CUI_A11Y_CLOSED;
     if (error != CUI_A11Y_OK) {
+        suspend_numeric(a);
         a->stats.status = error;
         mtx_unlock(&a->mutex);
         return false;
@@ -463,10 +546,13 @@ bool cui_accessibility_update(cui_accessibility *a, cui_context *ui,
             }
             r->token = generation++;
         }
-        r->actions =
-            (cui_accessibility_action_supported(ui, sem[i].id, CUI_ACCESSIBILITY_FOCUS) ? 1u : 0u) |
-            (cui_accessibility_action_supported(ui, sem[i].id, CUI_ACCESSIBILITY_ACTIVATE) ? 2u
-                                                                                           : 0u);
+        for (size_t j = 0; j < ACTION_COUNT; ++j)
+            if ((!actions[j].numeric || a->numeric_values) &&
+                cui_accessibility_action_supported(ui, sem[i].id, actions[j].core))
+                r->actions |= 1u << j;
+        if (a->numeric_values && sem[i].role == CUI_ROLE_SLIDER &&
+            !(r->actions & (1u << action_index(CUI_ACCESSIBILITY_SET_VALUE))))
+            r->semantic.details.readonly = true;
     }
     for (size_t i = 0; i < count && error == CUI_A11Y_OK; ++i) {
         record *r = &next->nodes[i];
@@ -487,13 +573,16 @@ bool cui_accessibility_update(cui_accessibility *a, cui_context *ui,
     }
     a->stats.status = error;
     if (error != CUI_A11Y_OK) {
+        suspend_numeric(a);
         mtx_unlock(&a->mutex);
         return false;
     }
+    a->numeric_published = a->numeric_values != NULL;
     if (same_snapshot(old, next)) {
         mtx_unlock(&a->mutex);
         return true;
     }
+    prune_numeric_requests(a, next);
     a->live ^= 1u;
     a->next_token = generation;
     ++a->stats.snapshots;
@@ -514,14 +603,17 @@ uint64_t cui_accessibility_token(cui_accessibility *a, cui_id id) {
     mtx_unlock(&a->mutex);
     return token;
 }
-bool cui_accessibility_request(cui_accessibility *a, uint64_t token,
-                               cui_accessibility_action kind) {
+static bool request_action(cui_accessibility *a, uint64_t token, cui_accessibility_action kind,
+                           const cui_accessibility_set_value_v1 *value) {
     if (!a)
         return false;
     mtx_lock(&a->mutex);
     record *r = find_token(&a->banks[a->live], token);
-    if (a->closed || (kind != CUI_ACCESSIBILITY_FOCUS && kind != CUI_ACCESSIBILITY_ACTIVATE) ||
-        !r || !(r->actions & (1u << (unsigned)kind))) {
+    size_t index = action_index(kind);
+    if (a->closed || index == ACTION_COUNT || !r || !(r->actions & (1u << index)) ||
+        (actions[index].numeric && !a->numeric_published) ||
+        (kind == CUI_ACCESSIBILITY_SET_VALUE &&
+         (!value || value->version != 1 || value->reserved || !isfinite(value->value)))) {
         ++a->stats.rejected;
         mtx_unlock(&a->mutex);
         return false;
@@ -532,7 +624,10 @@ bool cui_accessibility_request(cui_accessibility *a, uint64_t token,
         mtx_unlock(&a->mutex);
         return false;
     }
-    a->requests[(a->head + a->count) % a->config.max_actions] = (request){token, kind};
+    size_t slot = (a->head + a->count) % a->config.max_actions;
+    a->requests[slot] = (request){token, kind};
+    if (a->numeric_values)
+        a->numeric_values[slot] = value ? value->value : 0;
     ++a->count;
     /* Locked invocation lets destroy synchronously stop the caller-owned wake user.
      * wake must not reenter this backend or block on the UI thread. */
@@ -541,24 +636,56 @@ bool cui_accessibility_request(cui_accessibility *a, uint64_t token,
     mtx_unlock(&a->mutex);
     return true;
 }
+bool cui_accessibility_request(cui_accessibility *a, uint64_t token,
+                               cui_accessibility_action kind) {
+    return request_action(a, token, kind, NULL);
+}
+bool cui_accessibility_request_set_value_v1(cui_accessibility *a, uint64_t token, uint32_t size,
+                                            const cui_accessibility_set_value_v1 *value) {
+    return request_action(a, token, CUI_ACCESSIBILITY_SET_VALUE,
+                          size == sizeof(*value) ? value : NULL);
+}
 size_t cui_accessibility_drain(cui_accessibility *a, cui_context *ui) {
     if (!a || !ui)
         return 0;
     size_t accepted = 0;
     mtx_lock(&a->mutex);
+    if (a->numeric_published && !cui_accessibility_numeric_snapshot_ready(ui)) {
+        suspend_numeric(a);
+        a->stats.status = CUI_A11Y_INVALID;
+    }
     while (a->count && !a->closed) {
         request q = a->requests[a->head];
         record *r = find_token(&a->banks[a->live], q.token);
-        if (!r || !cui_accessibility_action_supported(ui, r->semantic.id, q.action))
+        size_t index = action_index(q.action);
+        bool numeric = actions[index].numeric;
+        if (!r || (numeric && !(r->actions & (1u << index))) ||
+            !cui_accessibility_action_supported(ui, r->semantic.id, q.action))
             ++a->stats.rejected;
         else {
-            if (!cui_queue_accessibility_action(ui, r->semantic.id, q.action)) {
+            cui_accessibility_set_value_v1 value = {.version = 1};
+            bool queued;
+            if (q.action == CUI_ACCESSIBILITY_SET_VALUE) {
+                value.value = a->numeric_values[a->head];
+                queued =
+                    cui_queue_accessibility_set_value_v1(ui, r->semantic.id, sizeof(value), &value);
+            } else {
+                queued = cui_queue_accessibility_action(ui, r->semantic.id, q.action);
+            }
+            if (!queued && (!numeric || cui_last_error(ui) == CUI_ERROR_CAPACITY)) {
                 a->stats.status = CUI_A11Y_CAPACITY;
                 break;
             }
-            ++a->stats.accepted;
-            ++accepted;
+            if (queued) {
+                ++a->stats.accepted;
+                ++accepted;
+            } else {
+                a->stats.status = CUI_A11Y_INVALID;
+                ++a->stats.rejected;
+            }
         }
+        if (a->numeric_values)
+            a->numeric_values[a->head] = 0;
         a->head = (a->head + 1) % a->config.max_actions;
         --a->count;
     }
@@ -580,6 +707,7 @@ void cui_accessibility_destroy(cui_accessibility *a) {
     mtx_lock(&a->mutex);
     a->closed = true;
     a->config.wake = NULL;
+    suspend_numeric(a);
     a->count = 0;
     mtx_unlock(&a->mutex);
     accesskit_unix_adapter_free(a->adapter);

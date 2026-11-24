@@ -31,7 +31,10 @@ target_include_directories(test_accessibility PRIVATE "${CMAKE_CURRENT_LIST_DIR}
 target_link_libraries(test_accessibility PRIVATE cui_accessibility)
 add_library(cui_sdl3 STATIC "${CUI_ROOT}/backends/sdl3/cui_sdl3.c" "${CUI_ROOT}/src/text/cui_text.c")
 target_link_libraries(cui_sdl3 PUBLIC cui PkgConfig::SDL3 PkgConfig::TEXT)
-add_executable(test_accessibility_native "${CUI_ROOT}/tests/integration/test_accessibility_native.c")
+add_executable(test_accessibility_native
+ "${CUI_ROOT}/tests/integration/test_accessibility_native.c"
+ "${CUI_ROOT}/src/base/cui_base_slider_model.c"
+ "${CUI_ROOT}/src/base/cui_slider_model.c")
 target_include_directories(test_accessibility_native PRIVATE "${CMAKE_CURRENT_LIST_DIR}")
 target_link_libraries(test_accessibility_native PRIVATE cui_accessibility cui_sdl3 PkgConfig::SDL3 PkgConfig::ATSPI)
 foreach(T cui cui_accessibility cui_sdl3 test_accessibility test_accessibility_native)

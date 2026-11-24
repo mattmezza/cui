@@ -4668,6 +4668,17 @@
           ]
         },
         {
+          "name": "opt-in Linux numeric accessibility transport for typed Slider",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_accessibility.c",
+            "tests/integration/test_accessibility_native.c"
+          ],
+          "limitations": [
+            "Linux X11 private AT-SPI client exercised Set Value, owner rejection and passive read-only state. Increment and Decrement are covered through the C mailbox. Foreign host configuration, browser, other OS adapters and physical screen readers remain open."
+          ]
+        },
+        {
           "name": "disabled/theme variants",
           "status": "not_started",
           "evidence": []

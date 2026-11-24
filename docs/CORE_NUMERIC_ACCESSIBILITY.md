@@ -1,10 +1,11 @@
-# Core numeric accessibility input (unreleased)
+# Core numeric accessibility input
 
 The additive declarations in `include/cui/cui.h` provide explicit numeric consumer
-capabilities, typed SET_VALUE queueing and current-semantic input claims. They do
-not implement a Slider model, bridge/binding authoring, native AccessKit numeric
-mapping, browser semantic bridge or physical assistive-technology acceptance.
-Existing Focus/Activate behavior and legacy Slider routes remain unchanged.
+capabilities, typed SET_VALUE queueing and current-semantic input claims. For a
+consumer see the [typed Slider model](STYLED_SLIDER_MODEL.md). For Linux AT-SPI
+transport see [the optional native adapter](NATIVE_ACCESSIBILITY.md#numeric-slider-actions).
+Browser semantic transport, foreign host opt-in and physical assistive-technology
+acceptance remain open.
 
 ## Registration and completed authority
 
@@ -46,8 +47,9 @@ readiness. Legacy input routes do not consult either new gate. Every rejected
 V2 begin conservatively expires new numeric/input authority, including options,
 budget or allocation failures before common begin; existing error codes, queued
 input and old Focus/Activate routing are preserved. Failed buffer growth still
-expires the old V2 list under its existing lifetime contract. This observer does
-not implement the planned typed Slider UI reducer or any host delivery.
+expires the old V2 list under its existing lifetime contract. This observer
+only reads input readiness. The typed Slider and optional Linux host each
+apply their own capability checks.
 
 ## Typed queue, ownership and claims
 

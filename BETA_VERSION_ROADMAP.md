@@ -1,6 +1,6 @@
 # CUI beta roadmap
 
-Updated: **2026-11-01** · Status: **working alpha; beta scope unfinished**.
+Updated: **2026-11-24** · Status: **working alpha; beta scope unfinished**.
 
 **Goal:** complete and verify all **78 frozen component families**, plus the
 requested native, language-binding, documentation and website capabilities.
@@ -13,7 +13,7 @@ use the checklists below to track acceptance and delivery.
 | --- | --- |
 | Public release | **v0.1.0-alpha.4**, including native starter and language assets; [release](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.4). |
 | Component coverage | **78 families: 77 tested subsets, 1 implemented, 0 fully verified.** These counts are not a completion percentage. |
-| Public website | Interactive WASM gallery, docs and API index; alpha.4 deployment verified at `17533b89`. |
+| Public website | Interactive WASM gallery, docs and API index; alpha.4 source at `17533b89`; [documentation deployment](https://github.com/mattmezza/cui/actions/runs/41308009221) at `4752885b` passed. |
 | Working source | Alpha.4 released from `17533b89`. Exact-source hosted CI/native bindings/Pages pass. Installed C/Python/JS/TS/Go/Rust, real-font text and native starter checks pass. Broader platform/parity acceptance remains open. |
 | Packages | Alpha.4 GitHub assets and verified Go tag/proxy; PyPI, npm and crates.io publication remains open. |
 
@@ -31,8 +31,8 @@ feature test does not establish complete component parity.
 
 Alpha.4 source, native starter, library/language assets and website are published
 and verified. Older releases remain immutable. Disposable worktrees/builds were
-cleaned while retaining unfinished source and evidence. Broader parity work stays
-paused until resumed; the unchecked milestones below remain open.
+cleaned while retaining unfinished source and evidence. Parity work resumed on
+2026-11-24.
 
 ## Next milestones, in order
 
@@ -52,7 +52,7 @@ paused until resumed; the unchecked milestones below remain open.
 | SDL rendering | V1 baseline and pure source-range design are recorded. Private preflight source passed initial focused checks, including 216 frozen-validator comparisons; private extraction is integrated as `16827ec9`. Its exact-limit boundary fixtures and frozen-validator comparison now pass three combined headless checks (0.16 seconds); broader rendering regressions remain open. Compile-only native/WASM guard measurements now preserve all 37 existing offsets and alignment; native object cost is +8 bytes, WASM +0. SDL V2 is now integrated (`e05071c1`): strict root build and three focused private-Xvfb tests pass, including actual software BGRA transfer, failure/reentry/restoration checks and the legacy ABI. Initial capability-query failures are retained; native format/limit handling was corrected. Generated-consumer checks passed for that slice; newer binding changes require regeneration. Broader regression and platform acceptance remain open; unreleased. SDL_Renderer software acceptance does not establish SDL_GPU, Sokol or hardware support. |
 | Owned Icon resources | Resource-only source is integrated with eight worker runtime checks, frozen legacy command/allocation compatibility and native/WASM layout proof. Root strict build, 15 headless checks, 18 skill tests and generated-file freshness pass; configured Badge consumers and language authoring remain open. No released resource API is claimed. |
 | Skeleton | Frozen-source audit confirmed missing dedicated theme background, full/fraction root sizing and modern options in all five bindings. Additive palette/fixed-painter source is integrated with eight focused worker checks, actual 38-preset C oracle and native/WASM proof. Root strict build, 17 targeted headless checks, 18 skill tests and generated-file freshness pass; responsive presentation has integrated strict/runtime/distribution proof; all five binding option sets and broader acceptance remain open. Existing motion checks do not close these gaps. See `docs/design/SKELETON_PARITY_CHECKPOINT.md`. |
-| Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix and native numeric delivery remain unfinished. Supported subsets released in alpha.4. |
+| Typed Slider | C/Python/JS/TS/Go/Rust authoring is integrated with focused checks. Rust current/legacy, 43 old/provider, four compile-fail and matching default-static UI/example checks pass; minimum-compiler acceptance remains open. Python/JS/TS/Go copied-wire evidence checks passed focused acceptance; the broader inactive-field matrix remains open. Alpha.4 contains the typed model and foreign bridge subsets. The subsequent opt-in Linux C adapter passes native AT-SPI Set Value and headless numeric mailbox checks. Foreign host opt-in, other OS adapters and physical screen-reader acceptance remain open. |
 | Backgrounds, shadows and text | Public C software V2 query/render is integrated with 20 focused headless/freshness checks; released in alpha.4. Shared CPU helpers passed focused acceptance (including a corrected include-order fixture); owned-frame extraction (integrated; 24 headless checks and actual WASM layout compilation pass), SDL integration is now covered by focused checks; the other three adapters and foreign authoring APIs remain open. V2 transforms/owned text support up to 64×; the existing scaled-font API retains its separate 16× limit. |
 | Validation | Exact alpha.4 hosted matrix/native bindings/Pages pass; installed consumers and starter pass. Earlier local 606/607 run had one documentation mismatch, repaired with 6/6 affected checks; 19 current skill tests pass. See [release evidence](docs/validation/alpha4-release.json). |
 
@@ -97,7 +97,7 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 | Families / area | Outstanding acceptance scope |
 | --- | --- |
-| Controls | Configured Badge artwork now has an additive C route with root software/frozen-legacy/nesting/resize/resource checks passing. The strict WASM build and full headless browser gate pass on artifact `f728908e`, including configured artwork and child activation. All 42 representative touch cases also pass. Extended authoring in all five bindings and deployment remain open. The existing bridge exposes only the scalar pill; configured artwork requires a reusable owned Icon resource and explicit Badge container. Design: `docs/design/NODE_CONFIGURED_BADGE.md`; implementation remains pending. Button state/style refinement, native numeric Slider delivery and five builders (typed C Base/Styled models and controlled gallery are released in alpha.4; native numeric accessibility remains open); consistent size, text alignment, icons, rounding and shadows across controls. |
+| Controls | Configured Badge artwork now has an additive C route with root software/frozen-legacy/nesting/resize/resource checks passing. The strict WASM build and full headless browser gate pass on artifact `f728908e`, including configured artwork and child activation. All 42 representative touch cases also pass. Extended authoring in all five bindings and deployment remain open. The existing bridge exposes only the scalar pill; configured artwork requires a reusable owned Icon resource and explicit Badge container. Design: `docs/design/NODE_CONFIGURED_BADGE.md`; implementation remains pending. Button state/style refinement, foreign Slider host accessibility and expanded builder styling. Linux C Slider Value transport is verified with an independent AT-SPI client. Consistent size, text alignment, icons, rounding and shadows across controls remain open. |
 | Date/time/color | Remaining parsing, formatting, bounds, keyboard, locale and accessibility contracts. Preserve existing locale/year navigation. |
 | Overlays | Close Dialog held-input reopening and broader lifecycle gaps; finish Popover focus/relationships/placement and HoverCard lifecycle/dismissal. Explicit collapsed semantics require a reviewed contract. |
 | Tables | Table selection/sorting/resizing/themed cells/keyboard; DataTable virtualization, remote callbacks, semantics and consistent scrolling. |

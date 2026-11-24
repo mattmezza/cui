@@ -46,6 +46,7 @@ static unsigned page_touch_cancels;
 #include "cui/cui_scroll.h"
 #include "cui/cui_settings.h"
 #include "cui/cui_sidebar.h"
+#include "cui/cui_skeleton_presentation.h"
 #include "cui/cui_speech.h"
 #include "cui/cui_status.h"
 #include "cui/cui_stepper_navigation.h"
@@ -213,7 +214,18 @@ static unsigned char progress_circle_pixels[1056 * 1056 * 4];
 static cui_progress_circle_state progress_circle_state = {progress_circle_pixels,
                                                           sizeof progress_circle_pixels, 0};
 static cui_progress_motion progress_motion;
-static cui_loading_motion spinner_motion, skeleton_motion;
+static cui_loading_motion spinner_motion;
+static cui_loading_motion skeleton_motion[4];
+static bool skeleton_loading = true;
+static int skeleton_appearance;
+void gallery_skeleton_options(int loading, int appearance) {
+    if (skeleton_loading != (loading != 0)) {
+        for (size_t i = 0; i < sizeof(skeleton_motion) / sizeof(skeleton_motion[0]); ++i)
+            skeleton_motion[i] = (cui_loading_motion){0};
+    }
+    skeleton_loading = loading != 0;
+    skeleton_appearance = appearance;
+}
 static float spinner_size = 16;
 static int spinner_icon, spinner_color, spinner_easing, spinner_sizing;
 static float spinner_rem = 16, spinner_paint_size, spinner_paint_radians, spinner_ease_input;
@@ -2167,6 +2179,83 @@ static cui_otp_state otp_state;
 static char otp_buffer[32];
 static int otp_completions, otp_groups = 2;
 static double next_wake;
+static void skeleton_placeholder(const char *key, const cui_skeleton_palette *palette,
+                                 cui_skeleton_presentation options, size_t index) {
+    cui_loading_motion_result result;
+    if (cui_skeleton_present(ui, cui_id_from(ui, key), palette, &skeleton_motion[index], options,
+                             &result) &&
+        result.next_wake_seconds > 0) {
+        double deadline = host_seconds + fmax(0, result.next_wake_seconds - options.now_seconds);
+        if (!next_wake || deadline < next_wake)
+            next_wake = deadline;
+    }
+}
+static void gallery_skeleton_profile(const cui_theme *theme) {
+    cui_id region = cui_id_from(ui, "profile");
+    cui_begin_box(ui, region,
+                  (cui_box){.width = 1,
+                            .width_percent = true,
+                            .max_width = 480,
+                            .padding = 16,
+                            .gap = 12,
+                            .radius = theme->radius_lg,
+                            .border = theme->border,
+                            .border_width = 1});
+    cui_interact(ui, region, CUI_ROLE_REGION, cui_string("Profile"), false, false, 0);
+    cui_set_tab_stop(ui, region, false);
+    cui_set_semantic_details(ui, region, (cui_semantic_details){.busy = skeleton_loading});
+    if (skeleton_loading) {
+        cui_skeleton_palette palette;
+        if (gallery_preset_index < 0 ||
+            !cui_skeleton_palette_preset_get((size_t)gallery_preset_index, &palette))
+            cui_skeleton_palette_from_theme(theme, &palette);
+        cui_skeleton_presentation bar = cui_skeleton_presentation_default();
+        bar.now_seconds = cui_frame_time(ui);
+        bar.reduced_motion = reduced_motion;
+        bar.secondary = skeleton_appearance == 1;
+        bar.custom_background = skeleton_appearance == 2;
+        bar.root.background = theme->primary;
+        bar.root.radius = 4;
+        cui_begin_box(ui, cui_id_from(ui, "profile-row"),
+                      (cui_box){.width = 1,
+                                .width_percent = true,
+                                .row = true,
+                                .gap = 12,
+                                .align_y = CUI_ALIGN_CENTER});
+        cui_skeleton_presentation circle = bar;
+        circle.root.width = circle.root.height = 40;
+        circle.root.width_percent = false;
+        circle.root.radius = 20;
+        skeleton_placeholder("profile-photo", &palette, circle, 0);
+        cui_begin_box(ui, cui_id_from(ui, "profile-lines"), (cui_box){.width = -1, .gap = 8});
+        bar.root.width = .65f;
+        skeleton_placeholder("profile-name", &palette, bar, 1);
+        bar.root.width = .4f;
+        bar.root.height = 10;
+        skeleton_placeholder("profile-role", &palette, bar, 2);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        bar.root.width = 1;
+        bar.root.height = 28;
+        skeleton_placeholder("profile-description", &palette, bar, 3);
+    } else {
+        cui_begin_box(ui, cui_id_from(ui, "profile-row"),
+                      (cui_box){.row = true, .gap = 12, .align_y = CUI_ALIGN_CENTER});
+        cui_avatar(ui, cui_id_from(ui, "profile-avatar"), theme, cui_string("Sam Patel"), 40);
+        cui_begin_box(ui, cui_id_from(ui, "profile-content"), (cui_box){.gap = 4});
+        cui_label(ui, theme, cui_string("Sam Patel"));
+        cui_text(ui, cui_string("Product designer"), theme->font_size * .875f, theme->muted);
+        cui_end_box(ui);
+        cui_end_box(ui);
+        cui_id status = cui_id_from(ui, "profile-status");
+        cui_begin_box(ui, status, (cui_box){0});
+        cui_interact(ui, status, CUI_ROLE_STATUS, cui_string("Profile loaded"), false, false, 0);
+        cui_set_tab_stop(ui, status, false);
+        cui_text(ui, cui_string("Profile loaded"), theme->font_size, theme->text);
+        cui_end_box(ui);
+    }
+    cui_end_box(ui);
+}
 static cui_shimmer_state shimmer_state;
 static int shimmer_mode;
 static float shimmer_started;
@@ -5243,21 +5332,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         cui_end_box(ui);
         cui_label(ui, &t, cui_string("Hints do not register shortcuts."));
         break;
-    case 18: {
-        cui_skeleton_options options = cui_skeleton_options_default();
-        options.width = width - 48;
-        options.height = 36;
-        options.radius = 6;
-        options.now_seconds = cui_frame_time(ui);
-        options.reduced_motion = reduced_motion;
-        cui_loading_motion_result motion;
-        if (cui_skeleton_ex(ui, cui_id_from(ui, "skeleton"), &t, &skeleton_motion, options,
-                            &motion))
-            next_wake = motion.next_wake_seconds > 0
-                            ? host_seconds + fmax(0, motion.next_wake_seconds - cui_frame_time(ui))
-                            : 0;
+    case 18:
+        gallery_skeleton_profile(&t);
         break;
-    }
     case 19: {
         cui_spinner_options options = cui_spinner_options_default();
         options.size = spinner_size;

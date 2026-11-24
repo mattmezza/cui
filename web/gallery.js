@@ -43,6 +43,20 @@ for(const [key,label,choices,initial] of [
 $('control-size').after(sliderControls);
 function sliderValues(){return ['kind','axis','reverse','scale','accept'].map(k=>Number($('slider-'+k).value));}
 function resetSliderControls(){for(const [k,v] of Object.entries({kind:0,axis:0,reverse:0,scale:0,accept:1}))$('slider-'+k).value=String(v);}
+const skeletonControls=document.createElement('span');
+skeletonControls.hidden=true;
+function skeletonControl(id,label,choices){
+ const input=document.createElement('select');
+ input.id='skeleton-'+id;
+ input.setAttribute('aria-label','Skeleton '+label);
+ for(const [value,text] of choices)input.add(new Option(text,value));
+ input.addEventListener('change',requestFrame);
+ skeletonControls.append(input,' ');
+ return input;
+}
+const skeletonState=skeletonControl('state','profile state',[[1,'Loading profile'],[0,'Loaded profile']]);
+const skeletonAppearance=skeletonControl('appearance','appearance',[[0,'Theme'],[1,'Secondary'],[2,'Accent']]);
+$('control-size').after(skeletonControls);
 const stepperControls=document.createElement('span');
 stepperControls.id='stepper-controls';stepperControls.hidden=true;
 function stepperControl(id,label,options,value){
@@ -493,7 +507,40 @@ const snippets = {
  Bubble:'cui_begin_bubble(ui, id, &theme, CUI_BUBBLE_FILLED, 240);\ncui_label(ui, &theme, cui_string("Message"));\ncui_end_bubble(ui);',
  Empty:'const cui_empty_slot title = {.text = cui_string("No projects yet")};\nconst cui_empty_slot description = {.text = cui_string("Create your first project.")};\nconst cui_empty_header header = {.title = &title, .description = &description};\ncui_empty_ex(ui, id, &theme, (cui_empty_options){\n    .header = &header, .accessible_name = cui_string("Empty workspace")});\n/* content.children accepts a borrowed callback that submits native controls;\n   see the Empty guide for a complete action-button example. */',
  GroupBox:'cui_begin_group_box(ui, id, &theme, cui_string("Preferences"), 320);\ncui_label(ui, &theme, cui_string("Your settings"));\ncui_end_group_box(ui);',
- Skeleton:'cui_skeleton(ui, id, &theme, 240, 20, 6,\n    cui_loading_phase(now_seconds, 1.2f), false, reduced_motion);',
+ Skeleton:`/* Include cui/cui_skeleton_presentation.h. Keep one motion array per profile. */
+static cui_loading_motion motion[3];
+cui_skeleton_palette palette;
+cui_skeleton_palette_from_theme(&theme, &palette);
+cui_begin_box(ui, id, (cui_box){.width = 1, .width_percent = true, .max_width = 480,
+                                .padding = 16, .gap = 12});
+cui_interact(ui, id, CUI_ROLE_REGION, cui_string("Profile"), false, false, 0);
+cui_set_tab_stop(ui, id, false);
+cui_set_semantic_details(ui, id, (cui_semantic_details){.busy = loading});
+double next_wake = 0;
+if (loading) {
+    cui_skeleton_presentation p = cui_skeleton_presentation_default();
+    p.now_seconds = now_seconds;
+    p.reduced_motion = reduced_motion;
+    const float widths[] = {40, .65f, 1};
+    const float heights[] = {40, 16, 28};
+    const char *keys[] = {"profile-avatar", "profile-name", "profile-description"};
+    for (size_t i = 0; i < 3; ++i) {
+        p.root.width = widths[i];
+        p.root.width_percent = i != 0;
+        p.root.height = heights[i];
+        p.root.radius = i == 0 ? 20 : 4;
+        cui_loading_motion_result result;
+        if (cui_skeleton_present(ui, cui_id_from(ui, keys[i]), &palette, &motion[i], p, &result) &&
+            result.next_wake_seconds > 0 && (!next_wake || result.next_wake_seconds < next_wake))
+            next_wake = result.next_wake_seconds;
+    }
+} else {
+    for (size_t i = 0; i < 3; ++i)
+        motion[i] = (cui_loading_motion){0};
+    cui_label(ui, &theme, cui_string("Sam Patel · Product designer"));
+}
+cui_end_box(ui);
+/* Schedule next_wake on the same clock as now_seconds. Zero means idle. */`,
  Spinner:'/* Retain one zero-initialized motion per spinner between frames. */\ncui_loading_motion motion = {0};\ncui_spinner_options options = cui_spinner_options_default();\noptions.now_seconds = now_seconds;\noptions.reduced_motion = reduced_motion;\ncui_loading_motion_result result;\ndouble next_wake = 0; /* Host schedules this deadline. */\nif (cui_spinner_ex(ui, id, &theme, &motion, options, &result))\n    next_wake = result.next_wake_seconds; /* Same clock domain. */\n(void)next_wake; /* Pass to the host scheduler; zero means idle. */',
  Tooltip:'/* Paint trigger before calling the tooltip. */\ncui_tooltip(ui, id, &theme, &hover, cui_string("Helpful detail"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport});',
  HoverCard:'/* Paint trigger before opening the card. */\nif (cui_begin_hover_card(ui, id, &theme, &hover, cui_string("Profile"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport})) {\n    cui_label(ui, &theme, cui_string("Alex Morgan"));\n    cui_end_hover_card(ui);\n}',
@@ -934,6 +981,10 @@ function render(){
  wasm.gallery_tabs_options(Number($('tabs-mode').value),Number($('tabs-size').value),Number($('tabs-variant').value),Number($('tabs-manual').checked));
  wasm.gallery_progress_mode(Number($('progress-mode').value));
  wasm.gallery_progress_shape(Number($('progress-shape').value));
+ if(selected.name==='Skeleton'){
+  skeletonAppearance.hidden=skeletonState.value==='0';
+  wasm.gallery_skeleton_options(Number(skeletonState.value),Number(skeletonAppearance.value));
+ }
  wasm.gallery_spinner_contract_options(Number($('spinner-sizing').value),Number($('spinner-rem').value));
  wasm.gallery_hover_policy(Number($('hover-policy').value));
  wasm.gallery_spinner_options(Number($('spinner-size').value),Number($('spinner-icon').value),Number($('spinner-color').value),Number($('spinner-easing').value));
@@ -1245,6 +1296,9 @@ function selectComponent(){
  $('source').href=`https://github.com/mattmezza/cui/${selected.public_header?'blob/main/'+selected.public_header:'blob/main/docs/gpui-parity.json'}`;
 
  sliderControls.hidden=selected.name!=='Slider';resetSliderControls();
+ skeletonControls.hidden=selected.name!=='Skeleton';
+ skeletonState.value='1';skeletonAppearance.value='0';skeletonAppearance.hidden=false;
+ $('disabled').parentElement.hidden=selected.name==='Skeleton';
  stepperControls.hidden=selected.name!=='Stepper';resetStepperControls();
  $('hover-policy').hidden=selected.name!=='HoverCard';
  for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing','spinner-sizing','spinner-rem'])$(id).hidden=selected.name!=='Spinner';

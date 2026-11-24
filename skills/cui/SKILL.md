@@ -176,6 +176,8 @@ Use the opt-in adapter and keep numeric requests separate from confirmed values.
 For responsive UI, derive available space from the host and use the documented
 layout constraints. Test narrow and wide viewports, long content and overflow;
 do not transplant CSS/browser assumptions into the C layout model.
+For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
+shape, schedule the earliest wake and attach busy state to the application region.
 
 For current-frame intrinsic scroll-body allocation in C Core, read
 `docs/SCROLL_LAYOUT.md` and `include/cui/cui.h`. The opt-in APIs require widths

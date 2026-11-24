@@ -70,6 +70,7 @@ def main():
         'Radio': 'cui_id selected = 0; cui_radio_group_state navigation = {0};',
         'Slider': 'float value = 0;',
         'Progress': 'float progress = 0; cui_progress_motion motion = {0};',
+        'Skeleton': 'bool loading = true;',
         'Input': 'cui_str label = {0}; cui_edit *edit = 0; cui_input_state state = {0};',
         'Textarea': 'cui_edit *edit = 0; cui_textarea_state state = {0};',
         'NumberInput': 'cui_number_state state = {0}; double value = 0; cui_str label = {0};',

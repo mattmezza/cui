@@ -1,14 +1,28 @@
 # Own-root responsive Skeleton presentation
 
-Unreleased focused proof: strict native C11, four C/C++ header-order consumers,
-real public responsive/contract tests, frozen legacy checks and pinned WASM
-compilation passed. Root strict/runtime/distribution acceptance also passes;
-modern five-binding authoring and publication remain pending. See the
+Alpha.4 ships the C presentation API. Strict native C11, four C/C++ header-order
+consumers, responsive/contract tests, frozen legacy checks and pinned WASM
+compilation passed. Modern options in the five language builders remain open. See the
 [worker receipt](validation/skeleton-responsive-first.json) and
 [root receipt](validation/skeleton-responsive-root.json).
 
 Include `cui/cui_skeleton_presentation.h`. This is a separate additive route;
 `cui_skeleton`, `cui_skeleton_ex` and `cui_skeleton_with_palette` are unchanged.
+
+## Loading a profile
+
+The gallery composes a fixed circular avatar, a growing column with two fraction
+width bars, and a full-width block. The Theme appearance reads the current
+preset's owned Skeleton palette. Secondary halves its alpha. Accent supplies an
+explicit custom background using the theme's primary color.
+
+The application marks the surrounding Profile region busy while loading. Choose
+**Loaded profile** to replace the shapes with content and a completion status.
+Each shape owns independent motion state. A host schedules the earliest positive
+deadline across the shapes. When content replaces the placeholders, the demo
+resets their motion and goes idle. **Copy code** gives you the basic
+loading and content branches for a single profile. The shapes themselves add
+no focus stops or accessibility nodes.
 
 ```c
 /* Persistent application-owned state, one per independent placeholder. */
@@ -86,4 +100,6 @@ Registered Y bodies with fixed Skeleton height/full width passed the real public
 API first-frame/resize tests. Percentage HEIGHT remains rejected
 by existing registered scroll admission. A cleared diagnostic cannot make that
 failed geometry valid; rebuild a fresh healthy frame. No Core admission widening,
-GPU/browser/native accessibility or full Styled/platform parity is claimed.
+GPU/native accessibility or full Styled/platform parity is claimed. The gallery
+browser test separately verifies responsive dimensions at desktop and mobile
+width, preset/secondary/accent pixels and busy/loaded semantics.

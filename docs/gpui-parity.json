@@ -2694,7 +2694,7 @@
       },
       "limitations": [
         "Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition.",
-        "Additive owned palette and fixed-size painter source is integrated; focused worker C/software/38-preset oracle and WASM compile evidence is recorded in docs/validation/skeleton-palette-first.json. Integrated strict build, 17 targeted headless checks, 18 consumer-skill tests and canonical freshness checks pass; see docs/validation/skeleton-palette-root.json. Responsive root composition now has the additive cui_skeleton_present source route with focused worker and integrated strict/runtime/distribution proof; all five language builders retain legacy Skeleton options. No full-family or deployed support claim."
+        "Alpha.4 ships owned palette and responsive C presentation. The subsequent profile gallery uses preset, secondary and custom colors and replaces decorative shapes with loaded content. Native binding builders retain legacy Skeleton options. See docs/SKELETON_RESPONSIVE.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -2703,7 +2703,9 @@
           "name": "placeholder sizes/layout",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_content.c",
+            "tests/unit/test_skeleton_responsive.c",
+            "tests/web/test_status_motion.py"
           ]
         },
         {
@@ -2712,6 +2714,7 @@
           "evidence": [
             "tests/unit/test_alert_loading_semantics.c",
             "examples/loading_region/scene.c",
+            "tests/web/test_status_motion.py",
             "docs/design/ALERT_SKELETON_SEMANTICS_AUDIT.md"
           ],
           "limitations": [
@@ -2722,7 +2725,8 @@
           "name": "theme/motion states",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
+            "tests/unit/test_content.c",
+            "tests/web/test_status_motion.py"
           ]
         }
       ],

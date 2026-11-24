@@ -360,6 +360,7 @@ function questionnaire(key,text=""){return new Node(78,text).key(key);}
 function dock(key,text=""){return new Node(79,text).key(key);}
 const sliderModels = require('./slider-model.cjs')(native, Node, NODE, keyFor);
 const localizedTimes = require('./time-field-localized.cjs')(native, Node, NODE, keyFor);
+const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 class App {
   constructor(options = {}) {
     if (options.initiallyHidden !== undefined && typeof options.initiallyHidden !== "boolean") throw new TypeError("initiallyHidden must be boolean");
@@ -379,6 +380,7 @@ class App {
     this._alive();
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
+    skeletons.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
     const attach = (node, parent) => {
@@ -400,6 +402,7 @@ class App {
       if(node.imageValue)native.setImage(this.handle,node[NODE],...node.imageValue);
       if(node.kind===55)native.setTime(this.handle,node[NODE],...node.timeValue);
       localizedTimes.mount(this,node);
+      skeletons.mount(this, node);
       if([57,58].includes(node.kind))native.setDate(this.handle,node[NODE],...node.dateValue);
       if(node.kind===56)native.setColor(this.handle,node[NODE],node.colorValue);
       if(node.kind===69){native.setChartKind(this.handle,node[NODE],node.chartKindValue);native.setChart(this.handle,node[NODE],node.chartDataValue);}
@@ -534,6 +537,7 @@ class App {
     if(this.localizedTimeEnabled && !this.closed && !this.disposed)delivered+=localizedTimes.dispatch(this);
     return delivered;
   }
+  supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
   enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}
   poll_localized_time_change(){if(this.localizedTimeDispatching)throw new Error('poll unavailable during localized TimeField callback');return localizedTimes.poll(this);}
@@ -579,4 +583,4 @@ module.exports = {radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,Sh
 
 Object.assign(module.exports, sliderModels.exports);
 
-Object.assign(module.exports,localizedTimes.exports);
+Object.assign(module.exports, localizedTimes.exports, skeletons.exports);

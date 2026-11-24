@@ -42,7 +42,8 @@ Node import library discovery and macOS Node linker settings are provided. See t
 ## Python: build and launch
 
 The [responsive Skeleton guide](PYTHON_SKELETON.md) includes a Python-authored
-profile UI that replaces loading placeholders with content.
+profile UI that replaces loading placeholders with content. See the
+[JavaScript and TypeScript examples](NODE_SKELETON.md) for the same composition in Node.
 
 ```sh
 cmake -S bindings/bridge -B build-bridge -G Ninja

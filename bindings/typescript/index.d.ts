@@ -396,3 +396,36 @@ export interface App {
 }
 
 export const LocalizedTimeField: {new(key: string, config?: LocalizedTimeConfigInput, text?: string): LocalizedTimeField};
+
+export type SkeletonWidth = 'fixed' | 'fraction' | 'grow';
+export interface SkeletonConfigInput {
+  widthMode?: SkeletonWidth;
+  width?: number;
+  height?: number;
+  maxWidth?: number;
+  radius?: number;
+  duration?: number;
+  /** Numeric 0xRRGGBBAA. Null uses the active palette. */
+  backgroundRgba?: number | null;
+  secondary?: boolean;
+  reducedMotion?: boolean;
+}
+export type SkeletonConfig = Readonly<Required<SkeletonConfigInput>>;
+export interface SkeletonPresentation {
+  readonly frameSequence: bigint;
+  readonly coreTime: number;
+  /** Absolute Core-clock deadline. Zero means static. */
+  readonly nextWakeSeconds: number;
+  readonly phase: number;
+  readonly opacity: number;
+}
+export interface ResponsiveSkeleton extends Node {
+  configure(config: SkeletonConfigInput): this;
+  get_config(): SkeletonConfig;
+  presentation(): SkeletonPresentation | undefined;
+}
+export const ResponsiveSkeleton: {new(key?: string, config?: SkeletonConfigInput): ResponsiveSkeleton};
+export function responsive_skeleton(key?: string, config?: SkeletonConfigInput): ResponsiveSkeleton;
+export interface App {
+  supports_skeleton_presentation(): boolean;
+}

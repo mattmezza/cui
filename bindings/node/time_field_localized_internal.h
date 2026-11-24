@@ -69,22 +69,10 @@ _Static_assert(sizeof(cui_bridge_time) == 12 && sizeof(cui_bridge_node) == 8,
 _Static_assert(sizeof(cui_bridge_time_token_v1) == 20 && sizeof(cui_bridge_time_name_v1) == 68,
                "Time strings");
 #undef TF_OFFSET
-static int tf_symbol(void *target, size_t size, const char *name) {
-#if defined(_WIN32)
-    HMODULE module = GetModuleHandleA("cui_bridge.dll");
-    FARPROC symbol = module ? GetProcAddress(module, name) : NULL;
-#else
-    void *symbol = dlsym(RTLD_DEFAULT, name);
-#endif
-    if (!symbol || size != sizeof(symbol))
-        return 0;
-    memcpy(target, &symbol, size);
-    return 1;
-}
 static int tf_resolve(localized_time_api *a) {
     memset(a, 0, sizeof(*a));
 #define TF_SYMBOL(field, suffix)                                                                   \
-    if (!tf_symbol(&a->field, sizeof a->field, "cui_bridge_time_field_" suffix))                   \
+    if (!optional_bridge_symbol(&a->field, sizeof a->field, "cui_bridge_time_field_" suffix))      \
     return 0
     TF_SYMBOL(versions, "versions");
     TF_SYMBOL(config_size, "config_size_v1");

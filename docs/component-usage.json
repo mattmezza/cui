@@ -849,7 +849,8 @@
         "docs/SKELETON_PALETTE.md",
         "docs/SKELETON_RESPONSIVE.md",
         "docs/BRIDGE_SKELETON.md",
-        "docs/PYTHON_SKELETON.md"
+        "docs/PYTHON_SKELETON.md",
+        "docs/NODE_SKELETON.md"
       ],
       "callback_symbols": [
         "cui_loading_ease_fn"
@@ -862,7 +863,9 @@
         "include/cui/cui_bridge.h"
       ],
       "examples": [
-        "bindings/bridge/examples/skeleton_profile.py"
+        "bindings/bridge/examples/skeleton_profile.py",
+        "bindings/node/examples/skeleton-profile.cjs",
+        "bindings/typescript/examples/skeleton_profile.ts"
       ]
     },
     {

@@ -2014,8 +2014,22 @@ static napi_value shadow_preset(napi_env env, napi_callback_info info) {
     return code == CUI_BRIDGE_OK ? shadow_array(env, &style, NULL) : status(env, code);
 }
 
+static int optional_bridge_symbol(void *target, size_t size, const char *name) {
+#if defined(_WIN32)
+    HMODULE module = GetModuleHandleA("cui_bridge.dll");
+    FARPROC symbol = module ? GetProcAddress(module, name) : NULL;
+#else
+    void *symbol = dlsym(RTLD_DEFAULT, name);
+#endif
+    if (!symbol || size != sizeof(symbol))
+        return 0;
+    memcpy(target, &symbol, size);
+    return 1;
+}
+
 #include "slider_model_internal.h"
 #include "time_field_localized_internal.h"
+#include "skeleton_presentation_internal.h"
 
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
@@ -2135,6 +2149,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("close", close_app, 0);
     EXPORT("sliderModel", slider_model, 0);
     EXPORT("timeFieldLocalized", time_field_localized, 0);
+    EXPORT("skeletonPresentation", skeleton_presentation, 0);
 #undef EXPORT
     return exports;
 }

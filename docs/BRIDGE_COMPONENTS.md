@@ -39,7 +39,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Empty | `cui_empty` | copied title/description, width | Static state |
 | GroupBox | `cui_begin_group_box` | copied title, width, child tree | Native group container |
 | Kbd | `cui_kbd` | copied chord | Default platform-neutral text |
-| Skeleton | `cui_skeleton`, optional retained presentation | Legacy fixed dimensions and [Python responsive sizing, styling and wake hints](PYTHON_SKELETON.md) | JS, TS, Go and Rust responsive builders, custom easing |
+| Skeleton | `cui_skeleton`, optional retained presentation | Legacy fixed dimensions and responsive sizing, styling and wake hints in [Python](PYTHON_SKELETON.md) and [JS/TS](NODE_SKELETON.md) | Go and Rust responsive builders, custom easing |
 | Spinner | `cui_spinner` | size, frame-time motion | Default style |
 | Tag | `cui_tag` | copied text | Default style |
 | Marker | `cui_marker` | copied text, retained state | Single text child |

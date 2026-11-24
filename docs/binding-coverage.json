@@ -361,8 +361,6 @@
         {
           "header": "include/cui/cui_bridge.h",
           "languages": [
-            "javascript",
-            "typescript",
             "go",
             "rust"
           ],
@@ -375,7 +373,7 @@
             "cui_bridge_skeleton_get_config_v1",
             "cui_bridge_skeleton_get_presentation_v1"
           ],
-          "note": "The optional C bridge and Python facade own responsive sizing, theme paint and motion. These four language facades still construct legacy Skeleton nodes."
+          "note": "The optional C bridge and Python, JavaScript and TypeScript facades own responsive sizing, theme paint and motion. Go and Rust still expose the legacy route."
         },
         {
           "header": "include/cui/cui_skeleton_presentation.h",
@@ -389,7 +387,7 @@
           "symbols": [
             "cui_skeleton_present"
           ],
-          "note": "Direct C owns custom easing and full box refinement. The Python facade uses built-in easing and supported bridge layout fields."
+          "note": "Direct C owns custom easing and full box refinement. Modern language facades use built-in easing and supported bridge layout fields."
         }
       ]
     },

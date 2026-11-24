@@ -226,3 +226,49 @@ if(CUI_NODE_TSC_EXECUTABLE)
   --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
   --output ${CMAKE_CURRENT_BINARY_DIR}/time-field-localized-types)
 endif()
+
+add_test(NAME node_skeleton_presentation COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/skeleton-presentation.test.cjs)
+add_test(NAME node_skeleton_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/skeleton-profile.cjs)
+if(CUI_BRIDGE_NATIVE_TESTS)
+ add_test(NAME node_skeleton_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/skeleton-profile.cjs "${CUI_TEST_FONT}" --smoke)
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_skeleton_bad_size SHARED test/skeleton-size-provider.c)
+ target_include_directories(cui_node_skeleton_bad_size PRIVATE ../../include)
+ target_compile_options(cui_node_skeleton_bad_size PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ add_test(NAME node_skeleton_bad_size COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> LD_PRELOAD=$<TARGET_FILE:cui_node_skeleton_bad_size>
+  CUI_SKELETON_UNSUPPORTED=1 ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/skeleton-presentation.test.cjs)
+ foreach(provider legacy partial)
+  string(TOUPPER "${provider}" kind)
+  set(provider_var CUI_NODE_SKELETON_${kind}_LIBRARY)
+  set(${provider_var} "" CACHE FILEPATH "Existing ${provider} bridge for Skeleton compatibility")
+  if(${provider_var})
+   if(NOT EXISTS "${${provider_var}}")
+    message(FATAL_ERROR "${provider_var} must name an existing bridge library")
+   endif()
+   set(target cui_node_skeleton_${provider})
+   add_library(${target} MODULE addon.c)
+   target_include_directories(${target} PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+   target_link_libraries(${target} PRIVATE "${${provider_var}}" m ${CMAKE_DL_LIBS})
+   target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+   set_target_properties(${target} PROPERTIES PREFIX "" SUFFIX ".node")
+   add_test(NAME node_skeleton_${provider} COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:${target}> CUI_SKELETON_UNSUPPORTED=1 ${NODE_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/skeleton-presentation.test.cjs)
+  endif()
+ endforeach()
+endif()
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_skeleton_types_runtime COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${Python3_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/test/run-skeleton-types.py
+  --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
+  --output ${CMAKE_CURRENT_BINARY_DIR}/skeleton-types)
+endif()

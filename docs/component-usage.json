@@ -848,7 +848,8 @@
         "docs/CONTENT.md",
         "docs/SKELETON_PALETTE.md",
         "docs/SKELETON_RESPONSIVE.md",
-        "docs/BRIDGE_SKELETON.md"
+        "docs/BRIDGE_SKELETON.md",
+        "docs/PYTHON_SKELETON.md"
       ],
       "callback_symbols": [
         "cui_loading_ease_fn"
@@ -859,6 +860,9 @@
       "composition": "immediate frame submission",
       "additional_public_headers": [
         "include/cui/cui_bridge.h"
+      ],
+      "examples": [
+        "bindings/bridge/examples/skeleton_profile.py"
       ]
     },
     {

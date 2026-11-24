@@ -494,7 +494,9 @@ Focused worker native/software/WASM proof and root strict/distribution checks
 pass (17 headless checks and 18 skill tests). The additive `cui_skeleton_present` route owns its responsive root layout; read
 `docs/SKELETON_RESPONSIVE.md` and its header. Use the optional retained C bridge in `docs/BRIDGE_SKELETON.md` for copied
 configuration, responsive sizing, and per-node wake hints on the Core clock.
-All five language builders still expose the legacy route.
+Use `docs/PYTHON_SKELETON.md` for the optional Python responsive builder and
+the runnable profile UI. Legacy `skeleton()` works with alpha.4. JavaScript,
+TypeScript, Go, and Rust builders expose the legacy route.
 
 For owned bridge Icon resources, read `docs/BRIDGE_ICON_RESOURCES.md` and the
 complete bridge header. The additive resource group has focused worker/root proof (15 headless checks); it copies source/map/bitmap data and requires matching app/owner

@@ -132,6 +132,8 @@ class _API:
         bind_api(self, bind)
         from .time_field_localized import bind_api as bind_time_api
         bind_time_api(self, bind)
+        from .skeleton_presentation import bind_api as bind_skeleton_api
+        bind_skeleton_api(self, bind)
         self.clipboard_set = bind("clipboard_set",C.c_int,C.c_void_p,C.c_char_p)
         self.clipboard_get = bind("clipboard_get",C.c_int,C.c_void_p,C.c_void_p,C.c_uint32,C.POINTER(C.c_uint32))
         self.theme_count = bind("theme_preset_count", C.c_uint32)
@@ -1499,6 +1501,9 @@ class App:
             for index, child in enumerate(node._children):
                 validate(child, node, f"{path}/{index}", depth + 1, lineage + (node,))
         validate(tree, None, "root", 0)
+        if any(isinstance(node, ResponsiveSkeleton) for node, _, _ in order):
+            from .skeleton_presentation import require_api
+            require_api(self)
         if any(node.kind == "slider_model" for node, _, _ in order) and not self._slider_enabled:
             self.enable_slider_requests()
         if any(isinstance(node, LocalizedTimeField) for node, _, _ in order) and not self._time_field_enabled:
@@ -1537,6 +1542,9 @@ class App:
                 if isinstance(node, LocalizedTimeField):
                     from .time_field_localized import mount_node as mount_time_node
                     mount_time_node(self, node)
+                if isinstance(node, ResponsiveSkeleton):
+                    from .skeleton_presentation import mount_node as mount_skeleton_node
+                    mount_skeleton_node(node)
                 if node.kind in {"calendar", "date_picker"}: node._change("set_date",_Date(*node._date))
                 if node.kind == "color_picker": node._change("set_color",node._color)
                 if node.kind == "chart": node.chart_kind(("line","area","bar","pie")[node._chart_kind]);node.chart_data(node._chart_data)
@@ -1945,6 +1953,10 @@ class App:
         from .slider_model import dispatch
         return dispatch(self)
 
+    def supports_skeleton_presentation(self) -> bool:
+        from .skeleton_presentation import supported
+        return supported(self)
+
     def supports_time_field(self) -> bool:
         from .time_field_localized import supported
         return supported(self)
@@ -2094,3 +2106,8 @@ from .time_field_localized import (TimeValue, TimeCycle, TimePrecision, TimeText
     TimeFieldConfig, TimeFieldChange, TimeFieldResult, LocalizedTimeField, localized_time_field)
 from .time_field_localized import __all__ as _time_field_exports
 __all__ += _time_field_exports
+
+from .skeleton_presentation import (SkeletonWidth, SkeletonConfig, SkeletonPresentation,
+                                    ResponsiveSkeleton, responsive_skeleton)
+from .skeleton_presentation import __all__ as _skeleton_exports
+__all__ += _skeleton_exports

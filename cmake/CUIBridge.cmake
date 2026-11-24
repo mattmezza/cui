@@ -59,6 +59,16 @@ add_test(NAME bridge_python
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
   CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_bridge.py)
+set(CUI_PYTHON_SKELETON_LEGACY_LIBRARY "" CACHE FILEPATH "Optional published pre-presentation bridge")
+set(CUI_PYTHON_SKELETON_PARTIAL_LIBRARY "" CACHE FILEPATH "Optional bridge with incomplete Skeleton symbols")
+add_test(NAME bridge_python_skeleton COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ CUI_SKELETON_LEGACY_LIBRARY=${CUI_PYTHON_SKELETON_LEGACY_LIBRARY}
+ CUI_SKELETON_PARTIAL_LIBRARY=${CUI_PYTHON_SKELETON_PARTIAL_LIBRARY}
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_skeleton_presentation.py)
+add_test(NAME bridge_python_skeleton_example COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/skeleton_profile.py)
 option(CUI_BRIDGE_NATIVE_TESTS "Register opt-in Linux invisible native binding checks" OFF)
 if(CUI_BRIDGE_NATIVE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT TARGET cui_sdl3 OR NOT CUI_TEST_FONT)
@@ -71,6 +81,10 @@ if(CUI_BRIDGE_NATIVE_TESTS)
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python
   CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge> CUI_TEST_FONT=${CUI_TEST_FONT}
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_native_virtual.py)
+ add_test(NAME bridge_python_skeleton_native COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/skeleton_profile.py
+  --font ${CUI_TEST_FONT} --smoke)
 endif()
 
 add_test(NAME bridge_python_components COMMAND ${CMAKE_COMMAND} -E env

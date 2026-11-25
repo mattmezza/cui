@@ -2518,8 +2518,24 @@ static bool popover_previews;
 static bool dialog_long_body;
 static cui_popover_position gallery_popover_position;
 static bool popover_edge, popover_inert, popover_modal;
+static bool popover_secondary_trigger;
 static float popover_opacity = 1;
 static cui_rect popover_anchor_used;
+static void popover_keyboard_or_touch(void *user, const cui_button_click_event *event) {
+    if (event->origin != CUI_BUTTON_CLICK_POINTER || event->pointer_type == CUI_POINTER_TOUCH)
+        *(bool *)user = true;
+}
+static void popover_keep_trigger_touch(cui_context *ui, cui_id trigger) {
+    /* The tap toggles on accepted release. Keep its down out of outside dismissal. */
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (events[i].type == CUI_EVENT_POINTER_DOWN &&
+            events[i].pointer_type == CUI_POINTER_TOUCH &&
+            events[i].pointer_button == CUI_POINTER_PRIMARY && !cui_event_consumed(ui, i) &&
+            cui_event_target(ui, i) == trigger)
+            cui_consume_event(ui, i);
+}
 static bool alert_decision(void *user, cui_surface_result result) {
     int *attempts = user;
     if (result != CUI_SURFACE_ACCEPTED)
@@ -3429,6 +3445,10 @@ void gallery_focus(unsigned index) {
         cui_focus(ui, semantics[index].id);
     else
         cui_focus(ui, 0);
+}
+int gallery_accessibility_activate(unsigned index) {
+    return index < semantic_count &&
+           cui_queue_accessibility_action(ui, semantics[index].id, CUI_ACCESSIBILITY_ACTIVATE);
 }
 /* Browser host owns decoding. This fixed staging area is borrowed only during
  * the synchronous Canvas draw-list consumption; JS never writes during render. */
@@ -6334,7 +6354,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                     .opacity = popover_opacity,
                                     .custom_opacity = true});
         cui_id trigger = cui_id_from(ui, "popover-trigger");
-        bool opening = cui_button(ui, trigger, &t, cui_string("Open account card"), disabled);
+        cui_str trigger_label = cui_string("Open account card");
+        bool opening = false;
+        if (popover_secondary_trigger) {
+            bool activated = false;
+            cui_button_ex(ui, trigger, &t, trigger_label,
+                          (cui_button_options){.disabled = disabled,
+                                               .open = popover_surface.overlay.open,
+                                               .on_click_event = popover_keyboard_or_touch,
+                                               .action_user = &activated});
+            if (!disabled && popover_surface.overlay.open)
+                popover_keep_trigger_touch(ui, trigger);
+            bool secondary = cui_popover_take_secondary_press(ui, trigger);
+            if (activated || secondary) {
+                opening = !popover_surface.overlay.open;
+                if (!opening)
+                    cui_surface_request_close(ui, &popover_surface, CUI_SURFACE_CLOSED);
+            }
+        } else {
+            opening = cui_button(ui, trigger, &t, trigger_label, disabled);
+        }
         if (opening)
             cui_surface_open(ui, &popover_surface, trigger);
         cui_rect anchor = cui_bounds(ui, trigger);
@@ -7590,7 +7629,8 @@ double gallery_sheet_motion(unsigned field) {
 /* Browser-host descriptor. The first six values map directly to the portable
  * positioning descriptor; the remainder configure only this demonstration. */
 void gallery_popover_options(int mode, int anchor, int custom_offset, float offset, int arrow,
-                             float reference_rem, int edge, float opacity, int inert, int modal) {
+                             float reference_rem, int edge, float opacity, int inert, int modal,
+                             int secondary_trigger) {
     gallery_popover_position = (cui_popover_position){
         .mode = mode == 1 ? CUI_POPOVER_POSITION_ANCHOR : CUI_POPOVER_POSITION_LEGACY,
         .anchor = anchor >= 0 && anchor <= 7 ? (cui_popover_anchor)anchor : CUI_POPOVER_TOP_LEFT,
@@ -7603,6 +7643,7 @@ void gallery_popover_options(int mode, int anchor, int custom_offset, float offs
     popover_edge = edge != 0;
     popover_opacity = isfinite(opacity) && opacity >= 0 && opacity <= 1 ? opacity : 1;
     popover_inert = inert != 0;
+    popover_secondary_trigger = secondary_trigger != 0;
     bool next_modal = mode == 1 && modal != 0;
     if (next_modal && !popover_modal)
         cui_surface_open(ui, &dialog_surface, 0);

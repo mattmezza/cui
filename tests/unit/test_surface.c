@@ -379,6 +379,91 @@ static void popover_link_scene(cui_context *ui, const cui_theme *theme, cui_surf
     cui_end_frame(ui);
     assert(cui_last_error(ui) == CUI_OK);
 }
+typedef enum {
+    TRIGGER_READY,
+    TRIGGER_DISABLED,
+    TRIGGER_OMITTED,
+    TRIGGER_INERT,
+    TRIGGER_CLIPPED,
+    TRIGGER_OCCLUDED
+} trigger_fixture;
+static bool popover_press_scene(cui_context *ui, const cui_theme *theme, trigger_fixture fixture,
+                                unsigned consumed) {
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    if (consume_first)
+        assert(cui_consume_event(ui, 0));
+    cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400});
+    bool clipped = fixture == TRIGGER_CLIPPED;
+    cui_begin_box(
+        ui, 901,
+        (cui_box){.inert = fixture == TRIGGER_INERT, .clip = clipped, .height = clipped ? 2 : 0});
+    if (fixture != TRIGGER_OMITTED)
+        button(ui, 1, theme, cui_string("Popover trigger"), fixture == TRIGGER_DISABLED);
+    bool pressed = cui_popover_take_secondary_press(ui, 1);
+    assert(!cui_popover_take_secondary_press(ui, 1));
+    cui_end_box(ui);
+    button(ui, 2, theme, cui_string("Another control"), false);
+    if (fixture == TRIGGER_OCCLUDED) {
+        cui_begin_portal(ui, 902, (cui_box){0}, (cui_rect){0, 0, 160, 40}, 120);
+        button(ui, 3, theme, cui_string("In front"), false);
+        cui_end_box(ui);
+    }
+    size_t count;
+    cui_frame_events(ui, &count);
+    assert(count <= 4);
+    for (size_t i = 0; i < count; ++i)
+        assert(cui_event_consumed(ui, i) == ((consumed & (1u << i)) != 0));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+    return pressed;
+}
+static void popover_pointer_event(cui_context *ui, cui_event_type type, cui_pointer_button which,
+                                  float x, float y) {
+    assert(cui_queue_event(ui, (cui_event){.type = type, .pointer_button = which, .x = x, .y = y}));
+}
+static void popover_secondary_trigger(void) {
+#ifdef CUI_SURFACE_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui && !cui_popover_take_secondary_press(ui, 1));
+    assert(!popover_press_scene(ui, &theme, TRIGGER_READY, 0));
+    cui_rect trigger = cui_bounds(ui, 1);
+    float x = trigger.x + trigger.w / 2, y = trigger.y + trigger.h / 2;
+    cui_focus(ui, 2);
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, x, y);
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, x, y);
+    popover_pointer_event(ui, CUI_EVENT_POINTER_UP, CUI_POINTER_SECONDARY, x, y);
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, 590, 390);
+    assert(popover_press_scene(ui, &theme, TRIGGER_READY, 3));
+    assert(cui_focused(ui) == 2);
+
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_MIDDLE, x, y);
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_PRIMARY, x, y);
+    popover_pointer_event(ui, CUI_EVENT_POINTER_UP, CUI_POINTER_PRIMARY, x, y);
+    assert(!popover_press_scene(ui, &theme, TRIGGER_READY, 0));
+    consume_first = true;
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, x, y);
+    assert(!popover_press_scene(ui, &theme, TRIGGER_READY, 1));
+    consume_first = false;
+
+    const trigger_fixture rejected[] = {TRIGGER_DISABLED, TRIGGER_OMITTED, TRIGGER_INERT};
+    for (size_t i = 0; i < sizeof(rejected) / sizeof(rejected[0]); ++i) {
+        popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, x, y);
+        assert(!popover_press_scene(ui, &theme, rejected[i], 0));
+        assert(!popover_press_scene(ui, &theme, TRIGGER_READY, 0));
+    }
+    assert(!popover_press_scene(ui, &theme, TRIGGER_OCCLUDED, 0));
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, x, y);
+    assert(!popover_press_scene(ui, &theme, TRIGGER_OCCLUDED, 0));
+    assert(!popover_press_scene(ui, &theme, TRIGGER_CLIPPED, 0));
+    popover_pointer_event(ui, CUI_EVENT_POINTER_DOWN, CUI_POINTER_SECONDARY, x, y);
+    assert(!popover_press_scene(ui, &theme, TRIGGER_CLIPPED, 0));
+    cui_destroy(ui);
+}
 static void popover_link_and_focus(void) {
 #ifdef CUI_SURFACE_BASE_ONLY
     cui_theme theme = {0};
@@ -1128,6 +1213,7 @@ int main(void) {
     dialog_events();
     confirmation_and_popover();
     popover_outside_focus();
+    popover_secondary_trigger();
     popover_link_and_focus();
     sheet_events();
     resize_sheets();

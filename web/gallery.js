@@ -86,6 +86,7 @@ function popoverControl(id,label,options,value){
  input.addEventListener('change',requestFrame);wrapper.append(input);popoverControls.append(wrapper,' ');return input;
 }
 popoverControl('mode','Positioning',[[0,'Legacy placement'],[1,'Source anchors (opt in)']],0);
+popoverControl('trigger','Trigger',[[0,'Click, tap, or keyboard'],[1,'Right-click, tap, or keyboard']],0);
 popoverControl('anchor','Popup anchor',popoverAnchors.map((name,i)=>[i,name.toLowerCase().replaceAll('_',' ')]),0);
 popoverControl('custom-offset','Custom signed gap',null,false);
 popoverControl('offset','Gap',[-24,-8,0,8,24].map(n=>[n,String(n)]),8);
@@ -103,9 +104,24 @@ dialogLongBody.id='dialog-long-body';dialogLongBody.type='checkbox';
 dialogLongBody.addEventListener('change',requestFrame);
 dialogBodyControl.append(dialogLongBody,' Long body');
 $('surface-variant').after(dialogBodyControl);
-function popoverValues(){return [Number($('popover-mode').value),Number($('popover-anchor').value),Number($('popover-custom-offset').checked),Number($('popover-offset').value),Number($('popover-arrow').checked),Number($('popover-rem').value),Number($('popover-edge').checked),Number($('popover-opacity').value),Number($('popover-inert').checked),Number($('popover-modal').checked)];}
+function popoverValues(){return [Number($('popover-mode').value),Number($('popover-anchor').value),
+ Number($('popover-custom-offset').checked),Number($('popover-offset').value),Number($('popover-arrow').checked),
+ Number($('popover-rem').value),Number($('popover-edge').checked),Number($('popover-opacity').value),
+ Number($('popover-inert').checked),Number($('popover-modal').checked),Number($('popover-trigger').value)];}
 function popoverUsage(){
- const [mode,anchor,custom,offset,arrow,rem,edge,opacity,inert,modal]=popoverValues();
+ const [mode,anchor,custom,offset,arrow,rem,edge,opacity,inert,modal,secondary]=popoverValues();
+ const trigger=secondary?`    bool activated = false;
+    cui_button_ex(ui, trigger, theme, cui_string("Open account card"),
+        (cui_button_options){.open = card->overlay.open,
+            .on_click_event = account_keyboard_or_touch, .action_user = &activated});
+    if (card->overlay.open)
+        account_keep_trigger_touch(ui, trigger);
+    bool secondary_pressed = cui_popover_take_secondary_press(ui, trigger);
+    bool toggle = activated || secondary_pressed;
+    bool opening = toggle && !card->overlay.open;
+    if (toggle && !opening)
+        cui_surface_request_close(ui, card, CUI_SURFACE_CLOSED);`:
+    `    bool opening = cui_button(ui, trigger, theme, cui_string("Open account card"), false);`;
  const placement=mode?'position':'(cui_popover_position){0}';
  const position=mode?`    cui_popover_position position = {
         .mode = CUI_POPOVER_POSITION_ANCHOR, .anchor = CUI_POPOVER_${popoverAnchors[anchor]},
@@ -117,7 +133,21 @@ function popoverUsage(){
           .custom_opacity = true, .opacity = ${Number(opacity).toFixed(1)}f, .inert = ${!!inert}});`:'';
  return `#include <cui/cui_surface.h>
 #include <cui/cui_components.h>
-/* Retain card and layer across frames. Call init once before drawing. */
+${secondary?`static void account_keyboard_or_touch(void *user, const cui_button_click_event *event) {
+    if (event->origin != CUI_BUTTON_CLICK_POINTER || event->pointer_type == CUI_POINTER_TOUCH)
+        *(bool *)user = true;
+}
+static void account_keep_trigger_touch(cui_context *ui, cui_id trigger) {
+    /* A tap toggles on release. Its down belongs to the trigger. */
+    size_t count;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (events[i].type == CUI_EVENT_POINTER_DOWN && events[i].pointer_type == CUI_POINTER_TOUCH &&
+            events[i].pointer_button == CUI_POINTER_PRIMARY && !cui_event_consumed(ui, i) &&
+            cui_event_target(ui, i) == trigger)
+            cui_consume_event(ui, i);
+}
+`:''}/* Retain card and layer across frames. Call init once before drawing. */
 void account_init(cui_context *ui, cui_surface_state *card, cui_surface_state *layer) {
     cui_surface_init(card, cui_id_from(ui, "account"), CUI_SURFACE_POPOVER);
     cui_surface_init(layer, cui_id_from(ui, "account-modal"), CUI_SURFACE_DIALOG);
@@ -132,7 +162,7 @@ void account_modal_open(cui_context *ui, cui_surface_state *layer) {
     (void)layer;
 ${position}
     cui_id trigger = cui_id_from(ui, "account-trigger");
-    bool opening = cui_button(ui, trigger, theme, cui_string("Open account card"), false);
+${trigger}
     if (opening)
         cui_surface_open(ui, card, trigger);
     cui_surface_options options = {.viewport = {0, 0, width, height},
@@ -996,7 +1026,8 @@ function render(){
  wasm.gallery_surface_variant(Number($('surface-variant').value));
  wasm.gallery_dialog_options(Number(dialogLongBody.checked));
  wasm.gallery_popover_options(...popoverValues());
- for(const input of popoverControls.querySelectorAll('select,input'))if(input.id!=='popover-mode')input.disabled=$('popover-mode').value==='0';
+ for(const input of popoverControls.querySelectorAll('select,input'))
+  if(!['popover-mode','popover-trigger'].includes(input.id))input.disabled=$('popover-mode').value==='0';
  wasm.gallery_button_collection(Number($('button-collection').value));
  wasm.gallery_input_mode(Number($('input-mode').value));
  wasm.gallery_disclosure_options(Number($('disclosure-mode').value),Number($('disclosure-multiple').checked));
@@ -1182,13 +1213,19 @@ function syncSemantics(){
   if(!el){el=document.createElement(interactiveRoles.includes(f(0))&&!['treeitem','columnheader'].includes(role)?'button':'div');el.id=id;if(el.tagName==='BUTTON'){el.type='button';el.tabIndex=-1;}semanticNodes.set(id,el);}
   if(role==='text')el.removeAttribute('role');else el.setAttribute('role',role);
   const name=stringAt(wasm.gallery_semantic_name(i),wasm.gallery_semantic_length(i));
+  const accountTrigger=selected.name==='Popover'&&role==='button'&&name==='Open account card';
   if(role==='text')el.textContent=name;
   el.setAttribute('aria-label',name);
   if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_keyboard_event(3,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(role==='textbox'&&plainCharacterInput(e)));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
   const description=stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
   if(description)el.setAttribute('aria-description',description);else el.removeAttribute('aria-description');
   if(role==='columnheader'){el.onclick=e=>{e.stopPropagation();if(f(5))return;wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};}
-  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{e.stopPropagation();wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();};}
+  if(el.tagName==='BUTTON'){if(el.textContent!==name)el.textContent=name;el.disabled=Boolean(f(5));el.onclick=e=>{
+   e.stopPropagation();
+   if(accountTrigger&&$('popover-trigger').value==='1'){if(wasm.gallery_accessibility_activate(i))requestFrame();return;}
+   wasm.gallery_event(1,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);
+   wasm.gallery_event(2,f(1)+f(3)/2,f(2)+f(4)/2,0,0,0,0,1);requestFrame();
+  };}
   else el.setAttribute('aria-label',name);
   if(['checkbox','switch','radio','menuitemcheckbox','menuitemradio'].includes(role))el.setAttribute('aria-checked',role==='checkbox'&&f(8)===2?'mixed':String(Boolean(f(6))));
   if(['checkbox','radio'].includes(role)){el.setAttribute('aria-required',String(Boolean(f(27))));el.setAttribute('aria-invalid',String(Boolean(f(28))));}
@@ -1208,7 +1245,6 @@ function syncSemantics(){
   if(role==='progressbar'){el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));if(f(14))el.removeAttribute('aria-valuenow');else el.setAttribute('aria-valuenow',String(f(8)));}
   if(role==='slider'||role==='scrollbar'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);else el.removeAttribute('aria-valuetext');
-  const accountTrigger=selected.name==='Popover'&&role==='button'&&name==='Open account card';
   if(accountTrigger)el.setAttribute('aria-haspopup','dialog');else el.removeAttribute('aria-haspopup');
   if(accountTrigger||selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
@@ -1390,7 +1426,7 @@ function selectComponent(){
  $('surface-variant').hidden=selected.name!=='Sheet';$('surface-variant').value='0';
  dialogBodyControl.hidden=selected.name!=='Dialog';dialogLongBody.checked=false;
  popoverControls.hidden=selected.name!=='Popover';
- for(const [id,value] of [['mode','0'],['anchor','0'],['offset','8'],['rem','16'],['opacity','1']])$('popover-'+id).value=value;
+ for(const [id,value] of [['mode','0'],['trigger','0'],['anchor','0'],['offset','8'],['rem','16'],['opacity','1']])$('popover-'+id).value=value;
  for(const id of ['custom-offset','edge','inert','modal'])$('popover-'+id).checked=false;
  $('popover-arrow').checked=true;
  $('disclosure-mode').hidden=!['Accordion','Collapsible'].includes(selected.name);$('disclosure-mode').value='0';

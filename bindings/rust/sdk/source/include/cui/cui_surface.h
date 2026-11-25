@@ -206,6 +206,12 @@ bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
 bool cui_popover_begin_with_outside_focus(cui_context *, const cui_theme *, cui_surface_state *,
                                           cui_str title, cui_str description, cui_surface_options,
                                           cui_popover_position, cui_popover_outside_focus);
+/* Call after submitting an enabled trigger with a stable interactive ID, in
+ * its scope. Consumes unconsumed secondary pointer downs routed to that exact
+ * ID, coalesced into one true per frame. Routing uses the prior clipped layout.
+ * False leaves input untouched. The caller chooses whether to open or close.
+ * Does not alter focus, invoke callbacks or control host default behavior. */
+bool cui_popover_take_secondary_press(cui_context *, cui_id trigger);
 /* After submitting the trigger and optional panel, update the trigger's current
  * controls/expanded details. Pass the begin result for this frame, or false
  * when omitting the panel. Call when closed, too. Only an admitted panel opened

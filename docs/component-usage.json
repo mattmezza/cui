@@ -1918,6 +1918,7 @@
         "cui_popover_begin_with_outside_focus",
         "cui_base_surface_begin_with_outside_focus",
         "cui_popover_surface_geometry",
+        "cui_popover_take_secondary_press",
         "cui_popover_link_trigger"
       ],
       "state_types": [
@@ -1925,7 +1926,7 @@
       ],
       "state_ownership": "Caller retains cui_surface_state and child form/application data.",
       "interaction": "cui_surface_decision_fn may veto close; cui_surface_closed_fn observes close; take_result consumes the decision.",
-      "usage": "Initialize the surface kind and open from an action. Pair end only when begin succeeds. On the opening action, applications may use cui_focus for an enabled child in that successful frame. Call cui_popover_link_trigger after the trigger and panel with the current begin result, or false when omitted. Choose CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER with an outside-focus begin function to preserve existing pointer focus on accepted nonmodal outside dismissal. Other closes restore the trigger. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning. Arrow rendering requires a mesh-capable adapter; SDL3 and browser adapters support bounded analytic meshes with documented limits. The gallery shows outside dismissal in both legacy and source anchor modes. Source anchors expose all eight popup anchors, signed custom gap, arrow toggle, app/host reference rem and edge clamping. The complete C11 snippet follows the current mode.",
+      "usage": "Initialize the surface kind and open from an action. Pair end only when begin succeeds. On the opening action, applications may use cui_focus for an enabled child in that successful frame. Call cui_popover_link_trigger after the trigger and panel with the current begin result, or false when omitted. Choose CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER with an outside-focus begin function to preserve existing pointer focus on accepted nonmodal outside dismissal. Other closes restore the trigger. Consume result once. Use cui_popover_begin for explicit anchor/offset/arrow positioning. Arrow rendering requires a mesh-capable adapter; SDL3 and browser adapters support bounded analytic meshes with documented limits. Call cui_popover_take_secondary_press after submitting an enabled trigger to opt into right-click handling. The gallery shows outside dismissal and both trigger modes in legacy and source anchor placements. Source anchors expose all eight popup anchors, signed custom gap, arrow toggle, app/host reference rem and edge clamping. The complete C11 snippet follows the current mode.",
       "docs": [
         "docs/SURFACES.md",
         "docs/SURFACE_EVENTS.md",

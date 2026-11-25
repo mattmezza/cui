@@ -80,6 +80,7 @@ Use `cui_focus` only on the accepted opening action inside a successful begin,
 then call `cui_popover_link_trigger` with the current begin result after the panel.
 Use `cui_popover_begin_with_outside_focus` and
 `CUI_POPOVER_OUTSIDE_FOCUS_KEEP_POINTER` to keep a nonmodal outside click's focus.
+For right-click, call `cui_popover_take_secondary_press` after submitting the trigger.
 
 `read PATH` still prints the exact full document; `info` lists paths and hashes.
 For broad Markdown guides use `read PATH --headings`, then

@@ -207,6 +207,12 @@ bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
 bool cui_popover_begin_with_outside_focus(cui_context *, const cui_theme *, cui_surface_state *,
                                           cui_str title, cui_str description, cui_surface_options,
                                           cui_popover_position, cui_popover_outside_focus);
+/* Call after submitting an enabled trigger with a stable interactive ID, in
+ * its scope. Consumes unconsumed secondary pointer downs routed to that exact
+ * ID, coalesced into one true per frame. Routing uses the prior clipped layout.
+ * False leaves input untouched. The caller chooses whether to open or close.
+ * Does not alter focus, invoke callbacks or control host default behavior. */
+bool cui_popover_take_secondary_press(cui_context *, cui_id trigger);
 /* After submitting the trigger and optional panel, update the trigger's current
  * controls/expanded details. Pass the begin result for this frame, or false
  * when omitting the panel. Call when closed, too. Only an admitted panel opened
@@ -749,6 +755,30 @@ bool cui_base_surface_begin_with_outside_focus(cui_context *ui, cui_surface_stat
 }
 void cui_base_surface_end(cui_context *ui) {
     cui_overlay_end(ui);
+}
+
+bool cui_popover_take_secondary_press(cui_context *ui, cui_id trigger) {
+    if (!trigger || !cui_frame_sequence(ui) || !cui_pointer_scope_allowed(ui, 0))
+        return false;
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    const cui_semantic *opener = NULL;
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].id == trigger) {
+            opener = &nodes[i];
+            break;
+        }
+    if (!opener || opener->disabled || opener->details.blocks_pointer_activation)
+        return false;
+    bool pressed = false;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i) {
+        const cui_event *e = &events[i];
+        if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_SECONDARY &&
+            !cui_event_consumed(ui, i) && cui_event_target(ui, i) == trigger)
+            pressed |= cui_consume_event(ui, i);
+    }
+    return pressed;
 }
 
 bool cui_popover_link_trigger(cui_context *ui, const cui_surface_state *s, cui_id trigger,

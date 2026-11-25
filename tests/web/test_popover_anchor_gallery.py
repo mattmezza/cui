@@ -231,16 +231,74 @@ def main():
                 a.configure('popover-mode','0')
                 legacy = a.page.evaluate(SNAPSHOT)
                 assert not [c for c in legacy['commands'] if c['type']==6]
+                a.configure('popover-trigger', '1')
+                compile_usage(a.page.locator('#snippet').inner_text())
+                if mobile:
+                    activate(a.target('Open account card'))
+                    assert a.page.evaluate(SNAPSHOT)['open']
+                    assert a.target('Notify me about releases')['f'][7]
+                    a.dispatch('touchStart', [a.point(a.target('Open account card'))])
+                    assert a.page.evaluate(SNAPSHOT)['open'], 'Trigger touch dismissed before release'
+                    a.dispatch('touchCancel', [])
+                    assert a.page.evaluate(SNAPSHOT)['open'], 'Cancelled trigger touch dismissed'
+                    a.dispatch('touchStart', [a.point(a.target('Open account card'))])
+                    a.dispatch('touchEnd', [])
+                    a.page.wait_for_function('!cuiGallery.exports.gallery_surface_open(3)')
+                    assert not a.page.evaluate(SNAPSHOT)['open']
+                else:
+                    def right_button(name):
+                        point = a.point(a.target(name))
+                        a.page.mouse.move(point['x'], point['y'])
+                    activate(a.target('Open account card'))
+                    assert not a.page.evaluate(SNAPSHOT)['open']
+                    right_button('Show previews')
+                    a.page.mouse.down(button='right')
+                    a.page.mouse.up(button='right')
+                    a.page.wait_for_timeout(80)
+                    assert not a.page.evaluate(SNAPSHOT)['open']
+                    for anchored in (False, True):
+                        if anchored:
+                            a.configure('popover-mode', '1')
+                            a.page.locator('#popover-edge').uncheck()
+                            a.configure('popover-anchor', '0')
+                            compile_usage(a.page.locator('#snippet').inner_text())
+                        right_button('Open account card')
+                        a.page.mouse.down(button='right')
+                        a.page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)')
+                        assert a.target('Notify me about releases')['f'][7]
+                        assert trigger_node.get_attribute('aria-expanded') == 'true'
+                        a.page.mouse.up(button='right')
+                        a.page.wait_for_timeout(80)
+                        assert a.page.evaluate(SNAPSHOT)['open']
+                        a.page.mouse.down(button='right')
+                        a.page.wait_for_function('!cuiGallery.exports.gallery_surface_open(3)')
+                        assert a.target('Open account card')['f'][7]
+                        assert trigger_node.get_attribute('aria-expanded') == 'false'
+                        a.page.mouse.up(button='right')
+                        a.page.wait_for_timeout(80)
+                    a.page.keyboard.press('Enter')
+                    a.page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)')
+                    assert a.target('Notify me about releases')['f'][7]
+                    a.page.keyboard.press('Escape')
+                    a.page.wait_for_function('!cuiGallery.exports.gallery_surface_open(3)')
+                    assert a.target('Open account card')['f'][7]
+                    trigger_node.evaluate('(button) => button.click()')
+                    a.page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)')
+                    assert a.target('Notify me about releases')['f'][7]
+                    trigger_node.evaluate('(button) => button.click()')
+                    a.page.wait_for_function('!cuiGallery.exports.gallery_surface_open(3)')
+                    assert a.target('Open account card')['f'][7]
                 a.route('Button'); a.route('Popover')
                 assert not a.page.evaluate(SNAPSHOT)['open']
                 assert trigger_node.get_attribute('aria-expanded') == 'false'
                 assert trigger_node.get_attribute('aria-controls') is None
                 assert a.page.locator('#popover-mode').input_value() == '0'
+                assert a.page.locator('#popover-trigger').input_value() == '0'
                 settled = a.page.evaluate('cuiGallery.frame')
                 a.page.wait_for_timeout(120)
                 assert a.page.evaluate('cuiGallery.frame')==settled
                 assert not a.errors, a.errors
-                print(f'PASS actual anchors, trigger relationship, outside focus and teardown mobile={mobile} DPR={dpr}',flush=True)
+                print(f'PASS actual anchors, trigger relationship, outside focus, trigger modes and teardown mobile={mobile} DPR={dpr}',flush=True)
                 context.close()
             browser.close()
     finally:

@@ -780,7 +780,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust builders omit the C anchor and arrow API (cui_popover_begin, cui_popover_surface_geometry, cui_popover_position_resolve, cui_popover_arrow_resolve), cui_popover_link_trigger and both outside-focus begin functions. Source SDKs include the C API; builder coverage is separate."
+        "Python, JavaScript, TypeScript, Go and Rust builders omit the C anchor and arrow API (cui_popover_begin, cui_popover_surface_geometry, cui_popover_position_resolve, cui_popover_arrow_resolve), cui_popover_link_trigger, cui_popover_take_secondary_press and both outside-focus begin functions. Source SDKs include the C API; builder coverage is separate."
       ]
     },
     {

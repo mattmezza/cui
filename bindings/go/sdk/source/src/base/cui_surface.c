@@ -511,6 +511,30 @@ void cui_base_surface_end(cui_context *ui) {
     cui_overlay_end(ui);
 }
 
+bool cui_popover_take_secondary_press(cui_context *ui, cui_id trigger) {
+    if (!trigger || !cui_frame_sequence(ui) || !cui_pointer_scope_allowed(ui, 0))
+        return false;
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    const cui_semantic *opener = NULL;
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].id == trigger) {
+            opener = &nodes[i];
+            break;
+        }
+    if (!opener || opener->disabled || opener->details.blocks_pointer_activation)
+        return false;
+    bool pressed = false;
+    const cui_event *events = cui_frame_events(ui, &count);
+    for (size_t i = 0; i < count; ++i) {
+        const cui_event *e = &events[i];
+        if (e->type == CUI_EVENT_POINTER_DOWN && e->pointer_button == CUI_POINTER_SECONDARY &&
+            !cui_event_consumed(ui, i) && cui_event_target(ui, i) == trigger)
+            pressed |= cui_consume_event(ui, i);
+    }
+    return pressed;
+}
+
 bool cui_popover_link_trigger(cui_context *ui, const cui_surface_state *s, cui_id trigger,
                               bool admitted) {
     if (!cui_frame_sequence(ui) || !s || s->kind != CUI_SURFACE_POPOVER || !s->overlay.id ||

@@ -80,7 +80,7 @@ The browser Canvas adapter has exact headless mesh-mask and opacity evidence at
 DPR 1 and 2. The gallery additionally tests all eight anchors, signed offsets,
 clamping, opacity, inert paint and modal ordering with desktop and touch input.
 Physical GPU hardware checks remain separate from Xvfb/software validation.
-Popover transitions and right-click triggers remain separate work.
+Popover transitions remain separate work.
 
 ## Keyboard focus and the trigger
 
@@ -130,12 +130,48 @@ its browser accessibility tree. Native screen-reader acceptance and foreign
 builder authoring remain open. Core's current expanded boolean alone does
 not identify an explicit collapsed state for all native adapters.
 
+## Right-click trigger
+
+After submitting an enabled trigger in its scope, call
+`cui_popover_take_secondary_press` with its stable ID. It uses the same routed
+target as other CUI input, including the last layout's clipping and occlusion.
+Matching secondary downs are consumed and coalesced into one true for the
+frame. A true result reports input only. Choose how to change your model. For
+example, open a closed card and request a decision-aware close of an open one
+before submitting it:
+
+```c
+/* The caller submitted trigger earlier this frame. */
+if (cui_popover_take_secondary_press(ui, trigger)) {
+    if (card->overlay.open)
+        cui_surface_request_close(ui, card, CUI_SURFACE_CLOSED);
+    else
+        cui_surface_open(ui, card, trigger);
+}
+```
+
+Keep keyboard and accessibility activation when changing the mouse gesture.
+The gallery uses the typed Button click observer to accept those activations
+and ordinary touch taps. Its accessibility button submits a CUI accessibility
+activation. An open card lets its enabled trigger consume touch down so the
+subsequent accepted tap can toggle it. In right-click mode a primary mouse click can still
+focus the trigger and dismiss an open card through the usual outside policy.
+The card stays anchored to the trigger. Explicitly focus a child on opening
+and link the trigger after panel submission as in the previous example.
+
+Host context-menu policy is independent of event consumption. The Canvas
+gallery uses its existing canvas context-menu policy. Custom hosts provide
+their own pointer mapping, including any secondary pen input. Touch long
+press is outside this contract.
+
 ## Browser gallery
 
 The Popover story starts with its existing legacy account card. Select **Source
 anchors (opt in)** to use anchor placement and a real centered CUI trigger.
 In either mode, open the card and click or tap **Show previews** to dismiss it
 while making a change in the control outside it.
+Choose **Right-click, tap, or keyboard** in **Trigger** to try the secondary
+press toggle. The displayed C11 example follows that selection.
 All eight names identify the popup's own anchor. Controls map directly to
 `mode`, `anchor`, `custom_offset`, signed scalar `offset`, `arrow` and
 `reference_rem`. The latter is explicit application/host root sizing: zero means

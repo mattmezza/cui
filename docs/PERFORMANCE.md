@@ -4,6 +4,35 @@ Development host: Intel Core Ultra 5 235U (14 logical CPUs), Arch Linux x86_64 k
 
 SDL_Renderer has bounded persistent glyph textures (256 LRU entries,4MiB coverage budget), text tint reuse tested. SDL_GPU has a1024×1024 grayscale atlas with4096 cached masks and32768 per-frame quad entries; uploads only after newly cached glyph masks. Atlas exhaustion returns failure instead of claiming successful output. GPU batching/regression thresholds and workload-specific measurement remain pending.
 
+## Native DataTable inbox
+
+The SDL software fixture keeps the viewport and columns constant and moves
+the pointer between rows halfway through a 1,000- or 10,000-message inbox.
+Each measured frame processes two motion events and checks that the last one
+determines the highlighted row in the submitted draw list. Both model sizes
+call the renderer for 30 virtual cells and emit 166 draw commands per frame.
+One native wheel tick then moves the inbox by 48 logical pixels.
+
+Private X11 with SDL 3.4.18, SDL software rendering, vsync off, Inter, GCC
+16.2.1 Release, and one CPU on the Core Ultra 5 235U. Measured 90 warm frames
+per size. Values are p50 / p95 wall time in milliseconds.
+
+| Rows | SDL poll | CUI composition | SDL software render and present | Total |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,000 | .009 / .016 | .166 / .205 | 4.737 / 4.883 | 4.909 / 5.087 |
+| 10,000 | .008 / .015 | .161 / .201 | 4.744 / 4.911 | 4.918 / 5.102 |
+
+Timing starts just before SDL polling and ends when software submission and
+present return. Physical input, scanout, display latency, model binding and
+sorting fall outside that interval. This workload submits a virtual window
+and reuses the bound model throughout. The test asserts work counts and
+same-frame hover. Timings are diagnostic and vary across hosts.
+
+```sh
+cmake --build build --target test_sdl_inbox_hover
+python scripts/test_local.py --build-dir build -- -R '^sdl_inbox_hover$' -V
+```
+
 ## Hosted check scheduling
 
 Portable CI runs at most two CTest processes at once and sets

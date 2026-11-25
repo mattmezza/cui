@@ -333,6 +333,8 @@ native traffic lights, and borderless windows use client controls. Read
 `docs/CHROME.md` for available actions.
 DataTable wheel steps match Scrollable at 48 logical pixels. Custom hosts
 that send pixel deltas must set `scroll_precise`. See `docs/TABLE.md`.
+Reuse the bound model between frames so only virtual cells are composed in
+long inboxes. See the measured SDL workload in `docs/PERFORMANCE.md`.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

@@ -7140,13 +7140,15 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_table.c",
+        "tests/integration/test_sdl_inbox_hover.c",
         "tests/web/test_browser.py",
         "tests/unit/test_table_selection_contracts.c",
         "tests/web/test_table_selection_contracts.py"
       ],
       "status": "tested",
       "platforms": {
-        "headless": "tested_partial"
+        "headless": "tested_partial",
+        "linux_x11": "tested_partial"
       },
       "limitations": [
         "Actual keyed rows/columns, controlled sort, bounded multiple selection, pointer/keyboard resize/reorder, pinned left columns and row headers, virtual rows/columns, context requests, load-range signaling, multi-level group headers, whole-row/trailing callbacks and actual scrollbars tested. Complete reference-default, remote adapter and behavior audit remains in progress.",
@@ -7174,7 +7176,16 @@
           ]
         },
         {
-          "name": "row virtualization/remote callbacks",
+          "name": "bounded virtual rows and same-frame native inbox hover",
+          "status": "tested",
+          "evidence": [
+            "tests/integration/test_sdl_inbox_hover.c",
+            "tests/unit/test_table.c",
+            "docs/PERFORMANCE.md"
+          ]
+        },
+        {
+          "name": "remote data adapter",
           "status": "not_started",
           "evidence": []
         },

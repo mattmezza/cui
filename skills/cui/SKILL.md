@@ -184,6 +184,9 @@ closing an overlay at a breakpoint. The starter also uses auto-measured
 reveals focused controls in short windows. Its Projects page keeps separate
 Resizable state per axis, sizes a bounded Tabs strip from the detail pane,
 and restores tab focus when the overflow button leaves the layout.
+For a Command palette inside a dialog, set `cui_command_options.width = -1` to fit
+the body. Rows and hit targets fill the current allocation. Width-dependent
+custom row heights settle on a follow-up frame. See `docs/COMMAND.md`.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

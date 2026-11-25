@@ -3658,6 +3658,16 @@
             "tests/unit/test_choice.c",
             "docs/validation/gcc-surfaces-choice.txt"
           ]
+        },
+        {
+          "name": "full-width result paint and edge activation in desktop and mobile gallery panels",
+          "status": "tested",
+          "evidence": [
+            "tests/web/test_choice_panel_width.py"
+          ],
+          "limitations": [
+            "The gallery verifies keyboard and touch selection separately from the editable query. Physical devices and other compositions remain open."
+          ]
         }
       ],
       "upstream_doc": {
@@ -4644,6 +4654,16 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_choice.c"
+          ]
+        },
+        {
+          "name": "full-width option paint and edge activation in desktop and mobile gallery panels",
+          "status": "tested",
+          "evidence": [
+            "tests/web/test_choice_panel_width.py"
+          ],
+          "limitations": [
+            "The gallery verifies centered trigger text, keyboard selection and actual touch input. Physical devices and other compositions remain open."
           ]
         }
       ],
@@ -7183,6 +7203,18 @@
           "name": "complete source layout and host Action lifecycle parity",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "grow-width result geometry and hit bounds on opening and resizing",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_command.c",
+            "tests/web/test_choice_panel_width.py",
+            "docs/COMMAND.md"
+          ],
+          "limitations": [
+            "Built-in row widths follow current layout. Width-dependent custom heights use an estimate and settle on a follow-up frame."
+          ]
         }
       ],
       "upstream_doc": {

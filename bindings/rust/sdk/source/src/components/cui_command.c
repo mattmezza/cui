@@ -3,6 +3,7 @@
 #include "cui/cui_components.h"
 #include "cui/cui_content.h"
 #include "cui/cui_icon.h"
+#include "cui_scroll_private.h"
 #include <math.h>
 static uint64_t cui_command_hash(cui_str q) {
     uint64_t h = UINT64_C(14695981039346656037);
@@ -48,16 +49,18 @@ static void cui_command_scroll_selection(cui_command_state *s, float viewport, f
     s->scroll.y = fminf(fmaxf(s->scroll.y, 0), fmaxf(0, total - viewport));
 }
 static bool cui_command_geometry(cui_context *ui, cui_command_state *s, float content, float font,
-                                 float density, float *out) {
+                                 float density, float *out, bool *custom_measure) {
+    *custom_measure = false;
     float total = 4 * density;
     for (size_t i = 0; i < s->row_count; ++i) {
         cui_command_row *r = &s->rows[i];
         float h = r->kind == CUI_COMMAND_ROW_SEPARATOR ? 9 * density
                   : r->kind == CUI_COMMAND_ROW_HEADING ? 28 * density
                                                        : 32 * density;
-        if (r->item && r->item->measure)
+        if (r->item && r->item->measure) {
+            *custom_measure = true;
             h = r->item->measure(content, font, r->item->content_user);
-        else if (r->item) {
+        } else if (r->item) {
             float measured = cui_measure_text(ui, r->item->label, font).height;
             h = fmaxf(20 * density, measured) + 12 * density;
         }
@@ -71,6 +74,13 @@ static bool cui_command_geometry(cui_context *ui, cui_command_state *s, float co
     }
     total += 4 * density;
     *out = total;
+    return true;
+}
+static bool cui_command_remeasure_grow_width(const cui_prepaint_info *info, const void *payload,
+                                             cui_prepaint_writer *writer) {
+    float measured_width = *(const float *)payload;
+    if (info->bounds.w > 0 && fabsf(info->bounds.w - measured_width) >= .01f)
+        cui_prepaint_request_frame(writer);
     return true;
 }
 static cui_component_event_metadata cui_command_styled_events_frame(cui_context *ui, cui_id id) {
@@ -123,13 +133,20 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
     float density = t->font_size / 16;
     if (!isfinite(density) || density <= 0)
         return false;
-    float width = o.width > 0 ? o.width : cui_bounds(ui, id).w;
+    bool grow_width = o.width < 0;
+    float width = grow_width ? cui_bounds(ui, id).w : o.width;
     if (width <= 0)
         width = 380 * density;
-    float inset = 4 * density, font = 14 * density,
-          content = fmaxf(0, width - 2 * inset - (o.bordered ? 2 : 0) - 10);
+    float inset = truncf(4 * density), font = 14 * density;
+    cui_scroll_options scroll = {.width = fmaxf(1, width - (o.bordered ? 2 : 0)),
+                                 .height = o.max_height,
+                                 .vertical = true,
+                                 .disabled = o.disabled};
+    float content =
+        fmaxf(0, cui_scroll_layout(cui_scroll_resolve(t, scroll)).viewport.width - 2 * inset);
     float total;
-    if (!cui_command_geometry(ui, s, content, font, density, &total))
+    bool custom_measure;
+    if (!cui_command_geometry(ui, s, content, font, density, &total, &custom_measure))
         return false;
     float viewport = s->row_count ? fminf(total, o.max_height)
                      : s->loading ? 8 * density
@@ -206,7 +223,7 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
             }
             s->query_hash = cui_command_hash(q);
             cui_invalidate(ui);
-            if (!cui_command_geometry(ui, s, content, font, density, &total)) {
+            if (!cui_command_geometry(ui, s, content, font, density, &total, &custom_measure)) {
                 cui_end_box(ui);
                 cui_end_focus_scope(ui);
                 return false;
@@ -219,12 +236,12 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
         }
     }
     cui_id list = cui_command_list_id(id);
-    cui_scroll_options scroll = {.width = fmaxf(1, width - (o.bordered ? 2 : 0)),
-                                 .height = viewport,
-                                 .content_height = s->row_count ? total : viewport,
-                                 .vertical = true,
-                                 .disabled = o.disabled};
-    if (cui_scrollable_begin(ui, list, t, &s->scroll, scroll)) {
+    scroll.height = viewport;
+    scroll.content_height = s->row_count ? total : viewport;
+    bool list_open = grow_width
+                         ? cui_scroll_private_begin_vertical_grow(ui, list, t, &s->scroll, scroll)
+                         : cui_scrollable_begin(ui, list, t, &s->scroll, scroll);
+    if (list_open) {
         (void)cui_set_semantic_role(ui, list, CUI_ROLE_LISTBOX);
         if (!s->row_count && !s->loading) {
             cui_begin_box(ui, id ^ UINT64_C(0x701c87),
@@ -240,6 +257,24 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
                          o.empty_message.length ? o.empty_message : cui_string("No results found."),
                          font, t->muted);
             cui_end_box(ui);
+        }
+        if (s->row_count) {
+            /* Let the scrollbar and insets take their space before attaching rows. */
+            cui_id allocation = grow_width && custom_measure ? id ^ UINT64_C(0x9a875c00) : 0;
+            cui_begin_box(ui, allocation,
+                          (cui_box){.width = -1,
+                                    .height = -1,
+                                    .custom_padding = true,
+                                    .padding_edges = {.left = inset, .right = inset}});
+            if (allocation) {
+                float estimated = cui_scroll_layout(cui_scroll_resolve(t, scroll)).viewport.width;
+                (void)cui_set_prepaint(
+                    ui, (cui_prepaint_options){.callback = cui_command_remeasure_grow_width,
+                                               .payload = &estimated,
+                                               .payload_bytes = sizeof estimated,
+                                               .command_budget = 1});
+            }
+            cui_begin_box(ui, 0, (cui_box){.width = -1, .height = -1});
         }
         cui_id hovered = 0;
         size_t position = 0;
@@ -278,8 +313,10 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
             }
             if (r->kind == CUI_COMMAND_ROW_SEPARATOR) {
                 cui_begin_absolute_box(ui, row, (cui_box){.align_y = CUI_ALIGN_CENTER},
-                                       (cui_rect){inset, r->offset, content, r->height});
-                cui_divider(ui, row ^ UINT64_C(0x79d7a00c), t, content, false);
+                                       (cui_rect){0, r->offset, -1, r->height});
+                cui_begin_box(ui, row ^ UINT64_C(0x79d7a00c),
+                              (cui_box){.width = -1, .height = 1, .background = t->border});
+                cui_end_box(ui);
                 cui_end_box(ui);
                 continue;
             }
@@ -291,7 +328,7 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
                           .padding = 6 * density,
                           .radius = o.bordered ? fmaxf(0, t->radius_lg - inset - 1) : t->radius,
                           .background = selected ? t->accent : (cui_color){0}},
-                (cui_rect){inset, r->offset, content, r->height});
+                (cui_rect){0, r->offset, -1, r->height});
             cui_begin_box(ui, row ^ UINT64_C(0x79d7a008),
                           (cui_box){.width = 2 * density, .height = 1});
             cui_end_box(ui);
@@ -302,9 +339,7 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
             cui_color color = selected                       ? t->accent_foreground
                               : r->item && r->item->disabled ? t->muted
                                                              : t->popover_foreground;
-            if (r->kind == CUI_COMMAND_ROW_SEPARATOR)
-                cui_divider(ui, row ^ UINT64_C(0x79d7a00c), t, content, false);
-            else if (r->kind == CUI_COMMAND_ROW_HEADING)
+            if (r->kind == CUI_COMMAND_ROW_HEADING)
                 cui_text_with_line_height(ui, r->heading, 12 * density, t->muted, 16 * density);
             else if (r->item->content)
                 r->item->content(ui, t, s, r->item->content_user);
@@ -348,6 +383,10 @@ static bool cui_command_styled_events_common(cui_context *ui, cui_id id, const c
             }
         }
         s->hovered_row = hovered;
+        if (s->row_count) {
+            cui_end_box(ui);
+            cui_end_box(ui);
+        }
         cui_scrollable_end_ex(ui, list, t, &s->scroll, scroll);
         cui_set_semantic_details(
             ui, list,

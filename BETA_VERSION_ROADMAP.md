@@ -97,8 +97,8 @@ subsets. Detailed ledgers and headers remain authoritative.
 ### Next component slices
 
 The native starter now combines Resizable, Sidebar, Sheet and Tabs in Projects.
-Next source slice: verify full-width Select, Combobox and Command rows plus
-trigger alignment and keyboard/touch selection in a bounded panel.
+Next source slice: verify intrinsic HoverCard height, viewport placement and
+dismissal with short and wrapped content.
 Check reported regressions against the current gallery as each slice lands.
 Ship the verified builders with the next release.
 
@@ -115,7 +115,7 @@ Ship the verified builders with the next release.
 | 4 | TitleBar | Exercise decorated Cocoa traffic lights and Retina placement on a Mac. Close documented native drag and system-window menu gaps by host capability. [TitleBar guide](docs/CHROME.md#title-bar) |
 | 5 | Dialog / AlertDialog | Composed Base and Styled surfaces drop held mouse, touch and Space on reopen, with focus restored and fresh activation verified. Intrinsic sizing and fixed-Footer scrolling have focused checks. Finish root ownership and foreign slot builders. |
 | 5 | Popover / HoverCard | Fit short content to its natural height, stay inside the viewport and verify the appropriate focus, dismissal and touch behavior for each surface. |
-| 5 | Select / Combobox / Command | Align triggers and results, keep option rows at panel width, and verify keyboard selection and dismissal at desktop and touch sizes. |
+| 5 | Select / Combobox / Command | Command grow-width row paint and hit targets follow the parent from the first frame, with a follow-up for width-dependent custom heights. Headless Chromium verifies Select trigger centering and full-width rows, keyboard selection and edge taps across Select, Combobox and Command. Deployment and physical device checks remain open. |
 | 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
 | 6 | Input / Textarea | Verify word movement, line movement, caret/selection visibility and IME placement across wrapped or scrolled content. Keep new Editor features lower priority. |
 | 7 | DatePicker / TimeField | Exercise direct year selection, localized formatting and range bounds with keyboard and touch. Finish installed TimeField examples and IME checks. |

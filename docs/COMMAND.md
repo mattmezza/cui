@@ -1,8 +1,9 @@
 # Command
 
 Command is an inline command palette, composed from the real persistent Input,
-virtual rows and Scroll control. The scroll area spans the panel width; rows reserve space for its scrollbar and horizontal insets. An application can host it in the existing
-Dialog/Overlay. This module follows the pinned GPUI 0.7.1
+virtual rows and a Scroll control. Rows fill the list inside its horizontal
+insets and any visible scrollbar gutter. An application can host Command in a
+Dialog or Overlay. This module follows the pinned GPUI 0.7.1
 `component/src/command/{command,item,state}.rs` contracts; it does not supply a
 native application Action registry or automatically create a modal dialog.
 
@@ -80,12 +81,19 @@ Default list maximum is 300 logical pixels. Frame uses popover colors, a
 one-pixel border and radius_lg; bordered=false removes that frame. List inset is
 4, default rows use horizontal8/vertical6 padding and font14/line20; headings
 use font12/line16, and separators occupy9. Theme density scales those metrics.
-The 380-pixel default width is a portable convenience; negative width grows.
-Growing palettes use retained width for measurement with an initial380 estimate.
-Default labels use a clipped single-line box; automatic arbitrary intrinsic
-wrapping/measurement is not implemented. A row's `measure` callback receives
-available outer content width and font size, returns its complete outer height,
-and can implement wrapping/custom variable heights. It must agree with its
+The default width is 380 logical pixels. Set `options.width = -1` to fill
+the available parent width, for example inside a Dialog body. The search field,
+list, and row hit bounds follow the current layout on the opening frame and
+while resizing. A theme with `CUI_SCROLLBAR_HIDDEN` lets rows use the gutter
+space as well.
+
+Built-in labels use a clipped single line. For custom wrapping or variable
+heights, supply `measure` and `content` callbacks. The measure callback receives
+the estimated available row width and font size and returns the complete outer
+height. A growing palette starts with the default width scaled by density
+and uses the previous allocation thereafter. If the allocation changes, it
+requests a follow-up frame to update custom heights. The row width itself
+already follows the current allocation. Keep measurement consistent with the
 content callback. Every flattened row is measured each submission; only visible
 rows invoke content and submit semantic/paint nodes. This has bounded O(n)
 measurement and avoids drawing all offscreen children, but does not reproduce

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT */
-#include "cui/cui_scroll.h"
 #include "cui/cui_scroll_events.h"
+#include "cui_scroll_private.h"
 #include <math.h>
 static float cui_scroll_component_positive(float value, float fallback) {
     return isfinite(value) && value > 0 ? value : fallback;
@@ -23,8 +23,9 @@ static cui_scroll_options cui_scroll_measured(cui_context *ui, cui_id id, cui_sc
     }
     return o;
 }
-bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_scroll_state *s,
-                          cui_scroll_options o) {
+static bool cui_scrollable_begin_layout(cui_context *ui, cui_id id, const cui_theme *t,
+                                        cui_scroll_state *s, cui_scroll_options o,
+                                        bool grow_width) {
     if (!ui || !id || !t || !s)
         return false;
     o = cui_scroll_resolve(t, o);
@@ -32,12 +33,12 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
     cui_scroll_geometry g = cui_scroll_layout(measured);
     cui_base_scrollable(ui, id, s, measured);
     cui_begin_box(ui, id,
-                  (cui_box){.width = cui_scroll_component_positive(o.width, 320),
+                  (cui_box){.width = grow_width ? -1 : cui_scroll_component_positive(o.width, 320),
                             .height = cui_scroll_component_positive(o.height, 240),
                             .background = t->surface});
     cui_begin_box(ui, 0, (cui_box){.width = -1, .height = g.viewport.height, .row = true});
     cui_begin_box(ui, id ^ UINT64_C(0x75b21b4d3cba0f89),
-                  (cui_box){.width = g.viewport.width,
+                  (cui_box){.width = grow_width ? -1 : g.viewport.width,
                             .height = g.viewport.height,
                             .clip = true,
                             .offset_x = -s->x,
@@ -45,7 +46,8 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
     cui_begin_box(
         ui, o.auto_measure_content ? cui_scroll_content_id(id) : 0,
         (cui_box){
-            .width = cui_scroll_auto_axis(o, false)
+            .width = grow_width ? -1
+                     : cui_scroll_auto_axis(o, false)
                          ? 0
                          : fmaxf(g.viewport.width,
                                  cui_scroll_component_positive(o.content_width, g.viewport.width)),
@@ -56,6 +58,14 @@ bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_sc
             .row = o.content_row,
             .gap = isfinite(o.gap) && o.gap > 0 ? o.gap : 0});
     return true;
+}
+bool cui_scrollable_begin(cui_context *ui, cui_id id, const cui_theme *t, cui_scroll_state *s,
+                          cui_scroll_options o) {
+    return cui_scrollable_begin_layout(ui, id, t, s, o, false);
+}
+bool cui_scroll_private_begin_vertical_grow(cui_context *ui, cui_id id, const cui_theme *t,
+                                            cui_scroll_state *s, cui_scroll_options o) {
+    return cui_scrollable_begin_layout(ui, id, t, s, o, true);
 }
 void cui_scrollbar(cui_context *ui, cui_id id, const cui_theme *t, const cui_scroll_state *s,
                    cui_scroll_geometry g, cui_scroll_options o, bool vertical) {

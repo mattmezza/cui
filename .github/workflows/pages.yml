@@ -228,6 +228,9 @@ jobs:
       - name: Verify numeric OTP and combobox native composition
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_ime_additional.py
+      - name: Verify full-width Select, Combobox and Command rows
+        if: ${{ matrix.shard == 2 }}
+        run: uv run tests/web/test_choice_panel_width.py --directory build/web
       - name: Audit representative touch behavior across the catalog
         if: ${{ matrix.shard == 2 }}
         run: uv run tests/web/test_touch_components.py

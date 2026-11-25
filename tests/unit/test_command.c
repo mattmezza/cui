@@ -294,6 +294,141 @@ static void test_panel_width(void) {
     cui_destroy(ui);
 }
 
+static cui_draw_list grow_panel(cui_context *ui, cui_command_state *state,
+                                const cui_command_entry *entries, size_t count, float width,
+                                cui_command_options options, bool hidden) {
+    cui_theme theme = cui_theme_light();
+    if (hidden)
+        theme.scrollbar.visibility = CUI_SCROLLBAR_HIDDEN;
+    assert(cui_begin_frame(ui, 700, 400, .016f));
+    cui_begin_box(ui, 41, (cui_box){.width = width, .padding = 8});
+    assert(cui_command(ui, 42, &theme, state, entries, count, options));
+    cui_end_box(ui);
+    cui_draw_list list = cui_end_frame(ui);
+    assert(list.count && cui_last_error(ui) == CUI_OK);
+    return list;
+}
+
+static void test_grow_panel_width(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = {0};
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_command_state state;
+    cui_command_row rows[8];
+    cui_command_entry entries[] = {
+        {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Open file")}},
+        {.kind = CUI_COMMAND_SEPARATOR},
+        {.kind = CUI_COMMAND_ITEM, .item = {.label = cui_string("Save file")}},
+    };
+    cui_command_options options = cui_command_default();
+    options.width = -1;
+    options.on_confirm = confirm;
+    options.user = order;
+    assert(ui && edit && cui_command_init(&state, rows, 8, edit));
+    float widths[] = {260, 520, 320};
+    for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
+        cui_draw_list draw = grow_panel(ui, &state, entries, 3, widths[i], options, false);
+        cui_rect panel = cui_bounds(ui, 42);
+        cui_rect list = cui_bounds(ui, cui_command_list_id(42));
+        cui_id row_id = cui_command_row_id(42, (cui_command_index){0, 0});
+        cui_rect row = cui_bounds(ui, row_id);
+        assert(fabsf(panel.w - widths[i] + 16) < .01f);
+        assert(fabsf(list.w - panel.w + 2) < .01f);
+        assert(fabsf(row.w - list.w + 18) < .01f);
+        assert(fabsf(row.x - list.x - 4) < .01f);
+        const cui_semantic *target = semantic(ui, row_id);
+        assert(target && fabsf(target->bounds.w - row.w) < .01f);
+        bool fill = false;
+        cui_color accent = cui_theme_light().accent;
+        for (size_t j = 0; j < draw.count; ++j) {
+            const cui_draw_command *cmd = &draw.commands[j];
+            if (cmd->type == CUI_DRAW_RECT && fabsf(cmd->bounds.x - row.x) < .01f &&
+                fabsf(cmd->bounds.y - row.y) < .01f && fabsf(cmd->bounds.w - row.w) < .01f &&
+                !memcmp(&accent, &cmd->color, sizeof accent))
+                fill = true;
+        }
+        assert(fill);
+    }
+
+    cui_rect row = cui_bounds(ui, cui_command_row_id(42, (cui_command_index){0, 1}));
+    cui_event tap = {.type = CUI_EVENT_POINTER_DOWN,
+                     .pointer_type = CUI_POINTER_TOUCH,
+                     .pointer_id = 2,
+                     .x = row.x + row.w - 2,
+                     .y = row.y + row.h / 2};
+    order_count = 0;
+    assert(cui_queue_event(ui, tap));
+    grow_panel(ui, &state, entries, 3, 320, options, false);
+    assert(order_count == 0);
+    tap.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, tap));
+    grow_panel(ui, &state, entries, 3, 320, options, false);
+    assert(order_count == 1 && selected_index.row == 1);
+    assert(cui_focused(ui) == cui_command_input_id(42));
+    options.width = 304;
+    grow_panel(ui, &state, entries, 3, 320, options, true);
+    cui_rect list = cui_bounds(ui, cui_command_list_id(42));
+    row = cui_bounds(ui, cui_command_row_id(42, (cui_command_index){0, 1}));
+    assert(fabsf(row.w - list.w + 8) < .01f);
+    assert(cui_bounds(ui, cui_scrollbar_id(cui_command_list_id(42), true)).w == 0);
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
+static float measure_width(float width, float font, void *user) {
+    (void)font;
+    *(float *)user = width;
+    return width < 300 ? 60 : 32;
+}
+
+static bool custom_header_prepaint(const cui_prepaint_info *info, const void *payload,
+                                   cui_prepaint_writer *writer) {
+    (void)info;
+    (void)payload;
+    (void)writer;
+    return true;
+}
+
+static void custom_header(cui_context *ui, const cui_theme *theme, const cui_command_state *state,
+                          void *user) {
+    (void)theme;
+    (void)state;
+    (void)user;
+    assert(cui_set_prepaint(
+        ui, (cui_prepaint_options){.callback = custom_header_prepaint, .command_budget = 1}));
+}
+
+static void test_grow_custom_measure(void) {
+    cui_context *ui = cui_create((cui_config){.max_elements = 256});
+    char buffer[32] = {0};
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_command_state state;
+    cui_command_row rows[8];
+    float measured_width = 0;
+    cui_command_entry entry = {.kind = CUI_COMMAND_ITEM,
+                               .item = {.label = cui_string("Wrapped entry"),
+                                        .measure = measure_width,
+                                        .content_user = &measured_width}};
+    cui_command_options options = cui_command_default();
+    options.width = -1;
+    options.searchable = false;
+    options.header = custom_header;
+    assert(ui && edit && cui_command_init(&state, rows, 8, edit));
+    cui_id row_id = cui_command_row_id(42, (cui_command_index){0, 0});
+    grow_panel(ui, &state, &entry, 1, 260, options, false);
+    assert(measured_width > 300 && cui_bounds(ui, row_id).h == 32 && cui_needs_redraw(ui));
+    grow_panel(ui, &state, &entry, 1, 260, options, false);
+    cui_rect row = cui_bounds(ui, row_id);
+    assert(fabsf(row.w - measured_width) < .01f && row.h == 60 && !cui_needs_redraw(ui));
+    grow_panel(ui, &state, &entry, 1, 520, options, false);
+    assert(cui_bounds(ui, row_id).h == 60 && cui_needs_redraw(ui));
+    grow_panel(ui, &state, &entry, 1, 520, options, false);
+    row = cui_bounds(ui, row_id);
+    assert(fabsf(row.w - measured_width) < .01f && row.h == 32 && !cui_needs_redraw(ui));
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+
 static void test_virtual_geometry(void) {
     cui_context *ui = cui_create((cui_config){.max_elements = 256});
     assert(ui);
@@ -509,6 +644,8 @@ int main(void) {
     test_render();
     test_virtual_geometry();
     test_panel_width();
+    test_grow_panel_width();
+    test_grow_custom_measure();
     test_dialog();
     test_slots_and_loading();
 #endif

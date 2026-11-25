@@ -452,6 +452,9 @@ typedef struct {
 } cui_input_options;
 bool cui_input_measure(cui_input_options, float root_font_size, cui_input_metrics *);
 cui_id cui_input_viewport_id(cui_id);
+/* Actual horizontal scroll of a growing single-line Input after a completed
+ * frame. Returns false during submission or if that viewport did not resolve. */
+bool cui_input_scroll_x(const cui_context *, cui_id input, float *out);
 /* Paint only: compose with a reducer without applying the event stream twice. */
 /* Input's framed/clipped paint root uses caller id. The public viewport ID
  * addresses inner text layout and is not an alias for that surface. */

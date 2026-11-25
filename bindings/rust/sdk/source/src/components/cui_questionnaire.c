@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "../base/cui_design_metrics.h"
+#include "../core/cui_scroll_x_internal.h"
 #include "cui/cui_components.h"
 #include "cui/cui_questionnaire_geometry.h"
 #include "cui/cui_questionnaire_keyboard.h"
@@ -1392,8 +1393,9 @@ cui_questionnaire_result cui_questionnaire_input_control(cui_context *ui, cui_id
     cui_input_metrics metrics;
     if (!cui_input_measure(paint, t->font_size, &metrics))
         return CUI_QUESTIONNAIRE_INVALID;
-    cui_input_hit_geometry hit = {ui, cui_bounds(ui, cui_input_viewport_id(id)), metrics.font_size,
-                                  input.scroll_x};
+    cui_id viewport = cui_input_viewport_id(id);
+    cui_input_hit_geometry hit = {ui, cui_bounds(ui, viewport), metrics.font_size,
+                                  cui_core_prior_scroll_x(ui, viewport, input.scroll_x)};
     cui_base_input_options base = {
         .disabled = disabled,
         .required = d->required,

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_components.h"
 #include "../base/cui_design_metrics.h"
+#include "../core/cui_scroll_x_internal.h"
 #include "cui/cui_button_styles.h"
 #include "cui/cui_icon.h"
 #include "cui_input_private.h"
@@ -2438,9 +2439,8 @@ bool cui_input_measure(cui_input_options options, float root_font_size,
 cui_id cui_input_viewport_id(cui_id id) {
     return id ^ UINT64_C(0xb1642b97583fbd63);
 }
-static float cui_input_alignment(float available, float text, cui_align align) {
-    float extra = fmaxf(0, available - text);
-    return align == CUI_ALIGN_CENTER ? extra * .5f : align == CUI_ALIGN_END ? extra : 0;
+bool cui_input_scroll_x(const cui_context *ui, cui_id id, float *out) {
+    return id && cui_core_painted_scroll_x(ui, cui_input_viewport_id(id), out);
 }
 /* Optional visual session is owned by a UI resource, shared by reduction and
  * paint in this frame. Collection refreshes it even when a host changes its
@@ -2888,16 +2888,12 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
             cui_measure_text(ui, (cui_str){text.data, selection.cursor}, metrics.font_size).width;
     }
 
-    float total = text_width + (focused ? 1 : 0);
-    if (!isfinite(state->scroll_x) || state->scroll_x < 0)
-        state->scroll_x = 0;
-    if (focused && viewport_width > 0) {
-        if (caret < state->scroll_x)
-            state->scroll_x = caret;
-        if (caret + 1 > state->scroll_x + viewport_width)
-            state->scroll_x = caret + 1 - viewport_width;
-    }
-    state->scroll_x = fminf(state->scroll_x, fmaxf(0, total - viewport_width));
+    float seed = cui_core_prior_scroll_x(ui, viewport_id, state->scroll_x);
+    if (!isfinite(seed) || seed < 0)
+        seed = 0;
+    float reveal = focused ? fmaxf(0, caret) : -1;
+    state->scroll_x = cui_core_scroll_x_clamp(seed, viewport_width, text_width, reveal);
+    float wrapper_width = fmaxf(text_width, 1);
     /* A clipped Clay row does not compress growing children. A percentage row
      * takes the resolved frame width independently of its long text, then its
      * unclipped flex layout constrains the inner viewport between the insets.
@@ -2911,18 +2907,19 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                 .fixed_height = true});
     cui_begin_box(ui, 0, (cui_box){.width = inset});
     cui_end_box(ui);
-    cui_begin_box(ui, viewport_id,
-                  (cui_box){.width = width > 0 ? viewport_width : -1,
-                            .fixed_width = width > 0,
-                            .height = metrics.line_height,
-                            .fixed_height = true,
-                            .clip = true,
-                            .align_x = options.text_align,
-                            .offset_x = -state->scroll_x});
+    cui_begin_box(
+        ui, viewport_id,
+        (cui_box){.width = width > 0 ? viewport_width : -1,
+                  .fixed_width = width > 0,
+                  .height = metrics.line_height,
+                  .fixed_height = true,
+                  .clip = true,
+                  .align_x = options.text_align,
+                  .offset_x = -state->scroll_x});
     /* Paint-only text wrapper: neighboring owner IDs must not alias another
      * field's tracked viewport. No routing or geometry refers to this box. */
     cui_begin_box(ui, 0,
-                  (cui_box){.width = fmaxf(text_width, 1),
+                  (cui_box){.width = wrapper_width,
                             .fixed_width = true,
                             .height = metrics.line_height,
                             .fixed_height = true});
@@ -2965,6 +2962,8 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
     }
     free(visual_selection);
     free(visual_composition);
+    cui_id placeholder_id = 0;
+    float placeholder_width = 0;
     if (text.length) {
         cui_text_line(ui, text, metrics.font_size, foreground, metrics.line_height,
                       (cui_text_style){0});
@@ -2974,13 +2973,14 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
             placeholder.a = (uint8_t)lroundf(placeholder.a * .5f);
         /* Align the placeholder by its own width while the empty text box
          * continues to anchor the caret and hit testing. */
-        float placeholder_width =
-            cui_measure_text(ui, options.placeholder, metrics.font_size).width;
+        placeholder_width = cui_measure_text(ui, options.placeholder, metrics.font_size).width;
+        if (width < 0)
+            placeholder_id = id ^ UINT64_C(0x15ec01bfa32a54c8);
         float placeholder_x =
-            cui_input_alignment(viewport_width, placeholder_width, options.text_align) -
-            cui_input_alignment(viewport_width, fmaxf(text_width, 1), options.text_align);
+            cui_core_scroll_x_alignment(viewport_width, placeholder_width, options.text_align) -
+            cui_core_scroll_x_alignment(viewport_width, wrapper_width, options.text_align);
         cui_begin_absolute_box(
-            ui, 0, (cui_box){0},
+            ui, placeholder_id, (cui_box){0},
             (cui_rect){placeholder_x, 0, placeholder_width, metrics.line_height});
         cui_text_line(ui, options.placeholder, metrics.font_size, placeholder, metrics.line_height,
                       (cui_text_style){0});
@@ -3000,6 +3000,15 @@ void cui_input_paint(cui_context *ui, cui_id id, const cui_theme *t, cui_str nam
                                                metrics.line_height);
     }
     cui_end_box(ui);
+    if (width < 0)
+        cui_core_project_scroll_x(ui, viewport_id,
+                                  (cui_scroll_x_projection){.seed = seed,
+                                                            .submitted = state->scroll_x,
+                                                            .text_width = text_width,
+                                                            .caret = reveal,
+                                                            .placeholder_width = placeholder_width,
+                                                            .placeholder = placeholder_id,
+                                                            .align = options.text_align});
     cui_end_box(ui);
     cui_begin_box(ui, 0, (cui_box){.width = inset});
     cui_end_box(ui);
@@ -3087,7 +3096,8 @@ cui_input_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, c
     }
     cui_id viewport_id = cui_input_viewport_id(id);
     cui_input_hit_geometry hit = {ui, overrides ? viewport : cui_bounds(ui, viewport_id),
-                                  metrics.font_size, state->scroll_x};
+                                  metrics.font_size,
+                                  cui_core_prior_scroll_x(ui, viewport_id, state->scroll_x)};
     bool multiline = cui_edit_get_state(edit).multiline;
     cui_input_cached_hit cached_hit = {
         hit, (multiline || options.masked) ? NULL : cui_input_visual_resource(ui, id)};
@@ -3102,7 +3112,7 @@ cui_input_common(cui_context *ui, cui_id id, const cui_theme *t, cui_str name, c
                            ? cached_hit.cache->geometry.width
                            : cui_measure_text(ui, committed, metrics.font_size).width;
     cached_hit.measured.viewport.x +=
-        cui_input_alignment(hit.viewport.w, text_width, options.text_align);
+        cui_core_scroll_x_alignment(hit.viewport.w, fmaxf(1, text_width), options.text_align);
     behavior->composition =
         cui_base_composition(ui, id, behavior->composition, &behavior->composition_owned);
     if (behavior->composition && behavior->composition_owned)

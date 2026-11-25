@@ -533,7 +533,7 @@ const snippets = {
  Toggle:'cui_toggle_group_ex(ui, group_id, &theme,\n    items, selected, 3, options);',
  Radio:'cui_radio_group_item choices[] = {\n    {cui_id_from(ui, "standard"), cui_string("Standard"), false},\n    {cui_id_from(ui, "priority"), cui_string("Priority"), false}};\ncui_radio_group(ui, id, &theme, choices, 2, &selected, &navigation,\n    (cui_radio_group_options){.name = cui_string("Delivery"),\n        .vertical = true, .design_size = CUI_DESIGN_BASE});',
  Slider:'cui_slider(ui, id, &theme,\n    cui_string("Volume"),\n    &value, 0, 100, 1, false);',
- Input:'cui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.size = CUI_INPUT_SMALL,\n                                .width = 280});',
+ Input:'/* Submit inside the parent whose width the field should follow. */\ncui_input_ex(ui, id, &theme, label, edit,\n    &state, (cui_input_options){.size = CUI_INPUT_SMALL,\n                                .width = -1});',
  Tag:'cui_tag(ui, id, &theme, cui_string("Workspace"), options);\n/* Rich children use cui_begin_tag / cui_end_tag. */',
  Notification:'/* Queue pushes after the frame; descriptors stay application-owned. */\ncui_notification_push(&state, descriptor, host_seconds);\ncui_notification_advance result = cui_notifications(\n    ui, id, &theme, &state, viewport, host_seconds);',
  Marker:'cui_marker(ui, id, &theme, &state, children, count, options);\n/* Schedule the deadline from cui_base_marker. */',

@@ -296,7 +296,10 @@ For Input and Textarea keyboard behavior, see `docs/INPUT.md` and
 `docs/TEXTAREA.md`. Both support Ctrl/Alt+Left/Right word movement and Shift
 selection. Single-line Input keeps its caret in place on Up/Down. Textarea
 navigates visual rows and keeps a full-width wrap caret and its IME anchor inside
-the viewport. Growing fields still have documented same-frame resize limits.
+the viewport. Growing single-line Input uses the current layout width. Set
+`width = -1` in a sized parent and query the actual offset with
+`cui_input_scroll_x` after a completed frame. The query is C-only. Growing
+Textarea still has documented same-frame rewrap limits.
 
 For validated color text, read `docs/COLOR_ENTRY.md` and
 `include/cui/cui_color_entry.h`. ColorEntry is an additive inline byte-RGBA field

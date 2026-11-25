@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MIT */
+#include "../core/cui_scroll_x_internal.h"
 #include "cui_form_private.h"
 #include <math.h>
 static size_t cui_form_private_columns(cui_form_options o) {
@@ -166,7 +167,7 @@ cui_input_group_result cui_form_private_input_group(
     cui_context *ui, cui_id group, cui_id input, cui_edit *edit, cui_input_group_state *state,
     const cui_input_group_addon *a, size_t count, cui_input_group_options o,
     cui_input_group_handler handler, cui_input_group_event_result *notifications,
-    cui_form_private_input_fn input_fn, void *input_user) {
+    cui_form_private_input_fn input_fn, void *input_user, cui_id painted_viewport) {
     cui_input_group_result result = {.input.error = CUI_EDIT_OK};
     if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
         result.error = CUI_FORM_INVALID;
@@ -226,7 +227,7 @@ cui_input_group_result cui_form_private_input_group(
     }
     cui_base_input_options behavior = o.input;
     cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
-                                  state->scroll_x};
+                                  cui_core_prior_scroll_x(ui, painted_viewport, state->scroll_x)};
     bool synthetic_hit = !behavior.hit_test && !cui_edit_get_state(edit).multiline;
     if (synthetic_hit) {
         behavior.hit_test = cui_base_input_hit_test;
@@ -265,7 +266,7 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
                                             const cui_input_group_addon *addons, size_t count,
                                             cui_input_group_options options) {
     return cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
-                                        (cui_input_group_handler){0}, NULL, NULL, NULL);
+                                        (cui_input_group_handler){0}, NULL, NULL, NULL, 0);
 }
 cui_input_group_event_result
 cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input, cui_edit *edit,
@@ -274,6 +275,6 @@ cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input, cui_edi
                             cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
     result.control = cui_form_private_input_group(ui, group, input, edit, state, addons, count,
-                                                  options, handler, &result, NULL, NULL);
+                                                  options, handler, &result, NULL, NULL, 0);
     return result;
 }

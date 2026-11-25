@@ -327,22 +327,11 @@ cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input, const
     paint_options.validate_user = o.input.validate_user;
     paint_options.normalization = o.input.normalization;
     paint_options.matcher = o.input.matcher;
-    cui_input_group_result result;
-    if (o.input.masked) {
-        cui_form_private_secure secure = {&t, state, &paint_options};
-        result =
-            cui_form_private_input_group(ui, group, input, edit, state, a, count, o, handler,
-                                         notifications, cui_form_private_secure_input, &secure);
-    } else if (notifications) {
-        cui_input_group_event_result observed =
-            cui_base_input_group_events(ui, group, input, edit, state, a, count, o, handler);
-        result = observed.control;
-        notifications->addon_count = observed.addon_count;
-        notifications->change_count = observed.change_count;
-        notifications->submit_count = observed.submit_count;
-        notifications->count_overflow = observed.count_overflow;
-    } else
-        result = cui_base_input_group(ui, group, input, edit, state, a, count, o);
+    cui_form_private_secure secure = {&t, state, &paint_options};
+    cui_input_group_result result = cui_form_private_input_group(
+        ui, group, input, edit, state, a, count, o, handler, notifications,
+        o.input.masked ? cui_form_private_secure_input : NULL, &secure,
+        cui_input_viewport_id(input));
     if (result.error != CUI_FORM_OK)
         return result;
     bool focused = cui_focused(ui) == input;

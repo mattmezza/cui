@@ -6,7 +6,7 @@
     "license": "Zlib",
     "license_file": "third_party/clay/LICENSE",
     "sha256": {
-      "third_party/clay/clay.h": "fda1f4cccf035d5114149a9020e10dac04e2a057fb9ca2525fb644c2004e5e4e",
+      "third_party/clay/clay.h": "4396b8fecd5b6d1ddaa0571a3c2cd1b9b5adc4472940032d85b2192ae633f578",
       "third_party/clay/LICENSE": "5dd30f9f52093076b7574458f5efb8242fe6cbbd4669d4a2914e7616810d0df8"
     }
   },

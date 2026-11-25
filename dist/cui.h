@@ -1507,6 +1507,43 @@ const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id 
 #endif
 
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_SCROLL_X_INTERNAL_H
+#define CUI_SCROLL_X_INTERNAL_H
+
+typedef struct {
+    float seed, submitted, text_width;
+    float caret; /* Negative when caret reveal is inactive. */
+    float placeholder_width;
+    cui_id placeholder;
+    cui_align align;
+} cui_scroll_x_projection;
+
+/* Called on the open named viewport, after its paint children were submitted. */
+void cui_core_project_scroll_x(cui_context *, cui_id, cui_scroll_x_projection);
+bool cui_core_painted_scroll_x(const cui_context *, cui_id, float *);
+float cui_core_prior_scroll_x(const cui_context *, cui_id, float fallback);
+
+static inline float cui_core_scroll_x_clamp(float seed, float width, float text_width,
+                                            float caret) {
+    if (width > 0 && caret >= 0) {
+        if (caret < seed)
+            seed = caret;
+        if (caret + 1 > seed + width)
+            seed = caret + 1 - width;
+    }
+    float maximum = text_width + (caret >= 0 ? 1 : 0) - width;
+    if (maximum < 0)
+        maximum = 0;
+    return seed < maximum ? seed : maximum;
+}
+
+static inline float cui_core_scroll_x_alignment(float width, float content, cui_align align) {
+    float extra = width > content ? width - content : 0;
+    return align == CUI_ALIGN_CENTER ? extra * .5f : align == CUI_ALIGN_END ? extra : 0;
+}
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_TEXT_PAINT_INTERNAL_H
 #define CUI_TEXT_PAINT_INTERNAL_H
 
@@ -3388,6 +3425,7 @@ static size_t cui_core_grapheme_next_valid(cui_str text, size_t offset) {
 #endif
 #define CLAY_CUSTOM_TEXT_MIN_WIDTH cui_core_custom_text_min_width
 #define CLAY_CUSTOM_TEXT_WRAP cui_core_custom_text_wrap
+#define CLAY_CUSTOM_LAYOUT_X cui_core_custom_layout_x
 // VERSION: 0.14
 
 /*
@@ -5478,6 +5516,9 @@ static float CLAY_CUSTOM_TEXT_MIN_WIDTH(Clay_String *, Clay_Dimensions *, void *
 #ifdef CLAY_CUSTOM_TEXT_WRAP
 static bool CLAY_CUSTOM_TEXT_WRAP(Clay_Context *, Clay_LayoutElement *, float, void *);
 #endif
+#ifdef CLAY_CUSTOM_LAYOUT_X
+static void CLAY_CUSTOM_LAYOUT_X(Clay_Context *, void *);
+#endif
 
 void Clay__OpenTextElement(Clay_String text, Clay_TextElementConfig textConfig) {
     Clay_Context* context = Clay_GetCurrentContext();
@@ -5987,6 +6028,9 @@ void Clay__CalculateFinalLayout(float deltaTime, bool useStoredBoundingBoxes, bo
     Clay__int32_tArray aspectRatioElements = context->reusableElementIndexBuffer;
     aspectRatioElements.length = 0;
     Clay__SizeContainersAlongAxis(true, deltaTime, &textElements, &aspectRatioElements);
+#ifdef CLAY_CUSTOM_LAYOUT_X
+    CLAY_CUSTOM_LAYOUT_X(context, context->measureTextUserData);
+#endif
 
     // Wrap text
     for (int32_t textElementIndex = 0; textElementIndex < textElements.length; ++textElementIndex) {
@@ -8468,6 +8512,7 @@ freely, subject to the following restrictions:
     distribution.
 */
 
+#undef CLAY_CUSTOM_LAYOUT_X
 #undef CLAY_CUSTOM_TEXT_MIN_WIDTH
 #undef CLAY_CUSTOM_TEXT_WRAP
 #ifdef CUI_CORE_DEFINED_CLAY_IMPLEMENTATION
@@ -8549,6 +8594,14 @@ typedef struct {
     cui_resource_fn collect, destroy;
     bool touched;
 } cui_core_resource;
+typedef struct cui_core_scroll_x {
+    struct cui_core_scroll_x *next;
+    Clay_LayoutElement *viewport, *placeholder;
+    cui_scroll_x_projection plan;
+    uint64_t frame;
+    float applied;
+    bool manual, resolved;
+} cui_core_scroll_x;
 typedef struct {
     size_t start, end;
     float advance;
@@ -8605,6 +8658,8 @@ struct cui_context {
     size_t ordered_queued_tab;
     cui_core_ordered_tab ordered_tab_result;
     const cui_core_scroll_layout_header *scroll_layout;
+    cui_core_scroll_x *scroll_x;
+    uint64_t scroll_x_ready_frame;
     int tab_path[32];
     size_t tab_depth;
     cui_core_focus_scope focus_scopes[CUI_CORE_STACK_MAX],
@@ -10509,6 +10564,7 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
     }
     ui->numeric_frame_invalid = false; /* A fresh admitted frame alone resets invalidity. */
     ui->scroll_layout = NULL;          /* Drop cached resource before collection/destruction. */
+    ui->scroll_x = NULL;
     for (size_t i = 0; i < ui->config.max_resources; ++i) {
         cui_core_resource *r = &ui->resources[i];
         if (!r->payload)
@@ -11166,9 +11222,100 @@ bool cui_set_box_scroll_offset(cui_context *ui, cui_id id, float x, float y) {
             if (!item->layoutElement)
                 return false;
             item->layoutElement->config.clip.childOffset = (Clay_Vector2){x, y};
+            for (cui_core_scroll_x *scroll = ui->scroll_x; scroll; scroll = scroll->next)
+                if (scroll->viewport == item->layoutElement) {
+                    scroll->manual = true;
+                    break;
+                }
             return true;
         }
     return false;
+}
+
+/* A presentational resource, keyed by viewport and bounded by the context's
+ * existing resource limits. Read the completed generation without touching it. */
+#define CUI_SCROLL_X_NAMESPACE UINT64_C(0x8f9cd011fc90d7a3)
+static const cui_core_scroll_x *cui_core_scroll_x_find(const cui_context *ui, cui_id id) {
+    if (!ui || !id || !ui->scroll_x_ready_frame ||
+        ui->scroll_x_ready_frame != ui->frame_sequence - (uint64_t)ui->in_frame)
+        return NULL;
+    for (size_t i = 0; i < ui->config.max_resources; i++) {
+        const cui_core_resource *resource = &ui->resources[i];
+        if (resource->owner == id && resource->namespace_id == CUI_SCROLL_X_NAMESPACE &&
+            resource->payload && resource->bytes == sizeof(cui_core_scroll_x)) {
+            const cui_core_scroll_x *scroll = resource->payload;
+            return scroll->resolved && scroll->frame == ui->scroll_x_ready_frame ? scroll : NULL;
+        }
+    }
+    return NULL;
+}
+bool cui_core_painted_scroll_x(const cui_context *ui, cui_id id, float *out) {
+    if (!out || !ui || ui->in_frame)
+        return false;
+    const cui_core_scroll_x *scroll = cui_core_scroll_x_find(ui, id);
+    if (!scroll)
+        return false;
+    *out = scroll->applied;
+    return true;
+}
+float cui_core_prior_scroll_x(const cui_context *ui, cui_id id, float fallback) {
+    const cui_core_scroll_x *scroll = cui_core_scroll_x_find(ui, id);
+    return scroll && scroll->plan.submitted == fallback ? scroll->applied : fallback;
+}
+void cui_core_project_scroll_x(cui_context *ui, cui_id id, cui_scroll_x_projection plan) {
+    if (!cui_core_mutation(ui) || !ui || !ui->in_frame || !ui->depth || ui->overflow_depth ||
+        !ui->opened[ui->depth - 1] || !id || !isfinite(plan.seed) || !isfinite(plan.text_width) ||
+        !isfinite(plan.caret) || !isfinite(plan.placeholder_width))
+        return;
+    const cui_core_box_node *node = &ui->nodes[ui->node_stack[ui->depth - 1]];
+    if (node->id != id || !node->clip || node->layout_only)
+        return;
+    cui_core_select_context(ui);
+    Clay_LayoutElement *viewport = Clay__GetOpenLayoutElement();
+    if (viewport->id != node->clay_id)
+        return;
+    Clay_LayoutElement *placeholder = NULL;
+    if (plan.placeholder)
+        placeholder = Clay__GetHashMapItem(cui_core_folded(plan.placeholder))->layoutElement;
+    cui_core_scroll_x *scroll =
+        cui_resource_get(ui, id, CUI_SCROLL_X_NAMESPACE, sizeof(*scroll), NULL, NULL);
+    if (!scroll || scroll->frame == ui->frame_sequence)
+        return;
+    *scroll = (cui_core_scroll_x){.next = ui->scroll_x,
+                                  .viewport = viewport,
+                                  .placeholder = placeholder,
+                                  .plan = plan,
+                                  .frame = ui->frame_sequence};
+    ui->scroll_x = scroll;
+}
+static void cui_core_custom_layout_x(Clay_Context *clay, void *user) {
+    cui_context *ui = user;
+    if (!ui || ui->clay != clay)
+        return;
+    for (cui_core_scroll_x *scroll = ui->scroll_x; scroll; scroll = scroll->next) {
+        Clay_LayoutElement *viewport = scroll->viewport;
+        const cui_scroll_x_projection *plan = &scroll->plan;
+        float width = viewport->dimensions.width;
+        float wrapper_width = fmaxf(1, plan->text_width);
+        viewport->config.layout.childAlignment.x =
+            width < wrapper_width             ? CLAY_ALIGN_X_LEFT
+            : plan->align == CUI_ALIGN_CENTER ? CLAY_ALIGN_X_CENTER
+            : plan->align == CUI_ALIGN_END    ? CLAY_ALIGN_X_RIGHT
+                                              : CLAY_ALIGN_X_LEFT;
+        /* A later explicit public offset wins. Otherwise every layout pass
+         * resolves from the original copied seed. */
+        if (!scroll->manual) {
+            scroll->applied =
+                cui_core_scroll_x_clamp(plan->seed, width, plan->text_width, plan->caret);
+            viewport->config.clip.childOffset.x = -scroll->applied;
+        } else
+            scroll->applied = -viewport->config.clip.childOffset.x;
+        if (scroll->placeholder)
+            scroll->placeholder->config.floating.offset.x =
+                cui_core_scroll_x_alignment(width, plan->placeholder_width, plan->align) -
+                cui_core_scroll_x_alignment(width, wrapper_width, plan->align);
+        scroll->resolved = true;
+    }
 }
 
 bool cui_bitmap_valid(cui_bitmap b) {
@@ -14773,6 +14920,8 @@ cui_core_commands_done:
         memset(ui->ordered_data, 0, ui->ordered_bytes);
     ui->ordered_frame = false;
     ui->semantic_text_ready = ui->error == CUI_OK;
+    ui->scroll_x_ready_frame =
+        ui->scroll_x && ui->error == CUI_OK && !ui->v2_failed ? ui->frame_sequence : 0;
     ui->in_frame = false;
     ui->resolving_layout = false;
     if (ui->scroll_layout && ui->error != CUI_OK)

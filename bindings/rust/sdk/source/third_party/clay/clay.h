@@ -2088,6 +2088,9 @@ static float CLAY_CUSTOM_TEXT_MIN_WIDTH(Clay_String *, Clay_Dimensions *, void *
 #ifdef CLAY_CUSTOM_TEXT_WRAP
 static bool CLAY_CUSTOM_TEXT_WRAP(Clay_Context *, Clay_LayoutElement *, float, void *);
 #endif
+#ifdef CLAY_CUSTOM_LAYOUT_X
+static void CLAY_CUSTOM_LAYOUT_X(Clay_Context *, void *);
+#endif
 
 void Clay__OpenTextElement(Clay_String text, Clay_TextElementConfig textConfig) {
     Clay_Context* context = Clay_GetCurrentContext();
@@ -2597,6 +2600,9 @@ void Clay__CalculateFinalLayout(float deltaTime, bool useStoredBoundingBoxes, bo
     Clay__int32_tArray aspectRatioElements = context->reusableElementIndexBuffer;
     aspectRatioElements.length = 0;
     Clay__SizeContainersAlongAxis(true, deltaTime, &textElements, &aspectRatioElements);
+#ifdef CLAY_CUSTOM_LAYOUT_X
+    CLAY_CUSTOM_LAYOUT_X(context, context->measureTextUserData);
+#endif
 
     // Wrap text
     for (int32_t textElementIndex = 0; textElementIndex < textElements.length; ++textElementIndex) {

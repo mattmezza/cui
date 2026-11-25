@@ -12,5 +12,5 @@ cui_input_group_result
 cui_form_private_input_group(cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
                              const cui_input_group_addon *, size_t, cui_input_group_options,
                              cui_input_group_handler, cui_input_group_event_result *,
-                             cui_form_private_input_fn, void *);
+                             cui_form_private_input_fn, void *, cui_id painted_viewport);
 #endif

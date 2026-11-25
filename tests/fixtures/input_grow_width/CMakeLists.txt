@@ -7,8 +7,3 @@ enable_testing()
 get_filename_component(CUI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 set(CUI_BUILD_NATIVE OFF CACHE BOOL "Portable fixture" FORCE)
 add_subdirectory("${CUI_SOURCE_DIR}" cui EXCLUDE_FROM_ALL)
-
-option(CUI_INPUT_GROW_CARET_PROBE "Register the intentionally failing unresolved same-frame caret probe" OFF)
-if(CUI_INPUT_GROW_CARET_PROBE)
- add_test(NAME input_grow_caret_probe COMMAND test_input_grow_width --probe-caret)
-endif()

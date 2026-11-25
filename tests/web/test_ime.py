@@ -3,13 +3,71 @@
 # requires-python = ">=3.11"
 # dependencies = ["playwright==1.58.0"]
 # ///
-"""Chromium IME composition and Textarea soft-wrap keyboard navigation."""
+"""Chromium IME composition, Input resize and Textarea soft-wrap navigation."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import threading
 from playwright.sync_api import sync_playwright
+
+
+def check_input_resize(page, session):
+    page.keyboard.press('Control+a')
+    session.send('Input.insertText', {'text': 'W' * 120})
+    page.wait_for_function('cuiGallery.exports.gallery_input_selection(1) === 120')
+
+    def sample_resizes(text_length):
+        return page.evaluate("""(textLength) => {
+            const canvas = document.querySelector('canvas');
+            const previousWidth = canvas.style.width;
+            const gallery = cuiGallery, e = gallery.exports;
+            try {
+                return [320, 224, 360, 230, 308].map(width => {
+                    canvas.style.width = width + 'px';
+                    const before = gallery.frame;
+                    gallery.render();
+                    const clips = [];
+                    let textX;
+                    for (let i = 0; i < e.gallery_count(); i++) {
+                        const type = e.gallery_command(i, 0);
+                        if (type === 3)
+                            clips.push([e.gallery_command(i, 1), e.gallery_command(i, 3)]);
+                        if (type === 2 && e.gallery_command_length(i) === textLength)
+                            textX = e.gallery_command(i, 1);
+                    }
+                    return {width, frameCount: gallery.frame - before, clips,
+                            caret: [e.gallery_ime_rect(0), e.gallery_ime_rect(2)], textX};
+                });
+            } finally {
+                canvas.style.width = previousWidth;
+                gallery.render();
+            }
+        }""", text_length)
+
+    for preedit in (False, True):
+        if preedit:
+            session.send('Input.imeSetComposition', {'text': 'WWWW', 'selectionStart': 4,
+                                                     'selectionEnd': 4})
+            page.wait_for_function("""() => {
+                const e = cuiGallery.exports;
+                return Array.from({length: e.gallery_count()}, (_, i) =>
+                    e.gallery_command_length(i)).includes(124);
+            }""")
+        samples = sample_resizes(124 if preedit else 120)
+        caret_offset = samples[0]['caret'][0] - samples[0]['textX']
+        for observed in samples:
+            assert observed['frameCount'] == 1 and len(observed['clips']) >= 2, observed
+            assert observed['clips'][0][1] == min(280, observed['width'] - 48), observed
+            x, width = observed['clips'][1]
+            caret_x, caret_width = observed['caret']
+            assert width > 0 and caret_width == 1, observed
+            assert x - .02 <= caret_x and caret_x + caret_width <= x + width + .02, observed
+            assert abs(caret_x - observed['textX'] - caret_offset) < .02, observed
+            if not preedit:
+                assert abs((caret_x + caret_width) - (x + width)) < .02, observed
+    session.send('Input.imeSetComposition', {'text': '', 'selectionStart': 0, 'selectionEnd': 0})
+    assert page.evaluate('cuiGallery.exports.gallery_input_selection(2)') == 120
 
 
 def check_textarea_word_movement(page, session):
@@ -107,7 +165,9 @@ def main():
                 session.send('Input.imeSetComposition',{'text':'','selectionStart':0,'selectionEnd':0})
                 page.wait_for_timeout(50)
                 assert length()==before,(story,'cancel mutated document')
-                if story == 'Textarea':
+                if story == 'Input':
+                    check_input_resize(page, session)
+                elif story == 'Textarea':
                     check_textarea_word_movement(page, session)
             page.evaluate('location.hash="Input"')
             page.wait_for_function('cuiGallery.renderedComponent==="Input"')
@@ -144,6 +204,7 @@ def main():
     finally:
         server.shutdown()
     print('Native browser IME preedit/commit/cancel/undo passed for Input, Textarea, Editor and Questionnaire.')
+    print('Growing Input caret and IME preedit stayed aligned on each of five resize frames.')
     print('Textarea soft-wrap caret placement and Alt+Arrow word selection passed.')
 
 if __name__=='__main__':

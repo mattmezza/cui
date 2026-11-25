@@ -120,6 +120,43 @@ cui_input_group_result cui_input_group(cui_context *, cui_id group, cui_id input
 /* src/base/cui_form.c */
 /* SPDX-License-Identifier: MIT */
 /* SPDX-License-Identifier: MIT */
+#ifndef CUI_SCROLL_X_INTERNAL_H
+#define CUI_SCROLL_X_INTERNAL_H
+
+typedef struct {
+    float seed, submitted, text_width;
+    float caret; /* Negative when caret reveal is inactive. */
+    float placeholder_width;
+    cui_id placeholder;
+    cui_align align;
+} cui_scroll_x_projection;
+
+/* Called on the open named viewport, after its paint children were submitted. */
+void cui_core_project_scroll_x(cui_context *, cui_id, cui_scroll_x_projection);
+bool cui_core_painted_scroll_x(const cui_context *, cui_id, float *);
+float cui_core_prior_scroll_x(const cui_context *, cui_id, float fallback);
+
+static inline float cui_core_scroll_x_clamp(float seed, float width, float text_width,
+                                            float caret) {
+    if (width > 0 && caret >= 0) {
+        if (caret < seed)
+            seed = caret;
+        if (caret + 1 > seed + width)
+            seed = caret + 1 - width;
+    }
+    float maximum = text_width + (caret >= 0 ? 1 : 0) - width;
+    if (maximum < 0)
+        maximum = 0;
+    return seed < maximum ? seed : maximum;
+}
+
+static inline float cui_core_scroll_x_alignment(float width, float content, cui_align align) {
+    float extra = width > content ? width - content : 0;
+    return align == CUI_ALIGN_CENTER ? extra * .5f : align == CUI_ALIGN_END ? extra : 0;
+}
+#endif
+
+/* SPDX-License-Identifier: MIT */
 #ifndef CUI_FORM_PRIVATE_H
 #define CUI_FORM_PRIVATE_H
 
@@ -133,7 +170,7 @@ cui_input_group_result
 cui_form_private_input_group(cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
                              const cui_input_group_addon *, size_t, cui_input_group_options,
                              cui_input_group_handler, cui_input_group_event_result *,
-                             cui_form_private_input_fn, void *);
+                             cui_form_private_input_fn, void *, cui_id painted_viewport);
 #endif
 
 #include <math.h>
@@ -302,7 +339,7 @@ cui_input_group_result cui_form_private_input_group(
     cui_context *ui, cui_id group, cui_id input, cui_edit *edit, cui_input_group_state *state,
     const cui_input_group_addon *a, size_t count, cui_input_group_options o,
     cui_input_group_handler handler, cui_input_group_event_result *notifications,
-    cui_form_private_input_fn input_fn, void *input_user) {
+    cui_form_private_input_fn input_fn, void *input_user, cui_id painted_viewport) {
     cui_input_group_result result = {.input.error = CUI_EDIT_OK};
     if (!ui || !edit || !state || !cui_form_private_group_valid(group, input, a, count, o)) {
         result.error = CUI_FORM_INVALID;
@@ -362,7 +399,7 @@ cui_input_group_result cui_form_private_input_group(
     }
     cui_base_input_options behavior = o.input;
     cui_input_hit_geometry hit = {ui, state->viewport, o.font_size > 0 ? o.font_size : 14,
-                                  state->scroll_x};
+                                  cui_core_prior_scroll_x(ui, painted_viewport, state->scroll_x)};
     bool synthetic_hit = !behavior.hit_test && !cui_edit_get_state(edit).multiline;
     if (synthetic_hit) {
         behavior.hit_test = cui_base_input_hit_test;
@@ -401,7 +438,7 @@ cui_input_group_result cui_base_input_group(cui_context *ui, cui_id group, cui_i
                                             const cui_input_group_addon *addons, size_t count,
                                             cui_input_group_options options) {
     return cui_form_private_input_group(ui, group, input, edit, state, addons, count, options,
-                                        (cui_input_group_handler){0}, NULL, NULL, NULL);
+                                        (cui_input_group_handler){0}, NULL, NULL, NULL, 0);
 }
 cui_input_group_event_result
 cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input, cui_edit *edit,
@@ -410,7 +447,7 @@ cui_base_input_group_events(cui_context *ui, cui_id group, cui_id input, cui_edi
                             cui_input_group_handler handler) {
     cui_input_group_event_result result = {0};
     result.control = cui_form_private_input_group(ui, group, input, edit, state, addons, count,
-                                                  options, handler, &result, NULL, NULL);
+                                                  options, handler, &result, NULL, NULL, 0);
     return result;
 }
 
@@ -430,7 +467,7 @@ cui_input_group_result
 cui_form_private_input_group(cui_context *, cui_id, cui_id, cui_edit *, cui_input_group_state *,
                              const cui_input_group_addon *, size_t, cui_input_group_options,
                              cui_input_group_handler, cui_input_group_event_result *,
-                             cui_form_private_input_fn, void *);
+                             cui_form_private_input_fn, void *, cui_id painted_viewport);
 #endif
 
 
@@ -772,22 +809,11 @@ cui_form_private_styled_group(cui_context *ui, cui_id group, cui_id input, const
     paint_options.validate_user = o.input.validate_user;
     paint_options.normalization = o.input.normalization;
     paint_options.matcher = o.input.matcher;
-    cui_input_group_result result;
-    if (o.input.masked) {
-        cui_form_private_secure secure = {&t, state, &paint_options};
-        result =
-            cui_form_private_input_group(ui, group, input, edit, state, a, count, o, handler,
-                                         notifications, cui_form_private_secure_input, &secure);
-    } else if (notifications) {
-        cui_input_group_event_result observed =
-            cui_base_input_group_events(ui, group, input, edit, state, a, count, o, handler);
-        result = observed.control;
-        notifications->addon_count = observed.addon_count;
-        notifications->change_count = observed.change_count;
-        notifications->submit_count = observed.submit_count;
-        notifications->count_overflow = observed.count_overflow;
-    } else
-        result = cui_base_input_group(ui, group, input, edit, state, a, count, o);
+    cui_form_private_secure secure = {&t, state, &paint_options};
+    cui_input_group_result result = cui_form_private_input_group(
+        ui, group, input, edit, state, a, count, o, handler, notifications,
+        o.input.masked ? cui_form_private_secure_input : NULL, &secure,
+        cui_input_viewport_id(input));
     if (result.error != CUI_FORM_OK)
         return result;
     bool focused = cui_focused(ui) == input;

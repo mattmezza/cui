@@ -674,9 +674,9 @@ API: `cui_form`. [Public header](../include/cui/cui_form.h); [guide](FORMS.md).
 
 **Interaction:** cui_input_result reports changed, submitted, rejected and errors. Optional whole-value validate callback decides whether a proposed edit is accepted. Checked pattern and number formatting use caller-owned workspace and commit as one Undo step.
 
-**Usage:** Create an editor once; submit it each frame and perform application submission only on the result event.
+**Usage:** Retain the editor across frames. Use width = -1 inside a sized parent so the caret follows live resize. Read the laid-out offset with cui_input_scroll_x after the frame.
 
-API: `cui_input`, `cui_input_ex`. [Public header](../include/cui/cui_components.h); [guide](INPUT.md).
+API: `cui_input`, `cui_input_ex`, `cui_input_scroll_x`. [Public header](../include/cui/cui_components.h); [guide](INPUT.md).
 
 ## Input Group
 

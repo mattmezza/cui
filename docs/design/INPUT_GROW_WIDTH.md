@@ -37,10 +37,10 @@ tracked viewport stays within that input. Existing Input and InputGroup event
 suites remain passing, including their acceptance/history/reduction coverage.
 No acceptance, IME composition, history or callback implementation changed.
 
-## Remaining same-frame caret limitation
+## Baseline before same-frame placement
 
-Width containment is **not** complete responsive caret/scroll correctness. The
-opt-in `--probe-caret` requirement fails after this correction:
+Width containment left a one-frame delay in responsive caret placement. The
+original opt-in `--probe-caret` reproduced it:
 
 | Frame width | Current viewport | End caret X | Viewport right | Stored scroll | Needed scroll |
 | --- | --- | --- | --- | --- | --- |
@@ -53,8 +53,7 @@ opt-in `--probe-caret` requirement fails after this correction:
 explicitly returns previous-frame bounds. Merely fixing viewport sizing cannot
 make that calculation current. Shrink can hide the end caret for a frame; grow
 can leave excess scroll until the next frame. Selection paint and host IME caret
-geometry share that stale projection. This probe is intentionally opt-in and
-failing, not a test that enshrines the defect as success.
+geometry share that stale projection. The later same-frame placement regression promotes these cases to the ordinary suite.
 
 Any follow-up must be reviewed separately before Core/API work. Existing
 prepaint supplies current bounds but forbids layout/input mutation; updating
@@ -64,10 +63,8 @@ state inside Styled InputGroup: a deferred callback must not retain that state
 pointer. An architecture proposal must resolve that lifetime and geometry
 ownership, not silently add an end-frame borrowing requirement to existing APIs.
 
-Reproduction is in `tests/fixtures/input_grow_width/README.md`. Canonical registration, source metadata and consumer guidance include the
-containment test and retain the narrower current-frame grow-caret/scroll
-limitation above. No
-full Input parity, browser acceptance or general text-engine completion claimed.
+The original fixture verified containment. The updated fixture in
+`tests/fixtures/input_grow_width/README.md` also verifies same-frame placement.
 
 Verified on this slice: strict-warning Release and ASan/UBSan builds each pass
 `input_grow_width`, `input`, and `input_group_events` (3/3) through the private
@@ -125,3 +122,14 @@ keeps event dispatch unchanged.
    the reproducer to an ordinary required regression.
 3. Validate the real WASM gallery and regenerate the standalone distributions,
    SDK sources, usage metadata and consumer skill.
+
+## Implemented scope
+
+The ordinary grow-width fixture now checks the previously failing sequence, all
+three alignments, paint and tracked IME agreement, short and overflowing
+placeholders, next-frame pointer hits, InputGroup and resource exhaustion. Real
+Chromium exercises the first frame at five widths during both committed input
+and active preedit. `cui_input_scroll_x` reads the actual completed growing
+viewport. The synchronous state field remains usable by legacy callers. The
+placement record retains no caller state after submission. The Clay revision is unchanged and
+its tiny local hook is recorded in the pin manifest.

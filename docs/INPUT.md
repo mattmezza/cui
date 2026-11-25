@@ -41,9 +41,33 @@ resolved frame width on the first frame and after parent resizing. The outer and
 text-viewport clips remain active; InputGroup prefix/suffix segments retain their
 widths. An extra internal layout row provides this containment.
 
-Remaining resize limitation: horizontal scroll, caret/selection projection and
-host IME geometry can use the previous frame's viewport during a width change.
-A focused end caret may be clipped for the first shrinking frame, or retain excess
-scroll for the first growing frame; the next frame converges. Width containment
-does not fix that separate projection defect. See
-[the characterization and opt-in failing probe](design/INPUT_GROW_WIDTH.md).
+### Follow the current parent width
+
+Set `width = -1` inside a parent sized by your layout. During a resize, the
+viewport uses its current width for horizontal scroll, selection paint, the
+caret and the IME anchor. Long values scroll from the start edge. Center and
+End take effect when the text fits. A placeholder aligns by its own width.
+
+```c
+/* Within the sized parent, during submission. Retain edit and state. */
+cui_input_result result = cui_input_ex(ui, input_id, &theme, cui_string("Name"),
+    edit, &state, (cui_input_options){.width = -1});
+/* After cui_end_frame, if your application needs the actual scroll offset. */
+float painted_scroll;
+bool has_painted_scroll = cui_input_scroll_x(ui, input_id, &painted_scroll);
+```
+
+The optional query returns true for the growing single-line viewport in the
+latest successful frame, including a field composed by InputGroup. It leaves
+its output untouched during submission and when the viewport is absent or the
+frame fails. Fixed-width fields continue to update `state.scroll_x` at
+submission. Growing fields also keep that synchronous update, then reconcile
+the last painted offset on the next submission when the supplied scroll is
+unchanged. An explicit change to the supplied scroll is honored. The layout
+pass retains no pointer to the caller’s state.
+
+Each admitted growing viewport uses one bounded Core resource for this placement.
+Resource exhaustion is reported as `CUI_ERROR_CAPACITY`. The C query has no
+handwritten Python, Node, Go or Rust facade. The single-line behavior does not
+cover same-frame multiline rewrap or animated width overrides. See the
+[resize design and regression](design/INPUT_GROW_WIDTH.md).

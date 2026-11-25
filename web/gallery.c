@@ -4919,6 +4919,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 6: {
+        cui_begin_box(ui, 0,
+                      (cui_box){.width = fmaxf(0, fminf(280, width - 48)), .fixed_width = true});
         cui_input_result result = cui_input_ex(
             ui, cui_id_from(ui, "input"), &t,
             cui_string(input_mode == 7   ? "Phone number"
@@ -4956,7 +4958,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 .invalid = input_mode == 2,
                 .size = (cui_input_size)control_size,
                 .design_size = design_size,
-                .width = width > 360 ? 280 : width - 48});
+                .width = -1});
+        cui_end_box(ui);
         if (result.rejected)
             input_rejected = true;
         else if (result.changed)

@@ -71,7 +71,7 @@ Chart accepts up to 64 caller-supplied label/value pairs through `chart_data`; t
 
 Table is compositional: Table children are Item rows and each row contains Item text cells. The first row is the header. This bridge Table has no sorting, selection, or virtualization.
 
-DataTable accepts copied UTF-8 headers and row-major cells (up to 16 columns and 32 rows) through `data_table`; its bounds helpers locate cells and headers for host input. `data_table_state` reports selected one-based row/column and requested sort column/direction. Sort is a request: re-supply rows in the desired order. Change callbacks expose the raw native `checked_raw` field as well as its Boolean convenience form; DataTable CHANGE callbacks include a copied JSON text snapshot with reason, row, column, sortColumn, and sortDirection; `data_table_state` reads current state.
+DataTable copies UTF-8 headers and row-major cells through `data_table`. Its bounds helpers locate cells and headers for host input. `data_table_state` reports the selected row key, one-based column, and requested sort column and direction. The legacy setter assigns positional keys starting at one. To apply a sort request, supply rows in the desired order. Change callbacks expose a copied JSON snapshot containing `reason`, `row`, `column`, `sortColumn`, and `sortDirection`. Use the [keyed DataTable example](#keep-the-visible-datatable-row-during-a-rust-update) for live replacements.
 
 Plot accepts up to 256 copied finite `PlotPoint { x, y }` values through `plot_points` and supports readback via `plot_point`. The current native Plot draws themed dots without axes, paths, or hit-testing.
 
@@ -92,6 +92,57 @@ Questionnaire composes Item questions and nested Item choices. `questionnaire_qu
 Dock composes Item panels with optional child content; `dock_activate`, `dock_move_split`, `dock_active`, `dock_panel_bounds`, and `dock_serialize` expose the native panel model. Dock panel schema freezes after the first frame. `DockAxis` selects horizontal or vertical splits; serialized layout is copied UTF-8.
 
 Settings composes Item pages, nested Item groups, and Switch/Checkbox/Input/NumberInput fields. `settings_query` filters pages (up to 256 bytes), `settings_page`/`settings_set_page` control navigation, `settings_field_bounds` locates visible fields, and `settings_reset_page` restores first-frame defaults with copied field events. The page/group schema freezes after the first frame; Input and NumberInput titles use `detail_text`. All fallible setters return the bridge status as `Error(code)`.
+
+## Keep the visible DataTable row during a Rust update
+
+Use `Builder::data_table_keyed` on creation and `App::data_table_keyed` on
+the owner thread to replace rows. Pass one distinct nonzero `u32` per row.
+Reusing keys preserves the visible row and its offset where scroll bounds
+allow. Surviving selection and keyboard navigation follow the keys. The
+bridge copies the input.
+
+```rust
+use cui_builders::{App, Kind, Result};
+
+fn inbox(app: &mut App) -> Result<()> {
+    let root = app.root(Kind::Column, "root")?;
+    let headers = ["Subject", "Sender"];
+    let rows: &[&[&str]] = &[&["Design review", "Morgan"], &["Build status", "Alex"]];
+    let table = app.build_child(root, Kind::DataTable, "inbox")?
+        .data_table_keyed(&headers, rows, &[203, 204])?
+        .visual_size(360., 184.)?
+        .finish();
+
+    // Apply a replacement on the UI thread after dispatching a page arrival.
+    let mut updated: Vec<&[&str]> = vec![&["Release notes", "Build team"]];
+    updated.extend_from_slice(rows);
+    app.data_table_keyed(table, &headers, &updated, &[301, 203, 204])?;
+    Ok(())
+}
+```
+
+`DataTableState.row` and the change payloads report the key. Cell text and
+bounds reads use zero-based matrix indices. The limits are 32 rows, 16
+columns, and 128 UTF-8 bytes per header or cell. Pass empty rows and keys
+to clear a keyed table. A replacement queues no change event.
+
+`app.supports_keyed_data_table()` checks the linked bridge. With alpha.4,
+an explicit keyed setter returns `Error(9)` and preserves existing data.
+`data_table` remains available and assigns positional keys.
+
+The complete [live inbox](../bindings/rust/examples/data_table_live.rs)
+drives the load button and verifies the viewport without opening a window.
+From the repository root, run:
+
+```sh
+cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example data_table_live
+```
+
+For the native window, add `-- --font /absolute/path/to/font.ttf` and use an
+SDL-enabled shared bridge via `CUI_BRIDGE_LIB_DIR`, or add `--features native`
+for the bundled Linux build. The inbox uses a local page arrival. Your
+application controls loading, and the retained bridge currently has no
+load-more notification.
 
 ## Composed workspace example
 

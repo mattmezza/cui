@@ -151,10 +151,12 @@ matrix. Step the bridge before reading the new layout bounds.
 
 The legacy `cui_bridge_data_table_set` uses keys 1 through row count and resets
 the retained table state. Switching to keyed updates can retain matching old
-keys. The [Python](BINDING_BUILDERS.md#keep-a-python-datatables-scroll-position-during-updates),
+keys. Keyed updates are available in the
+[Python](BINDING_BUILDERS.md#keep-a-python-datatables-scroll-position-during-updates),
 [JavaScript/TypeScript](BINDING_BUILDERS.md#keep-a-javascript-or-typescript-datatables-scroll-position-during-updates),
-and [Go](GO_BUILDERS.md#keep-the-visible-datatable-row-during-a-go-update)
-builders expose keyed updates. Rust uses positional keys.
+[Go](GO_BUILDERS.md#keep-the-visible-datatable-row-during-a-go-update),
+and [Rust](RUST_BUILDERS.md#keep-the-visible-datatable-row-during-a-rust-update)
+builders.
 The keyed C bridge has no load-more event or network adapter.
 
 The visual families above expose their documented default variants. Avatar is

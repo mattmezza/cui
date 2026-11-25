@@ -414,6 +414,7 @@ pub struct ChangeEvent {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DataTableState {
+    /// Selected row key, or zero. The legacy setter assigns one-based keys.
     pub row: u32,
     pub column: u32,
     pub sort_column: u32,
@@ -799,6 +800,52 @@ fn string(s: &str) -> Result<CString> {
     }
     CString::new(s).map_err(|_| Error(3))
 }
+type DataTableKeyedSetter = unsafe extern "C" fn(
+    *mut c_void,
+    RawNode,
+    *const *const c_char,
+    u32,
+    *const *const c_char,
+    *const u32,
+    u32,
+) -> u32;
+
+#[cfg(cui_bridge_static)]
+fn data_table_keyed_setter() -> Option<DataTableKeyedSetter> {
+    extern "C" {
+        fn cui_bridge_data_table_set_keyed(
+            app: *mut c_void,
+            node: RawNode,
+            headers: *const *const c_char,
+            column_count: u32,
+            cells: *const *const c_char,
+            row_keys: *const u32,
+            row_count: u32,
+        ) -> u32;
+    }
+    Some(cui_bridge_data_table_set_keyed)
+}
+
+#[cfg(all(not(cui_bridge_static), any(unix, windows)))]
+fn data_table_keyed_setter() -> Option<DataTableKeyedSetter> {
+    // Rust links one bridge for the lifetime of the process.
+    static SETTER: std::sync::OnceLock<Option<DataTableKeyedSetter>> = std::sync::OnceLock::new();
+    *SETTER.get_or_init(|| unsafe {
+        let symbol = notification_symbol_v1(b"cui_bridge_data_table_set_keyed\0".as_ptr().cast());
+        if symbol.is_null() {
+            return None;
+        }
+        Some(std::mem::transmute::<*mut c_void, DataTableKeyedSetter>(
+            symbol,
+        ))
+    })
+}
+
+#[cfg(not(any(cui_bridge_static, unix, windows)))]
+fn data_table_keyed_setter() -> Option<DataTableKeyedSetter> {
+    None
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Row = 1,
@@ -1432,14 +1479,48 @@ impl App {
         Ok((label, value))
     }
     pub fn data_table(&mut self, n: Node, headers: &[&str], rows: &[&[&str]]) -> Result<&mut Self> {
+        self.set_data_table(n, headers, rows, None)
+    }
+
+    /// Whether the linked bridge can replace DataTable rows by key.
+    pub fn supports_keyed_data_table(&self) -> bool {
+        data_table_keyed_setter().is_some()
+    }
+
+    /// Copy a matrix with a distinct nonzero key for each row. Replacement
+    /// preserves the viewport and surviving selection and keyboard cursor.
+    /// It emits no change event. Pass empty rows and keys to clear the table.
+    /// An unavailable provider returns `Error(9)` and keeps the existing table.
+    pub fn data_table_keyed(
+        &mut self,
+        n: Node,
+        headers: &[&str],
+        rows: &[&[&str]],
+        row_keys: &[u32],
+    ) -> Result<&mut Self> {
+        self.set_data_table(n, headers, rows, Some(row_keys))
+    }
+
+    fn set_data_table(
+        &mut self,
+        n: Node,
+        headers: &[&str],
+        rows: &[&[&str]],
+        row_keys: Option<&[u32]>,
+    ) -> Result<&mut Self> {
         let n = self.valid(n)?;
         if headers.is_empty()
             || headers.len() > 16
             || rows.len() > 32
             || rows.iter().any(|r| r.len() != headers.len())
+            || row_keys.is_some_and(|keys| keys.len() != rows.len())
         {
             return Err(Error(3));
         }
+        let keyed = match row_keys {
+            Some(keys) => Some((data_table_keyed_setter().ok_or(Error(9))?, keys)),
+            None => None,
+        };
         let header_strings: Vec<CString> =
             headers.iter().map(|h| string(h)).collect::<Result<_>>()?;
         let cell_strings: Vec<CString> = rows
@@ -1450,14 +1531,25 @@ impl App {
         let header_ptrs: Vec<*const c_char> = header_strings.iter().map(|s| s.as_ptr()).collect();
         let cell_ptrs: Vec<*const c_char> = cell_strings.iter().map(|s| s.as_ptr()).collect();
         check(unsafe {
-            cui_bridge_data_table_set(
-                self.raw,
-                n,
-                header_ptrs.as_ptr(),
-                headers.len() as u32,
-                cell_ptrs.as_ptr(),
-                rows.len() as u32,
-            )
+            match keyed {
+                Some((set, keys)) => set(
+                    self.raw,
+                    n,
+                    header_ptrs.as_ptr(),
+                    headers.len() as u32,
+                    cell_ptrs.as_ptr(),
+                    keys.as_ptr(),
+                    rows.len() as u32,
+                ),
+                None => cui_bridge_data_table_set(
+                    self.raw,
+                    n,
+                    header_ptrs.as_ptr(),
+                    headers.len() as u32,
+                    cell_ptrs.as_ptr(),
+                    rows.len() as u32,
+                ),
+            }
         })?;
         Ok(self)
     }
@@ -2430,6 +2522,18 @@ impl<'a> Builder<'a> {
     }
     pub fn data_table(self, headers: &[&str], rows: &[&[&str]]) -> Result<Self> {
         self.app.data_table(self.node, headers, rows)?;
+        Ok(self)
+    }
+    /// Set copied table data with stable row keys. Check provider support with
+    /// [App::supports_keyed_data_table] before building a keyed table.
+    pub fn data_table_keyed(
+        self,
+        headers: &[&str],
+        rows: &[&[&str]],
+        row_keys: &[u32],
+    ) -> Result<Self> {
+        self.app
+            .data_table_keyed(self.node, headers, rows, row_keys)?;
         Ok(self)
     }
     pub fn data_table_selection_mode(self, mode: DataTableSelectionMode) -> Result<Self> {

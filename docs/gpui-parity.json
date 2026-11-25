@@ -7323,7 +7323,7 @@
             "docs/TABLE.md"
           ],
           "limitations": [
-            "Opt-in C helpers preserve a row key and pixel offset. Automatic remote updates and foreign builder exposure remain open."
+            "Opt-in C helpers preserve a row key and pixel offset. Retained bindings expose keyed replacement within a 32-row cap. Automatic remote updates remain open."
           ]
         },
         {
@@ -7357,6 +7357,15 @@
           "evidence": [
             "bindings/go/cui/keyed_data_table_test.go",
             "bindings/go/examples/data_table_live/main.go"
+          ]
+        },
+        {
+          "name": "Rust retained DataTable keyed updates",
+          "status": "tested",
+          "evidence": [
+            "bindings/rust/tests/data_table_keyed.rs",
+            "bindings/rust/examples/data_table_live.rs",
+            "docs/RUST_BUILDERS.md"
           ]
         },
         {

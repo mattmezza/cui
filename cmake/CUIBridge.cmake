@@ -294,6 +294,44 @@ if(CUI_RUST_ICON_TESTS)
   endif()
  endforeach()
 endif()
+option(CUI_RUST_KEYED_DATA_TABLE_TESTS "Check keyed DataTable authoring with Rust on Linux" OFF)
+if(CUI_RUST_KEYED_DATA_TABLE_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Rust keyed DataTable provider tests currently support Linux only")
+ endif()
+ find_program(CUI_RUST_KEYED_DATA_TABLE_CARGO cargo REQUIRED)
+ set(CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY "" CACHE FILEPATH "Optional existing bridge without keyed tables")
+ function(cui_rust_keyed_data_table_test suffix target library legacy)
+  add_test(NAME bridge_rust_keyed_data_table_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
+   CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings SDL_RENDER_DRIVER=software
+   CUI_RUST_KEYED_DATA_TABLE_LEGACY=${legacy} ${library}
+   ${CUI_RUST_KEYED_DATA_TABLE_CARGO} ${ARGN})
+  set_tests_properties(bridge_rust_keyed_data_table_${suffix} PROPERTIES
+   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
+ endfunction()
+ set(_cui_rust_table_shared CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>)
+ cui_rust_keyed_data_table_test(dynamic "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+  test --offline --locked -j1 --test data_table_keyed)
+ cui_rust_keyed_data_table_test(static "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --test data_table_keyed)
+ cui_rust_keyed_data_table_test(example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  run --offline --locked -j1 --example data_table_live)
+ if(CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY)
+  if(NOT EXISTS "${CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY}" OR IS_DIRECTORY "${CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY}")
+   message(FATAL_ERROR "CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY must name an existing bridge")
+  endif()
+  set(provider_dir "${CMAKE_CURRENT_BINARY_DIR}/rust-keyed-data-table-legacy")
+  file(MAKE_DIRECTORY "${provider_dir}")
+  file(CREATE_LINK "${CUI_RUST_KEYED_DATA_TABLE_LEGACY_LIBRARY}" "${provider_dir}/libcui_bridge.so" SYMBOLIC)
+  cui_rust_keyed_data_table_test(legacy "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared};LD_LIBRARY_PATH=${provider_dir}" 1
+   test --offline --locked -j1 --test data_table_keyed -- --exact legacy_provider_keeps_positional_tables_usable)
+ endif()
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_rust_keyed_data_table_test(native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_table_shared}" 0
+   run --offline --locked -j1 --example data_table_live -- --font ${CUI_TEST_FONT} --smoke)
+ endif()
+endif()
 if(CUI_BRIDGE_NATIVE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT TARGET cui_sdl3 OR NOT CUI_TEST_FONT)
   message(FATAL_ERROR "Binding native checks require Linux, SDL/text adapters and CUI_TEST_FONT")

@@ -368,7 +368,10 @@ JavaScript and TypeScript use `table_data(headers, rows, rowKeys)` with the same
 capability query. See `docs/BINDING_BUILDERS.md` for both inbox examples. Go
 uses `TableDataKeyed` and `SetTableKeyed`, with `SupportsKeyedDataTable` for
 provider checks. See `docs/GO_BUILDERS.md` and
-`bindings/go/examples/data_table_live/main.go`. Rust uses positional keys.
+`bindings/go/examples/data_table_live/main.go`. In Rust, use
+`Builder::data_table_keyed` or `App::data_table_keyed` after checking
+`app.supports_keyed_data_table()`. See `docs/RUST_BUILDERS.md` and
+`bindings/rust/examples/data_table_live.rs`.
 For paging, use `result.load_more` with an app-owned in-flight flag and keep
 the current rows interactive. See **Paged inbox** and the paging guide in
 `docs/TABLE.md`.

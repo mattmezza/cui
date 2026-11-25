@@ -6333,7 +6333,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                     .opacity = popover_opacity,
                                     .custom_opacity = true});
         cui_id trigger = cui_id_from(ui, "popover-trigger");
-        if (cui_button(ui, trigger, &t, cui_string("Open account card"), disabled))
+        bool opening = cui_button(ui, trigger, &t, cui_string("Open account card"), disabled);
+        if (opening)
             cui_surface_open(ui, &popover_surface, trigger);
         cui_rect anchor = cui_bounds(ui, trigger);
         popover_anchor_used = anchor;
@@ -6344,17 +6345,22 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                        .margin = 12,
                                        .side = CUI_POPUP_BELOW,
                                        .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
-        if (cui_popover_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
-                              cui_string("Maintainer · Portable UI systems"), options,
-                              gallery_popover_position)) {
+        bool admitted = cui_popover_begin(ui, &t, &popover_surface, cui_string("Alex Morgan"),
+                                          cui_string("Maintainer · Portable UI systems"), options,
+                                          gallery_popover_position);
+        if (admitted) {
+            cui_id updates = cui_id_from(ui, "popover-updates");
+            if (opening)
+                cui_focus(ui, updates);
             cui_avatar(ui, cui_id_from(ui, "popover-avatar"), &t, cui_string("Alex Morgan"), 40);
-            cui_checkbox(ui, cui_id_from(ui, "popover-updates"), &t,
-                         cui_string("Notify me about releases"), &popover_updates, false);
+            cui_checkbox(ui, updates, &t, cui_string("Notify me about releases"), &popover_updates,
+                         false);
             if (cui_button(ui, cui_id_from(ui, "popover-profile"), &t, cui_string("View profile"),
                            false))
                 cui_surface_close(ui, &popover_surface, CUI_SURFACE_ACCEPTED);
             cui_surface_end(ui);
         }
+        (void)cui_popover_link_trigger(ui, &popover_surface, trigger, admitted);
         if (positioned)
             cui_end_box(ui);
         if (positioned && popover_modal && dialog_surface.overlay.open) {

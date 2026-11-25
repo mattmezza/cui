@@ -192,6 +192,14 @@ bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
  * may retry. No legacy public struct ABI change. */
 bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options, cui_popover_position);
+/* After submitting the trigger and optional panel, update the trigger's current
+ * controls/expanded details. Pass the begin result for this frame, or false
+ * when omitting the panel. Call when closed, too. Only an admitted panel opened
+ * for this trigger is linked. Other semantic details are preserved. Returns false
+ * for a missing trigger, invalid state/IDs or use outside active submission.
+ * Does not move focus, consume input or dispatch callbacks. */
+bool cui_popover_link_trigger(cui_context *, const cui_surface_state *, cui_id trigger,
+                              bool admitted);
 void cui_surface_end(cui_context *);
 /* Close the body and begin a fixed footer row; surface_end closes the footer. */
 void cui_surface_footer_begin(cui_context *, const cui_theme *);

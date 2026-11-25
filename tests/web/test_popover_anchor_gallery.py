@@ -71,9 +71,31 @@ def main():
                     vertices = [v for c in data['commands'] if c['type']==6 for v in c['vertices']]
                     bounds = [min(v[0] for v in vertices),min(v[1] for v in vertices),max(v[0] for v in vertices),max(v[1] for v in vertices)]
                     return a.page.evaluate('''b=>{const c=document.querySelector('canvas').getContext('2d'),s=c.getTransform().a,x=Math.floor(b[0]*s),y=Math.floor(b[1]*s);return Array.from(c.getImageData(x,y,Math.ceil(b[2]*s)-x,Math.ceil(b[3]*s)-y).data);}''',bounds)
+                trigger_node = a.page.locator('#accessible button[aria-label="Open account card"]')
+                assert trigger_node.get_attribute('aria-haspopup') == 'dialog'
+                assert trigger_node.get_attribute('aria-expanded') == 'false'
+                assert trigger_node.get_attribute('aria-controls') is None
+                if not mobile:
+                    canvas = a.page.locator('canvas')
+                    canvas.focus()
+                    a.page.keyboard.press('Tab')
+                    a.page.wait_for_timeout(70)
+                    assert a.target('Open account card')['f'][7]
+                    a.page.keyboard.press('Enter')
+                    a.page.wait_for_function('cuiGallery.exports.gallery_surface_open(3)')
+                    assert a.target('Notify me about releases')['f'][7]
+                    a.page.keyboard.press('Escape')
+                    a.page.wait_for_function('!cuiGallery.exports.gallery_surface_open(3)')
+                    assert a.target('Open account card')['f'][7]
+                    assert trigger_node.get_attribute('aria-expanded') == 'false'
+                    assert trigger_node.get_attribute('aria-controls') is None
                 activate(a.target('Open account card'))
                 base = a.page.evaluate(SNAPSHOT)
                 assert base['open'] and not [c for c in base['commands'] if c['type']==6]
+                assert a.target('Notify me about releases')['f'][7]
+                assert trigger_node.get_attribute('aria-expanded') == 'true'
+                panel = trigger_node.get_attribute('aria-controls')
+                assert panel and a.page.locator('#'+panel).get_attribute('role') == 'dialog'
                 a.configure('popover-mode', '1')
                 def check(anchor, rem=16, offset=None, arrow=True):
                     a.page.wait_for_timeout(80)
@@ -189,12 +211,14 @@ def main():
                 assert not [c for c in legacy['commands'] if c['type']==6]
                 a.route('Button'); a.route('Popover')
                 assert not a.page.evaluate(SNAPSHOT)['open']
+                assert trigger_node.get_attribute('aria-expanded') == 'false'
+                assert trigger_node.get_attribute('aria-controls') is None
                 assert a.page.locator('#popover-mode').input_value() == '0'
                 settled = a.page.evaluate('cuiGallery.frame')
                 a.page.wait_for_timeout(120)
                 assert a.page.evaluate('cuiGallery.frame')==settled
                 assert not a.errors, a.errors
-                print(f'PASS actual anchors/offsets/rem/arrow/clamp/legacy/teardown mobile={mobile} DPR={dpr}',flush=True)
+                print(f'PASS actual anchors, trigger relationship, focus and teardown mobile={mobile} DPR={dpr}',flush=True)
                 context.close()
             browser.close()
     finally:

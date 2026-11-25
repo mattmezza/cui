@@ -131,16 +131,23 @@ void account_modal_open(cui_context *ui, cui_surface_state *layer) {
     (void)layer;
 ${position}
     cui_id trigger = cui_id_from(ui, "account-trigger");
-    if (cui_button(ui, trigger, theme, cui_string("Open account card"), false))
+    bool opening = cui_button(ui, trigger, theme, cui_string("Open account card"), false);
+    if (opening)
         cui_surface_open(ui, card, trigger);
     cui_surface_options options = {.viewport = {0, 0, width, height},
         .anchor = cui_bounds(ui, trigger), .width = width > 500 ? 340 : width - 48,
         .height = 190, .margin = 12, .side = CUI_POPUP_BELOW,
         .popover_appearance = CUI_POPOVER_APPEARANCE_SOURCE};
-    if (${begin}) {
-        cui_label(ui, theme, cui_string("Profile content"));
+    bool admitted = ${begin};
+    if (admitted) {
+        cui_id profile = cui_id_from(ui, "view-profile");
+        if (opening)
+            cui_focus(ui, profile);
+        if (cui_button(ui, profile, theme, cui_string("View profile"), false))
+            cui_surface_close(ui, card, CUI_SURFACE_ACCEPTED);
         cui_surface_end(ui);
     }
+    (void)cui_popover_link_trigger(ui, card, trigger, admitted);
 ${mode?'    cui_end_box(ui);\n':''}${modal&&mode?`    cui_surface_options modal = {.viewport = {0, 0, width, height},
         .width = width > 500 ? 260 : width - 72, .height = 120, .layer = 200};
     if (cui_surface_begin(ui, theme, layer, cui_string("Layering modal"),
@@ -1191,7 +1198,9 @@ function syncSemantics(){
   if(role==='progressbar'){el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));if(f(14))el.removeAttribute('aria-valuenow');else el.setAttribute('aria-valuenow',String(f(8)));}
   if(role==='slider'||role==='scrollbar'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);else el.removeAttribute('aria-valuetext');
-  if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
+  const accountTrigger=selected.name==='Popover'&&role==='button'&&name==='Open account card';
+  if(accountTrigger)el.setAttribute('aria-haspopup','dialog');else el.removeAttribute('aria-haspopup');
+  if(accountTrigger||selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }
  for(const id of ['scrollbar-policy','scrollbar-width','scrollbar-radius','scrollbar-track-control'])$(id).hidden=!hasScrollablePanel;

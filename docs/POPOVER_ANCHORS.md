@@ -80,8 +80,47 @@ The browser Canvas adapter has exact headless mesh-mask and opacity evidence at
 DPR 1 and 2. The gallery additionally tests all eight anchors, signed offsets,
 clamping, opacity, inert paint and modal ordering with desktop and touch input.
 Physical GPU hardware checks remain separate from Xvfb/software validation.
-This slice does not cover
-Popover transition, right-click trigger or focus/control parity.
+Popover transitions and right-click triggers remain separate work.
+
+## Keyboard focus and the trigger
+
+On trigger activation, explicitly move focus to an enabled, focusable child
+inside a successful begin. Choose a stable ID and submit the child in the same
+frame. Move focus only on the opening action so later frames respect the user's
+navigation. Nonmodal Popovers keep ordinary Tab order. Subject to the decision
+policy, Escape cancels the focused surface, and closing restores its enabled
+trigger. See [Surfaces](SURFACES.md) for close ordering.
+
+```c
+/* card is initialized with CUI_SURFACE_POPOVER and retained between frames. */
+bool opening = cui_button(ui, trigger, theme, cui_string("Open account"), false);
+if (opening)
+    cui_surface_open(ui, card, trigger);
+
+bool admitted = cui_popover_begin(ui, theme, card, cui_string("Account"),
+                                   (cui_str){0}, options, position);
+if (admitted) {
+    if (opening)
+        cui_focus(ui, profile);
+    if (cui_button(ui, profile, theme, cui_string("View profile"), false))
+        cui_surface_close(ui, card, CUI_SURFACE_ACCEPTED);
+    cui_surface_end(ui);
+}
+cui_popover_link_trigger(ui, card, trigger, admitted);
+```
+
+`cui_popover_link_trigger` is optional. Call it after the trigger and the
+optional panel, passing the current begin result. On frames that omit the
+panel pass false. An admitted open panel exposes expanded and controls on
+its actual trigger. Closing from a child or omitting the panel clears both
+details in the same frame. Other semantic details are preserved. The helper
+uses current submissions and leaves state, input and callbacks to the existing
+surface and child APIs. It works with Base or Styled composition.
+
+The gallery projects the expanded state and the live controlled dialog into
+its browser accessibility tree. Native screen-reader acceptance and foreign
+builder authoring remain open. Core's current expanded boolean alone does
+not identify an explicit collapsed state for all native adapters.
 
 ## Browser gallery
 
@@ -112,4 +151,5 @@ ordering. Fractional clamped Canvas rectangle edges can still antialias the join
 differently from mesh pixel-center coverage: a dark fill value 10 can read 9 at
 an adjacent join pixel. Clamped geometry is checked separately; exact centered
 join assertions retain exact values. This known raster difference is not claimed
-as GPUI pixel parity. Browser font, accessibility and focus limitations remain.
+as GPUI pixel parity. Browser keyboard opening and Escape cover the explicit
+focus path above. Native focus and accessibility depend on the host.

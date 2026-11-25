@@ -488,6 +488,31 @@ void cui_base_surface_end(cui_context *ui) {
     cui_overlay_end(ui);
 }
 
+bool cui_popover_link_trigger(cui_context *ui, const cui_surface_state *s, cui_id trigger,
+                              bool admitted) {
+    if (!cui_frame_sequence(ui) || !s || s->kind != CUI_SURFACE_POPOVER || !s->overlay.id ||
+        !trigger || trigger == s->overlay.id)
+        return false;
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    const cui_semantic *opener = NULL;
+    bool has_panel = false;
+    for (size_t i = 0; i < count; ++i) {
+        if (nodes[i].id == trigger)
+            opener = &nodes[i];
+        if (nodes[i].id == s->overlay.id && nodes[i].role == CUI_ROLE_DIALOG)
+            has_panel = true;
+    }
+    if (!opener)
+        return false;
+    bool linked = admitted && has_panel && s->overlay.open && s->overlay.trigger == trigger;
+    cui_semantic_details details = opener->details;
+    details.controls = linked ? s->overlay.id : 0;
+    details.expanded = linked;
+    cui_set_semantic_details(ui, trigger, details);
+    return true;
+}
+
 void cui_base_surface_submit_resize(cui_context *ui, const cui_surface_state *s,
                                     cui_surface_options o) {
     if (!ui || !s || !s->overlay.open)

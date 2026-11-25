@@ -193,6 +193,14 @@ bool cui_surface_begin(cui_context *, const cui_theme *, cui_surface_state *, cu
  * may retry. No legacy public struct ABI change. */
 bool cui_popover_begin(cui_context *, const cui_theme *, cui_surface_state *, cui_str title,
                        cui_str description, cui_surface_options, cui_popover_position);
+/* After submitting the trigger and optional panel, update the trigger's current
+ * controls/expanded details. Pass the begin result for this frame, or false
+ * when omitting the panel. Call when closed, too. Only an admitted panel opened
+ * for this trigger is linked. Other semantic details are preserved. Returns false
+ * for a missing trigger, invalid state/IDs or use outside active submission.
+ * Does not move focus, consume input or dispatch callbacks. */
+bool cui_popover_link_trigger(cui_context *, const cui_surface_state *, cui_id trigger,
+                              bool admitted);
 void cui_surface_end(cui_context *);
 /* Close the body and begin a fixed footer row; surface_end closes the footer. */
 void cui_surface_footer_begin(cui_context *, const cui_theme *);
@@ -704,6 +712,31 @@ bool cui_base_surface_begin(cui_context *ui, cui_surface_state *s, cui_str title
 }
 void cui_base_surface_end(cui_context *ui) {
     cui_overlay_end(ui);
+}
+
+bool cui_popover_link_trigger(cui_context *ui, const cui_surface_state *s, cui_id trigger,
+                              bool admitted) {
+    if (!cui_frame_sequence(ui) || !s || s->kind != CUI_SURFACE_POPOVER || !s->overlay.id ||
+        !trigger || trigger == s->overlay.id)
+        return false;
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    const cui_semantic *opener = NULL;
+    bool has_panel = false;
+    for (size_t i = 0; i < count; ++i) {
+        if (nodes[i].id == trigger)
+            opener = &nodes[i];
+        if (nodes[i].id == s->overlay.id && nodes[i].role == CUI_ROLE_DIALOG)
+            has_panel = true;
+    }
+    if (!opener)
+        return false;
+    bool linked = admitted && has_panel && s->overlay.open && s->overlay.trigger == trigger;
+    cui_semantic_details details = opener->details;
+    details.controls = linked ? s->overlay.id : 0;
+    details.expanded = linked;
+    cui_set_semantic_details(ui, trigger, details);
+    return true;
 }
 
 void cui_base_surface_submit_resize(cui_context *ui, const cui_surface_state *s,

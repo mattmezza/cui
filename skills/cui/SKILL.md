@@ -75,6 +75,9 @@ For HoverCard, read the fit section of `docs/CONTENT.md`. Zero height fits
 children and may request one follow-up for edge placement. A child height
 change remeasures automatically. Tap dismissal and its host limits are in
 `docs/HOVER_CARD_EXTENDED.md`.
+For Popover focus and trigger semantics, read `docs/POPOVER_ANCHORS.md`.
+Use `cui_focus` only on the accepted opening action inside a successful begin,
+then call `cui_popover_link_trigger` with the current begin result after the panel.
 
 `read PATH` still prints the exact full document; `info` lists paths and hashes.
 For broad Markdown guides use `read PATH --headings`, then

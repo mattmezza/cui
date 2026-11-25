@@ -212,6 +212,89 @@ static void confirmation_and_popover(void) {
     assert(s.overlay.open);
     cui_destroy(ui);
 }
+static const cui_semantic *find_semantic(cui_context *ui, cui_id id) {
+    size_t count;
+    const cui_semantic *nodes = cui_semantics(ui, &count);
+    for (size_t i = 0; i < count; ++i)
+        if (nodes[i].id == id)
+            return &nodes[i];
+    return NULL;
+}
+static void popover_link_scene(cui_context *ui, const cui_theme *theme, cui_surface_state *s,
+                               bool omit_panel, bool omit_trigger) {
+    assert(cui_begin_frame(ui, 600, 400, .016f));
+    cui_begin_box(ui, 900, (cui_box){.width = 600, .height = 400, .gap = 8});
+    bool opening = !omit_trigger && button(ui, 1, theme, cui_string("Open account"), false);
+    if (!omit_trigger) {
+        cui_semantic_details details = find_semantic(ui, 1)->details;
+        details.description = cui_string("Account options");
+        cui_set_semantic_details(ui, 1, details);
+    }
+    button(ui, 2, theme, cui_string("Another control"), false);
+    if (opening)
+        cui_surface_open(ui, s, 1);
+    bool admitted = !omit_panel &&
+                    begin(ui, theme, s,
+                          (cui_surface_options){.viewport = {0, 0, 600, 400},
+                                                .anchor = {0, 0, 110, 30},
+                                                .width = 280,
+                                                .height = 200});
+    if (admitted) {
+        if (opening)
+            cui_focus(ui, 20);
+        if (button(ui, 20, theme, cui_string("Apply"), false))
+            cui_surface_close(ui, s, CUI_SURFACE_ACCEPTED);
+        end(ui);
+    }
+    assert(cui_popover_link_trigger(ui, s, 1, admitted) == !omit_trigger);
+    assert(!cui_popover_link_trigger(ui, s, s->overlay.id, admitted));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void popover_link_and_focus(void) {
+#ifdef CUI_SURFACE_BASE_ONLY
+    cui_theme theme = {0};
+#else
+    cui_theme theme = cui_theme_light();
+#endif
+    cui_context *ui = cui_create((cui_config){.width = 600, .height = 400});
+    assert(ui);
+    cui_surface_state state;
+    cui_surface_init(&state, 100, CUI_SURFACE_POPOVER);
+    assert(!cui_popover_link_trigger(ui, &state, 1, false));
+    popover_link_scene(ui, &theme, &state, false, false);
+    assert(!find_semantic(ui, 1)->details.expanded && !find_semantic(ui, 1)->details.controls);
+    cui_focus(ui, 1);
+    key(ui, CUI_KEY_ENTER);
+    popover_link_scene(ui, &theme, &state, false, false);
+    const cui_semantic *trigger = find_semantic(ui, 1);
+    assert(trigger && trigger->details.expanded && trigger->details.controls == 100 &&
+           trigger->details.description.length == 15 && find_semantic(ui, 100));
+    assert(cui_focused(ui) == 20 && find_semantic(ui, 20)->focused);
+    key(ui, CUI_KEY_ESCAPE);
+    popover_link_scene(ui, &theme, &state, false, false);
+    assert(!state.overlay.open && cui_focused(ui) == 1 && !find_semantic(ui, 100));
+    assert(!find_semantic(ui, 1)->details.expanded && !find_semantic(ui, 1)->details.controls);
+
+    key(ui, CUI_KEY_ENTER);
+    popover_link_scene(ui, &theme, &state, false, false);
+    key(ui, CUI_KEY_ENTER);
+    popover_link_scene(ui, &theme, &state, false, false);
+    assert(cui_surface_take_result(&state) == CUI_SURFACE_ACCEPTED);
+    assert(cui_focused(ui) == 1 && !find_semantic(ui, 20));
+    assert(!find_semantic(ui, 1)->details.expanded && !find_semantic(ui, 1)->details.controls);
+
+    cui_surface_open(ui, &state, 1);
+    popover_link_scene(ui, &theme, &state, true, false);
+    assert(state.overlay.open && !find_semantic(ui, 100) && !find_semantic(ui, 1)->details.controls);
+    popover_link_scene(ui, &theme, &state, false, false);
+    assert(find_semantic(ui, 1)->details.controls == 100);
+    cui_surface_request_close(ui, &state, CUI_SURFACE_CLOSED);
+    popover_link_scene(ui, &theme, &state, false, true);
+    assert(!state.overlay.open && !cui_focused(ui) && !find_semantic(ui, 1));
+    cui_destroy(ui);
+}
 static void sheet_events(void) {
 #ifdef CUI_SURFACE_BASE_ONLY
     cui_theme themes[4] = {0};
@@ -916,6 +999,7 @@ int main(void) {
     geometry();
     dialog_events();
     confirmation_and_popover();
+    popover_link_and_focus();
     sheet_events();
     resize_sheets();
     nested_surfaces();

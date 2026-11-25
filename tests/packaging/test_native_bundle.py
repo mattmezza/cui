@@ -39,6 +39,7 @@ def extract_and_check(archive, destination):
         package.extractall(destination)
     bundle = destination / 'cui-native'
     for name in ('Makefile', 'main.c', 'app.c', 'README.md', 'sources.mk',
+                 'responsive/main.c', 'responsive/app.c', 'responsive/app.h', 'responsive/test_app.c',
                  'assets/fonts/Inter-Regular.otf', 'assets/fonts/Inter-Bold.otf'):
         assert (bundle / name).is_file(), name
     for name in ('include', 'src', 'backends', 'third_party'):
@@ -129,6 +130,15 @@ def native_checks(bundle, work):
     run([bundle / 'build/mail_demo', '--frames', '3', '--capture', mail_capture],
         cwd=work, env=env, timeout=30)
     useful_bmp(mail_capture)
+    run([*make, 'APP_SOURCES=responsive/main.c responsive/app.c',
+         'TARGET=build/responsive_starter'], cwd=bundle, env=env)
+    run([*make, 'APP_SOURCES=responsive/test_app.c responsive/app.c',
+         'TARGET=build/test_responsive_starter'], cwd=bundle, env=env)
+    run([bundle / 'build/test_responsive_starter'], cwd=work, env=env)
+    responsive_capture = work / 'responsive.bmp'
+    run([bundle / 'build/responsive_starter', '--font', bundle / 'assets/fonts/Inter-Regular.otf',
+         '--frames', '3', '--capture', responsive_capture], cwd=work, env=env, timeout=30)
+    useful_bmp(responsive_capture)
     # Exercise compiler-produced dependency files, including transitive public headers.
     dependencies = list((bundle / 'build/vendor').rglob('*.d'))
     assert dependencies, 'vendor compilations must emit dependency files'

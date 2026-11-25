@@ -61,6 +61,8 @@ def bundle_files():
     files['upstream-dependencies.json'] = (json.dumps(dependencies, indent=2) + '\n').encode()
     for name in ('Makefile', 'README.md', 'main.c', 'app.c', 'mail.c'):
         add('examples/native_bundle/' + name, name)
+    for name in ('main.c', 'app.c', 'app.h', 'test_app.c'):
+        add('examples/native_starter/' + name, 'responsive/' + name)
     lines = ['# Generated from cmake/sources.json; do not edit.']
     for name, paths in groups.items():
         lines.append(name.upper() + '_SOURCES := ' + ' '.join('vendor/' + p for p in paths))

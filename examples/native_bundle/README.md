@@ -120,6 +120,27 @@ selected objects; unchanged vendor objects are reused. Changing compiler or
 flags requires a fresh build directory. External dependency requirements remain
 unchanged.
 
+## Responsive workspace starter
+
+The `responsive/` example has Home, Projects and Settings, with a sidebar at
+768 logical pixels and wider and a navigation drawer below that width. Both
+views keep the account menu in the footer. Page, account and unsaved edit state
+survive resizing.
+
+```sh
+make APP_SOURCES="responsive/main.c responsive/app.c" TARGET=build/responsive_starter
+./build/responsive_starter --font assets/fonts/Inter-Regular.otf
+```
+
+`responsive/app.c` owns the UI and `responsive/main.c` owns the SDL callback
+loop. Start by editing the pages and callbacks in `responsive/app.c`. Run the
+packaged interaction test without opening a window:
+
+```sh
+make APP_SOURCES="responsive/test_app.c responsive/app.c" TARGET=build/test_responsive_starter
+./build/test_responsive_starter
+```
+
 ## Mail layout acceptance fixture
 
 ```sh

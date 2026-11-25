@@ -1,6 +1,6 @@
 # Build your first native CUI app
 
-Download the [versioned alpha.4 starter kit](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.4/cui-0.1.0-alpha.4-native-starter.tar.gz) from GitHub Releases. It includes the source, bundled fonts and examples described below.
+Download the [versioned alpha.4 starter kit](https://github.com/mattmezza/cui/releases/download/v0.1.0-alpha.4/cui-0.1.0-alpha.4-native-starter.tar.gz) from GitHub Releases for the minimal app, fonts and CUI sources.
 
 For the smallest standalone build, use the **native source bundle**.
 [Download the archive](https://matteo.merola.co/cui/downloads/cui-native.tar.gz)
@@ -61,8 +61,16 @@ The [bundle README](../examples/native_bundle/README.md) is the canonical consum
 build contract. Read [Layout](LAYOUT_GUIDE.md), [IDs and lifetimes](IDS_AND_LIFETIMES.md)
 and [Debugging](DEBUGGING.md) before growing the application.
 
-The existing installed-library starter below remains useful for projects that
-prefer an installed CUI package and a larger three-page example.
+The source bundle built from current working source also includes the three-page
+starter under `responsive/`. From that extracted bundle:
+
+```sh
+make APP_SOURCES="responsive/main.c responsive/app.c" TARGET=build/responsive_starter
+./build/responsive_starter --font assets/fonts/Inter-Regular.otf
+```
+
+For an installed-library development workflow, build the same example as
+described below.
 
 The [C11 starter](../examples/native_starter/README.md) has Home, Projects and
 Settings. A sidebar or compact navigation drawer selects the page and keeps

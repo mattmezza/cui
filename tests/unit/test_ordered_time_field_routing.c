@@ -312,6 +312,92 @@ static void failed_frame_keeps_owner(void) {
     cui_destroy(ui);
 }
 
+static void host_tab_boundary(void) {
+    working_time work = time_work();
+    cui_context *ui = create();
+    prime(ui, &work, false);
+    cui_core_ordered_input input = admission(&work);
+    cui_focus(ui, FIELD);
+    assert(cui_core_ordered_queue_tab(ui, false));
+    assert(!cui_core_ordered_queue_tab(ui, false));
+    assert(begin_probe(ui, &input));
+    assert(cui_focused(ui) == FIELD && cui_event_consumed(ui, 0));
+    assert(cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_UNRESOLVED);
+    button(ui, BEFORE);
+    field(ui, &work, false);
+    button(ui, AFTER);
+    end(ui);
+    assert(cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_INSIDE);
+
+    work.state.segment = CUI_TIME_FIELD_HOUR_V1;
+    digit(ui, "3");
+    assert(cui_core_ordered_queue_tab(ui, false));
+    assert(begin_probe(ui, &input));
+    assert(cui_focused(ui) == AFTER && cui_event_target(ui, 1) == FIELD &&
+           !cui_event_consumed(ui, 1));
+    button(ui, BEFORE);
+    field(ui, &work, false);
+    button(ui, AFTER);
+    end(ui);
+    assert(work.value.hour == 3 && cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_INSIDE);
+
+    assert(cui_core_ordered_queue_tab(ui, false));
+    key(ui, CUI_KEY_ENTER, 0);
+    assert(begin_probe(ui, &input));
+    assert(!cui_focused(ui) && !cui_event_target(ui, 1) && !cui_event_activation(ui, 1) &&
+           !cui_event_consumed(ui, 0));
+    button(ui, BEFORE);
+    field(ui, &work, false);
+    button(ui, AFTER);
+    end(ui);
+    assert(cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_LEAVE);
+
+    cui_focus(ui, BEFORE);
+    assert(cui_core_ordered_queue_tab(ui, true));
+    assert(begin_probe(ui, &input));
+    assert(!cui_focused(ui) && !cui_event_consumed(ui, 0));
+    button(ui, BEFORE);
+    field(ui, &work, false);
+    button(ui, AFTER);
+    end(ui);
+    assert(cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_LEAVE);
+
+    /* Unmarked traversal retains the ordinary desktop wrap and clears receipts. */
+    cui_focus(ui, BEFORE);
+    key(ui, CUI_KEY_TAB, CUI_MOD_SHIFT);
+    assert(begin_probe(ui, &input));
+    assert(cui_focused(ui) == AFTER);
+    end(ui);
+    assert(cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_UNRESOLVED);
+    cui_destroy(ui);
+}
+
+static void host_tab_modal_wraps(void) {
+    working_time work = time_work();
+    cui_context *ui = create();
+    assert(cui_begin_frame(ui, 640, 180, 0));
+    assert(cui_begin_focus_scope(ui, MODAL, true));
+    button(ui, BEFORE);
+    field(ui, &work, false);
+    button(ui, AFTER);
+    cui_end_focus_scope(ui);
+    end(ui);
+
+    cui_focus(ui, AFTER);
+    cui_core_ordered_input input = admission(&work);
+    assert(cui_core_ordered_queue_tab(ui, false));
+    assert(begin_probe(ui, &input));
+    assert(cui_focused(ui) == BEFORE && !cui_event_consumed(ui, 0));
+    assert(cui_begin_focus_scope(ui, MODAL, true));
+    button(ui, BEFORE);
+    field(ui, &work, false);
+    button(ui, AFTER);
+    cui_end_focus_scope(ui);
+    end(ui);
+    assert(cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_INSIDE);
+    cui_destroy(ui);
+}
+
 int main(void) {
     ordered_batch(false, false);
     ordered_batch(true, false);
@@ -320,6 +406,8 @@ int main(void) {
     invalid_admissions();
     changed_mode_and_composition_guard();
     failed_frame_keeps_owner();
+    host_tab_boundary();
+    host_tab_modal_wraps();
     puts("ordered TimeField dispatch experiment: PASS");
     return 0;
 }

@@ -163,6 +163,8 @@ struct cui_context {
         retired_ordered_roots[CUI_ORDERED_INPUT_MAX];
     size_t ordered_count, previous_ordered_count, retired_ordered_count;
     bool ordered_frame, ordered_observing;
+    size_t ordered_queued_tab;
+    cui_core_ordered_tab ordered_tab_result;
     const cui_core_scroll_layout_header *scroll_layout;
     int tab_path[32];
     size_t tab_depth;
@@ -1285,7 +1287,7 @@ static int cui_core_tab_compare(const cui_semantic *a, size_t ai, const cui_sema
         return an < bn ? -1 : 1;
     return ai == bi ? 0 : ai < bi ? -1 : 1;
 }
-static void cui_core_tab(cui_context *ui, bool reverse) {
+static bool cui_core_tab(cui_context *ui, bool reverse, bool host_tab) {
     size_t found = SIZE_MAX, next = SIZE_MAX, wrap = SIZE_MAX;
     for (size_t i = 0; i < ui->previous_count; ++i)
         if (ui->previous[i].id == ui->focus)
@@ -1307,11 +1309,18 @@ static void cui_core_tab(cui_context *ui, bool reverse) {
                 next = i;
         }
     }
-    if (next == SIZE_MAX)
+    if (next == SIZE_MAX) {
+        if (host_tab && ui->previous_top_modal == SIZE_MAX &&
+            (found != SIZE_MAX || wrap == SIZE_MAX)) {
+            cui_core_set_focus(ui, 0);
+            return true;
+        }
         next = wrap;
+    }
     if (next != SIZE_MAX)
         cui_core_set_focus(ui, ui->previous[next].id);
     ui->focus_visible = true;
+    return false;
 }
 static bool cui_core_accessibility_activate(const cui_semantic *s) {
     if (s->disabled)
@@ -1653,6 +1662,22 @@ void cui_core_ordered_publish(cui_context *ui, cui_id id) {
 void cui_core_ordered_observing(cui_context *ui, bool observing) {
     ui->ordered_observing = observing;
 }
+bool cui_core_ordered_queue_tab(cui_context *ui, bool reverse) {
+    if (!ui || ui->ordered_queued_tab || ui->in_frame || ui->error != CUI_OK)
+        return false;
+    ui->ordered_tab_result = CUI_ORDERED_TAB_UNRESOLVED;
+    if (!cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN,
+                                        .key = CUI_KEY_TAB,
+                                        .modifiers = reverse ? CUI_MOD_SHIFT : 0}))
+        return false;
+    ui->ordered_queued_tab = ui->queued_count;
+    return true;
+}
+cui_core_ordered_tab cui_core_ordered_tab_result(const cui_context *ui) {
+    return ui && !ui->in_frame && cui_accessibility_numeric_snapshot_ready(ui)
+               ? ui->ordered_tab_result
+               : CUI_ORDERED_TAB_UNRESOLVED;
+}
 static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bool v2,
                                  const cui_core_ordered_input *inputs, size_t input_count) {
     if (!cui_core_mutation(ui))
@@ -1734,6 +1759,9 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
     memcpy(ui->events, ui->queued, ui->queued_count * sizeof(*ui->events));
     for (size_t i = 0; i < ui->event_count; i++)
         ui->event_origin[i] = i;
+    size_t host_tab_origin = ui->ordered_frame ? ui->ordered_queued_tab : 0;
+    ui->ordered_queued_tab = 0;
+    ui->ordered_tab_result = CUI_ORDERED_TAB_UNRESOLVED;
     ui->queued_count = 0;
     ui->activation_count = 0;
     if (ui->release_pending && !cui_core_release_policy(ui, ui->focus))
@@ -2011,8 +2039,11 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
                             handled = true;
                             break;
                         }
-                if (!handled)
-                    cui_core_tab(ui, (e.modifiers & CUI_MOD_SHIFT) != 0);
+                bool host_tab = host_tab_origin && ui->event_origin[i] + 1 == host_tab_origin;
+                bool leave = !handled && cui_core_tab(ui, (e.modifiers & CUI_MOD_SHIFT) != 0,
+                                                      host_tab);
+                if (host_tab)
+                    ui->ordered_tab_result = leave ? CUI_ORDERED_TAB_LEAVE : CUI_ORDERED_TAB_INSIDE;
             } else if (e.key == CUI_KEY_ENTER)
                 cui_core_activate(ui, ui->focus);
             else if (e.key == CUI_KEY_SPACE)

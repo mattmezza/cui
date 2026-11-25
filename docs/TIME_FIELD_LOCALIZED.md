@@ -155,8 +155,13 @@ resource budget. The result and synchronous callback see the applied model
 after semantics, and after paint submission in Styled. A later layout or
 renderer failure leaves an already applied change in the caller's model.
 Schedule teardown after the observer returns. IME options are rejected by
-this route. Use the ordinary localized widget when you need IME. The gallery
-and language bindings currently use their ordinary routes.
+this route. Use the ordinary localized widget when you need IME. Language
+bindings currently expose the ordinary route.
+
+Choose **One stop per field** in the gallery's **TimeField navigation** menu
+to try both fields and Save. Tab and Shift-Tab leave the preview at its edges
+using normal browser navigation. The gallery checks the routing decision
+after applying queued input and before the browser's default action.
 
 Run the [complete two-field form](../examples/time_field_ordered.c) from a
 configured repository. It queues one batch that edits both fields and

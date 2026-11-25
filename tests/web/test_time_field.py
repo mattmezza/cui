@@ -13,6 +13,102 @@ from threading import Thread
 from playwright.sync_api import sync_playwright
 
 
+def ordered_tab_preview(page):
+    canvas = page.locator('#preview')
+    mode = page.locator('#time-field-tab-mode')
+    mode.select_option('ordered')
+    page.wait_for_function('document.querySelector("#snippet").textContent.includes("schedule_frame")')
+    roots = page.locator('#accessible [role=group]')
+    assert roots.evaluate_all('(groups)=>groups.map(g=>g.getAttribute("aria-label"))') == [
+        'Start time', 'End time',
+    ]
+    assert 'cui_begin_time_field_frame_v1' in page.locator('#snippet').text_content()
+
+    def focused(name):
+        page.wait_for_function('''name=>{
+          if(document.activeElement.id!=='preview')return false;
+          const e=cuiGallery.exports,d=new TextDecoder();
+          for(let i=0;i<e.gallery_semantic_count();i++)
+            if(e.gallery_semantic(i,7)&&d.decode(new Uint8Array(
+                e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name)
+                return true;
+          return false;
+        }''', arg=name)
+
+    def value(name, segment):
+        return page.evaluate('''([name,segment])=>{
+          const e=cuiGallery.exports,d=new TextDecoder();
+          const label=i=>d.decode(new Uint8Array(e.memory.buffer,e.gallery_semantic_name(i),
+              e.gallery_semantic_length(i)));
+          for(let i=0;i<e.gallery_semantic_count();i++)
+            if(e.gallery_semantic(i,0)===9&&label(i)===name){
+              const id=e.gallery_semantic_id(i);
+              for(let j=0;j<e.gallery_semantic_count();j++)
+                if(e.gallery_semantic_parent(j)===id&&label(j)===segment)return e.gallery_semantic(j,8);
+            }
+          throw Error('Missing TimeField segment: '+name+' '+segment);
+        }''', [name, segment])
+
+    def digit_then_tab(digit, field, destination):
+        # Use real key events while holding the async frame. The digit must
+        # change the Tab outcome even though no preceding paint has run.
+        page.evaluate('''()=>{
+          const queued=[],raf=window.requestAnimationFrame;
+          window.requestAnimationFrame=callback=>queued.push(callback);
+          window.restoreTimeFieldFrame=()=>{
+            window.requestAnimationFrame=raf;
+            for(const callback of queued)raf(callback);
+          };
+        }''')
+        try:
+            page.keyboard.press(digit)
+            assert value(field, 'Hour') != int(digit)
+            page.keyboard.press('Tab')
+            focused(destination)
+            assert value(field, 'Hour') == int(digit)
+        finally:
+            page.evaluate('window.restoreTimeFieldFrame()')
+
+    canvas.focus()
+    page.keyboard.press('Tab')
+    focused('Start time')
+    digit_then_tab('3', 'Start time', 'End time')
+    page.keyboard.press('Shift+Tab')
+    focused('Start time')
+    page.keyboard.press('ArrowUp')
+    page.keyboard.press('Shift+Tab')
+    focused('Start time')
+    assert value('Start time', 'Hour') == 3 and value('Start time', 'Minute') == 31
+    page.keyboard.press('Shift+Tab')
+    page.wait_for_function('document.activeElement.id==="disabled"')
+
+    page.keyboard.press('Tab')
+    page.wait_for_function('document.activeElement.id==="preview"')
+    page.keyboard.press('Tab')
+    focused('Start time')
+    page.keyboard.press('Tab')
+    focused('Start time')
+    page.keyboard.press('Tab')
+    focused('End time')
+    digit_then_tab('4', 'End time', 'Save schedule')
+    page.keyboard.press('Enter')
+    page.locator('#accessible [role=status][aria-label="Schedule saved."]').wait_for(state='attached')
+    page.keyboard.press('Tab')
+    page.wait_for_function('document.activeElement.matches(".component-mode a")')
+
+    page.keyboard.press('Shift+Tab')
+    page.wait_for_function('document.activeElement.id==="preview"')
+    page.keyboard.press('Shift+Tab')
+    focused('Save schedule')
+    page.locator('#disabled').check()
+    page.locator('#accessible [aria-label="Start time"] [role=textbox][disabled]').first.wait_for(
+        state='attached')
+    canvas.focus()
+    page.keyboard.press('Tab')
+    page.wait_for_function('document.activeElement.matches(".component-mode a")')
+    assert page.locator('#cui-ime-input').count() == 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, default=Path('build/web'))
@@ -155,6 +251,14 @@ def main():
             assert not errors, errors
             page.close()
 
+            page = browser.new_page(viewport={'width': 1280, 'height': 900})
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(f'http://127.0.0.1:{server.server_port}/cui/#TimeField')
+            page.wait_for_function('window.cuiGallery?.renderedComponent==="TimeField"')
+            ordered_tab_preview(page)
+            assert not errors, errors
+            page.close()
+
             page = browser.new_page(viewport={'width': 390, 'height': 880}, device_scale_factor=2,
                                     is_mobile=True, has_touch=True)
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -179,9 +283,28 @@ def main():
                     'type': 'touchMove', 'touchPoints': [{'x': x - offset, 'y': y}]})
             cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
             page.wait_for_function('document.getElementById("video-player-stage").scrollLeft > 80')
+            page.locator('#design-size').select_option('3')
+            page.locator('#time-field-tab-mode').select_option('ordered')
+            page.wait_for_function('document.querySelector("#snippet").textContent.includes("schedule_frame")')
+            stage.scroll_into_view_if_needed()
+            x, y, w, h = box('Minute', 6)
+            canvas = page.locator('#preview').bounding_box()
+            page.touchscreen.tap(canvas['x'] + x + w / 2, canvas['y'] + y + h / 2)
+            next_paint()
+            assert page.evaluate('document.activeElement.id==="preview"')
+            page.keyboard.press('ArrowUp')
+            next_paint()
+            assert page.evaluate('''()=>{
+                const e=cuiGallery.exports,d=new TextDecoder();
+                for(let i=0;i<e.gallery_semantic_count();i++)
+                    if(e.gallery_semantic(i,0)===6&&d.decode(new Uint8Array(
+                        e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))==='Minute')
+                        return e.gallery_semantic(i,8)===31;
+                return false;
+            }''')
             assert not errors, errors
             browser.close()
-            print('PASS: TimeField sizes, density, touch, keyboard, H12/Arabic locale, and IME')
+            print('PASS: TimeField sizes, density, touch, keyboard, ordered Tab, H12/Arabic locale, and IME')
     finally:
         server.shutdown()
         server.server_close()

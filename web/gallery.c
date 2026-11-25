@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #include "../examples/composed_apps/app.h"
+#include "../src/core/cui_ordered_input_internal.h"
 #include "gallery_avatars.h"
 #include "touch_page_host.h"
 static cui_touch_page_host page_touch_host;
@@ -1866,6 +1867,33 @@ static void gallery_time_changed(void *user, const cui_time_change *event) {
     ++time_field_changes; /* External bookkeeping; active model remains borrowed. */
     redraw = true;
 }
+enum { GALLERY_ORDERED_TIME = 83 };
+static const char *const ordered_time_labels[] = {"Start time", "End time"};
+static const char *const ordered_time_keys[] = {"ordered-start-time", "ordered-end-time"};
+static cui_time ordered_times[] = {{9, 30, 0}, {10, 45, 0}};
+static cui_time_field_state_v1 ordered_time_state[2];
+static cui_time_field_options_v1 ordered_time_options;
+static bool ordered_time_ready, ordered_time_saved;
+
+static bool gallery_begin_ordered_time(float width, float height, bool disabled) {
+    if (!ordered_time_ready) {
+        if (cui_time_field_options_init_v1(&ordered_time_options) != CUI_TIME_TEXT_OK)
+            return false;
+        for (unsigned i = 0; i < 2; i++)
+            if (cui_time_field_state_init_v1(&ordered_time_state[i], ordered_times[i],
+                                            &ordered_time_options) != CUI_TIME_TEXT_OK)
+                return false;
+        ordered_time_ready = true;
+    }
+    ordered_time_options.flags = disabled ? CUI_TIME_FIELD_DISABLED_V1 : 0;
+    cui_time_field_frame_entry_v1 fields[2];
+    for (unsigned i = 0; i < 2; i++)
+        fields[i] = (cui_time_field_frame_entry_v1){cui_id_from(ui, ordered_time_keys[i]),
+                                                   &ordered_time_state[i], &ordered_times[i],
+                                                   &ordered_time_options};
+    return cui_begin_time_field_frame_v1(ui, width, height, host_dt, fields, 2) == CUI_TIME_TEXT_OK;
+}
+
 static bool multiple_mode, multi_selected[4];
 static cui_color chosen_color = {35, 102, 80, 255};
 static cui_color_state color_state;
@@ -3505,6 +3533,13 @@ void gallery_focus(unsigned index) {
     else
         cui_focus(ui, 0);
 }
+int gallery_ordered_time_tab(int reverse) {
+    return ui && previous_story == GALLERY_ORDERED_TIME &&
+           cui_core_ordered_queue_tab(ui, reverse != 0);
+}
+int gallery_ordered_time_leave(void) {
+    return cui_core_ordered_tab_result(ui) == CUI_ORDERED_TAB_LEAVE;
+}
 int gallery_accessibility_activate(unsigned index) {
     return index < semantic_count &&
            cui_queue_accessibility_action(ui, semantics[index].id, CUI_ACCESSIBILITY_ACTIVATE);
@@ -3698,7 +3733,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     /* Apply host preferences before begin resets invalidation and dispatches input.
      * Updating after begin needlessly schedules a second preference-only frame. */
     cui_set_reduced_motion(ui, reduced_motion);
-    cui_begin_frame(ui, width, height, host_dt);
+    if (story == GALLERY_ORDERED_TIME) {
+        if (!gallery_begin_ordered_time(width, height, disabled != 0))
+            return 0;
+    } else if (!cui_begin_frame(ui, width, height, host_dt))
+        return 0;
     if (story != 75 && story != 80)
         cui_begin_box(ui, cui_id_from(ui, "preview"),
                       (cui_box){.width = width,
@@ -6935,6 +6974,26 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                                                                 .today = calendar_today}});
         break;
     }
+    case GALLERY_ORDERED_TIME:
+        for (unsigned i = 0; i < 2; i++) {
+            cui_label(ui, &t, cui_string(ordered_time_labels[i]));
+            cui_time_field_result_v1 time =
+                cui_time_field_from_frame_v1(ui, cui_id_from(ui, ordered_time_keys[i]), &t,
+                                             cui_string(ordered_time_labels[i]), design_size,
+                                             (cui_time_handler){0});
+            if (time.changed)
+                ordered_time_saved = false;
+        }
+        if (cui_button(ui, cui_id_from(ui, "ordered-time-save"), &t,
+                       cui_string("Save schedule"), disabled))
+            ordered_time_saved = true;
+        if (ordered_time_saved) {
+            cui_str status = cui_string("Schedule saved.");
+            (void)cui_interact(ui, cui_id_from(ui, "ordered-time-status"), CUI_ROLE_STATUS, status,
+                               false, false, 0);
+            cui_label(ui, &t, status);
+        }
+        break;
     case 41: {
         if (!time_field_initialized) {
             if (cui_time_field_options_init_v1(&time_field_options) != CUI_TIME_TEXT_OK ||

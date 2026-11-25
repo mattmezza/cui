@@ -1006,12 +1006,16 @@ const videoHost=(()=>{
  return {start,stop,sync,drain,snapshot};
 })();
 
+function orderedTimeField(){
+ return selected?.name==='TimeField'&&$('time-field-tab-mode').value==='ordered';
+}
 function render(){
  clearTimeout(wakeTimer);
  if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
  const timeField=selected.name==='TimeField';
+ const orderedTime=orderedTimeField();
  const timeFieldHeight=designHeights[designScale]*($('density').value==='1'?.875:1);
  const wideTimeField=timeField&&designScale>=8;
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
@@ -1019,6 +1023,7 @@ function render(){
  canvas.style.touchAction=wideTimeField?'pan-x':'none';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:wideTimeField?`${Math.ceil(4*timeFieldHeight)+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
  const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):timeField?Math.max(width<420?560:360,timeFieldHeight+240):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ if(orderedTime)height=Math.max(360,2*timeFieldHeight+224);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1099,7 +1104,8 @@ function render(){
  const now=performance.now();wasm.gallery_time(now/1000,Math.min((now-lastTime)/1000,.1),Number(frameReducedMotion));lastTime=now;
  wasm.gallery_theme_preset(themeChoice==='high-contrast'?-1:selectedPreset());
  if(['Video','VideoPlayer'].includes(selected.name))videoHost.sync();
- if(!wasm.gallery_frame(selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name],effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
+ const story=orderedTime?83:selected.name==='Menu'&&$('menu-kind').value==='1'?47:selected.example?80:stories[selected.name];
+ if(!wasm.gallery_frame(story,effectiveTheme(),Number($('disabled').checked),width,height))throw Error(`CUI layout failed (error ${wasm.gallery_error()})`);
  applyTouchPageFallback();
  const commandCount=wasm.gallery_count();let meshVertices=0;
  if(commandCount>131072)throw Error('CUI mesh command capacity');
@@ -1166,7 +1172,7 @@ function render(){
  controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
  if(selected.name==='Slider'&&!wasm.gallery_slider_stats(12))$('snippet').textContent=sliderUsage(...sliderValues(),$('disabled').checked,controlShadowsEnabled());
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
- if(timeField)$('snippet').textContent=timeFieldUsage(designScale);
+ if(timeField)$('snippet').textContent=timeFieldUsage(designScale,orderedTime);
  if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value),Number($('hover-preview').value));
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='VirtualList')$('snippet').textContent=
@@ -1461,6 +1467,7 @@ function selectComponent(){
  $('control-size').disabled=false;
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
+ $('time-field-tab-mode').hidden=selected.name!=='TimeField';$('time-field-tab-mode').value='segments';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
  $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
@@ -1652,6 +1659,17 @@ canvas.addEventListener('pointercancel',e=>{const t=pageTouches.get(e.pointerId)
 canvas.addEventListener('blur',e=>{if(secureInput.element&&e.relatedTarget===secureInput.element)return;pointerFocusLoss();wasm?.gallery_focus(0xffffffff);requestFrame();});
 function handleCanvasKey(e,type){
  if(!wasm)return;const key=keyIdentity(e.key);
+ if(e.key==='Tab'&&orderedTimeField()){
+  if(type!==3||e.ctrlKey||e.metaKey||e.altKey||composing||e.isComposing)return;
+  if(e.repeat){e.preventDefault();return;}
+  if(!wasm.gallery_ordered_time_tab(Number(e.shiftKey)))return;
+  // Use the real queued edits and traversal before the browser runs its Tab default.
+  try {
+   render();
+   if(!wasm.gallery_ordered_time_leave())e.preventDefault();
+  }catch(error){e.preventDefault();fatal(error);}
+  return;
+ }
  if(e.key==='Tab'&&!composing&&!e.isComposing){
   const enabled=Array.from({length:wasm.gallery_semantic_count()},(_,i)=>i).filter(i=>!wasm.gallery_semantic(i,5)&&!wasm.gallery_semantic(i,37)&&(wasm.gallery_semantic(i,36)||wasm.gallery_semantic(i,9)>=0)&&(interactiveRoles.includes(wasm.gallery_semantic(i,0))||wasm.gallery_semantic(i,33))).sort((a,b)=>wasm.gallery_tab_compare(a,b));
   const focused=enabled.findIndex(i=>wasm.gallery_semantic(i,7));
@@ -1707,6 +1725,7 @@ $('checkbox-state').addEventListener('change',()=>{wasm.gallery_checkbox_state(N
 $('selection-mode').addEventListener('change',requestFrame);
 $('menu-kind').addEventListener('change',requestFrame);
 $('input-mode').addEventListener('change',requestFrame);
+$('time-field-tab-mode').addEventListener('change',requestFrame);
 for(const id of ['avatar-source','avatar-palette','avatar-hue','avatar-placeholder','avatar-rem','message-alignment','message-variant','message-inset','message-avatar','message-scrollbar','dropdown-names','dropdown-order','dropdown-skip','dropdown-toggle','dropdown-paint','dropdown-shadow','dropdown-variant','dropdown-size','dropdown-halves','dropdown-action','dropdown-anchor','dropdown-outline','dropdown-selected','tabs-mode','tabs-size','tabs-variant','tabs-manual','progress-shape','progress-mode','shimmer-mode','disclosure-mode','disclosure-multiple','notification-anchor','notification-kind','notification-autohide','tag-variant','tag-color','tag-outline','tag-pill','marker-variant','marker-loading','marker-alignment','marker-icon'])$(id).addEventListener('change',requestFrame);
 $('otp-groups').addEventListener('change',requestFrame);
 $('otp-mask').addEventListener('change',requestFrame);

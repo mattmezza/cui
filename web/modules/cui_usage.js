@@ -4,7 +4,53 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
-export function timeFieldUsage(size) {
+export function timeFieldUsage(size, ordered = false) {
+ if(ordered)return `#include <cui/cui_components.h>
+#include <cui/cui_time_field_v1.h>
+
+typedef struct {
+    cui_time_field_options_v1 options;
+    cui_time_field_state_v1 start_state, end_state;
+    cui_time start, end;
+    bool saved;
+} schedule_example;
+
+static bool schedule_init(schedule_example *schedule) {
+    schedule->start = (cui_time){9, 30, 0};
+    schedule->end = (cui_time){10, 45, 0};
+    schedule->saved = false;
+    return cui_time_field_options_init_v1(&schedule->options) == CUI_TIME_TEXT_OK &&
+           cui_time_field_state_init_v1(&schedule->start_state, schedule->start,
+                                        &schedule->options) == CUI_TIME_TEXT_OK &&
+           cui_time_field_state_init_v1(&schedule->end_state, schedule->end,
+                                        &schedule->options) == CUI_TIME_TEXT_OK;
+}
+
+/* Queue host input first. Draw the returned list with the host renderer. */
+static cui_draw_list schedule_frame(cui_context *ui, const cui_theme *theme,
+        float width, float height, float dt, schedule_example *schedule) {
+    cui_time_field_frame_entry_v1 fields[] = {
+        {1, &schedule->start_state, &schedule->start, &schedule->options},
+        {2, &schedule->end_state, &schedule->end, &schedule->options},
+    };
+    if (cui_begin_time_field_frame_v1(ui, width, height, dt, fields, 2) != CUI_TIME_TEXT_OK)
+        return (cui_draw_list){0};
+    cui_begin_box(ui, 4, (cui_box){.padding = 16, .gap = 8});
+    cui_time_field_result_v1 start =
+        cui_time_field_from_frame_v1(ui, 1, theme, cui_string("Start time"),
+        ${sizes[size] || "CUI_DESIGN_BASE"}, (cui_time_handler){0});
+    cui_time_field_result_v1 end =
+        cui_time_field_from_frame_v1(ui, 2, theme, cui_string("End time"),
+        ${sizes[size] || "CUI_DESIGN_BASE"}, (cui_time_handler){0});
+    if (start.changed || end.changed)
+        schedule->saved = false;
+    if (cui_button(ui, 3, theme, cui_string("Save schedule"), false))
+        schedule->saved = true;
+    if (schedule->saved)
+        cui_label(ui, theme, cui_string("Schedule saved."));
+    cui_end_box(ui);
+    return cui_end_frame(ui);
+}`;
  return `#include <cui/cui_time_field_v1.h>
 
 /* Call init once per field. Keep the options, state and time between frames. */

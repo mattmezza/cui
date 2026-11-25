@@ -144,5 +144,18 @@ failed admission, and discarding an edit before application. Layout or rendering
 can fail after a synchronous observer has acted. The C route has a headless
 [two-field example](../../examples/time_field_ordered.c).
 
-Browser default Tab, IME in the ordered route, platform accessibility mapping
-and foreign authoring still need integration and verification.
+## Gallery host handoff
+
+The gallery offers an ordered schedule preview alongside the per-segment IME
+preview. On an ordinary Tab keydown the browser host tags one queued key and
+runs the current ordered frame synchronously. Core sees any earlier input in
+the batch. Normal traversal stays within the preview until it runs out of
+stops in that direction. At an open edge Core clears scene focus and reports
+that the browser can run its native Tab default. Modal scopes continue
+wrapping. Consumption and the host handoff are distinct decisions. This
+policy is private to the bundled host. Public C ordered frames retain normal
+CUI traversal.
+
+Headless Chromium tests real focus transfer at the canvas edges and retains a
+pending digit across Tab. Ordered IME, platform accessibility mapping and
+foreign authoring remain open.

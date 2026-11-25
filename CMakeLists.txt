@@ -2920,6 +2920,10 @@ endforeach()
 
 # Optional bridge Icon resources: same-TU fault injection plus public ABI clients.
 if(CUI_BUILD_BRIDGE)
+ add_executable(test_bridge_icon_presentation tests/unit/test_bridge_icon_presentation.c)
+ target_link_libraries(test_bridge_icon_presentation PRIVATE cui_software)
+ cui_warnings(test_bridge_icon_presentation)
+ add_test(NAME bridge_icon_presentation COMMAND test_bridge_icon_presentation)
  add_executable(test_bridge_icon_resources tests/unit/test_bridge_icon_resources.c)
  target_link_libraries(test_bridge_icon_resources PRIVATE cui)
  cui_warnings(test_bridge_icon_resources)

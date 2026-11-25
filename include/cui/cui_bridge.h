@@ -1034,7 +1034,7 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_dropdown_part_bounds(cui_bridge_app 
 CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t part,
                                                                 cui_bridge_rect *out_bounds);
-/* Unreleased optional owned Icon resources; native-endian fixed-width records.
+/* Optional owned Icon resources; native-endian fixed-width records.
  * Handles are scoped to the matching app; C callers must retain that app.
  * Foreign wrappers must additionally retain/check owner identity. No raw state,
  * callbacks or bitmap pointers cross this interface. Zero limits select C defaults.
@@ -1045,9 +1045,8 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_numeric_part_bounds(cui_bridge_app *
  * app/resource graph. Output records require exact size/version initialized; other prior bytes are
  * ignored and success writes canonical zero reserved fields. INPUT reserved
  * words reject.
- * Destroy rejects referenced resources; no references exist until later consumers.
- * Arbitrary C loaders, configured Badge and configured Icon presentation are NOT
- * advertised by this resource-only group. Existing kind11/50 behavior is unchanged. */
+ * Destroy rejects referenced resources. This group advertises resource utilities.
+ * Query Icon presentation separately. Arbitrary loader callbacks stay in direct C. */
 typedef struct {
     uint32_t slot, generation;
 } cui_bridge_icon_handle_v1;
@@ -1141,6 +1140,98 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_bitmap_copy_v1(cui_bridge_app *
                                                                 cui_bridge_icon_bitmap_v1 *,
                                                                 unsigned char *, uint32_t capacity,
                                                                 uint32_t *required);
+
+/* Optional configured presentation for a retained Icon. Fixed-width,
+ * native-endian records use exact size and schema_version=1. RGBA numbers
+ * are 0xRRGGBBAA. Flags express presence, including explicit zero. */
+enum {
+    CUI_BRIDGE_ICON_WIDTH_V1 = 1u << 0,
+    CUI_BRIDGE_ICON_HEIGHT_V1 = 1u << 1,
+    CUI_BRIDGE_ICON_COLOR_V1 = 1u << 2,
+    CUI_BRIDGE_ICON_INHERITED_COLOR_V1 = 1u << 3,
+    CUI_BRIDGE_ICON_OPACITY_V1 = 1u << 4,
+    CUI_BRIDGE_ICON_TRANSFORM_V1 = 1u << 5,
+    CUI_BRIDGE_ICON_DECORATIVE_V1 = 1u << 6,
+    CUI_BRIDGE_ICON_STYLE_V1 = 1u << 7,
+    CUI_BRIDGE_ICON_CONSTRAINTS_V1 = 1u << 8,
+    CUI_BRIDGE_ICON_DEBUG_PLACEHOLDER_V1 = 1u << 9
+};
+enum {
+    CUI_BRIDGE_ICON_BOX_ROW_V1 = 1u << 0,
+    CUI_BRIDGE_ICON_BOX_CLIP_V1 = 1u << 1,
+    CUI_BRIDGE_ICON_BOX_CORNERS_V1 = 1u << 2,
+    CUI_BRIDGE_ICON_BOX_BORDER_EDGES_V1 = 1u << 3,
+    CUI_BRIDGE_ICON_BOX_FIXED_WIDTH_V1 = 1u << 4,
+    CUI_BRIDGE_ICON_BOX_FIXED_HEIGHT_V1 = 1u << 5,
+    CUI_BRIDGE_ICON_BOX_LAYOUT_ONLY_V1 = 1u << 6,
+    CUI_BRIDGE_ICON_BOX_INERT_V1 = 1u << 7,
+    CUI_BRIDGE_ICON_BOX_OPACITY_V1 = 1u << 8,
+    CUI_BRIDGE_ICON_BOX_WIDTH_PERCENT_V1 = 1u << 9,
+    CUI_BRIDGE_ICON_BOX_HEIGHT_PERCENT_V1 = 1u << 10,
+    CUI_BRIDGE_ICON_BOX_PADDING_EDGES_V1 = 1u << 11
+};
+enum {
+    CUI_BRIDGE_ICON_MIN_WIDTH_V1 = 1u << 0,
+    CUI_BRIDGE_ICON_MIN_HEIGHT_V1 = 1u << 1,
+    CUI_BRIDGE_ICON_MAX_WIDTH_V1 = 1u << 2,
+    CUI_BRIDGE_ICON_MAX_HEIGHT_V1 = 1u << 3
+};
+typedef struct {
+    uint32_t struct_size, schema_version, flags, reserved;
+    float width, height, padding, gap, radius;
+    uint32_t background_rgba, border_rgba;
+    float border_width;
+    uint32_t align_x, align_y; /* START=0, CENTER=1, END=2 */
+    float offset_x, offset_y;
+    float corners[4], border_edges[4]; /* TL,TR,BL,BR and L,R,T,B */
+    float max_width, max_height, opacity, padding_edges[4]; /* L,R,T,B */
+    uint32_t reserved_tail;
+} cui_bridge_icon_style_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, flags, reserved;
+    float min_width, min_height, max_width, max_height;
+} cui_bridge_icon_constraints_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, flags, size, design_size, reserved[3];
+    float custom_size, inherited_text_size, width, height, opacity, rem_size;
+    uint32_t color_rgba, inherited_color_rgba;
+    float transform[6]; /* a,b,c,d,tx,ty */
+    cui_bridge_icon_style_v1 style;
+    cui_bridge_icon_constraints_v1 constraints;
+    uint32_t reserved_tail[2];
+} cui_bridge_icon_options_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, icon_error, frame_status;
+    cui_bridge_node node;
+    uint64_t frame_sequence, reserved;
+} cui_bridge_icon_result_v1;
+enum {
+    CUI_BRIDGE_ICON_STYLE_RECORD_V1 = 0,
+    CUI_BRIDGE_ICON_CONSTRAINTS_RECORD_V1 = 1,
+    CUI_BRIDGE_ICON_OPTIONS_RECORD_V1 = 2,
+    CUI_BRIDGE_ICON_RESULT_RECORD_V1 = 3
+};
+/* bit0: all V1 presentation operations. Independent of resource size indices. */
+CUI_BRIDGE_API uint32_t cui_bridge_icon_presentation_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_icon_presentation_record_size_v1(uint32_t kind);
+/* Size is INHERITED=0 through CUSTOM=5. Design size follows CUI_DESIGN_*.
+ * Copy options and strict UTF-8 name (<=4096 bytes, no NUL in the span).
+ * Absent nested records are all zero. Present records have their own headers.
+ * See the Icon component for layout/paint precedence and ignored box fields.
+ * Resource references survive frames. Legacy text/visual-size setters reject
+ * until reset. All entry points require serialized use on the app owner thread. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_configure_node_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_icon_handle_v1,
+    const cui_bridge_icon_options_v1 *, const char *name, uint32_t name_bytes);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_get_node_config_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_icon_handle_v1 *, cui_bridge_icon_options_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_copy_node_name_v1(
+    cui_bridge_app *, cui_bridge_node, char *, uint32_t capacity, uint32_t *required);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_reset_node_v1(cui_bridge_app *, cui_bridge_node);
+/* EMPTY until invoked in the latest admitted step. The copied Icon error and
+ * whole-frame status are independent. Reads never prepare or paint. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_get_node_result_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_icon_result_v1 *);
 
 CUI_BRIDGE_API cui_bridge_status cui_bridge_request_close(cui_bridge_app *app);
 

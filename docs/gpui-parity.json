@@ -1529,7 +1529,8 @@
       "sample": null,
       "tests": [
         "tests/unit/test_icon.c",
-        "tests/unit/test_icon_accessibility_source.c"
+        "tests/unit/test_icon_accessibility_source.c",
+        "tests/unit/test_bridge_icon_presentation.c"
       ],
       "status": "tested",
       "platforms": {
@@ -1537,7 +1538,8 @@
       },
       "limitations": [
         "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
-        "Icon is decorative by default; named image semantics must currently be supplied by the caller. Dedicated accessible/decorative API remains pending."
+        "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
+        "Optional retained C presentation supports copied configuration and app-owned resources. Configured Badge composition and standalone Icon authoring in the foreign language builders remain open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1584,6 +1586,14 @@
           ],
           "limitations": [
             "Ambient text style inheritance and general SVG renderer fidelity remain separate gaps."
+          ]
+        },
+        {
+          "name": "retained Icon presentation with owned resources",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_bridge_icon_presentation.c",
+            "docs/BRIDGE_ICON_PRESENTATION.md"
           ]
         }
       ],

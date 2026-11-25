@@ -235,7 +235,8 @@ gaps preclude a full-family parity claim.
 
 ## Owned bridge resources
 
-The unreleased C bridge has an additive app-owned resource group with copied
-SVG/maps/bitmap utilities and explicit size/version negotiation. See
-[the resource contract](BRIDGE_ICON_RESOURCES.md) before use. Root strict integration and 15 targeted headless checks pass. It does not yet add configured Icon/Badge rendering or
-Python, JS/TS, Go or Rust resource facades; existing named Icon builders remain.
+Alpha.4 includes app-owned resources with copied SVG, path maps and bitmap
+utilities. Working source adds a retained Icon node with copied styling and a
+per-frame result. Configured Badge and language authoring remain open. See the
+[resource contract](BRIDGE_ICON_RESOURCES.md) and
+[retained presentation guide](BRIDGE_ICON_PRESENTATION.md).

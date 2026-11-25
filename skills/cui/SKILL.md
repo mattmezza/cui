@@ -499,7 +499,9 @@ the runnable profile UI. See `docs/NODE_SKELETON.md`, `docs/GO_SKELETON.md`
 and `docs/RUST_SKELETON.md` for their responsive builders. The legacy factory
 works with alpha.4.
 
-For owned bridge Icon resources, read `docs/BRIDGE_ICON_RESOURCES.md` and the
-complete bridge header. The additive resource group has focused worker/root proof (15 headless checks); it copies source/map/bitmap data and requires matching app/owner
-thread and exact versioned records. It does not yet provide configured Icon/Badge
-presentation or foreign resource facades. Preserve legacy named Icon builders.
+For app-owned SVG data, read `docs/BRIDGE_ICON_RESOURCES.md` and
+`include/cui/cui_bridge.h`. Working source adds
+`docs/BRIDGE_ICON_PRESENTATION.md` for copied styling, shared resources and
+per-frame results in retained C nodes. Probe presentation separately from the
+alpha.4 resource API. Keep resources on the app's owner thread. Configured
+Badge and foreign authoring are pending. Existing language builders use names.

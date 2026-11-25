@@ -1,4 +1,4 @@
-# Owned bridge Icon resources (unreleased)
+# Owned bridge Icon resources
 
 This focused C slice provides reusable app-owned Icon state and copied resource
 utilities. Worker strict native builds and eight private-display runtime checks
@@ -7,16 +7,18 @@ measure an 8-byte app increase on both targets. See the
 [worker receipt](validation/bridge-icon-resources-worker.json). Root strict integration build and 15 targeted headless checks pass, including
 frozen legacy trace/allocations, old-header consumers and actual owner-thread
 refusal. All 18 consumer-skill tests and canonical generated checks pass; see
-[the root receipt](validation/bridge-icon-resources-root.json). Configured
-Badge/standalone configured Icon/Spinner presentation and their five language facades remain pending. Legacy kind 11 text
+[the root receipt](validation/bridge-icon-resources-root.json). The resource API
+is available in alpha.4. Working source adds
+[retained Icon presentation](BRIDGE_ICON_PRESENTATION.md). Configured Badge,
+configurable Spinner, and language facades remain pending. Legacy kind 11 text
 Badge and kind 50 named Icon keep their render paths. All 78 families remain.
 
 `cui_bridge_icon_versions()` bit 0 advertises the complete resource group on the
 existing supported owner-thread build. Default/shared WASM and NO_TLS are not
 supported; explicit unshared WASM uses the existing Slider opt-in and needs final
 module validation. `icon_record_size_v1` exposes only LIMITS (3), INFO (4) and BITMAP (5).
-Future style/options/Badge record kinds return 0; those declarations and Badge
-capability await their real parser/render consumer, including debug-placeholder.
+Other kinds return 0. The separate Icon presentation query covers style,
+constraints, options and results.
 
 Create an app-scoped slot/generation handle with `icon_create_v1` and an initialized
 limits record. Zero limits normalize to the C defaults **before** reservation:
@@ -69,8 +71,8 @@ process memory. Native allocation failure preserves prior owned source/map.
 
 Caller precondition: serialize all app calls, including existing void destruction,
 on the original owner thread. New resource APIs reject step/render phases;
-resource operations hold an owner busy guard. Destroy rejects references; current
-resource-only clients cannot attach node references yet. Generations advance on
+resource operations hold an owner busy guard. Destroy rejects resources with
+active configured Icon references. Generations advance on
 slot reuse and retire on wrap. Collect frees inactive masks only after the caller
 has consumed all prior draws. Source replacement keeps old masks alive. Close
 makes resource calls CLOSED; final app destroy releases resources once after

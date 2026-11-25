@@ -329,7 +329,11 @@ Event API: `cui_hover_update_events`, `cui_begin_hover_card_events`.
 
 **Usage:** Initialize custom icon state, load data/name/path, submit each frame and destroy prepared resources after use.
 
-API: `cui_icon`, `cui_icon_named`, `cui_icon_state_init`, `cui_icon_state_destroy`. [Public header](../include/cui/cui_icon.h); [guide](ICON.md).
+API: `cui_icon`, `cui_icon_named`, `cui_icon_state_init`, `cui_icon_state_destroy`. [Public header](../include/cui/cui_icon.h), [guide](ICON.md).
+
+Retained apps can share a copied SVG resource and configure each Icon node
+independently. [Bridge public header](../include/cui/cui_bridge.h),
+[retained presentation guide](BRIDGE_ICON_PRESENTATION.md).
 
 ## Image
 

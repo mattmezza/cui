@@ -691,6 +691,7 @@ static void bridge_apply_shadows(cui_bridge_app *app, cui_bridge_node_record *no
 #include "cui_bridge_slider_internal.h"
 #include "cui_bridge_time_internal.h"
 #include "cui_bridge_icon_internal.h"
+#include "cui_bridge_icon_presentation_internal.h"
 #include "cui_bridge_skeleton_internal.h"
 // clang-format on
 
@@ -819,6 +820,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     bridge_slider_remove(node->owner, node->own_slot);
     bridge_time_remove(node->owner, node->own_slot);
     bridge_skeleton_remove(node->owner, node->own_slot);
+    bridge_icon_presentation_remove(node->owner, node->own_slot);
     free(node->part_shadows);
     free(node->key);
     free(node->text);
@@ -1809,6 +1811,8 @@ cui_bridge_status cui_bridge_set_text(cui_bridge_app *app, cui_bridge_node handl
         return status;
     if (node->kind == CUI_BRIDGE_SLIDER_MODEL)
         return bridge_slider_text(app, handle.slot, text_utf8);
+    if (node->kind == CUI_BRIDGE_ICON && bridge_icon_node(app, handle.slot))
+        return CUI_BRIDGE_INVALID_STATE;
     if (node->parent && app->nodes[node->parent].kind == CUI_BRIDGE_DOCK &&
         app->nodes[node->parent].dock && app->nodes[node->parent].dock->initialized)
         return CUI_BRIDGE_INVALID_STATE;
@@ -2275,6 +2279,8 @@ cui_bridge_status cui_bridge_set_visual_size(cui_bridge_app *app, cui_bridge_nod
         height > 4096 || (node->kind == CUI_BRIDGE_CHART && (width > 512 || height > 512)))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     if (node->kind == CUI_BRIDGE_SKELETON && bridge_skeleton_node(app, handle.slot))
+        return CUI_BRIDGE_INVALID_STATE;
+    if (node->kind == CUI_BRIDGE_ICON && bridge_icon_node(app, handle.slot))
         return CUI_BRIDGE_INVALID_STATE;
     node->visual_width = width;
     node->visual_height = height;
@@ -4891,18 +4897,23 @@ static void bridge_render_node_other(cui_bridge_app *app, uint32_t slot) {
     } else if (node->kind == CUI_BRIDGE_KBD) {
         cui_kbd(app->ui, node->id, &app->theme, cui_string(node->text));
     } else if (node->kind == CUI_BRIDGE_ICON) {
-        cui_icon_options options = {0};
-        if (node->visual_width > 0) {
-            options.custom_width = true;
-            options.width = node->visual_width;
+        bridge_icon_presented *configured = bridge_icon_node(app, slot);
+        if (configured) {
+            bridge_icon_presentation_render(app, node->id, configured);
+        } else {
+            cui_icon_options options = {0};
+            if (node->visual_width > 0) {
+                options.custom_width = true;
+                options.width = node->visual_width;
+            }
+            if (node->visual_height > 0) {
+                options.custom_height = true;
+                options.height = node->visual_height;
+            }
+            if (cui_icon_named(app->ui, node->id, &app->theme, cui_string(node->text), options) !=
+                CUI_ICON_OK)
+                app->frame_error = CUI_BRIDGE_INVALID_STATE;
         }
-        if (node->visual_height > 0) {
-            options.custom_height = true;
-            options.height = node->visual_height;
-        }
-        if (cui_icon_named(app->ui, node->id, &app->theme, cui_string(node->text), options) !=
-            CUI_ICON_OK)
-            app->frame_error = CUI_BRIDGE_INVALID_STATE;
     } else if (node->kind == CUI_BRIDGE_MESSAGE) {
         cui_message_body body = {.slot = {.present = true, .text = cui_string(node->text)},
                                  .typed_bubble = true,
@@ -5191,6 +5202,8 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
     app->now_seconds += dt;
     app->stepping = true;
     app->frame_error = CUI_BRIDGE_OK;
+    if (app->icons && app->icons->presentations)
+        app->icons->presentation_frame = 0;
     if (app->backend == CUI_BRIDGE_BACKEND_SDL) {
         status = cui_bridge_native_poll(app);
         if (status != CUI_BRIDGE_OK)
@@ -5201,6 +5214,8 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
         goto done;
     }
     app->last_core_frame = cui_frame_sequence(app->ui);
+    if (app->icons && app->icons->presentations)
+        app->icons->presentation_frame = app->last_core_frame;
     bridge_slider_begin(app);
     for (uint32_t i = 1; i <= app->max_nodes; i++)
         if (app->nodes[i].live && app->nodes[i].speech)
@@ -5224,6 +5239,8 @@ done:
     bridge_time_finish(app, status);
     if (app->skeletons)
         app->skeletons->step_ok = status == CUI_BRIDGE_OK;
+    if (app->icons && app->icons->presentations)
+        app->icons->presentation_status = status;
     app->stepping = false;
     if (status == CUI_BRIDGE_CLOSED)
         app->closed = true;

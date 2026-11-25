@@ -54,7 +54,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | StatusBar | `cui_status_bar` | Item labels in left/center/right regions | Set Item step status to 0/1/2 for region |
 | Toolbar | `cui_toolbar` | Item child controls, inherited disabled state | Up to 64 Items; child controls own actions |
 | TitleBar | `cui_title_bar` | Item text labels, retained title state | No native window host controls |
-| Icon | `cui_icon_named` | Copied catalog name, width/height | Embedded catalog assets; unknown name fails the frame |
+| Icon | `cui_icon_named`, optional `cui_icon` | Legacy catalog name and dimensions, or a shared owned resource and full copied Icon options | An unknown legacy name fails the frame. A configured Icon reports its own artwork error separately. [C presentation guide](BRIDGE_ICON_PRESENTATION.md). |
 | Message | `cui_message` | Copied body/header, width | Incoming filled bubble, one body |
 | Attachment | `cui_attachment` | Copied title/description, status, progress, width | Metadata chip; no host file or remove/retry actions |
 | Image | `cui_image` | Owned RGBA8 pixels, revision, description, size | At most 16 MiB; no path, URI, animated loader |

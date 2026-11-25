@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT */
-/* Same-TU resource adapter. No presentation or foreign callbacks. */
+/* Same-TU resource adapter. No foreign callbacks. */
 #ifndef CUI_BRIDGE_ICON_INTERNAL_H
 #define CUI_BRIDGE_ICON_INTERNAL_H
 #include "cui/cui_icon.h"
@@ -32,12 +32,16 @@ typedef struct {
     uint32_t generation;
     bool retired;
 } bridge_icon_slot;
+typedef struct bridge_icon_presented bridge_icon_presented;
 struct bridge_icon_app {
     const void *owner;
     bridge_icon_slot *slots;
     uint32_t capacity;
     uint64_t cache_quota, svg_quota, copied_bytes;
     bool busy;
+    bridge_icon_presented **presentations;
+    uint64_t presentation_frame;
+    cui_bridge_status presentation_status;
 };
 static cui_bridge_status bridge_icon_thread_check(cui_bridge_app *app) {
     return app->icons && (app->icons->owner != bridge_slider_owner() || app->icons->busy)
@@ -202,6 +206,7 @@ static void bridge_icon_app_destroy(cui_bridge_app *app) {
     for (uint32_t i = 0; i < a->capacity; i++)
         bridge_icon_free(a->slots[i].value);
     free(a->slots);
+    free(a->presentations);
     free(a);
     app->icons = NULL;
 }

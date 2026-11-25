@@ -226,7 +226,22 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_bridge.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": [
+            "cui_bridge_icon_options_v1",
+            "cui_bridge_icon_result_v1"
+          ],
+          "symbols": [
+            "cui_bridge_icon_configure_node_v1",
+            "cui_bridge_icon_get_node_result_v1"
+          ],
+          "note": "Owned resource creation and retained Icon configuration are available in the C bridge. Language builders use named Icons."
+        }
+      ]
     },
     {
       "name": "Image",
@@ -1240,7 +1255,7 @@
     ]
   },
   "owned_icon_resources_v1": {
-    "scope": "Complete optional C bridge resource/utilities group, negotiated independently; no configured node rendering consumer yet.",
+    "scope": "Optional C bridge resource/utilities group. Working source adds independently negotiated retained Icon presentation.",
     "public_header": "include/cui/cui_bridge.h",
     "languages": {
       "python": "documented_omission",
@@ -1249,8 +1264,9 @@
       "go": "documented_omission",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Copied resources do not imply configured Icon/Badge authoring in any language.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Configured Icon is available in the C bridge. Configured Badge and foreign authoring remain open.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
+    "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

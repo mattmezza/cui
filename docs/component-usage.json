@@ -501,7 +501,8 @@
       "usage": "Initialize custom icon state, load data/name/path, submit each frame and destroy prepared resources after use.",
       "docs": [
         "docs/ICON.md",
-        "docs/BRIDGE_ICON_RESOURCES.md"
+        "docs/BRIDGE_ICON_RESOURCES.md",
+        "docs/BRIDGE_ICON_PRESENTATION.md"
       ],
       "callback_symbols": [
         "cui_icon_loader_fn"

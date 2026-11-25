@@ -172,7 +172,7 @@ static void exercise(cui_sdl3 *host, SDL_WindowID window, bool vertical) {
 }
 
 int main(void) {
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
     cui_sdl3 *host =
         cui_sdl3_create_with_options("SDL tab overflow", WIDTH, HEIGHT, NULL,
                                      (cui_sdl3_window_options){.initially_hidden = true});

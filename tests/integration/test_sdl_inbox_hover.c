@@ -211,7 +211,7 @@ static size_t exercise(cui_sdl3 *host, SDL_WindowID window, cui_font *font, size
 
 int main(int argc, char **argv) {
     assert(argc == 2);
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
     cui_font *font = cui_font_open(argv[1]);
     assert(font);
     cui_sdl3 *host =

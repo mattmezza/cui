@@ -31,7 +31,7 @@ static void check_title_bar(cui_context *ui, cui_window_host *window,
 }
 
 int main(void) {
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
     cui_sdl3 *host = cui_sdl3_create_with_options(
         "SDL title bar", 480, 180, NULL, (cui_sdl3_window_options){.initially_hidden = true});
     cui_context *ui = cui_create((cui_config){.max_elements = 128, .max_commands = 256});

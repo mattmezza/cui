@@ -72,7 +72,7 @@ static void check_wheels(tabs_scene *scene, const cui_event *expected, size_t co
 }
 
 int main(void) {
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
     tabs_scene scene = {
         .host = cui_sdl3_create_with_options("SDL Tabs wheel", 320, 240, NULL,
                                              (cui_sdl3_window_options){.initially_hidden = true}),

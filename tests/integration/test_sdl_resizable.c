@@ -361,7 +361,7 @@ static int exercise_workspace(const char *font_path) {
 }
 
 int main(int argc, char **argv) {
-    assert(SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software"));
+    assert(SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "software", SDL_HINT_OVERRIDE));
     if (argc == 2)
         return exercise_workspace(argv[1]);
     split_scene scene = {

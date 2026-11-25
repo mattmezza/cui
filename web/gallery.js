@@ -676,7 +676,12 @@ if (cui_questionnaire_begin_with_keyboard(ui, root_id, &theme, &state, options,
 }`,
 
  Speech:'cui_speech_init(&state, workspace, recognizer, input, on_event, user);\ncui_speech_button(ui, id, &theme, &state, options, now);\ncui_speech_waveform(ui, waveform_id, &theme, &state, waveform, now);',
- Chart:'cui_chart_options options = cui_chart_theme(config, &theme);\ncui_chart_render_animated(ui, &state, &options);\ncui_chart(ui, id, &state, &options, cui_string("Activity"));',
+ Chart:`cui_chart_options options = cui_chart_theme(config, &theme);
+/* Resolve a two-logical-pixel outline when the bitmap is scaled. */
+if (options.logical_height > 0)
+    options.line_width = 2.0f * options.height / options.logical_height;
+cui_chart_render_animated(ui, &state, &options);
+cui_chart(ui, id, &state, &options, cui_string("Activity"));`,
  TextView:'cui_text_view_init(&state, workspace, CUI_TEXT_VIEW_MARKDOWN);\ncui_text_view_set_text(&state, markdown);\ncui_text_view(ui, id, &theme, &state, options);',
  Video:`/* The host owns decoding, playback and frame lifetime. */
 cui_video_surface_options surface = {

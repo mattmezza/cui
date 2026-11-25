@@ -4362,6 +4362,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             {.label = {"Jun", 3}, .value = 53, .open = 39, .high = 57, .low = 37, .close = 53}};
         static const cui_chart_link links[] = {{0, 2, 16, {0}}, {0, 3, 12, {0}}, {1, 3, 18, {0}},
                                                {2, 4, 16, {0}}, {3, 5, 30, {0}}, {4, 5, 16, {0}}};
+        const unsigned raster_scale = 2;
+        const float logical_height = 280;
         float logical_width = fminf(width - 48, 720);
         cui_chart_options options = {
             .kind = (cui_chart_kind)chart_kind,
@@ -4373,10 +4375,11 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             .count = sizeof(data) / sizeof(data[0]),
             .links = links,
             .link_count = sizeof(links) / sizeof(links[0]),
-            .width = (unsigned)(logical_width * 2),
-            .height = 560,
+            .width = (unsigned)(logical_width * raster_scale),
+            .height = (unsigned)(logical_height * raster_scale),
             .logical_width = logical_width,
-            .logical_height = 280,
+            .logical_height = logical_height,
+            .line_width = 2.0f * raster_scale,
             .data_revision = chart_revision,
             .appear_key = chart_revision,
             .disable_appear = !chart_animate,

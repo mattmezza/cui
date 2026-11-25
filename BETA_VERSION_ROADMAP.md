@@ -117,7 +117,7 @@ Check reported regressions against the current gallery as each slice lands.
 | 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
 | 6 | Input / Textarea | Verify word movement, line movement, caret/selection visibility and IME placement across wrapped or scrolled content. Keep new Editor features lower priority. |
 | 7 | DatePicker / TimeField | Exercise direct year selection, localized formatting and range bounds with keyboard and touch. The ordered TimeField gallery has Chromium evidence for composition, preview-edge navigation and named accessible values. Complete physical native and accessibility action validation. [Focus routing](docs/design/TIME_FIELD_FOCUS_ROUTING.md) |
-| 7 | Chart / Plot | Verify that thin curves remain continuous across scales and that existing pan/pinch/zoom works without hijacking the parent scroll region when the plot cannot use the gesture. |
+| 7 | Chart / Plot | Chromium verifies continuous Chart strokes for all three curves at desktop/mobile widths and 1×/2× display scales. Verify Plot pan/pinch/zoom ownership when the viewport cannot use the gesture. |
 
 ### Component gaps to close
 

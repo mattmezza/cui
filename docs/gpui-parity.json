@@ -7121,6 +7121,16 @@
           ]
         },
         {
+          "name": "continuous two-logical-pixel Chart preview strokes across display densities",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_chart.c",
+            "tests/web/test_chart_appearance_gallery.py",
+            "docs/CHART.md"
+          ],
+          "scope": "Chromium canvas pixels for Natural, Linear and Step after in default light and dark at 1× and 2× display scales. The C raster still accepts caller-specified bitmap pixel widths."
+        },
+        {
           "name": "line and area curves plus radar multi-series",
           "status": "tested",
           "evidence": [

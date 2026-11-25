@@ -34,6 +34,13 @@ All seven source families expose `appear`, `appear_key`, `id`, and `interactive`
 
 Cartesian line and area outlines use a 2px stroke by default, with round segment ends and coverage-based edge smoothing. Set `cui_chart_options.line_width` in bitmap pixels to customize it; positive values are capped at 16px, while zero, negative or nonfinite values select the default. The width participates in the render cache key. Grid/axis strokes keep their previous dimensions. Natural, linear and step-after curves share the same stroke painter.
 
+When the bitmap and display dimensions differ, multiply the desired logical
+stroke width by `options.height / options.logical_height` for a uniformly
+scaled bitmap. The gallery uses four bitmap pixels to paint a two-logical-pixel
+outline at 2× raster density. The browser regression samples actual canvas
+pixels for all three curves at desktop and narrow widths, 1× and 2× display
+scales, and the default light and dark themes.
+
 ## Shared Sankey solver
 
 Chart Sankey topology/relaxation and end-width calculation now delegate to the

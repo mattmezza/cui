@@ -1,7 +1,7 @@
 # /// script
 # dependencies = ["playwright==1.58.0"]
 # ///
-"""Actual gallery automatic/copied content across tooltip appearance choices."""
+"""Actual gallery tooltip appearance and Chart stroke pixels."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -16,6 +16,57 @@ COMMANDS = """()=>{const e=cuiGallery.exports,d=new TextDecoder();return Array.f
  text:d.decode(new Uint8Array(e.memory.buffer,e.gallery_command_text(i),
  e.gallery_command_length(i)))}));}"""
 
+STROKE_PROFILE = """(scheme)=>{
+  const e=cuiGallery.exports,canvas=document.querySelector('#preview');
+  const image=Array.from({length:e.gallery_count()},(_,i)=>i)
+    .find(i=>e.gallery_command(i,0)===5&&e.gallery_bitmap(i,1)>0);
+  if(image===undefined)throw Error('Missing Chart bitmap');
+  const [x,y,w,h]=[1,2,3,4].map(field=>e.gallery_command(image,field));
+  const scale=canvas.width/canvas.clientWidth;
+  const [left,right,top,bottom]=[x+w*.08,x+w*.92,y,y+h].map(v=>Math.round(v*scale));
+  const pixels=canvas.getContext('2d').getImageData(left,top,right-left,bottom-top);
+  const color=cuiGallery.themes.find(t=>t.id==='default-'+scheme).colors['chart.2'];
+  const signal=parseInt(color.slice(5,7),16)-parseInt(color.slice(1,3),16);
+  let minThickness=Infinity,minPeak=Infinity,breaks=0;
+  for(let col=0;col<pixels.width;col++){
+    let sum=0,peak=0;
+    for(let row=0;row<pixels.height;row++){
+      const at=(row*pixels.width+col)*4;
+      // The default light and dark palettes use neutral grid and background colors.
+      const coverage=Math.max(0,(pixels.data[at+2]-pixels.data[at])/signal);
+      sum+=coverage;
+      peak=Math.max(peak,coverage);
+    }
+    minThickness=Math.min(minThickness,sum/scale);
+    minPeak=Math.min(minPeak,peak);
+    if(peak<.75)breaks++;
+  }
+  return {minThickness,minPeak,breaks,scale};
+}"""
+
+
+def verify_stroke_pixels(browser, url):
+    for width, scale, scheme in [(1280, 1, 'light'), (1280, 2, 'dark'), (390, 2, 'light')]:
+        page = browser.new_page(viewport={'width': width, 'height': 900},
+                                device_scale_factor=scale, color_scheme=scheme)
+        try:
+            page.goto(url + '/#Chart')
+            page.wait_for_function('window.cuiGallery?.renderedComponent==="Chart"')
+            curve = page.locator('#chart-curve')
+            for value in ['0', '1', '2']:
+                if curve.input_value() != value:
+                    # Wait for the requested curve's actual painted frame.
+                    before = page.evaluate('cuiGallery.frame')
+                    curve.select_option(value)
+                    page.wait_for_function('before=>cuiGallery.frame>before', arg=before)
+                profile = page.evaluate(STROKE_PROFILE, scheme)
+                assert abs(profile['scale'] - scale) < .01, profile
+                assert profile['minThickness'] >= 1.5 and profile['breaks'] == 0, (
+                    width, scale, scheme, value, profile)
+        finally:
+            page.close()
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--directory',type=Path,default=Path('build/web'))
@@ -28,7 +79,9 @@ def main():
     try:
         with sync_playwright() as pw:
             browser=pw.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}))
-            audit=Audit(browser,f'http://127.0.0.1:{server.server_port}')
+            url=f'http://127.0.0.1:{server.server_port}'
+            verify_stroke_pixels(browser, url)
+            audit=Audit(browser,url)
             for width in [1280,390]:
                 audit.page.set_viewport_size({'width':width,'height':900})
                 audit.route('Chart')
@@ -63,7 +116,7 @@ def main():
             assert audit.page.locator('#doc-opt-in-chart-tooltip-appearance').count()==1
             assert not audit.errors,audit.errors
             browser.close()
-        print('PASS gallery classic/popover/bare typography and placement, automatic/copied rows, desktop/390px and linked guide')
+        print('PASS gallery curve stroke pixels at desktop/mobile and 1×/2×, tooltip placement, rows and linked guide')
     finally:
         server.shutdown()
 

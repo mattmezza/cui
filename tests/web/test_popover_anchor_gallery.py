@@ -77,14 +77,7 @@ def main():
                 assert trigger_node.get_attribute('aria-controls') is None
                 def dismiss_with_previews():
                     checkbox = a.target('Show previews', 2)
-                    activate(checkbox)
-                    assert not a.page.evaluate(SNAPSHOT)['open']
-                    assert a.value(checkbox, 6) != checkbox['f'][6]
-                    assert a.value(checkbox, 7)
-                    assert trigger_node.get_attribute('aria-expanded') == 'false'
-                    assert trigger_node.get_attribute('aria-controls') is None
-                    if not mobile:
-                        a.page.keyboard.press('Space')
+                    def wait_checked(checked):
                         a.page.wait_for_function(
                             '''([id, checked]) => {
                                 const e = cuiGallery.exports;
@@ -92,7 +85,17 @@ def main():
                                     if (String(e.gallery_semantic_id(i)) === id)
                                         return e.gallery_semantic(i, 6) === checked;
                                 return false;
-                            }''', arg=[checkbox['id'], checkbox['f'][6]])
+                            }''', arg=[checkbox['id'], checked])
+                    activate(checkbox)
+                    wait_checked(1 - checkbox['f'][6])
+                    assert not a.page.evaluate(SNAPSHOT)['open']
+                    assert a.value(checkbox, 6) != checkbox['f'][6]
+                    assert a.value(checkbox, 7)
+                    assert trigger_node.get_attribute('aria-expanded') == 'false'
+                    assert trigger_node.get_attribute('aria-controls') is None
+                    if not mobile:
+                        a.page.keyboard.press('Space')
+                        wait_checked(checkbox['f'][6])
                 if not mobile:
                     canvas = a.page.locator('canvas')
                     canvas.focus()

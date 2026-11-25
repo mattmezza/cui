@@ -133,7 +133,9 @@ def main():
             action('Unmute')
             page.wait_for_function('!cuiGallery.video.snapshot().muted')
             assert abs(snap()['volume']-.95)<.001
-            # Both default skip glyphs must paint actual pixels, not only accessible labels.
+            # The host confirms volume first; the next rendered frame publishes Mute.
+            page.locator('#accessible').get_by_role('button',name='Mute',exact=True).wait_for(state='attached')
+            # Check the actual pixels of the skip and mute glyphs.
             for label in ('Skip backward', 'Skip forward', 'Mute'):
                 proof=page.evaluate('''label=>{const w=cuiGallery.exports,td=new TextDecoder(),c=document.querySelector('#preview');
                     for(let i=0;i<w.gallery_semantic_count();i++){

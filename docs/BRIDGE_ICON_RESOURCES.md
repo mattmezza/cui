@@ -11,11 +11,13 @@ refusal. All 18 consumer-skill tests and canonical generated checks pass; see
 is available in alpha.4. Working source adds
 [retained Icon presentation](BRIDGE_ICON_PRESENTATION.md) and a
 [configured Badge container](BRIDGE_BADGE.md). Python exposes these APIs through
-typed builders. Configurable Spinner and the other language facades remain open.
+typed builders. The JavaScript and TypeScript resource facade works with the
+alpha.4 bridge. Node retained presentation, configurable Spinner and Go/Rust
+facades remain open.
 Legacy kind 11 text
 Badge and kind 50 named Icon keep their render paths. All 78 families remain.
 
-[Python usage](PYTHON_ICON_BADGE.md).
+[Python usage](PYTHON_ICON_BADGE.md). [Node and TypeScript resources](NODE_ICON_RESOURCES.md).
 
 `cui_bridge_icon_versions()` bit 0 advertises the complete resource group on the
 existing supported owner-thread build. Default/shared WASM and NO_TLS are not

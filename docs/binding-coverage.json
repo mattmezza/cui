@@ -262,7 +262,7 @@
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_icon_loader_fn"],
           "symbols": ["cui_icon_set_path", "cui_icon_set_name"],
-          "note": "Direct C accepts arbitrary loader callbacks. Python path sources use a resource-local map of copied SVG data."
+          "note": "Direct C accepts arbitrary loader callbacks. Python, JavaScript and TypeScript path sources use a resource-local map of copied SVG data."
         }
       ]
     },
@@ -1282,16 +1282,17 @@
     "public_header": "include/cui/cui_bridge.h",
     "languages": {
       "python": "tested_subset",
-      "javascript": "documented_omission",
-      "typescript": "documented_omission",
+      "javascript": "tested_subset",
+      "typescript": "tested_subset",
       "go": "documented_omission",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python also exposes owned SVG resources and catalog/cache utilities, configured retained Icon and Badge builders, copied results and Indicator geometry. See the guide for optional provider support.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript and TypeScript expose owned SVG resources and catalog/cache utilities. Python also provides configured retained Icon and Badge builders with copied results and indicator geometry. See the guide for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
     "python_guide": "docs/PYTHON_ICON_BADGE.md",
+    "node_resources_guide": "docs/NODE_ICON_RESOURCES.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

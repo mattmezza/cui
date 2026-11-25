@@ -25,20 +25,6 @@ static bool skeleton_resolve(skeleton_api *api) {
 #undef SKELETON_SYMBOL
 }
 
-static napi_value skeleton_object(napi_env env, const char *const *names, const double *values,
-                                  size_t fields) {
-    napi_value obj;
-    if (napi_create_object(env, &obj) != napi_ok)
-        return NULL;
-    for (size_t i = 0; i < fields; i++) {
-        napi_value value;
-        if (napi_create_double(env, values[i], &value) != napi_ok ||
-            napi_set_named_property(env, obj, names[i], value) != napi_ok)
-            return NULL;
-    }
-    return obj;
-}
-
 static napi_value skeleton_configure(napi_env env, napi_value *v, const skeleton_api *api,
                                      js_app *app, js_node *node) {
     cui_bridge_skeleton_config_v1 config = {.struct_size = sizeof config,
@@ -97,7 +83,7 @@ static napi_value skeleton_presentation(napi_env env, napi_callback_info info) {
         const double values[] = {config.flags,    config.width_mode,     config.width,
                                  config.height,   config.max_width,      config.radius,
                                  config.duration, config.background_rgba};
-        return skeleton_object(env, names, values, sizeof values / sizeof values[0]);
+        return numeric_object(env, names, values, sizeof values / sizeof values[0]);
     }
 
     cui_bridge_skeleton_presentation_v1 sample = {.struct_size = sizeof sample,
@@ -112,7 +98,7 @@ static napi_value skeleton_presentation(napi_env env, napi_callback_info info) {
     const char *const names[] = {"coreTime", "nextWakeSeconds", "phase", "opacity"};
     const double values[] = {sample.core_time, sample.next_wake_seconds, sample.phase,
                              sample.opacity};
-    napi_value result = skeleton_object(env, names, values, sizeof values / sizeof values[0]);
+    napi_value result = numeric_object(env, names, values, sizeof values / sizeof values[0]);
     napi_value frame;
     if (!result || napi_create_bigint_uint64(env, sample.frame_sequence, &frame) != napi_ok ||
         napi_set_named_property(env, result, "frameSequence", frame) != napi_ok)

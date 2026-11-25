@@ -17,7 +17,6 @@ subprocess.run([*base, '--rootDir', str(root / 'bindings'), '--outDir', str(a.ou
                 str(root / 'bindings/typescript/examples/time_field_localized.ts')], check=True)
 node_dir = a.output / 'node'
 node_dir.mkdir(parents=True, exist_ok=True)
-for name in ('index.cjs', 'shadows.cjs', 'slider-model.cjs', 'time-field-localized.cjs',
-             'skeleton-presentation.cjs'):
-    shutil.copyfile(root / 'bindings/node' / name, node_dir / name)
+for module in (root / 'bindings/node').glob('*.cjs'):
+    shutil.copyfile(module, node_dir / module.name)
 subprocess.run([a.node, str(a.output / 'typescript/examples/time_field_localized.js')], check=True)

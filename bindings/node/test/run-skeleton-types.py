@@ -17,7 +17,6 @@ subprocess.run([*base, '--rootDir', str(bindings), '--outDir', str(args.output),
                 str(bindings / 'typescript/examples/skeleton_profile.ts')], check=True)
 node_dir = args.output / 'node'
 node_dir.mkdir(parents=True, exist_ok=True)
-for name in ('index.cjs', 'shadows.cjs', 'slider-model.cjs', 'time-field-localized.cjs',
-             'skeleton-presentation.cjs'):
-    shutil.copyfile(bindings / 'node' / name, node_dir / name)
+for module in (bindings / 'node').glob('*.cjs'):
+    shutil.copyfile(module, node_dir / module.name)
 subprocess.run([args.node, str(args.output / 'typescript/examples/skeleton_profile.js')], check=True)

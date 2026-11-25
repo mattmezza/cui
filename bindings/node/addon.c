@@ -1055,7 +1055,7 @@ static napi_value poll_notification_v1(napi_env env, napi_callback_info info) {
     return result;
 }
 /* Strict UTF-8: Node's string constructor otherwise replaces malformed bytes. */
-static bool notification_utf8(const char *text, uint32_t length) {
+static bool strict_utf8(const char *text, uint32_t length) {
     uint32_t i = 0;
     while (i < length) {
         unsigned char c = (unsigned char)text[i++];
@@ -1161,7 +1161,7 @@ static napi_value poll_value_notification_v1(napi_env env, napi_callback_info in
     }
     if (event.schema_version != 1 || event.struct_size != sizeof event ||
         event.text_length >= capacity || text[event.text_length] != '\0' ||
-        !notification_utf8(text, event.text_length) || required != event.text_length + 1u ||
+        !strict_utf8(text, event.text_length) || required != event.text_length + 1u ||
         (event.flags & ~CUI_BRIDGE_NOTIFY_HAS_FRAME) ||
         ((event.flags & CUI_BRIDGE_NOTIFY_HAS_FRAME) != 0) != (event.frame_sequence != 0) ||
         event.kind < 1u || event.kind > 3u || event.legacy.type != event.kind ||
@@ -2027,9 +2027,24 @@ static int optional_bridge_symbol(void *target, size_t size, const char *name) {
     return 1;
 }
 
+static napi_value numeric_object(napi_env env, const char *const *names, const double *values,
+                                 size_t fields) {
+    napi_value obj;
+    if (napi_create_object(env, &obj) != napi_ok)
+        return NULL;
+    for (size_t i = 0; i < fields; i++) {
+        napi_value value;
+        if (napi_create_double(env, values[i], &value) != napi_ok ||
+            napi_set_named_property(env, obj, names[i], value) != napi_ok)
+            return NULL;
+    }
+    return obj;
+}
+
 #include "slider_model_internal.h"
 #include "time_field_localized_internal.h"
 #include "skeleton_presentation_internal.h"
+#include "icon_resources_internal.h"
 
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
@@ -2150,6 +2165,7 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("sliderModel", slider_model, 0);
     EXPORT("timeFieldLocalized", time_field_localized, 0);
     EXPORT("skeletonPresentation", skeleton_presentation, 0);
+    EXPORT("iconResource", icon_resource, 0);
 #undef EXPORT
     return exports;
 }

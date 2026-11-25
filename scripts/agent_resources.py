@@ -53,7 +53,7 @@ def source_files(root):
                  'bindings/python/cui_bridge/time_field_localized.py',
                  'bindings/python/cui_bridge/skeleton_presentation.py',
                  'bindings/node/shadows.cjs', 'bindings/node/slider-model.cjs',
-                 'bindings/node/skeleton-presentation.cjs',
+                 'bindings/node/skeleton-presentation.cjs', 'bindings/node/icon-resources.cjs',
                  'bindings/node/time-field-localized.cjs', 'bindings/node/time_field_localized_internal.h', 'bindings/rust/src/shadows.rs', 'bindings/rust/src/slider_model.rs',
                  'bindings/go/cui/time_localized.go', 'bindings/go/cui/time_localized_ffi.h',
                  'bindings/go/cui/skeleton_presentation.go',

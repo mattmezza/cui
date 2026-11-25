@@ -511,7 +511,8 @@
         "docs/ICON.md",
         "docs/BRIDGE_ICON_RESOURCES.md",
         "docs/BRIDGE_ICON_PRESENTATION.md",
-        "docs/PYTHON_ICON_BADGE.md"
+        "docs/PYTHON_ICON_BADGE.md",
+        "docs/NODE_ICON_RESOURCES.md"
       ],
       "callback_symbols": [
         "cui_icon_loader_fn"

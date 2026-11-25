@@ -429,3 +429,78 @@ export function responsive_skeleton(key?: string, config?: SkeletonConfigInput):
 export interface App {
   supports_skeleton_presentation(): boolean;
 }
+
+/** Source values are copied into an app-owned Icon resource. */
+export type IconSourceValue =
+  | Readonly<{kind: 'empty'; text: ''}>
+  | Readonly<{kind: 'name' | 'path'; text: string}>
+  | Readonly<{kind: 'data'; text: string}>;
+export const IconSource: Readonly<{
+  empty(): IconSourceValue;
+  named(name: string): IconSourceValue;
+  path(path: string): IconSourceValue;
+  svg(svg: string | Uint8Array): IconSourceValue;
+}>;
+export const IconError: Readonly<{OK: 0; INVALID: 1; NOT_FOUND: 2; PARSE: 3; LIMIT: 4; ALLOCATION: 5}>;
+export type IconErrorValue = typeof IconError[keyof typeof IconError];
+export const IconAvailability: Readonly<{UNKNOWN: 0; CATALOG_NOT_EMBEDDED: 1; EMBEDDED: 2}>;
+export type IconAvailabilityValue = typeof IconAvailability[keyof typeof IconAvailability];
+export type IconTransform = readonly [number, number, number, number, number, number];
+export interface IconLimitsInput {
+  /** Zero selects the C default for the corresponding limit. */
+  maxSvgBytes?: number;
+  maxPixels?: number;
+  maxCacheBytes?: number;
+  maxVersions?: number;
+}
+export type IconLimits = Readonly<Required<IconLimitsInput>>;
+export interface IconResourceInfo {
+  readonly error: IconErrorValue;
+  readonly references: number;
+  readonly parseCount: bigint;
+  readonly rasterCount: bigint;
+  readonly cacheBytes: bigint;
+  readonly cacheVersions: bigint;
+  readonly sourceRevision: bigint;
+  readonly sourceKind: IconSourceValue['kind'];
+}
+export interface IconCatalogEntry {
+  readonly name: string;
+  readonly path: string;
+  readonly defaultEmbedded: boolean;
+}
+export interface IconBitmap {
+  readonly width: number;
+  readonly height: number;
+  readonly stride: number;
+  readonly revision: bigint;
+  readonly paint: Readonly<{x: number; y: number; width: number; height: number}>;
+  /** Packed straight RGBA8 in an independent copy. */
+  readonly rgba: Uint8Array;
+}
+export class IconResource {
+  private readonly resourceBrand: never;
+  constructor(app: App, source?: IconSourceValue, limits?: IconLimitsInput);
+  set_source(source: IconSourceValue): this;
+  source(): IconSourceValue;
+  info(): IconResourceInfo;
+  set_limits(limits: IconLimitsInput): this;
+  limits(): IconLimits;
+  put_asset(path: string, svg: string | Uint8Array): this;
+  remove_asset(path: string): this;
+  clear_assets(): this;
+  reload(): this;
+  collect(): this;
+  prepare(width: number, height: number, transform?: IconTransform): IconErrorValue;
+  bitmap(): IconBitmap;
+  close(): void;
+}
+export interface App {
+  supports_icon_resources(): boolean;
+  icon_resource(source?: IconSourceValue, limits?: IconLimitsInput): IconResource;
+  default_icon_limits(): IconLimits;
+  icon_catalog_count(): number;
+  icon_catalog_entry(index: number): IconCatalogEntry;
+  query_icon(name: string): IconAvailabilityValue;
+  copy_icon_asset(name: string): string | undefined;
+}

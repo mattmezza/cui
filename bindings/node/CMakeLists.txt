@@ -272,3 +272,41 @@ if(CUI_NODE_TSC_EXECUTABLE)
   --tsc ${CUI_NODE_TSC_EXECUTABLE} --node ${NODE_EXECUTABLE}
   --output ${CMAKE_CURRENT_BINARY_DIR}/skeleton-types)
 endif()
+
+add_test(NAME node_icon_resources COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} --test
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-resources.test.cjs)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_icon_bad_size SHARED test/icon-size-provider.c)
+ target_include_directories(cui_node_icon_bad_size PRIVATE ../../include)
+ target_compile_options(cui_node_icon_bad_size PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ add_test(NAME node_icon_resources_bad_size COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> LD_PRELOAD=$<TARGET_FILE:cui_node_icon_bad_size>
+  CUI_ICON_UNSUPPORTED=1 ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-resources.test.cjs)
+ set(CUI_NODE_ICON_ALPHA4_LIBRARY "" CACHE FILEPATH "Existing alpha.4 bridge with Icon resources")
+ if(CUI_NODE_ICON_ALPHA4_LIBRARY)
+  if(NOT EXISTS "${CUI_NODE_ICON_ALPHA4_LIBRARY}")
+   message(FATAL_ERROR "CUI_NODE_ICON_ALPHA4_LIBRARY must name an existing bridge library")
+  endif()
+  add_library(cui_node_icon_alpha4 MODULE addon.c)
+  target_include_directories(cui_node_icon_alpha4 PRIVATE ${NODE_API_INCLUDE_DIR} ../../include)
+  target_link_libraries(cui_node_icon_alpha4 PRIVATE "${CUI_NODE_ICON_ALPHA4_LIBRARY}" m ${CMAKE_DL_LIBS})
+  target_compile_options(cui_node_icon_alpha4 PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  set_target_properties(cui_node_icon_alpha4 PROPERTIES PREFIX "" SUFFIX ".node")
+  add_test(NAME node_icon_resources_alpha4 COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4>
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-resources.test.cjs)
+ endif()
+ if(TARGET cui_node_old_slider_bindings)
+  add_test(NAME node_icon_resources_old COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_old_slider_bindings> CUI_ICON_UNSUPPORTED=1
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-resources.test.cjs)
+ endif()
+endif()
+add_test(NAME node_icon_resources_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/icon-resource.cjs)
+if(CUI_NODE_TSC_EXECUTABLE)
+ add_test(NAME node_icon_resources_types COMMAND "${CUI_NODE_TSC_EXECUTABLE}" --noEmit --strict
+  --target ES2020 --module commonjs --skipLibCheck ${CMAKE_CURRENT_SOURCE_DIR}/test/icon-resources.types.ts)
+endif()

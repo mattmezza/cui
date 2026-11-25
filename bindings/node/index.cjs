@@ -360,6 +360,7 @@ function questionnaire(key,text=""){return new Node(78,text).key(key);}
 function dock(key,text=""){return new Node(79,text).key(key);}
 const sliderModels = require('./slider-model.cjs')(native, Node, NODE, keyFor);
 const localizedTimes = require('./time-field-localized.cjs')(native, Node, NODE, keyFor);
+const icons = require('./icon-resources.cjs')(native);
 const skeletons = require('./skeleton-presentation.cjs')(native, Node, NODE);
 class App {
   constructor(options = {}) {
@@ -537,6 +538,13 @@ class App {
     if(this.localizedTimeEnabled && !this.closed && !this.disposed)delivered+=localizedTimes.dispatch(this);
     return delivered;
   }
+  supports_icon_resources() { return icons.supports(this); }
+  icon_resource(source, limits) { return new icons.IconResource(this, source, limits); }
+  default_icon_limits() { return icons.defaultLimits(this); }
+  icon_catalog_count() { return icons.catalogCount(this); }
+  icon_catalog_entry(index) { return icons.catalogEntry(this, index); }
+  query_icon(name) { return icons.query(this, name); }
+  copy_icon_asset(name) { return icons.copyAsset(this, name); }
   supports_skeleton_presentation() { return skeletons.supports(this); }
   supports_localized_time_field(){return localizedTimes.supports(this);}
   enable_localized_time_fields(capacity=4096){return localizedTimes.enable(this,capacity);}
@@ -583,4 +591,4 @@ module.exports = {radio_item:item,ShadowPart,BoxShadow,ShadowStyle,ShadowKind,Sh
 
 Object.assign(module.exports, sliderModels.exports);
 
-Object.assign(module.exports, localizedTimes.exports, skeletons.exports);
+Object.assign(module.exports, localizedTimes.exports, skeletons.exports, icons.exports);

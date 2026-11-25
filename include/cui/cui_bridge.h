@@ -516,10 +516,26 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *, cui
 CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set_keyed(
     cui_bridge_app *, cui_bridge_node, const char *const *headers, uint32_t column_count,
     const char *const *cells, const uint32_t *row_keys, uint32_t row_count);
+/* Maximum per table, independent of available app-wide storage. A runtime
+ * loaded provider supports this extension when it exports both V1 functions. */
+CUI_BRIDGE_API uint32_t cui_bridge_data_table_max_row_capacity_v1(void);
+/* Same copying and interaction rules as set_keyed. Owner thread, between
+ * steps. Capacity must be nonzero and at least row_count. Pass NULL for
+ * cells and keys with zero rows. Allocates for submitted rows, and preserves
+ * the 16-column and 128-byte string limits. The provider row limit and the
+ * app-wide 32 MiB retained opt-in allocation budget return CAPACITY when
+ * exceeded. Allocation failure returns OUT_OF_MEMORY. Any failure preserves
+ * the old matrix, interaction state and unclaimed paging edge. A successful
+ * ordinary set/set_keyed replacement returns the table to capacity 32. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set_keyed_capacity_v1(
+    cui_bridge_app *, cui_bridge_node, const char *const *headers, uint32_t column_count,
+    const char *const *cells, const uint32_t *row_keys, uint32_t row_count,
+    uint32_t row_capacity);
 /* Retained near-end demand, copied after a successful step. The visible
  * window is [visible_begin, visible_end) in the supplied matrix, without
  * overscan. The last row key is zero for an empty matrix. A local key does
- * not describe a remote service cursor. The V1 record is 32 bytes. */
+ * not describe a remote service cursor. Capacity is the active matrix's
+ * row capacity. The V1 record is 32 bytes. */
 typedef struct {
     uint64_t frame;
     uint32_t row_count, visible_begin, visible_end, last_row_key, capacity, reserved;

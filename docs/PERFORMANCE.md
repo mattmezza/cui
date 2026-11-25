@@ -40,6 +40,48 @@ cmake --build build --target test_sdl_inbox_hover
 python scripts/test_local.py --build-dir build -- -R '^sdl_inbox_hover$' -V
 ```
 
+### Retained C DataTable snapshots
+
+The optional bridge setter owns a copy of every submitted cell and builds
+key indexes for the actual row count. Replace the snapshot when data changes
+and reuse it across frames. A requested capacity of 10,000 with zero rows
+allocates only the empty matrix and a minimal key index. The C bridge
+allows 10,000 rows per opted-in table and 32 MiB of retained allocation
+requests per app, including copied strings, metadata and Base indexes.
+Allocator overhead and caller-owned inputs are excluded.
+
+This fixture uses 128 ASCII bytes per cell, 2 or 16 columns, a 340×160
+logical pixel table, GCC 16.2.1 Release and one CPU on the Core Ultra 5
+235U. It measures mean CPU time for allocation, validation, copying,
+indexing and replacement, and separately measures a steady headless
+bridge step with no renderer. The allocation probe counts requested bytes
+and observes both matrices while replacing one. Semantic cell counts
+include overscan. The same source string is reused in the input fixture.
+
+| Setter | Rows × columns | Replace | Steady step | Retained | Peak | Semantic cells |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Ordinary keyed | 32 × 2 | 13.2 µs | 73.0 µs | 13,670 B | 27,340 B | 10 |
+| Capacity | 32 × 2 | 12.8 µs | 72.7 µs | 13,670 B | 27,340 B | 10 |
+| Capacity | 1,000 × 2 | 394.2 µs | 72.8 µs | 388,854 B | 777,708 B | 10 |
+| Capacity | 10,000 × 2 | 4.23 ms | 72.6 µs | 4,269,894 B | 8,539,788 B | 10 |
+| Ordinary keyed | 32 × 16 | 99.7 µs | 122.1 µs | 78,728 B | 157,456 B | 20 |
+| Capacity | 32 × 16 | 100.2 µs | 122.6 µs | 78,728 B | 157,456 B | 20 |
+| Capacity | 1,000 × 16 | 3.26 ms | 122.6 µs | 2,418,952 B | 4,837,904 B | 20 |
+| Capacity | 10,000 × 16 | 34.76 ms | 124.5 µs | 24,569,992 B | 49,139,984 B | 20 |
+
+The largest wide replacement took 34.76 ms on this host. For data that
+changes on every frame, consider the C11 [borrowed model](TABLE.md#virtual-datatable)
+and its row-anchor helpers. Use the bridge setter for bounded owned snapshots.
+This workload also sweeps allocator failures at every replacement allocation.
+The ordinary keyed and opt-in rows above use the same current bridge build.
+
+~~~sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCUI_BUILD_BRIDGE=ON
+cmake --build build --target test_bridge_data_table_capacity_allocations
+CUI_TEST_DATA_TABLE_BENCHMARK=1 python scripts/test_local.py --build-dir build \
+  -V -R '^bridge_data_table_capacity_allocations$'
+~~~
+
 ## Core hover with individually submitted rows
 
 `cui_bench_hover` submits every row into a 500×480 clipped box. It moves the

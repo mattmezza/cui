@@ -2,6 +2,7 @@
 #include "cui/cui_media.h"
 #include "cui/cui_message.h"
 #include "cui/cui_stepper_visual.h"
+#include "../base/cui_table_internal.h"
 #include "cui_bridge_internal.h"
 #include <math.h>
 #include <stddef.h>
@@ -139,7 +140,13 @@ static bridge_speech_owned *bridge_speech_create(cui_bridge_node_record *node) {
     }
     return speech;
 }
-enum { BRIDGE_DATA_TABLE_MAX_ROWS = 32 };
+enum {
+    BRIDGE_DATA_TABLE_LEGACY_ROWS = 32,
+    BRIDGE_DATA_TABLE_MAX_ROWS = 10000,
+    BRIDGE_DATA_TABLE_MAX_COLUMNS = 16,
+    BRIDGE_DATA_TABLE_MAX_TEXT = 128
+};
+static const size_t bridge_data_table_budget = (size_t)32 * 1024 * 1024;
 _Static_assert(sizeof(cui_bridge_data_table_load_more_v1) == 32 &&
                    offsetof(cui_bridge_data_table_load_more_v1, row_count) == 8 &&
                    offsetof(cui_bridge_data_table_load_more_v1, reserved) == 28,
@@ -147,11 +154,12 @@ _Static_assert(sizeof(cui_bridge_data_table_load_more_v1) == 32 &&
 struct bridge_data_table_owned {
     cui_table_model *model;
     cui_table_state state;
-    cui_table_row rows[BRIDGE_DATA_TABLE_MAX_ROWS];
-    cui_table_column columns[16];
-    char *headers[16];
-    char *cells[BRIDGE_DATA_TABLE_MAX_ROWS * 16];
-    uint32_t row_count, column_count;
+    cui_table_row *rows;
+    cui_table_column columns[BRIDGE_DATA_TABLE_MAX_COLUMNS];
+    cui_str *cells;
+    char *strings;
+    size_t charged_bytes;
+    uint32_t row_count, column_count, row_capacity;
     float viewport_width, viewport_height;
     cui_bridge_data_table_load_more_v1 load_more;
     bridge_data_table_owned *next_load_more;
@@ -172,14 +180,14 @@ static void bridge_data_table_finish_load_more(cui_bridge_app *app, cui_bridge_s
             bridge_data_table_clear_load_more(table);
     }
 }
-static void bridge_data_table_free(bridge_data_table_owned *table) {
+static void bridge_data_table_free(cui_bridge_app *app, bridge_data_table_owned *table) {
     if (!table)
         return;
+    app->data_table_capacity_bytes -= table->charged_bytes;
     cui_table_destroy(table->model);
-    for (size_t i = 0; i < 16; i++)
-        free(table->headers[i]);
-    for (size_t i = 0; i < BRIDGE_DATA_TABLE_MAX_ROWS * 16; i++)
-        free(table->cells[i]);
+    free(table->rows);
+    free(table->cells);
+    free(table->strings);
     free(table);
 }
 static void bridge_chart_free(bridge_chart_owned *chart) {
@@ -867,7 +875,7 @@ static void bridge_free_node_resources(cui_bridge_node_record *node) {
     free(node->resizable_state);
     bridge_text_view_free(node->text_view);
     bridge_chart_free(node->chart);
-    bridge_data_table_free(node->data_table);
+    bridge_data_table_free(node->owner, node->data_table);
     free(node->plot_samples);
     free(node->command_rows);
     free(node->command_entries);
@@ -1989,16 +1997,32 @@ cui_bridge_status cui_bridge_chart_get_datum(cui_bridge_app *app, cui_bridge_nod
     *value = node->chart->data[index].value;
     return CUI_BRIDGE_OK;
 }
-static cui_bridge_status bridge_data_table_copy(const char *source, char **destination) {
-    size_t length = 0;
-    if (!bridge_utf8(source, &length) || length > 128)
-        return CUI_BRIDGE_INVALID_ARGUMENT;
-    char *copy = malloc(length + 1);
-    if (!copy)
-        return CUI_BRIDGE_OUT_OF_MEMORY;
-    memcpy(copy, source, length + 1);
-    *destination = copy;
+static bool bridge_data_table_add_bytes(size_t *total, size_t bytes) {
+    if (bytes > SIZE_MAX - *total)
+        return false;
+    *total += bytes;
+    return true;
+}
+
+static cui_bridge_status bridge_data_table_measure(const char *const *strings, size_t count,
+                                                    size_t *bytes) {
+    for (size_t i = 0; i < count; i++) {
+        size_t length;
+        if (bridge_utf8_limit(strings[i], BRIDGE_DATA_TABLE_MAX_TEXT, &length) != CUI_BRIDGE_OK)
+            return CUI_BRIDGE_INVALID_ARGUMENT;
+        if (!bridge_data_table_add_bytes(bytes, length + 1))
+            return CUI_BRIDGE_CAPACITY;
+    }
     return CUI_BRIDGE_OK;
+}
+
+/* The complete input was validated above and is borrowed for this call. */
+static cui_str bridge_data_table_pack(char **cursor, const char *source) {
+    size_t length = strlen(source);
+    char *destination = *cursor;
+    memcpy(destination, source, length + 1);
+    *cursor += length + 1;
+    return (cui_str){destination, length};
 }
 static cui_table_options bridge_data_table_options(const cui_bridge_node_record *node) {
     cui_table_options options = cui_table_options_default();
@@ -2045,44 +2069,88 @@ static void bridge_data_table_restore(const cui_bridge_node_record *node,
     }
 }
 
-static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_node handle,
-                                               const char *const *headers, uint32_t column_count,
-                                               const char *const *cells, const uint32_t *row_keys,
-                                               uint32_t row_count, bool preserve) {
+typedef enum {
+    BRIDGE_DATA_TABLE_POSITIONAL,
+    BRIDGE_DATA_TABLE_KEYED,
+    BRIDGE_DATA_TABLE_KEYED_CAPACITY
+} bridge_data_table_mode;
+
+static cui_bridge_status bridge_data_table_set(
+    cui_bridge_app *app, cui_bridge_node handle, const char *const *headers, uint32_t column_count,
+    const char *const *cells, const uint32_t *row_keys, uint32_t row_count, uint32_t row_capacity,
+    bridge_data_table_mode mode) {
     cui_bridge_node_record *node;
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
         return status;
     if (node->kind != CUI_BRIDGE_DATA_TABLE)
         return CUI_BRIDGE_INVALID_STATE;
-    if (!column_count || column_count > 16 || row_count > BRIDGE_DATA_TABLE_MAX_ROWS || !headers ||
+    const bool preserve = mode != BRIDGE_DATA_TABLE_POSITIONAL;
+    const bool extended = mode == BRIDGE_DATA_TABLE_KEYED_CAPACITY;
+    if (!column_count || column_count > BRIDGE_DATA_TABLE_MAX_COLUMNS || !row_capacity ||
+        row_count > row_capacity || !headers ||
         (row_count && (!cells || (preserve && !row_keys))))
         return CUI_BRIDGE_INVALID_ARGUMENT;
+    if (row_capacity > BRIDGE_DATA_TABLE_MAX_ROWS)
+        return CUI_BRIDGE_CAPACITY;
+
+    const size_t rows = row_count;
+    const size_t columns = column_count;
+    if (rows > SIZE_MAX / sizeof(cui_table_row) || rows > SIZE_MAX / sizeof(cui_str) / columns)
+        return CUI_BRIDGE_CAPACITY;
+    const size_t cell_count = rows * columns;
+    size_t string_bytes = 0;
+    status = bridge_data_table_measure(headers, columns, &string_bytes);
+    if (status == CUI_BRIDGE_OK)
+        status = bridge_data_table_measure(cells, cell_count, &string_bytes);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+
+    bridge_data_table_owned *old = node->data_table;
+    const size_t model_capacity = extended ? (rows ? rows : 1) : BRIDGE_DATA_TABLE_LEGACY_ROWS;
+    size_t charge = 0;
+    if (extended) {
+        const size_t model_bytes = cui_table_model_allocation_size_internal(model_capacity);
+        const size_t other_tables = app->data_table_capacity_bytes - (old ? old->charged_bytes : 0);
+        charge = sizeof(bridge_data_table_owned);
+        if (!model_bytes || !bridge_data_table_add_bytes(&charge, model_bytes) ||
+            !bridge_data_table_add_bytes(&charge, rows * sizeof(cui_table_row)) ||
+            !bridge_data_table_add_bytes(&charge, cell_count * sizeof(cui_str)) ||
+            !bridge_data_table_add_bytes(&charge, string_bytes) ||
+            charge > bridge_data_table_budget - other_tables)
+            return CUI_BRIDGE_CAPACITY;
+    }
+
     bridge_data_table_owned *next = calloc(1, sizeof *next);
     if (!next)
         return CUI_BRIDGE_OUT_OF_MEMORY;
+    next->strings = malloc(string_bytes);
+    if (rows) {
+        next->rows = malloc(rows * sizeof *next->rows);
+        next->cells = malloc(cell_count * sizeof *next->cells);
+    }
+    if (!next->strings || (rows && (!next->rows || !next->cells))) {
+        status = CUI_BRIDGE_OUT_OF_MEMORY;
+        goto fail;
+    }
+
     next->row_count = row_count;
     next->column_count = column_count;
+    next->row_capacity = row_capacity;
+    char *cursor = next->strings;
     for (uint32_t c = 0; c < column_count; c++) {
-        status = bridge_data_table_copy(headers[c], &next->headers[c]);
-        if (status != CUI_BRIDGE_OK)
-            goto fail;
-        next->columns[c] = cui_table_column_default(c + 1, cui_string(next->headers[c]));
+        cui_str header = bridge_data_table_pack(&cursor, headers[c]);
+        next->columns[c] = cui_table_column_default(c + 1, header);
         next->columns[c].sortable = true;
         next->columns[c].resizable = false;
         next->columns[c].movable = false;
     }
-    for (uint32_t r = 0; r < row_count; r++) {
-        for (uint32_t c = 0; c < column_count; c++) {
-            uint32_t index = r * column_count + c;
-            status = bridge_data_table_copy(cells[index], &next->cells[index]);
-            if (status != CUI_BRIDGE_OK)
-                goto fail;
-        }
+    for (size_t i = 0; i < cell_count; i++)
+        next->cells[i] = bridge_data_table_pack(&cursor, cells[i]);
+    for (uint32_t r = 0; r < row_count; r++)
         next->rows[r] = (cui_table_row){.key = row_keys ? row_keys[r] : r + 1,
-                                        .label = cui_string(next->cells[r * column_count])};
-    }
-    next->model = cui_table_create(BRIDGE_DATA_TABLE_MAX_ROWS);
+                                        .label = next->cells[r * columns]};
+    next->model = cui_table_create(model_capacity);
     if (!next->model) {
         status = CUI_BRIDGE_OUT_OF_MEMORY;
         goto fail;
@@ -2095,25 +2163,28 @@ static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_n
                      : CUI_BRIDGE_CORE_ERROR;
         goto fail;
     }
-    if (node->data_table) {
-        next->load_more_enabled = node->data_table->load_more_enabled;
-        next->load_more_threshold = node->data_table->load_more_threshold;
+    if (old) {
+        next->load_more_enabled = old->load_more_enabled;
+        next->load_more_threshold = old->load_more_threshold;
         if (preserve)
             bridge_data_table_restore(node, next);
     }
-    bridge_data_table_free(node->data_table);
+    bridge_data_table_free(app, old);
+    next->charged_bytes = charge;
+    app->data_table_capacity_bytes += charge;
     node->data_table = next;
     node->value = (double)next->state.row;
     node->checked = (uint32_t)next->state.column;
     return CUI_BRIDGE_OK;
 fail:
-    bridge_data_table_free(next);
+    bridge_data_table_free(app, next);
     return status;
 }
 cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *app, cui_bridge_node handle,
                                             const char *const *headers, uint32_t column_count,
                                             const char *const *cells, uint32_t row_count) {
-    return bridge_data_table_set(app, handle, headers, column_count, cells, NULL, row_count, false);
+    return bridge_data_table_set(app, handle, headers, column_count, cells, NULL, row_count,
+                                 BRIDGE_DATA_TABLE_LEGACY_ROWS, BRIDGE_DATA_TABLE_POSITIONAL);
 }
 
 cui_bridge_status cui_bridge_data_table_set_keyed(cui_bridge_app *app, cui_bridge_node handle,
@@ -2121,7 +2192,18 @@ cui_bridge_status cui_bridge_data_table_set_keyed(cui_bridge_app *app, cui_bridg
                                                   const char *const *cells,
                                                   const uint32_t *row_keys, uint32_t row_count) {
     return bridge_data_table_set(app, handle, headers, column_count, cells, row_keys, row_count,
-                                 true);
+                                 BRIDGE_DATA_TABLE_LEGACY_ROWS, BRIDGE_DATA_TABLE_KEYED);
+}
+
+uint32_t cui_bridge_data_table_max_row_capacity_v1(void) {
+    return BRIDGE_DATA_TABLE_MAX_ROWS;
+}
+
+cui_bridge_status cui_bridge_data_table_set_keyed_capacity_v1(
+    cui_bridge_app *app, cui_bridge_node handle, const char *const *headers, uint32_t column_count,
+    const char *const *cells, const uint32_t *row_keys, uint32_t row_count, uint32_t row_capacity) {
+    return bridge_data_table_set(app, handle, headers, column_count, cells, row_keys, row_count,
+                                 row_capacity, BRIDGE_DATA_TABLE_KEYED_CAPACITY);
 }
 
 uint32_t cui_bridge_data_table_load_more_size_v1(void) {
@@ -2132,7 +2214,7 @@ cui_bridge_status cui_bridge_data_table_configure_load_more_v1(cui_bridge_app *a
                                                                cui_bridge_node handle,
                                                                uint32_t enabled,
                                                                uint32_t threshold) {
-    if (enabled > 1 || threshold > BRIDGE_DATA_TABLE_MAX_ROWS)
+    if (enabled > 1 || threshold > BRIDGE_DATA_TABLE_LEGACY_ROWS)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     cui_bridge_node_record *node;
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
@@ -2179,12 +2261,12 @@ cui_bridge_status cui_bridge_data_table_get_cell(cui_bridge_app *app, cui_bridge
     bridge_data_table_owned *table = node->data_table;
     if (!table || row >= table->row_count || column >= table->column_count || !required_capacity)
         return CUI_BRIDGE_INVALID_ARGUMENT;
-    const char *source = table->cells[row * table->column_count + column];
-    size_t required = strlen(source) + 1;
+    cui_str source = table->cells[(size_t)row * table->column_count + column];
+    size_t required = source.length + 1;
     *required_capacity = (uint32_t)required;
     if (!destination || capacity < required)
         return CUI_BRIDGE_CAPACITY;
-    memcpy(destination, source, required);
+    memcpy(destination, source.data, required);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_data_table_get_state(cui_bridge_app *app, cui_bridge_node handle,
@@ -4306,7 +4388,7 @@ static cui_str bridge_data_table_label(void *user, size_t row, cui_id column) {
     bridge_data_table_owned *table = user;
     if (row >= table->row_count || !column || column > table->column_count)
         return cui_string("");
-    return cui_string(table->cells[row * table->column_count + (size_t)column - 1]);
+    return table->cells[row * table->column_count + (size_t)column - 1];
 }
 static void bridge_render_data_table(cui_bridge_app *app, uint32_t slot,
                                      cui_bridge_node_record *node) {
@@ -4319,7 +4401,7 @@ static void bridge_render_data_table(cui_bridge_app *app, uint32_t slot,
     uint64_t frame = table->load_more_enabled ? cui_frame_sequence(app->ui) : 0;
     if (options.disabled)
         bridge_data_table_clear_load_more(table);
-    options.load_more = frame && !options.disabled && table->row_count < BRIDGE_DATA_TABLE_MAX_ROWS;
+    options.load_more = frame && !options.disabled && table->row_count < table->row_capacity;
     options.load_more_threshold = table->load_more_threshold;
     cui_table_result result =
         cui_data_table(app->ui, node->id, &app->theme, table->model, &table->state, options,
@@ -4331,7 +4413,7 @@ static void bridge_render_data_table(cui_bridge_app *app, uint32_t slot,
             .visible_begin = (uint32_t)result.rows.begin,
             .visible_end = (uint32_t)result.rows.end,
             .last_row_key = table->row_count ? (uint32_t)table->rows[table->row_count - 1].key : 0,
-            .capacity = BRIDGE_DATA_TABLE_MAX_ROWS,
+            .capacity = table->row_capacity,
         };
         if (!table->load_more_staged) {
             table->load_more_staged = true;

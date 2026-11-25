@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_table.h"
 #include "cui/cui_table_events.h"
+#include "cui_table_internal.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,16 +54,32 @@ cui_id cui_table_trailing_id(cui_id id, bool header, cui_id row) {
     return id ^ mix(row + UINT64_C(0x3c6ef372fe94f82b)) ^
            (header ? UINT64_C(0xa54ff53a5f1d36f1) : UINT64_C(0x510e527fade682d1));
 }
+static size_t cui_table_model_slots(size_t capacity) {
+    const size_t slot_bytes = 2 * (sizeof(cui_id) + sizeof(size_t));
+    const size_t max_slots = (SIZE_MAX - sizeof(cui_table_model)) / slot_bytes;
+    if (!capacity || capacity > 1000000 || capacity > max_slots / 2)
+        return 0;
+    size_t slots = 1;
+    while (slots < capacity * 2) {
+        if (slots > max_slots / 2)
+            return 0;
+        slots *= 2;
+    }
+    return slots;
+}
+size_t cui_table_model_allocation_size_internal(size_t capacity) {
+    size_t slots = cui_table_model_slots(capacity);
+    return slots ? sizeof(cui_table_model) + slots * 2 * (sizeof(cui_id) + sizeof(size_t)) : 0;
+}
 cui_table_model *cui_table_create(size_t capacity) {
-    if (!capacity || capacity > 1000000)
+    size_t slots = cui_table_model_slots(capacity);
+    if (!slots)
         return NULL;
     cui_table_model *m = calloc(1, sizeof(*m));
     if (!m)
         return NULL;
     m->capacity = capacity;
-    m->slots = 1;
-    while (m->slots < capacity * 2)
-        m->slots *= 2;
+    m->slots = slots;
     for (size_t b = 0; b < 2; b++) {
         m->keys[b] = calloc(m->slots, sizeof(cui_id));
         m->indices[b] = calloc(m->slots, sizeof(size_t));

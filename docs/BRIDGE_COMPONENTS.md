@@ -75,7 +75,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Editor | `cui_editor` | Owned multiline UTF-8 model, native line-numbered editing, copied text CHANGE, language label and disabled state | 4096 UTF-8 bytes and 512 layout lines; no host syntax-highlighting, completion, search, or clipboard callbacks |
 | Chart | `cui_chart` | Copied up to 64 labeled numeric data points, native line/area/bar/pie raster and hover, data readback, disabled | Up to 512×512 pixels; one series, default native tooltip; no custom callbacks, candle, radar, or Sankey |
 | Table | `cui_table_begin_ex`, checked row/cell APIs | Item rows and nested Item cells with copied text, native table semantics and layout; first row is header | Up to 64 rows/64 cells per row; fixed equal column widths, text-only cells; no sort, selection, or virtualization |
-| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots, optional near-end polling in C, Python, JavaScript, TypeScript, Go and Rust | 32 rows × 16 columns, 128 UTF-8 bytes per cell, row selection by default, caller-owned sorting and page delivery, no custom cell content |
+| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots and optional near-end polling | Up to 32 rows in the language builders or 10,000 via the opt-in C setter, 16 columns and 128 UTF-8 bytes per header or cell, caller-owned sorting and page delivery |
 | Plot | `cui_plot_dots` | Copied up to 256 Cartesian (x,y) samples, native themed point rendering, point readback | Dot plot only; coordinates within ±16384, no path, axis, zoom, or point hit model |
 | Command | `cui_command` | Up to 64 Item actions, owned UTF-8 query editor, native keyword filtering, keyboard/pointer selection, copied query/selection CHANGE and Item confirm CLICK | Flat palette; Item detail is one keyword string, no grouped headings, custom row content, or host action callback |
 | VirtualList | `cui_virtual_list_draw` | Up to 64 keyed Item rows, native overscanned vertical viewport, wheel/keyboard scroll, copied offset CHANGE, visible Item bounds, disabled | Fixed 32px rows, vertical only; no intrinsic row sizing or host data provider |
@@ -138,7 +138,8 @@ cui_bridge_status update_inbox(cui_bridge_app *app, cui_bridge_node table,
 
 Pass a flat row-major array of two strings per row to the example and one
 key per row. For an empty table, pass zero rows with NULL cells and keys.
-The limits are 32 rows, 16 columns and 128 UTF-8 bytes per header or cell.
+The ordinary setter accepts up to 32 rows, 16 columns and 128 UTF-8 bytes per
+header or cell.
 Invalid keys, invalid data or allocation failure preserve the previous table.
 
 A successful replacement keeps the first visible row at its previous offset
@@ -158,6 +159,46 @@ keys. Keyed updates are available in the
 and [Rust](RUST_BUILDERS.md#keep-the-visible-datatable-row-during-a-rust-update)
 builders.
 
+### Retain more than 32 DataTable rows in C
+
+Query `cui_bridge_data_table_max_row_capacity_v1()` and choose a nonzero
+row capacity at least as large as the submitted row count. Pass the capacity
+along with each row-major snapshot to
+`cui_bridge_data_table_set_keyed_capacity_v1`. Both V1 symbols must be available
+when loading the bridge dynamically. The C provider supports capacities up to
+10,000 rows. The five language builders currently expose the 32-row setters.
+
+The setter copies headers and cells of up to 128 UTF-8 bytes each, with up to
+16 columns. Pass zero rows and NULL cells and keys for an empty table. The
+bridge allocates for the submitted rows even when capacity is much larger.
+Call on the owner thread between steps, just as with the ordinary keyed setter.
+
+The app shares a 32 MiB budget across opted-in matrices. This covers CUI's
+allocation requests for owned matrix metadata, row and cell views, copied
+UTF-8 with terminators, and Base indexes. Allocator overhead, application input
+arrays and ordinary 32-row matrices sit outside that budget. While staging a
+replacement the old allocation stays live. The opted-in allocations can
+therefore briefly total up to 64 MiB. Replacing a table credits its old charge
+when checking the retained budget. Removing a table, switching to an ordinary
+setter, or destroying the app releases its charge.
+
+An invalid count, key or string returns `CUI_BRIDGE_INVALID_ARGUMENT`. A
+request beyond the provider's maximum or available app budget returns
+`CUI_BRIDGE_CAPACITY`. An allocator failure returns `CUI_BRIDGE_OUT_OF_MEMORY`.
+Each failure leaves the old matrix, selection, scroll anchor, sort and paging
+edge intact. A successful keyed update preserves the surviving selections and
+the viewport under the ordinary keyed rules, and clears stale paging demand.
+
+Run `bridge_data_table_paging_example --larger` for an offline inbox that
+grows from 8 to 40 rows and keeps its selection and position. The command
+below runs that scenario through the private-display test wrapper.
+
+~~~sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
+cmake --build build --target bridge_data_table_paging_example
+python scripts/test_local.py --build-dir build -R '^bridge_data_table_capacity_example$'
+~~~
+
 ### Load another DataTable page
 
 Bind the initial rows, or an empty matrix with column headers, then call
@@ -170,7 +211,7 @@ with a `cui_bridge_data_table_load_more_v1` output and its exact size.
 `CUI_BRIDGE_OK` yields one copied record. `CUI_BRIDGE_EMPTY` means there
 is no request to claim. Neither polling nor replacing rows dispatches an
 event. Drain the regular event queue separately. The frame number,
-row count, visible index range, last row key, and bridge capacity describe
+row count, visible index range, last row key, and active row capacity describe
 the table when it raised the edge.
 
 Keep one in-flight request per data source. Use your own generation and
@@ -185,8 +226,8 @@ How to stop network I/O belongs to the transport.
 A successful replacement clears any unclaimed edge and keeps the policy.
 Changing the policy or disabling the table also clears the edge. Removing
 the table retires its handle. A failed step discards edges first raised in
-that step. A full 32-row table cannot request another page. The application
-owns page delivery.
+that step. Demand stops at the active capacity. The application owns page
+delivery.
 [Python paging example](BINDING_BUILDERS.md#page-a-python-datatable) ·
 [JavaScript and TypeScript paging examples](BINDING_BUILDERS.md#page-a-javascript-or-typescript-datatable) ·
 [Go paging example](GO_BUILDERS.md#page-a-go-datatable) ·

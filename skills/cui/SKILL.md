@@ -361,6 +361,10 @@ of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
 table options, including the effective scrollbar style. Selection stays keyed.
 See the **Live updates** gallery example and `docs/TABLE.md`. The retained C
 bridge offers `cui_bridge_data_table_set_keyed` for copied matrices up to 32 rows.
+For larger C matrices, query `cui_bridge_data_table_max_row_capacity_v1` and
+use `cui_bridge_data_table_set_keyed_capacity_v1` with an explicit row capacity.
+The current provider supports up to 10,000 rows within an app-wide 32 MiB
+retained budget. Language builders use the 32-row setters.
 See `docs/BRIDGE_COMPONENTS.md`. In Python, use `table_data(headers, rows,
 row_keys=keys)` after checking `app.supports_keyed_data_table()`. The runnable
 inbox in `bindings/bridge/examples/data_table_live.py` defaults to headless.

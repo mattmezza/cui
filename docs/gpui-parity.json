@@ -7323,7 +7323,7 @@
             "docs/TABLE.md"
           ],
           "limitations": [
-            "Opt-in C helpers preserve a row key and pixel offset. Retained bindings expose keyed replacement within a 32-row cap. Automatic remote updates remain open."
+            "Opt-in C helpers preserve a row key and pixel offset. Retained language builders expose keyed replacement within a 32-row cap. Automatic remote updates remain open."
           ]
         },
         {
@@ -7390,7 +7390,21 @@
             "docs/BRIDGE_COMPONENTS.md"
           ],
           "limitations": [
-            "Opt-in C polling copies one coalesced near-end snapshot per retained table, independently of the legacy event queue. The bridge is capped at 32 rows. The application owns remote transport."
+            "Opt-in C polling copies one coalesced near-end snapshot per retained table, independently of the legacy event queue. The capacity is 32 for ordinary setters and configurable through the opt-in C setter. The application owns remote transport."
+          ]
+        },
+        {
+          "name": "bounded retained C DataTable capacity beyond 32 rows",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_bridge.h",
+            "bindings/bridge/tests/test_bridge_data_table_capacity.c",
+            "bindings/bridge/examples/data_table_paging.c",
+            "docs/BRIDGE_COMPONENTS.md",
+            "docs/PERFORMANCE.md"
+          ],
+          "limitations": [
+            "Opt-in copied C matrices support up to 10,000 rows, subject to an app-wide 32 MiB retained budget. Python, JavaScript, TypeScript, Go and Rust authoring remains limited to 32 rows."
           ]
         },
         {
@@ -7442,7 +7456,7 @@
             "docs/RUST_BUILDERS.md"
           ],
           "limitations": [
-            "Bundled and shared providers return copied demand. The native inbox polls from the existing after-frame hook, and the application owns requests. The retained bridge has a 32-row cap."
+            "Bundled and shared providers return copied demand. The native inbox polls from the existing after-frame hook, and the application owns requests. Rust authoring uses the 32-row setter."
           ]
         },
         {

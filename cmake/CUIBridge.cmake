@@ -54,10 +54,28 @@ add_executable(test_bridge_components ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/t
 target_link_libraries(test_bridge_components PRIVATE cui_bridge)
 cui_warnings(test_bridge_components)
 add_test(NAME bridge_components COMMAND test_bridge_components)
+add_executable(test_bridge_data_table_capacity
+ ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_data_table_capacity.c)
+target_link_libraries(test_bridge_data_table_capacity PRIVATE cui_bridge)
+cui_warnings(test_bridge_data_table_capacity)
+add_test(NAME bridge_data_table_capacity COMMAND test_bridge_data_table_capacity)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+ add_executable(test_bridge_data_table_capacity_allocations
+  ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/test_bridge_data_table_capacity.c)
+ target_compile_definitions(test_bridge_data_table_capacity_allocations
+  PRIVATE CUI_TEST_DATA_TABLE_ALLOCATIONS=1)
+ target_link_libraries(test_bridge_data_table_capacity_allocations PRIVATE cui)
+ target_link_options(test_bridge_data_table_capacity_allocations PRIVATE
+  LINKER:--wrap=malloc LINKER:--wrap=calloc LINKER:--wrap=free)
+ cui_warnings(test_bridge_data_table_capacity_allocations)
+ add_test(NAME bridge_data_table_capacity_allocations
+  COMMAND test_bridge_data_table_capacity_allocations)
+endif()
 add_executable(bridge_data_table_paging_example ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_paging.c)
 target_link_libraries(bridge_data_table_paging_example PRIVATE cui_bridge)
 cui_warnings(bridge_data_table_paging_example)
 add_test(NAME bridge_data_table_paging_example COMMAND bridge_data_table_paging_example)
+add_test(NAME bridge_data_table_capacity_example COMMAND bridge_data_table_paging_example --larger)
 add_test(NAME bridge_python
  COMMAND ${CMAKE_COMMAND} -E env
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python

@@ -3,6 +3,7 @@
 #include "cui/cui_bridge.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     uint64_t generation, frame;
@@ -12,6 +13,7 @@ typedef struct {
     cui_bridge_app *app;
     cui_bridge_node table, status;
     uint64_t generation, pending_frame;
+    uint32_t capacity;
 } inbox;
 
 static const char *headers[] = {"Subject"};
@@ -20,6 +22,28 @@ static const char *messages[] = {"Release notes",    "Build report",  "Design re
                                  "Workspace update", "Agenda",        "New project",
                                  "Bug report",       "Meeting notes", "Next steps"};
 static const uint32_t keys[] = {101, 102, 103, 104, 105, 106, 107, 108, 301, 302, 303, 304};
+
+static cui_bridge_status replace_messages(const inbox *owner, uint32_t count) {
+    if (!owner->capacity)
+        return cui_bridge_data_table_set_keyed(owner->app, owner->table, headers, 1, messages,
+                                                keys, count);
+
+    const char *rows[40];
+    uint32_t row_keys[40];
+    char more[28][24];
+    for (uint32_t i = 0; i < count; i++) {
+        if (i < 12) {
+            rows[i] = messages[i];
+            row_keys[i] = keys[i];
+        } else {
+            snprintf(more[i - 12], sizeof more[0], "Inbox message %u", (unsigned)(i + 1));
+            rows[i] = more[i - 12];
+            row_keys[i] = i + 500;
+        }
+    }
+    return cui_bridge_data_table_set_keyed_capacity_v1(owner->app, owner->table, headers, 1, rows,
+                                                        row_keys, count, owner->capacity);
+}
 
 static cui_bridge_status start_page(inbox *owner, page_ticket *ticket) {
     if (owner->pending_frame)
@@ -42,13 +66,14 @@ static cui_bridge_status receive_page(inbox *owner, page_ticket ticket) {
         ticket.frame != owner->pending_frame)
         return CUI_BRIDGE_EMPTY;
     /* A production host supplies the newly combined snapshot here. */
-    cui_bridge_status status =
-        cui_bridge_data_table_set_keyed(owner->app, owner->table, headers, 1, messages, keys, 12);
+    cui_bridge_status status = replace_messages(owner, owner->capacity ? 40 : 12);
     if (status != CUI_BRIDGE_OK)
         return status;
     owner->pending_frame = 0;
     /* The data source says this is the final page. Leave paging off. */
-    return cui_bridge_set_text(owner->app, owner->status, "12 messages. End of inbox.");
+    return cui_bridge_set_text(owner->app, owner->status, owner->capacity
+                                   ? "40 messages. End of inbox."
+                                   : "12 messages. End of inbox.");
 }
 
 static cui_bridge_status retry_page(inbox *owner) {
@@ -66,7 +91,16 @@ static cui_bridge_status retry_page(inbox *owner) {
         }                                                                                          \
     } while (0)
 
-int main(void) {
+int main(int argc, char **argv) {
+    uint32_t capacity = 0;
+    if (argc == 2 && strcmp(argv[1], "--larger") == 0) {
+        capacity = cui_bridge_data_table_max_row_capacity_v1();
+        if (capacity < 40)
+            return EXIT_FAILURE;
+    } else if (argc != 1) {
+        fprintf(stderr, "Usage: %s [--larger]\n", argv[0]);
+        return EXIT_FAILURE;
+    }
     cui_bridge_options options = {.struct_size = sizeof options,
                                   .abi_version = CUI_BRIDGE_ABI_VERSION,
                                   .backend = CUI_BRIDGE_BACKEND_NONE,
@@ -75,7 +109,7 @@ int main(void) {
     cui_bridge_status status;
     cui_bridge_app *app = cui_bridge_create(&options, &status);
     CHECK(app && status == CUI_BRIDGE_OK);
-    inbox owner = {.app = app, .generation = 1};
+    inbox owner = {.app = app, .generation = 1, .capacity = capacity};
     cui_bridge_node root = {0};
     CHECK(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "inbox", &root) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_node_create(app, root, CUI_BRIDGE_DATA_TABLE, "messages", &owner.table) ==
@@ -84,8 +118,7 @@ int main(void) {
           CUI_BRIDGE_OK);
     CHECK(cui_bridge_set_text(app, owner.status, "8 messages") == CUI_BRIDGE_OK);
     CHECK(cui_bridge_set_visual_size(app, owner.table, 360, 160) == CUI_BRIDGE_OK);
-    CHECK(cui_bridge_data_table_set_keyed(app, owner.table, headers, 1, messages, keys, 8) ==
-          CUI_BRIDGE_OK);
+    CHECK(replace_messages(&owner, 8) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_data_table_configure_load_more_v1(app, owner.table, 1, 0) == CUI_BRIDGE_OK);
     CHECK(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
     page_ticket original, fresh;
@@ -115,6 +148,13 @@ int main(void) {
     CHECK(cui_bridge_data_table_get_state(app, owner.table, &row, &column, &sort_column,
                                           &direction) == CUI_BRIDGE_OK);
     CHECK(row == keys[6]);
+    if (capacity) {
+        char copied[24];
+        uint32_t required;
+        CHECK(cui_bridge_data_table_get_cell(app, owner.table, 39, 0, copied, sizeof copied,
+                                             &required) == CUI_BRIDGE_OK);
+        CHECK(strcmp(copied, "Inbox message 40") == 0);
+    }
     CHECK(cui_bridge_data_table_cell_bounds(app, owner.table, 6, 0, &after) == CUI_BRIDGE_OK);
     CHECK(after.y == selected.y);
     CHECK(cui_bridge_queue_scroll(app, x, y, 0, -20) == CUI_BRIDGE_OK);

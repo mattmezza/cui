@@ -1108,6 +1108,122 @@ static void test_data_table(void) {
                                            &sort_direction) == CUI_BRIDGE_STALE_HANDLE);
     cui_bridge_destroy(app);
 }
+static void test_data_table_keyed_rebind(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .width = 640,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, table = {0};
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_DATA_TABLE, "inbox", &table) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, table, 320, 160) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_set_selection_mode(app, table, 2) == CUI_BRIDGE_OK);
+
+    const char *headers[] = {"Subject", "Sender"};
+    const char *cells[] = {"New",   "A", "Build",  "B", "Report",  "C", "Plan",   "D", "Notes", "E",
+                           "Issue", "F", "Status", "G", "Release", "H", "Update", "I"};
+    uint32_t keys[] = {9, 11, 22, UINT32_MAX, 44, 55, 66, 77, 88};
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, cells + 2, keys + 1, 8) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+
+    cui_bridge_rect header, first, scrolled, selected;
+    assert(cui_bridge_data_table_header_bounds(app, table, 1, &header) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 1, 0, &first) == CUI_BRIDGE_OK);
+    float x = header.x + header.width * .5f, y = header.y + header.height * .5f;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_scroll(app, first.x + 10, first.y + 10, 0, -1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 1, 0, &scrolled) == CUI_BRIDGE_OK);
+    assert(scrolled.y == first.y - 48 && scrolled.y < header.y + header.height);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 2, 1, &selected) == CUI_BRIDGE_OK);
+    x = selected.x + selected.width * .5f;
+    y = selected.y + selected.height * .5f;
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_DOWN, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_pointer(app, CUI_BRIDGE_POINTER_UP, x, y) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_event_ex event;
+    char payload[128];
+    uint32_t required, row, column, sort_column, sort_direction;
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK);
+    assert(strstr(payload, "\"reason\":\"sort\""));
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_OK);
+    assert(event.value == (double)UINT32_MAX && strstr(payload, "\"row\":4294967295"));
+
+    uint32_t duplicate[] = {44, 44}, zero[] = {0};
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, cells, duplicate, 2) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, cells, zero, 1) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, cells, NULL, 1) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == UINT32_MAX && column == 2 && sort_column == 2 && sort_direction == 1);
+
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, cells, keys, 9) ==
+           CUI_BRIDGE_OK);
+    keys[3] = 99;
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == UINT32_MAX && column == 2 && sort_column == 2 && sort_direction == 1);
+    cui_bridge_rect moved;
+    assert(cui_bridge_data_table_cell_bounds(app, table, 2, 0, &moved) == CUI_BRIDGE_OK);
+    assert(moved.y == scrolled.y);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 3, 1, &moved) == CUI_BRIDGE_OK);
+    assert(moved.y == selected.y);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_EMPTY);
+
+    assert(cui_bridge_queue_key(app, CUI_BRIDGE_KEY_DOWN, CUI_BRIDGE_KEY_DOWN_ARROW, 0, 0) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == 44 && column == 2);
+    cui_bridge_notification_v1 notice;
+    assert(cui_bridge_poll_notification_v1(app, sizeof notice, &notice, payload, sizeof payload,
+                                           &required) == CUI_BRIDGE_OK);
+    assert(notice.payload_kind == CUI_BRIDGE_PAYLOAD_TABLE &&
+           notice.payload.table.reason == CUI_BRIDGE_TABLE_SELECTION &&
+           notice.payload.table.row == 44 && notice.payload.table.column == 2);
+    assert(notice.legacy.value == 44 && strstr(payload, "\"row\":44"));
+
+    const uint32_t replacement[] = {9, 11, 33, UINT32_MAX, 45, 55, 66, 77, 88};
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, cells, replacement, 9) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 2, 0, &moved) == CUI_BRIDGE_OK);
+    assert(moved.y == scrolled.y);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == 0 && column == 0 && sort_column == 2 && sort_direction == 1);
+    assert(cui_bridge_poll_event_ex(app, &event, payload, sizeof payload, &required) ==
+           CUI_BRIDGE_EMPTY);
+
+    assert(cui_bridge_data_table_set(app, table, headers, 2, cells, 9) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_get_state(app, table, &row, &column, &sort_column,
+                                           &sort_direction) == CUI_BRIDGE_OK);
+    assert(row == 0 && column == 0 && sort_column == 0 && sort_direction == 0);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 1, 0, &moved) == CUI_BRIDGE_OK);
+    assert(moved.y == first.y);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 2, NULL, NULL, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_cell_bounds(app, table, 0, 0, &moved) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    cui_bridge_destroy(app);
+}
 static void test_plot(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -1903,6 +2019,7 @@ int main(void) {
     test_chart();
     test_table();
     test_data_table();
+    test_data_table_keyed_rebind();
     test_plot();
     test_command();
     test_virtual_list();

@@ -505,6 +505,17 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *, cui
                                                            uint32_t column_count,
                                                            const char *const *cells,
                                                            uint32_t row_count);
+/* Transactionally copies headers, cells and distinct nonzero row keys. The
+ * existing limits of 16 columns, 32 rows and 128 bytes per string apply.
+ * Preserves vertical position by key and within-row offset (old index if
+ * removed), clamped to the new viewport. Surviving selection, keyboard cursor
+ * and sort column retain their identities. A replacement emits no event.
+ * get_state and change events report the selected row key (zero if none).
+ * Cell access and bounds still use zero-based indices in the supplied data.
+ * The legacy setter keeps assigning keys 1..row_count and resetting state. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set_keyed(
+    cui_bridge_app *, cui_bridge_node, const char *const *headers, uint32_t column_count,
+    const char *const *cells, const uint32_t *row_keys, uint32_t row_count);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_get_cell(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t row, uint32_t column,
                                                                 char *destination,

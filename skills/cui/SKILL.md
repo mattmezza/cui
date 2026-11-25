@@ -359,8 +359,9 @@ For live DataTable updates in C, capture with `cui_table_capture_row_anchor`
 before changing the borrowed rows. After a successful bind, assign the result
 of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
 table options, including the effective scrollbar style. Selection stays keyed.
-See the **Live updates** gallery example and `docs/TABLE.md`. Foreign builders
-lack the C row-anchor helpers.
+See the **Live updates** gallery example and `docs/TABLE.md`. The retained C
+bridge offers `cui_bridge_data_table_set_keyed` for copied matrices up to 32 rows.
+See `docs/BRIDGE_COMPONENTS.md`. Foreign builders still use the legacy setter.
 For paging, use `result.load_more` with an app-owned in-flight flag and keep
 the current rows interactive. See **Paged inbox** and the paging guide in
 `docs/TABLE.md`.

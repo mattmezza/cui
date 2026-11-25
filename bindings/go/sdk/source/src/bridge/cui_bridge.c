@@ -147,6 +147,7 @@ struct bridge_data_table_owned {
     char *headers[16];
     char *cells[512];
     uint32_t row_count, column_count;
+    float viewport_width, viewport_height;
 };
 static void bridge_data_table_free(bridge_data_table_owned *table) {
     if (!table)
@@ -1976,16 +1977,63 @@ static cui_bridge_status bridge_data_table_copy(const char *source, char **desti
     *destination = copy;
     return CUI_BRIDGE_OK;
 }
-cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *app, cui_bridge_node handle,
-                                            const char *const *headers, uint32_t column_count,
-                                            const char *const *cells, uint32_t row_count) {
+static cui_table_options bridge_data_table_options(const cui_bridge_node_record *node) {
+    cui_table_options options = cui_table_options_default();
+    options.width = node->visual_width > 0 ? node->visual_width : 480;
+    options.height = node->visual_height > 0 ? node->visual_height : 240;
+    options.row_height = 32;
+    options.header_height = 32;
+    options.disabled = node->disabled;
+    options.selection_mode = (cui_table_selection_mode)node->table_selection_mode;
+    options.accessible_name = cui_string(node->key);
+    return options;
+}
+
+static void bridge_data_table_restore(const cui_bridge_node_record *node,
+                                      bridge_data_table_owned *next) {
+    const bridge_data_table_owned *old = node->data_table;
+    const cui_table_state *previous = &old->state;
+    cui_table_state *state = &next->state;
+    size_t index;
+    bool valid_column = previous->column > 0 && previous->column <= next->column_count;
+    if ((node->table_selection_mode == CUI_TABLE_SELECT_ROW || valid_column) &&
+        cui_table_row_index(next->model, previous->row, &index))
+        state->row = previous->row;
+    if (valid_column && (node->table_selection_mode == CUI_TABLE_SELECT_COLUMN || state->row))
+        state->column = previous->column;
+    if (previous->sort_column <= next->column_count) {
+        state->sort_column = previous->sort_column;
+        state->sort = previous->sort;
+    }
+    state->cursor_row = previous->cursor_row;
+    state->cursor_column = previous->cursor_column;
+    state->header_cursor = previous->header_cursor;
+    state->scroll_x = previous->scroll_x;
+    if (old->viewport_height > 0) {
+        cui_table_options options = bridge_data_table_options(node);
+        cui_table_options prior = options;
+        prior.width = old->viewport_width;
+        prior.height = old->viewport_height;
+        cui_table_row_anchor anchor =
+            cui_table_capture_row_anchor(old->model, previous->scroll_y, prior);
+        state->scroll_y = cui_table_restore_row_anchor(next->model, anchor, options);
+        next->viewport_width = options.width;
+        next->viewport_height = options.height;
+    }
+}
+
+static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_node handle,
+                                               const char *const *headers, uint32_t column_count,
+                                               const char *const *cells, const uint32_t *row_keys,
+                                               uint32_t row_count, bool preserve) {
     cui_bridge_node_record *node;
     cui_bridge_status status = bridge_valid_node(app, handle, &node);
     if (status != CUI_BRIDGE_OK)
         return status;
     if (node->kind != CUI_BRIDGE_DATA_TABLE)
         return CUI_BRIDGE_INVALID_STATE;
-    if (!column_count || column_count > 16 || row_count > 32 || !headers || (row_count && !cells))
+    if (!column_count || column_count > 16 || row_count > 32 || !headers ||
+        (row_count && (!cells || (preserve && !row_keys))))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     bridge_data_table_owned *next = calloc(1, sizeof *next);
     if (!next)
@@ -2008,28 +2056,47 @@ cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *app, cui_bridge_node
             if (status != CUI_BRIDGE_OK)
                 goto fail;
         }
-        next->rows[r] =
-            (cui_table_row){.key = r + 1, .label = cui_string(next->cells[r * column_count])};
+        next->rows[r] = (cui_table_row){.key = row_keys ? row_keys[r] : r + 1,
+                                        .label = cui_string(next->cells[r * column_count])};
     }
     next->model = cui_table_create(32);
     if (!next->model) {
         status = CUI_BRIDGE_OUT_OF_MEMORY;
         goto fail;
     }
-    if (cui_table_bind(next->model, next->rows, row_count, next->columns, column_count) !=
-        CUI_TABLE_OK) {
-        status = CUI_BRIDGE_CORE_ERROR;
+    cui_table_error bound =
+        cui_table_bind(next->model, next->rows, row_count, next->columns, column_count);
+    if (bound != CUI_TABLE_OK) {
+        status = bound == CUI_TABLE_INVALID || bound == CUI_TABLE_DUPLICATE_KEY
+                     ? CUI_BRIDGE_INVALID_ARGUMENT
+                     : CUI_BRIDGE_CORE_ERROR;
         goto fail;
     }
+    if (preserve && node->data_table)
+        bridge_data_table_restore(node, next);
     bridge_data_table_free(node->data_table);
     node->data_table = next;
-    node->value = 0;
-    node->checked = 0;
+    node->value = (double)next->state.row;
+    node->checked = (uint32_t)next->state.column;
     return CUI_BRIDGE_OK;
 fail:
     bridge_data_table_free(next);
     return status;
 }
+cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *app, cui_bridge_node handle,
+                                            const char *const *headers, uint32_t column_count,
+                                            const char *const *cells, uint32_t row_count) {
+    return bridge_data_table_set(app, handle, headers, column_count, cells, NULL, row_count, false);
+}
+
+cui_bridge_status cui_bridge_data_table_set_keyed(cui_bridge_app *app, cui_bridge_node handle,
+                                                  const char *const *headers, uint32_t column_count,
+                                                  const char *const *cells,
+                                                  const uint32_t *row_keys, uint32_t row_count) {
+    return bridge_data_table_set(app, handle, headers, column_count, cells, row_keys, row_count,
+                                 true);
+}
+
 cui_bridge_status cui_bridge_data_table_get_cell(cui_bridge_app *app, cui_bridge_node handle,
                                                  uint32_t row, uint32_t column, char *destination,
                                                  uint32_t capacity, uint32_t *required_capacity) {
@@ -2099,7 +2166,8 @@ cui_bridge_status cui_bridge_data_table_cell_bounds(cui_bridge_app *app, cui_bri
     bridge_data_table_owned *table = node->data_table;
     if (!table || row >= table->row_count || column >= table->column_count || !out_bounds)
         return CUI_BRIDGE_INVALID_ARGUMENT;
-    cui_rect rect = cui_bounds(app->ui, cui_table_cell_id(node->id, row + 1, column + 1));
+    cui_rect rect =
+        cui_bounds(app->ui, cui_table_cell_id(node->id, table->rows[row].key, column + 1));
     *out_bounds = (cui_bridge_rect){rect.x, rect.y, rect.w, rect.h};
     return rect.w > 0 && rect.h > 0 ? CUI_BRIDGE_OK : CUI_BRIDGE_INVALID_STATE;
 }
@@ -4175,14 +4243,7 @@ static void bridge_render_data_table(cui_bridge_app *app, uint32_t slot,
         cui_text(app->ui, cui_string("No data"), app->theme.font_size, app->theme.muted);
         return;
     }
-    cui_table_options options = cui_table_options_default();
-    options.width = node->visual_width > 0 ? node->visual_width : 480;
-    options.height = node->visual_height > 0 ? node->visual_height : 240;
-    options.row_height = 32;
-    options.header_height = 32;
-    options.disabled = node->disabled;
-    options.selection_mode = (cui_table_selection_mode)node->table_selection_mode;
-    options.accessible_name = cui_string(node->key);
+    cui_table_options options = bridge_data_table_options(node);
     cui_table_result result =
         cui_data_table(app->ui, node->id, &app->theme, table->model, &table->state, options,
                        bridge_data_table_label, NULL, table);
@@ -4191,6 +4252,8 @@ static void bridge_render_data_table(cui_bridge_app *app, uint32_t slot,
             result.error == CUI_TABLE_CAPACITY ? CUI_BRIDGE_CAPACITY : CUI_BRIDGE_CORE_ERROR;
         return;
     }
+    table->viewport_width = options.width;
+    table->viewport_height = options.height;
     if (result.selection_changed || result.sort_changed) {
         node->value = table->state.row;
         node->checked = (uint32_t)table->state.column;

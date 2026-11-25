@@ -75,7 +75,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Editor | `cui_editor` | Owned multiline UTF-8 model, native line-numbered editing, copied text CHANGE, language label and disabled state | 4096 UTF-8 bytes and 512 layout lines; no host syntax-highlighting, completion, search, or clipboard callbacks |
 | Chart | `cui_chart` | Copied up to 64 labeled numeric data points, native line/area/bar/pie raster and hover, data readback, disabled | Up to 512×512 pixels; one series, default native tooltip; no custom callbacks, candle, radar, or Sankey |
 | Table | `cui_table_begin_ex`, checked row/cell APIs | Item rows and nested Item cells with copied text, native table semantics and layout; first row is header | Up to 64 rows/64 cells per row; fixed equal column widths, text-only cells; no sort, selection, or virtualization |
-| DataTable | `cui_data_table` | Copied column headers and row-major cell matrix, native virtualized viewport, explicit row/column/cell selection mode, sortable header state, queried cell/state/bounds, copied CHANGE JSON snapshot | Up to 32 rows×16 columns, 128 UTF-8 bytes per cell; row selection by default; sort direction is a request, caller must supply reordered rows; no custom cell content |
+| DataTable | `cui_data_table` | Copied column headers and row-major cell matrix, native virtualized viewport, optional keyed replacement preserving position, explicit row/column/cell selection mode, sortable header state, queried cell/state/bounds, copied CHANGE JSON snapshot | Up to 32 rows×16 columns, 128 UTF-8 bytes per cell; row selection by default; sort direction is a request, caller must supply reordered rows; no custom cell content |
 | Plot | `cui_plot_dots` | Copied up to 256 Cartesian (x,y) samples, native themed point rendering, point readback | Dot plot only; coordinates within ±16384, no path, axis, zoom, or point hit model |
 | Command | `cui_command` | Up to 64 Item actions, owned UTF-8 query editor, native keyword filtering, keyboard/pointer selection, copied query/selection CHANGE and Item confirm CLICK | Flat palette; Item detail is one keyword string, no grouped headings, custom row content, or host action callback |
 | VirtualList | `cui_virtual_list_draw` | Up to 64 keyed Item rows, native overscanned vertical viewport, wheel/keyboard scroll, copied offset CHANGE, visible Item bounds, disabled | Fixed 32px rows, vertical only; no intrinsic row sizing or host data provider |
@@ -110,10 +110,50 @@ number changes remain available after initialization, and reset restores the
 captured defaults. Only individual fields accept `set_disabled`.
 
 DataTable CHANGE events include copied JSON text with `reason` (`selection` or `sort`),
-`row`, `column`, `sortColumn`, and `sortDirection`. The numeric event value is
-the selected one-based row; use the JSON for exact column and sort snapshots
-when multiple changes are queued. A caller can replace the matrix after a step
-to implement the requested sort order.
+`row`, `column`, `sortColumn`, and `sortDirection`. The numeric event value
+and `row` in the JSON and typed snapshot report the selected row key. Zero
+means no selected row. The legacy setter assigns one-based row keys, so its
+event values keep their original meaning. Columns and sort columns stay
+one-based. The application can supply a reordered matrix after a step to apply
+a sort request.
+
+### Replace DataTable rows without losing the viewport
+
+Use `cui_bridge_data_table_set_keyed` for a retained DataTable with changing
+rows. Assign each logical row a distinct nonzero `uint32_t` key and reuse that
+key wherever the row appears in later updates. Call the setter on the bridge's
+UI thread between steps. Headers, cells and keys are copied during the call.
+
+```c
+#include <cui/cui_bridge.h>
+
+cui_bridge_status update_inbox(cui_bridge_app *app, cui_bridge_node table,
+                               const char *const *cells, const uint32_t *keys,
+                               uint32_t row_count) {
+    const char *headers[] = {"Subject", "Sender"};
+    return cui_bridge_data_table_set_keyed(app, table, headers, 2, cells, keys,
+                                          row_count);
+}
+```
+
+Pass a flat row-major array of two strings per row to the example and one
+key per row. For an empty table, pass zero rows with NULL cells and keys.
+The limits are 32 rows, 16 columns and 128 UTF-8 bytes per header or cell.
+Invalid keys, invalid data or allocation failure preserve the previous table.
+
+A successful replacement keeps the first visible row at its previous offset
+where scroll bounds allow. If its key disappears, the former row index is
+clamped to the new data. Selection and keyboard navigation follow surviving
+keys and column positions. A removed selection clears, and the existing sort
+request remains if its column position survives. The setter queues no change
+event. Cell text and bounds lookups use zero-based indices in the current
+matrix. Step the bridge before reading the new layout bounds.
+
+The legacy `cui_bridge_data_table_set` uses keys 1 through row count and resets
+the retained table state. Switching to keyed updates can retain matching old
+keys. Python, JavaScript, TypeScript, Go and Rust still use the legacy setter in
+their DataTable builders. The keyed C bridge has no load-more event or
+network adapter.
 
 The visual families above expose their documented default variants. Avatar is
 an initials avatar with no image source. Marker is a single text child; Shimmer

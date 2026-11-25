@@ -7327,6 +7327,14 @@
           ]
         },
         {
+          "name": "retained C bridge keyed row replacement",
+          "status": "tested",
+          "evidence": [
+            "bindings/bridge/tests/test_bridge_components.c",
+            "docs/BRIDGE_COMPONENTS.md"
+          ]
+        },
+        {
           "name": "caller-owned page requests and viewport retention",
           "status": "tested",
           "evidence": [

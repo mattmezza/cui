@@ -2403,7 +2403,8 @@
         "cui_table_capture_row_anchor",
         "cui_table_restore_row_anchor",
         "cui_data_table_events",
-        "cui_data_table_set_events"
+        "cui_data_table_set_events",
+        "cui_bridge_data_table_set_keyed"
       ],
       "state_types": [
         "cui_table_model",
@@ -2415,7 +2416,8 @@
       "docs": [
         "docs/TABLE.md",
         "docs/TABLE_EVENTS.md",
-        "docs/EVENT_HOVER.md"
+        "docs/EVENT_HOVER.md",
+        "docs/BRIDGE_COMPONENTS.md"
       ],
       "callback_symbols": [
         "cui_table_label_fn",
@@ -2426,7 +2428,8 @@
       "public_header": "include/cui/cui_table.h",
       "composition": "application model + frame composition",
       "additional_public_headers": [
-        "include/cui/cui_table_events.h"
+        "include/cui/cui_table_events.h",
+        "include/cui/cui_bridge.h"
       ]
     },
     {

@@ -1161,6 +1161,9 @@ API: `cui_table_create`, `cui_table_bind`, `cui_data_table`, `cui_table_destroy`
 
 Additional event includes: `cui/cui_table_events.h`.
 
+For a retained table, `cui_bridge_data_table_set_keyed` copies the matrix and
+preserves the viewport during replacement. See the [keyed C bridge guide](BRIDGE_COMPONENTS.md#replace-datatable-rows-without-losing-the-viewport).
+
 ## Plot
 
 **Composition:** application model + frame composition. **Scope:** styled frame adapter + standalone numeric model; bounded software rasterizer.

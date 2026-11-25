@@ -168,6 +168,8 @@ while the model rebinds. Changing examples or disabling the preview cancels
 the pending update. The example demonstrates the UI-thread rebind step using a
 local timer.
 
+Retained C bridge consumers can use the [keyed DataTable setter](BRIDGE_COMPONENTS.md#replace-datatable-rows-without-losing-the-viewport) to copy a bounded matrix and preserve the viewport on replacement.
+
 ### Request another page
 
 Choose **Paged inbox** in the gallery. Start with 16 files and scroll near the

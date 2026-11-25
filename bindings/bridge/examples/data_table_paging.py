@@ -13,13 +13,16 @@ class Inbox:
     headers = ["Subject", "Sender"]
     initial_count = 8
 
-    def __init__(self):
-        self.rows = [[f"Project update {i}", "Workspace"] for i in range(1, 13)]
-        self.keys = list(range(101, 109)) + list(range(201, 205))
+    def __init__(self, row_capacity=None):
+        count = 40 if row_capacity is not None else 12
+        self.rows = [[f"Project update {i}", "Workspace"] for i in range(1, count + 1)]
+        self.keys = list(range(101, 109)) + list(range(201, 201 + count - self.initial_count))
+        self.row_capacity = row_capacity
         self.generation = 1
         self.pending = None
         self.table = (data_table("inbox").table_data(
-            self.headers, self.rows[:self.initial_count], row_keys=self.keys[:self.initial_count])
+            self.headers, self.rows[:self.initial_count], row_keys=self.keys[:self.initial_count],
+            row_capacity=self.row_capacity)
             .visual_size(360, 160).configure_load_more())
         self.status = label("8 messages", key="status")
 
@@ -48,10 +51,11 @@ class Inbox:
     def complete_page(self, ticket):
         if self.pending is None or ticket != self.pending:
             return False
-        # This local source returns the final 4 messages. Merge and apply on the UI thread.
-        self.table.table_data(self.headers, self.rows, row_keys=self.keys)
+        # Apply the final snapshot on the UI thread.
+        self.table.table_data(self.headers, self.rows, row_keys=self.keys,
+                              row_capacity=self.row_capacity)
         self.pending = None
-        self.status.label("12 messages · End of inbox")
+        self.status.label(f"{len(self.rows)} messages · End of inbox")
         return True
 
 
@@ -87,19 +91,21 @@ def verify_inbox(app, owner, smoke):
     app.step()
     assert table.table_cell_bounds(6, 0) == selected
     assert table.table_state()["row"] == owner.keys[6]
-    assert table.current_cell(11, 0) == owner.rows[11][0]
+    last = len(owner.rows) - 1
+    assert table.current_cell(last, 0) == owner.rows[last][0]
     assert app.dispatch() == 0
 
-    app.queue_scroll(x + 10, y + 10, 0, -20)
+    app.queue_scroll(x + 10, y + 10, 0, -(last + 1))
     app.step()
     assert owner.start_page() is None
     if smoke:
-        click_cell(app, table.table_cell_bounds(10, 0))
+        next_selection = last - 1
+        click_cell(app, table.table_cell_bounds(next_selection, 0))
         ran = False
 
         def verify_runner(active_app):
             nonlocal ran
-            assert changes == [owner.keys[6], owner.keys[10]]
+            assert changes == [owner.keys[6], owner.keys[next_selection]]
             assert active_app is app and owner.start_page() is None
             ran = True
             app.request_close()
@@ -113,6 +119,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--font", help="existing font path for the native SDL UI")
     parser.add_argument("--smoke", action="store_true", help="check the hidden SDL runner")
+    parser.add_argument("--larger", action="store_true", help="grow the inbox to 40 rows")
     args = parser.parse_args()
     if args.smoke and (not args.font or os.environ.get("CUI_TEST_VIRTUAL_DISPLAY") != "1"):
         parser.error("--smoke requires --font and the private display from scripts/test_local.py")
@@ -120,10 +127,18 @@ def main():
     if args.font:
         options.update(backend="sdl", font_path=args.font, initially_hidden=args.smoke)
 
-    owner = Inbox()
     with App(**options) as app:
-        if not app.supports_data_table_paging() or not app.supports_keyed_data_table():
+        if not app.supports_data_table_paging():
+            parser.error("the paged inbox requires a bridge with paging")
+        capacity = None
+        if args.larger:
+            maximum = app.data_table_max_row_capacity()
+            if maximum is None or maximum < 40:
+                parser.error("--larger requires an opt-in capacity of at least 40 rows")
+            capacity = min(maximum, 128)
+        elif not app.supports_keyed_data_table():
             parser.error("the paged inbox requires a bridge with paging and keyed replacement")
+        owner = Inbox(capacity)
         app.mount(owner.view())
         if not args.font or args.smoke:
             verify_inbox(app, owner, args.smoke)

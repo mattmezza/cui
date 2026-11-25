@@ -7323,7 +7323,7 @@
             "docs/TABLE.md"
           ],
           "limitations": [
-            "Opt-in C helpers preserve a row key and pixel offset. Retained language builders expose keyed replacement within a 32-row cap. Automatic remote updates remain open."
+            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C and Python also expose larger snapshots. Automatic remote updates remain open."
           ]
         },
         {
@@ -7404,7 +7404,7 @@
             "docs/PERFORMANCE.md"
           ],
           "limitations": [
-            "Opt-in copied C matrices support up to 10,000 rows, subject to an app-wide 32 MiB retained budget. Python, JavaScript, TypeScript, Go and Rust authoring remains limited to 32 rows."
+            "Opt-in copied C matrices support up to 10,000 rows, subject to an app-wide 32 MiB retained budget."
           ]
         },
         {
@@ -7418,6 +7418,18 @@
           ],
           "limitations": [
             "Mounted DataTable polling returns copied demand. The owner schedules, cancels, and applies pages. The native example reads demand after legacy callback dispatch and uses a local source."
+          ]
+        },
+        {
+          "name": "Python bounded retained DataTable snapshots beyond 32 rows",
+          "status": "tested",
+          "evidence": [
+            "bindings/python/test_data_table_paging.py",
+            "bindings/bridge/examples/data_table_paging.py",
+            "docs/BINDING_BUILDERS.md"
+          ],
+          "limitations": [
+            "Optional row_capacity requires stable keys and both V1 provider exports. The owner applies complete bounded snapshots between frames. Native retained limits and budget apply."
           ]
         },
         {

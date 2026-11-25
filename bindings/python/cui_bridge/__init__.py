@@ -8,11 +8,15 @@ from __future__ import annotations
 import ctypes as C
 import datetime
 from dataclasses import dataclass
+from itertools import islice
 import math
 import os
 from pathlib import Path
 from threading import current_thread
 from typing import Callable, ClassVar, Iterable, Iterator, Literal
+
+_DATA_TABLE_LEGACY_ROWS = 32
+_DATA_TABLE_MAX_ROWS = 10_000
 
 
 def _utf8(value: str, limit: int = 4096) -> bytes:
@@ -173,6 +177,18 @@ class _API:
                 C.POINTER(C.c_char_p), C.c_uint32, C.POINTER(C.c_char_p),
                 C.POINTER(C.c_uint32), C.c_uint32,
             )
+        self.table_capacity_limit = None
+        self.set_matrix_capacity = None
+        names = ("data_table_max_row_capacity_v1", "data_table_set_keyed_capacity_v1")
+        if all(hasattr(lib, "cui_bridge_" + name) for name in names):
+            maximum = bind(names[0], C.c_uint32)()
+            if maximum > 0:
+                self.table_capacity_limit = min(maximum, _DATA_TABLE_MAX_ROWS)
+                self.set_matrix_capacity = bind(
+                    names[1], C.c_int, C.c_void_p, _Handle,
+                    C.POINTER(C.c_char_p), C.c_uint32, C.POINTER(C.c_char_p),
+                    C.POINTER(C.c_uint32), C.c_uint32, C.c_uint32,
+                )
         self.get_matrix_cell = bind("data_table_get_cell", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.c_void_p, C.c_uint32, C.POINTER(C.c_uint32))
         self.get_matrix_state = bind("data_table_get_state", C.c_int, C.c_void_p, _Handle, *([C.POINTER(C.c_uint32)]*4))
         self.matrix_cell_bounds = bind("data_table_cell_bounds", C.c_int, C.c_void_p, _Handle, C.c_uint32, C.c_uint32, C.POINTER(_Rect))
@@ -1043,43 +1059,74 @@ class Widget:
         point=_PlotPoint();self._change("get_plot",index,C.byref(point));return point.x,point.y
 
     def table_data(self, headers: Iterable[str], rows: Iterable[Iterable[str]], *,
-                   row_keys: Iterable[int] | None = None) -> "Widget":
+                   row_keys: Iterable[int] | None = None,
+                   row_capacity: int | None = None) -> "Widget":
         """Copy a DataTable matrix and optionally preserve the viewport by row key.
 
         Supply unique nonzero uint32 keys to retain position, selection and
         keyboard navigation through updates. State and change events report
         the selected key. Cell access still takes zero-based matrix indices.
         Omitting keys resets retained table state as before.
+
+        An explicit row_capacity opts into the provider's larger matrix API
+        and requires row_keys, even for an empty matrix. Omitting capacity
+        uses the ordinary 32-row setters.
         """
         if self.kind != "data_table":
             raise ValueError("table_data requires DataTable")
-        headers = tuple(headers)
-        rows = tuple(tuple(row) for row in rows)
-        if not 1 <= len(headers) <= 16 or len(rows) > 32 or any(
+        if row_capacity is None:
+            headers = tuple(headers)
+            rows = tuple(tuple(row) for row in rows)
+            limit = _DATA_TABLE_LEGACY_ROWS
+        else:
+            if type(row_capacity) is not int or not 1 <= row_capacity <= _DATA_TABLE_MAX_ROWS:
+                raise ValueError(f"row_capacity must be an integer in 1..{_DATA_TABLE_MAX_ROWS}")
+            if row_keys is None:
+                raise ValueError("row_capacity requires row_keys")
+            if self._app is not None:
+                self._app._require_table_capacity(row_capacity)
+            limit = row_capacity
+            headers = tuple(islice(headers, 17))
+            if not 1 <= len(headers) <= 16:
+                raise ValueError("invalid matrix dimensions")
+            rows = tuple(tuple(islice(row, len(headers) + 1)) for row in islice(rows, limit + 1))
+        if not 1 <= len(headers) <= 16 or len(rows) > limit or any(
             len(row) != len(headers) for row in rows
         ):
             raise ValueError("invalid matrix dimensions")
-        keys = None if row_keys is None else tuple(row_keys)
+        if row_keys is None:
+            keys = None
+        elif row_capacity is None:
+            keys = tuple(row_keys)
+        else:
+            keys = tuple(islice(row_keys, len(rows) + 1))
         if keys is not None:
             if len(keys) != len(rows) or any(
                 isinstance(key, bool) or not isinstance(key, int) or not 0 < key <= 0xffffffff
                 for key in keys
             ) or len(set(keys)) != len(keys):
                 raise ValueError("row_keys must contain one distinct nonzero uint32 per row")
-            if self._app is not None and not self._app.supports_keyed_data_table():
+            if (row_capacity is None and self._app is not None and
+                    not self._app.supports_keyed_data_table()):
                 raise RuntimeError("keyed DataTable replacement is unavailable in this bridge")
 
         encoded_headers = [_utf8(header, 128) for header in headers]
         encoded_cells = [_utf8(cell, 128) for row in rows for cell in row]
-        native_headers = (C.c_char_p * len(headers))(*encoded_headers)
-        native_cells = (C.c_char_p * len(encoded_cells))(*encoded_cells)
-        if keys is None:
-            self._change("set_matrix", native_headers, len(headers), native_cells, len(rows))
-        else:
-            native_keys = (C.c_uint32 * len(keys))(*keys)
-            self._change("set_matrix_keyed", native_headers, len(headers), native_cells,
-                         native_keys, len(rows))
-        self._matrix = headers, rows, keys
+        if self._disposed:
+            raise RuntimeError("Widget belongs to a disposed App")
+        if self._app is not None:
+            native_headers = (C.c_char_p * len(headers))(*encoded_headers)
+            native_cells = (C.c_char_p * len(encoded_cells))(*encoded_cells)
+            args = native_headers, len(headers), native_cells if rows else None
+            if keys is None:
+                self._change("set_matrix", *args, len(rows))
+            else:
+                native_keys = (C.c_uint32 * len(keys))(*keys) if rows else None
+                if row_capacity is None:
+                    self._change("set_matrix_keyed", *args, native_keys, len(rows))
+                else:
+                    self._change("set_matrix_capacity", *args, native_keys, len(rows), row_capacity)
+        self._matrix = headers, rows, keys, row_capacity
         return self
 
     def configure_load_more(self, *, enabled: bool = True, threshold: int = 0) -> "Widget":
@@ -1109,7 +1156,10 @@ class Widget:
         if status == 1:  # CUI_BRIDGE_EMPTY
             return None
         app._api.check(status)
+        capacity = ((self._matrix[3] if self._matrix is not None else None) or
+                    _DATA_TABLE_LEGACY_ROWS)
         if (wire.reserved or not wire.frame or
+                wire.capacity != capacity or
                 not wire.visible_begin <= wire.visible_end <= wire.row_count < wire.capacity or
                 bool(wire.row_count) != bool(wire.last_row_key)):
             raise BridgeError(8, "malformed DataTable load-more record")
@@ -1576,6 +1626,20 @@ class App:
         self._ensure_open()
         return self._api.set_matrix_keyed is not None
 
+    def data_table_max_row_capacity(self) -> int | None:
+        """Return the opt-in row limit usable by Python, or None on older providers."""
+        self._ensure_open()
+        return self._api.table_capacity_limit
+
+    def _require_table_capacity(self, capacity: int) -> None:
+        if current_thread() is not self._creation_thread:
+            raise RuntimeError("DataTable capacity requires the app's owner thread")
+        maximum = self.data_table_max_row_capacity()
+        if maximum is None:
+            raise RuntimeError("DataTable capacity requires a compatible bridge symbol group")
+        if capacity > maximum:
+            raise ValueError(f"row_capacity exceeds the provider's {maximum}-row limit")
+
     def supports_data_table_paging(self) -> bool:
         """Report whether the bridge offers the complete DataTable paging V1 API."""
         self._ensure_open()
@@ -1632,6 +1696,8 @@ class App:
                 self._require_table_paging()
                 if node._matrix is None:
                     raise ValueError("DataTable paging requires a matrix with column headers")
+            if node._matrix is not None and node._matrix[3] is not None:
+                self._require_table_capacity(node._matrix[3])
             key = node.key if node.key is not None else f"{node.kind}@{path}"
             _utf8(key)
             if _KIND[node.kind] >= 3:
@@ -1698,8 +1764,8 @@ class App:
                 if node.kind == "data_table": node._change("set_selection_mode",node._selection_mode)
                 if node.kind == "sidebar" and node._open_set: node._change("set_open",int(node._open))
                 if node.kind == "data_table" and node._matrix is not None:
-                    headers, rows, keys = node._matrix
-                    node.table_data(headers, rows, row_keys=keys)
+                    headers, rows, keys, capacity = node._matrix
+                    node.table_data(headers, rows, row_keys=keys, row_capacity=capacity)
                     if node._load_more_threshold is not None:
                         node.configure_load_more(threshold=node._load_more_threshold)
                 if node.kind == "text_view": node._change("set_text_format",node._text_format)

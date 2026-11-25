@@ -456,6 +456,12 @@ if(CUI_BRIDGE_NATIVE_TESTS)
   ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_paging.py
   --font ${CUI_TEST_FONT} --smoke)
  set_tests_properties(bridge_python_data_table_paging_native PROPERTIES TIMEOUT 30)
+ add_test(NAME bridge_python_data_table_capacity_native COMMAND ${CMAKE_COMMAND} -E env
+  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+  SDL_RENDER_DRIVER=software
+  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_paging.py
+  --font ${CUI_TEST_FONT} --smoke --larger)
+ set_tests_properties(bridge_python_data_table_capacity_native PROPERTIES TIMEOUT 30)
  add_test(NAME bridge_python_icon_badge_native COMMAND ${CMAKE_COMMAND} -E env
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
   SDL_RENDER_DRIVER=software
@@ -506,6 +512,9 @@ add_test(NAME bridge_python_data_table_paging COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME bridge_python_data_table_paging_example COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_paging.py)
+add_test(NAME bridge_python_data_table_capacity_example COMMAND ${CMAKE_COMMAND} -E env
+ PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
+ ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_paging.py --larger)
 add_test(NAME bridge_python_run COMMAND ${CMAKE_COMMAND} -E env
  PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python CUI_BRIDGE_LIBRARY=$<TARGET_FILE:cui_bridge>
  ${Python3_EXECUTABLE} ${CUI_BRIDGE_ROOT}/bindings/python/test_run.py)

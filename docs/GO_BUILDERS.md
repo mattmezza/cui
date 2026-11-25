@@ -216,7 +216,7 @@ The regular callback queue is independent.
 Keep one request in flight while the current rows remain interactive. Use
 your own generation and service cursor to reject stale results, then apply
 accepted pages on the UI thread with `SetTableKeyed`. Enable paging again
-if more data is available. The bridge holds up to 32 rows.
+if more data is available. The Go builder holds up to 32 rows.
 
 The synchronous `app.RunWith(.016, afterFrame)` hook receives the app after
 regular callbacks for each successful native frame. A request to close or

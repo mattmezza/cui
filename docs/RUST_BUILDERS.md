@@ -173,7 +173,7 @@ independent. The copy remains valid after removing the table or dropping the app
 Keep the service cursor and one in-flight request in application state.
 Rows stay interactive while paging is off. Check that a response still belongs
 to the current request before using `data_table_keyed` to append it. Enable
-paging again if the source has more rows. The retained bridge holds up to 32.
+paging again if the source has more rows. The Rust builder holds up to 32 rows.
 
 Use `App::run_with` to poll demand and ready completions in a synchronous
 after-frame hook, or poll after `step` in a manual loop. Apply responses on

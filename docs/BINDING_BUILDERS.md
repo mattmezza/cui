@@ -108,7 +108,7 @@ the first visible row and its intra-row offset where scroll bounds allow.
 Selection and keyboard focus follow surviving keys. `table_state()["row"]`
 and change notifications report the selected key. `current_cell(row, column)`
 and `table_cell_bounds(row, column)` take zero-based matrix indices.
-The limits are 32 rows, 16 columns, and 128 UTF-8 bytes per string.
+The ordinary setters accept 32 rows, 16 columns, and 128 UTF-8 bytes per string.
 
 Use `app.supports_keyed_data_table()` to check the loaded provider. Older
 libraries accept `table_data(headers, rows)` with positional keys and reset
@@ -165,7 +165,7 @@ Keep one request in flight. While loading, turn paging off and continue
 drawing the existing table and a status label. Apply accepted responses
 on the UI thread with `table_data(..., row_keys=...)` to preserve scroll
 position and selection. Re-enable paging when the source has another page.
-The retained bridge holds at most 32 rows.
+Demand stops when the table reaches the active row capacity.
 
 For a native loop, pass `app.run(after_frame=update)`. The callable receives
 the App after a successful step and regular event dispatch. It runs
@@ -187,6 +187,44 @@ python bindings/bridge/examples/data_table_paging.py
 For the native demo, build with SDL enabled and add `--font /path/to/font.ttf`.
 The demo uses a local source and simulates latency without blocking the UI.
 
+### Retain more than 32 rows in Python
+
+`App.data_table_max_row_capacity()` reports the loaded provider's usable
+opt-in limit, up to 10,000 rows in Python. It returns `None` when the provider
+lacks the complete capacity API. Choose a capacity within that limit and
+supply it on every opted-in update, along with stable row keys.
+
+```python
+from cui_bridge import App, column, data_table
+
+with App() as app:
+    maximum = app.data_table_max_row_capacity()
+    if maximum is None or maximum < 64:
+        raise RuntimeError("This inbox requires a provider with at least 64 rows")
+    messages = data_table("messages").visual_size(360, 160)
+    messages.table_data(["Subject"], [], row_keys=[], row_capacity=64)
+    app.mount(column("inbox").children(messages.configure_load_more()))
+    app.step()
+    first_page = messages.poll_load_more()
+    assert first_page and first_page.capacity == 64
+    messages.table_data(["Subject"], [[f"Message {i}"] for i in range(40)],
+                        row_keys=range(1, 41), row_capacity=64)
+    app.step()
+```
+
+This example also requires the V1 paging API to poll for the first page.
+For a mounted widget, set data on the owner's UI thread between steps.
+The row capacity can change with a successful replacement and is reported
+in the next demand record. Leave `row_capacity` out to use the ordinary
+32-row setter. A rejected replacement preserves the old data and paging
+record. The native provider's [32 MiB app-wide budget](BRIDGE_COMPONENTS.md#retain-more-than-32-datatable-rows-in-c)
+applies to the copied C matrices. Apply large snapshots when data arrives
+and reuse them across frames.
+
+Run `python bindings/bridge/examples/data_table_paging.py --larger` after
+setting the same bridge and import paths as above. The example grows to
+40 rows, preserves the selected row and its position, and discards a late
+response. Add `--font /path/to/font.ttf` for the interactive SDL inbox.
 
 ## JavaScript and TypeScript: build and launch
 
@@ -317,7 +355,7 @@ Keep a single request in flight and disable paging while it runs. The rows
 remain interactive. Verify the response against the current request before
 appending through `table_data(headers, rows, rowKeys)` on the UI thread. This
 preserves the viewport and selection. Enable paging again when more data is
-available. The retained bridge holds up to 32 rows.
+available. The JavaScript and TypeScript builders hold up to 32 rows.
 
 `app.run(afterFrame)` calls a synchronous hook after painting and regular
 event dispatch. Closing from regular dispatch skips the hook. The native runner

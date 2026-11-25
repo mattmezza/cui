@@ -946,7 +946,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "All five bindings support keyed replacement on providers with cui_bridge_data_table_set_keyed and opt-in near-end polling on compatible V1 providers. These builders use the 32-row setters. The opt-in retained C capacity setter accepts up to 10,000 rows. Custom cells and network transport are outside the bridge contract."
+        "All five bindings support keyed replacement and opt-in near-end polling on compatible providers. Ordinary setters accept 32 rows. Python also exposes the opt-in C capacity setter for up to 10,000 rows. JavaScript, TypeScript, Go and Rust use the ordinary limits. Custom cells and network transport are outside the bridge contract."
       ]
     },
     {

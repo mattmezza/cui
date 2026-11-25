@@ -703,8 +703,8 @@
         "rust": "tested_subset"
       },
       "limitations": [
-        "Existing scalar widget subset only. Pure cui_time_text.h locale/domain records, additive cui_time_field_v1.h localized widget options/state, and typed C aggregate observers remain unbound in all five languages.",
-        "Additive localized C bridge source is prepared but unvalidated; no localized foreign builder support is advertised. See localized_time_field_v1_source_checkpoint. Existing tested scalar subsets remain unchanged."
+        "The legacy scalar route and the optional localized builders are tested subsets in all five languages. The localized builders own their configuration and expose copied aggregate change observations. See localized_time_field_v1_source_checkpoint.",
+        "Direct C options and state, pure locale text helpers, opt-in IME preedit and the explicit Styled size and appearance entry point remain unbound."
       ]
     },
     {
@@ -1195,7 +1195,7 @@
     "fixture_scope": "Actual build script with fake CMake/pkg-config; no SDK compilation, dependency installation or native windows."
   },
   "localized_time_field_v1_source_checkpoint": {
-    "implementation": "Integrated unreleased C/Python/JS/TS/Go/Rust localized authoring has focused root proof: C bridge thirteen checks; Python sixteen configured checks; Node eighty-one configured checks including twenty localized; dynamic Go/Rust and offline runner three configured entries. Bundled-source Go/Rust static consumers also pass three root checks. Full integration, packages and broader platform/IME/focus acceptance remain open.",
+    "implementation": "Localized C/Python/JS/TS/Go/Rust authoring is available in alpha.5. Focused root checks cover the bridge and bridges to all five languages, including dynamic and bundled-source Go/Rust. Offline examples pass from released packages. Broader platform, IME and focus acceptance remain open.",
     "public_header": "include/cui/cui_bridge.h",
     "node_kind": 55,
     "languages": {

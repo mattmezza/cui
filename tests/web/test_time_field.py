@@ -43,19 +43,24 @@ def main():
             page.locator('canvas').scroll_into_view_if_needed()
             assert 'CUI_TIME_FIELD_IME_V1' in page.locator('#snippet').text_content()
 
-            def click(name, role):
-                point = page.evaluate('''([name,role])=>{
+            def box(name, role):
+                return page.evaluate('''([name,role])=>{
                     const e=cuiGallery.exports,d=new TextDecoder();
-                    const c=document.querySelector('canvas').getBoundingClientRect();
                     for(let i=0;i<e.gallery_semantic_count();i++)
                         if(e.gallery_semantic(i,0)===role&&d.decode(new Uint8Array(
                             e.memory.buffer,e.gallery_semantic_name(i),e.gallery_semantic_length(i)))===name)
-                            return [c.x+e.gallery_semantic(i,1)+e.gallery_semantic(i,3)/2,
-                                    c.y+e.gallery_semantic(i,2)+e.gallery_semantic(i,4)/2];
+                            return [1,2,3,4].map(field=>e.gallery_semantic(i,field));
                     throw Error('Missing semantic '+name);
                 }''', [name, role])
-                page.mouse.click(*point)
+
+            def next_paint():
                 page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))')
+
+            def click(name, role):
+                x, y, w, h = box(name, role)
+                canvas = page.locator('canvas').bounding_box()
+                page.mouse.click(canvas['x'] + x + w / 2, canvas['y'] + y + h / 2)
+                next_paint()
 
             def stats(field):
                 return page.evaluate('field=>cuiGallery.exports.gallery_control_stats(field)', field)
@@ -68,6 +73,26 @@ def main():
                 }''', arg=[name, attribute, value])
 
             textbox('Hour')
+            size = page.locator('#design-size')
+            assert size.is_visible() and size.input_value() == '3'
+            assert box('Time', 9)[3] == 32
+            for value, expected, name in [
+                ('1', 20, 'XS'), ('9', 80, '4XL'), ('14', 264, '9XL'), ('3', 32, 'BASE')
+            ]:
+                size.select_option(value)
+                next_paint()
+                root = box('Time', 9)
+                cell = box('Hour', 6)
+                assert root[3] == expected, (value, root)
+                assert abs(root[1] + root[3] / 2 - cell[1] - cell[3] / 2) < 1
+                assert root[0] + root[2] < page.locator('canvas').bounding_box()['width']
+                assert f'CUI_DESIGN_{name}' in page.locator('#snippet').text_content()
+            density = page.locator('#density')
+            density.select_option('1')
+            next_paint()
+            assert box('Time', 9)[3] == 28
+            density.select_option('0')
+            next_paint()
             click('Hour', 6)
             page.keyboard.press('ArrowUp')
             page.wait_for_function('cuiGallery.exports.gallery_control_stats(16)===103000')
@@ -128,8 +153,35 @@ def main():
             painted('٤٢', present=False)
             assert stats(16) == 102000 and stats(17) == callbacks + 1
             assert not errors, errors
+            page.close()
+
+            page = browser.new_page(viewport={'width': 390, 'height': 880}, device_scale_factor=2,
+                                    is_mobile=True, has_touch=True)
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(f'http://127.0.0.1:{server.server_port}/cui/#TimeField')
+            page.wait_for_function('window.cuiGallery?.renderedComponent==="TimeField"')
+            stage = page.locator('#video-player-stage')
+            stage.scroll_into_view_if_needed()
+            x, y, w, h = box('Hour', 6)
+            canvas = page.locator('canvas').bounding_box()
+            page.touchscreen.tap(canvas['x'] + x + w / 2, canvas['y'] + y + h / 2)
+            page.wait_for_function('document.activeElement.id==="cui-ime-input"')
+            page.locator('#design-size').select_option('14')
+            next_paint()
+            stage.scroll_into_view_if_needed()
+            rectangle = stage.bounding_box()
+            x, y = round(rectangle['x'] + rectangle['width'] - 35), round(rectangle['y'] + 120)
+            cdp = page.context.new_cdp_session(page)
+            cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart',
+                                                  'touchPoints': [{'x': x, 'y': y}]})
+            for offset in range(25, 226, 25):
+                cdp.send('Input.dispatchTouchEvent', {
+                    'type': 'touchMove', 'touchPoints': [{'x': x - offset, 'y': y}]})
+            cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
+            page.wait_for_function('document.getElementById("video-player-stage").scrollLeft > 80')
+            assert not errors, errors
             browser.close()
-            print('PASS: TimeField keyboard, H12/Arabic locale, read-only, bounds, and IME paint/commit/rejection/cancel')
+            print('PASS: TimeField sizes, density, touch, keyboard, H12/Arabic locale, and IME')
     finally:
         server.shutdown()
         server.server_close()

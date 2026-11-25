@@ -4,6 +4,33 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
+export function timeFieldUsage(size) {
+ return `#include <cui/cui_time_field_v1.h>
+
+/* Call init once per field. Keep the options, state and time between frames. */
+typedef struct {
+    cui_time_field_options_v1 options;
+    cui_time_field_state_v1 state;
+    cui_time value;
+} time_field_example;
+
+static bool time_field_init(time_field_example *field) {
+    field->value = (cui_time){9, 30, 0};
+    if (cui_time_field_options_init_v1(&field->options) != CUI_TIME_TEXT_OK)
+        return false;
+    field->options.flags = CUI_TIME_FIELD_IME_V1;
+    return cui_time_field_state_init_v1(&field->state, field->value,
+                                      &field->options) == CUI_TIME_TEXT_OK;
+}
+
+static cui_time_field_result_v1 time_field_draw(cui_context *ui, cui_id id,
+        const cui_theme *theme, time_field_example *field) {
+    return cui_time_field_with_size_v1(ui, id, theme, cui_string("Time"),
+        &field->state, &field->value, &field->options,
+        ${sizes[size] || "CUI_DESIGN_BASE"}, (cui_time_handler){0});
+}`;
+}
+
 export const liveDataTableUsage = `#include <cui/cui_table.h>
 
 /* On the UI thread, before drawing. Keep the new rows and columns alive

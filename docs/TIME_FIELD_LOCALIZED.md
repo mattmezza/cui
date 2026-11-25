@@ -44,8 +44,8 @@ static bool reminder_init(reminder *owner) {
 }
 static cui_time_field_result_v1 reminder_compose(
     cui_context *ui, const cui_theme *theme, reminder *owner) {
-    return cui_time_field_v1(ui, 20, theme, cui_string("Reminder"),
-        &owner->state, &owner->value, &owner->options,
+    return cui_time_field_with_size_v1(ui, 20, theme, cui_string("Reminder"),
+        &owner->state, &owner->value, &owner->options, CUI_DESIGN_BASE,
         (cui_time_handler){reminder_changed, owner});
 }
 ```
@@ -55,6 +55,23 @@ geometry without applying queued edits. Disabled, readonly, inert and layout-onl
 submissions freeze edits and notifications. Editing uses original-order targeted
 Core events, copied UTF-8 text payloads, token prefixes across TEXT events and
 atomic full formatted paste up to 160 bytes.
+
+## Size and appearance
+
+`cui_time_field_with_size_v1` accepts the shared `CUI_DESIGN_XS` through
+`CUI_DESIGN_9XL` scale. Use `CUI_DESIGN_BASE` for a 32 logical pixel control at
+the default theme density. Sizes scale with `theme.font_size / 16`; Base and MD
+share metrics. The field fits its locale, cycle and precision, and centers
+each segment in a cell measured to fit the widest token pair or period label.
+The font's individual glyphs retain their own widths.
+
+Explicit sizes use theme input colors, a selection background on the active
+segment, and an outer focus ring that can coexist with the validation border.
+`theme.hide_focus_ring` suppresses the outer ring. Disabled fields are dimmed
+and lose the selected paint. Pass `CUI_DESIGN_INHERIT` or call
+`cui_time_field_v1` for the existing appearance. Editing, state and callbacks
+are shared across both entry points. The language bindings currently expose
+their existing localized appearance.
 
 ## IME composition
 
@@ -107,8 +124,8 @@ Unset OWNER_INVALID only when the application's separate validation clears.
 All visible segments are ordinary global Tab stops. Forward/backward navigation
 exits at boundaries; the widget does not consume Tab or trap focus. This differs
 from the upstream one-root focus/selection-retaining behavior, which remains
-unfinished. Full source size/focus-ring styling and localized DateTimePicker
-also remain open. See the [original design](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md)
+unfinished. The copied gallery example follows the selected size. See the
+[original design](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md)
 and [binding contract](design/TIME_FIELD_BINDING_CHECKPOINT.md).
 
 The gallery's TimeField source uses this route by default with Arabic token,

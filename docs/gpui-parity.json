@@ -5007,7 +5007,8 @@
       },
       "limitations": [
         "Legacy segmented ASCII and additive localized options coexist. Bridge and foreign builders expose localized options and copied observations through the subset described in docs/binding-coverage.json.",
-        "The localized widget uses global segment Tab stops. Source one-root focus and re-entry, full size/focus-ring styling, localized DateTimePicker and physical native accessibility remain open.",
+        "The localized widget uses global segment Tab stops. Source one-root focus and re-entry, tabular glyph styling, arbitrary root style refinement and physical native accessibility remain open.",
+        "Direct C has opt-in shared size metrics, stable centered cells, input and selection tokens, disabled opacity and a focus band independent of the invalid border. The WASM gallery exposes the scale. Existing binding widgets preserve their appearance.",
         "Direct C composition and borrowed preedit are opt-in. Chromium verifies localized preedit paint, atomic commit, rejection and cancellation. Private Xvfb tests injected SDL3 empty-edit and same-owner commit handoff. Physical IME, composition-range styling and bridge exposure remain open."
       ],
       "owner": "integrator",
@@ -5021,9 +5022,18 @@
           ]
         },
         {
-          "name": "source one-root focus and full Styled integration",
+          "name": "source one-root focus and re-entry",
           "status": "not_started",
           "evidence": []
+        },
+        {
+          "name": "shared size scale and focus, selection, invalid and disabled paint",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_time_field_v1.c",
+            "tests/web/test_time_field.py",
+            "docs/TIME_FIELD_LOCALIZED.md"
+          ]
         },
         {
           "name": "opt-in localized C composition and Chromium gallery IME",

@@ -6998,9 +6998,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         for (unsigned i = 0; i < 4; ++i)
             time_field_options.segment_names[i] =
                 time_field_arabic ? cui_string(names[i]) : (cui_str){0};
-        time_field_result = cui_time_field_v1(
+        time_field_result = cui_time_field_with_size_v1(
             ui, cui_id_from(ui, "time-field"), &t, cui_string("Time"), &time_field_state,
-            &time_value, &time_field_options, (cui_time_handler){gallery_time_changed, NULL});
+            &time_value, &time_field_options, design_size,
+            (cui_time_handler){gallery_time_changed, NULL});
         char text[96];
         snprintf(text, sizeof text, "%02u:%02u:%02u · changes %zu · validation %u", time_value.hour,
                  time_value.minute, time_value.second, time_field_changes,

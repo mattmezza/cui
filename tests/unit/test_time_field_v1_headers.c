@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #if defined(CUI_TIME_FIELD_NEW_FIRST)
-#include "cui/cui_picker.h"
 #include "cui/cui_time_field_v1.h"
+#include "cui/cui_picker.h"
 #else
 #include "cui/cui_picker.h"
 #include "cui/cui_time_field_v1.h"

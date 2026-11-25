@@ -270,7 +270,8 @@ applied aggregate, never a controlled proposal/acceptance protocol.
 | Go | Scalar legacy subset only | New widget options/events omitted |
 | Rust | Scalar legacy subset only | New widget options/events omitted |
 | IME/clipboard shortcuts/physical AT | Not established by this slice | Separate host/editor evidence required |
-| Source one-root Tab/focus/size styling | Unfinished | Separate compatible review required |
+| Explicit C size and appearance | Tested subset | Shared scale, stable centered cells, focus band and separate invalid border in the [localized guide](../TIME_FIELD_LOCALIZED.md) |
+| Source one-root Tab and retained segment on re-entry | Unfinished | Separate compatible review required |
 
 No compiler or test execution for this source-only proposal. All names/signatures
 and the ordinary-global-Tab exception require review before production.

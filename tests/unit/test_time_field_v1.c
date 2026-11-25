@@ -23,6 +23,7 @@ typedef struct {
     cui_time_field_options_v1 options;
     cui_time_field_state_v1 state;
     cui_draw_list draw;
+    cui_design_size design;
     size_t calls, measurements;
     bool styled, inert, layout, omit, handler, modal;
     cui_time_change copy;
@@ -106,10 +107,15 @@ static cui_time_field_result_v1 frame(fixture *f) {
     f->preedit_length = 0;
     if (!f->omit) {
         cui_time_handler h = {.on_change = f->handler ? observe : NULL, .user = f};
-        r = f->styled ? cui_time_field_v1(f->ui, 20, &f->theme, cui_string("Time"), &f->state,
-                                          &f->time, &f->options, h)
-                      : cui_base_time_field_v1(f->ui, 20, cui_string("Time"), &f->state, &f->time,
-                                               &f->options, h);
+        if (f->design)
+            r = cui_time_field_with_size_v1(f->ui, 20, &f->theme, cui_string("Time"), &f->state,
+                                            &f->time, &f->options, f->design, h);
+        else if (f->styled)
+            r = cui_time_field_v1(f->ui, 20, &f->theme, cui_string("Time"), &f->state, &f->time,
+                                  &f->options, h);
+        else
+            r = cui_base_time_field_v1(f->ui, 20, cui_string("Time"), &f->state, &f->time,
+                                       &f->options, h);
         assert(r.status == CUI_TIME_TEXT_OK);
         if (f->options.flags & CUI_TIME_FIELD_IME_V1) {
             cui_str preedit = cui_time_field_preedit_v1(f->ui, 20, &f->composing);
@@ -698,9 +704,85 @@ static void pixels_and_text(void) {
     cui_software_destroy(renderer);
     cui_destroy(f.ui);
 }
-static void composition_edits(bool styled) {
+static bool same_color(cui_color a, cui_color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
+}
+static const cui_draw_command *paint(const fixture *f, cui_draw_type type, cui_color color) {
+    for (size_t i = 0; i < f->draw.count; i++)
+        if (f->draw.commands[i].type == type && same_color(f->draw.commands[i].color, color))
+            return &f->draw.commands[i];
+    return NULL;
+}
+static void explicit_appearance(void) {
+    fixture f;
+    init(&f, true);
+    cui_id hour = cui_time_segment_id(20, 0);
+    float previous = 0;
+    for (cui_design_size size = CUI_DESIGN_XS; size <= CUI_DESIGN_9XL; ++size) {
+        f.design = size;
+        frame(&f);
+        cui_design_metrics metrics;
+        assert(cui_design_measure(size, 1, &metrics));
+        cui_rect root = cui_bounds(f.ui, 20);
+        cui_rect cell = cui_bounds(f.ui, hour);
+        assert(root.h == metrics.control_height && root.h >= previous);
+        assert(cell.h == metrics.line_height &&
+               fabsf(cell.y + cell.h / 2 - root.y - root.h / 2) < .01f);
+        const cui_draw_command *digits = paint(&f, CUI_DRAW_TEXT, f.theme.text);
+        assert(digits && digits->font_size == metrics.font_size);
+        assert(fabsf(digits->bounds.x + digits->bounds.w / 2 - cell.x - cell.w / 2) < .01f);
+        previous = root.h;
+    }
+    f.theme.font_size = 14;
+    f.design = CUI_DESIGN_BASE;
+    f.options.flags = CUI_TIME_FIELD_OWNER_INVALID_V1 | CUI_TIME_FIELD_IME_V1;
+    focus(&f, 0);
+    frame(&f);
+    cui_rect root = cui_bounds(f.ui, 20);
+    assert(root.h == 28);
+    assert(paint(&f, CUI_DRAW_RECT, f.theme.input_background));
+    const cui_draw_command *ring = paint(&f, CUI_DRAW_BORDER, f.theme.focus);
+    const cui_draw_command *invalid = paint(&f, CUI_DRAW_BORDER, f.theme.danger);
+    const cui_draw_command *selection = paint(&f, CUI_DRAW_RECT, f.theme.selection);
+    assert(ring && ring->stroke == 2 && ring->bounds.w == root.w + 4 &&
+           ring->bounds.y == root.y - 2);
+    assert(invalid && invalid->stroke == 1 && invalid->bounds.w == root.w);
+    assert(selection && selection->radius == f.theme.radius / 2);
+    float stable_width = root.w;
+    key(&f, CUI_KEY_UP, 0);
+    assert(frame(&f).changed && f.calls == 1 && f.time.hour == 10);
+    assert(cui_bounds(f.ui, 20).w == stable_width);
+
+    f.theme.hide_focus_ring = true;
+    frame(&f);
+    assert(!paint(&f, CUI_DRAW_BORDER, f.theme.focus));
+    assert(paint(&f, CUI_DRAW_BORDER, f.theme.danger));
+    assert(paint(&f, CUI_DRAW_RECT, f.theme.selection));
+    f.theme.hide_focus_ring = false;
+    f.options.flags |= CUI_TIME_FIELD_DISABLED_V1;
+    key(&f, CUI_KEY_UP, 0);
+    assert(!frame(&f).changed && f.calls == 1 && f.time.hour == 10);
+    assert(!paint(&f, CUI_DRAW_BORDER, f.theme.focus) &&
+           !paint(&f, CUI_DRAW_RECT, f.theme.selection));
+    cui_color dimmed_danger = f.theme.danger;
+    dimmed_danger.a /= 2;
+    assert(paint(&f, CUI_DRAW_BORDER, dimmed_danger));
+
+    f.options.flags = 0;
+    assert(cui_begin_frame(f.ui, 1200, 400, .016f));
+    cui_time_field_state_v1 before = f.state;
+    cui_time_field_result_v1 result = cui_time_field_with_size_v1(
+        f.ui, 20, &f.theme, cui_string("Time"), &f.state, &f.time, &f.options,
+        (cui_design_size)(CUI_DESIGN_9XL + 1), (cui_time_handler){observe, &f});
+    assert(result.status == CUI_TIME_TEXT_INVALID_ARGUMENT && f.calls == 1);
+    assert(f.state.last_frame_sequence == before.last_frame_sequence && f.time.hour == 10);
+    assert(cui_end_frame(f.ui).count == 0);
+    cui_destroy(f.ui);
+}
+static void composition_edits(bool styled, cui_design_size size) {
     fixture f;
     init(&f, styled);
+    f.design = size;
     f.options.flags = CUI_TIME_FIELD_IME_V1;
     cui_time_locale_v1 locale;
     cui_time_locale_init_v1(&locale);
@@ -734,7 +816,11 @@ static void composition_edits(bool styled) {
         cui_rect caret;
         assert(cui_text_input_rect(f.ui, &caret));
         cui_rect cell = cui_bounds(f.ui, hour);
-        assert(caret.x > cell.x && caret.x < cell.x + cell.w && caret.h == f.theme.font_size);
+        cui_design_metrics design;
+        float height = cui_design_measure(size, f.theme.font_size / 16, &design)
+                           ? design.font_size
+                           : f.theme.font_size;
+        assert(caret.x > cell.x && caret.x < cell.x + cell.w && caret.h == height);
         assert(cell.x == f.hour_bounds.x && cell.w == f.hour_bounds.w);
     }
     assert(!frame(&f).changed && f.composing == hour);
@@ -865,11 +951,13 @@ int main(void) {
         paste_and_bounds(styled != 0);
         inactive_and_generation(styled != 0);
         readiness_recovery(styled != 0);
-        composition_edits(styled != 0);
+        composition_edits(styled != 0, CUI_DESIGN_INHERIT);
         composition_handoff(styled != 0);
     }
     atomic_preflight();
     pixels_and_text();
+    explicit_appearance();
+    composition_edits(true, CUI_DESIGN_XL);
     printf("localized TimeField: PASS state=%zu options=%zu result=%zu\n",
            sizeof(cui_time_field_state_v1), sizeof(cui_time_field_options_v1),
            sizeof(cui_time_field_result_v1));

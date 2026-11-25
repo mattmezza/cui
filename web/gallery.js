@@ -3,7 +3,7 @@ import {createSecureInputBridge} from "./secure_input.js";
 import {createCuiShadowRenderer,cuiShadowWasmRasterizer} from "./modules/cui_shadow.js";
 import {createCuiMeshRenderer} from "./modules/cui_mesh.js";
 import {paintGradientText} from "./modules/cui_text_paint.js";
-import {selectedUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage} from "./modules/cui_usage.js";
+import {selectedUsage,timeFieldUsage,virtualInboxUsage,liveDataTableUsage,pagedDataTableUsage} from "./modules/cui_usage.js";
 import {resizableUsage} from "./modules/cui_resizable_usage.js";
 import {stepperUsage} from "./modules/cui_stepper_usage.js";
 import {spinnerUsage} from "./modules/cui_spinner_usage.js";
@@ -627,29 +627,7 @@ cui_end_box(ui);
  Calendar:'/* Supply today as a host-local civil date when desired. */\ncui_calendar_ex(ui, id, &theme, &state, &selection, options,\n    (cui_calendar_presentation_options){\n        .month_toggle = true, .neighboring_days = true});',
  DatePicker:'cui_date_picker_ex(ui, id, &theme, label, &state, &selection, options,\n    (cui_date_picker_calendar_options){.presentation = {\n        .month_toggle = true, .neighboring_days = true}});',
  ColorPicker:'cui_color_picker(ui, id, &theme,\n    &state, &color, options);',
- TimeField:`#include <cui/cui_time_field_v1.h>
-
-/* Call init once per field. Keep the options, state and time between frames. */
-typedef struct {
-    cui_time_field_options_v1 options;
-    cui_time_field_state_v1 state;
-    cui_time value;
-} time_field_example;
-
-static bool time_field_init(time_field_example *field) {
-    field->value = (cui_time){9, 30, 0};
-    if (cui_time_field_options_init_v1(&field->options) != CUI_TIME_TEXT_OK)
-        return false;
-    field->options.flags = CUI_TIME_FIELD_IME_V1;
-    return cui_time_field_state_init_v1(&field->state, field->value,
-                                      &field->options) == CUI_TIME_TEXT_OK;
-}
-
-static cui_time_field_result_v1 time_field_draw(cui_context *ui, cui_id id,
-        const cui_theme *theme, time_field_example *field) {
-    return cui_time_field_v1(ui, id, theme, cui_string("Time"),
-        &field->state, &field->value, &field->options, (cui_time_handler){0});
-}`,
+ TimeField:timeFieldUsage(3),
  Combobox:'cui_combobox(ui, id, &theme, label, query,\n    items, 4, scratch, 4, &selection,\n    &popup, options);',
  NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, (cui_number_options){\n        .size = CUI_NUMBER_SMALL, .step = 1});',
  Pagination:'cui_pagination(ui, id, &theme,\n    &page, total_pages, true, false);',
@@ -1033,10 +1011,14 @@ function render(){
  if(!selected || (!selected.example && !(selected.name in stories)))return;
  const designScale=($('design-size').hidden?0:Number($('design-size').value)),designHeights=[0,20,24,32,32,40,48,56,64,80,104,128,152,200,264];
  const gaps=[0,4,4,6,6,8,8,12,12,16,20,24,28,32,40];
+ const timeField=selected.name==='TimeField';
+ const timeFieldHeight=designHeights[designScale]*($('density').value==='1'?.875:1);
+ const wideTimeField=timeField&&designScale>=8;
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
- canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
- canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):selected.name==='TimeField'?(width<420?560:360):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ canvas.parentElement.style.overflowX=selected.name==='Avatar'||wideTimeField?'auto':'';
+ canvas.style.touchAction=wideTimeField?'pan-x':'none';
+ canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:wideTimeField?`${Math.ceil(4*timeFieldHeight)+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
+ const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):timeField?Math.max(width<420?560:360,timeFieldHeight+240):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'?($('popover-mode').value==='1'?520:320):selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?($('virtual-axis').value==='2'?390:360):selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1184,6 +1166,7 @@ function render(){
  controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
  if(selected.name==='Slider'&&!wasm.gallery_slider_stats(12))$('snippet').textContent=sliderUsage(...sliderValues(),$('disabled').checked,controlShadowsEnabled());
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
+ if(timeField)$('snippet').textContent=timeFieldUsage(designScale);
  if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value),Number($('hover-preview').value));
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='VirtualList')$('snippet').textContent=
@@ -1479,7 +1462,7 @@ function selectComponent(){
  $('plot-mode').hidden=selected.name!=='Plot';$('plot-mode').value='0';
  $('virtual-axis').hidden=selected.name!=='VirtualList';$('virtual-axis').value='0';
  for(const id of ['effect-angle','effect-blur','effect-opacity','text-family','text-size','text-weight','text-italic-control','text-paint'])$(id).hidden=selected.name!=='Theme';textPaintControl.value='0';$('effect-angle').value='35';$('effect-blur').value='0';$('effect-opacity').value='1';
- $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
+ $('design-size').hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','List','Select','Combobox','Menu','Textarea','NumberInput','Form','Input Group','OtpInput','DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech','Table','Avatar','TimeField'].includes(selected.name);$('design-size').value='3';$('control-size').hidden=$('control-size').hidden||!$('design-size').hidden;
  for(const id of ['design-radius','design-spacing'])$(id).hidden=!['Button','Checkbox','Radio','Switch','Toggle','Input','Theme'].includes(selected.name);
  $('design-radius').value='-1';$('design-spacing').value='-1';
  for(const id of ['choice-required-control','choice-invalid-control','choice-skip-tab-control'])$(id).hidden=!['Checkbox','Radio'].includes(selected.name);
@@ -1659,7 +1642,9 @@ canvas.addEventListener('wheel',e=>{
 canvas.addEventListener('pointerleave',e=>{if(e.pointerType!=='touch')pointerPresenceLeave();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('click',()=>{suppressCompatibilityMouse=false;});
-canvas.style.touchAction='none';
+canvas.parentElement.addEventListener('scroll',()=>{
+ if(selected?.name==='TimeField')syncImeTarget();
+},{passive:true});
 function cancelPageTouches(){for(const [id,t] of pageTouches)if(!t.owned)wasm?.gallery_touch(7,0,0,id,1);pageTouches.clear();requestFrame();}
 window.addEventListener('blur',()=>{cancelPageTouches();pointerFocusLoss();secureInput.reset();imeTarget=null;composing=false;wasm?.gallery_focus(0xffffffff);requestFrame();});window.addEventListener('hashchange',cancelPageTouches);
 canvas.addEventListener('lostpointercapture',e=>{const t=pageTouches.get(e.pointerId);if(!t)return;pageTouches.delete(e.pointerId);if(!t.owned)wasm?.gallery_touch(7,0,0,e.pointerId,1);requestFrame();});

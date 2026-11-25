@@ -61,6 +61,15 @@ cui_time_field_result_v1 cui_base_time_field_v1(cui_context *, cui_id, cui_str n
 cui_time_field_result_v1 cui_time_field_v1(cui_context *, cui_id, const cui_theme *, cui_str name,
                                            cui_time_field_state_v1 *, cui_time *,
                                            const cui_time_field_options_v1 *, cui_time_handler);
+/* Explicit sizes use the shared design scale at theme.font_size/16 density,
+ * centered segments, input/selection colors and a separate field focus ring.
+ * INHERIT uses cui_time_field_v1 appearance. Invalid sizes reject before
+ * submission. Options, state, editing, focus routing and callback rules match
+ * cui_time_field_v1. The control fits its localized content. */
+cui_time_field_result_v1 cui_time_field_with_size_v1(cui_context *, cui_id, const cui_theme *,
+                                                     cui_str name, cui_time_field_state_v1 *,
+                                                     cui_time *, const cui_time_field_options_v1 *,
+                                                     cui_design_size, cui_time_handler);
 /* With CUI_TIME_FIELD_IME_V1, query after submitting this frame's widget.
  * Empty unless the focused segment has an active composition; if segment is
  * supplied, it receives that segment ID or zero. Text is borrowed from the

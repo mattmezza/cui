@@ -136,16 +136,29 @@ def verify_starter(folder, values):
     assert (left, right) == (tuple(values[9:12]), tuple(values[12:15])), (width, left, right)
 
 
+def verify_starter_workspace(folder, values):
+    seq, width, height, rw, rh, main_x, main_w = values[:7]
+    assert rw == width and rh == height == 760
+    assert main_x == (220 if width >= 768 else 0) and main_x + main_w == width
+    pixel = bitmap_pixels(folder, seq, width, height)
+    assert values[15:18] != values[18:21]
+    for pane, color in ((values[7:11], values[15:18]), (values[11:15], values[18:21])):
+        x, y, w, h = pane
+        assert x > main_x and y > 0 and w > 0 and h > 0 and x + w < width and y + h < height
+        actual = pixel(x + w - 8, y + h - 8)
+        assert actual == tuple(color), (width, pane, actual, color)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--executable', required=True, type=Path)
     parser.add_argument('--font', required=True, type=Path)
-    parser.add_argument('--scene', choices=('dashboard', 'starter'), default='dashboard')
+    parser.add_argument('--scene', choices=('dashboard', 'starter', 'starter-workspace'), default='dashboard')
     args = parser.parse_args()
-    if args.scene == 'starter':
+    if args.scene in ('starter', 'starter-workspace'):
         widths = [224, 768, 1400, 360, 767, 960] * 4
-        required = {224, 768, 1400}
-        verify = verify_starter
+        required = set(widths) if args.scene == 'starter-workspace' else {224, 768, 1400}
+        verify = verify_starter if args.scene == 'starter' else verify_starter_workspace
     else:
         widths = [360, 800, 1400, 480, 1100, 640] * 4
         required = {360, 800, 1400}
@@ -182,8 +195,11 @@ def main():
             title = folder.name
             quit_file = folder / 'quit'
             env = dict(os.environ, SDL_VIDEODRIVER='x11', SDL_RENDER_DRIVER='software')
-            child = subprocess.Popen([str(args.executable.resolve()), str(args.font.resolve()),
-                str(folder), str(quit_file), title], env=env, stdout=subprocess.PIPE,
+            command = [str(args.executable.resolve()), str(args.font.resolve()),
+                       str(folder), str(quit_file), title]
+            if args.scene == 'starter-workspace':
+                command.append(args.scene)
+            child = subprocess.Popen(command, env=env, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, bufsize=1)
             records = []
             selector = selectors.DefaultSelector()

@@ -3,6 +3,7 @@
 #define NATIVE_STARTER_APP_H
 #include "cui/cui_choice.h"
 #include "cui/cui_components.h"
+#include "cui/cui_resizable.h"
 #include "cui/cui_scroll.h"
 #include "cui/cui_sidebar.h"
 #include "cui/cui_surface.h"
@@ -30,7 +31,22 @@ enum {
     STARTER_DRAWER_NAV_SETTINGS = 203,
     STARTER_DRAWER_ACCOUNT = 210,
     STARTER_DRAWER_ACCOUNT_SETTINGS = 211,
-    STARTER_DRAWER_SESSION = 212
+    STARTER_DRAWER_SESSION = 212,
+    STARTER_PROJECT_WIDE = 300,
+    STARTER_PROJECT_COMPACT = 301,
+    STARTER_PROJECT_LIST = 302,
+    STARTER_PROJECT_DETAILS = 303,
+    STARTER_PROJECT_DESKTOP = 304,
+    STARTER_PROJECT_TOOLS = 305,
+    STARTER_PROJECT_TABS = 310,
+    STARTER_PROJECT_OVERVIEW = 311,
+    STARTER_PROJECT_ACTIVITY = 312,
+    STARTER_PROJECT_FILES = 313,
+    STARTER_PROJECT_RELEASES = 314,
+    STARTER_PROJECT_ACCESS = 315,
+    STARTER_PROJECT_ALL_TABS = 316,
+    STARTER_PROJECT_TAB_POPUP = 317,
+    STARTER_PROJECT_TAB_COUNT = 5
 };
 typedef struct starter_app starter_app;
 typedef void (*starter_callback)(void *user, starter_event event, const starter_app *app);
@@ -48,6 +64,13 @@ struct starter_app {
     cui_sidebar_cache navigation_cache[1];
     cui_surface_state drawer;
     cui_choice_popup account;
+    unsigned project_index;
+    cui_id project_tab;
+    cui_resizable_state project_split[2];
+    cui_resizable_slot project_slots[2][2];
+    cui_tab_scroll_state project_tab_scroll;
+    cui_tab_overflow project_overflow;
+    cui_menu_entry project_tab_entries[STARTER_PROJECT_TAB_COUNT];
     starter_callback callback;
     void *user;
 };

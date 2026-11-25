@@ -181,7 +181,9 @@ preserving page, account and edit state. Use distinct IDs for controls in
 alternate navigation layouts and transfer focus to a visible counterpart when
 closing an overlay at a breakpoint. The starter also uses auto-measured
 `cui_scrollable_begin` / `cui_scrollable_end_ex` below its pinned Menu and
-explicitly reveals focused form controls in short windows.
+reveals focused controls in short windows. Its Projects page keeps separate
+Resizable state per axis, sizes a bounded Tabs strip from the detail pane,
+and restores tab focus when the overflow button leaves the layout.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

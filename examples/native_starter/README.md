@@ -7,6 +7,11 @@ pages and account actions. Crossing the breakpoint preserves page and edit
 state. Navigation focus moves to the corresponding visible control. In short
 windows the page scrolls separately while the compact Menu stays pinned.
 
+**Projects** combines a resizable list and detail pane with bounded tabs.
+Drag the divider or focus it and use the arrow keys. Below 768, the panes
+stack and keep a separate divider position. Scroll a narrow tab strip with
+Shift-wheel or a touch swipe, or choose a tab from **All tabs**.
+
 Follow [Build your first native CUI app](../../docs/NATIVE_APP_STARTER.md) for
 prerequisites, installation, CMake, Make and direct compiler commands. The build
 consumes an installed `cui-sdl3` pkg-config package; set `PKG_CONFIG_PATH` to its
@@ -17,7 +22,7 @@ prefix. Copy this folder to start a separate project.
 - `app.h` defines persistent state, callbacks and stable IDs.
 - `app.c` submits components and applies actions.
 - `main.c` manages the native font, window, input, clipboard and render loop.
-- `test_app.c` verifies navigation, drawer dismissal, body-only scrolling and
+- `test_app.c` verifies navigation, scrolling, divider drag, tab selection and
   focus across resizes without a native window.
 
 Sign-in/out is local demonstration state; no authentication service is connected.

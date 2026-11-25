@@ -1954,7 +1954,8 @@
       "interaction": "Mouse and touch drag the handle. The focused separator responds to arrow keys. cui_resizable_resize_fn observes completed resizes.",
       "usage": "Initialize slot storage, submit panel descriptors within a feasible combined min/max range every frame and save sizes after completed resizes.",
       "docs": [
-        "docs/RESIZABLE.md"
+        "docs/RESIZABLE.md",
+        "docs/NATIVE_APP_STARTER.md"
       ],
       "callback_symbols": [
         "cui_resizable_resize_fn"
@@ -2154,7 +2155,8 @@
       "docs": [
         "docs/CHOICE.md",
         "docs/TABS_EVENTS.md",
-        "docs/TABS_SCROLL_CHAINING.md"
+        "docs/TABS_SCROLL_CHAINING.md",
+        "docs/NATIVE_APP_STARTER.md"
       ],
       "callback_symbols": [
         "cui_tab_panel_fn"

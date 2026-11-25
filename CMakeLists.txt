@@ -2244,7 +2244,12 @@ if(TARGET cui_sdl3)
     ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_continuous_resize.py --scene starter
     --executable $<TARGET_FILE:test_starter_resize>
     --font ${CMAKE_CURRENT_SOURCE_DIR}/third_party/inter/Inter-Regular.otf)
-   set_tests_properties(linux_starter_continuous_resize PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
+   add_test(NAME linux_starter_workspace_resize COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_continuous_resize.py --scene starter-workspace
+    --executable $<TARGET_FILE:test_starter_resize>
+    --font ${CMAKE_CURRENT_SOURCE_DIR}/third_party/inter/Inter-Regular.otf)
+   set_tests_properties(linux_starter_continuous_resize linux_starter_workspace_resize
+    PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
   endif()
  endif()
 endif()

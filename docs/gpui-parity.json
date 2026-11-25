@@ -5782,6 +5782,18 @@
           "limitations": [
             "Asymmetric padding is covered on both axes in headless layout. The editable horizontal workspace uses injected SDL pointer/text events and programmatic window sizes on private X11."
           ]
+        },
+        {
+          "name": "responsive split axes, separate sizes and drag cancellation in the native starter",
+          "status": "tested",
+          "evidence": [
+            "examples/native_starter/test_app.c",
+            "tests/integration/test_continuous_resize.c",
+            "docs/LINUX_LIVE_RESIZE.md"
+          ],
+          "limitations": [
+            "Application composition is covered with injected input and private-X11 SDL software rendering. Physical input and other hosts remain open."
+          ]
         }
       ],
       "upstream_doc": {
@@ -5903,7 +5915,7 @@
             "docs/NATIVE_APP_STARTER.md"
           ],
           "limitations": [
-            "The example verifies wheel and injected touch scrolling and implements application-level reveal for three Settings controls. This does not establish generalized focus reveal or physical touch coverage."
+            "The example verifies wheel and injected touch scrolling and application-level focus reveal for Projects and Settings controls. Generalized focus reveal and physical touch coverage remain open."
           ]
         },
         {
@@ -6406,6 +6418,18 @@
           "evidence": [
             "tests/integration/test_sdl_tabs_overflow.c",
             "docs/CHOICE.md"
+          ]
+        },
+        {
+          "name": "bounded strip, overflow selection and responsive focus in the native starter",
+          "status": "tested",
+          "evidence": [
+            "examples/native_starter/test_app.c",
+            "tests/integration/test_continuous_resize.c",
+            "docs/LINUX_LIVE_RESIZE.md"
+          ],
+          "limitations": [
+            "Application composition is covered with injected input and private-X11 SDL software rendering. Physical input and other hosts remain open."
           ]
         }
       ],

@@ -53,6 +53,15 @@ requested widths during a 1.48-second burst**. The headless starter tests cover
 focus transfer between navigation layouts, body-only scrolling, and drawer
 dismissal.
 
+`linux_starter_workspace_resize` runs the Projects page through the same host.
+Its X11 software run captured **48 intermediate frames at all six requested
+widths during a 1.48-second burst**. Each frame verifies the current split
+axis, divider seam, rendered pane colors and the selected tab's focus and
+visibility. The headless starter test sweeps across the breakpoint with
+held divider input and an open tab menu. It also exercises keyboard resizing,
+touch panning in the tab strip, short-window focus reveal, and navigation
+through the compact Sheet.
+
 ## Run safely
 
 After the integration target is registered, configure native SDL3/text support
@@ -64,9 +73,13 @@ cmake --build build --target test_continuous_resize
 python scripts/test_local.py --build-dir build -R '^linux_continuous_resize$' -V
 ```
 
-To include the native starter test, configure with
-`-DCUI_BUILD_NATIVE_STARTER=ON`, build `test_starter_resize`, and select
-`linux_starter_continuous_resize` in the same wrapper.
+To include the two native starter cases, configure with
+`-DCUI_BUILD_NATIVE_STARTER=ON`, build `test_starter_resize`, and select them
+through the same wrapper:
+
+```sh
+python scripts/test_local.py --build-dir build -R '^linux_starter_(continuous|workspace)_resize$'
+```
 
 The Python driver requires the wrapper's `CUI_TEST_VIRTUAL_DISPLAY=1`, a private
 X11 DISPLAY and no Wayland display; unsupported platforms/drivers return 77.

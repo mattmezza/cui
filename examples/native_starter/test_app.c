@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include "app.h"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 static unsigned calls[3];
 static float width = 960, height = 640;
@@ -291,6 +292,166 @@ static void short_settings(bool wide) {
     cui_destroy(ui);
 }
 
+static cui_rect workspace_geometry(cui_context *ui, bool wide) {
+    cui_id group_id = wide ? STARTER_PROJECT_WIDE : STARTER_PROJECT_COMPACT;
+    cui_rect group = cui_bounds(ui, group_id), left = cui_bounds(ui, STARTER_PROJECT_LIST);
+    cui_rect right = cui_bounds(ui, STARTER_PROJECT_DETAILS);
+    cui_rect divider = cui_bounds(ui, cui_resizable_handle_id(group_id, STARTER_PROJECT_LIST));
+    assert_fits(group);
+    assert(left.x == group.x && left.y == group.y);
+    if (wide) {
+        assert(fabsf(left.x + left.w - right.x) < 1 && left.y == right.y);
+        assert(fabsf(right.x + right.w - group.x - group.w) < 1 && right.h == group.h);
+        assert(fabsf(divider.x + divider.w / 2 - right.x) <= 1);
+    } else {
+        assert(fabsf(left.y + left.h - right.y) < 1 && left.x == right.x);
+        assert(fabsf(right.y + right.h - group.y - group.h) < 1 && right.w == group.w);
+        assert(fabsf(divider.y + divider.h / 2 - right.y) <= 1);
+    }
+    return divider;
+}
+
+static void project_workspace(void) {
+    starter_app a;
+    assert(starter_app_init(&a, changed, calls));
+    width = 960;
+    height = 640;
+    cui_context *ui = cui_create((cui_config){.width = width, .height = height});
+    assert(ui);
+    frame(ui, &a);
+    click(ui, &a, STARTER_NAV_PROJECTS);
+    assert(a.page == STARTER_PROJECTS && a.project_tab == STARTER_PROJECT_OVERVIEW);
+    click(ui, &a, STARTER_PROJECT_TOOLS);
+    assert(a.project_index == 1);
+
+    cui_rect divider = workspace_geometry(ui, true);
+    float initial = cui_bounds(ui, STARTER_PROJECT_LIST).w;
+    cui_event drag = {.type = CUI_EVENT_POINTER_DOWN,
+                      .x = divider.x + divider.w / 2,
+                      .y = divider.y + divider.h / 2,
+                      .pointer_type = CUI_POINTER_MOUSE,
+                      .pointer_id = 1};
+    assert(cui_queue_event(ui, drag));
+    frame(ui, &a);
+    drag.type = CUI_EVENT_POINTER_MOVE;
+    drag.x += 46;
+    assert(cui_queue_event(ui, drag));
+    width = 1040;
+    frame(ui, &a);
+    workspace_geometry(ui, true);
+    float adjusted = cui_bounds(ui, STARTER_PROJECT_LIST).w;
+    assert(adjusted > initial + 30 && a.project_split[true].dragging);
+    drag.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, drag));
+    frame(ui, &a);
+    assert(!a.project_split[true].dragging);
+
+    cui_focus(ui, STARTER_PROJECT_OVERVIEW);
+    key(ui, &a, CUI_KEY_RIGHT);
+    assert(a.project_tab == STARTER_PROJECT_ACTIVITY && cui_focused(ui) == a.project_tab);
+    width = 300;
+    frame(ui, &a);
+    frame(ui, &a);
+    workspace_geometry(ui, false);
+    assert(!a.wide_layout && a.project_index == 1);
+    assert(a.project_tab == STARTER_PROJECT_ACTIVITY && cui_focused(ui) == a.project_tab);
+    assert(a.project_tab_scroll.maximum > 0 && a.project_overflow.visible);
+
+    cui_rect strip = a.project_tab_scroll.viewport;
+    float offset = a.project_tab_scroll.offset;
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_SCROLL,
+                                           .x = strip.x + strip.w / 2,
+                                           .y = strip.y + strip.h / 2,
+                                           .dx = -2,
+                                           .modifiers = CUI_MOD_SHIFT}));
+    frame(ui, &a);
+    assert(a.project_tab_scroll.offset > offset && a.page_scroll.y == 0);
+    offset = a.project_tab_scroll.offset;
+    cui_event pan = {.type = CUI_EVENT_POINTER_DOWN,
+                     .x = strip.x + 18,
+                     .y = strip.y + strip.h / 2,
+                     .pointer_type = CUI_POINTER_TOUCH,
+                     .pointer_id = 3};
+    assert(cui_queue_event(ui, pan));
+    frame(ui, &a);
+    pan.type = CUI_EVENT_POINTER_MOVE;
+    pan.x += 58;
+    assert(cui_queue_event(ui, pan));
+    frame(ui, &a);
+    pan.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, pan));
+    frame(ui, &a);
+    assert(a.project_tab_scroll.offset < offset && a.page_scroll.y == 0);
+    assert(a.project_tab == STARTER_PROJECT_ACTIVITY);
+    click(ui, &a, STARTER_PROJECT_ALL_TABS);
+    assert(a.project_overflow.menu.overlay.open);
+    click(ui, &a, a.project_tab_entries[STARTER_PROJECT_TAB_COUNT - 1].id);
+    assert(a.project_tab == STARTER_PROJECT_ACCESS && !a.project_overflow.menu.overlay.open);
+    click(ui, &a, STARTER_PROJECT_ALL_TABS);
+    assert(a.project_overflow.menu.overlay.open);
+    width = 560;
+    frame(ui, &a);
+    assert(!a.wide_layout && !a.project_overflow.visible && !a.project_overflow.menu.overlay.open);
+    assert(cui_focused(ui) == STARTER_PROJECT_ACCESS);
+
+    width = 300;
+    frame(ui, &a);
+    click(ui, &a, STARTER_PROJECT_ALL_TABS);
+    assert(a.project_overflow.menu.overlay.open);
+    width = 1040;
+    frame(ui, &a);
+    workspace_geometry(ui, true);
+    assert(!a.project_overflow.menu.overlay.open && cui_focused(ui) == STARTER_PROJECT_ACCESS);
+    assert(fabsf(cui_bounds(ui, STARTER_PROJECT_LIST).w - adjusted) < 1);
+    assert(a.project_index == 1 && a.project_tab == STARTER_PROJECT_ACCESS);
+    assert(cui_bounds(ui, STARTER_ACCOUNT).y > 540);
+
+    /* An unfinished drag does not resize the stacked panes after a breakpoint. */
+    divider = workspace_geometry(ui, true);
+    drag = (cui_event){.type = CUI_EVENT_POINTER_DOWN,
+                       .x = divider.x + divider.w / 2,
+                       .y = divider.y + divider.h / 2,
+                       .pointer_type = CUI_POINTER_TOUCH,
+                       .pointer_id = 2};
+    assert(cui_queue_event(ui, drag));
+    frame(ui, &a);
+    assert(a.project_split[true].active_handle);
+    float compact_size = a.project_split[false].slots[0].size;
+    width = 300;
+    frame(ui, &a);
+    divider = workspace_geometry(ui, false);
+    drag.type = CUI_EVENT_POINTER_UP;
+    drag.x = divider.x + divider.w / 2;
+    drag.y = divider.y + divider.h / 2;
+    assert(cui_queue_event(ui, drag));
+    frame(ui, &a);
+    assert(!a.project_split[true].active_handle && !a.project_split[false].active_handle &&
+           a.project_split[false].slots[0].size == compact_size);
+    assert(cui_focused(ui) ==
+           cui_resizable_handle_id(STARTER_PROJECT_COMPACT, STARTER_PROJECT_LIST));
+    key(ui, &a, CUI_KEY_DOWN);
+    assert(a.project_split[false].slots[0].size > compact_size);
+    assert(fabsf(a.project_split[true].slots[0].size - adjusted) < 1);
+
+    height = 208;
+    cui_focus(ui, STARTER_PROJECT_ACCESS);
+    frame(ui, &a);
+    frame(ui, &a);
+    cui_rect visible = cui_bounds(ui, STARTER_PAGE_VIEWPORT);
+    cui_rect tab = cui_bounds(ui, STARTER_PROJECT_ACCESS);
+    assert(a.page_scroll.y > 0 && tab.y >= visible.y &&
+           tab.y + tab.h <= visible.y + visible.h + .01f);
+    height = 640;
+    frame(ui, &a);
+    click(ui, &a, STARTER_MENU);
+    assert(a.drawer.overlay.open && cui_bounds(ui, STARTER_DRAWER_ACCOUNT).y > 540);
+    click(ui, &a, STARTER_DRAWER_NAV_SETTINGS);
+    assert(a.page == STARTER_SETTINGS && !a.drawer.overlay.open);
+    assert(cui_bounds(ui, STARTER_PROJECT_DETAILS).w == 0);
+    starter_app_destroy(&a);
+    cui_destroy(ui);
+}
+
 int main(void) {
     starter_app a;
     assert(starter_app_init(&a, changed, calls));
@@ -332,5 +493,6 @@ int main(void) {
     cui_destroy(ui);
     short_settings(true);
     short_settings(false);
+    project_workspace();
     return 0;
 }

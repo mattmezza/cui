@@ -74,7 +74,8 @@ described below.
 
 The [C11 starter](../examples/native_starter/README.md) has Home, Projects and
 Settings. A sidebar or compact navigation drawer selects the page and keeps
-the account menu at the bottom. Settings edits a name, toggles notifications
+the account menu at the bottom. The current source includes a Projects workspace
+with an adjustable split and tabs. Settings edits a name, toggles notifications
 and saves local state. Sign-in and sign-out change demo state.
 
 ![Native starter Home page](../examples/native_starter/screenshots/home.png)
@@ -202,15 +203,36 @@ its available width. On crossing the breakpoint, the app closes any navigation
 overlay whose trigger is leaving the current layout. Sidebar focus moves to
 Menu in compact mode. On widening, Menu focus moves to the current page link;
 focus in the drawer moves to the matching sidebar link or account control.
-Focus in the page stays where it is. The two navigation layouts use different
-control IDs, so a press belongs to the layout where it started.
+The Settings input and Projects tabs keep their focus across layouts. The two
+navigation layouts use different IDs, so a press belongs to the layout where
+it started.
 See [responsive containers](RESPONSIVE_LAYOUT.md).
 
+## Build on the Projects workspace
+
+Open **Projects** and select either project to switch the detail header.
+At MD and wider, drag the divider between the list and details. Below MD,
+the same panes stack and the divider moves vertically. Focus the divider
+and use the arrow keys for its current axis. Each orientation keeps its
+own pane sizes, while the selected project and tab share state across layouts.
+
+Use Left and Right on a focused tab. At narrow pane widths, scroll the tab
+strip with Shift-wheel or a horizontal touch swipe, or open **All tabs** to
+select any tab. If resizing hides the overflow button, focus moves to the
+selected tab. If the resize changes the split's axis, the starter cancels
+any divider drag and moves divider focus to the new handle.
+
+Use `project_workspace` as the starting point for your own panes. Keep the
+`cui_resizable_state` and slots in app storage. The pane callbacks borrow their
+arguments during submission. The detail callback uses the resized pane's width
+to bound `cui_tabs`. The CUI IDs for project links and tabs stay the same across
+layouts. [Starter source](../examples/native_starter/app.c)
+
 The page uses an auto-measured Scrollable below the compact Menu button. Short
-windows can scroll to the bottom of Settings by wheel or touch. The starter uses
-the previous layout bounds to reveal a newly focused form control. It shows the
-scrollbar only when the page overflows and holds content width steady as the bar
-comes and goes. A new page starts at the top.
+windows can scroll by wheel or touch. The starter uses the previous layout
+bounds to reveal focused Projects and Settings controls vertically. It shows
+the scrollbar when the page overflows and holds content width steady as the
+bar comes and goes. A new page starts at the top.
 
 Navigation uses `cui_sidebar_menu` activation callbacks. Settings uses
 `cui_input_ex`, `cui_checkbox` and `cui_button`. Extend `changed()` with your

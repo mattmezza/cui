@@ -71,6 +71,11 @@ function declarations produce matching paths only. `api SYMBOL --full` restores
 complete matching headers. `--declaration` explicitly selects the concise API view.
 No output is clipped or filtered by safety keywords.
 
+For HoverCard, read the fit section of `docs/CONTENT.md`. Zero height fits
+children and may request one follow-up for edge placement. A child height
+change remeasures automatically. Tap dismissal and its host limits are in
+`docs/HOVER_CARD_EXTENDED.md`.
+
 `read PATH` still prints the exact full document; `info` lists paths and hashes.
 For broad Markdown guides use `read PATH --headings`, then
 `read PATH --section 'Exact heading title'`. Sections include child headings up to

@@ -1465,7 +1465,8 @@
       "tests": [
         "tests/unit/test_content.c",
         "tests/unit/test_hover_card_extended.c",
-        "tests/unit/test_hover_card_extended_header.cpp"
+        "tests/unit/test_hover_card_extended_header.cpp",
+        "tests/web/test_hover_card_release.py"
       ],
       "status": "tested",
       "platforms": {
@@ -1473,7 +1474,7 @@
         "wasm_browser": "tested_partial"
       },
       "limitations": [
-        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. advanced focus ownership and complete native accessibility bridge pending.",
+        "Delayed hover/focus, interactive content retention, viewport portals/collision and Escape suppression tested. Collision uses previous trigger geometry. Intrinsic child height changes request a measured placement follow-up. Advanced focus ownership and complete native accessibility bridge remain pending.",
         "Opt-in tap policy supports conservative outside taps and raw primary releases outside prior content bounds with CUI consumption/modal routing. Core controls/expanded snapshots are supported; exclusive overlay ownership, explicit collapsed AccessKit state, live AT and foreign wrappers remain unsupported. See docs/HOVER_CARD_EXTENDED.md."
       ],
       "owner": "integrator",
@@ -1490,8 +1491,10 @@
           "name": "popup placement/collision",
           "status": "tested",
           "evidence": [
-            "tests/unit/test_content.c"
-          ]
+            "tests/unit/test_content.c",
+            "tests/web/test_hover_card_release.py"
+          ],
+          "scope": "Intrinsic compact and wrapped content, changes while open, narrow edge placement and quiescence after the measured follow-up. Positive fixed height and intrinsic caps remain available."
         },
         {
           "name": "explicit tap toggle, conservative outside taps and admitted-panel semantic relationship",
@@ -1510,9 +1513,10 @@
           "evidence": [
             "tests/unit/test_hover_card_extended.c",
             "tests/unit/test_hover_card_extended_header.cpp",
+            "tests/web/test_hover_card_release.py",
             "examples/hover_card_extended/main.c"
           ],
-          "scope": "Additive TAP_TOGGLE-only release policy; finite unconsumed primary up outside prior valid content bounds, no down/movement requirement. Accepted trigger activation uses entry-open; existing disabled/Escape/placement precedence and callback timing preserved. Actual-browser proof remains a separate fixture."
+          "scope": "Additive TAP_TOGGLE-only release policy; finite unconsumed primary up outside prior valid content bounds, no down/movement requirement. Accepted trigger activation uses entry-open; existing disabled/Escape/placement precedence and callback timing preserved. Actual WASM covers pointer drag, trigger/content hit, keyboard and touch."
         },
         {
           "name": "explicit collapsed native accessibility state",

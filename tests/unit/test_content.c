@@ -160,6 +160,26 @@ static void hover_intrinsic(void) {
     cui_rect middle = cui_bounds(edge, 82);
     assert(fabsf(middle.h - small.h) < .02f && middle.y + middle.h <= 100);
     cui_destroy(edge);
+    /* With the same options and revision, caller content can grow while open.
+     * It should schedule its own placement update, then let an idle loop sleep. */
+    float live_y = 180 - 24 - 4 - small.h - 2;
+    for (unsigned i = 0; i < 3; i++)
+        intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, live_y, false);
+    assert(fabsf(cui_bounds(ui, 82).y - (live_y + 28)) < .02f);
+    assert(!cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, live_y, true);
+    assert(cui_bounds(ui, 82).y + cui_bounds(ui, 82).h <= 180.02f);
+    assert(cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, live_y, true);
+    cui_rect live = cui_bounds(ui, 82);
+    assert(live.h > small.h && live.y < live_y && live.y >= 0 && live.y + live.h <= 180.02f);
+    assert(!cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, live_y, false);
+    assert(cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 0, 0, live_y, false);
+    assert(fabsf(cui_bounds(ui, 82).y - (live_y + 28)) < .02f);
+    assert(fabsf(cui_bounds(ui, 82).h - small.h) < .02f);
+    assert(!cui_needs_redraw(ui));
     for (unsigned i = 0; i < 3; i++)
         intrinsic_hover_scene(ui, &t, &state, 220, 0, 0, 1, 145, true);
     cui_rect wrapped = cui_bounds(ui, 82);
@@ -171,8 +191,14 @@ static void hover_intrinsic(void) {
     assert(narrow.h > wrapped.h && narrow.y >= 0 && narrow.y + narrow.h <= 180);
     for (unsigned i = 0; i < 3; i++)
         intrinsic_hover_scene(ui, &t, &state, 200, 0, 50, 2, 5, false);
-    assert(cui_bounds(ui, 82).h <= 50.02f);
-    intrinsic_hover_scene(ui, &t, &state, 200, 90, 30, 3, 5, false);
+    assert(fabsf(cui_bounds(ui, 82).h - 50) < .02f && !cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 50, 2, 5, true);
+    assert(fabsf(cui_bounds(ui, 82).h - 50) < .02f && !cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 50, 3, 5, true);
+    assert(cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 0, 50, 3, 5, true);
+    assert(!cui_needs_redraw(ui));
+    intrinsic_hover_scene(ui, &t, &state, 200, 90, 30, 4, 5, false);
     assert(fabsf(cui_bounds(ui, 82).h - 90) < .02f);
     /* Closed/omitted content does not retain caller storage or pin resources. */
     cui_focus(ui, 0);

@@ -12,7 +12,32 @@ Keyboard formatting takes modifier bits, the display key label, and an explicit 
 
 The legacy `cui_spinner` is an eight-dot phase ring with Loading status semantics and moving-frame invalidation. Use `cui_spinner_ex` for the source-style decorative Loader SVG, custom color/icon/easing/size and caller-owned bounded wake scheduling; see [Spinner](SPINNER.md). Skeleton supports arbitrary size, radius, a secondary opacity, and a legacy cosine pulse; `cui_skeleton_ex` adds source-style caller-clocked motion. Reduced motion freezes both APIs. Divider accepts horizontal/vertical orientation and length.
 
-`cui_hover_update` is the reusable Tooltip/HoverCard timing reducer. Trigger hover and keyboard focus open after a configured delay. Once open, hovering content keeps it open; leaving starts a cancellable close delay. Escape or disabled closes immediately. Invalid time steps do not advance timers. `cui_tooltip` and the composable HoverCard begin/end pair now render viewport portals above their clipping ancestors. They observe previous-frame clipped trigger/card regions, support keyboard-focus opening, and flip/clamp popup placement to the provided viewport. Escape suppresses reopening until hover and focus leave the trigger. Cards keep open while their contents are hovered or a child retains focus; tooltips never own a focus stop. Trigger descriptions preserve existing semantic details. Applications supply viewport and popup dimensions and frame time; text/layout is clipped to those bounds. Automatic text sizing/wrapping, tooltip animation, collision avoidance among unrelated overlays, native accessibility announcements, and all upstream appearance options remain pending. HoverCard is nonmodal and does not trap or take keyboard focus.
+`cui_hover_update` is the reusable Tooltip/HoverCard timing reducer. Trigger hover
+and keyboard focus open after a configured delay. Hovering card content or
+focusing a child keeps the card open. Leaving starts a cancellable close delay.
+Escape or disabled closes immediately. Escape suppresses reopening until hover
+and focus leave the trigger. Both components use previous-frame trigger geometry
+and flip or clamp their portals to the supplied viewport. HoverCard is nonmodal.
+Tooltips never own a focus stop, and their descriptions preserve the trigger's
+existing semantic details.
+
+### Fit a HoverCard to its children
+
+Submit the trigger first and pass its ID, the viewport and the frame time.
+Leave `height` at zero to fit the card around its children. Text wraps
+inside the supplied width after accounting for padding. A positive
+`max_height` caps the intrinsic card, and clipped content that needs scrolling
+can use an explicit scroll region. A positive `height` sets a fixed card size
+subject to the viewport.
+
+Placement starts with the previous measurement and clips that frame to the
+viewport. If a child changes the fitted height, CUI requests a follow-up frame
+to update collision placement. This also works while a card is already open.
+`content_revision` is optional and can explicitly request a redraw when
+the app moves an anchor within the same viewport. Submit the requested redraw
+in idle hosts. The gallery shows this with compact, wrapped and near-edge
+profiles. Tooltip animation, coordination among unrelated overlays and native
+accessibility announcements remain outside this behavior.
 
 Headless tests verify UTF-8 validation, formatting truncation, lifecycle transitions, reduced motion and animated redraw, measured geometry, named semantic snapshots, controlled pointer dismissal, actual portal clipping escape, edge flipping, keyboard opening, hover-card retention, Escape suppression, trigger-description preservation, and omission of dismissed content across all four themes. The worker compiles the new files with C11 strict warnings, runs `test_content` linked to the core library, and runs the existing CTest suite. Build/distribution registration belongs to the integrator.
 

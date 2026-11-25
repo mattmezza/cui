@@ -1657,8 +1657,15 @@ static void conversation_row(cui_context *context, cui_id id, size_t index, void
 static cui_hover_state tooltip_state, card_state;
 static cui_hover_card_contact card_contact;
 static int card_policy;
+typedef enum { CARD_PROFILE, CARD_BIO, CARD_EDGE } gallery_card_view;
+static gallery_card_view card_view;
 static unsigned card_changes;
 static cui_hover_card_extended_result card_result;
+static void gallery_card_reset(void) {
+    card_state = (cui_hover_state){0};
+    card_contact = (cui_hover_card_contact){0};
+    card_result = (cui_hover_card_extended_result){0};
+}
 static void gallery_card_changed(void *user, const cui_hover_lifecycle_event *event) {
     (void)user;
     (void)event;
@@ -1668,10 +1675,14 @@ void gallery_hover_policy(int policy) {
     int next = policy >= 0 && policy <= 2 ? policy : 0;
     if (next != card_policy) {
         card_policy = next;
-        card_state = (cui_hover_state){0};
-        card_contact = (cui_hover_card_contact){0};
-        card_result = (cui_hover_card_extended_result){0};
+        gallery_card_reset();
     }
+}
+void gallery_hover_preview(int preview) {
+    gallery_card_view next = preview == 1 ? CARD_BIO : preview == 2 ? CARD_EDGE : CARD_PROFILE;
+    if ((card_view == CARD_EDGE) != (next == CARD_EDGE))
+        gallery_card_reset();
+    card_view = next;
 }
 static cui_virtual_list *virtual_list;
 static cui_virtual_list *virtual_horizontal;
@@ -3548,6 +3559,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     if (design_spacing >= 0)
         t.gap = cui_space(design_spacing);
     if (previous_story != story) {
+        if (previous_story == 24)
+            gallery_card_reset();
         if (previous_story == 78)
             (void)cui_speech_cancel(&speech_state);
         if (story == 59)
@@ -5639,7 +5652,14 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     case 23:
     case 24: {
         cui_id trigger = cui_id_from(ui, "hover-trigger");
+        bool edge = story == 24 && card_view == CARD_EDGE;
+        if (edge)
+            cui_begin_absolute_box(ui, 0, (cui_box){.align_x = CUI_ALIGN_END},
+                                   (cui_rect){24, height - 103, fmaxf(1, width - 48),
+                                              t.control_height});
         bool accepted = cui_button(ui, trigger, &t, cui_string("Hover or focus here"), disabled);
+        if (edge)
+            cui_end_box(ui);
         cui_hover_options options = {.trigger = trigger,
                                      .viewport = {0, 0, width, height},
                                      .side = CUI_POPUP_BELOW,
@@ -5673,7 +5693,12 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             }
             if (admitted) {
                 cui_label(ui, &t, cui_string("Alex Morgan"));
-                cui_label(ui, &t, cui_string("A composable floating card."));
+                cui_label(
+                    ui, &t,
+                    cui_string(card_view == CARD_PROFILE
+                                   ? "A composable floating card."
+                                   : "Alex designs tools for teams and keeps a notebook full of "
+                                     "ideas from the people who use them."));
                 cui_end_hover_card(ui);
             }
         }

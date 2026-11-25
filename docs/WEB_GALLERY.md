@@ -216,4 +216,13 @@ coverage excludes date-time editing, arbitrary styling, observers and bindings.
 
 DatePicker additionally offers an explicit **Date + time** mode using the optional single civil date/time C facade. Minute/second, 12/24-hour and clear/Delete controls appear only in that mode; date-only/Date-only actions modes remain available when it is off. See `docs/DATE_TIME_PICKER.md` for state transfer, preset/default-time and source-event limits. Headless desktop and CDP touch proof lives in `tests/web/test_date_time_picker_gallery.py`; copied snippets strictly compile as C11.
 
-HoverCard offers explicit legacy hover/focus, conservative tap and raw-primary-release modes. The tap modes show the additive direct-C policy and copyable C snippet; raw releases use prior content-only bounds, while conservative taps retain the matching outside down/up rule. `tests/web/test_hover_card_release.py` is the focused actual-WASM mouse/keyboard/touch regression fixture; its execution is a separate validation step. Native collapsed accessibility and foreign binding policy exposure remain limited as described in `HOVER_CARD_EXTENDED.md`.
+HoverCard offers legacy hover/focus, conservative tap and raw-primary-release
+modes. Open the compact profile in a tap mode and switch to **Wrapped bio**
+to see it remeasure while it stays open. **Near bottom edge** puts the trigger
+low in the preview so the measured card can flip above it. The copyable C
+example follows both selectors. Raw releases use prior content-only bounds.
+Conservative taps require a matching outside down/up. The focused actual-WASM
+fixture `tests/web/test_hover_card_release.py` covers mouse, keyboard, touch,
+live fit, edge placement and gallery-route cleanup. Native collapsed
+accessibility and foreign policy exposure remain limited as described in
+`HOVER_CARD_EXTENDED.md`.

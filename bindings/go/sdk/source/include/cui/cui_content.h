@@ -317,8 +317,8 @@ typedef struct {
     float width, height, gap, dt, open_delay, close_delay;
     bool disabled;
     /* HoverCard only: height<=0 fits children; positive max_height bounds the
-     * intrinsic panel. Increment revision when arbitrary child content changes
-     * without a width change so collision placement receives a measured redraw. */
+     * intrinsic panel. Changing content_revision explicitly requests a placement
+     * redraw. Ordinary child height changes are measured automatically. */
     float max_height;
     uint64_t content_revision;
 } cui_hover_options;
@@ -330,9 +330,9 @@ bool cui_tooltip(cui_context *ui, cui_id id, const cui_theme *theme, cui_hover_s
                  cui_str text, cui_hover_options options);
 /* Pair end only when begin returns true; accepts arbitrary children without a
  * modal focus trap. Hover/focus inside the open card extends its lifetime.
- * Default height fits children and is bounded by the viewport. Collision
- * placement settles after the retained measurement redraw; explicit positive
- * height remains fixed. Context owns measurement storage, not the caller. */
+ * Default height fits children and is bounded by the viewport. If the current
+ * measured height changes the fit estimate, CUI requests a follow-up frame
+ * for placement. Explicit positive height remains fixed. CUI owns storage. */
 bool cui_begin_hover_card(cui_context *ui, cui_id id, const cui_theme *theme,
                           cui_hover_state *state, cui_str name, cui_hover_options options);
 void cui_end_hover_card(cui_context *ui);

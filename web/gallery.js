@@ -308,6 +308,7 @@ $('icon-size').after(iconLayoutControl);iconLayoutControl.addEventListener('chan
 
 for(const [id,label,choices] of [
  ['hover-policy','HoverCard dismissal',[['0','Legacy hover/focus'],['1','Tap toggle · conservative outside tap'],['2','Tap toggle · outside release']]],
+ ['hover-preview','HoverCard content',[['0','Compact profile'],['1','Wrapped bio'],['2','Near bottom edge']]],
  ['spinner-size','Spinner size',[['12','Extra small · 12px'],['14','Small · 14px'],['16','Medium · 16px'],['24','Large · 24px'],['64','Custom · 64px']]],
  ['spinner-icon','Spinner icon',[['0','Loader'],['1','Loader circle'],['2','Arrow right']]],
  ['spinner-color','Spinner color',[['0','Theme foreground'],['1','Custom pink'],['2','Transparent']]],
@@ -566,7 +567,6 @@ cui_end_box(ui);
 /* Schedule next_wake on the same clock as now_seconds. Zero means idle. */`,
  Spinner:'/* Retain one zero-initialized motion per spinner between frames. */\ncui_loading_motion motion = {0};\ncui_spinner_options options = cui_spinner_options_default();\noptions.now_seconds = now_seconds;\noptions.reduced_motion = reduced_motion;\ncui_loading_motion_result result;\ndouble next_wake = 0; /* Host schedules this deadline. */\nif (cui_spinner_ex(ui, id, &theme, &motion, options, &result))\n    next_wake = result.next_wake_seconds; /* Same clock domain. */\n(void)next_wake; /* Pass to the host scheduler; zero means idle. */',
  Tooltip:'/* Paint trigger before calling the tooltip. */\ncui_tooltip(ui, id, &theme, &hover, cui_string("Helpful detail"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport});',
- HoverCard:'/* Paint trigger before opening the card. */\nif (cui_begin_hover_card(ui, id, &theme, &hover, cui_string("Profile"),\n    (cui_hover_options){.trigger = trigger_id, .viewport = viewport})) {\n    cui_label(ui, &theme, cui_string("Alex Morgan"));\n    cui_end_hover_card(ui);\n}',
  'Focus Trap':'if (cui_begin_focus_scope(ui, scope_id, true)) {\n    /* Paint focusable children here. */\n    cui_end_focus_scope(ui);\n}',
  Clipboard:'/* Install clipboard_set/get on cui_platform first. */\nif (cui_button(ui, id, &theme, cui_string("Copy"), false))\n    platform.clipboard_set(platform.user, cui_string("Copied text"));',
  Shimmer:'cui_shimmer_text(ui, id, &theme, &shimmer,\n    cui_string("Loading content"), cui_shimmer_options_default());',
@@ -1030,6 +1030,7 @@ function render(){
  }
  wasm.gallery_spinner_contract_options(Number($('spinner-sizing').value),Number($('spinner-rem').value));
  wasm.gallery_hover_policy(Number($('hover-policy').value));
+ wasm.gallery_hover_preview(Number($('hover-preview').value));
  wasm.gallery_spinner_options(Number($('spinner-size').value),Number($('spinner-icon').value),Number($('spinner-color').value),Number($('spinner-easing').value));
  wasm.gallery_shimmer_mode(Number($('shimmer-mode').value));
  wasm.gallery_notification_options(Number($('notification-anchor').value),Number($('notification-kind').value),Number($('notification-autohide').checked));
@@ -1113,7 +1114,7 @@ function render(){
  controlShadowInput.disabled=selected.name==='Button'&&$('button-collection').value!=='0';
  if(selected.name==='Slider'&&!wasm.gallery_slider_stats(12))$('snippet').textContent=sliderUsage(...sliderValues(),$('disabled').checked,controlShadowsEnabled());
  if(selected.name==='Spinner')$('snippet').textContent=spinnerUsage(...['size','icon','color','easing','sizing','rem'].map(k=>Number($('spinner-'+k).value)));
- if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value))||snippets.HoverCard;
+ if(selected.name==='HoverCard')$('snippet').textContent=hoverCardUsage(Number($('hover-policy').value),Number($('hover-preview').value));
  if(selected.name==='Resizable')$('snippet').textContent=resizableUsage($('resizable-nested').checked);
  if(selected.name==='VirtualList')$('snippet').textContent=
   $('virtual-axis').value==='2'?virtualInboxUsage:snippets.VirtualList;
@@ -1349,6 +1350,7 @@ function selectComponent(){
  $('disabled').parentElement.hidden=selected.name==='Skeleton';
  stepperControls.hidden=selected.name!=='Stepper';resetStepperControls();
  $('hover-policy').hidden=selected.name!=='HoverCard';
+ $('hover-preview').hidden=$('hover-policy').hidden;
  for(const id of ['spinner-size','spinner-icon','spinner-color','spinner-easing','spinner-sizing','spinner-rem'])$(id).hidden=selected.name!=='Spinner';
  $('icon-catalog-panel').hidden=selected.name!=='Icon';if(selected.name==='Icon')loadIconCatalog();
  loadComponentApi(selected);

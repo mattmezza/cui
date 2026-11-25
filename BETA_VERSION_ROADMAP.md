@@ -97,8 +97,9 @@ subsets. Detailed ledgers and headers remain authoritative.
 ### Next component slices
 
 The native starter now combines Resizable, Sidebar, Sheet and Tabs in Projects.
-Next source slice: verify intrinsic HoverCard height, viewport placement and
-dismissal with short and wrapped content.
+HoverCard remeasures changing content while open and settles after the placement
+follow-up. The next overlay slice is Popover focus entry/return and trigger
+relationships.
 Check reported regressions against the current gallery as each slice lands.
 Ship the verified builders with the next release.
 
@@ -114,7 +115,7 @@ Ship the verified builders with the next release.
 | 4 | Tabs | Projects verifies bounded scrolling, horizontal touch pan, overflow selection and focus handoff when resize hides the trigger. Private X11 confirms the selected tab stays visible and focused. Existing library focus behavior stays available. Publication remains open. |
 | 4 | TitleBar | Exercise decorated Cocoa traffic lights and Retina placement on a Mac. Close documented native drag and system-window menu gaps by host capability. [TitleBar guide](docs/CHROME.md#title-bar) |
 | 5 | Dialog / AlertDialog | Composed Base and Styled surfaces drop held mouse, touch and Space on reopen, with focus restored and fresh activation verified. Intrinsic sizing and fixed-Footer scrolling have focused checks. Finish root ownership and foreign slot builders. |
-| 5 | Popover / HoverCard | Fit short content to its natural height, stay inside the viewport and verify the appropriate focus, dismissal and touch behavior for each surface. |
+| 5 | Popover / HoverCard | HoverCard now has compact, wrapped and near-edge WASM profiles with copyable C. Native checks cover live height changes and idle quiescence. Chromium checks narrow touch placement, strict/raw dismissal and route cleanup. Deployment, broader focus ownership and native accessibility remain open. Next for Popover: focus entry/return and trigger relationships. |
 | 5 | Select / Combobox / Command | Command grow-width row paint and hit targets follow the parent from the first frame, with a follow-up for width-dependent custom heights. Headless Chromium verifies Select trigger centering and full-width rows, keyboard selection and edge taps across Select, Combobox and Command. Deployment and physical device checks remain open. |
 | 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
 | 6 | Input / Textarea | Verify word movement, line movement, caret/selection visibility and IME placement across wrapped or scrolled content. Keep new Editor features lower priority. |

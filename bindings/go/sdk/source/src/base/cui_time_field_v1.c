@@ -290,14 +290,6 @@ syntax:
     s->validation = CUI_TIME_TEXT_INVALID_SYNTAX;
     return false;
 }
-typedef struct {
-    cui_id segment;
-    uint64_t frame;
-    size_t length;
-    bool awaiting_commit;
-    char text[CUI_TIME_TEXT_MAX_BYTES_V1];
-} cui_tfw_preedit;
-
 static const cui_id cui_tfw_preedit_resource = UINT64_C(0x3deac05a9c016746);
 
 cui_str cui_time_field_preedit_v1(cui_context *ui, cui_id id, cui_id *segment) {
@@ -307,7 +299,7 @@ cui_str cui_time_field_preedit_v1(cui_context *ui, cui_id id, cui_id *segment) {
         return (cui_str){0};
     const cui_tfw_preedit *p = cui_resource_find(ui, id, cui_tfw_preedit_resource);
     if (!p || p->frame != cui_frame_sequence(ui) || p->awaiting_commit || !p->segment ||
-        p->segment != cui_focused(ui))
+        (p->root ? p->root : p->segment) != cui_focused(ui))
         return (cui_str){0};
     if (segment)
         *segment = p->segment;
@@ -439,8 +431,11 @@ cui_time_field_result_v1 cui_time_field_v1_compose(cui_context *ui, cui_id id, c
     bool ready = writable && consecutive && cui_frame_input_snapshot_ready(ui);
     bool ime = (o->flags & CUI_TIME_FIELD_IME_V1) != 0;
     cui_tfw_preedit *preedit = ime ? cui_resource_find(ui, id, cui_tfw_preedit_resource) : NULL;
-    if (preedit && (!ready || preedit->frame != frame - 1))
-        preedit->segment = 0;
+    if (preedit) {
+        if (preedit->root || !ready || preedit->frame != frame - 1)
+            preedit->segment = 0;
+        preedit->root = 0;
+    }
     if (writable) {
         bool reset = !consecutive || !cui_time_field_v1_equal(s->last_value, *t) ||
                      s->edit_generation != o->edit_generation || s->last_cycle != o->text.cycle ||
@@ -684,6 +679,41 @@ typedef struct {
 static void cui_tfw_frame_blur(void *user) {
     cui_tfw_frame_field *field = user;
     cui_tfw_reset(&field->state);
+    field->preedit.segment = 0;
+    field->text_current = false;
+}
+static cui_id cui_tfw_frame_text_owner(void *user) {
+    cui_tfw_frame_field *field = user;
+    return field->text_current ? cui_time_segment_id(field->entry.id, field->state.segment) : 0;
+}
+static void cui_tfw_frame_compose(cui_tfw_frame_field *field, const cui_event *event) {
+    cui_tfw_preedit *p = &field->preedit;
+    cui_id target = event->composition_target;
+    cui_str text = cui_tfw_text(event);
+    if (event->type == CUI_EVENT_COMPOSITION_START || event->type == CUI_EVENT_COMPOSITION_UPDATE) {
+        if (event->type == CUI_EVENT_COMPOSITION_UPDATE && !cui_tfw_preedit_valid(text)) {
+            if (p->segment == target) {
+                p->length = 0;
+                p->awaiting_commit = false;
+            }
+            return;
+        }
+        p->segment = target;
+        p->awaiting_commit = false;
+        p->length = event->type == CUI_EVENT_COMPOSITION_UPDATE ? text.length : 0;
+        if (p->length)
+            memcpy(p->text, text.data, p->length);
+    } else if (p->segment == target) {
+        if (event->type == CUI_EVENT_COMPOSITION_CANCEL && event->ime_composing) {
+            p->length = 0;
+            p->awaiting_commit = true;
+            return;
+        }
+        p->segment = 0;
+        if (event->type == CUI_EVENT_COMPOSITION_COMMIT && text.length)
+            field->rejected += !cui_tfw_compose_value(&field->state, &field->value,
+                                                     field->entry.options, text);
+    }
 }
 
 static cui_core_ordered_result cui_tfw_frame_step(void *user, const cui_event *event, cui_id hit) {
@@ -691,6 +721,8 @@ static cui_core_ordered_result cui_tfw_frame_step(void *user, const cui_event *e
     cui_time_field_state_v1 *state = &field->state;
     const cui_time_field_options_v1 *options = field->entry.options;
     if (event->type == CUI_EVENT_POINTER_DOWN) {
+        field->preedit.segment = 0;
+        field->text_current = false;
         for (unsigned i = 0; i < 4; i++)
             if (cui_tfw_visible(options, i) && hit == cui_time_segment_id(field->entry.id, i)) {
                 state->segment = i;
@@ -698,6 +730,7 @@ static cui_core_ordered_result cui_tfw_frame_step(void *user, const cui_event *e
                 return (cui_core_ordered_result){.consume = true};
             }
     } else if (event->type == CUI_EVENT_KEY_DOWN && event->key == CUI_KEY_TAB) {
+        field->preedit.segment = 0;
         unsigned selection =
             cui_tfw_next(options, state->segment, !(event->modifiers & CUI_MOD_SHIFT));
         if (selection != state->segment) {
@@ -710,12 +743,23 @@ static cui_core_ordered_result cui_tfw_frame_step(void *user, const cui_event *e
                 !(options->flags & CUI_TIME_FIELD_READONLY_V1))) {
         bool accepted;
         if (cui_tfw_edit_key(state, &field->value, options, event->key, &accepted)) {
+            field->preedit.segment = 0;
             field->rejected += !accepted;
             return (cui_core_ordered_result){.consume = true};
         }
     } else if (event->type == CUI_EVENT_TEXT && !(options->flags & CUI_TIME_FIELD_READONLY_V1)) {
+        if (field->preedit.segment && !field->preedit.awaiting_commit)
+            return (cui_core_ordered_result){.consume = true};
+        field->preedit.segment = 0;
         field->rejected += !cui_tfw_text_edit(state, &field->value, options, cui_tfw_text(event));
         return (cui_core_ordered_result){.consume = true};
+    } else if (event->type >= CUI_EVENT_COMPOSITION_START &&
+               event->type <= CUI_EVENT_COMPOSITION_CANCEL && field->text_current) {
+        cui_tfw_frame_compose(field, event);
+        return (cui_core_ordered_result){.consume = true};
+    } else if (event->type == CUI_EVENT_CANCEL) {
+        field->preedit.segment = 0;
+        field->text_current = false;
     }
     return (cui_core_ordered_result){0};
 }
@@ -730,6 +774,8 @@ cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, 
     cui_tfw_frame_batch pending = {.count = count};
     cui_core_ordered_input inputs[CUI_ORDERED_INPUT_MAX];
     uint64_t previous = cui_core_completed_sequence(ui);
+    cui_text_input_state host = {0};
+    bool has_host = cui_get_text_input_config(ui, &host);
     for (size_t i = 0; i < count; i++) {
         cui_time_field_frame_entry_v1 entry = entries[i];
         if (!entry.id || !entry.value || !cui_tfw_state(entry.state))
@@ -742,8 +788,6 @@ cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, 
         if (status != CUI_TIME_TEXT_OK)
             return status;
         const cui_time_field_options_v1 *options = entry.options;
-        if (options->flags & CUI_TIME_FIELD_IME_V1)
-            return CUI_TIME_TEXT_INVALID_CONFIG;
         status = cui_time_validate_v1(*entry.value, &options->text);
         if (status != CUI_TIME_TEXT_OK && status != CUI_TIME_TEXT_OUT_OF_RANGE)
             return status;
@@ -752,11 +796,12 @@ cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, 
         *field = (cui_tfw_frame_field){
             .entry = entry, .state = *entry.state, .value = *entry.value, .before = *entry.value};
         cui_time_field_state_v1 *state = &field->state;
-        if (disabled || !previous || state->last_frame_sequence != previous ||
+        bool reset = disabled || !previous || state->last_frame_sequence != previous ||
             !cui_time_field_v1_equal(state->last_value, field->value) ||
             state->edit_generation != options->edit_generation ||
             state->last_cycle != options->text.cycle ||
-            state->last_precision != options->text.precision) {
+            state->last_precision != options->text.precision;
+        if (reset) {
             cui_tfw_reset(state);
             state->validation = status;
         }
@@ -767,11 +812,24 @@ cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, 
         state->edit_generation = options->edit_generation;
         state->last_cycle = options->text.cycle;
         state->last_precision = options->text.precision;
+        bool ime = (options->flags & CUI_TIME_FIELD_IME_V1) &&
+                   !(options->flags & (CUI_TIME_FIELD_DISABLED_V1 | CUI_TIME_FIELD_READONLY_V1));
+        field->text_current = ime && !reset && has_host && cui_focused(ui) == entry.id &&
+                              host.owner == cui_time_segment_id(entry.id, state->segment);
+        if (field->text_current) {
+            const cui_tfw_preedit *retained =
+                cui_core_ordered_retained(ui, entry.id, cui_tfw_preedit_resource);
+            if (retained && retained->root == entry.id && retained->frame == previous &&
+                retained->generation == host.generation)
+                field->preedit = *retained;
+            field->preedit.generation = host.generation;
+        }
         inputs[i] = (cui_core_ordered_input){.root = entry.id,
                                             .step = cui_tfw_frame_step,
                                             .user = field,
                                             .disabled = disabled,
-                                            .blur = cui_tfw_frame_blur};
+                                            .blur = cui_tfw_frame_blur,
+                                            .text_owner = ime ? cui_tfw_frame_text_owner : NULL};
     }
     cui_tfw_frame_batch *batch = cui_core_ordered_reserve(ui, sizeof(pending));
     if (!batch || !cui_core_begin_ordered_frame(ui, w, h, dt, inputs, count))
@@ -794,6 +852,15 @@ cui_tfw_frame_field *cui_tfw_frame_start(cui_context *ui, cui_id id, cui_str nam
             cui_time_field_v1_equal(*f->entry.value, f->before)) {
             f->submitted = true;
             cui_tfw_submit(ui, id, name, &f->state, &f->value, f->entry.options, true);
+            if (f->preedit.segment && cui_focused(ui) == id) {
+                cui_tfw_preedit *paint = cui_resource_get(ui, id, cui_tfw_preedit_resource,
+                                                          sizeof(*paint), NULL, NULL);
+                if (!paint)
+                    return NULL;
+                f->preedit.frame = cui_frame_sequence(ui);
+                f->preedit.root = id;
+                *paint = f->preedit;
+            }
             return f;
         }
     }
@@ -808,6 +875,11 @@ cui_time_field_result_v1 cui_tfw_frame_apply(cui_context *ui, cui_tfw_frame_fiel
         (batch->ready && !cui_frame_input_snapshot_ready(ui)))
         return r;
     cui_core_ordered_publish(ui, f->entry.id);
+    unsigned flags = f->entry.options->flags;
+    if ((flags & CUI_TIME_FIELD_IME_V1) &&
+        !(flags & (CUI_TIME_FIELD_DISABLED_V1 | CUI_TIME_FIELD_READONLY_V1)))
+        cui_core_ordered_text_segment(ui, f->entry.id,
+                                      cui_time_segment_id(f->entry.id, f->state.segment));
     r.status = CUI_TIME_TEXT_OK;
     r.validation = (cui_time_text_status_v1)f->state.validation;
     r.changed = !cui_time_field_v1_equal(f->before, f->value);

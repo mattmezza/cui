@@ -71,6 +71,30 @@ commit. Other controls still receive the same ordered clear and commit
 events. An unmarked cancel terminates the session.
 [SDL IBus preedit and commit signals](https://github.com/libsdl-org/SDL/blob/7f3ae3d57459e59943a4ecfefc8f6277ec6bf540/src/core/linux/SDL_ibus.c#L207-L251).
 
+An ordered TimeField keeps logical focus on the field root while an editable
+segment owns the host text session. After frame completion, read
+`cui_get_text_input_config` to obtain the segment ID and generation. Capture
+that pair when the host session begins. Include the segment in
+`cui_event.composition_target` and offer its composition events through
+`cui_queue_text_input_event_v1`. This entry point also accepts TEXT from a
+specific text session. Normal unbound keyboard text can still use
+`cui_queue_event`. Keep the original pair on an empty preedit clear and
+its later commit. A change of selected segment, owner generation or focus
+can invalidate offers already in the queue, even when focus returns to the same
+segment in that batch. Stale offers leave the caller's value alone.
+
+```c
+/* Run outside a frame with the state captured for this host session. */
+bool accepted = cui_queue_text_input_event_v1(ui, session.generation,
+    (cui_event){.type = CUI_EVENT_COMPOSITION_UPDATE,
+                .composition_target = session.owner,
+                .text_data = preedit_utf8.data, .text_length = preedit_utf8.length});
+```
+
+Here `accepted` reports queue admission. The widget reports committed value
+changes after composition. Styled supplies a candidate rectangle for the
+selected segment. A Base author can register their own segment rectangle.
+
 Read-only, disabled, unfocused and removed controls cancel their session. External
 document revision or selection changes invalidate the old replacement range.
 Keys and ordinary text events yield while composition is active. Pointer selection
@@ -150,7 +174,8 @@ composition, Numeric Undo, masked OTP first-scalar commit, cancel and disable.
 Native headless Numeric/OTP tests cover filtering, trailing payload, callback
 counts, caller capacity, source replacement and stale-focus rejection. Injected
 SDL events check scalar-to-byte conversion with an emoji and an accented
-scalar. The SDL TimeField test covers empty editing and committed text in
-one poll and across polls, plus suppression after window focus loss. The
-tests exercise the Linux SDL adapter and Chromium. Physical IME interaction
-and system candidate UI require platform qualification.
+scalar. The ordinary and ordered SDL TimeField paths cover empty editing and
+committed text in one poll and across polls. Tests also cover window focus loss
+and a queued ordered commit after the selected segment changes. The headless
+browser exercises the per-segment IME path. Physical IME interaction and
+system candidate UI require platform qualification.

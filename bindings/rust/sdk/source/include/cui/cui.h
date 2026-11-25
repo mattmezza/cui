@@ -199,7 +199,8 @@ typedef struct {
      * next begin_frame. Selection offsets are UTF-8 bytes in preedit. */
     const char *text_data;
     size_t text_length, composition_anchor, composition_cursor;
-    cui_id composition_target; /* Optional originating focus; stale host updates are dropped. */
+    /* Optional originating focus or a qualified host text owner. */
+    cui_id composition_target;
     /* Optional host gesture metadata. Zero preserves legacy wheel steps.
      * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
     bool scroll_precise;
@@ -1164,6 +1165,12 @@ double cui_frame_time(cui_context *);
  * context recreation. No strings/model/platform pointers are retained. */
 bool cui_set_text_input_config(cui_context *, cui_id owner, cui_text_input_config);
 bool cui_get_text_input_config(const cui_context *, cui_text_input_state *);
+/* Offer TEXT or a COMPOSITION event for the finalized text owner. Set
+ * event.composition_target and pass that owner's generation. Returns false
+ * for a stale or unavailable owner without queuing input. During dispatch,
+ * an intervening focus or text-owner change can still discard the event.
+ * Text storage follows cui_queue_event. Untagged input uses its existing route. */
+bool cui_queue_text_input_event_v1(cui_context *, uint64_t generation, cui_event event);
 /* Host candidate-window rectangle, logical pixels, last painted focused caret. */
 void cui_set_text_input_rect(cui_context *, cui_id, cui_rect);
 /* Resolve a painted caret child's final layout bounds for the IME line box.

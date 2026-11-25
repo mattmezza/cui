@@ -200,7 +200,8 @@ typedef struct {
      * next begin_frame. Selection offsets are UTF-8 bytes in preedit. */
     const char *text_data;
     size_t text_length, composition_anchor, composition_cursor;
-    cui_id composition_target; /* Optional originating focus; stale host updates are dropped. */
+    /* Optional originating focus or a qualified host text owner. */
+    cui_id composition_target;
     /* Optional host gesture metadata. Zero preserves legacy wheel steps.
      * Precise deltas are logical pixels; zero-delta end/cancel events are valid. */
     bool scroll_precise;
@@ -1165,6 +1166,12 @@ double cui_frame_time(cui_context *);
  * context recreation. No strings/model/platform pointers are retained. */
 bool cui_set_text_input_config(cui_context *, cui_id owner, cui_text_input_config);
 bool cui_get_text_input_config(const cui_context *, cui_text_input_state *);
+/* Offer TEXT or a COMPOSITION event for the finalized text owner. Set
+ * event.composition_target and pass that owner's generation. Returns false
+ * for a stale or unavailable owner without queuing input. During dispatch,
+ * an intervening focus or text-owner change can still discard the event.
+ * Text storage follows cui_queue_event. Untagged input uses its existing route. */
+bool cui_queue_text_input_event_v1(cui_context *, uint64_t generation, cui_event event);
 /* Host candidate-window rectangle, logical pixels, last painted focused caret. */
 void cui_set_text_input_rect(cui_context *, cui_id, cui_rect);
 /* Resolve a painted caret child's final layout bounds for the IME line box.
@@ -1451,6 +1458,7 @@ typedef struct {
     void *user;
     bool disabled;
     void (*blur)(void *user);
+    cui_id (*text_owner)(void *user);
 } cui_core_ordered_input;
 /* Reserve context-owned typed storage before dispatch. The step callbacks and
  * their event records are borrowed only inside begin. Steps may edit the
@@ -1473,6 +1481,11 @@ typedef enum {
  * decision after completing that frame, before the host's default action. */
 bool cui_core_ordered_queue_tab(cui_context *, bool reverse);
 cui_core_ordered_tab cui_core_ordered_tab_result(const cui_context *);
+/* Register the selected editable child of the currently focused ordered root.
+ * Only a submitted delegated textbox can become the finalized host owner. */
+void cui_core_ordered_text_segment(cui_context *, cui_id root, cui_id segment);
+/* Copy the preceding resource into isolated working state before dispatch. */
+const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id namespace_id);
 #endif
 
 /* SPDX-License-Identifier: MIT */
@@ -8617,6 +8630,7 @@ struct cui_context {
     cui_id *activations;
     size_t activation_count;
     cui_event queued[CUI_CORE_EVENT_MAX], events[CUI_CORE_DISPATCH_MAX];
+    uint64_t queued_host_text[(CUI_CORE_EVENT_MAX + 63) / 64];
     size_t queued_count, event_count;
     char *queued_text[CUI_CORE_EVENT_MAX], *frame_text[CUI_CORE_EVENT_MAX];
     size_t queued_text_bytes;
@@ -8656,6 +8670,9 @@ struct cui_context {
     size_t measuring_depth;
     bool resolving_layout, wrap_failed;
     cui_id text_input_owner, composition_owner;
+    cui_id text_input_focus, ordered_text_segment;
+    uint64_t text_input_focus_generation;
+    bool ordered_text_changed;
     cui_rect text_input_bounds;
     cui_text_input_state text_input_state;
     bool text_input_exhausted;
@@ -9949,6 +9966,18 @@ static bool cui_core_queue_event(cui_context *ui, cui_event e, const double *num
 bool cui_queue_event(cui_context *ui, cui_event e) {
     return cui_core_queue_event(ui, e, NULL);
 }
+bool cui_queue_text_input_event_v1(cui_context *ui, uint64_t generation, cui_event event) {
+    cui_text_input_state input;
+    if ((event.type != CUI_EVENT_TEXT &&
+         (event.type < CUI_EVENT_COMPOSITION_START || event.type > CUI_EVENT_COMPOSITION_CANCEL)) ||
+        !event.composition_target || !cui_get_text_input_config(ui, &input) ||
+        event.composition_target != input.owner || generation != input.generation ||
+        !cui_queue_event(ui, event))
+        return false;
+    size_t i = ui->queued_count - 1;
+    ui->queued_host_text[i / 64] |= UINT64_C(1) << (i % 64);
+    return true;
+}
 bool cui_queue_accessibility_set_value_v1(cui_context *ui, cui_id id, uint32_t size,
                                           const cui_accessibility_set_value_v1 *value) {
     if (!cui_core_mutation(ui) || !ui)
@@ -9964,12 +9993,15 @@ bool cui_queue_accessibility_set_value_v1(cui_context *ui, cui_id id, uint32_t s
                                             .accessibility_action = CUI_ACCESSIBILITY_SET_VALUE},
                                 &value->value);
 }
-static void cui_core_finalize_text_input(cui_context *ui) {
-    cui_text_input_state next = {0};
+static const cui_semantic *cui_core_text_input_semantic(const cui_context *ui, cui_id owner) {
+    if (!owner || !ui->focus)
+        return NULL;
     for (size_t i = 0; i < ui->semantic_count; i++) {
         const cui_semantic *s = &ui->semantics[i];
-        if (s->id == ui->focus && s->role == CUI_ROLE_TEXTBOX && !s->disabled &&
-            !s->details.readonly &&
+        bool delegated = owner != ui->focus && s->details.no_focus &&
+                         s->details.focus_target == ui->focus && s->details.parent == ui->focus;
+        if (s->id == owner && s->role == CUI_ROLE_TEXTBOX && !s->disabled && !s->details.readonly &&
+            (delegated || (owner == ui->focus && cui_core_focusable(s))) &&
             (!s->details.text_input_configured ||
              (s->details.text_input_config.type >= CUI_TEXT_INPUT_TEXT &&
               s->details.text_input_config.type <= CUI_TEXT_INPUT_PASSWORD_VISIBLE &&
@@ -9978,21 +10010,32 @@ static void cui_core_finalize_text_input(cui_context *ui) {
             (!s->details.multiline || !s->details.text_input_configured ||
              (s->details.text_input_config.type == CUI_TEXT_INPUT_TEXT &&
               s->details.text_input_config.purpose == CUI_TEXT_INPUT_PURPOSE_UNSPECIFIED)) &&
-            cui_core_focusable(s) &&
-            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
-            next.owner = s->id;
-            next.multiline = s->details.multiline;
-            next.explicit_config = s->details.text_input_configured;
-            next.config = s->details.text_input_configured ? s->details.text_input_config
-                                                           : (cui_text_input_config){0};
-            break;
-        }
+            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal))
+            return s;
+    }
+    return NULL;
+}
+static void cui_core_finalize_text_input(cui_context *ui) {
+    cui_text_input_state next = {0};
+    const cui_semantic *s = cui_core_text_input_semantic(ui, ui->ordered_text_segment);
+    if (!s)
+        s = cui_core_text_input_semantic(ui, ui->focus);
+    if (s) {
+        next.owner = s->id;
+        next.multiline = s->details.multiline;
+        next.explicit_config = s->details.text_input_configured;
+        next.config = s->details.text_input_configured ? s->details.text_input_config
+                                                       : (cui_text_input_config){0};
     }
     cui_text_input_state old = ui->text_input_state;
     next.generation = old.generation;
+    bool delegated = next.owner && next.owner != ui->focus;
+    bool old_delegated = old.owner && old.owner != ui->text_input_focus;
     if (old.owner != next.owner || old.config.type != next.config.type ||
         old.config.purpose != next.config.purpose || old.explicit_config != next.explicit_config ||
-        old.multiline != next.multiline) {
+        old.multiline != next.multiline ||
+        ((delegated || old_delegated) &&
+         (ui->ordered_text_changed || ui->text_input_focus_generation != ui->focus_generation))) {
         if (old.generation == UINT64_MAX)
             ui->text_input_exhausted = true;
         else
@@ -10000,6 +10043,8 @@ static void cui_core_finalize_text_input(cui_context *ui) {
     }
     if (ui->text_input_exhausted)
         next.owner = 0;
+    ui->text_input_focus = next.owner ? ui->focus : 0;
+    ui->text_input_focus_generation = ui->focus_generation;
     ui->text_input_state = next;
 }
 /* SPDX-License-Identifier: MIT */
@@ -10263,6 +10308,18 @@ static const cui_core_ordered_input *cui_core_ordered_find(const cui_core_ordere
             return &inputs[i];
     return NULL;
 }
+static void cui_core_ordered_check_text(cui_context *ui, const cui_core_ordered_input *input) {
+    if (!ui->text_input_state.owner || ui->text_input_state.owner == ui->text_input_focus ||
+        ui->ordered_text_changed)
+        return;
+    if (ui->focus != ui->text_input_focus ||
+        ui->text_input_focus_generation != ui->focus_generation || !input ||
+        !input->text_owner || input->text_owner(input->user) != ui->text_input_state.owner) {
+        ui->ordered_text_changed = true;
+        if (ui->composition_owner == ui->text_input_focus)
+            ui->composition_owner = 0;
+    }
+}
 static void cui_core_ordered_blur(const cui_core_ordered_input *inputs, size_t count,
                                   cui_id before, cui_id after) {
     if (count && before && before != after) {
@@ -10322,6 +10379,20 @@ void cui_core_ordered_publish(cui_context *ui, cui_id id) {
 void cui_core_ordered_observing(cui_context *ui, bool observing) {
     ui->ordered_observing = observing;
 }
+void cui_core_ordered_text_segment(cui_context *ui, cui_id root, cui_id segment) {
+    if (cui_core_mutation(ui) && ui && ui->ordered_frame && cui_frame_sequence(ui) && root &&
+        ui->focus == root)
+        ui->ordered_text_segment = segment;
+}
+const void *cui_core_ordered_retained(const cui_context *ui, cui_id owner, cui_id namespace_id) {
+    if (ui && !ui->in_frame)
+        for (size_t i = 0; i < ui->config.max_resources; i++) {
+            const cui_core_resource *resource = &ui->resources[i];
+            if (resource->owner == owner && resource->namespace_id == namespace_id)
+                return resource->payload;
+        }
+    return NULL;
+}
 bool cui_core_ordered_queue_tab(cui_context *ui, bool reverse) {
     if (!ui || ui->ordered_queued_tab || ui->in_frame || ui->error != CUI_OK)
         return false;
@@ -10359,6 +10430,9 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
     for (size_t i = 0; i < input_count; ++i)
         if (!inputs[i].disabled && inputs[i].step && cui_core_ordered_ready(ui, inputs[i].root))
             active[active_count++] = inputs[i];
+    ui->ordered_text_segment = 0;
+    ui->ordered_text_changed = false;
+    cui_core_ordered_check_text(ui, cui_core_ordered_find(active, active_count, ui->focus));
     ui->frame_v2 = v2;
     ui->v2_failed = false;
     if (ui->v2) {
@@ -10422,6 +10496,9 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
     size_t host_tab_origin = ui->ordered_frame ? ui->ordered_queued_tab : 0;
     ui->ordered_queued_tab = 0;
     ui->ordered_tab_result = CUI_ORDERED_TAB_UNRESOLVED;
+    uint64_t host_text[sizeof(ui->queued_host_text) / sizeof(uint64_t)];
+    memcpy(host_text, ui->queued_host_text, sizeof(host_text));
+    memset(ui->queued_host_text, 0, sizeof(ui->queued_host_text));
     ui->queued_count = 0;
     ui->activation_count = 0;
     if (ui->release_pending && !cui_core_release_policy(ui, ui->focus))
@@ -10541,8 +10618,22 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->events[i] = e;
             ui->event_targets[i] = cui_core_scroll_hit(ui, e, SIZE_MAX, false, touch_owner);
         }
-        if (e.type >= CUI_EVENT_COMPOSITION_START && e.type <= CUI_EVENT_COMPOSITION_CANCEL &&
-            e.composition_target && e.composition_target != ui->focus) {
+        const cui_core_ordered_input *ordered =
+            active_count ? cui_core_ordered_find(active, active_count, ui->focus) : NULL;
+        if (ui->text_input_state.owner != ui->text_input_focus)
+            cui_core_ordered_check_text(ui, ordered);
+        bool composition = e.type >= CUI_EVENT_COMPOSITION_START && e.type <= CUI_EVENT_COMPOSITION_CANCEL;
+        size_t origin = ui->event_origin[i];
+        bool tagged = origin < CUI_CORE_EVENT_MAX &&
+                      (host_text[origin / 64] & (UINT64_C(1) << (origin % 64)));
+        bool stale = tagged &&
+                     (e.composition_target != ui->text_input_state.owner ||
+                      ui->focus != ui->text_input_focus ||
+                      ui->text_input_focus_generation != ui->focus_generation ||
+                      ui->ordered_text_changed);
+        if (stale || (composition && !tagged &&
+                      ((ordered && ordered->text_owner) ||
+                       (e.composition_target && e.composition_target != ui->focus)))) {
             ui->event_consumed[i] = true;
             ui->event_targets[i] = 0;
             continue;
@@ -10595,15 +10686,12 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->pointer_present = true;
         }
         bool ordered_tab_moved = false;
-        const cui_core_ordered_input *ordered =
-            active_count && ui->event_targets[i] == ui->focus
-                ? cui_core_ordered_find(active, active_count, ui->focus)
-                : NULL;
-        if (ordered && ordered->step) {
+        if (ordered && ordered->step && ui->event_targets[i] == ui->focus) {
             bool tab = e.type == CUI_EVENT_KEY_DOWN && e.key == CUI_KEY_TAB;
             bool ordinary_tab = tab && !e.repeat && !(e.modifiers & ~CUI_MOD_SHIFT);
             if ((e.type == CUI_EVENT_KEY_DOWN && (!tab || ordinary_tab)) ||
-                (e.type == CUI_EVENT_TEXT && ui->composition_owner != ordered->root)) {
+                (e.type == CUI_EVENT_TEXT && ui->composition_owner != ordered->root) ||
+                (composition && tagged) || e.type == CUI_EVENT_CANCEL) {
                 cui_core_ordered_result step = ordered->step(ordered->user, &e, ordered->root);
                 ui->event_consumed[i] = step.consume;
                 ordered_tab_moved = ordinary_tab && step.tab_moved;
@@ -10726,6 +10814,8 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
             ui->event_activation_slots[i] = ui->activation_count - 1;
         }
     }
+    if (ui->text_input_state.owner != ui->text_input_focus)
+        cui_core_ordered_check_text(ui, cui_core_ordered_find(active, active_count, ui->focus));
     /* Routing completes before ordinary component reducers run. Present capture loss
      * before the replacement scroll/gesture event, retaining every event's
      * target, ownership and activation metadata. Cancelling after STARTED would
@@ -15665,18 +15755,12 @@ bool cui_set_text_input_config(cui_context *ui, cui_id owner, cui_text_input_con
 }
 bool cui_get_text_input_config(const cui_context *ui, cui_text_input_state *out) {
     if (!ui || !out || ui->in_frame || ui->text_input_exhausted || !ui->text_input_state.owner ||
-        ui->focus != ui->text_input_state.owner)
+        ui->focus != ui->text_input_focus ||
+        (ui->text_input_state.owner != ui->focus && !cui_accessibility_numeric_snapshot_ready(ui)) ||
+        !cui_core_text_input_semantic(ui, ui->text_input_state.owner))
         return false;
-    for (size_t i = 0; i < ui->semantic_count; i++) {
-        const cui_semantic *s = &ui->semantics[i];
-        if (s->id == ui->focus && s->role == CUI_ROLE_TEXTBOX && !s->disabled &&
-            !s->details.readonly && cui_core_focusable(s) &&
-            cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i], ui->top_modal)) {
-            *out = ui->text_input_state;
-            return true;
-        }
-    }
-    return false;
+    *out = ui->text_input_state;
+    return true;
 }
 void cui_set_text_input_rect(cui_context *ui, cui_id owner, cui_rect bounds) {
     if (!cui_core_mutation(ui))
@@ -15716,9 +15800,14 @@ bool cui_set_text_input_geometry_rect(cui_context *ui, cui_id owner, cui_id care
     return true;
 }
 bool cui_text_input_rect(const cui_context *ui, cui_rect *out) {
-    if (!ui || !out || !ui->focus || ui->focus != ui->text_input_owner)
+    if (!ui || !out || !ui->focus)
         return false;
-    if (ui->text_geometry_ime_owner == ui->focus && !ui->in_frame) {
+    cui_id owner = ui->focus;
+    if (!ui->in_frame && ui->text_input_focus == ui->focus && ui->text_input_state.owner)
+        owner = ui->text_input_state.owner;
+    if (owner != ui->text_input_owner)
+        return false;
+    if (ui->text_geometry_ime_owner == owner && !ui->in_frame) {
         cui_rect bounds = ui->text_geometry_ime_bounds;
         cui_rect result = {bounds.x, bounds.y - (ui->text_geometry_ime_height - bounds.h) * .5f, 1,
                            ui->text_geometry_ime_height};

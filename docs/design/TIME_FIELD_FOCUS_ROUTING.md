@@ -157,5 +157,21 @@ policy is private to the bundled host. Public C ordered frames retain normal
 CUI traversal.
 
 Headless Chromium tests real focus transfer at the canvas edges and retains a
-pending digit across Tab. Ordered IME, platform accessibility mapping and
-foreign authoring remain open.
+pending digit across Tab.
+
+## Ordered native composition
+
+An editable segment can own the finalized host text session while Core focus
+remains on the root. The additive queue entry point admits an event only for
+the published segment and generation. Core uses a bit per queue slot to
+identify these offers. The existing event struct, ordinary host admission and
+activation evidence retain their existing shapes. In ordered dispatch a
+focus or segment change invalidates the previous session before later events
+can reach the reducer. A transition away and back generates a new session.
+The reducer copies bounded preedit state and publishes it when the field
+submits. A retained draft also matches the host generation.
+
+SDL captures the pair for composition and its empty-clear/late-commit handoff.
+Headless tests cover that route and the existing per-segment path.
+Ordered browser composition, platform accessibility mapping and foreign
+authoring remain open.

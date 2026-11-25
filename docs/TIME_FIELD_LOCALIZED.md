@@ -154,14 +154,27 @@ ordered route reserves one fixed-capacity workspace from the context's
 resource budget. The result and synchronous callback see the applied model
 after semantics, and after paint submission in Styled. A later layout or
 renderer failure leaves an already applied change in the caller's model.
-Schedule teardown after the observer returns. IME options are rejected by
-this route. Use the ordinary localized widget when you need IME. Language
-bindings currently expose the ordinary route.
+Schedule teardown after the observer returns. Language bindings currently
+expose the ordinary route.
 
 Choose **One stop per field** in the gallery's **TimeField navigation** menu
 to try both fields and Save. Tab and Shift-Tab leave the preview at its edges
 using normal browser navigation. The gallery checks the routing decision
 after applying queued input and before the browser's default action.
+
+For ordered C editing with IME, set `CUI_TIME_FIELD_IME_V1` in each field's
+options before admission. Keyboard focus stays on the field root. After a
+completed frame, `cui_get_text_input_config` returns the editable segment and
+its generation. Custom hosts pass this pair with composition events using
+`cui_queue_text_input_event_v1`. Recheck it after completing each frame. The
+selected segment supplies the candidate rectangle through `cui_text_input_rect`
+in Styled. With Base, register the rectangle for the selected segment when
+laying out your own field.
+
+The SDL3 adapter routes ordered preedit, empty preedit clearing and the later
+commit automatically. The preview's **Per segment with IME** mode remains
+available for browser composition. Ordered composition in the gallery still
+needs browser host integration. See the [host event contract](IME.md).
 
 Run the [complete two-field form](../examples/time_field_ordered.c) from a
 configured repository. It queues one batch that edits both fields and

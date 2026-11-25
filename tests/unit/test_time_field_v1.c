@@ -920,10 +920,10 @@ static void ordered_public(void) {
     cui_time_field_frame_entry_v1 duplicate[] = {entries[0], entries[0]};
     assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, duplicate, 2) ==
            CUI_TIME_TEXT_INVALID_CONFIG);
-    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    f.options.reserved = 1;
     assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 2) ==
            CUI_TIME_TEXT_INVALID_CONFIG);
-    f.options.flags = 0;
+    f.options.reserved = 0;
     assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, entries, 2) == CUI_TIME_TEXT_OK);
     assert(f.time.hour == 9 && other.hour == 10 && !first.calls && !second.calls);
     assert(cui_event_target(f.ui, 1) == 20 && cui_event_target(f.ui, 3) == 25 &&
@@ -1011,6 +1011,107 @@ static void ordered_pointer_and_discard(void) {
     assert(ordered_story(&f, 20, &observer).changed && f.time.minute == 2 && observer.calls == 2);
     assert(f.state.segment == CUI_TIME_FIELD_MINUTE_V1);
     cui_end_frame(f.ui);
+    cui_destroy(f.ui);
+}
+
+static cui_time_field_result_v1 ordered_ime_frame(fixture *f, ordered_observer *observer,
+                                                   const char *expected) {
+    cui_time_field_frame_entry_v1 entry = {20, &f->state, &f->time, &f->options};
+    assert(cui_begin_time_field_frame_v1(f->ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    cui_time_field_result_v1 result = ordered_story(f, 20, observer);
+    assert(result.status == CUI_TIME_TEXT_OK);
+    cui_id composing;
+    cui_str preedit = cui_time_field_preedit_v1(f->ui, 20, &composing);
+    if (expected) {
+        assert(composing == cui_time_segment_id(20, f->state.segment));
+        assert(preedit.length == strlen(expected) && !memcmp(preedit.data, expected, preedit.length));
+    } else
+        assert(!composing && !preedit.length);
+    f->draw = cui_end_frame(f->ui);
+    if (expected) {
+        bool painted = false;
+        for (size_t i = 0; i < f->draw.count; ++i) {
+            cui_draw_command c = f->draw.commands[i];
+            if (c.type == CUI_DRAW_TEXT && c.text.length == strlen(expected) &&
+                !memcmp(c.text.data, expected, c.text.length))
+                painted = true;
+        }
+        assert(painted);
+    }
+    return result;
+}
+
+static bool offer(fixture *f, cui_text_input_state input, cui_event_type type, cui_str text,
+                  bool empty_clear) {
+    return cui_queue_text_input_event_v1(
+        f->ui, input.generation,
+        (cui_event){.type = type, .composition_target = input.owner, .text_data = text.data,
+                    .text_length = text.length, .ime_composing = empty_clear});
+}
+
+static void ordered_composition(void) {
+    fixture f;
+    init(&f, true);
+    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    ordered_observer observer = {f.ui, 20, &f.time, 0};
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    cui_focus(f.ui, 20);
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    cui_text_input_state hour, minute, refreshed;
+    assert(cui_get_text_input_config(f.ui, &hour) &&
+           hour.owner == cui_time_segment_id(20, CUI_TIME_FIELD_HOUR_V1));
+    cui_rect anchor;
+    assert(cui_text_input_rect(f.ui, &anchor));
+    cui_rect cell = cui_bounds(f.ui, hour.owner);
+    assert(anchor.x >= cell.x && anchor.x < cell.x + cell.w && cui_focused(f.ui) == 20);
+
+    char copied[] = "03";
+    assert(offer(&f, hour, CUI_EVENT_COMPOSITION_UPDATE, (cui_str){copied, 2}, false));
+    memset(copied, 'z', sizeof copied);
+    assert(!ordered_ime_frame(&f, &observer, "03").changed && f.time.hour == 9);
+    assert(offer(&f, hour, CUI_EVENT_COMPOSITION_CANCEL, (cui_str){0}, true));
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    assert(offer(&f, hour, CUI_EVENT_COMPOSITION_COMMIT, cui_string("03"), false));
+    cui_time_field_result_v1 result = ordered_ime_frame(&f, &observer, NULL);
+    assert(result.changed && result.change_count == 1 && f.time.hour == 3 && observer.calls == 1);
+    assert(cui_focused(f.ui) == 20 && cui_get_text_input_config(f.ui, &minute) &&
+           minute.owner == cui_time_segment_id(20, CUI_TIME_FIELD_MINUTE_V1) &&
+           minute.generation != hour.generation);
+    assert(!offer(&f, hour, CUI_EVENT_COMPOSITION_COMMIT, cui_string("23"), false));
+    assert(!offer(&f, hour, CUI_EVENT_TEXT, cui_string("3"), false));
+
+    /* Old offers accepted before dispatch are dropped after an away/back transition. */
+    key(&f, CUI_KEY_LEFT, 0);
+    key(&f, CUI_KEY_RIGHT, 0);
+    assert(offer(&f, minute, CUI_EVENT_COMPOSITION_UPDATE, cui_string("44"), false));
+    assert(offer(&f, minute, CUI_EVENT_COMPOSITION_COMMIT, cui_string("44"), false));
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && f.time.minute == 30);
+    assert(cui_get_text_input_config(f.ui, &refreshed) && refreshed.owner == minute.owner &&
+           refreshed.generation != minute.generation && cui_focused(f.ui) == 20);
+    assert(!offer(&f, minute, CUI_EVENT_COMPOSITION_UPDATE, cui_string("44"), false));
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, refreshed.owner, cui_string("44"));
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, refreshed.owner, cui_string("44"));
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && f.time.minute == 30);
+
+    assert(offer(&f, refreshed, CUI_EVENT_COMPOSITION_UPDATE, cui_string("99"), false));
+    assert(offer(&f, refreshed, CUI_EVENT_COMPOSITION_COMMIT, cui_string("99"), false));
+    result = ordered_ime_frame(&f, &observer, NULL);
+    assert(!result.changed && result.rejected_count == 1 &&
+           result.validation == CUI_TIME_TEXT_INVALID_VALUE && observer.calls == 1);
+
+    assert(offer(&f, refreshed, CUI_EVENT_COMPOSITION_UPDATE, cui_string("42"), false));
+    assert(!ordered_ime_frame(&f, &observer, "42").changed);
+    assert(offer(&f, refreshed, CUI_EVENT_COMPOSITION_COMMIT, cui_string("42"), false));
+    ++f.options.edit_generation;
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && f.time.minute == 30);
+    assert(cui_get_text_input_config(f.ui, &refreshed) && refreshed.owner == minute.owner);
+    assert(offer(&f, refreshed, CUI_EVENT_COMPOSITION_UPDATE, cui_string("42"), false));
+    assert(offer(&f, refreshed, CUI_EVENT_COMPOSITION_COMMIT, cui_string("42"), false));
+    assert(ordered_ime_frame(&f, &observer, NULL).change_count == 1 && f.time.minute == 42 &&
+           observer.calls == 2);
+    f.options.flags |= CUI_TIME_FIELD_READONLY_V1;
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && cui_focused(f.ui) == 20);
+    assert(!cui_get_text_input_config(f.ui, &refreshed));
     cui_destroy(f.ui);
 }
 
@@ -1213,6 +1314,7 @@ int main(void) {
     explicit_appearance();
     ordered_public();
     ordered_pointer_and_discard();
+    ordered_composition();
     ordered_budget();
     composition_edits(true, CUI_DESIGN_XL);
     printf("localized TimeField: PASS state=%zu options=%zu result=%zu\n",

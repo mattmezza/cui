@@ -13,6 +13,7 @@ typedef struct {
     void *user;
     bool disabled;
     void (*blur)(void *user);
+    cui_id (*text_owner)(void *user);
 } cui_core_ordered_input;
 /* Reserve context-owned typed storage before dispatch. The step callbacks and
  * their event records are borrowed only inside begin. Steps may edit the
@@ -35,4 +36,9 @@ typedef enum {
  * decision after completing that frame, before the host's default action. */
 bool cui_core_ordered_queue_tab(cui_context *, bool reverse);
 cui_core_ordered_tab cui_core_ordered_tab_result(const cui_context *);
+/* Register the selected editable child of the currently focused ordered root.
+ * Only a submitted delegated textbox can become the finalized host owner. */
+void cui_core_ordered_text_segment(cui_context *, cui_id root, cui_id segment);
+/* Copy the preceding resource into isolated working state before dispatch. */
+const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id namespace_id);
 #endif

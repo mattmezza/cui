@@ -76,7 +76,8 @@ cui_time_field_result_v1 cui_time_field_with_size_v1(cui_context *, cui_id, cons
  * until cui_end_frame. Keep each state and value distinct and unchanged until its
  * matching submission applies edits.
  * Changing a field's options, visibility or enabled state takes effect at
- * the next begin. A configuration with CUI_TIME_FIELD_IME_V1 is rejected. */
+ * the next begin. With CUI_TIME_FIELD_IME_V1, offer IME events through
+ * cui_queue_text_input_event_v1 using the finalized segment owner and generation. */
 #define CUI_TIME_FIELD_FRAME_MAX_V1 8u
 typedef struct {
     cui_id id;

@@ -141,8 +141,8 @@ cargo run --offline --locked --manifest-path bindings/rust/Cargo.toml --example 
 For the native window, add `-- --font /absolute/path/to/font.ttf` and use an
 SDL-enabled shared bridge via `CUI_BRIDGE_LIB_DIR`, or add `--features native`
 for the bundled Linux build. The inbox uses a local page arrival. Your
-application controls loading, and the retained bridge currently has no
-load-more notification.
+application controls loading. The Rust builders currently expose keyed
+replacement. [Paging support](BRIDGE_COMPONENTS.md#load-another-datatable-page)
 
 ## Composed workspace example
 

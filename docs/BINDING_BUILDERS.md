@@ -128,8 +128,64 @@ python bindings/bridge/examples/data_table_live.py
 ```
 
 For interactive SDL, provide an installed font using `--font /path/to/font.ttf`.
-This example applies local data from a callback. The retained bridge currently
-has no automatic load-more notification.
+This example applies local data from a callback.
+[Load more when scrolling reaches the end](#page-a-python-datatable)
+
+## Page a Python DataTable
+
+Check `app.supports_data_table_paging()` before mounting a tree with paging.
+The bridge must export the complete V1 API. A bridge without paging can still
+use its existing positional or keyed table setters. On an unmounted builder,
+`configure_load_more(enabled=False)` clears the paging opt-in for that fallback.
+
+```python
+from cui_bridge import data_table
+
+inbox = (data_table("inbox")
+         .table_data(["Subject"], initial_messages, row_keys=initial_keys)
+         .configure_load_more(threshold=1))
+
+# After mounting and stepping, on the UI thread.
+request = inbox.poll_load_more()
+if request is not None:
+    inbox.configure_load_more(enabled=False)
+    # Enqueue the fetch using app-owned request identity and cursor.
+```
+
+`threshold` is the number of rows remaining beyond the visible window, from
+0 through 32. With zero, demand appears when the window reaches the last row.
+You can bind headers with empty rows and keys to request the initial page.
+`poll_load_more()` consumes one immutable `DataTableLoadMore` record or
+returns `None`. The record holds the Core frame sequence, row count, exclusive
+visible index range, last row key and capacity. It stays readable after the
+app closes. A row key describes local data. Keep the service cursor and
+request generation in your application.
+
+Keep one request in flight. While loading, turn paging off and continue
+drawing the existing table and a status label. Apply accepted responses
+on the UI thread with `table_data(..., row_keys=...)` to preserve scroll
+position and selection. Re-enable paging when the source has another page.
+The retained bridge holds at most 32 rows.
+
+For a native loop, pass `app.run(after_frame=update)`. The callable receives
+the App after a successful step and regular event dispatch. It runs
+synchronously on the owner thread. A close requested during dispatch skips
+the hook. Use a worker for blocking I/O and poll completed work in the hook.
+For your own loop, call `poll_load_more()` after `step()`.
+
+Run the [offline paged inbox](../bindings/bridge/examples/data_table_paging.py)
+from the repository root after [building the Python bridge](#python-build-and-launch).
+It opens no window by default. It exercises scrolling, selection during
+loading, retry, stale response rejection, and appending a final page.
+
+```sh
+export CUI_BRIDGE_LIBRARY="$PWD/build-bridge/libcui_bridge.so"
+export PYTHONPATH="$PWD/bindings/python"
+python bindings/bridge/examples/data_table_paging.py
+```
+
+For the native demo, build with SDL enabled and add `--font /path/to/font.ttf`.
+The demo uses a local source and simulates latency without blocking the UI.
 
 
 ## JavaScript and TypeScript: build and launch

@@ -946,7 +946,7 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        "Python, JavaScript, TypeScript, Go and Rust support keyed replacement on providers with cui_bridge_data_table_set_keyed. The retained load-more poll is available in C only. Bindings omit paging notifications and custom cell content."
+        "All five bindings support keyed replacement on providers with cui_bridge_data_table_set_keyed. Python also supports opt-in near-end polling on V1 providers. JavaScript, TypeScript, Go and Rust omit paging. Custom cells and network transport are outside the bridge contract."
       ]
     },
     {

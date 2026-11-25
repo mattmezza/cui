@@ -58,6 +58,12 @@ class _TableNotificationV1(C.Structure):
                 ("reason", "row", "column", "sort_column", "sort_direction")]
 
 
+class _DataTableLoadMoreV1(C.Structure):
+    _fields_ = [("frame", C.c_uint64)] + [(name, C.c_uint32) for name in
+                ("row_count", "visible_begin", "visible_end", "last_row_key", "capacity",
+                 "reserved")]
+
+
 class _NotificationValueV1(C.Union):
     _fields_ = [("boolean_value", C.c_uint32), ("scalar_value", C.c_double),
                 ("selected", _Handle), ("table", _TableNotificationV1),
@@ -142,6 +148,16 @@ class _API:
         self.set_theme = bind("set_theme_preset", C.c_int, C.c_void_p, C.c_uint32)
         self.get_theme = bind("get_theme_preset", C.c_int, C.c_void_p, C.POINTER(C.c_uint32))
         self.set_selection_mode = bind("data_table_set_selection_mode", C.c_int, C.c_void_p, _Handle, C.c_uint32)
+        self.configure_table_paging = self.poll_table_paging = None
+        names = ("data_table_load_more_size_v1", "data_table_configure_load_more_v1",
+                 "data_table_poll_load_more_v1")
+        if all(hasattr(lib, "cui_bridge_" + name) for name in names):
+            size = bind(names[0], C.c_uint32)
+            if size() == C.sizeof(_DataTableLoadMoreV1) == 32:
+                self.configure_table_paging = bind(names[1], C.c_int, C.c_void_p, _Handle,
+                                                   C.c_uint32, C.c_uint32)
+                self.poll_table_paging = bind(names[2], C.c_int, C.c_void_p, _Handle,
+                                              C.c_uint32, C.POINTER(_DataTableLoadMoreV1))
         self.command_bounds = bind("command_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
         self.virtual_bounds = bind("virtual_list_item_bounds", C.c_int, C.c_void_p, _Handle, _Handle, C.POINTER(_Rect))
         self.set_chart = bind("chart_set_data", C.c_int, C.c_void_p, _Handle, C.POINTER(_ChartDatum), C.c_uint32)
@@ -354,6 +370,18 @@ class TableChangeNotificationV1(NotificationV1):
 
 
 @dataclass(frozen=True)
+class DataTableLoadMore:
+    """Copied viewport demand from a successful frame, with an exclusive end index."""
+
+    frame_sequence: int
+    row_count: int
+    visible_begin: int
+    visible_end: int
+    last_row_key: int
+    capacity: int
+
+
+@dataclass(frozen=True)
 class SurfaceCloseNotificationV1(NotificationV1):
     result: int
     kind: ClassVar[Literal["surface-close"]] = "surface-close"
@@ -424,6 +452,7 @@ class Widget:
         self._chart_kind = 0
         self._plot_points = ()
         self._matrix = None
+        self._load_more_threshold: int | None = None
         self._selection_mode = 0
         self._text_format = 0
         self._panel_size = None
@@ -1053,6 +1082,40 @@ class Widget:
         self._matrix = headers, rows, keys
         return self
 
+    def configure_load_more(self, *, enabled: bool = True, threshold: int = 0) -> "Widget":
+        """Set DataTable near-end demand. The app owns any in-flight work."""
+        if self.kind != "data_table":
+            raise ValueError("configure_load_more requires DataTable")
+        if type(enabled) is not bool:
+            raise TypeError("enabled must be bool")
+        if type(threshold) is not int or not 0 <= threshold <= 32:
+            raise ValueError("threshold must be an integer in 0..32")
+        if self._app is not None:
+            self._app._require_table_paging()
+        self._change("configure_table_paging", int(enabled), threshold)
+        self._load_more_threshold = threshold if enabled else None
+        return self
+
+    def poll_load_more(self) -> DataTableLoadMore | None:
+        """Consume one copied DataTable paging observation after a frame, if available."""
+        if self.kind != "data_table":
+            raise ValueError("poll_load_more requires DataTable")
+        if self._app is None:
+            raise RuntimeError("poll_load_more requires a mounted DataTable")
+        app = self._app
+        app._require_table_paging()
+        wire = _DataTableLoadMoreV1()
+        status = app._api.poll_table_paging(app._ptr, self._handle, C.sizeof(wire), C.byref(wire))
+        if status == 1:  # CUI_BRIDGE_EMPTY
+            return None
+        app._api.check(status)
+        if (wire.reserved or not wire.frame or
+                not wire.visible_begin <= wire.visible_end <= wire.row_count < wire.capacity or
+                bool(wire.row_count) != bool(wire.last_row_key)):
+            raise BridgeError(8, "malformed DataTable load-more record")
+        return DataTableLoadMore(wire.frame, wire.row_count, wire.visible_begin,
+                                 wire.visible_end, wire.last_row_key, wire.capacity)
+
     def current_cell(self, row: int, column: int) -> str:
         if self.kind != "data_table" or any(isinstance(v,bool) or not isinstance(v,int) or not 0<=v<=0xffffffff for v in (row,column)): raise ValueError("invalid cell indices")
         if self._app is None:
@@ -1492,6 +1555,7 @@ class App:
             raise RuntimeError("bridge create failed")
         self._root: Widget | None = None
         self._by_handle: dict[tuple[int, int], Widget] = {}
+        self._close_requested = False
         self._slider_enabled = False
         self._slider_dispatching = False
         self._time_field_enabled = False
@@ -1511,6 +1575,17 @@ class App:
         """Report whether the loaded bridge exports keyed DataTable replacement."""
         self._ensure_open()
         return self._api.set_matrix_keyed is not None
+
+    def supports_data_table_paging(self) -> bool:
+        """Report whether the bridge offers the complete DataTable paging V1 API."""
+        self._ensure_open()
+        return self._api.poll_table_paging is not None
+
+    def _require_table_paging(self) -> None:
+        if current_thread() is not self._creation_thread:
+            raise RuntimeError("DataTable paging requires the app's owner thread")
+        if not self.supports_data_table_paging():
+            raise RuntimeError("DataTable paging requires a complete, compatible bridge symbol group")
 
     def font_fallbacks(self, paths: list[str] | tuple[str, ...]) -> "App":
         """Replace the SDL font's owned ordered fallback chain (at most 32)."""
@@ -1553,6 +1628,10 @@ class App:
                 if not isinstance(node, ConfiguredBadge):
                     raise TypeError("use configured_badge() for the Badge container")
                 node._preflight_badge(self)
+            if node._load_more_threshold is not None:
+                self._require_table_paging()
+                if node._matrix is None:
+                    raise ValueError("DataTable paging requires a matrix with column headers")
             key = node.key if node.key is not None else f"{node.kind}@{path}"
             _utf8(key)
             if _KIND[node.kind] >= 3:
@@ -1621,6 +1700,8 @@ class App:
                 if node.kind == "data_table" and node._matrix is not None:
                     headers, rows, keys = node._matrix
                     node.table_data(headers, rows, row_keys=keys)
+                    if node._load_more_threshold is not None:
+                        node.configure_load_more(threshold=node._load_more_threshold)
                 if node.kind == "text_view": node._change("set_text_format",node._text_format)
                 if node._question_flags is not None: node._change("question_config",*[int(v) for v in node._question_flags])
                 if node._panel_size is not None: node._change("set_value",node._panel_size)
@@ -2080,9 +2161,11 @@ class App:
         from .time_field_localized import dispatch
         return dispatch(self)
 
-    def run(self, dt: float = 1 / 60) -> None:
+    def run(self, dt: float = 1 / 60, *,
+            after_frame: Callable[["App"], object] | None = None) -> None:
         """Run the native event loop; dispatch after paint, including live resize.
 
+        after_frame, if provided, runs after regular callbacks on the owner thread.
         dt is retained for source compatibility and validated; native scheduling
         supplies actual frame timing. Older bridges fail clearly without fallback.
         """
@@ -2093,6 +2176,8 @@ class App:
         self._ensure_open()
         if not math.isfinite(dt) or dt <= 0:
             raise ValueError("run requires positive finite dt")
+        if after_frame is not None and not callable(after_frame):
+            raise TypeError("after_frame must be callable")
         if getattr(self, "_running", False):
             raise RuntimeError("app is already running")
         try:
@@ -2104,16 +2189,18 @@ class App:
         runner.argtypes = [C.c_void_p, callback_type, C.c_void_p]
         failure = []
         @callback_type
-        def after_frame(_user):
+        def dispatch_frame(_user):
             try:
                 self.dispatch()
+                if after_frame is not None and self._ptr and not self._close_requested:
+                    after_frame(self)
                 return 0
             except BaseException as exc:
                 failure.append((exc, exc.__traceback__))
                 return 3  # Stop C first; foreign exceptions must never cross C.
         self._running = True
         try:
-            status = runner(self._ptr, after_frame, None)
+            status = runner(self._ptr, dispatch_frame, None)
         finally:
             self._running = False
         if failure:
@@ -2125,6 +2212,7 @@ class App:
     def request_close(self) -> None:
         self._ensure_open()
         self._api.check(self._api.request_close(self._ptr))
+        self._close_requested = True
 
     def close(self) -> None:
         if self._ptr:
@@ -2178,7 +2266,7 @@ __all__ += ["focus_trap"]
 
 __all__ += ["message_scroller", "carousel", "resizable", "text_view", "editor"]
 
-__all__ += ["chart", "table", "data_table", "plot"]
+__all__ += ["chart", "table", "data_table", "DataTableLoadMore", "plot"]
 
 __all__ += ["command", "virtual_list"]
 

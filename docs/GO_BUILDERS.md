@@ -178,7 +178,8 @@ The bundled native route on Linux uses
 `go run -tags cui_native ./examples/data_table_live --font /path/to/font.ttf`.
 For an existing SDL shared bridge, set `CUI_BRIDGE_LIBRARY` to its absolute
 path and use `-tags cui_dynamic` instead. The examples here use a local
-arrival. The retained bridge currently has no load-more notification.
+arrival. The Go builders currently expose keyed replacement.
+[Paging support](BRIDGE_COMPONENTS.md#load-another-datatable-page)
 
 ## Packaged build-time CUI bridge
 

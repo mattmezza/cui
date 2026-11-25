@@ -3,28 +3,120 @@
 #include <assert.h>
 #include <string.h>
 static unsigned calls[3];
+static float width = 960, height = 640;
 static void changed(void *user, starter_event event, const starter_app *app) {
     assert(user == calls && app);
     calls[event]++;
 }
 static void frame(cui_context *ui, starter_app *a) {
-    cui_draw_list list = starter_app_frame(ui, a, 960, 640, .016f, NULL);
+    cui_draw_list list = starter_app_frame(ui, a, width, height, .016f, NULL);
     assert(list.count > 10 && cui_last_error(ui) == CUI_OK);
 }
-static void click(cui_context *ui, starter_app *a, cui_id id) {
+static void tap(cui_context *ui, starter_app *a, float x, float y, cui_pointer_type pointer) {
     starter_page previous_page = a->page;
     bool previous_signed_in = a->signed_in;
-    cui_rect r = cui_bounds(ui, id);
-    assert(r.w > 0 && r.h > 0);
-    assert(cui_queue_event(
-        ui, (cui_event){.type = CUI_EVENT_POINTER_DOWN, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));
+    cui_event event = {
+        .type = CUI_EVENT_POINTER_DOWN, .x = x, .y = y, .pointer_type = pointer, .pointer_id = 1};
+    assert(cui_queue_event(ui, event));
     frame(ui, a);
-    assert(cui_queue_event(
-        ui, (cui_event){.type = CUI_EVENT_POINTER_UP, .x = r.x + r.w / 2, .y = r.y + r.h / 2}));
+    event.type = CUI_EVENT_POINTER_UP;
+    assert(cui_queue_event(ui, event));
     frame(ui, a);
     if (previous_page != a->page || previous_signed_in != a->signed_in)
         assert(cui_needs_redraw(ui)); /* Repaint labels submitted before callbacks. */
     frame(ui, a);
+}
+static void click(cui_context *ui, starter_app *a, cui_id id) {
+    cui_rect r = cui_bounds(ui, id);
+    assert(r.w > 0 && r.h > 0);
+    tap(ui, a, r.x + r.w / 2, r.y + r.h / 2, CUI_POINTER_MOUSE);
+}
+static void key(cui_context *ui, starter_app *a, cui_key code) {
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = code}));
+    frame(ui, a);
+    assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_UP, .key = code}));
+    frame(ui, a);
+}
+static void assert_fits(cui_rect bounds) {
+    assert(bounds.w > 0 && bounds.h > 0 && bounds.x >= 0 && bounds.y >= 0 &&
+           bounds.x + bounds.w <= width && bounds.y + bounds.h <= height);
+}
+static void responsive(cui_context *ui, starter_app *a) {
+    assert(a->page == STARTER_SETTINGS && !a->signed_in);
+    assert(cui_edit_replace_range(a->name_edit, 0, 5, cui_string("Uncommitted")) == CUI_EDIT_OK);
+    /* Cross the boundary with an open desktop popup. */
+    click(ui, a, STARTER_ACCOUNT);
+    const float widths[] = {320, 767, 768, 1280, 360, 960, 224, 360};
+    for (size_t i = 0; i < sizeof widths / sizeof widths[0]; ++i) {
+        width = widths[i];
+        frame(ui, a);
+        cui_rect root = cui_bounds(ui, STARTER_ROOT), main = cui_bounds(ui, STARTER_MAIN);
+        bool wide = width >= 768;
+        assert(root.w == width && root.h == height);
+        assert(main.x == (wide ? 220 : 0) && main.x + main.w == width);
+        assert_fits(cui_bounds(ui, STARTER_NAME));
+        assert(cui_bounds(ui, STARTER_NAME).w <= 300);
+        if (wide) {
+            cui_rect account = cui_bounds(ui, STARTER_ACCOUNT);
+            assert(account.y + account.h > height - 20 && account.x + account.w <= 220);
+            assert(cui_bounds(ui, STARTER_MENU).w == 0);
+        } else {
+            assert_fits(cui_bounds(ui, STARTER_MENU));
+            assert(cui_bounds(ui, STARTER_ACCOUNT).w == 0);
+            assert(cui_bounds(ui, STARTER_NAV_HOME).w == 0);
+        }
+        assert(a->page == STARTER_SETTINGS && !a->signed_in && !a->notifications &&
+               !a->drawer.overlay.open && !a->account.overlay.open);
+        assert(!strcmp(a->name, "Uncommitted") && !strcmp(a->saved_name, "Grace") && a->saves == 1);
+    }
+
+    cui_focus(ui, STARTER_MENU);
+    key(ui, a, CUI_KEY_ENTER);
+    assert(a->drawer.overlay.open);
+    assert_fits(cui_bounds(ui, STARTER_DRAWER));
+    cui_rect account = cui_bounds(ui, STARTER_ACCOUNT);
+    assert_fits(account);
+    assert(account.y + account.h > height - 20);
+    click(ui, a, STARTER_ACCOUNT);
+    assert(a->account.overlay.open && a->drawer.overlay.open);
+    key(ui, a, CUI_KEY_ESCAPE);
+    assert(!a->account.overlay.open && a->drawer.overlay.open);
+    assert(cui_focused(ui) == STARTER_ACCOUNT);
+    click(ui, a, STARTER_ACCOUNT);
+    click(ui, a, STARTER_SESSION);
+    assert(a->signed_in && !a->account.overlay.open && a->drawer.overlay.open);
+    key(ui, a, CUI_KEY_ESCAPE);
+    assert(!a->drawer.overlay.open && cui_focused(ui) == STARTER_MENU);
+    assert(cui_bounds(ui, STARTER_ACCOUNT).w == 0);
+
+    cui_rect menu = cui_bounds(ui, STARTER_MENU);
+    tap(ui, a, menu.x + menu.w / 2, menu.y + menu.h / 2, CUI_POINTER_TOUCH);
+    assert(a->drawer.overlay.open);
+    cui_rect projects = cui_bounds(ui, STARTER_NAV_PROJECTS);
+    assert_fits(projects);
+    tap(ui, a, projects.x + projects.w / 2, projects.y + projects.h / 2, CUI_POINTER_TOUCH);
+    assert(!a->drawer.overlay.open && a->page == STARTER_PROJECTS);
+    unsigned navigations = calls[STARTER_NAVIGATED];
+    tap(ui, a, projects.x + projects.w / 2, projects.y + projects.h / 2, CUI_POINTER_MOUSE);
+    assert(a->page == STARTER_PROJECTS && calls[STARTER_NAVIGATED] == navigations);
+    click(ui, a, STARTER_MENU);
+    tap(ui, a, 350, 480, CUI_POINTER_MOUSE);
+    assert(!a->drawer.overlay.open && cui_focused(ui) == STARTER_MENU);
+    click(ui, a, STARTER_MENU);
+    click(ui, a, STARTER_ACCOUNT);
+    width = 960;
+    height = 190;
+    frame(ui, a);
+    assert(!a->drawer.overlay.open && !a->account.overlay.open && a->signed_in);
+    assert(cui_bounds(ui, STARTER_DRAWER).w == 0 && cui_bounds(ui, STARTER_MENU).w == 0);
+    account = cui_bounds(ui, STARTER_ACCOUNT);
+    assert_fits(account);
+    assert(account.y + account.h > height - 20);
+    height = 640;
+    frame(ui, a);
+    click(ui, a, STARTER_NAV_SETTINGS);
+    assert(!strcmp(a->name, "Uncommitted") && !strcmp(a->saved_name, "Grace") &&
+           a->page == STARTER_SETTINGS);
 }
 int main(void) {
     starter_app a;
@@ -59,6 +151,7 @@ int main(void) {
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = CUI_KEY_ESCAPE}));
     frame(ui, &a);
     assert(!a.account.overlay.open);
+    responsive(ui, &a);
     starter_app_destroy(&a);
     cui_destroy(ui);
     return 0;

@@ -61,8 +61,13 @@ resizing: navigation stays beside content at LG, becomes a Menu disclosure below
 LG, and the cards stack when their minimum widths no longer fit. The disclosure
 occupies layout space above the main content, so it cannot overlap active content
 beneath it. Hidden navigation is omitted from submission, including its input and
-semantics. Closing it keeps page/account state. Applications that want an overlay
-drawer should additionally use the existing modal/overlay scope APIs.
+semantics. Closing it keeps page/account state.
+
+The [native starter](NATIVE_APP_STARTER.md#where-to-change-the-app) shows an
+overlay variant. At MD and above it uses a persistent Sidebar with a fixed
+account footer. Below MD the Menu button opens a modal Sheet with the same
+navigation and account actions. Page and edit state stay application-owned
+and survive breakpoint changes.
 
 This helper supplies width policies, not CSS media-query or browser-layout parity.
 The example and tests cover live container resizing, boundary crossings,

@@ -3,9 +3,16 @@
 #define NATIVE_STARTER_APP_H
 #include "cui/cui_choice.h"
 #include "cui/cui_components.h"
+#include "cui/cui_sidebar.h"
+#include "cui/cui_surface.h"
 typedef enum { STARTER_HOME, STARTER_PROJECTS, STARTER_SETTINGS } starter_page;
 typedef enum { STARTER_NAVIGATED, STARTER_SESSION_CHANGED, STARTER_SAVED } starter_event;
 enum {
+    STARTER_ROOT = 1,
+    STARTER_SIDEBAR = 10,
+    STARTER_DRAWER = 13,
+    STARTER_MAIN = 20,
+    STARTER_MENU = 100,
     STARTER_NAV_HOME = 101,
     STARTER_NAV_PROJECTS = 102,
     STARTER_NAV_SETTINGS = 103,
@@ -25,6 +32,9 @@ struct starter_app {
     char name[80], saved_name[80];
     cui_edit *name_edit;
     cui_input_state name_input;
+    cui_sidebar_state sidebar;
+    cui_sidebar_cache navigation_cache[1];
+    cui_surface_state drawer;
     cui_choice_popup account;
     starter_callback callback;
     void *user;

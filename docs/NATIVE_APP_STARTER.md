@@ -64,11 +64,10 @@ and [Debugging](DEBUGGING.md) before growing the application.
 The existing installed-library starter below remains useful for projects that
 prefer an installed CUI package and a larger three-page example.
 
-Start with [examples/native_starter](../examples/native_starter/README.md). It is
-an ordinary C11 desktop app: a left sidebar selects Home, Projects and Settings;
-an account menu stays at the sidebar bottom; Settings edits a name, toggles
-notifications and saves local state. Sign-in/out is a demo state change, with no
-credentials or network request.
+The [C11 starter](../examples/native_starter/README.md) has Home, Projects and
+Settings. A sidebar or compact navigation drawer selects the page and keeps
+the account menu at the bottom. Settings edits a name, toggles notifications
+and saves local state. Sign-in and sign-out change demo state.
 
 ![Native starter Home page](../examples/native_starter/screenshots/home.png)
 
@@ -180,14 +179,23 @@ required. The CMake example likewise uses `CUI_STATIC_*` results.
 
 ## Where to change the app
 
-Read [app.h](../examples/native_starter/app.h) for the small application state and
-stable control IDs, then [app.c](../examples/native_starter/app.c) for layout and
-callbacks. Each frame submits the current page. The sidebar uses actual
-`cui_sidebar_menu` activation callbacks; the account popup uses `cui_menu` with
-an above-trigger anchor. A growing spacer places its trigger at the bottom.
-Settings uses `cui_input_ex`, `cui_checkbox` and `cui_button`. `changed()` in
-[main.c](../examples/native_starter/main.c) is a concrete callback seam for your
-persistence or application services. State currently lasts only until exit.
+Read [app.h](../examples/native_starter/app.h) for application state and stable
+control IDs, then [app.c](../examples/native_starter/app.c) for layout and
+callbacks. The current logical width chooses the navigation layout each frame.
+At the default MD breakpoint of 768 logical pixels, `cui_sidebar` holds the
+links in its scrolling body and the account menu in its fixed footer. Below
+MD, a Menu button opens a left Sheet with the same links and a pinned account
+footer. Escape dismisses the inner account menu first. Closing the drawer
+returns focus to Menu.
+
+The page, account session, and Settings edit model live in the application.
+Changing width preserves these values. The compact view caps the name input at
+its available width. On crossing the breakpoint, the app closes any navigation
+overlay whose trigger is leaving the current layout. See [responsive containers](RESPONSIVE_LAYOUT.md).
+
+Navigation uses `cui_sidebar_menu` activation callbacks. Settings uses
+`cui_input_ex`, `cui_checkbox` and `cui_button`. Extend `changed()` with your
+persistence or application services. [Native host and callbacks](../examples/native_starter/main.c).
 
 `main.c` opens the font, installs styled measuring and font metrics, creates the
 SDL3 host and Core context, then polls input, gets the logical window size,
@@ -198,16 +206,18 @@ poll; the input owns its preedit state. This uses the supported SDL adapter,
 without asserting every OS IME has been tested. Rendering and all font/SDL
 operations stay on the main thread. Destruction runs in reverse ownership order.
 
-The loop uses a simple 16 ms step to keep the starter readable. A production app
-can use an actual clock delta, persist state, add scrollable content and responsive
-navigation, and supply fonts covering its text. The fixed 220 px sidebar targets
-desktop-sized windows; this starter does not implement mobile navigation.
+The starter uses `cui_sdl3_run` and the host's frame delta. The callback
+submits the scene using the current logical window size whenever the host
+requests a redraw, including during resize.
 
 ## Verify it
 
 `test_app.c` exercises real Core/component reducers without opening a window:
 navigation callbacks, bottom-account geometry, sign-in/out, menu settings,
-Escape dismissal, text-model editing, notification changes and save callbacks.
+Escape dismissal, touch navigation, text-model editing, notification changes
+and save callbacks. It also crosses the responsive breakpoint repeatedly with
+unsaved edits. A separate Linux test verifies intermediate rendered frames
+during a burst of native resize requests. [Linux live-resize evidence](LINUX_LIVE_RESIZE.md).
 Run the app for a bounded native capture with:
 
 ```sh
@@ -215,10 +225,13 @@ Run the app for a bounded native capture with:
   --frames 3 --capture build/starter/home.bmp
 ```
 
-Linux automation can prefix that command with
-`xvfb-run -a -s "-screen 0 1600x1000x24" env SDL_VIDEODRIVER=x11 SDL_RENDER_DRIVER=software`.
-Use a screen at least as large as the app window for coordinate-based interaction.
-The screenshot above is from the actual SDL3 window, not a browser mockup.
+For Linux automation, configure the repository build with
+`-DCUI_BUILD_NATIVE_STARTER=ON` and `-DCUI_TEST_FONT=/absolute/path/to/font.ttf`,
+build `cui_native_starter`, and run its smoke through the private-display wrapper.
+
+```sh
+python scripts/test_local.py --build-dir build -R '^native_starter_callback_smoke$'
+```
 
 Historical starter validation (before the current usability additions) checked an actual local installation:
 standalone CMake/CTest, Make with warnings treated as errors, the direct compiler

@@ -2209,6 +2209,17 @@ if(TARGET cui_sdl3)
    --executable $<TARGET_FILE:test_continuous_resize>
    --font ${CMAKE_CURRENT_SOURCE_DIR}/third_party/inter/Inter-Regular.otf)
   set_tests_properties(linux_continuous_resize PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
+  if(TARGET cui_native_starter)
+   add_executable(test_starter_resize tests/integration/test_continuous_resize.c examples/native_starter/app.c)
+   target_compile_definitions(test_starter_resize PRIVATE CUI_TEST_STARTER_RESIZE=1)
+   target_link_libraries(test_starter_resize PRIVATE cui_sdl3)
+   cui_warnings(test_starter_resize)
+   add_test(NAME linux_starter_continuous_resize COMMAND ${Python3_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/packaging/test_continuous_resize.py --scene starter
+    --executable $<TARGET_FILE:test_starter_resize>
+    --font ${CMAKE_CURRENT_SOURCE_DIR}/third_party/inter/Inter-Regular.otf)
+   set_tests_properties(linux_starter_continuous_resize PROPERTIES TIMEOUT 45 SKIP_RETURN_CODE 77)
+  endif()
  endif()
 endif()
 

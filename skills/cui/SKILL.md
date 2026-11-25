@@ -174,8 +174,10 @@ For native typed Slider accessibility on Linux, read the Numeric Slider actions
 section of `docs/NATIVE_ACCESSIBILITY.md` and `include/cui/cui_accessibility.h`.
 Use the opt-in adapter and keep numeric requests separate from confirmed values.
 For responsive UI, derive available space from the host and use the documented
-layout constraints. Test narrow and wide viewports, long content and overflow;
-do not transplant CSS/browser assumptions into the C layout model.
+layout constraints. See `docs/RESPONSIVE_LAYOUT.md` and the native starter in
+`docs/NATIVE_APP_STARTER.md` for a sidebar that becomes a compact drawer while
+preserving page, account and edit state. Test narrow and wide viewports, long
+content and overflow.
 For loading placeholders, see `docs/SKELETON_RESPONSIVE.md`. Keep motion per
 shape, schedule the earliest wake and attach busy state to the application region.
 

@@ -37,6 +37,20 @@ while a 1.46-second burst was ongoing**. This scoped callback-runner path did no
 require a production fix. It does not establish that an older manual loop or
 another host integration handles the user's resize path correctly.
 
+## Native starter resize
+
+`linux_starter_continuous_resize` uses the same harness with the native
+starter's actual frame function. It repeatedly crosses 768 logical pixels,
+including 767 and 768, while the starter displays Settings. Each frame
+checks the current window, main layout and input widths. Captured pixels
+verify the sidebar background where the sidebar is present, and the main
+background across the full width in compact mode. Settings, sign-in,
+notification state, saved name, and unsaved edit all survive.
+
+The private X11 software run presented **24 frames across all six requested
+widths during a 1.48-second burst**. The headless starter tests cover drawer
+interaction and dismissal separately.
+
 ## Run safely
 
 After the integration target is registered, configure native SDL3/text support
@@ -47,6 +61,10 @@ cmake -S . -B build -G Ninja -DCUI_REQUIRE_NATIVE=ON
 cmake --build build --target test_continuous_resize
 python scripts/test_local.py --build-dir build -R '^linux_continuous_resize$' -V
 ```
+
+To include the native starter test, configure with
+`-DCUI_BUILD_NATIVE_STARTER=ON`, build `test_starter_resize`, and select
+`linux_starter_continuous_resize` in the same wrapper.
 
 The Python driver requires the wrapper's `CUI_TEST_VIRTUAL_DISPLAY=1`, a private
 X11 DISPLAY and no Wayland display; unsupported platforms/drivers return 77.

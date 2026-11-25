@@ -6018,6 +6018,7 @@
       "sample": "web/gallery.c",
       "tests": [
         "tests/unit/test_surface.c",
+        "examples/native_starter/test_app.c",
         "tests/web/test_browser.py"
       ],
       "status": "tested",
@@ -6129,12 +6130,15 @@
       "public_header": "include/cui/cui_sidebar.h",
       "sample": "web/gallery.c",
       "tests": [
-        "tests/unit/test_sidebar.c"
+        "tests/unit/test_sidebar.c",
+        "examples/native_starter/test_app.c",
+        "tests/integration/test_continuous_resize.c"
       ],
       "status": "tested",
       "platforms": {
         "headless": "tested_partial",
-        "wasm_browser": "tested_partial"
+        "wasm_browser": "tested_partial",
+        "linux_x11": "tested_partial"
       },
       "limitations": [
         "Variable-height bounded navigation, nested items, independent carets, callbacks and animated Icon/Offcanvas collapse are tested. Full font-weight styling, intrinsic virtual measurement and host popup placement remain partial; see docs/SIDEBAR.md."
@@ -6161,6 +6165,18 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_sidebar.c"
+          ]
+        },
+        {
+          "name": "responsive native sidebar with pinned account footer",
+          "status": "tested",
+          "evidence": [
+            "examples/native_starter/test_app.c",
+            "tests/integration/test_continuous_resize.c",
+            "docs/LINUX_LIVE_RESIZE.md"
+          ],
+          "limitations": [
+            "Starter composition verified with programmatic X11 resize and headless input. Physical window-border drag and other hosts remain open."
           ]
         },
         {

@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: MIT */
+#ifdef CUI_TEST_STARTER_RESIZE
+#include "../../examples/native_starter/app.h"
+#else
 #include "../../examples/responsive_dashboard/app.h"
+#endif
 #include "cui/cui_sdl3.h"
 #include "cui/cui_theme.h"
 #include <math.h>
@@ -8,7 +12,11 @@
 #include <string.h>
 #ifdef __linux__
 typedef struct {
+#ifdef CUI_TEST_STARTER_RESIZE
+    starter_app app;
+#else
     dashboard_app app;
+#endif
     cui_sdl3 *host;
     cui_context *ui;
     cui_font *font;
@@ -46,9 +54,19 @@ static bool initialize(void *user, int argc, char **argv, cui_sdl3 **host, cui_c
                                     .measure_user = s->font});
     if (!s->ui)
         return false;
+#ifdef CUI_TEST_STARTER_RESIZE
+    if (!starter_app_init(&s->app, NULL, NULL))
+        return false;
+    s->app.page = STARTER_SETTINGS;
+    s->app.signed_in = true;
+    s->app.notifications = false;
+    if (cui_edit_replace_range(s->app.name_edit, 0, 3, cui_string("Unsaved")) != CUI_EDIT_OK)
+        return false;
+#else
     dashboard_init(&s->app, NULL, NULL);
     s->app.page = 1;
     s->app.signed_in = true;
+#endif
     *host = s->host;
     *ui = s->ui;
     return true;
@@ -62,16 +80,41 @@ static int frame(void *user, cui_sdl3 *host, cui_context *ui) {
     }
     float width, height;
     cui_sdl3_size(host, &width, &height);
-    if (!cui_begin_frame(ui, width, height, cui_sdl3_frame_delta(host)))
+    float dt = cui_sdl3_frame_delta(host);
+#ifdef CUI_TEST_STARTER_RESIZE
+    cui_draw_list list = starter_app_frame(ui, &s->app, width, height, dt, NULL);
+#else
+    if (!cui_begin_frame(ui, width, height, dt))
         return -1;
     dashboard_scene(ui, &s->app, width, height);
     cui_draw_list list = cui_end_frame(ui);
+#endif
     char path[4096];
     if (snprintf(path, sizeof path, "%s/frame-%u.bmp", s->folder, s->frames) >= (int)sizeof path)
         return -1;
-    if (!cui_sdl3_render_capture(host, &list, (cui_color){245, 247, 250, 255}, path) ||
+    if (!list.count ||
+        !cui_sdl3_render_capture(host, &list, (cui_color){245, 247, 250, 255}, path) ||
         cui_last_error(ui) != CUI_OK)
         return -1;
+#ifdef CUI_TEST_STARTER_RESIZE
+    cui_rect root = cui_bounds(ui, STARTER_ROOT), main = cui_bounds(ui, STARTER_MAIN);
+    cui_rect sidebar = cui_bounds(ui, STARTER_SIDEBAR), menu = cui_bounds(ui, STARTER_MENU);
+    cui_rect account = cui_bounds(ui, STARTER_ACCOUNT), input = cui_bounds(ui, STARTER_NAME);
+    bool wide = width >= 768;
+    if (s->app.page != STARTER_SETTINGS || !s->app.signed_in || s->app.notifications ||
+        s->app.saves || strcmp(s->app.name, "Unsaved") || strcmp(s->app.saved_name, "Ada") ||
+        s->app.drawer.overlay.open || s->app.account.overlay.open)
+        return -1;
+    if (wide ? (sidebar.w != 220 || account.y + account.h <= height - 20 || menu.w > 0)
+             : (sidebar.w > 0 || account.w > 0 || menu.w <= 0))
+        return -1;
+    cui_theme theme = cui_theme_light();
+    cui_color left = wide ? theme.surface : theme.background;
+    printf("FRAME %u %.0f %.0f %.0f %.0f %.0f %.0f %.0f %.0f %u %u %u %u %u %u\n", s->frames, width,
+           height, root.w, root.h, main.x, main.w, input.x, input.w, (unsigned)left.r,
+           (unsigned)left.g, (unsigned)left.b, (unsigned)theme.background.r,
+           (unsigned)theme.background.g, (unsigned)theme.background.b);
+#else
     cui_rect root = cui_bounds(ui, DASH_ROOT), main = cui_bounds(ui, DASH_MAIN);
     cui_rect a = cui_bounds(ui, DASH_SUMMARY), b = cui_bounds(ui, DASH_ACTIVITY);
     bool wide = width >= 1024;
@@ -91,6 +134,7 @@ static int frame(void *user, cui_sdl3 *host, cui_context *ui) {
            s->frames, width, height, root.w, root.h, main.x, main.w, a.w, b.w, wide, row,
            s->app.page, s->app.signed_in, a.x, a.y, a.h, b.x, b.y, b.h, (unsigned)card.r,
            (unsigned)card.g, (unsigned)card.b);
+#endif
     fflush(stdout);
     ++s->frames;
     return 0;
@@ -99,6 +143,9 @@ static void shutdown(void *user, bool success) {
     test_state *s = user;
     if (!success && !s->unsupported)
         fprintf(stderr, "resize child: %s\n", cui_sdl3_error());
+#ifdef CUI_TEST_STARTER_RESIZE
+    starter_app_destroy(&s->app);
+#endif
     cui_destroy(s->ui);
     cui_sdl3_destroy(s->host);
     cui_font_close(s->font);

@@ -2073,7 +2073,8 @@
       "usage": "Initialize the appropriate surface kind, open from an action, and pair end only when begin succeeds. Consume result once.",
       "docs": [
         "docs/SURFACES.md",
-        "docs/SURFACE_EVENTS.md"
+        "docs/SURFACE_EVENTS.md",
+        "docs/NATIVE_APP_STARTER.md"
       ],
       "callback_symbols": [
         "cui_surface_decision_fn",
@@ -2105,7 +2106,8 @@
       "usage": "Initialize measurement cache, submit current entries, and update routing from menu-item events.",
       "docs": [
         "docs/SIDEBAR.md",
-        "docs/SIDEBAR_EVENTS.md"
+        "docs/SIDEBAR_EVENTS.md",
+        "docs/NATIVE_APP_STARTER.md"
       ],
       "callback_symbols": [
         "cui_sidebar_content_fn"

@@ -342,8 +342,11 @@ long inboxes. See the measured SDL workload in `docs/PERFORMANCE.md`.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.
+Group padding reduces the available extent; reserve each pane's inner room in
+its minimum size when supplying panel padding. The divider stays on the seam.
 Repeated drag and keyboard resizing have focused WASM and private X11 SDL
-software coverage. Physical devices and hardware rendering remain open.
+software coverage, including a padded workspace with focused editing across
+host resize. Physical devices and hardware rendering remain open.
 The gallery nested editor/console mode uses distinct
 caller-owned states/IDs and supplies current outer pane width to the inner group;
 copy its compilable C example. See `docs/RESIZABLE_BROWSER_REAUDIT.md`.

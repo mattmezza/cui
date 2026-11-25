@@ -36,8 +36,11 @@ size along that axis, and `cross_size` sets the other dimension, matching the
 source group's cross-axis `size` option. Zero selects automatic parent sizing;
 box fixed-zero flags permit explicit collapsed dimensions. Group/panel box styles
 permit padding, colors and borders, while group direction/gap and panel axis
-size/min/max stay managed. Panel callbacks run inside their available content
-area and may compose further Resizable groups with distinct IDs and states.
+size/min/max stay managed. Group padding reduces the extent available to panels.
+Panel padding insets callback content within the declared pane size, including
+at the minimum. Both accept asymmetric `custom_padding`. The divider is centered
+on the pane seam independently of padding. Panel callbacks may compose further
+Resizable groups with distinct IDs and states.
 IDs are stable and unique across the UI; reserve the IDs returned by
 `cui_resizable_handle_id` for this group.
 
@@ -137,6 +140,11 @@ X11. It presents a software-rendered frame at each step and checks both pane
 bounds and the submitted fills in that frame. It covers both axes, drag
 capture beyond the hit band, min/max clamping, release and regrab in the
 opposite direction, keyboard sizing, and one callback per completed resize.
+The `sdl_resizable_workspace` case renders a padded workspace with a header,
+file control, editable Notes field, and footer. It changes the host size while
+the divider is held, drags to the Notes pane's minimum, and changes the size
+again with Notes focused. It checks the reflow, caret bounds, and actual edit
+from a queued SDL text event.
 Physical touch devices, other window systems, and hardware-renderer paths
 remain open.
 

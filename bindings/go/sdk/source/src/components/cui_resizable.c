@@ -80,6 +80,22 @@ void cui_resize_handle_appearance(cui_context *ui, const cui_theme *theme, cui_r
 cui_resizable_options cui_resizable_options_default(void) {
     return (cui_resizable_options){.duration_seconds = .12, .key_step = 10};
 }
+
+static float cui_resizable_layout_padding(float value) {
+    /* Match the layout's whole-logical-pixel padding conversion. */
+    return isfinite(value) ? truncf(fminf(fmaxf(value, 0), 65535)) : 0;
+}
+
+static float cui_resizable_axis_padding(cui_box box, cui_resizable_axis axis) {
+    if (!box.custom_padding)
+        return 2 * cui_resizable_layout_padding(box.padding);
+    cui_border_edges edges = box.padding_edges;
+    return axis == CUI_RESIZABLE_HORIZONTAL ? cui_resizable_layout_padding(edges.left) +
+                                                  cui_resizable_layout_padding(edges.right)
+                                            : cui_resizable_layout_padding(edges.top) +
+                                                  cui_resizable_layout_padding(edges.bottom);
+}
+
 cui_resizable_error cui_resizable(cui_context *ui, cui_id id, const cui_theme *theme,
                                   cui_resizable_state *state, const cui_resizable_panel *panels,
                                   size_t count, cui_resizable_options o) {
@@ -119,13 +135,12 @@ cui_resizable_error cui_resizable(cui_context *ui, cui_id id, const cui_theme *t
                 return CUI_RESIZABLE_INVALID;
         }
     }
-    float padding = isfinite(o.box.padding) && o.box.padding > 0 ? o.box.padding : 0;
     float declared = o.axis == CUI_RESIZABLE_HORIZONTAL ? o.box.width : o.box.height;
     bool fixed_zero = o.axis == CUI_RESIZABLE_HORIZONTAL ? o.box.fixed_width : o.box.fixed_height;
     float measured = o.axis == CUI_RESIZABLE_HORIZONTAL ? state->bounds.w : state->bounds.h;
     float outer_extent = o.extent > 0 ? o.extent : declared > 0 ? declared : measured;
     bool first_measure = outer_extent <= 0 && !fixed_zero;
-    float extent = fmaxf(0, outer_extent - padding * 2);
+    float extent = fmaxf(0, outer_extent - cui_resizable_axis_padding(o.box, o.axis));
     if (first_measure) {
         for (size_t i = 0; i < count; i++)
             if (!panels[i].hidden)
@@ -188,6 +203,14 @@ cui_resizable_error cui_resizable(cui_context *ui, cui_id id, const cui_theme *t
         if (slot->hidden)
             continue;
         cui_box box = panels[i].box;
+        cui_box content = {.row = box.row,
+                           .gap = box.gap,
+                           .padding = box.padding,
+                           .custom_padding = box.custom_padding,
+                           .padding_edges = box.padding_edges};
+        /* Padding belongs inside the fixed pane, including at its minimum size. */
+        box.padding = 0;
+        box.custom_padding = false;
         float size = first_measure && !panels[i].has_initial_size ? -1 : slot->size;
         if (o.axis == CUI_RESIZABLE_HORIZONTAL) {
             box.width = size;
@@ -211,19 +234,16 @@ cui_resizable_error cui_resizable(cui_context *ui, cui_id id, const cui_theme *t
                                 .fixed_height = o.axis == CUI_RESIZABLE_HORIZONTAL});
         cui_end_box(ui);
         if (panels[i].content) {
-            cui_begin_absolute_box(ui, 0, (cui_box){.row = box.row, .gap = box.gap},
-                                   (cui_rect){0, 0, -1, -1});
+            cui_begin_absolute_box(ui, 0, content, (cui_rect){0, 0, -1, -1});
             panels[i].content(ui, panels[i].content_user);
             cui_end_box(ui);
         }
         if (preceding < count) {
             cui_resizable_slot *handle_slot = &state->slots[preceding];
             cui_id handle = cui_resizable_handle_id(id, handle_slot->id);
-            float padding = isfinite(box.padding) && box.padding > 0 ? box.padding : 0;
-            float cross = -1;
-            cui_rect band = o.axis == CUI_RESIZABLE_HORIZONTAL
-                                ? (cui_rect){-4 - padding, -padding, 9, cross}
-                                : (cui_rect){-padding, -4 - padding, cross, 9};
+            /* Absolute children start at the pane's outer edge. */
+            cui_rect band = o.axis == CUI_RESIZABLE_HORIZONTAL ? (cui_rect){-4, 0, 9, -1}
+                                                               : (cui_rect){0, -4, -1, 9};
             cui_begin_absolute_box(ui, handle, (cui_box){0}, band);
             if (cui_resizable_indicator(handle_slot, o))
                 cui_invalidate(ui);

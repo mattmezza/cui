@@ -5750,6 +5750,18 @@
             "tests/integration/test_sdl_resizable.c",
             "docs/RESIZABLE.md"
           ]
+        },
+        {
+          "name": "padded workspace seam, minimum-size layout and editing across host resize",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_resizable.c",
+            "tests/integration/test_sdl_resizable.c",
+            "docs/RESIZABLE.md"
+          ],
+          "limitations": [
+            "Asymmetric padding is covered on both axes in headless layout. The editable horizontal workspace uses injected SDL pointer/text events and programmatic window sizes on private X11."
+          ]
         }
       ],
       "upstream_doc": {

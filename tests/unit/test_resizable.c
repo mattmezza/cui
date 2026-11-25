@@ -416,6 +416,52 @@ static void test_responsive_actual_panels(void) {
                 cui_destroy(ui);
             }
 }
+
+static void test_padded_panels(void) {
+    cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+    assert(ui);
+    cui_resizable_slot slots[2];
+    cui_resizable_state state;
+    assert(cui_resizable_state_init(&state, slots, 2));
+    cui_theme theme = cui_theme_light();
+    cui_id content = 31;
+    cui_resizable_panel panels[] = {
+        cui_resizable_panel_default(10),
+        {.id = 11,
+         .box = {.custom_padding = true, .padding_edges = {12, 16, 9, 15}},
+         .content = responsive_content,
+         .content_user = &content}};
+    for (int axis = 0; axis < 2; axis++) {
+        cui_resizable_options options = cui_resizable_options_default();
+        options.axis = (cui_resizable_axis)axis;
+        options.extent = 220;
+        options.cross_size = 300;
+        options.box = (cui_box){.custom_padding = true, .padding_edges = {8, 12, 6, 14}};
+        assert(cui_begin_frame(ui, 400, 400, .016f));
+        assert(cui_resizable(ui, 100, &theme, &state, panels, 2, options) == CUI_RESIZABLE_OK);
+        cui_end_frame(ui);
+        assert(cui_last_error(ui) == CUI_OK);
+        cui_rect group = cui_bounds(ui, 100), first = cui_bounds(ui, 10), next = cui_bounds(ui, 11);
+        cui_rect body = cui_bounds(ui, content);
+        cui_rect band = cui_bounds(ui, cui_resizable_handle_id(100, 10));
+        near(first.x, group.x + 8);
+        near(first.y, group.y + 6);
+        near(axis == 0 ? first.w : first.h, 100);
+        near(axis == 0 ? next.w : next.h, 100);
+        near(next.x + next.w, group.x + group.w - 12);
+        near(next.y + next.h, group.y + group.h - 14);
+        near(body.x, next.x + 12);
+        near(body.y, next.y + 9);
+        near(body.w, next.w - 28);
+        near(body.h, next.h - 24);
+        near(band.x + (axis == 0 ? 4 : 0), next.x);
+        near(band.y + (axis == 1 ? 4 : 0), next.y);
+        near(band.w, axis == 0 ? 9 : next.w);
+        near(band.h, axis == 0 ? next.h : 9);
+    }
+    cui_destroy(ui);
+}
+
 static void test_styled(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
     assert(ui);
@@ -615,6 +661,7 @@ int main(void) {
 #ifndef CUI_RESIZABLE_BASE_ONLY
     test_edge_appearance();
     test_responsive_actual_panels();
+    test_padded_panels();
     test_styled();
 #endif
     return 0;

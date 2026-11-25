@@ -48,6 +48,41 @@ the actual C options across both retained consumers and requires one bridge
 renderer integration. The independent query preserves prior resource ABI
 observations. Legacy scalar Badge child admission and rendering stay intact.
 
+## Configured Badge bridge record and admission
+
+Use the 64-byte Badge configuration and 40-byte result from the resource
+checkpoint, with the refinements below. The Badge capability group has its own
+version and size query. The resource and Icon presentation queries retain their
+existing indices. The optional owned artwork takes the existing 256-byte Icon
+options as-is. Numeric RGBA follows the shipped bridge convention,
+`0xRRGGBBAA`. Count and maximum are unsigned 64-bit values and checked against
+`SIZE_MAX` before conversion to the C component. Zero maximum is explicit.
+
+The versioned factory takes an initial configuration so a node always has a
+valid render path. Stage the copied configuration, both UTF-8 strings and
+sidecar storage before creating the node. Reuse ordinary bridge key, depth,
+parent and generation checks. Only the dedicated factory admits the configured
+Badge kind. It can wrap ordered children and nest; an ordinary scalar Badge
+still rejects children. Reuse the existing internal child submission callback
+and carry the wrapper's disabled state to its content. Legacy text, detail,
+visual size and design-size setters are ambiguous for this kind and reject.
+
+For count and dot, use `cui_badge_ex` and require the artwork inputs to be absent.
+For icon mode, accept either a named catalog asset or an owned resource with
+complete Icon options. Named mode uses the existing named path in
+`cui_badge_ex`; owned mode uses `cui_badge_with_icon`. The copied Badge name
+labels the status marker; the artwork is decorative. A separate artwork name
+would have no observable meaning. Expose a copied result with a flag that
+indicates when the owned path returned an actual Icon error. The C named
+Badge path returns submission only, so the bridge does not infer an artwork
+error from it. After an accepted step, report current indicator bounds only if
+the marker was submitted and has valid geometry in a successful frame.
+
+Reuse the existing lazy Icon pool as the owner of the Badge sidecar table. A
+count/dot-only app has no SVG slots or masks. Each live configured Badge holds
+one copied payload and at most one resource reference. Atomic reconfiguration,
+omission and results follow the standalone Icon's timing and ownership.
+
 ## Acceptance
 
 - Standalone Icon. Compare software output to the ordinary C painter, including

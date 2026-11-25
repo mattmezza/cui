@@ -15,7 +15,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Slider | `cui_slider` | value, range, step, change, disabled | Float native precision |
 | SliderModel (kind81, C/Python/Node/TypeScript/Go) | `cui_styled_slider_model_events_v1` | owned double Single/Range, separate copied request FIFO, explicit receipt acceptance | [Exact contract](BRIDGE_SLIDER_MODEL.md); [Python builder](PYTHON_SLIDER_MODEL.md); [Node/TypeScript builders](NODE_SLIDER_MODEL.md); [Go builder](GO_SLIDER_MODEL.md); Rust typed builders, native numeric AT, V2 adapter and typed shadows pending |
 | Progress | `cui_progress` | value in [0,1] | Width fixed at 160 |
-| Badge | `cui_badge` | copied UTF-8 text | Legacy text badge |
+| Badge | `cui_badge`, optional `cui_badge_ex` and `cui_badge_with_icon` | Legacy text pill, or a configured count, dot or artwork indicator around retained children | Configured Badge preserves ordinary child actions and reports current indicator geometry. [Retained C guide](BRIDGE_BADGE.md). |
 | Input | `cui_input_ex` | per-node edit model, text, change, disabled | 4096 UTF-8 bytes |
 | Textarea | `cui_textarea` | per-node multiline edit model, text, change, disabled | 4096 UTF-8 bytes, 512 layout lines |
 | NumberInput | `cui_number_input` | per-node numeric editor, value, range, step, change, disabled | Finite values; 127-byte draft |

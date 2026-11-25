@@ -105,6 +105,7 @@ returns `CUI_BRIDGE_EMPTY` before the first invocation, after reconfiguration or
 reset, and when the latest accepted step omitted the Icon or stopped before
 composition. Reading a result leaves rendering and resources untouched.
 
-Configured Badge, configurable Spinner, and resource and presentation builders
-for Python, JavaScript, TypeScript, Go and Rust are separate work. Existing
-language builders continue to serve named Icons.
+The [retained Badge](BRIDGE_BADGE.md) uses the same owned resources and Icon
+options. Configurable Spinner and resource and presentation builders for
+Python, JavaScript, TypeScript, Go and Rust remain open. Existing language
+builders continue to serve named Icons.

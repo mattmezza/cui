@@ -170,7 +170,8 @@ typedef enum {
     CUI_BRIDGE_QUESTIONNAIRE,
     CUI_BRIDGE_DOCK,
     CUI_BRIDGE_SETTINGS,
-    CUI_BRIDGE_SLIDER_MODEL = 81 /* Additive controlled route; use versioned factory. */
+    CUI_BRIDGE_SLIDER_MODEL = 81, /* Additive controlled route; use versioned factory. */
+    CUI_BRIDGE_BADGE_CONFIGURED = 82 /* Use the Badge V1 factory. */
 } cui_bridge_kind;
 /* Optional responsive presentation for the existing Skeleton kind35.
  * Without explicit configuration, legacy construction and visual size apply. */
@@ -1232,6 +1233,70 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_reset_node_v1(cui_bridge_app *,
  * whole-frame status are independent. Reads never prepare or paint. */
 CUI_BRIDGE_API cui_bridge_status cui_bridge_icon_get_node_result_v1(
     cui_bridge_app *, cui_bridge_node, cui_bridge_icon_result_v1 *);
+
+/* Optional zero-flow Badge indicator around ordinary retained children.
+ * Size follows C control sizes: medium=0, small=1, large=2, xsmall=3.
+ * Design size follows CUI_DESIGN_*. V1 records are exact-size, native-endian.
+ * RGBA numbers are 0xRRGGBBAA; custom color includes transparent black.
+ * Count and maximum must fit the target's size_t. Count=0 omits the indicator.
+ * ICON accepts an owned resource with Icon options, or a nonempty catalog name.
+ * COUNT and DOT use neither. The optional copied name labels the indicator. */
+enum {
+    CUI_BRIDGE_BADGE_COUNT_V1 = 0,
+    CUI_BRIDGE_BADGE_DOT_V1 = 1,
+    CUI_BRIDGE_BADGE_ICON_V1 = 2,
+    CUI_BRIDGE_BADGE_CUSTOM_COLOR_V1 = 1u << 0,
+    CUI_BRIDGE_BADGE_ICON_OBSERVED_V1 = 1u << 0
+};
+typedef struct {
+    uint32_t struct_size, schema_version, reserved[2];
+    uint32_t variant, size, design_size, flags;
+    uint64_t count, maximum;
+    uint32_t color_rgba, reserved_tail;
+    cui_bridge_icon_handle_v1 artwork;
+} cui_bridge_badge_config_v1;
+typedef struct {
+    uint32_t struct_size, schema_version, submitted, icon_error;
+    cui_bridge_node node;
+    uint64_t frame_sequence;
+    uint32_t frame_status, flags;
+} cui_bridge_badge_result_v1;
+enum {
+    CUI_BRIDGE_BADGE_CONFIG_RECORD_V1 = 0,
+    CUI_BRIDGE_BADGE_RESULT_RECORD_V1 = 1,
+    CUI_BRIDGE_BADGE_NAME_V1 = 0,
+    CUI_BRIDGE_BADGE_NAMED_ICON_V1 = 1
+};
+/* bit0: complete configured Badge V1 group. */
+CUI_BRIDGE_API uint32_t cui_bridge_badge_versions(void);
+CUI_BRIDGE_API uint32_t cui_bridge_badge_record_size_v1(uint32_t kind);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_default_config_v1(cui_bridge_badge_config_v1 *);
+/* Create or replace atomically. Strings copy strict UTF-8, at most 4096 bytes
+ * each, excluding NUL. Supply artwork options only with a nonzero handle.
+ * Use the matching app on its owner thread, outside steps. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_create_v1(
+    cui_bridge_app *, cui_bridge_node parent, const char *key,
+    const cui_bridge_badge_config_v1 *, const cui_bridge_icon_options_v1 *,
+    const char *name, uint32_t name_bytes, const char *named_icon, uint32_t icon_bytes,
+    cui_bridge_node *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_configure_v1(
+    cui_bridge_app *, cui_bridge_node, const cui_bridge_badge_config_v1 *,
+    const cui_bridge_icon_options_v1 *, const char *name, uint32_t name_bytes,
+    const char *named_icon, uint32_t icon_bytes);
+/* Both output records need their exact headers. When no owned artwork is
+ * configured, the output Icon options contain only their header. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_get_config_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_badge_config_v1 *,
+    cui_bridge_icon_options_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_copy_text_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t field, char *, uint32_t capacity,
+    uint32_t *required);
+/* Result is EMPTY until invoked in the latest admitted step. Inspect the flag
+ * before interpreting icon_error. Frame status and submission are separate. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_get_result_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_badge_result_v1 *);
+CUI_BRIDGE_API cui_bridge_status cui_bridge_badge_indicator_bounds_v1(
+    cui_bridge_app *, cui_bridge_node, cui_bridge_rect *);
 
 CUI_BRIDGE_API cui_bridge_status cui_bridge_request_close(cui_bridge_app *app);
 

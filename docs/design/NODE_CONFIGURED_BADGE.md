@@ -5,6 +5,11 @@ validation. Existing `badge(key,text)` remains the standalone kind11 text pill.
 All 78 entries remain; configured foreign Badge and complete Icon authoring are
 pending in every language until their individual gates pass.
 
+The retained C prerequisite is now implemented in working source. Use the
+[Icon guide](../BRIDGE_ICON_PRESENTATION.md), [Badge guide](../BRIDGE_BADGE.md)
+and public bridge header for the final C symbols, record sizes and lifetime
+rules. The proposal below records the earlier language design.
+
 ## Actual authority and gaps
 
 There is no `include/cui/cui_badge.h` at this revision. Badge authority is

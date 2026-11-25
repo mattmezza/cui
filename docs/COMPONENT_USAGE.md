@@ -184,6 +184,9 @@ API: `cui_avatar`, `cui_avatar_ex`, `cui_avatar_stack`, `cui_avatar_image_init`,
 
 API: `cui_badge_defaults`, `cui_badge_ex`, `cui_badge_with_icon`, `cui_badge_icon_content`, `cui_badge_result`, `cui_badge`. Callback: `cui_button_content_fn`. [Public header](../include/cui/cui_components.h); [guide](BADGE.md), [guide](COMPONENTS.md).
 
+Retained C apps can create a configured Badge node around ordinary retained
+children. [Bridge header](../include/cui/cui_bridge.h), [retained guide](BRIDGE_BADGE.md).
+
 ## Bubble
 
 **Composition:** immediate frame submission. **Scope:** styled frame component.

@@ -9,8 +9,9 @@ frozen legacy trace/allocations, old-header consumers and actual owner-thread
 refusal. All 18 consumer-skill tests and canonical generated checks pass; see
 [the root receipt](validation/bridge-icon-resources-root.json). The resource API
 is available in alpha.4. Working source adds
-[retained Icon presentation](BRIDGE_ICON_PRESENTATION.md). Configured Badge,
-configurable Spinner, and language facades remain pending. Legacy kind 11 text
+[retained Icon presentation](BRIDGE_ICON_PRESENTATION.md) and a
+[configured Badge container](BRIDGE_BADGE.md). Configurable Spinner and language
+facades remain pending. Legacy kind 11 text
 Badge and kind 50 named Icon keep their render paths. All 78 families remain.
 
 `cui_bridge_icon_versions()` bit 0 advertises the complete resource group on the

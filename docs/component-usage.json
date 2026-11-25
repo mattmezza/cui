@@ -189,7 +189,10 @@
         "cui_badge_ex",
         "cui_badge",
         "cui_badge_indicator_id",
-        "cui_badge_with_icon"
+        "cui_badge_with_icon",
+        "cui_bridge_badge_create_v1",
+        "cui_bridge_badge_configure_v1",
+        "cui_bridge_badge_get_result_v1"
       ],
       "state_types": [
         "cui_badge_icon_content",
@@ -200,6 +203,7 @@
       "usage": "Use cui_badge_ex for count/dot/named-icon composition; use cui_badge_with_icon with caller-owned Icon state/options for configured artwork. Handle icon_error independently from composition admission and Core frame success.",
       "docs": [
         "docs/BADGE.md",
+        "docs/BRIDGE_BADGE.md",
         "docs/COMPONENTS.md",
         "docs/ELEMENT_SHADOWS.md"
       ],
@@ -209,6 +213,9 @@
       "scope": "styled frame component",
       "name": "Badge",
       "public_header": "include/cui/cui_components.h",
+      "additional_public_headers": [
+        "include/cui/cui_bridge.h"
+      ],
       "composition": "immediate frame submission"
     },
     {

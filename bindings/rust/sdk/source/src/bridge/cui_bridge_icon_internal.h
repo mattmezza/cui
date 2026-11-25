@@ -33,6 +33,7 @@ typedef struct {
     bool retired;
 } bridge_icon_slot;
 typedef struct bridge_icon_presented bridge_icon_presented;
+typedef struct bridge_badge_configured bridge_badge_configured;
 struct bridge_icon_app {
     const void *owner;
     bridge_icon_slot *slots;
@@ -40,6 +41,7 @@ struct bridge_icon_app {
     uint64_t cache_quota, svg_quota, copied_bytes;
     bool busy;
     bridge_icon_presented **presentations;
+    bridge_badge_configured **badges;
     uint64_t presentation_frame;
     cui_bridge_status presentation_status;
 };
@@ -207,6 +209,7 @@ static void bridge_icon_app_destroy(cui_bridge_app *app) {
         bridge_icon_free(a->slots[i].value);
     free(a->slots);
     free(a->presentations);
+    free(a->badges);
     free(a);
     app->icons = NULL;
 }

@@ -74,7 +74,23 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        {
+          "header": "include/cui/cui_bridge.h",
+          "languages": ["python", "javascript", "typescript", "go", "rust"],
+          "types": [
+            "cui_bridge_badge_config_v1",
+            "cui_bridge_badge_result_v1"
+          ],
+          "symbols": [
+            "cui_bridge_badge_create_v1",
+            "cui_bridge_badge_configure_v1",
+            "cui_bridge_badge_get_result_v1"
+          ],
+          "note": "Configured Badge children and owned SVG are available in the C bridge. Language builders still expose the scalar text pill."
+        }
+      ]
     },
     {
       "name": "Bubble",
@@ -1264,9 +1280,10 @@
       "go": "documented_omission",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Configured Icon is available in the C bridge. Configured Badge and foreign authoring remain open.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Configured Icon and Badge are available in the C bridge. Foreign authoring remains open.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
+    "badge_guide": "docs/BRIDGE_BADGE.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

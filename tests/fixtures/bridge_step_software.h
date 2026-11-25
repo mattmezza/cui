@@ -1,5 +1,8 @@
 /* SPDX-License-Identifier: MIT */
 /* Run the actual bridge step and software backend using a simulated native host. */
+#ifndef CUI_BRIDGE_TEST_RENDER
+#define CUI_BRIDGE_TEST_RENDER cui_software_render
+#endif
 static cui_software *software;
 static cui_bridge_status poll_status, render_status;
 
@@ -36,9 +39,11 @@ cui_bridge_status cui_bridge_native_render(cui_bridge_app *app, const cui_draw_l
     if (render_status != CUI_BRIDGE_OK)
         return render_status;
     assert(cui_software_resize(software, (unsigned)app->width, (unsigned)app->height));
-    return cui_software_render(software, list, (cui_color){0, 0, 0, 255}) ? CUI_BRIDGE_OK
-                                                                          : CUI_BRIDGE_CORE_ERROR;
+    return CUI_BRIDGE_TEST_RENDER(software, list, (cui_color){0, 0, 0, 255})
+               ? CUI_BRIDGE_OK
+               : CUI_BRIDGE_CORE_ERROR;
 }
+#undef CUI_BRIDGE_TEST_RENDER
 
 cui_bridge_status cui_bridge_native_set_font_fallbacks(cui_bridge_app *app,
                                                        const char *const *paths, uint32_t count) {

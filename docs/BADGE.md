@@ -96,6 +96,6 @@ frozen old-route scenes and retained old-mask rendering. Descriptor sizes were
 measured as 136 bytes native/104 WASM32; WASM was a header probe only. The root
 configured build and expanded headless fixture also pass: nested interactive
 children, narrow/wide resize, omission/reappearance and resource-error recovery.
-Exhaustive allocation failures, generated consumers and browser acceptance remain
-open. Foreign configured Badge authoring is still unavailable;
-this does not complete the frozen family.
+The retained C bridge also composes Badge nodes around ordinary retained
+children with copied descriptors, shared SVG handles and frame results. Language
+builders still use the standalone text pill. [Retained C guide](BRIDGE_BADGE.md).

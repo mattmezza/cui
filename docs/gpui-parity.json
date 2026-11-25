@@ -1547,7 +1547,8 @@
         "bindings/python/test_icons.py",
         "bindings/node/test/icon-resources.test.cjs",
         "bindings/node/test/icon-badge.test.cjs",
-        "bindings/go/cui/icon_badge_test.go"
+        "bindings/go/cui/icon_badge_test.go",
+        "bindings/rust/tests/icon_resources.rs"
       ],
       "status": "tested",
       "platforms": {
@@ -1556,7 +1557,7 @@
       "limitations": [
         "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
         "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
-        "The optional retained C, Python, JavaScript, TypeScript and Go APIs support copied Icon and Badge configuration and app-owned SVG resources. Configured Rust authoring remains open."
+        "The optional retained C, Python, JavaScript, TypeScript and Go APIs support copied Icon and Badge configuration and app-owned SVG resources. Rust supports owned resources. Configured retained Rust authoring remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

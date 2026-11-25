@@ -1,8 +1,13 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
+mod icon_resources;
 mod shadows;
 mod skeleton_presentation;
 mod slider_model;
 mod time_localized;
+pub use icon_resources::{
+    IconAvailability, IconBitmap, IconCatalogEntry, IconError, IconInfo, IconLimits, IconResource,
+    IconSource, IconSourceKind, IconTransform,
+};
 pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};
 pub use skeleton_presentation::{SkeletonConfig, SkeletonPresentation, SkeletonWidth};
 pub use slider_model::{

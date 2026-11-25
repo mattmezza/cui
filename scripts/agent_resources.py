@@ -60,6 +60,7 @@ def source_files(root):
                  'bindings/go/cui/skeleton_presentation.go', 'bindings/go/cui/icon_resources.go',
                  'bindings/go/cui/icon_presentation.go', 'bindings/go/cui/badge_configured.go',
                  'bindings/rust/src/time_localized.rs', 'bindings/rust/src/skeleton_presentation.rs',
+                 'bindings/rust/src/icon_resources.rs',
                  'bindings/go/cui/part_shadows.go', 'bindings/go/cui/slider_model.go', 'bindings/rust/src/part_shadows.rs'))
     paths.add(root / 'bindings/rust/build.rs')
     for path in ('web/gallery.c', 'web/gallery.js', 'cmake/sources.json', 'CMakeLists.txt',

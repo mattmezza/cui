@@ -43,6 +43,7 @@ Surfaces expose `open`/`is_open`, `on_close_event`, and typed `surface_result()`
 `visual_size` sets explicit dimensions for Avatar, EmptyView, GroupBox, Skeleton, and Spinner. `total`, `step_status`, and `numeric_part_bounds` expose native pagination, rating, and step interactions. `scroll_extent` sets Scrollable content dimensions and `scroll` queues a host wheel fixture; offset changes arrive through `on_change_event`.
 
 StatusBar, Toolbar, and TitleBar use Item children; StatusBar Item `step_status` chooses left (0), center (1), or right (2). Icon `text` is a catalog name; an unknown name fails the frame. Message `text` is body and `detail_text` is header.
+Rust can also [prepare and copy custom SVG artwork](RUST_ICON_RESOURCES.md).
 
 Attachment uses `text` title, `detail_text` description, `value` progress 0..1, and typed `attachment_status`; this bridge component is a metadata chip. `image_rgba` copies RGBA8 pixels into the bridge (maximum 16 MiB, 2048 pixels per dimension), so the caller can release its buffer after the call.
 

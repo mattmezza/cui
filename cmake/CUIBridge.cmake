@@ -196,6 +196,53 @@ if(CUI_RUST_SKELETON_TESTS)
    run --offline --locked -j1 --example skeleton_profile -- --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
+option(CUI_RUST_ICON_TESTS "Check owned Icon resources with Rust on Linux" OFF)
+if(CUI_RUST_ICON_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Rust Icon provider tests currently support Linux only")
+ endif()
+ find_program(CUI_RUST_ICON_CARGO cargo REQUIRED)
+ set(CUI_RUST_ICON_TARGET_DIR "${CUI_RUST_SKELETON_TARGET_DIR}" CACHE PATH "Reusable Cargo cache for shared Rust Icon tests")
+ set(CUI_RUST_ICON_STATIC_TARGET_DIR "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" CACHE PATH "Reusable Cargo cache for bundled Rust Icon tests")
+ function(cui_rust_icon_test suffix target library_dir unsupported)
+  add_test(NAME bridge_rust_icon_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
+   CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings
+   CUI_TEST_ICON_RESOURCE_UNSUPPORTED=${unsupported} ${library_dir}
+   ${CUI_RUST_ICON_CARGO} ${ARGN})
+  set_tests_properties(bridge_rust_icon_${suffix} PROPERTIES
+   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
+ endfunction()
+ set(_cui_rust_icon_shared CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>)
+ cui_rust_icon_test(dynamic "${CUI_RUST_ICON_TARGET_DIR}" "${_cui_rust_icon_shared}" 0
+  test --offline --locked -j1 --test icon_resources -- --test-threads=1)
+ cui_rust_icon_test(static "${CUI_RUST_ICON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --test icon_resources -- --test-threads=1)
+ cui_rust_icon_test(example "${CUI_RUST_ICON_STATIC_TARGET_DIR}" "" 0
+  run --offline --locked -j1 --example icon_resource)
+ foreach(provider LEGACY ALPHA4)
+  set(CUI_RUST_ICON_${provider}_LIBRARY "" CACHE FILEPATH "Optional Rust Icon ${provider} provider")
+  if(CUI_RUST_ICON_${provider}_LIBRARY)
+   set(lib "${CUI_RUST_ICON_${provider}_LIBRARY}")
+   if(NOT EXISTS "${lib}" OR IS_DIRECTORY "${lib}")
+    message(FATAL_ERROR "CUI_RUST_ICON_${provider}_LIBRARY must name an existing provider")
+   endif()
+   string(TOLOWER ${provider} suffix)
+   set(provider_dir "${CMAKE_CURRENT_BINARY_DIR}/rust-icon-providers/${suffix}")
+   file(MAKE_DIRECTORY "${provider_dir}")
+   file(CREATE_LINK "${lib}" "${provider_dir}/libcui_bridge.so" SYMBOLIC)
+   set(selection)
+   set(unsupported 0)
+   if(provider STREQUAL "LEGACY")
+    set(selection --exact optional_provider_preserves_legacy)
+    set(unsupported 1)
+   endif()
+   cui_rust_icon_test(${suffix} "${CUI_RUST_ICON_TARGET_DIR}"
+    "${_cui_rust_icon_shared};LD_LIBRARY_PATH=${provider_dir}" ${unsupported}
+    test --offline --locked -j1 --test icon_resources -- --test-threads=1 ${selection})
+  endif()
+ endforeach()
+endif()
 if(CUI_BRIDGE_NATIVE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT TARGET cui_sdl3 OR NOT CUI_TEST_FONT)
   message(FATAL_ERROR "Binding native checks require Linux, SDL/text adapters and CUI_TEST_FONT")

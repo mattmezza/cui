@@ -255,14 +255,14 @@
             "cui_bridge_icon_configure_node_v1",
             "cui_bridge_icon_get_node_result_v1"
           ],
-          "note": "C, Python, JavaScript, TypeScript and Go support owned resources and retained Icon configuration. Rust uses named Icons."
+          "note": "C, Python, JavaScript, TypeScript and Go support retained Icon configuration. Rust has owned SVG resources and the legacy named Icon builder."
         },
         {
           "header": "include/cui/cui_icon.h",
           "languages": ["python", "javascript", "typescript", "go", "rust"],
           "types": ["cui_icon_loader_fn"],
           "symbols": ["cui_icon_set_path", "cui_icon_set_name"],
-          "note": "Direct C accepts arbitrary loader callbacks. Python, JavaScript, TypeScript and Go path sources use a resource-local map of copied SVG data."
+          "note": "Direct C accepts arbitrary loader callbacks. Python, JavaScript, TypeScript, Go and Rust path sources use a resource-local map of copied SVG data."
         }
       ]
     },
@@ -1285,9 +1285,9 @@
       "javascript": "tested_subset",
       "typescript": "tested_subset",
       "go": "tested_subset",
-      "rust": "documented_omission"
+      "rust": "tested_subset"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript and Go expose owned SVG resources and catalog/cache utilities, plus configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript, Go and Rust expose owned SVG resources and catalog/cache utilities. Python, JavaScript, TypeScript and Go also expose configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
@@ -1296,6 +1296,7 @@
     "node_components_guide": "docs/NODE_ICON_BADGE.md",
     "go_resources_guide": "docs/GO_ICON_RESOURCES.md",
     "go_components_guide": "docs/GO_ICON_BADGE.md",
+    "rust_resources_guide": "docs/RUST_ICON_RESOURCES.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

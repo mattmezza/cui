@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MIT */
 #define _POSIX_C_SOURCE 200809L
+#include "../../src/core/cui_ordered_input_internal.h"
 #include "cui/cui_accessibility.h"
 #include "cui/cui_base_slider_model.h"
 #include "cui/cui_sdl3.h"
@@ -64,6 +65,19 @@ static void slider_update(void *opaque, const cui_slider_model_request_v1 *event
     if (event->requested.end != 50) /* Application rejects one value. */
         state->slider_value = event->requested.end;
 }
+enum { DEPARTURE = 47, DEPARTURE_MINUTE = 48, DEPARTURE_HOUR = 49 };
+static cui_core_ordered_result time_step(void *user, const cui_event *event, cui_id target) {
+    (void)user;
+    (void)event;
+    (void)target;
+    return (cui_core_ordered_result){0};
+}
+static bool time_focus_child(void *user, cui_id child) {
+    if (child != DEPARTURE_MINUTE && child != DEPARTURE_HOUR)
+        return false;
+    *(cui_id *)user = child;
+    return true;
+}
 static int provider(int commands, int output) {
     assert(SDL_Init(SDL_INIT_VIDEO));
     cui_sdl3 *backend = cui_sdl3_create("CUI native accessibility fixture", 320, 200, NULL);
@@ -88,6 +102,9 @@ static int provider(int commands, int output) {
     report state = {.slider_value = 30};
     cui_slider_model_state_v1 slider;
     assert(cui_slider_model_state_init_v1(sizeof(slider), &slider));
+    cui_id segment = DEPARTURE_HOUR;
+    cui_core_ordered_input departure = {
+        .root = DEPARTURE, .step = time_step, .user = &segment, .focus_child = time_focus_child};
     bool running = true, disabled = false, present = true, hold = false;
     for (unsigned frame = 0; running && frame < 3000; ++frame) {
         char cmd;
@@ -114,7 +131,7 @@ static int provider(int commands, int output) {
         }
         if (!hold)
             cui_accessibility_drain(bridge, ui);
-        assert(cui_begin_frame(ui, 320, 200, .01f));
+        assert(cui_core_begin_ordered_frame(ui, 320, 200, .01f, &departure, 1));
         cui_begin_box(ui, 1, (cui_box){.width = 320, .height = 200});
         char frame_label[32] = "Native button";
         if (present)
@@ -145,17 +162,31 @@ static int provider(int commands, int output) {
         assert(result.status == CUI_SLIDER_MODEL_OK);
         node(ui, 46, CUI_ROLE_SLIDER, "Passive slider", (cui_rect){170, 120, 100, 30}, false, NULL,
              NULL);
-        node(ui, 47, CUI_ROLE_TIME_INPUT, "Departure time", (cui_rect){20, 165, 130, 25}, false,
-             NULL, NULL);
-        node(ui, 48, CUI_ROLE_SPINBUTTON, "Departure minute", (cui_rect){95, 165, 48, 25}, false,
-             NULL, NULL);
-        cui_set_semantic_details(
-            ui, 48,
-            (cui_semantic_details){
-                .parent = 47, .no_focus = true, .focus_target = 47, .maximum = 59});
-        cui_update_semantic(ui, 48, false, 30);
-        assert(cui_set_semantic_text_value_v1(ui, 47, cui_string("٠٩:٣٠")));
-        assert(cui_set_semantic_text_value_v1(ui, 48, cui_string("٣٠")));
+        node(ui, DEPARTURE, CUI_ROLE_TIME_INPUT, "Departure time", (cui_rect){20, 165, 130, 25},
+             false, NULL, NULL);
+        cui_set_semantic_details(ui, DEPARTURE, (cui_semantic_details){.focusable = true});
+        node(ui, DEPARTURE_HOUR, CUI_ROLE_SPINBUTTON, "Departure hour", (cui_rect){20, 165, 48, 25},
+             false, NULL, NULL);
+        node(ui, DEPARTURE_MINUTE, CUI_ROLE_SPINBUTTON, "Departure minute",
+             (cui_rect){95, 165, 48, 25}, false, NULL, NULL);
+        cui_set_semantic_details(ui, DEPARTURE_HOUR,
+                                 (cui_semantic_details){.parent = DEPARTURE,
+                                                        .no_focus = true,
+                                                        .focus_target = DEPARTURE,
+                                                        .selected = segment == DEPARTURE_HOUR,
+                                                        .maximum = 23});
+        cui_set_semantic_details(ui, DEPARTURE_MINUTE,
+                                 (cui_semantic_details){.parent = DEPARTURE,
+                                                        .no_focus = true,
+                                                        .focus_target = DEPARTURE,
+                                                        .selected = segment == DEPARTURE_MINUTE,
+                                                        .maximum = 59});
+        cui_update_semantic(ui, DEPARTURE_HOUR, false, 9);
+        cui_update_semantic(ui, DEPARTURE_MINUTE, false, 30);
+        assert(cui_set_semantic_text_value_v1(ui, DEPARTURE, cui_string("٠٩:٣٠")));
+        assert(cui_set_semantic_text_value_v1(ui, DEPARTURE_HOUR, cui_string("٠٩")));
+        assert(cui_set_semantic_text_value_v1(ui, DEPARTURE_MINUTE, cui_string("٣٠")));
+        cui_core_ordered_publish(ui, DEPARTURE);
         cui_end_box(ui);
         cui_end_frame(ui);
         assert(cui_last_error(ui) == CUI_OK);
@@ -330,8 +361,7 @@ int main(int argc, char **argv) {
     assert(atspi_value_get_minimum_value(minute_value, &error) == 0 && !error);
     assert(atspi_value_get_maximum_value(minute_value, &error) == 59 && !error);
     g_object_unref(minute_value);
-    g_object_unref(minute);
-    g_object_unref(time);
+
     AtspiAccessible *volume = find(desktop, "Native volume", 0);
     AtspiAccessible *passive = find(desktop, "Passive slider", 0);
     assert(volume && passive);
@@ -357,6 +387,18 @@ int main(int argc, char **argv) {
     g_object_unref(value);
     g_object_unref(passive);
     g_object_unref(volume);
+    AtspiComponent *minute_component = atspi_accessible_get_component_iface(minute);
+    assert(minute_component && atspi_component_grab_focus(minute_component, &error) && !error);
+    sleep_ms(150);
+    state = latest(output[0]);
+    assert(state.focus == DEPARTURE && state.clicks == 1 && state.slider_requests == 2);
+    atspi_accessible_clear_cache_single(minute);
+    states = atspi_accessible_get_state_set(minute);
+    assert(atspi_state_set_contains(states, ATSPI_STATE_FOCUSED));
+    g_object_unref(states);
+    g_object_unref(minute_component);
+    g_object_unref(minute);
+    g_object_unref(time);
     assert(write(command[1], "d", 1) == 1);
     sleep_ms(150);
     AtspiAction *actions = atspi_accessible_get_action_iface(button);

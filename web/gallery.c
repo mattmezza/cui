@@ -3562,6 +3562,11 @@ int gallery_accessibility_activate(unsigned index) {
     return index < semantic_count &&
            cui_queue_accessibility_action(ui, semantics[index].id, CUI_ACCESSIBILITY_ACTIVATE);
 }
+int gallery_accessibility_focus(unsigned index) {
+    return index < semantic_count &&
+           cui_accessibility_action_supported(ui, semantics[index].id, CUI_ACCESSIBILITY_FOCUS) &&
+           cui_queue_accessibility_action(ui, semantics[index].id, CUI_ACCESSIBILITY_FOCUS);
+}
 /* Browser host owns decoding. This fixed staging area is borrowed only during
  * the synchronous Canvas draw-list consumption; JS never writes during render. */
 static unsigned char video_pixels[320 * 180 * 4];
@@ -7605,6 +7610,8 @@ float gallery_semantic(unsigned i, unsigned field) {
         return s->tab_ordered;
     case 37:
         return s->tab_stop_disabled;
+    case 38:
+        return cui_accessibility_action_supported(ui, s->id, CUI_ACCESSIBILITY_FOCUS);
     default:
         return 0;
     }

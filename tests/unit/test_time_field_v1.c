@@ -1100,6 +1100,94 @@ static bool offer(fixture *f, cui_text_input_state input, cui_event_type type, c
                     .text_length = text.length, .ime_composing = empty_clear});
 }
 
+static void ordered_accessibility_focus(void) {
+    fixture f;
+    init(&f, true);
+    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    f.options.text.precision = CUI_TIME_TEXT_SECOND;
+    ordered_observer observer = {f.ui, 20, &f.time, 0};
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    cui_id hour = cui_time_segment_id(20, CUI_TIME_FIELD_HOUR_V1);
+    cui_id minute = cui_time_segment_id(20, CUI_TIME_FIELD_MINUTE_V1);
+    cui_id second = cui_time_segment_id(20, CUI_TIME_FIELD_SECOND_V1);
+    assert(cui_accessibility_action_supported(f.ui, 20, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(!cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_ACTIVATE));
+    assert(!cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_SET_VALUE));
+    assert(!cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_INCREMENT));
+    cui_focus(f.ui, minute);
+    assert(cui_focused(f.ui) == 0);
+    assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    key(&f, CUI_KEY_UP, 0);
+    cui_time_field_frame_entry_v1 entry = {20, &f.state, &f.time, &f.options};
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(cui_focused(f.ui) == 20 && cui_event_target(f.ui, 0) == minute &&
+           !cui_event_consumed(f.ui, 0));
+    assert(cui_event_target(f.ui, 1) == 20 && cui_event_consumed(f.ui, 1));
+    assert(ordered_story(&f, 20, &observer).changed && f.state.segment == CUI_TIME_FIELD_MINUTE_V1);
+    cui_end_frame(f.ui);
+    assert(cui_focused(f.ui) == 20 && cui_event_target(f.ui, 0) == minute &&
+           !cui_event_consumed(f.ui, 0));
+    assert(f.time.hour == 9 && f.time.minute == 31 && observer.calls == 1);
+
+    cui_text_input_state input;
+    assert(cui_get_text_input_config(f.ui, &input) && input.owner == minute);
+    assert(offer(&f, input, CUI_EVENT_COMPOSITION_UPDATE, cui_string("43"), false));
+    assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(!ordered_ime_frame(&f, &observer, "43").changed);
+    assert(cui_queue_accessibility_action(f.ui, hour, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(offer(&f, input, CUI_EVENT_COMPOSITION_COMMIT, cui_string("43"), false));
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    cui_text_input_state fresh;
+    assert(cui_get_text_input_config(f.ui, &fresh) && fresh.owner == minute &&
+           fresh.generation != input.generation && f.time.minute == 31);
+
+    assert(cui_queue_accessibility_action(f.ui, second, CUI_ACCESSIBILITY_FOCUS));
+    f.options.text.precision = CUI_TIME_TEXT_MINUTE;
+    f.time.second = 0;
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && cui_event_target(f.ui, 0) == 0 &&
+           cui_event_consumed(f.ui, 0));
+    assert(!cui_accessibility_action_supported(f.ui, second, CUI_ACCESSIBILITY_FOCUS));
+    f.options.flags |= CUI_TIME_FIELD_READONLY_V1;
+    assert(cui_queue_accessibility_action(f.ui, hour, CUI_ACCESSIBILITY_FOCUS));
+    key(&f, CUI_KEY_UP, 0);
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && cui_focused(f.ui) == 20 &&
+           f.state.segment == CUI_TIME_FIELD_HOUR_V1 && observer.calls == 1);
+    assert(!cui_get_text_input_config(f.ui, &fresh));
+
+    assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(cui_event_target(f.ui, 0) == minute && !cui_event_consumed(f.ui, 0));
+    cui_end_frame(f.ui); /* Admitted but omitted during submission. */
+    assert(!cui_focused(f.ui) && !cui_event_target(f.ui, 0) && cui_event_consumed(f.ui, 0));
+    assert(f.state.segment == CUI_TIME_FIELD_HOUR_V1 && observer.calls == 1);
+    assert(!cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    f.options.flags |= CUI_TIME_FIELD_DISABLED_V1;
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed && !cui_focused(f.ui));
+    assert(!cui_event_target(f.ui, 0) && cui_event_consumed(f.ui, 0));
+    assert(!cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+
+    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    assert(!ordered_ime_frame(&f, &observer, NULL).changed);
+    assert(cui_queue_accessibility_action(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(cui_begin_time_field_frame_v1(f.ui, 1200, 400, 0, &entry, 1) == CUI_TIME_TEXT_OK);
+    assert(cui_event_target(f.ui, 0) == minute && !cui_event_consumed(f.ui, 0));
+    assert(!ordered_story(&f, 20, &observer).changed);
+    assert(cui_begin_focus_scope(f.ui, 90, true));
+    cui_begin_box(f.ui, 91, (cui_box){.width = 100, .height = 30});
+    (void)cui_interact(f.ui, 91, CUI_ROLE_BUTTON, cui_string("Close"), false, false, 0);
+    cui_end_box(f.ui);
+    cui_end_focus_scope(f.ui);
+    cui_end_frame(f.ui);
+    assert(cui_focused(f.ui) == 91 && !cui_event_target(f.ui, 0) && cui_event_consumed(f.ui, 0));
+    assert(!cui_accessibility_action_supported(f.ui, minute, CUI_ACCESSIBILITY_FOCUS));
+    assert(observer.calls == 1);
+    cui_destroy(f.ui);
+}
+
 static void ordered_composition(void) {
     fixture f;
     init(&f, true);
@@ -1367,6 +1455,7 @@ int main(void) {
     ordered_public();
     ordered_pointer_and_discard();
     ordered_composition();
+    ordered_accessibility_focus();
     ordered_budget();
     composition_edits(true, CUI_DESIGN_XL);
     printf("localized TimeField: PASS state=%zu options=%zu result=%zu\n",

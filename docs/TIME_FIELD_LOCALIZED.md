@@ -170,6 +170,22 @@ sole keyboard stop. In the browser preview the selected segment has an
 accessible name and value while its native input buffer handles transient
 composition. See the [accessibility contract](ACCESSIBILITY.md#committed-text-values).
 
+A custom accessibility host can request focus on a segment after completing
+an ordered frame. Use the requested visible segment's semantic ID:
+
+```c
+cui_id minute = cui_time_segment_id(field_id, CUI_TIME_FIELD_MINUTE_V1);
+if (cui_accessibility_action_supported(ui, minute, CUI_ACCESSIBILITY_FOCUS))
+    cui_queue_accessibility_action(ui, minute, CUI_ACCESSIBILITY_FOCUS);
+```
+
+Admit the field again for the next ordered frame. The request selects Minute
+before later queued keys. A change of segment clears the draft and retires its
+old IME session. A repeated request for the same segment preserves its Core
+draft. Read-only fields can select a segment and keep their value. Use
+`cui_focused(ui)` to read the field ID. Focus does not trigger the time-change
+observer. Numeric accessibility requests for TimeField are still pending.
+
 For ordered C editing with IME, set `CUI_TIME_FIELD_IME_V1` in each field's
 options before admission. Keyboard focus stays on the field root. After a
 completed frame, `cui_get_text_input_config` returns the editable segment and

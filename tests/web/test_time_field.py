@@ -161,7 +161,8 @@ def ordered_ime_preview(page):
         assert properties['valuemin'] == 0
         assert properties['valuemax'] == (23 if name.endswith('Hour') else 59)
         assert page.locator('#accessible [role=spinbutton][aria-hidden=true]').count() == 1
-        assert page.locator('#accessible [role=group][aria-label="Start time"]').get_attribute(
+        field = name.split(',')[0]
+        assert page.locator(f'#accessible [role=group][aria-label="{field}"]').get_attribute(
             'aria-description') == whole
         if not composing:
             assert proxy.input_value() == ''
@@ -227,6 +228,27 @@ def ordered_ime_preview(page):
     assert ordered_segment(page, 'Start time', 'Minute')['value'] == 41
     assert ordered_segment(page, 'End time', 'Minute')['value'] == 45
     assert_focused_value('Start time, Minute', 41, '41', '03:41')
+
+    # The accessibility mirror can focus a different field or choose its segment.
+    end = page.locator('#accessible [aria-label="End time"]')
+    hour_mirror = end.locator('[role=spinbutton][aria-label=Hour]')
+    minute_mirror = end.locator('[role=spinbutton][aria-label=Minute]')
+    minute_mirror.focus()
+    page.wait_for_function('document.activeElement.getAttribute("aria-label")==="End time, Minute"')
+    assert_focused_value('End time, Minute', 45, '45', '10:45')
+    assert minute_mirror.get_attribute('tabindex') is None
+    assert hour_mirror.get_attribute('tabindex') == '-1'
+    page.keyboard.press('ArrowUp')
+    wait_for_paint(page, '46')
+    assert_focused_value('End time, Minute', 46, '46', '10:46')
+    hour_mirror.focus()
+    page.wait_for_function('document.activeElement.getAttribute("aria-label")==="End time, Hour"')
+    assert_focused_value('End time, Hour', 10, '10', '10:46')
+    page.keyboard.press('ArrowUp')
+    wait_for_paint(page, '11')
+    assert ordered_segment(page, 'End time', 'Hour')['value'] == 11
+    assert ordered_segment(page, 'End time', 'Minute')['value'] == 46
+    assert ordered_segment(page, 'Start time', 'Minute')['value'] == 41
 
 
 def main():

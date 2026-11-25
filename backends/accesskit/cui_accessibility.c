@@ -157,6 +157,24 @@ static accesskit_role role(cui_semantic s) {
 static accesskit_rect rectangle(cui_rect r) {
     return (accesskit_rect){r.x, r.y, (double)r.x + r.w, (double)r.y + r.h};
 }
+static uint64_t snapshot_focus(const snapshot *s) {
+    for (size_t i = 0; i < s->count; ++i) {
+        const record *root = &s->nodes[i];
+        if (!root->semantic.focused)
+            continue;
+        if (root->semantic.role == CUI_ROLE_TIME_INPUT) {
+            const unsigned focus_action = 1u << action_index(CUI_ACCESSIBILITY_FOCUS);
+            for (size_t j = 0; j < s->count; ++j) {
+                const record *child = &s->nodes[j];
+                if (child->parent == root->token && child->semantic.role == CUI_ROLE_SPINBUTTON &&
+                    child->semantic.details.selected && (child->actions & focus_action))
+                    return child->token;
+            }
+        }
+        return root->token;
+    }
+    return 1;
+}
 static accesskit_tree_update *make_tree(void *opaque) {
     cui_accessibility *a = opaque;
     mtx_lock(&a->mutex);
@@ -166,12 +184,8 @@ static accesskit_tree_update *make_tree(void *opaque) {
     }
     a->stats.native_active = true;
     snapshot *s = &a->banks[a->live];
-    uint64_t focus = 1;
-    for (size_t i = 0; i < s->count; ++i)
-        if (s->nodes[i].semantic.focused)
-            focus = s->nodes[i].token;
     accesskit_tree_update *tree =
-        accesskit_tree_update_with_capacity_and_focus(s->count + 1, focus);
+        accesskit_tree_update_with_capacity_and_focus(s->count + 1, snapshot_focus(s));
     accesskit_tree_update_set_tree_info(tree, accesskit_tree_info_new(1));
     accesskit_node *root = accesskit_node_new(ACCESSKIT_ROLE_WINDOW);
     accesskit_node_set_label_with_length(root, s->window.title.data, s->window.title.length);

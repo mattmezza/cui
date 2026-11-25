@@ -140,6 +140,9 @@ typedef struct {
     bool disabled;
     void (*blur)(void *user);
     cui_id (*text_owner)(void *user);
+    /* Select a currently visible child for an already qualified Focus offer.
+     * Return false without mutation when the current options exclude it. */
+    bool (*focus_child)(void *user, cui_id child);
 } cui_core_ordered_input;
 /* Reserve context-owned typed storage before dispatch. The step callbacks and
  * their event records are borrowed only inside begin. Steps may edit the
@@ -163,7 +166,7 @@ typedef enum {
 bool cui_core_ordered_queue_tab(cui_context *, bool reverse);
 cui_core_ordered_tab cui_core_ordered_tab_result(const cui_context *);
 /* Register the selected editable child of the currently focused ordered root.
- * Only a submitted delegated textbox can become the finalized host owner. */
+ * Only a submitted delegated text control can become the finalized host owner. */
 void cui_core_ordered_text_segment(cui_context *, cui_id root, cui_id segment);
 /* Copy the preceding resource into isolated working state before dispatch. */
 const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id namespace_id);
@@ -919,6 +922,21 @@ static void cui_tfw_frame_blur(void *user) {
     field->preedit.segment = 0;
     field->text_current = false;
 }
+static bool cui_tfw_frame_select(cui_tfw_frame_field *field, cui_id child, bool reset_same) {
+    for (unsigned i = 0; i < 4; ++i)
+        if (cui_tfw_visible(field->entry.options, i) &&
+            child == cui_time_segment_id(field->entry.id, i)) {
+            if (reset_same || field->state.segment != i) {
+                field->state.segment = i;
+                cui_tfw_frame_blur(field);
+            }
+            return true;
+        }
+    return false;
+}
+static bool cui_tfw_frame_focus_child(void *user, cui_id child) {
+    return cui_tfw_frame_select(user, child, false);
+}
 static cui_id cui_tfw_frame_text_owner(void *user) {
     cui_tfw_frame_field *field = user;
     return field->text_current ? cui_time_segment_id(field->entry.id, field->state.segment) : 0;
@@ -958,14 +976,10 @@ static cui_core_ordered_result cui_tfw_frame_step(void *user, const cui_event *e
     cui_time_field_state_v1 *state = &field->state;
     const cui_time_field_options_v1 *options = field->entry.options;
     if (event->type == CUI_EVENT_POINTER_DOWN) {
+        if (cui_tfw_frame_select(field, hit, true))
+            return (cui_core_ordered_result){.consume = true};
         field->preedit.segment = 0;
         field->text_current = false;
-        for (unsigned i = 0; i < 4; i++)
-            if (cui_tfw_visible(options, i) && hit == cui_time_segment_id(field->entry.id, i)) {
-                state->segment = i;
-                cui_tfw_reset(state);
-                return (cui_core_ordered_result){.consume = true};
-            }
     } else if (event->type == CUI_EVENT_KEY_DOWN && event->key == CUI_KEY_TAB) {
         field->preedit.segment = 0;
         unsigned selection =
@@ -1062,11 +1076,12 @@ cui_time_text_status_v1 cui_begin_time_field_frame_v1(cui_context *ui, float w, 
             field->preedit.generation = host.generation;
         }
         inputs[i] = (cui_core_ordered_input){.root = entry.id,
-                                            .step = cui_tfw_frame_step,
-                                            .user = field,
-                                            .disabled = disabled,
-                                            .blur = cui_tfw_frame_blur,
-                                            .text_owner = ime ? cui_tfw_frame_text_owner : NULL};
+                                             .step = cui_tfw_frame_step,
+                                             .user = field,
+                                             .disabled = disabled,
+                                             .blur = cui_tfw_frame_blur,
+                                             .text_owner = ime ? cui_tfw_frame_text_owner : NULL,
+                                             .focus_child = cui_tfw_frame_focus_child};
     }
     cui_tfw_frame_batch *batch = cui_core_ordered_reserve(ui, sizeof(pending));
     if (!batch || !cui_core_begin_ordered_frame(ui, w, h, dt, inputs, count))

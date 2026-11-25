@@ -1242,7 +1242,18 @@ function syncSemantics(){
   const accountTrigger=selected.name==='Popover'&&role==='button'&&name==='Open account card';
   if(role==='text')el.textContent=name;
   el.setAttribute('aria-label',name);
-  if(f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_keyboard_event(3,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(role==='textbox'&&plainCharacterInput(e)));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
+  const orderedFocus=f(0)===timeInputRole||role==='spinbutton';
+  const activeMirror=role==='spinbutton'&&secureInput.element?.dataset.cuiSemanticId===id;
+  if(orderedFocus&&!activeMirror&&f(38)){
+   el.tabIndex=-1;
+   el.onfocus=()=>{
+    if(el.isConnected&&wasm.gallery_accessibility_focus(i)){
+     canvas.focus({preventScroll:true});
+     requestFrame();
+    }
+   };
+   el.onkeydown=null;
+  }else if(!orderedFocus&&f(33)&&el.tagName!=='BUTTON'){el.tabIndex=-1;el.setAttribute('aria-disabled',String(Boolean(f(5))));el.onfocus=()=>{if(!f(5)){wasm.gallery_focus(i);requestFrame();}};el.onkeydown=e=>{const key=keyIdentity(e.key);if(key&&!f(5)){e.preventDefault();wasm.gallery_keyboard_event(3,key,mods(e),Number(e.repeat),Number(e.isComposing),Number(role==='textbox'&&plainCharacterInput(e)));requestFrame();}};}else if(el.tagName!=='BUTTON'){el.removeAttribute('tabindex');el.onfocus=null;el.onkeydown=null;}
   const description=f(0)===timeInputRole?semanticTextValue(i):
    stringAt(wasm.gallery_semantic_description(i),wasm.gallery_semantic_description_length(i));
   if(description)el.setAttribute('aria-description',description);else el.removeAttribute('aria-description');
@@ -1273,7 +1284,7 @@ function syncSemantics(){
   if(role==='slider'||role==='scrollbar'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
   if(role==='spinbutton'){
    syncSpinbutton(el,i);
-   if(secureInput.element?.dataset.cuiSemanticId===id)el.setAttribute('aria-hidden','true');
+   if(activeMirror)el.setAttribute('aria-hidden','true');
    else el.removeAttribute('aria-hidden');
   }else if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);
   else el.removeAttribute('aria-valuetext');

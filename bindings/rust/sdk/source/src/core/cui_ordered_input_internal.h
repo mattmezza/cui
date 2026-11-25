@@ -14,6 +14,9 @@ typedef struct {
     bool disabled;
     void (*blur)(void *user);
     cui_id (*text_owner)(void *user);
+    /* Select a currently visible child for an already qualified Focus offer.
+     * Return false without mutation when the current options exclude it. */
+    bool (*focus_child)(void *user, cui_id child);
 } cui_core_ordered_input;
 /* Reserve context-owned typed storage before dispatch. The step callbacks and
  * their event records are borrowed only inside begin. Steps may edit the
@@ -37,7 +40,7 @@ typedef enum {
 bool cui_core_ordered_queue_tab(cui_context *, bool reverse);
 cui_core_ordered_tab cui_core_ordered_tab_result(const cui_context *);
 /* Register the selected editable child of the currently focused ordered root.
- * Only a submitted delegated textbox can become the finalized host owner. */
+ * Only a submitted delegated text control can become the finalized host owner. */
 void cui_core_ordered_text_segment(cui_context *, cui_id root, cui_id segment);
 /* Copy the preceding resource into isolated working state before dispatch. */
 const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id namespace_id);

@@ -1470,6 +1470,9 @@ typedef struct {
     bool disabled;
     void (*blur)(void *user);
     cui_id (*text_owner)(void *user);
+    /* Select a currently visible child for an already qualified Focus offer.
+     * Return false without mutation when the current options exclude it. */
+    bool (*focus_child)(void *user, cui_id child);
 } cui_core_ordered_input;
 /* Reserve context-owned typed storage before dispatch. The step callbacks and
  * their event records are borrowed only inside begin. Steps may edit the
@@ -1493,7 +1496,7 @@ typedef enum {
 bool cui_core_ordered_queue_tab(cui_context *, bool reverse);
 cui_core_ordered_tab cui_core_ordered_tab_result(const cui_context *);
 /* Register the selected editable child of the currently focused ordered root.
- * Only a submitted delegated textbox can become the finalized host owner. */
+ * Only a submitted delegated text control can become the finalized host owner. */
 void cui_core_ordered_text_segment(cui_context *, cui_id root, cui_id segment);
 /* Copy the preceding resource into isolated working state before dispatch. */
 const void *cui_core_ordered_retained(const cui_context *, cui_id owner, cui_id namespace_id);
@@ -9897,12 +9900,50 @@ bool cui_claim_accessibility_numeric_input_v1(cui_context *ui, cui_id id, size_t
     *out = value;
     return true;
 }
+static bool cui_core_accessibility_ordered_root(const cui_context *ui, cui_id id, bool previous) {
+    if (!id || (previous && !ui->numeric_snapshot_ready))
+        return false;
+    const cui_id *published = previous ? ui->previous_ordered_roots : ui->ordered_roots;
+    size_t roots = previous ? ui->previous_ordered_count : ui->ordered_count;
+    for (size_t r = 0; r < roots; ++r) {
+        if (published[r] != id)
+            continue;
+        const cui_semantic *items = previous ? ui->previous : ui->semantics;
+        size_t count = previous ? ui->previous_count : ui->semantic_count;
+        for (size_t i = 0; i < count; ++i)
+            if (items[i].id == id && items[i].role == CUI_ROLE_TIME_INPUT &&
+                cui_core_focusable(&items[i]))
+                return previous ? cui_core_previous_allowed(ui, i)
+                                : cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[i],
+                                                          ui->top_modal);
+        break;
+    }
+    return false;
+}
+static cui_id cui_core_accessibility_focus_owner(const cui_context *ui, const cui_semantic *s,
+                                                 bool previous) {
+    if (cui_core_focusable(s))
+        return s->id;
+    if (s->role == CUI_ROLE_SPINBUTTON && s->details.no_focus && !s->disabled &&
+        s->details.parent == s->details.focus_target &&
+        cui_core_accessibility_ordered_root(ui, s->details.focus_target, previous))
+        return s->details.focus_target;
+    return 0;
+}
+static cui_id cui_core_previous_accessibility_focus(const cui_context *ui, cui_id id) {
+    for (size_t i = 0; i < ui->previous_count; ++i)
+        if (ui->previous[i].id == id && cui_core_previous_allowed(ui, i))
+            return cui_core_accessibility_focus_owner(ui, &ui->previous[i], true);
+    return 0;
+}
 static bool cui_core_accessibility_supported(const cui_context *ui, cui_id id,
                                              cui_accessibility_action action) {
     if (!ui || !id)
         return false;
+    if (action == CUI_ACCESSIBILITY_FOCUS)
+        return cui_core_previous_accessibility_focus(ui, id) != 0;
     uint32_t numeric = cui_core_numeric_bit(action);
-    if (!numeric && action != CUI_ACCESSIBILITY_FOCUS && action != CUI_ACCESSIBILITY_ACTIVATE)
+    if (!numeric && action != CUI_ACCESSIBILITY_ACTIVATE)
         return false;
     if (numeric && (!ui->numeric || !ui->numeric_snapshot_ready || ui->error != CUI_OK))
         return false;
@@ -9911,9 +9952,7 @@ static bool cui_core_accessibility_supported(const cui_context *ui, cui_id id,
             if (numeric)
                 return cui_core_numeric_eligible(
                     &ui->previous[i], ui->numeric->masks[ui->config.max_elements + i], action);
-            return action == CUI_ACCESSIBILITY_FOCUS
-                       ? cui_core_focusable(&ui->previous[i])
-                       : cui_core_accessibility_activate(&ui->previous[i]);
+            return cui_core_accessibility_activate(&ui->previous[i]);
         }
     return false;
 }
@@ -10588,23 +10627,37 @@ static bool cui_core_begin_frame(cui_context *ui, float w, float h, float dt, bo
         ui->event_activation_slots[i] = SIZE_MAX;
         if (e.type == CUI_EVENT_ACCESSIBILITY_ACTION) {
             ui->event_targets[i] = 0;
-            if (!cui_core_accessibility_supported(ui, e.accessibility_target,
-                                                  e.accessibility_action)) {
-                ui->event_consumed[i] = true;
-                continue;
-            }
-            ui->event_targets[i] = e.accessibility_target;
             if (e.accessibility_action == CUI_ACCESSIBILITY_FOCUS) {
+                cui_id owner = cui_core_previous_accessibility_focus(ui, e.accessibility_target);
+                if (owner && owner != e.accessibility_target) {
+                    const cui_core_ordered_input *input =
+                        cui_core_ordered_find(active, active_count, owner);
+                    if (!input || !input->focus_child ||
+                        !input->focus_child(input->user, e.accessibility_target))
+                        owner = 0;
+                }
+                if (!owner) {
+                    ui->event_consumed[i] = true;
+                    continue;
+                }
                 cui_id before = ui->focus;
-                cui_core_set_focus(ui, e.accessibility_target);
+                ui->event_targets[i] = e.accessibility_target;
+                cui_core_set_focus(ui, owner);
                 cui_core_ordered_blur(active, active_count, before, ui->focus);
+                cui_core_ordered_check_text(ui, cui_core_ordered_find(active, active_count, owner));
                 ui->focus_visible = true;
-            } else if (e.accessibility_action == CUI_ACCESSIBILITY_ACTIVATE) {
-                cui_core_activate(ui, e.accessibility_target);
-                ui->event_activations[i] = e.accessibility_target;
-                ui->event_activation_slots[i] = ui->activation_count - 1;
-                if (ui->activation_count > before_activation)
-                    cui_core_activation_evidence(ui, ui->activation_count - 1, e, false);
+            } else if (cui_core_accessibility_supported(ui, e.accessibility_target,
+                                                        e.accessibility_action)) {
+                ui->event_targets[i] = e.accessibility_target;
+                if (e.accessibility_action == CUI_ACCESSIBILITY_ACTIVATE) {
+                    cui_core_activate(ui, e.accessibility_target);
+                    ui->event_activations[i] = e.accessibility_target;
+                    ui->event_activation_slots[i] = ui->activation_count - 1;
+                    if (ui->activation_count > before_activation)
+                        cui_core_activation_evidence(ui, ui->activation_count - 1, e, false);
+                }
+            } else {
+                ui->event_consumed[i] = true;
             }
             continue;
         }
@@ -14549,23 +14602,27 @@ cui_core_commands_done:
     for (size_t e = ui->event_count; e-- > 0;) {
         if (ui->events[e].type != CUI_EVENT_ACCESSIBILITY_ACTION)
             continue;
+        cui_accessibility_action action = ui->events[e].accessibility_action;
+        cui_id target = ui->events[e].accessibility_target;
+        cui_id owner = action == CUI_ACCESSIBILITY_FOCUS && ui->event_targets[e]
+                           ? cui_core_previous_accessibility_focus(ui, target)
+                           : 0;
         bool allowed = false;
         for (size_t n = 0; n < ui->semantic_count; n++)
-            if (ui->semantics[n].id == ui->events[e].accessibility_target &&
+            if (ui->semantics[n].id == target &&
                 cui_core_scope_contains(ui->focus_scopes, ui->semantic_scopes[n], ui->top_modal))
                 for (size_t p = 0; p < ui->previous_count; p++)
                     if (ui->previous[p].id == ui->semantics[n].id &&
                         ui->previous[p].role == ui->semantics[n].role)
-                        allowed =
-                            ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS
-                                ? cui_core_focusable(&ui->semantics[n])
-                            : ui->events[e].accessibility_action == CUI_ACCESSIBILITY_ACTIVATE
-                                ? cui_core_accessibility_activate(&ui->semantics[n])
-                                : cui_core_numeric_current(ui, ui->semantics[n].id,
-                                                           ui->events[e].accessibility_action);
+                        allowed = action == CUI_ACCESSIBILITY_FOCUS
+                                      ? owner && owner == cui_core_accessibility_focus_owner(
+                                                              ui, &ui->semantics[n], false)
+                                  : action == CUI_ACCESSIBILITY_ACTIVATE
+                                      ? cui_core_accessibility_activate(&ui->semantics[n])
+                                      : cui_core_numeric_current(ui, target, action);
         if (!allowed) {
-            if (ui->events[e].accessibility_action == CUI_ACCESSIBILITY_FOCUS &&
-                ui->focus == ui->events[e].accessibility_target)
+            if (owner && ui->focus == owner &&
+                (owner == target || !cui_core_accessibility_ordered_root(ui, owner, false)))
                 cui_core_set_focus(ui, ui->event_previous_focus[e]);
             size_t slot = ui->event_activation_slots[e];
             if (slot < ui->activation_count)

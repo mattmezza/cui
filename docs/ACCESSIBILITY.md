@@ -29,5 +29,16 @@ description when no help text was supplied. The gallery groups the
 segments and exposes the active proxy as a spinbutton with its segment
 name, numeric value and full-time description. The ordered semantic
 snapshot exposes read-only and invalid state while editing drafts and IME
-preedit remain transient. Platform value editing has its own action
-contract and remains open for TimeField. [TimeField C guide](TIME_FIELD_LOCALIZED.md)
+preedit remain transient.
+
+During an ordered frame, a visible enabled segment can receive
+`CUI_ACCESSIBILITY_FOCUS` even though `cui_focused` and Tab still use the
+field root. Native hosts can test eligibility after a completed frame with
+`cui_accessibility_action_supported` and enqueue the request with
+`cui_queue_accessibility_action`. Dispatch selects the segment before the
+next queued input. The receipt keeps the segment ID and uses the ordinary
+unconsumed Focus convention. The AccessKit bridge reports the selected
+segment as focused to Linux AT-SPI. An eligible gallery mirror can request
+that same focus and hands subsequent keyboard input to the active proxy.
+Platform value actions and physical screen-reader qualification remain open.
+[TimeField C guide](TIME_FIELD_LOCALIZED.md)

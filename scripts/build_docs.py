@@ -77,7 +77,14 @@ def description_for(path):
     tokens = MarkdownIt('commonmark', {'html': False}).parse(path.read_text(encoding='utf-8'))
     for index, token in enumerate(tokens):
         if token.type == 'paragraph_open' and index + 1 < len(tokens):
-            return re.sub(r'\s+', ' ', tokens[index + 1].content).strip()[:220]
+            parts = []
+            for child in tokens[index + 1].children or []:
+                if child.type in {'text', 'code_inline', 'image'}:
+                    parts.append(child.content)
+                elif child.type in {'softbreak', 'hardbreak'}:
+                    parts.append(' ')
+            description = website_text(''.join(parts))
+            return re.sub(r'\s+', ' ', description).strip()[:220]
     return path.stem.replace('_', ' ').title()
 
 

@@ -12,14 +12,14 @@ packages are required. The CLI writes UTF-8 to stdout/stderr, including redirect
 Windows pipes; consumers should decode its output as UTF-8. The skill includes offline documentation, headers and
 examples; it does not include the CUI implementation or compiler toolchain.
 
-For unreleased owned background colors/two-stop values and pure sampling, read
+For owned background colors, two-stop values and pure sampling, read
 `docs/BACKGROUND_VALUES.md` and `include/cui/cui_background.h`. CSS and SOURCE_038
 have different alpha/geometry semantics. Pure values alone do not apply paint.
 For opt-in Core V2 mode/setters/emission read `docs/CORE_DRAW_V2.md` and
 `include/cui/cui_draw_v2.h`. The C software adapter's actual query/render route is
 in `docs/SOFTWARE_V2.md` and `include/cui/cui_software.h`: query the initialized
 renderer before composition, use its support/defaults, then render V2 explicitly.
-The unreleased SDL_Renderer C route is documented in `docs/SDL_V2.md` and
+The SDL_Renderer C route is documented in `docs/SDL_V2.md` and
 `include/cui/cui_sdl3.h`; query its actual capability before composition.
 Never cast to V1 or fabricate consumer support. SDL_GPU, Sokol, Canvas and foreign
 bindings remain pending; these C routes do not complete all78 parts. V1 renderer tables/default routes remain unchanged.
@@ -161,7 +161,7 @@ Read these with `read PATH --source CUI_SOURCE`:
 | Hosting C-authored UI from another language | `docs/LANGUAGE_BINDINGS.md` (different from language component builders) |
 | Embedding/custom host or renderer | `docs/INTERFACES.md`, `docs/PLATFORM_MATRIX.md`, relevant `backends/*/README.md` |
 | Single-date time editing | `docs/DATE_TIME_PICKER.md`, `include/cui/cui_date_time_picker.h`: separate retained date/time value/state, explicit assignment, Base composition helpers or one-reduction Styled facade, bounded presets/clear/Delete. Same-day confirms; changed-day stays open. Gallery DatePicker has an opt-in Date + time mode with headless desktop/touch proof and copyable C11 usage. No timezone/range/chrono parsing, binding builder or callback stream; oversized Styled popup rejects before mutation. |
-| Localized TimeField and bridge delivery | `docs/TIME_FIELD_LOCALIZED.md`, `docs/TIME_FIELD_LOCALIZED_EXAMPLE.md` for the C widget; `docs/BRIDGE_TIME_FIELD_LOCALIZED.md` documents the unreleased C bridge with focused headless proof. `docs/PYTHON_TIME_FIELD_LOCALIZED.md` documents the unreleased Python facade with focused root and actual old/partial-provider proof; native interactive and package acceptance remain pending. `docs/GO_RUST_TIME_FIELD_LOCALIZED.md` covers integrated Go/Rust with focused root dynamic and bundled-source static proof; installed-package/MSRV/native-interactive checks remain pending. `docs/NODE_TIME_FIELD_LOCALIZED.md` covers integrated JS/TS with strict root build, actual provider and authored-UI proof; package/native-interactive acceptance remains pending. Keep owned wire configuration distinct from borrowed direct C widget state. |
+| Localized TimeField and bridge delivery | Use `docs/TIME_FIELD_LOCALIZED.md` and `docs/TIME_FIELD_LOCALIZED_EXAMPLE.md` for the C widget. `docs/BRIDGE_TIME_FIELD_LOCALIZED.md` covers the C bridge. The [Python](docs/PYTHON_TIME_FIELD_LOCALIZED.md), [Go and Rust](docs/GO_RUST_TIME_FIELD_LOCALIZED.md) and [JS/TS](docs/NODE_TIME_FIELD_LOCALIZED.md) guides describe authoring, verified provider combinations and remaining installed-example and native IME checks. The bridge owns copied configuration. Direct C widget state is borrowed. |
 | Calendar presentation and localized dates | `docs/PICKERS.md`, `docs/CALENDAR_PRESENTATION.md`, `docs/CALENDAR_BEHAVIOR.md`; read `include/cui/cui_calendar_presentation.h` and `include/cui/cui_calendar_behavior.h` for opt-in month/today/neighbor and independent range/year/recenter policies, matching-header/library rebuild and binding limits. DatePicker forwarding uses `docs/DATE_PICKER_CALENDAR.md` and `include/cui/cui_date_picker_calendar.h`; legacy typed CHANGE does not observe extensions or lifecycle. |
 | Layout and responsive composition | `docs/LAYOUT_GUIDE.md`, `docs/APP_RECIPES.md`, `docs/FORMS.md`, `docs/COMPOSED_APPS.md` |
 | Fonts, metrics, fallback and shaping | `docs/TYPOGRAPHY.md`, `docs/TEXT.md`, `docs/BIDI_SHAPING.md`, `docs/IME.md` |
@@ -465,17 +465,17 @@ Slider roles do not opt in automatically. Snapshot readiness certifies completed
 Core semantics only; not rendering, native numeric AT delivery or owner acceptance.
 No new host/model/bridge/Python/JS/TS/Go/Rust numeric authoring is implied.
 
-For the unreleased C-only typed Slider value/domain/math helpers, read
+For the C-only typed Slider value, domain and math helpers, read
 `docs/SLIDER_MODEL_VALUES.md` and `include/cui/cui_slider_model.h`. Single/Range
 records and initialized state own their data; proposals require explicit owner
-acceptance. For the separate C-only explicit-size Base route include
+acceptance. For the explicit-size C Base route include
 `cui/cui_base_slider_model.h` and read `docs/BASE_SLIDER_MODEL.md`. It paints
 Single/Range horizontal/vertical geometry and emits typed synchronous proposals
 with frozen current/evolving requested intent; callback may mutate external
 owner/userdata, never active UI/state/options. Numeric input is current-thumb
-opt-in and busy rejection is independent of owner acceptance. Styled typed
-presentation, native numeric host delivery and all five language builders remain
-pending. Preserve legacy scalar routes and whole-family partial status.
+opt-in and busy rejection is independent of owner acceptance. See the Styled and
+retained builder guides below for their additional contracts. Preserve legacy
+scalar routes and whole-family partial status.
 
 For in-frame prior Core geometry/semantic validity use the narrowly scoped
 `cui_frame_input_snapshot_ready`, separately from outside-frame numeric readiness.
@@ -490,20 +490,20 @@ persistent state, callback, composition and a windowless driver; owner acceptanc
 is explicit on UPDATE. CANCEL may carry an old kind/domain and must not be blindly
 accepted. This example does not add Styled rendering or foreign builders.
 
-Slider's unreleased C-only `cui_slider_style_resolve_v1` owns source metrics and
+Slider's C-only `cui_slider_style_resolve_v1` owns source metrics and
 an exact background brush value; read `docs/SLIDER_STYLE_VALUES.md` and its header.
 It is a pure resolver, not a Styled widget or renderer capability. Preserve
 Aurora's gradient and distinguish transparent masked overrides; never infer a
 preset from custom theme bytes or flatten a brush for unsupported adapters.
 
-The unreleased C-only typed Styled Slider facade is in `cui_styled_slider_model.h`;
+The C-only typed Styled Slider facade is in `cui_styled_slider_model.h`;
 read `docs/STYLED_SLIDER_MODEL.md` and the complete compiled
 `examples/styled_slider_model_controlled.c`. It reuses the Base handler and double
 Single/Range ownership, with separate owned ring motion and passive absolute Core
 wake deadlines. Visible V1 gradient thumbs reject atomically; copied V2 support is
 a host obligation, and current adapters do not render Aurora. Inert/layout-only/
-blocked/recovery calls never advance presentation; native numeric hosts and five
-typed builders remain pending. Do not describe this C slice as whole Slider parity.
+blocked/recovery calls never advance presentation. This C facade covers the
+documented Slider presentation subset.
 
 For the browser Slider demonstration, use the complete callback/init/compose
 copy panel in `web/modules/slider_usage.js` and the gallery section of
@@ -515,13 +515,13 @@ blindly. Convert passive Core-clock deadlines to the host monotonic clock.
 The demonstration does not confer native numeric/all-five builder/V2 adapter
 support or vertical registered-scroll admission.
 
-For unreleased C bridge controlled Slider kind81, read
+For C bridge controlled Slider kind81, read
 `docs/BRIDGE_SLIDER_MODEL.md` and matching `include/cui/cui_bridge.h`. Resolve the
 complete optional symbol group before use; enable the separate owned FIFO, poll
 after step and explicitly accept full double Single/Range pairs using receipts.
 Polling never autoaccepts or emits legacy CHANGE. Expired records remain readable,
 not acceptable. Native owner TLS and explicit final-module-verified unshared WASM
-are the supported modes; default/shared WASM remains versions0. The unreleased Python controlled builder is documented in
+are the supported modes; default/shared WASM remains versions0. The Python controlled builder is documented in
 `docs/PYTHON_SLIDER_MODEL.md`; read its complete source records in
 `bindings/python/cui_bridge/slider_model.py` and runnable UI in
 `bindings/bridge/examples/slider_model.py`. Resolve the complete optional group,

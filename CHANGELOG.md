@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-alpha.5 — candidate
+## 0.1.0-alpha.5 — 2026-11-25
 
 - DataTable keeps the visible row and selection across keyed updates. C, Python,
   JavaScript, TypeScript, Go and Rust support opt-in near-end paging and copied

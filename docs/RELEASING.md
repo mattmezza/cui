@@ -1,10 +1,21 @@
-# Candidate v0.1.0-alpha.5
+# Published prerelease v0.1.0-alpha.5
 
-The integration branch prepares `v0.1.0-alpha.5` for the library, native
-starter, language assets, and gallery. The [changelog](../CHANGELOG.md) lists
-the changes. Publication depends on the frozen source, exact-revision hosted
-gates, and installed-artifact checks below. The latest published release is
-alpha.4.
+[CUI v0.1.0-alpha.5](https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5) is published from `57aeb20bcb405fdb441666374abff0254c9abcd4` on 2026-11-25.
+The source, static Linux C bundle, native Python and npm packages, Go and Rust
+source packages, and responsive native starter match the tested revision.
+The website displays the same version and serves the verified starter archive.
+
+Hosted build, native binding callbacks and all three headless browser shards
+pass. Six installed-artifact checks cover the extracted starter, C, Python,
+Node, strict TypeScript, Go, Rust, real-font text, and installed paging demos.
+The root and nested Go tags point to the same source, and all
+662 public Go module files match the tested archive.
+[Release validation record](validation/alpha5-release.json)
+
+Rebuild consumers with matching C headers and libraries. The wheel uses
+`0.1.0a5`. Linux binary assets are host-specific. Physical GPU, OS input and
+assistive-technology acceptance, full component parity and publication to
+PyPI, npm and crates.io remain open. Earlier releases remain immutable.
 
 # Published prerelease: v0.1.0-alpha.4
 

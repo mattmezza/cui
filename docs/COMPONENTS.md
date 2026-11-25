@@ -2,11 +2,11 @@
 
 Baseline: GPUI Kit 0.7.1. This is an original functional breakdown informed by the upstream catalog and pinned source. It is not a claim of equivalent implementation. Read [machine-readable status](gpui-parity.json) for evidence and limitations.
 
-Upstream reference documentation: https://gpui-kit.com/component/ (GPUI Kit, CC BY 4.0). No upstream prose or illustrations reproduced here.
+[Upstream reference documentation](https://gpui-kit.com/component/) is licensed under CC BY 4.0. No upstream prose or illustrations reproduced here.
 
 ## Accordion
 
-Reference: https://gpui-kit.com/component/accordion/
+[Upstream component reference](https://gpui-kit.com/component/accordion/)
 
 - single/multiple expanded items
 - controlled state and disabled items
@@ -14,7 +14,7 @@ Reference: https://gpui-kit.com/component/accordion/
 
 ## AlertDialog
 
-Reference: https://gpui-kit.com/component/alert-dialog/
+[Upstream component reference](https://gpui-kit.com/component/alert-dialog/)
 
 - modal focus trap and restore
 - confirm/cancel actions
@@ -22,7 +22,7 @@ Reference: https://gpui-kit.com/component/alert-dialog/
 
 ## Alert
 
-Reference: https://gpui-kit.com/component/alert/
+[Upstream component reference](https://gpui-kit.com/component/alert/)
 
 - severity variants
 - title/content/action slots
@@ -30,7 +30,7 @@ Reference: https://gpui-kit.com/component/alert/
 
 ## Attachment
 
-Reference: https://gpui-kit.com/component/attachment/
+[Upstream component reference](https://gpui-kit.com/component/attachment/)
 
 - file/media metadata
 - preview/remove actions
@@ -38,7 +38,7 @@ Reference: https://gpui-kit.com/component/attachment/
 
 ## Avatar
 
-Reference: https://gpui-kit.com/component/avatar/
+[Upstream component reference](https://gpui-kit.com/component/avatar/)
 
 - image source and fallback initials
 - size variants
@@ -46,7 +46,7 @@ Reference: https://gpui-kit.com/component/avatar/
 
 ## Badge
 
-Reference: https://gpui-kit.com/component/badge/
+[Upstream component reference](https://gpui-kit.com/component/badge/)
 
 - count and dot variants
 - overflow count
@@ -54,7 +54,7 @@ Reference: https://gpui-kit.com/component/badge/
 
 ## Bubble
 
-Reference: https://gpui-kit.com/component/bubble/
+[Upstream component reference](https://gpui-kit.com/component/bubble/)
 
 - incoming/outgoing alignment
 - message/reaction slots
@@ -62,7 +62,7 @@ Reference: https://gpui-kit.com/component/bubble/
 
 ## Button
 
-Reference: https://gpui-kit.com/component/button/
+[Upstream component reference](https://gpui-kit.com/component/button/)
 
 - pointer press/release/capture
 - keyboard activation and focus
@@ -71,7 +71,7 @@ Reference: https://gpui-kit.com/component/button/
 
 ## Checkbox
 
-Reference: https://gpui-kit.com/component/checkbox/
+[Upstream component reference](https://gpui-kit.com/component/checkbox/)
 
 - unchecked/checked/mixed state
 - controlled value and activation
@@ -79,7 +79,7 @@ Reference: https://gpui-kit.com/component/checkbox/
 
 ## Clipboard
 
-Reference: https://gpui-kit.com/component/clipboard/
+[Upstream component reference](https://gpui-kit.com/component/clipboard/)
 
 - OS read/write adapter
 - capability failure handling
@@ -87,7 +87,7 @@ Reference: https://gpui-kit.com/component/clipboard/
 
 ## Collapsible
 
-Reference: https://gpui-kit.com/component/collapsible/
+[Upstream component reference](https://gpui-kit.com/component/collapsible/)
 
 - controlled disclosure
 - keyboard trigger
@@ -95,7 +95,7 @@ Reference: https://gpui-kit.com/component/collapsible/
 
 ## DropdownButton
 
-Reference: https://gpui-kit.com/component/dropdown-button/
+[Upstream component reference](https://gpui-kit.com/component/dropdown-button/)
 
 - split primary and menu actions
 - keyboard opening and focus restore
@@ -103,7 +103,7 @@ Reference: https://gpui-kit.com/component/dropdown-button/
 
 ## Empty
 
-Reference: https://gpui-kit.com/component/empty/
+[Upstream component reference](https://gpui-kit.com/component/empty/)
 
 - title/description/media/action slots
 - themed layout
@@ -111,7 +111,7 @@ Reference: https://gpui-kit.com/component/empty/
 
 ## Focus Trap
 
-Reference: https://gpui-kit.com/component/focus-trap/
+[Upstream component reference](https://gpui-kit.com/component/focus-trap/)
 
 - tab and reverse cycling
 - nested scope and restore
@@ -119,7 +119,7 @@ Reference: https://gpui-kit.com/component/focus-trap/
 
 ## GroupBox
 
-Reference: https://gpui-kit.com/component/group-box/
+[Upstream component reference](https://gpui-kit.com/component/group-box/)
 
 - title/content slots
 - themed border/layout
@@ -127,7 +127,7 @@ Reference: https://gpui-kit.com/component/group-box/
 
 ## HoverCard
 
-Reference: https://gpui-kit.com/component/hover-card/
+[Upstream component reference](https://gpui-kit.com/component/hover-card/)
 
 - hover/focus delay
 - popup placement/collision
@@ -135,7 +135,7 @@ Reference: https://gpui-kit.com/component/hover-card/
 
 ## Icon
 
-Reference: https://gpui-kit.com/component/icon/
+[Upstream component reference](https://gpui-kit.com/component/icon/)
 
 - original/licensed vector set
 - size/stroke/theme
@@ -143,7 +143,7 @@ Reference: https://gpui-kit.com/component/icon/
 
 ## Image
 
-Reference: https://gpui-kit.com/component/image/
+[Upstream component reference](https://gpui-kit.com/component/image/)
 
 - host resource lifecycle
 - scaling/clipping/fallback
@@ -151,7 +151,7 @@ Reference: https://gpui-kit.com/component/image/
 
 ## Kbd
 
-Reference: https://gpui-kit.com/component/kbd/
+[Upstream component reference](https://gpui-kit.com/component/kbd/)
 
 - platform key labels
 - grouped shortcut rendering (ordinary sibling composition; see [Kbd guide](KBD.md))
@@ -159,7 +159,7 @@ Reference: https://gpui-kit.com/component/kbd/
 
 ## Label
 
-Reference: https://gpui-kit.com/component/label/
+[Upstream component reference](https://gpui-kit.com/component/label/)
 
 - UTF-8 text and theme size
 - control association
@@ -167,7 +167,7 @@ Reference: https://gpui-kit.com/component/label/
 
 ## Marker
 
-Reference: https://gpui-kit.com/component/marker/
+[Upstream component reference](https://gpui-kit.com/component/marker/)
 
 - status/separator modes
 - semantic content
@@ -175,7 +175,7 @@ Reference: https://gpui-kit.com/component/marker/
 
 ## Message
 
-Reference: https://gpui-kit.com/component/message/
+[Upstream component reference](https://gpui-kit.com/component/message/)
 
 - sender/time/content slots
 - attachments and reactions
@@ -183,7 +183,7 @@ Reference: https://gpui-kit.com/component/message/
 
 ## MessageScroller
 
-Reference: https://gpui-kit.com/component/message-scroller/
+[Upstream component reference](https://gpui-kit.com/component/message-scroller/)
 
 - variable-height virtualization
 - stable keys and incremental updates
@@ -191,7 +191,7 @@ Reference: https://gpui-kit.com/component/message-scroller/
 
 ## Notification
 
-Reference: https://gpui-kit.com/component/notification/
+[Upstream component reference](https://gpui-kit.com/component/notification/)
 
 - toast queue/lifetimes
 - actions/dismissal
@@ -199,7 +199,7 @@ Reference: https://gpui-kit.com/component/notification/
 
 ## Pagination
 
-Reference: https://gpui-kit.com/component/pagination/
+[Upstream component reference](https://gpui-kit.com/component/pagination/)
 
 - controlled page bounds
 - keyboard and disabled actions
@@ -207,7 +207,7 @@ Reference: https://gpui-kit.com/component/pagination/
 
 ## Progress
 
-Reference: https://gpui-kit.com/component/progress/
+[Upstream component reference](https://gpui-kit.com/component/progress/)
 
 - determinate and indeterminate
 - value semantics
@@ -215,7 +215,7 @@ Reference: https://gpui-kit.com/component/progress/
 
 ## Radio
 
-Reference: https://gpui-kit.com/component/radio/
+[Upstream component reference](https://gpui-kit.com/component/radio/)
 
 - group exclusivity and roving focus
 - controlled selection
@@ -223,7 +223,7 @@ Reference: https://gpui-kit.com/component/radio/
 
 ## Rating
 
-Reference: https://gpui-kit.com/component/rating/
+[Upstream component reference](https://gpui-kit.com/component/rating/)
 
 - pointer and keyboard value
 - read-only/disabled states
@@ -231,7 +231,7 @@ Reference: https://gpui-kit.com/component/rating/
 
 ## Shimmer
 
-Reference: https://gpui-kit.com/component/shimmer/
+[Upstream component reference](https://gpui-kit.com/component/shimmer/)
 
 - animation scheduling
 - reduced-motion fallback
@@ -239,7 +239,7 @@ Reference: https://gpui-kit.com/component/shimmer/
 
 ## Skeleton
 
-Reference: https://gpui-kit.com/component/skeleton/
+[Upstream component reference](https://gpui-kit.com/component/skeleton/)
 
 - placeholder sizes/layout
 - loading semantics (decorative Skeleton plus application-owned busy region; see [example](../examples/loading_region/README.md))
@@ -247,7 +247,7 @@ Reference: https://gpui-kit.com/component/skeleton/
 
 ## Spinner
 
-Reference: https://gpui-kit.com/component/spinner/
+[Upstream component reference](https://gpui-kit.com/component/spinner/)
 
 - animation scheduling
 - sizes and theme
@@ -255,7 +255,7 @@ Reference: https://gpui-kit.com/component/spinner/
 
 ## Stepper
 
-Reference: https://gpui-kit.com/component/stepper/
+[Upstream component reference](https://gpui-kit.com/component/stepper/)
 
 - steps/current/completed state
 - navigation/validation (controlled requests and application-owned validation; see [guide](STEPPER_NAVIGATION.md))
@@ -263,7 +263,7 @@ Reference: https://gpui-kit.com/component/stepper/
 
 ## Switch
 
-Reference: https://gpui-kit.com/component/switch/
+[Upstream component reference](https://gpui-kit.com/component/switch/)
 
 - controlled binary activation
 - keyboard/pointer/disabled behavior
@@ -271,7 +271,7 @@ Reference: https://gpui-kit.com/component/switch/
 
 ## Tag
 
-Reference: https://gpui-kit.com/component/tag/
+[Upstream component reference](https://gpui-kit.com/component/tag/)
 
 - semantic/custom/named palettes, outlines, sizes and radius
 - passive accessible text and arbitrary rich children
@@ -279,7 +279,7 @@ Reference: https://gpui-kit.com/component/tag/
 
 ## Toggle
 
-Reference: https://gpui-kit.com/component/toggle/
+[Upstream component reference](https://gpui-kit.com/component/toggle/)
 
 - controlled pressed state
 - keyboard/pointer/disabled behavior
@@ -287,7 +287,7 @@ Reference: https://gpui-kit.com/component/toggle/
 
 ## Tooltip
 
-Reference: https://gpui-kit.com/component/tooltip/
+[Upstream component reference](https://gpui-kit.com/component/tooltip/)
 
 - hover/focus timing
 - popup collision
@@ -295,7 +295,7 @@ Reference: https://gpui-kit.com/component/tooltip/
 
 ## Calendar
 
-Reference: https://gpui-kit.com/component/calendar/
+[Upstream component reference](https://gpui-kit.com/component/calendar/)
 
 - date/leap-year/month geometry
 - min/max bounds and range selection
@@ -303,7 +303,7 @@ Reference: https://gpui-kit.com/component/calendar/
 
 ## ColorPicker
 
-Reference: https://gpui-kit.com/component/color-picker/
+[Upstream component reference](https://gpui-kit.com/component/color-picker/)
 
 - color-space model and conversion
 - picker geometry and pointer drag
@@ -311,7 +311,7 @@ Reference: https://gpui-kit.com/component/color-picker/
 
 ## Combobox
 
-Reference: https://gpui-kit.com/component/combobox/
+[Upstream component reference](https://gpui-kit.com/component/combobox/)
 
 - filter/single/multiple selection
 - active descendant and keyboard
@@ -319,7 +319,7 @@ Reference: https://gpui-kit.com/component/combobox/
 
 ## DatePicker
 
-Reference: https://gpui-kit.com/component/date-picker/
+[Upstream component reference](https://gpui-kit.com/component/date-picker/)
 
 - calendar popup composition
 - parse/format and bounds
@@ -327,7 +327,7 @@ Reference: https://gpui-kit.com/component/date-picker/
 
 ## Editor
 
-Reference: https://gpui-kit.com/component/editor/
+[Upstream component reference](https://gpui-kit.com/component/editor/)
 
 - UTF-8 grapheme editing and selection
 - undo/redo and multiline indentation
@@ -337,7 +337,7 @@ Reference: https://gpui-kit.com/component/editor/
 
 ## Form
 
-Reference: https://gpui-kit.com/component/form/
+[Upstream component reference](https://gpui-kit.com/component/form/)
 
 - field registration and validation
 - error/required labels
@@ -345,7 +345,7 @@ Reference: https://gpui-kit.com/component/form/
 
 ## Input
 
-Reference: https://gpui-kit.com/component/input/
+[Upstream component reference](https://gpui-kit.com/component/input/)
 
 - UTF-8 insertion/deletion/selection
 - clipboard and IME
@@ -354,7 +354,7 @@ Reference: https://gpui-kit.com/component/input/
 
 ## Input Group
 
-Reference: https://gpui-kit.com/component/input-group/
+[Upstream component reference](https://gpui-kit.com/component/input-group/)
 
 - prefix/suffix/button slots
 - focus and disabled propagation
@@ -362,7 +362,7 @@ Reference: https://gpui-kit.com/component/input-group/
 
 ## NumberInput
 
-Reference: https://gpui-kit.com/component/number-input/
+[Upstream component reference](https://gpui-kit.com/component/number-input/)
 
 - numeric parsing and bounds
 - increment/decrement/step
@@ -370,7 +370,7 @@ Reference: https://gpui-kit.com/component/number-input/
 
 ## OtpInput
 
-Reference: https://gpui-kit.com/component/otp-input/
+[Upstream component reference](https://gpui-kit.com/component/otp-input/)
 
 - segmented input focus
 - paste and validation
@@ -378,7 +378,7 @@ Reference: https://gpui-kit.com/component/otp-input/
 
 ## Questionnaire
 
-Reference: https://gpui-kit.com/component/questionnaire/
+[Upstream component reference](https://gpui-kit.com/component/questionnaire/)
 
 - step and answer models
 - validation/navigation
@@ -386,7 +386,7 @@ Reference: https://gpui-kit.com/component/questionnaire/
 
 ## Select
 
-Reference: https://gpui-kit.com/component/select/
+[Upstream component reference](https://gpui-kit.com/component/select/)
 
 - single/multiple controlled selection
 - keyboard active descendant
@@ -394,7 +394,7 @@ Reference: https://gpui-kit.com/component/select/
 
 ## Slider
 
-Reference: https://gpui-kit.com/component/slider/
+[Upstream component reference](https://gpui-kit.com/component/slider/)
 
 - pointer drag capture
 - keyboard range/step/clamp
@@ -403,7 +403,7 @@ Reference: https://gpui-kit.com/component/slider/
 
 ## Speech
 
-Reference: https://gpui-kit.com/component/speech/
+[Upstream component reference](https://gpui-kit.com/component/speech/)
 
 - capability/permission adapter
 - recognition callback lifecycle
@@ -411,7 +411,7 @@ Reference: https://gpui-kit.com/component/speech/
 
 ## Textarea
 
-Reference: https://gpui-kit.com/component/textarea/
+[Upstream component reference](https://gpui-kit.com/component/textarea/)
 
 - multiline editing/selection
 - wrap and auto-grow
@@ -419,7 +419,7 @@ Reference: https://gpui-kit.com/component/textarea/
 
 ## TimeField
 
-Reference: https://gpui-kit.com/component/time-field/
+[Upstream component reference](https://gpui-kit.com/component/time-field/)
 
 - segmented hour/minute/second model
 - parse/validation/localization
@@ -427,7 +427,7 @@ Reference: https://gpui-kit.com/component/time-field/
 
 ## Carousel
 
-Reference: https://gpui-kit.com/component/carousel/
+[Upstream component reference](https://gpui-kit.com/component/carousel/)
 
 - controlled current item
 - keyboard/drag navigation
@@ -435,7 +435,7 @@ Reference: https://gpui-kit.com/component/carousel/
 
 ## DescriptionList
 
-Reference: https://gpui-kit.com/component/description-list/
+[Upstream component reference](https://gpui-kit.com/component/description-list/)
 
 - key/value composition
 - responsive layout
@@ -443,7 +443,7 @@ Reference: https://gpui-kit.com/component/description-list/
 
 ## Dialog
 
-Reference: https://gpui-kit.com/component/dialog/
+[Upstream component reference](https://gpui-kit.com/component/dialog/)
 
 - modal overlay/dismissal
 - focus trap/restore
@@ -451,7 +451,7 @@ Reference: https://gpui-kit.com/component/dialog/
 
 ## Dock
 
-Reference: https://gpui-kit.com/component/dock/
+[Upstream component reference](https://gpui-kit.com/component/dock/)
 
 - nested splits and tab groups
 - drag reorder/resize/edge docks
@@ -460,7 +460,7 @@ Reference: https://gpui-kit.com/component/dock/
 
 ## List
 
-Reference: https://gpui-kit.com/component/list/
+[Upstream component reference](https://gpui-kit.com/component/list/)
 
 - selection and item keys
 - keyboard navigation
@@ -468,7 +468,7 @@ Reference: https://gpui-kit.com/component/list/
 
 ## Menu
 
-Reference: https://gpui-kit.com/component/menu/
+[Upstream component reference](https://gpui-kit.com/component/menu/)
 
 - roving item focus/actions
 - nested popup collision
@@ -476,7 +476,7 @@ Reference: https://gpui-kit.com/component/menu/
 
 ## Popover
 
-Reference: https://gpui-kit.com/component/popover/
+[Upstream component reference](https://gpui-kit.com/component/popover/)
 
 - anchor placement/collision
 - controlled open/dismissal
@@ -484,7 +484,7 @@ Reference: https://gpui-kit.com/component/popover/
 
 ## Resizable
 
-Reference: https://gpui-kit.com/component/resizable/
+[Upstream component reference](https://gpui-kit.com/component/resizable/)
 
 - split geometry/min/max
 - pointer drag and keyboard resize
@@ -492,7 +492,7 @@ Reference: https://gpui-kit.com/component/resizable/
 
 ## Root View
 
-Reference: https://gpui-kit.com/component/root/
+[Upstream component reference](https://gpui-kit.com/component/root/)
 
 - theme/overlay/notification providers
 - window lifecycle and focus scopes
@@ -500,7 +500,7 @@ Reference: https://gpui-kit.com/component/root/
 
 ## Scrollable
 
-Reference: https://gpui-kit.com/component/scrollable/
+[Upstream component reference](https://gpui-kit.com/component/scrollable/)
 
 - scroll bounds and nested clipping
 - wheel/drag scrollbar
@@ -508,7 +508,7 @@ Reference: https://gpui-kit.com/component/scrollable/
 
 ## Settings
 
-Reference: https://gpui-kit.com/component/settings/
+[Upstream component reference](https://gpui-kit.com/component/settings/)
 
 - grouped settings models
 - validation and persistence hooks
@@ -516,7 +516,7 @@ Reference: https://gpui-kit.com/component/settings/
 
 ## Sheet
 
-Reference: https://gpui-kit.com/component/sheet/
+[Upstream component reference](https://gpui-kit.com/component/sheet/)
 
 - edge placement and transition
 - focus trap/restore/dismissal
@@ -524,7 +524,7 @@ Reference: https://gpui-kit.com/component/sheet/
 
 ## Sidebar
 
-Reference: https://gpui-kit.com/component/sidebar/
+[Upstream component reference](https://gpui-kit.com/component/sidebar/)
 
 - hierarchical navigation
 - collapsed/selected/disabled state
@@ -532,7 +532,7 @@ Reference: https://gpui-kit.com/component/sidebar/
 
 ## StatusBar
 
-Reference: https://gpui-kit.com/component/status-bar/
+[Upstream component reference](https://gpui-kit.com/component/status-bar/)
 
 - left/center/right slots
 - density/theme variants
@@ -540,7 +540,7 @@ Reference: https://gpui-kit.com/component/status-bar/
 
 ## Tabs
 
-Reference: https://gpui-kit.com/component/tabs/
+[Upstream component reference](https://gpui-kit.com/component/tabs/)
 
 - controlled selected tab
 - roving keyboard focus
@@ -548,7 +548,7 @@ Reference: https://gpui-kit.com/component/tabs/
 
 ## Theme
 
-Reference: https://gpui-kit.com/component/theme/
+[Upstream component reference](https://gpui-kit.com/component/theme/)
 
 - runtime light/dark and tokens
 - per-component overrides/density
@@ -556,7 +556,7 @@ Reference: https://gpui-kit.com/component/theme/
 
 ## TitleBar
 
-Reference: https://gpui-kit.com/component/title-bar/
+[Upstream component reference](https://gpui-kit.com/component/title-bar/)
 
 - window controls and host chrome
 - drag/maximize integration
@@ -564,7 +564,7 @@ Reference: https://gpui-kit.com/component/title-bar/
 
 ## Toolbar
 
-Reference: https://gpui-kit.com/component/toolbar/
+[Upstream component reference](https://gpui-kit.com/component/toolbar/)
 
 - left/center/right slots
 - keyboard group navigation
@@ -572,7 +572,7 @@ Reference: https://gpui-kit.com/component/toolbar/
 
 ## Tree
 
-Reference: https://gpui-kit.com/component/tree/
+[Upstream component reference](https://gpui-kit.com/component/tree/)
 
 - hierarchical model/expand/selection
 - keyboard parent/child navigation
@@ -580,7 +580,7 @@ Reference: https://gpui-kit.com/component/tree/
 
 ## VirtualList
 
-Reference: https://gpui-kit.com/component/virtual-list/
+[Upstream component reference](https://gpui-kit.com/component/virtual-list/)
 
 - variable-height efficient offsets
 - stable keyed incremental items
@@ -589,7 +589,7 @@ Reference: https://gpui-kit.com/component/virtual-list/
 
 ## Chart
 
-Reference: https://gpui-kit.com/component/chart/
+[Upstream component reference](https://gpui-kit.com/component/chart/)
 
 - line/bar/area/pie/candlestick series
 - axes/scales/ticks/legend
@@ -598,7 +598,7 @@ Reference: https://gpui-kit.com/component/chart/
 
 ## Command
 
-Reference: https://gpui-kit.com/component/command/
+[Upstream component reference](https://gpui-kit.com/component/command/)
 
 - fuzzy filtering and action model
 - keyboard navigation and focus restore
@@ -606,7 +606,7 @@ Reference: https://gpui-kit.com/component/command/
 
 ## DataTable
 
-Reference: https://gpui-kit.com/component/data-table/
+[Upstream component reference](https://gpui-kit.com/component/data-table/)
 
 - column models/sort/resize/pinning
 - cell/row selection keyboard and mouse
@@ -615,7 +615,7 @@ Reference: https://gpui-kit.com/component/data-table/
 
 ## Plot
 
-Reference: https://gpui-kit.com/component/plot/
+[Upstream component reference](https://gpui-kit.com/component/plot/)
 
 - linear/log/category/time scales
 - axes/ticks/series/legend
@@ -624,7 +624,7 @@ Reference: https://gpui-kit.com/component/plot/
 
 ## Table
 
-Reference: https://gpui-kit.com/component/table/
+[Upstream component reference](https://gpui-kit.com/component/table/)
 
 - semantic row/column/header/footer
 - selection/sorting/resizing
@@ -632,7 +632,7 @@ Reference: https://gpui-kit.com/component/table/
 
 ## TextView
 
-Reference: https://gpui-kit.com/component/text-view/
+[Upstream component reference](https://gpui-kit.com/component/text-view/)
 
 - safe Markdown/HTML subset parser
 - Unicode text selection and links

@@ -8,9 +8,8 @@ are inspected evidence, not a fresh execution receipt. The family remains partia
 
 The baseline is GPUI Kit v0.7.1, commit
 `87d10ae5e1299d1be18670a37570c5402f952e34`, as recorded in
-`docs/upstream-baseline.md`. Primary files were fetched individually from
-`https://raw.githubusercontent.com/longbridge/gpui-kit/87d10ae5e1299d1be18670a37570c5402f952e34/`;
-no repository clone or dependency installation was used.
+`docs/upstream-baseline.md`. The audit fetched each primary file directly from
+the [pinned repository](https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34).
 
 | Path below pinned repository | SHA256 |
 | --- | --- |

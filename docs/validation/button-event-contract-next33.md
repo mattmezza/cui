@@ -4,7 +4,7 @@ This is a read-only proposal based on CUI `ee9947b4`, component source commit
 `87d10ae5e1299d1be18670a37570c5402f952e34` (v0.7.1), and its exact published
 `gpui-pre = 0.3.8` dependency. It authorizes no production changes and certifies
 no family or platform parity. The dependency was inspected from
-https://crates.io/api/v1/crates/gpui-pre/0.3.8/download .
+[the pinned crate archive](https://crates.io/api/v1/crates/gpui-pre/0.3.8/download).
 
 ## Actual source contracts
 

@@ -6,7 +6,7 @@ Baseline: CUI `332fdaa8897c055fd4d150ca147c6e903dcc543d`.
 ## Frozen authority
 
 All upstream paths below are relative to
-<https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34>.
+[Pinned repository](https://github.com/longbridge/gpui-kit/tree/87d10ae5e1299d1be18670a37570c5402f952e34).
 Only these four primary files were fetched; no dependency checkout was installed.
 
 | File | SHA256 | Relevant lines |

@@ -7,6 +7,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -35,12 +36,16 @@ class DocumentationTests(unittest.TestCase):
     def test_website_wording_preserves_heading_links(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'README.md').write_text('# GPUI comparison\n\n[Jump](#gpui-comparison)\n\nCUI usage.\n')
+            (root / 'README.md').write_text(
+                '# GPUI comparison\n\n'
+                'GPUI source: [Reference](https://gpui-kit.com/base/) and [Jump](#gpui-comparison).\n')
             pages = DOCS.build(root, root / 'output')
             self.assertEqual(pages[0]['title'], 'upstream comparison')
             self.assertIn('id="doc-gpui-comparison"', pages[0]['html'])
             self.assertIn('href="#docs/getting-started/gpui-comparison"', pages[0]['html'])
             self.assertNotIn('>GPUI', pages[0]['html'])
+            self.assertEqual(pages[0]['description'], 'upstream source: Reference and Jump.')
+            self.assertIn('href="https://gpui-kit.com/base/"', pages[0]['html'])
 
     def test_website_language_keeps_source_urls(self):
         text = DOCS.website_text('GPUI Kit parity; GPUI. https://gpui-kit.com/base/')
@@ -205,6 +210,12 @@ if (x < 2) puts("<script>");
         with tempfile.TemporaryDirectory() as directory:
             pages = DOCS.build(ROOT, Path(directory))
             sources = {p['source'] for p in pages}
+            for page in pages:
+                # Link destinations retain provenance. The rendered labels
+                # and text use CUI's terminology.
+                text = re.sub(r'<[^>]+>', '', page['html'])
+                visible = ' '.join((page['title'], page['description'], text))
+                self.assertNotRegex(visible, r'(?i)\bgpui\b', page['source'])
             for path in (ROOT / 'docs').rglob('*.md'):
                 self.assertIn(DOCS.REPOSITORY.replace('/main/', '/' + DOCS.source_revision(ROOT) + '/') + path.relative_to(ROOT).as_posix(), sources)
             self.assertIn('getting-started', {p['slug'] for p in pages})

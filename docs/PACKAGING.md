@@ -1,6 +1,6 @@
 # Install local alpha binding artifacts
 
-The commands below build alpha.5 candidate artifacts from the current checkout
+The commands below build alpha.5 artifacts from the current checkout
 (`0.1.0-alpha.5`, Python `0.1.0a5`). See [RELEASING.md](RELEASING.md) for
 published releases and the source freeze checklist.
 

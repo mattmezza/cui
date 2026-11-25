@@ -1,0 +1,139 @@
+{
+  "release": {
+    "isDraft": false,
+    "isPrerelease": true,
+    "publishedAt": "2026-11-25T20:03:38Z",
+    "url": "https://github.com/mattmezza/cui/releases/tag/v0.1.0-alpha.5"
+  },
+  "source_revision": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+  "hosted_gates": {
+    "ci": {
+      "conclusion": "success",
+      "headSha": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45686574980"
+    },
+    "native_bindings": {
+      "conclusion": "success",
+      "headSha": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45686574984"
+    },
+    "pages": {
+      "conclusion": "success",
+      "headSha": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+      "status": "completed",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45688971148"
+    }
+  },
+  "website": {
+    "verification": {
+      "source_revision": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+      "public_url": "https://matteo.merola.co/cui/",
+      "version": "0.1.0-alpha.5",
+      "native_starter": {
+        "bytes": 2102986,
+        "sha256": "4cf1cf58c3e112d0e1eaa2149e266754fd90c5fae6cca2c8974e4ebe4e4ea3e1"
+      },
+      "gallery_wasm_cache_key": "e7515d0776cac46b"
+    },
+    "deployment": {
+      "conclusion": "success",
+      "headBranch": "main",
+      "headSha": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+      "url": "https://github.com/mattmezza/cui/actions/runs/45688971148"
+    },
+    "native_starter": {
+      "file": "cui-0.1.0-alpha.5-native-starter.tar.gz",
+      "bytes": 2102986,
+      "sha256": "4cf1cf58c3e112d0e1eaa2149e266754fd90c5fae6cca2c8974e4ebe4e4ea3e1"
+    }
+  },
+  "local_validation": {
+    "installed_checks": [
+      "downloaded native starter",
+      "static C",
+      "Python/Node/TypeScript",
+      "Go/Rust",
+      "actual-font text",
+      "installed Python and Node paging"
+    ],
+    "vendor_notices": "pass",
+    "gallery": "exact source site, headers, 78 families and starter verified locally",
+    "native_repair_checks": "122 portable Node/bridge tests and 7 native/source/SDK checks passed"
+  },
+  "draft_asset_verification": {
+    "release_tag": "v0.1.0-alpha.5",
+    "source_revision": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+    "assets": {
+      "ASSET_MANIFEST.json": {
+        "bytes": 4966,
+        "sha256": "03708e4e1c947188014e64f08e28a41b524daf9a5dcbb84420997760251f9e8d"
+      },
+      "RELEASE_NOTES.md": {
+        "bytes": 2907,
+        "sha256": "4187bf40e0a3756b5c65dc61c64626e6a7d3297b14024cf5fb20e656c5004de1"
+      },
+      "SHA256SUMS": {
+        "bytes": 994,
+        "sha256": "bbd2289473cd8fc5d902217db6276aaeb0bc8a40c3dd88f406fe2225e7f02715"
+      },
+      "cui-0.1.0-alpha.5-go-source-proxy.tar.gz": {
+        "bytes": 2298444,
+        "sha256": "979b66e21e8db1c494c3bdb4ab394daf18e37a7f21f8ef3ab62ee69e1eb9c05e"
+      },
+      "cui-0.1.0-alpha.5-linux-x86_64-static.tar.gz": {
+        "bytes": 11222450,
+        "sha256": "72d5c0fcda1729d6d153919ede362a0115131fa28c993535e5877c2aae0b30b7"
+      },
+      "cui-0.1.0-alpha.5-native-starter.tar.gz": {
+        "bytes": 2102986,
+        "sha256": "4cf1cf58c3e112d0e1eaa2149e266754fd90c5fae6cca2c8974e4ebe4e4ea3e1"
+      },
+      "cui-0.1.0-alpha.5-source.tar.gz": {
+        "bytes": 30168356,
+        "sha256": "c29fc19c3e3645080ebce6a52b55c89d807988250f03e15e39cb0213d273ea9e"
+      },
+      "cui-builders-0.1.0-alpha.5.crate": {
+        "bytes": 2042361,
+        "sha256": "d8a290fef8f4fe8d836f99e9a87f0b6ea25d18cddc1c0a64580a561ed954e2c7"
+      },
+      "cui-native-0.1.0-alpha.5.tgz": {
+        "bytes": 12592228,
+        "sha256": "9c6a9ba2a5fae11a73e26330e3a9f6152ed625cd6d456b1bee9f6f4bfe54a7cf"
+      },
+      "cui_bridge-0.1.0a5-py3-none-linux_x86_64.whl": {
+        "bytes": 15214115,
+        "sha256": "3e7e6b10138be507481f6ca7e474e6739feae86e0ebfa85ad352557b509cb1d1"
+      },
+      "source-artifact-inspection.json": {
+        "bytes": 1356,
+        "sha256": "26250374ed7f5b98680c22e6d074ea8ca441f9cdfc5fa4fed31d97d712d09115"
+      }
+    }
+  },
+  "public_go_module": {
+    "source_revision": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+    "version": "v0.1.0-alpha.5",
+    "endpoint": "https://proxy.golang.org/github.com/mattmezza/cui/bindings/go/@v/v0.1.0-alpha.5",
+    "public_zip_sha256": "4632818e4239581eaad83639be23c03d3682c1dd6dc633f8614a0d8aa31c67e1",
+    "verified_files": 662,
+    "version_info": {
+      "Version": "v0.1.0-alpha.5",
+      "Time": "2026-11-25T19:34:29Z",
+      "Origin": {
+        "VCS": "git",
+        "URL": "https://github.com/mattmezza/cui",
+        "Subdir": "bindings/go",
+        "Hash": "57aeb20bcb405fdb441666374abff0254c9abcd4",
+        "Ref": "refs/tags/bindings/go/v0.1.0-alpha.5"
+      }
+    }
+  },
+  "limitations": [
+    "Native binary packages are Linux x86_64 host artifacts and have no manylinux certification.",
+    "The Go and Rust SDK maps and packaged headers were verified against the frozen source.",
+    "Physical GPU, device and assistive-technology acceptance and full component parity remain open.",
+    "The Python, npm and Rust artifacts are available through GitHub Releases. Registry publication is pending."
+  ]
+}

@@ -8,7 +8,7 @@ bounds (`264–271`), and TouchClickEvent as tap position/count/long-press (`275
 The current portable Button payload deliberately describes CUI's accepted release,
 key, or accessibility event. It does not fabricate those missing source fields.
 The exact dependency source was inspected from the published pinned crate:
-https://crates.io/api/v1/crates/gpui-pre/0.3.8/download .
+[Pinned crate archive](https://crates.io/api/v1/crates/gpui-pre/0.3.8/download).
 
 The smallest next capture slice is a Core read-only accepted-pointer snapshot
 query, populated by actual input routing. A private capture-start sample must

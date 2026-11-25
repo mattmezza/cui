@@ -68,7 +68,7 @@ cluster metadata also contains only those display scalars.
 
 - Runtime source: [gpui-pre 0.3.8 LineLayout](https://docs.rs/crate/gpui-pre/0.3.8/source/src/text_system/line_layout.rs)
   and [LineWrapper](https://docs.rs/crate/gpui-pre/0.3.8/source/src/text_system/line_wrapper.rs).
-  Official crate archive: `https://crates.io/api/v1/crates/gpui-pre/0.3.8/download`.
+  [Official crate archive](https://crates.io/api/v1/crates/gpui-pre/0.3.8/download).
   SHA256 `d7f0bc3ebba070f8981b3f8e905a12f47d27794a30d029e59cdb9edf7a4b3360`.
   The classifier/candidate policy was ported into C; the copyright/license notice
   for the Apache-2.0 runtime appears below.

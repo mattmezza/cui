@@ -291,7 +291,7 @@ inbox.table_data(headers, [['New message', 'Workspace'], ...rows], [301, 203, 20
 Attach the array to both the initial data and later replacements. The builder
 copies headers, cells, and keys. Use one distinct integer from 1 through
 4,294,967,295 per row, with the same key wherever that logical row appears.
-The limits are 32 rows, 16 columns, and 128 UTF-8 bytes per string.
+The ordinary setters accept up to 32 rows, 16 columns, and 128 UTF-8 bytes per string.
 `table_state().row` and change events report the selected key.
 Look up cells and layout bounds by zero-based matrix indices.
 
@@ -355,7 +355,7 @@ Keep a single request in flight and disable paging while it runs. The rows
 remain interactive. Verify the response against the current request before
 appending through `table_data(headers, rows, rowKeys)` on the UI thread. This
 preserves the viewport and selection. Enable paging again when more data is
-available. The JavaScript and TypeScript builders hold up to 32 rows.
+available. Demand stops at the active row capacity.
 
 `app.run(afterFrame)` calls a synchronous hook after painting and regular
 event dispatch. Closing from regular dispatch skips the hook. The native runner
@@ -366,8 +366,9 @@ The [JavaScript inbox](../bindings/node/examples/data-table-paging.cjs) checks
 selection during loading, retry, rejection of a stale response, and an anchored
 final append. Pass a font path as the first argument to try the native demo
 with an SDL-enabled bridge. The [TypeScript inbox](../bindings/typescript/examples/data_table_paging.ts)
-uses the same API and verifies an anchored append with strict types. With the
-addon built and an existing TypeScript compiler, run from the repository root:
+uses the same API and verifies an anchored append to 40 rows with strict
+types. With the addon built and a TypeScript compiler, run from the repository
+root:
 
 ```sh
 export CUI_NODE_ADDON="$PWD/build-node/cui.node"
@@ -376,6 +377,44 @@ python bindings/node/test/run-data-table-types.py --case paging \
   --tsc "$(command -v tsc)" --node "$(command -v node)" \
   --output build-node/data-table-paging-types
 ```
+
+### Retain more than 32 rows in JavaScript or TypeScript
+
+Query `app.data_table_max_row_capacity()` for the usable opt-in limit,
+up to 10,000 rows. It returns `undefined` when the addon or provider lacks the
+capacity API. Pass stable row keys and `{rowCapacity}` as the fourth argument
+on each opted-in replacement. Omit the fourth argument to use the ordinary
+32-row setters.
+
+```javascript
+const {App, column, data_table} = require('./bindings/node/index.cjs');
+
+const app = new App({backend: 'headless'});
+try {
+  const maximum = app.data_table_max_row_capacity();
+  if (maximum === undefined || maximum < 64)
+    throw new Error('This inbox requires capacity for 64 rows');
+  const table = data_table('inbox').table_data(['Subject'], [], [], {rowCapacity: 64});
+  app.mount(column().children(table)).step();
+  const keys = Array.from({length: 40}, (_, i) => i + 1);
+  table.table_data(['Subject'], keys.map(key => [`Message ${key}`]), keys, {rowCapacity: 64});
+  app.step();
+} finally {
+  app.dispose();
+}
+```
+
+Update on the UI thread between steps, as with ordinary keyed snapshots.
+The next paging record reports the active capacity. A rejected replacement
+preserves the previous data and pending demand. The [32 MiB C retention
+budget](BRIDGE_COMPONENTS.md#retain-more-than-32-datatable-rows-in-c) applies
+per app. The addon also uses bounded temporary marshalling storage, up to
+about 21 MiB on 64-bit hosts for 10,000 rows of 16 columns. Apply large
+snapshots when data arrives and reuse them across frames.
+
+Run `node bindings/node/examples/data-table-paging.cjs --larger` with the
+same addon path as above. The example grows from 8 to 40 rows and preserves
+selection and position. Add a font path to try it interactively with SDL.
 
 ## Styling, state and callbacks
 

@@ -41,19 +41,31 @@ function validateDate(year,month,day) {
   const leap=year%4===0 && (year%100!==0 || year%400===0);
   if(day>[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1])throw new TypeError('invalid date');
 }
-function requiresKeyedTable(node) {
-  return node.matrixValue?.[2] !== undefined || node.childrenValue.some(requiresKeyedTable);
+const legacyTableRows = 32;
+const maxTableRows = 10_000;
+function requireDataTableCapacity(app, rowCapacity) {
+  const maximum = app.data_table_max_row_capacity();
+  if (maximum === undefined) throw new Error('DataTable capacity is unavailable in this bridge');
+  if (rowCapacity > maximum) throw new RangeError(`rowCapacity exceeds the provider's ${maximum}-row limit`);
 }
-function preflightDataTablePaging(app, node) {
+function preflightDataTables(app, node) {
+  const rowCapacity = node.matrixValue?.[3];
+  if (rowCapacity !== undefined) requireDataTableCapacity(app, rowCapacity);
+  else if (node.matrixValue?.[2] !== undefined && !app.supports_keyed_data_table())
+    throw new Error('keyed DataTable replacement is unavailable in this bridge');
   if (node.loadMoreThreshold !== undefined) {
     if (!app.supports_data_table_paging())
       throw new Error('DataTable paging is unavailable in this bridge');
     if (!node.matrixValue) throw new Error('DataTable paging requires column headers');
   }
-  for (const child of node.childrenValue) preflightDataTablePaging(app, child);
+  for (const child of node.childrenValue) preflightDataTables(app, child);
 }
-function applyTableData(node, [headers, rows, rowKeys]) {
+function applyTableData(node, [headers, rows, rowKeys, rowCapacity]) {
   const app = node.owner;
+  if (rowCapacity !== undefined) {
+    native.setMatrixCapacity(app.handle, node[NODE], headers, rows, rowKeys, rowCapacity);
+    return;
+  }
   if (rowKeys === undefined) {
     native.setMatrix(app.handle, node[NODE], headers, rows);
     return;
@@ -278,15 +290,28 @@ class Node {
   current_datum(index) {if(this.kind!==69 || !Number.isInteger(index)||index<0||index>=64)throw new TypeError('invalid datum index');if(this.owner)return native.getChart(this.owner.handle,this[NODE],index);if(!this.chartDataValue[index])throw new RangeError('missing datum');return [...this.chartDataValue[index]];}
   plot_points(points) {if(this.kind!==72 || !Array.isArray(points)||points.length>256||points.some(p=>!Array.isArray(p)||p.length!==2||p.some(v=>!Number.isFinite(v)||Math.abs(v)>16384)))throw new TypeError('invalid plot points');const copied=points.map(p=>[...p]);if(this.owner)native.setPlot(this.owner.handle,this[NODE],copied);this.plotPointsValue=copied;return this;}
   current_point(index) {if(this.kind!==72 || !Number.isInteger(index)||index<0||index>=256)throw new TypeError('invalid point index');if(this.owner)return native.getPlot(this.owner.handle,this[NODE],index);if(!this.plotPointsValue[index])throw new RangeError('missing point');return [...this.plotPointsValue[index]];}
-  table_data(headers, rows, rowKeys) {
-    if (this.kind !== 71 || !Array.isArray(headers) || headers.length < 1 ||
-        headers.length > 16 || !Array.isArray(rows) || rows.length > 32)
+  table_data(headers, rows, rowKeys, options) {
+    if (this.kind !== 71 || !Array.isArray(headers) || !Array.isArray(rows))
+      throw new TypeError('invalid table matrix');
+    let rowCapacity;
+    if (options !== undefined) {
+      if (!options || typeof options !== 'object' || Array.isArray(options))
+        throw new TypeError('DataTable capacity requires an options object');
+      ({rowCapacity} = options);
+      if (!Number.isInteger(rowCapacity) || rowCapacity < 1 || rowCapacity > maxTableRows)
+        throw new RangeError(`rowCapacity must be an integer in 1..${maxTableRows}`);
+      if (rowKeys === undefined) throw new TypeError('rowCapacity requires rowKeys');
+      if (this.owner) requireDataTableCapacity(this.owner, rowCapacity);
+    }
+    const columnCount = headers.length, rowCount = rows.length;
+    if (!Number.isInteger(columnCount) || columnCount < 1 || columnCount > 16 ||
+        !Number.isInteger(rowCount) || rowCount < 0 || rowCount > (rowCapacity ?? legacyTableRows))
       throw new TypeError('invalid table matrix');
     const text = value => typeof value === 'string' && !value.includes('\0') &&
       Buffer.byteLength(value) <= 128;
-    const copiedHeaders = Array.from({length: headers.length}, (_, index) => headers[index]);
+    const copiedHeaders = Array.from({length: columnCount}, (_, index) => headers[index]);
     if (!copiedHeaders.every(text)) throw new TypeError('invalid table matrix');
-    const copiedRows = Array.from({length: rows.length}, (_, index) => {
+    const copiedRows = Array.from({length: rowCount}, (_, index) => {
       const row = rows[index];
       if (!Array.isArray(row) || row.length !== copiedHeaders.length)
         throw new TypeError('invalid table matrix');
@@ -303,7 +328,7 @@ class Node {
           new Set(keys).size !== keys.length)
         throw new TypeError('rowKeys must contain one distinct nonzero uint32 per row');
     }
-    const copied = [copiedHeaders, copiedRows, keys];
+    const copied = [copiedHeaders, copiedRows, keys, rowCapacity];
     if (this.owner) applyTableData(this, copied);
     this.matrixValue = copied;
     return this;
@@ -329,7 +354,10 @@ class Node {
     if (!this.owner.supports_data_table_paging())
       throw new Error('DataTable paging is unavailable in this bridge');
     const request = native.pollDataTableLoadMore(this.owner.handle, this[NODE]);
-    return request === undefined ? undefined : Object.freeze(request);
+    if (request === undefined) return undefined;
+    if (request.capacity !== (this.matrixValue?.[3] ?? legacyTableRows))
+      throw new Error('malformed DataTable load-more record');
+    return Object.freeze(request);
   }
   current_cell(row,column) {if(this.kind!==71||![row,column].every(v=>Number.isInteger(v)&&v>=0&&v<=0xffffffff))throw new TypeError('invalid cell');if(this.owner)return native.getMatrixCell(this.owner.handle,this[NODE],row,column);if(!this.matrixValue||!this.matrixValue[1][row]||column>=this.matrixValue[0].length)throw new RangeError('missing cell');return this.matrixValue[1][row][column];}
   selection_mode(value) {const modes={row:0,column:1,cell:2};if(this.kind!==71||!Object.hasOwn(modes,value))throw new TypeError('invalid table selection mode');if(this.owner)native.setSelectionMode(this.owner.handle,this[NODE],modes[value]);this.selectionModeValue=modes[value];return this;}
@@ -457,9 +485,7 @@ class App {
     this._alive();
     if (this.root) throw new Error('app already has a root');
     if (!(root instanceof Node) || root.parent || root.owner || ![1,2,76].includes(root.kind)) throw new TypeError('root must be an unattached row, column or root_view');
-    if (!this.supports_keyed_data_table() && requiresKeyedTable(root))
-      throw new Error('keyed DataTable replacement is unavailable in this bridge');
-    preflightDataTablePaging(this, root);
+    preflightDataTables(this, root);
     skeletons.preflight(this, root);
     sliderModels.preflight(this, root);
     localizedTimes.preflight(this, root);
@@ -636,6 +662,12 @@ class App {
   supports_keyed_data_table() {
     this._alive();
     return typeof native.supportsKeyedDataTable === 'function' && native.supportsKeyedDataTable();
+  }
+  data_table_max_row_capacity() {
+    this._alive();
+    if (typeof native.maxMatrixCapacity === 'function' && typeof native.setMatrixCapacity === 'function')
+      return native.maxMatrixCapacity() || undefined;
+    return undefined;
   }
   supports_data_table_paging() {
     this._alive();

@@ -7323,7 +7323,7 @@
             "docs/TABLE.md"
           ],
           "limitations": [
-            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C and Python also expose larger snapshots. Automatic remote updates remain open."
+            "Opt-in C helpers preserve a row key and pixel offset. Retained builders support ordinary keyed replacement with a 32-row cap. C, Python, JavaScript and TypeScript also expose larger snapshots. Automatic remote updates remain open."
           ]
         },
         {
@@ -7444,6 +7444,20 @@
           ],
           "limitations": [
             "The mounted builder returns frozen copied demand with a bigint frame sequence. The blocking SDL runner can poll in a synchronous after-frame hook. Apps using Node asynchronous I/O own their step loop and request lifecycle."
+          ]
+        },
+        {
+          "name": "JavaScript and TypeScript bounded retained DataTable snapshots beyond 32 rows",
+          "status": "tested",
+          "evidence": [
+            "bindings/node/test/data-table-capacity.test.cjs",
+            "bindings/node/test/data-table-paging.types.ts",
+            "bindings/node/examples/data-table-paging.cjs",
+            "bindings/typescript/examples/data_table_paging.ts",
+            "docs/BINDING_BUILDERS.md"
+          ],
+          "limitations": [
+            "The optional rowCapacity requires stable keys and a compatible addon and provider. The toolkit copies bounded UTF-8 strings and applies the bridge's retained matrix budget. The app owns transport and applies snapshots between frames."
           ]
         },
         {

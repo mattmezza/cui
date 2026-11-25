@@ -390,10 +390,19 @@ add_test(NAME node_data_table_paging COMMAND ${CMAKE_COMMAND} -E env
 add_test(NAME node_data_table_paging_example COMMAND ${CMAKE_COMMAND} -E env
  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
  ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-paging.cjs)
+add_test(NAME node_data_table_capacity COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE} --test
+ ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-capacity.test.cjs)
+add_test(NAME node_data_table_capacity_example COMMAND ${CMAKE_COMMAND} -E env
+ CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> ${NODE_EXECUTABLE}
+ ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-paging.cjs --larger)
 if(CUI_BRIDGE_NATIVE_TESTS)
  add_test(NAME node_data_table_paging_native COMMAND ${CMAKE_COMMAND} -E env
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE}
   ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-paging.cjs "${CUI_TEST_FONT}" --smoke)
+ add_test(NAME node_data_table_capacity_native COMMAND ${CMAKE_COMMAND} -E env
+  CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE}
+  ${CMAKE_CURRENT_SOURCE_DIR}/examples/data-table-paging.cjs "${CUI_TEST_FONT}" --smoke --larger)
  add_test(NAME node_native_run COMMAND ${CMAKE_COMMAND} -E env
   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_TEST_FONT=${CUI_TEST_FONT}
   SDL_RENDER_DRIVER=software ${NODE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/run-native.test.cjs)
@@ -405,6 +414,15 @@ if(CUI_NODE_TSC_EXECUTABLE)
   --node "${NODE_EXECUTABLE}" --output ${CMAKE_CURRENT_BINARY_DIR}/data-table-paging-types)
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+ add_library(cui_node_capacity_query_fixture SHARED ../tests/data_table_capacity_provider.c)
+ target_include_directories(cui_node_capacity_query_fixture PRIVATE ../../include)
+ target_compile_options(cui_node_capacity_query_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ foreach(mode limited zero large)
+  add_test(NAME node_data_table_capacity_${mode} COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_bindings> CUI_DATA_TABLE_CAPACITY_FIXTURE=${mode}
+   LD_PRELOAD=$<TARGET_FILE:cui_node_capacity_query_fixture>
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-capacity.test.cjs)
+ endforeach()
  add_library(cui_node_data_table_paging_fixture SHARED ../tests/data_table_paging_provider.c)
  target_include_directories(cui_node_data_table_paging_fixture PRIVATE ../../include)
  target_compile_options(cui_node_data_table_paging_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
@@ -415,6 +433,24 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
    ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-paging.test.cjs)
  endforeach()
  if(TARGET cui_node_icon_alpha4)
+  add_library(cui_node_capacity_setter_fixture SHARED ../tests/data_table_capacity_provider.c)
+  target_include_directories(cui_node_capacity_setter_fixture PRIVATE ../../include)
+  target_compile_definitions(cui_node_capacity_setter_fixture PRIVATE CUI_TEST_CAPACITY_SETTER_ONLY)
+  target_compile_options(cui_node_capacity_setter_fixture PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  add_test(NAME node_data_table_capacity_alpha4 COMMAND ${CMAKE_COMMAND} -E env
+   CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4> CUI_DATA_TABLE_CAPACITY_FIXTURE=legacy
+   ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-capacity.test.cjs)
+  foreach(missing query setter)
+   if(missing STREQUAL "query")
+    set(capacity_fixture cui_node_capacity_setter_fixture)
+   else()
+    set(capacity_fixture cui_node_capacity_query_fixture)
+   endif()
+   add_test(NAME node_data_table_capacity_missing_${missing} COMMAND ${CMAKE_COMMAND} -E env
+    CUI_NODE_ADDON=$<TARGET_FILE:cui_node_icon_alpha4> CUI_DATA_TABLE_CAPACITY_FIXTURE=missing_${missing}
+    LD_PRELOAD=$<TARGET_FILE:${capacity_fixture}>
+    ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test/data-table-capacity.test.cjs)
+  endforeach()
   add_library(cui_node_partial_paging_fixture SHARED ../tests/data_table_paging_provider.c)
   target_include_directories(cui_node_partial_paging_fixture PRIVATE ../../include)
   target_compile_definitions(cui_node_partial_paging_fixture PRIVATE CUI_TEST_PARTIAL_PAGING_PROVIDER)

@@ -1,12 +1,19 @@
 import {App, data_table, label} from '../index.cjs';
-import type {DataTableLoadMore} from '../index.cjs';
+import type {DataTableCapacityOptions, DataTableLoadMore} from '../index.cjs';
 
 declare const app: App;
 declare const request: DataTableLoadMore;
 const table = data_table('inbox').configure_load_more({enabled: true, threshold: 1});
 const supported: boolean = app.supports_data_table_paging();
 const frame: bigint | undefined = table.poll_load_more()?.frameSequence;
-void [supported, frame];
+const maximum: number | undefined = app.data_table_max_row_capacity();
+const capacity: DataTableCapacityOptions = {rowCapacity: Math.min(maximum ?? 64, 64)};
+table.table_data(['Subject'], [['Report']], [1], capacity);
+void [supported, frame, maximum];
+// @ts-expect-error opting into larger capacity requires stable row keys
+table.table_data(['Subject'], [], undefined, capacity);
+// @ts-expect-error capacity must be a number
+table.table_data(['Subject'], [], [], {rowCapacity: '64'});
 app.run(active => { if (active === app) active.close(); });
 app.run();
 

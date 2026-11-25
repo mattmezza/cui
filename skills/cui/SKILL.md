@@ -371,7 +371,9 @@ and `docs/BINDING_BUILDERS.md`. For ordinary Python tables, use `table_data(head
 row_keys=keys)` after checking `app.supports_keyed_data_table()`. The runnable
 inbox in `bindings/bridge/examples/data_table_live.py` defaults to headless.
 JavaScript and TypeScript use `table_data(headers, rows, rowKeys)` with the same
-capability query. See `docs/BINDING_BUILDERS.md` for both inbox examples. Go
+keyed capability query. For larger snapshots, query
+`app.data_table_max_row_capacity()` and pass `{rowCapacity}` as the fourth
+argument. See `docs/BINDING_BUILDERS.md`. Go
 uses `TableDataKeyed` and `SetTableKeyed`, with `SupportsKeyedDataTable` for
 provider checks. See `docs/GO_BUILDERS.md` and
 `bindings/go/examples/data_table_live/main.go`. In Rust, use

@@ -201,9 +201,14 @@ export interface DataTableLoadMore {
   readonly lastRowKey: number;
   readonly capacity: number;
 }
+export interface DataTableCapacityOptions {
+  /** Opt-in capacity in rows. Query the loaded provider before choosing a limit. */
+  readonly rowCapacity: number;
+}
 export interface DataTable extends Label {
   /** Supply stable nonzero uint32 row keys to preserve the viewport on replacement. */
   table_data(headers: readonly string[], rows: readonly (readonly string[])[], rowKeys?: readonly number[]): this;
+  table_data(headers: readonly string[], rows: readonly (readonly string[])[], rowKeys: readonly number[], options: DataTableCapacityOptions | undefined): this;
   configure_load_more(options?: DataTablePagingOptions): this;
   /** Consume one copied request from a mounted table after a successful frame. */
   poll_load_more(): DataTableLoadMore | undefined;
@@ -216,7 +221,12 @@ export interface DataTable extends Label {
   disabled(value?: boolean): this;
   on_change(callback: (event: ChangeEvent) => void): this;
 }
-export interface App {supports_keyed_data_table(): boolean; supports_data_table_paging(): boolean}
+export interface App {
+  supports_keyed_data_table(): boolean;
+  supports_data_table_paging(): boolean;
+  /** Return the usable opt-in row limit, or undefined when the provider lacks it. */
+  data_table_max_row_capacity(): number | undefined;
+}
 export interface Plot extends Label {plot_points(points: Array<[number,number]>): this; current_point(index: number): [number,number]; visual_size(width: number,height: number): this}
 export function chart(key?: string,text?: string): Chart;
 export function table(key?: string,text?: string): Table;

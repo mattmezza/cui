@@ -75,7 +75,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Editor | `cui_editor` | Owned multiline UTF-8 model, native line-numbered editing, copied text CHANGE, language label and disabled state | 4096 UTF-8 bytes and 512 layout lines; no host syntax-highlighting, completion, search, or clipboard callbacks |
 | Chart | `cui_chart` | Copied up to 64 labeled numeric data points, native line/area/bar/pie raster and hover, data readback, disabled | Up to 512×512 pixels; one series, default native tooltip; no custom callbacks, candle, radar, or Sankey |
 | Table | `cui_table_begin_ex`, checked row/cell APIs | Item rows and nested Item cells with copied text, native table semantics and layout; first row is header | Up to 64 rows/64 cells per row; fixed equal column widths, text-only cells; no sort, selection, or virtualization |
-| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots and optional near-end polling | Up to 32 rows through ordinary setters or 10,000 via opt-in C and Python APIs, 16 columns and 128 UTF-8 bytes per header or cell, caller-owned sorting and page delivery |
+| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots and optional near-end polling | Up to 32 rows through ordinary setters or 10,000 via opt-in C, Python and JS/TS APIs, 16 columns and 128 UTF-8 bytes per header or cell, caller-owned sorting and page delivery |
 | Plot | `cui_plot_dots` | Copied up to 256 Cartesian (x,y) samples, native themed point rendering, point readback | Dot plot only; coordinates within ±16384, no path, axis, zoom, or point hit model |
 | Command | `cui_command` | Up to 64 Item actions, owned UTF-8 query editor, native keyword filtering, keyboard/pointer selection, copied query/selection CHANGE and Item confirm CLICK | Flat palette; Item detail is one keyword string, no grouped headings, custom row content, or host action callback |
 | VirtualList | `cui_virtual_list_draw` | Up to 64 keyed Item rows, native overscanned vertical viewport, wheel/keyboard scroll, copied offset CHANGE, visible Item bounds, disabled | Fixed 32px rows, vertical only; no intrinsic row sizing or host data provider |
@@ -166,8 +166,9 @@ row capacity at least as large as the submitted row count. Pass the capacity
 along with each row-major snapshot to
 `cui_bridge_data_table_set_keyed_capacity_v1`. Both V1 symbols must be available
 when loading the bridge dynamically. The C provider supports capacities up to
-10,000 rows. Python exposes the same opt-in through
-[`table_data(..., row_capacity=...)`](BINDING_BUILDERS.md#retain-more-than-32-rows-in-python).
+10,000 rows. See the corresponding language APIs for
+[Python](BINDING_BUILDERS.md#retain-more-than-32-rows-in-python) and
+[JavaScript and TypeScript](BINDING_BUILDERS.md#retain-more-than-32-rows-in-javascript-or-typescript).
 
 The setter copies headers and cells of up to 128 UTF-8 bytes each, with up to
 16 columns. Pass zero rows and NULL cells and keys for an empty table. The

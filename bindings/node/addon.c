@@ -1365,62 +1365,150 @@ static napi_value supports_keyed_data_table(napi_env env, napi_callback_info inf
                                                                                             : NULL;
 }
 
+enum {
+    MATRIX_POSITIONAL,
+    MATRIX_KEYED,
+    MATRIX_CAPACITY,
+    MATRIX_LEGACY_ROWS = 32,
+    MATRIX_MAX_ROWS = 10000,
+    MATRIX_MAX_COLUMNS = 16,
+    MATRIX_STRING_BYTES = 129
+};
+typedef cui_bridge_status (*data_table_set_capacity_fn)(cui_bridge_app *, cui_bridge_node,
+                                                        const char *const *, uint32_t,
+                                                        const char *const *, const uint32_t *,
+                                                        uint32_t, uint32_t);
+
+static uint32_t data_table_capacity_limit(data_table_set_capacity_fn *set) {
+    uint32_t (*query)(void) = NULL;
+    if (!optional_bridge_symbol(&query, sizeof query,
+                                "cui_bridge_data_table_max_row_capacity_v1") ||
+        !optional_bridge_symbol(set, sizeof *set, "cui_bridge_data_table_set_keyed_capacity_v1"))
+        return 0;
+    uint32_t maximum = query();
+    return maximum > MATRIX_MAX_ROWS ? MATRIX_MAX_ROWS : maximum;
+}
+
+static napi_value max_matrix_capacity(napi_env env, napi_callback_info info) {
+    (void)info;
+    data_table_set_capacity_fn set;
+    napi_value result;
+    return napi_create_uint32(env, data_table_capacity_limit(&set), &result) == napi_ok ? result
+                                                                                        : NULL;
+}
+
+static bool matrix_string(napi_env env, napi_value value, char *out) {
+    size_t length;
+    if (napi_get_value_string_utf8(env, value, NULL, 0, &length) != napi_ok) {
+        fail(env, "expected string");
+        return false;
+    }
+    if (length >= MATRIX_STRING_BYTES) {
+        fail(env, "matrix strings exceed 128 UTF-8 bytes");
+        return false;
+    }
+    if (napi_get_value_string_utf8(env, value, out, MATRIX_STRING_BYTES, &length) != napi_ok) {
+        fail(env, "invalid string");
+        return false;
+    }
+    if (strlen(out) != length) {
+        fail(env, "embedded NUL is not allowed");
+        return false;
+    }
+    return true;
+}
+
 static napi_value set_matrix(napi_env env, napi_callback_info info) {
-    napi_value v[5], entry, row;
+    napi_value v[6], entry, row;
     size_t argc = sizeof v / sizeof v[0];
-    void *keyed;
+    void *mode_data;
     js_app *app;
     js_node *node;
-    uint32_t columns, rows, len, keys[32];
-    char *headers[16] = {0}, *cells[512] = {0};
-    cui_bridge_status code = CUI_BRIDGE_OK;
-    if (napi_get_cb_info(env, info, &argc, v, NULL, &keyed) != napi_ok || argc < (keyed ? 5u : 4u))
+    uint32_t columns, rows, len, capacity = MATRIX_LEGACY_ROWS;
+    if (napi_get_cb_info(env, info, &argc, v, NULL, &mode_data) != napi_ok ||
+        argc < 4 + (uintptr_t)mode_data)
         return fail(env, "missing argument");
-    if (!app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node) ||
-        !array_count(env, v[2], 16, &columns) || !array_count(env, v[3], 32, &rows))
+    const uintptr_t mode = (uintptr_t)mode_data;
+    if (!app_arg(env, v[0], &app) || !node_arg(env, v[1], app, &node))
         return NULL;
-    if (!columns)
-        return fail(env, "matrix requires headers");
+    data_table_set_capacity_fn set_capacity = NULL;
     data_table_set_keyed_fn set_keyed = NULL;
-    if (keyed) {
+    if (mode == MATRIX_CAPACITY) {
+        uint32_t maximum = data_table_capacity_limit(&set_capacity);
+        if (!maximum)
+            return fail(env, "DataTable capacity is unavailable in this bridge");
+        if (!uint_arg(env, v[5], &capacity))
+            return NULL;
+        if (!capacity || capacity > maximum)
+            return fail(env, "rowCapacity exceeds the supported range");
+    } else if (mode == MATRIX_KEYED) {
         set_keyed = data_table_set_keyed_symbol();
         if (!set_keyed)
             return fail(env, "keyed DataTable replacement is unavailable in this bridge");
-        if (!array_count(env, v[4], 32, &len))
+    }
+    if (!array_count(env, v[2], MATRIX_MAX_COLUMNS, &columns) ||
+        !array_count(env, v[3], capacity, &rows))
+        return NULL;
+    if (!columns)
+        return fail(env, "matrix requires headers");
+    if (mode != MATRIX_POSITIONAL) {
+        if (!array_count(env, v[4], capacity, &len))
             return NULL;
         if (len != rows)
             return fail(env, "expected one row key per matrix row");
+    }
+
+    /* The checked dimensions cap this temporary copy at 160,016 strings. */
+    const size_t count = ((size_t)rows + 1) * columns;
+    char *text = malloc(count * MATRIX_STRING_BYTES);
+    const char **strings = malloc(count * sizeof *strings);
+    const bool needs_keys = rows && mode != MATRIX_POSITIONAL;
+    uint32_t *keys = needs_keys ? malloc((size_t)rows * sizeof *keys) : NULL;
+    cui_bridge_status code = CUI_BRIDGE_OUT_OF_MEMORY;
+    if (!text || !strings || (needs_keys && !keys))
+        goto cleanup;
+    code = CUI_BRIDGE_INVALID_ARGUMENT;
+    if (needs_keys) {
         for (uint32_t r = 0; r < rows; r++)
             if (napi_get_element(env, v[4], r, &entry) != napi_ok ||
                 !uint_arg(env, entry, &keys[r]))
-                return NULL;
+                goto cleanup;
     }
     for (uint32_t i = 0; i < columns; i++) {
+        char *destination = text + (size_t)i * MATRIX_STRING_BYTES;
         if (napi_get_element(env, v[2], i, &entry) != napi_ok ||
-            !string_arg(env, entry, &headers[i]))
+            !matrix_string(env, entry, destination))
             goto cleanup;
+        strings[i] = destination;
     }
     for (uint32_t r = 0; r < rows; r++) {
-        if (napi_get_element(env, v[3], r, &row) != napi_ok || !array_count(env, row, 16, &len) ||
-            len != columns) {
+        if (napi_get_element(env, v[3], r, &row) != napi_ok ||
+            !array_count(env, row, MATRIX_MAX_COLUMNS, &len))
+            goto cleanup;
+        if (len != columns) {
             fail(env, "matrix rows must match headers");
             goto cleanup;
         }
-        for (uint32_t col = 0; col < columns; col++)
+        for (uint32_t col = 0; col < columns; col++) {
+            const size_t index = ((size_t)r + 1) * columns + col;
+            char *destination = text + index * MATRIX_STRING_BYTES;
             if (napi_get_element(env, row, col, &entry) != napi_ok ||
-                !string_arg(env, entry, &cells[r * columns + col]))
+                !matrix_string(env, entry, destination))
                 goto cleanup;
+            strings[index] = destination;
+        }
     }
-    code = set_keyed
-               ? set_keyed(app->bridge, node->node, (const char *const *)headers, columns,
-                           (const char *const *)cells, keys, rows)
-               : cui_bridge_data_table_set(app->bridge, node->node, (const char *const *)headers,
-                                           columns, (const char *const *)cells, rows);
+    const char *const *cells = rows ? strings + columns : NULL;
+    if (mode == MATRIX_CAPACITY)
+        code = set_capacity(app->bridge, node->node, strings, columns, cells, keys, rows, capacity);
+    else if (mode == MATRIX_KEYED)
+        code = set_keyed(app->bridge, node->node, strings, columns, cells, keys, rows);
+    else
+        code = cui_bridge_data_table_set(app->bridge, node->node, strings, columns, cells, rows);
 cleanup:
-    for (uint32_t i = 0; i < 16; i++)
-        free(headers[i]);
-    for (uint32_t i = 0; i < 512; i++)
-        free(cells[i]);
+    free(keys);
+    free(strings);
+    free(text);
     bool pending = false;
     napi_is_exception_pending(env, &pending);
     if (pending)
@@ -2178,11 +2266,14 @@ static void wire_big_out(unsigned char *wire, const void *record, size_t at) {
         wire[at + i] = (unsigned char)(value >> (8 * i));
 }
 
+/* The Badge implementation uses helpers from the Icon resource header. */
+// clang-format off
 #include "slider_model_internal.h"
 #include "time_field_localized_internal.h"
 #include "skeleton_presentation_internal.h"
 #include "icon_resources_internal.h"
 #include "icon_badge_internal.h"
+// clang-format on
 
 static napi_value init(napi_env env, napi_value exports) {
 #define EXPORT(name, fn, data)                                                                     \
@@ -2285,8 +2376,10 @@ static napi_value init(napi_env env, napi_value exports) {
     EXPORT("getChart", get_chart, 0);
     EXPORT("setPlot", set_plot, 0);
     EXPORT("getPlot", get_plot, 0);
-    EXPORT("setMatrix", set_matrix, 0);
-    EXPORT("setMatrixKeyed", set_matrix, 1);
+    EXPORT("setMatrix", set_matrix, MATRIX_POSITIONAL);
+    EXPORT("setMatrixKeyed", set_matrix, MATRIX_KEYED);
+    EXPORT("setMatrixCapacity", set_matrix, MATRIX_CAPACITY);
+    EXPORT("maxMatrixCapacity", max_matrix_capacity, 0);
     EXPORT("supportsKeyedDataTable", supports_keyed_data_table, 0);
     EXPORT("supportsDataTablePaging", supports_data_table_paging, 0);
     EXPORT("configureDataTableLoadMore", configure_data_table_load_more, 0);

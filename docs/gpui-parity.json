@@ -5007,7 +5007,7 @@
       },
       "limitations": [
         "Legacy segmented ASCII and additive localized options coexist. Bridge and foreign builders expose localized options and copied observations through the subset described in docs/binding-coverage.json.",
-        "The localized widget uses global segment Tab stops. Source one-root focus and re-entry, tabular glyph styling, arbitrary root style refinement and physical native accessibility remain open.",
+        "The localized widget uses global segment Tab stops. The executable trace and proposed opt-in architecture in docs/design/TIME_FIELD_FOCUS_ROUTING.md identify the ordering constraint for one-root focus and re-entry. Tabular glyph styling, arbitrary root style refinement and physical native accessibility also remain open.",
         "Direct C has opt-in shared size metrics, stable centered cells, input and selection tokens, disabled opacity and a focus band independent of the invalid border. The WASM gallery exposes the scale. Existing binding widgets preserve their appearance.",
         "Direct C composition and borrowed preedit are opt-in. Chromium verifies localized preedit paint, atomic commit, rejection and cancellation. Private Xvfb tests injected SDL3 empty-edit and same-owner commit handoff. Physical IME, composition-range styling and bridge exposure remain open."
       ],

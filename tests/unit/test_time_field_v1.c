@@ -25,7 +25,7 @@ typedef struct {
     cui_draw_list draw;
     cui_design_size design;
     size_t calls, measurements;
-    bool styled, inert, layout, omit, handler, modal;
+    bool styled, inert, layout, omit, handler, modal, following_button_activated;
     cui_time_change copy;
     cui_id raw_targets[16];
     size_t raw_count;
@@ -79,10 +79,12 @@ static void init(fixture *f, bool styled) {
         (cui_config){.width = 1200, .height = 400, .measure = measure, .measure_user = f});
     assert(f->ui);
 }
-static void neighbor(cui_context *ui, cui_id id) {
-    cui_interact(ui, id, CUI_ROLE_BUTTON, cui_string("Neighbor"), false, false, 0);
+static bool neighbor(cui_context *ui, cui_id id) {
+    cui_interaction interaction =
+        cui_interact(ui, id, CUI_ROLE_BUTTON, cui_string("Neighbor"), false, false, 0);
     cui_begin_box(ui, id, (cui_box){.width = 50, .height = 30});
     cui_end_box(ui);
+    return interaction.activated;
 }
 static cui_time_field_result_v1 frame(fixture *f) {
     assert(cui_begin_frame(f->ui, 1200, 400, .016f));
@@ -142,7 +144,7 @@ static cui_time_field_result_v1 frame(fixture *f) {
     if (!f->inert && !f->layout)
         for (size_t i = 0; i < event_count; ++i)
             assert(f->raw_targets[i] == cui_event_target(f->ui, i));
-    neighbor(f->ui, 30);
+    f->following_button_activated = neighbor(f->ui, 30);
     cui_end_box(f->ui);
     f->draw = cui_end_frame(f->ui);
     assert(cui_last_error(f->ui) == CUI_OK);
@@ -396,6 +398,70 @@ static void tab_exit_draft(bool styled, bool prefix) {
     assert(f.raw_count == 2 && f.raw_targets[0] == cui_time_segment_id(20, 1));
     assert(f.raw_targets[1] == cui_time_segment_id(20, 1));
     assert(cui_focused(f.ui) == 30 && f.state.digit_count == 0 && f.state.pending_length == 0);
+    cui_destroy(f.ui);
+}
+static void tab_routing_checkpoint(bool styled) {
+    fixture f;
+    init(&f, styled);
+    warm(&f);
+    cui_id hour = cui_time_segment_id(20, CUI_TIME_FIELD_HOUR_V1);
+    cui_id minute = cui_time_segment_id(20, CUI_TIME_FIELD_MINUTE_V1);
+
+    /* V1 traversal consults the focus that existed when the batch was routed.
+     * The hour's auto-advance is only applied during widget submission. */
+    focus(&f, 0);
+    text(&f, cui_string("3"));
+    key(&f, CUI_KEY_TAB, 0);
+    key(&f, CUI_KEY_ENTER, 0);
+    cui_time_field_result_v1 result = frame(&f);
+    assert(f.raw_count == 3 && f.raw_targets[0] == hour && f.raw_targets[1] == hour);
+    assert(f.raw_targets[2] == minute && cui_focused(f.ui) == minute);
+    assert(!f.following_button_activated && result.changed && result.change_count == 1 &&
+           same(f.time, (cui_time){3, 30, 0}));
+
+    /* In the same trace, completing the edit before routing Tab lets Enter
+     * reach the following real button. This is the source-order oracle. */
+    f.time = (cui_time){9, 30, 0};
+    focus(&f, 0);
+    text(&f, cui_string("3"));
+    result = frame(&f);
+    assert(result.changed && result.change_count == 1 && cui_focused(f.ui) == minute);
+    key(&f, CUI_KEY_TAB, 0);
+    key(&f, CUI_KEY_ENTER, 0);
+    result = frame(&f);
+    assert(f.raw_targets[0] == minute && f.raw_targets[1] == 30);
+    assert(f.following_button_activated && cui_focused(f.ui) == 30 && !result.changed &&
+           !result.change_count);
+
+    /* Existing composition may cancel the edit after the route was formed.
+     * A projection that assumes all queued edits apply would skip the field. */
+    f.time = (cui_time){9, 30, 0};
+    focus(&f, 0);
+    f.consume_mask = 1;
+    text(&f, cui_string("3"));
+    key(&f, CUI_KEY_TAB, 0);
+    key(&f, CUI_KEY_ENTER, 0);
+    result = frame(&f);
+    assert(f.raw_targets[1] == hour && f.raw_targets[2] == minute);
+    assert(cui_focused(f.ui) == minute && !f.following_button_activated);
+    assert(!result.changed && !result.change_count && same(f.time, (cui_time){9, 30, 0}));
+
+    /* A domain rejection differs from consumption before the reducer. V1
+     * declines the value but still advances from a completed numeric segment. */
+    f.consume_mask = 0;
+    f.options.text.flags = CUI_TIME_TEXT_HAS_MINIMUM_V1;
+    f.options.text.minimum = (cui_time){9, 0, 0};
+    ++f.options.edit_generation;
+    focus(&f, 0);
+    text(&f, cui_string("3"));
+    result = frame(&f);
+    assert(result.rejected_count == 1 && result.validation == CUI_TIME_TEXT_OUT_OF_RANGE);
+    assert(!result.changed && !result.change_count && same(f.time, (cui_time){9, 30, 0}));
+    assert(cui_focused(f.ui) == minute && f.state.segment == CUI_TIME_FIELD_MINUTE_V1);
+    key(&f, CUI_KEY_TAB, 0);
+    key(&f, CUI_KEY_ENTER, 0);
+    frame(&f);
+    assert(f.following_button_activated && f.raw_targets[1] == 30);
     cui_destroy(f.ui);
 }
 static void tabs(bool styled) {
@@ -947,6 +1013,7 @@ int main(void) {
         focus_transition(styled != 0, true);
         tab_exit_draft(styled != 0, false);
         tab_exit_draft(styled != 0, true);
+        tab_routing_checkpoint(styled != 0);
         tabs(styled != 0);
         paste_and_bounds(styled != 0);
         inactive_and_generation(styled != 0);

@@ -116,7 +116,7 @@ Check reported regressions against the current gallery as each slice lands.
 | 5 | Select / Combobox / Command | Command grow-width row paint and hit targets follow the parent from the first frame, with a follow-up for width-dependent custom heights. Headless Chromium verifies Select trigger centering and full-width rows, keyboard selection and edge taps across Select, Combobox and Command. Alpha.5 deploys these fixes. Physical-device checks remain open. |
 | 6 | Button / Checkbox / Radio / Switch / Slider | Check the shared size scale and hover, pressed, focus, disabled and loading states where applicable. Extend typed activation and value coverage in the bindings while preserving existing C callback timing. |
 | 6 | Input / Textarea | Verify word movement, line movement, caret/selection visibility and IME placement across wrapped or scrolled content. Keep new Editor features lower priority. |
-| 7 | DatePicker / TimeField | Exercise direct year selection, localized formatting and range bounds with keyboard and touch. Finish native TimeField example validation, physical IME and one-root Tab. |
+| 7 | DatePicker / TimeField | Exercise direct year selection, localized formatting and range bounds with keyboard and touch. Finish native TimeField example validation and physical IME. Single-stop Tab needs the [ordered focus checkpoint](docs/design/TIME_FIELD_FOCUS_ROUTING.md) and host verification. |
 | 7 | Chart / Plot | Verify that thin curves remain continuous across scales and that existing pan/pinch/zoom works without hijacking the parent scroll region when the plot cannot use the gesture. |
 
 ### Component gaps to close

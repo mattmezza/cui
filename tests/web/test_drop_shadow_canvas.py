@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import subprocess
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--chromium');parser.add_argument('--output',type=Path,required=True);args=parser.parse_args()
@@ -12,9 +13,9 @@ def main():
     exports=['cui_canvas_shadow_values','cui_canvas_shadow_query','cui_canvas_shadow_prepare','cui_canvas_shadow_width','cui_canvas_shadow_height','cui_canvas_shadow_layer_bound','cui_canvas_shadow_bound','cui_canvas_shadow_pixels']
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*[str(ROOT/p) for p in ['src/core/cui.c','src/effects/cui_effects.c','web/modules/cui_shadow_bridge.c']],'-lm',*[f'-Wl,--export={e}' for e in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
-        browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}));page=browser.new_page()
-        result=page.evaluate('''async ([bytes,source])=>{
-          const module=await WebAssembly.compile(new Uint8Array(bytes)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
+        browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}));page=browser.new_page(offline=True)
+        result=page.evaluate('''async ([wasmUrl,source])=>{
+          const module=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(module,imports).exports;e._initialize?.();const m=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
           const raster=m.cuiShadowWasmRasterizer(e),renderer=m.createCuiShadowRenderer(raster),results=[];
           const base=[20,20,24,16,4,4,4,4,0,4,3,-1,0,0,0,128];
@@ -65,7 +66,7 @@ def main():
           same(Array.from(c.getImageData(33,21,1,1).data),[0,0,0,255]);
           same(Array.from(c.getImageData(34,21,1,1).data),[255,255,255,255]);
           return {results,cache:r.stats()};
-        }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()])
+        }''',[route_wasm_probe(page, wasm),(ROOT/'web/modules/cui_shadow.js').read_text()])
         assert [r['scale'] for r in result['results']]==[1,2],result
         print('PASS actual Canvas DPR1/2 shadow pixels, rounded backing vs actual uniform transform, copied values, rejection before clear, tail culling and cache:',result);browser.close()
 if __name__=='__main__':main()

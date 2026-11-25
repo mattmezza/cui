@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 import subprocess
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT=Path(__file__).resolve().parents[2]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--chromium');p.add_argument('--output',type=Path,required=True);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True)
@@ -15,9 +16,9 @@ def main():
     assert subprocess.check_output(['zig','version'],text=True).strip()=='0.16.0'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*[str(ROOT/x) for x in ['src/core/cui.c','src/effects/cui_effects.c','web/modules/cui_shadow_bridge.c','tests/web/shadow_presets_probe.c']],'-lm',*[f'-Wl,--export={x}' for x in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
-        b=p.chromium.launch(headless=True,**({'executable_path':a.chromium} if a.chromium else {}));page=b.new_page()
-        result=page.evaluate('''async ([bytes,source])=>{
-          const module=await WebAssembly.compile(new Uint8Array(bytes)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
+        b=p.chromium.launch(headless=True,**({'executable_path':a.chromium} if a.chromium else {}));page=b.new_page(offline=True)
+        result=page.evaluate('''async ([wasmUrl,source])=>{
+          const module=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(module,imports).exports;e._initialize?.();const m=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
           const expected=[[],[[1,0,0,13]],[[1,2,0,13]],[[1,3,0,26],[1,2,-1,26]],[[4,6,-1,26],[2,4,-2,26]],[[10,15,-3,26],[4,6,-4,26]],[[20,25,-5,26],[8,10,-6,26]],[[25,50,-12,64]]];
           let frames=0;
@@ -53,5 +54,5 @@ def main():
             frames++;
           }
           return {frames};
-        }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()]);assert result['frames']==16,result;print('PASS actual Canvas/WASM all named presets, DPR1/2 composition/opacity:',result);b.close()
+        }''',[route_wasm_probe(page, wasm),(ROOT/'web/modules/cui_shadow.js').read_text()]);assert result['frames']==16,result;print('PASS actual Canvas/WASM all named presets, DPR1/2 composition/opacity:',result);b.close()
 if __name__=='__main__':main()

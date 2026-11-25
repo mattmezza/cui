@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 import subprocess
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT=Path(__file__).resolve().parents[2]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--chromium');p.add_argument('--output',type=Path,required=True);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True);wasm=a.output/'notification.wasm'
@@ -15,9 +16,9 @@ def main():
     assert subprocess.check_output(['zig','version'],text=True).strip()=='0.16.0'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-UNDEBUG','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*sources,'-lm',*[f'-Wl,--export={x}' for x in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
-        b=p.chromium.launch(headless=True,**({'executable_path':a.chromium} if a.chromium else {}));page=b.new_page()
-        result=page.evaluate('''async ([bytes,source])=>{
-          const module=await WebAssembly.compile(new Uint8Array(bytes)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
+        b=p.chromium.launch(headless=True,**({'executable_path':a.chromium} if a.chromium else {}));page=b.new_page(offline=True)
+        result=page.evaluate('''async ([wasmUrl,source])=>{
+          const module=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(module,imports).exports;e._initialize?.();const m=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
           const ease=(p)=>{let lo=0,hi=1;for(let i=0;i<60;i++){const u=(lo+hi)/2,x=3*(1-u)**2*u*.25+3*(1-u)*u*u*.25+u**3;if(x<p)lo=u;else hi=u;}const u=(lo+hi)/2;return 3*(1-u)**2*u*.1+3*(1-u)*u*u+u**3;};
           let frames=0;
@@ -57,5 +58,5 @@ def main():
             }
             frames++;
           }return {frames};
-        }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()]);assert result['frames']==64,result;print('PASS controlled actual Notification SOURCE Canvas64 enter/exit/placement/reduced/legacy DPR1/2 frames:',result);b.close()
+        }''',[route_wasm_probe(page, wasm),(ROOT/'web/modules/cui_shadow.js').read_text()]);assert result['frames']==64,result;print('PASS controlled actual Notification SOURCE Canvas64 enter/exit/placement/reduced/legacy DPR1/2 frames:',result);b.close()
 if __name__=='__main__':main()

@@ -7,6 +7,7 @@ import ast
 from pathlib import Path
 import subprocess
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT=Path(__file__).resolve().parents[2]
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--chromium');parser.add_argument('--output',type=Path,default=ROOT/'build/tooltip-appearance-probe')
@@ -19,11 +20,11 @@ def main():
     exports=['probe_init','probe_frame','probe_calls','probe_focus','probe_bounds','probe_count','probe_command','probe_text','probe_length','probe_pixels','probe_bitmap','probe_shadow','probe_shadow_coverage','cui_canvas_shadow_values','cui_canvas_shadow_query','cui_canvas_shadow_prepare','cui_canvas_shadow_width','cui_canvas_shadow_height','cui_canvas_shadow_layer_bound','cui_canvas_shadow_bound','cui_canvas_shadow_pixels'];wasm=out/'probe.wasm'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*[str(ROOT/s) for s in sources],'-lm','-Wl,-z,stack-size=8388608',*[f'-Wl,--export={s}' for s in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
-        browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}));page=browser.new_page()
+        browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}));page=browser.new_page(offline=True)
         page.set_content('<canvas width="500" height="400"></canvas>')
         results=page.evaluate('''async input=>{
-          const [bytes,moduleSource]=input;const mod=await import(URL.createObjectURL(new Blob([moduleSource],{type:'text/javascript'})));
-          const m=await WebAssembly.compile(new Uint8Array(bytes)),imports={};
+          const [wasmUrl,moduleSource]=input;const mod=await import(URL.createObjectURL(new Blob([moduleSource],{type:'text/javascript'})));
+          const m=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};
           for(const i of WebAssembly.Module.imports(m))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(m,imports).exports;e._initialize?.();if(e.probe_init())throw Error('init');
           const ctx=document.querySelector('canvas').getContext('2d');
@@ -62,7 +63,7 @@ def main():
             return {texts,surfaces,borders,rings,shadows,outside,inside,outsideExpected,insideExpected,corner,oldCorner,focus:e.probe_focus(),boxHeight,calls:e.probe_calls()-before,bounds:e.probe_bounds(),ink:Array.from(ctx.getImageData(0,0,500,400).data).filter((v,i)=>i%4!==3&&v<200).length};
           };
           return [frame(0,0),frame(1,0),frame(2,0),frame(3,0),frame(0,1),frame(1,1),frame(2,1),frame(3,1),frame(1,0,10,260),frame(4,0,0,240),frame(4,1,0,240),frame(8,0,0,240),frame(8,1,0,240),frame(24,0,0,240),frame(24,1,0,240)];
-        }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()])
+        }''',[route_wasm_probe(page, wasm),(ROOT/'web/modules/cui_shadow.js').read_text()])
         get=lambda r,text:next(t['rect'] for t in r['texts'] if t['text']==text)
         for i,result in enumerate(results):
             automatic=i%4>=2 if i<8 else False

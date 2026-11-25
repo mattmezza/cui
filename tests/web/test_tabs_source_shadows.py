@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT = Path(__file__).resolve().parents[2]
 def main():
     parser = argparse.ArgumentParser()
@@ -32,9 +33,9 @@ def main():
         *[f'-Wl,--export={e}' for e in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
         browser=p.chromium.launch(headless=True, **({'executable_path':args.chromium} if args.chromium else {}))
-        page=browser.new_page()
-        result=page.evaluate('''async ([bytes,source])=>{
-          const module=await WebAssembly.compile(new Uint8Array(bytes)),imports={};
+        page=browser.new_page(offline=True)
+        result=page.evaluate('''async ([wasmUrl,source])=>{
+          const module=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};
           for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(module,imports).exports;e._initialize?.();
           const m=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
@@ -89,7 +90,7 @@ def main():
             frames++;
           }
           return {frames};
-        }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()])
+        }''',[route_wasm_probe(page, wasm),(ROOT/'web/modules/cui_shadow.js').read_text()])
         assert result['frames']==40,result
         print('PASS actual segmented Tabs Canvas/WASM DPR1/2',result); browser.close()
 if __name__=='__main__': main()

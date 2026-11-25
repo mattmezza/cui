@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 import subprocess
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT=Path(__file__).resolve().parents[2]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--chromium');p.add_argument('--output',type=Path,required=True);a=p.parse_args();a.output.mkdir(parents=True,exist_ok=True);wasm=a.output/'notification.wasm'
@@ -17,9 +18,9 @@ def main():
     assert subprocess.check_output(['zig','version'],text=True).strip()=='0.16.0'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-UNDEBUG','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*sources,'-lm',*[f'-Wl,--export={x}' for x in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
-        b=p.chromium.launch(headless=True,**({'executable_path':a.chromium} if a.chromium else {}));page=b.new_page()
-        result=page.evaluate('''async ([bytes,source])=>{
-          const module=await WebAssembly.compile(new Uint8Array(bytes)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
+        b=p.chromium.launch(headless=True,**({'executable_path':a.chromium} if a.chromium else {}));page=b.new_page(offline=True)
+        result=page.evaluate('''async ([wasmUrl,source])=>{
+          const module=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};for(const i of WebAssembly.Module.imports(module))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(module,imports).exports;e._initialize?.();const m=await import(URL.createObjectURL(new Blob([source],{type:'text/javascript'})));
           let frames=0;
           for(const dark of [0,1])for(const scale of [1,2]){
@@ -46,5 +47,5 @@ def main():
             }
             const before=Array.from(ctx.getImageData(0,0,128,128).data);shadows[0].values[10]=NaN;let rejected=false;try{renderer.prepare(commands,ctx,128/scale,128/scale);}catch{rejected=true;}const after=ctx.getImageData(0,0,128,128).data;if(!rejected||before.some((x,i)=>x!==after[i]))throw Error('preclear rejection');frames++;
           }return {frames};
-        }''',[list(wasm.read_bytes()),(ROOT/'web/modules/cui_shadow.js').read_text()]);assert result['frames']==4,result;print('PASS actual Notification SOURCE Canvas light/dark DPR1/2 commands/pixels/preclear:',result);b.close()
+        }''',[route_wasm_probe(page, wasm),(ROOT/'web/modules/cui_shadow.js').read_text()]);assert result['frames']==4,result;print('PASS actual Notification SOURCE Canvas light/dark DPR1/2 commands/pixels/preclear:',result);b.close()
 if __name__=='__main__':main()

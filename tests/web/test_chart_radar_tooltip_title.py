@@ -7,6 +7,7 @@ import ast
 from pathlib import Path
 import subprocess
 from playwright.sync_api import sync_playwright
+from wasm_probe import route_wasm_probe
 ROOT=Path(__file__).resolve().parents[2]
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--chromium');parser.add_argument('--output',type=Path,default=ROOT/'build/radar-title-probe')
@@ -18,10 +19,10 @@ def main():
     exports=['probe_init','probe_frame','probe_hover','probe_count','probe_command','probe_text','probe_length','probe_pixels','probe_bitmap'];wasm=out/'probe.wasm'
     subprocess.run(['zig','cc','-target','wasm32-wasi','-mexec-model=reactor','-std=c11','-O2','-Wall','-Wextra','-Wpedantic','-Werror','-I',str(ROOT/'include'),'-I',str(ROOT/'third_party/clay'),*[str(ROOT/s) for s in sources],'-lm','-Wl,-z,stack-size=8388608',*[f'-Wl,--export={s}' for s in exports],'-o',str(wasm)],check=True)
     with sync_playwright() as p:
-        browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}));page=browser.new_page()
+        browser=p.chromium.launch(headless=True,**({'executable_path':args.chromium} if args.chromium else {}));page=browser.new_page(offline=True)
         page.set_content('<canvas width="240" height="220"></canvas>')
-        results=page.evaluate('''async bytes=>{
-          const m=await WebAssembly.compile(new Uint8Array(bytes)),imports={};
+        results=page.evaluate('''async wasmUrl=>{
+          const m=await WebAssembly.compileStreaming(fetch(wasmUrl)),imports={};
           for(const i of WebAssembly.Module.imports(m))(imports[i.module]??={})[i.name]=()=>0;
           const e=new WebAssembly.Instance(m,imports).exports;e._initialize?.();if(e.probe_init())throw Error('init');
           const ctx=document.querySelector('canvas').getContext('2d');
@@ -43,7 +44,7 @@ def main():
             return {texts,boxHeight,hover:e.probe_hover()};
           };
           return [frame(0,0),frame(1,0),frame(1,1)];
-        }''',list(wasm.read_bytes()))
+        }''',route_wasm_probe(page, wasm))
         for result in results:
             assert result['hover']==0,result
             assert any(t['text']=='20' and t['ink']>0 for t in result['texts']),result

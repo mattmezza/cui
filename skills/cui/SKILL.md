@@ -343,6 +343,10 @@ For live DataTable updates in C, capture with `cui_table_capture_row_anchor`
 before changing the borrowed rows. After a successful bind, assign the result
 of `cui_table_restore_row_anchor` to `state.scroll_y`. Pass the corresponding
 table options. Selection stays keyed. Foreign builders lack these helpers.
+For variable-height VirtualList updates in C, capture an anchor before
+rebuilding keys or changing heights and restore it before the next draw.
+Retain the within-row offset for surviving keys. Clear it if a removed item's
+replacement should begin at the viewport edge. See `docs/VIRTUAL_LIST.md`.
 For Resizable composition, read `docs/RESIZABLE.md`. Keep caller state/slots alive
 through frame completion and ensure the container fits the panels' combined
 min/max range. A pane at its constraint cannot move farther in that direction.

@@ -72,6 +72,35 @@ updates this frame's translation, sets `window_pending`, and invalidates the UI.
 The next frame renders the new window. `result.view` describes the callbacks that
 ran, including overscan; `state.scroll` holds the final scroll position.
 
+## Preserve position during live updates
+
+For a vertical list, capture the first visible item before changing the model,
+then restore its position before drawing the next frame. This example assumes
+the list has completed a frame and keeps the same viewport height.
+
+```c
+cui_virtual_anchor anchor = cui_virtual_capture_anchor(list, state.scroll.y);
+if (cui_virtual_rebuild(list, next_keys, NULL, next_count) == CUI_VIRTUAL_OK) {
+    size_t index;
+    if (anchor.valid && !cui_virtual_index(list, anchor.key, &index))
+        anchor.within = 0;
+    state.scroll.y = (float)cui_virtual_restore_anchor(list, anchor,
+                                                       state.last_viewport.height);
+}
+```
+
+Use the same capture and restore around `cui_virtual_set_height` when updating
+row measurements. For horizontal lists use `state.scroll.x` and the viewport
+width. A failed update leaves the model and scroll position intact. When the
+viewport size changes, supply the new extent along the scroll axis.
+
+The **Live inbox** gallery example uses variable heights and retains the visible
+item and its partial-row offset when you prepend a message or resize the row
+above it. Removing the first visible item clears its saved offset so its
+successor starts at the top, subject to end-of-list clamping. This C workflow
+uses the existing model helpers. The foreign builders do not expose those
+helpers.
+
 Verified scope: both orientations, variable extents, keyed reorder identity,
 visible-window callback bounds, overscan, cross-axis scroll, precise wheel motion,
 owner and scrollbar keyboard scrolling, disabled behavior, invalid-input state

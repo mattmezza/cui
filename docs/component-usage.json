@@ -2287,7 +2287,9 @@
         "cui_virtual_list_draw",
         "cui_base_virtual_list",
         "cui_virtual_list_draw_events",
-        "cui_base_virtual_list_events"
+        "cui_base_virtual_list_events",
+        "cui_virtual_capture_anchor",
+        "cui_virtual_restore_anchor"
       ],
       "state_types": [
         "cui_virtual_list",
@@ -2296,7 +2298,7 @@
       ],
       "state_ownership": "Application retains cui_virtual_list and cui_virtual_widget_state; keyed extents live in the model and row controls remain application-owned.",
       "interaction": "cui_virtual_render_item_fn composes the visible window; cui_virtual_measure_item_fn supplies intrinsic measurement; optional cui_scroll_handler observes aggregate final offsets after composition, with UNKNOWN source.",
-      "usage": "Rebuild keyed extents between frames and keep keys stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result.",
+      "usage": "Capture with cui_virtual_capture_anchor before model updates and apply cui_virtual_restore_anchor before drawing again. Keep keys and extents stable during row callbacks. Use cui_virtual_list_draw_events for final-offset observation; inspect changed separately from delivered change_count and the unchanged deferred control_result.",
       "docs": [
         "docs/VIRTUAL_LIST.md",
         "docs/VIRTUALIZATION.md",

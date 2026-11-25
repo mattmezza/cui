@@ -10,7 +10,9 @@ Viewport ranges are half-open `[begin,end)`, with optional overscan measured in 
 
 Capture an anchor before changing measurements or rebuilding: it stores the row key and offset within that row. Restore looks up the same key in the new order and clamps its within-row offset to its new height. If the key was removed, it uses the captured ordinal, clamped to the remaining rows. Restored scroll is clamped to the new viewport extent. An empty list or invalid anchor restores zero. This supports stable scroll positioning during reorder, resize, and measurements; applications decide when to capture and restore.
 
-This model does not create a styled Virtual/ScrollArea widget, own scrollbars, handle focus for unmounted controls, perform asynchronous measurements, or implement keyboard navigation. Those behaviors require a later widget layer that submits the returned rows and spacers with stable IDs. It is an efficient data/geometry model, not a full component parity claim.
+The model owns data and geometry. The [styled VirtualList adapter](VIRTUAL_LIST.md)
+submits keyed rows, scrollbars and focusable keyboard scrolling. Focus for
+unmounted controls and asynchronous measurement remain application concerns.
 
 Tests compare 20000 deterministic updates and queries against a linear reference, and cover exact boundaries, viewport overscan, keys including zero, retained measurements after reorder/removal, anchors, transactional rejection, empty lists, and oversized configurations under ASan/UBSan.
 
@@ -26,6 +28,13 @@ These are local CPU timings, not performance guarantees. Run `test_virtual --ben
 
 ## Browser demonstration
 
-The VirtualList gallery composes the retained model with `cui_scrollable_begin`/`cui_scrollable_end_ex`. It submits a top spacer plus only the viewport range and one overscan row on each side. The fixed 144px viewport shows 24px tasks; an unaligned scroll can require seven intersecting rows and two overscan rows, at most nine of 100,000. Stable task keys provide row IDs and list-item position semantics.
+The VirtualList gallery uses `cui_virtual_list_draw`. It positions only the
+viewport range and one overscan row on each side. The 144px vertical task
+viewport shows 24px rows. An unaligned scroll can submit at most nine of
+100,000. Stable task keys provide row IDs and list-item position semantics.
 
-Wheel over the list, click or drag its scrollbar, or focus the scrollbar and press Home/End or arrow keys. The live submission count makes virtualization visible. The demo does not add asynchronous measurement, offscreen item focus, or drag-and-drop behavior to the model.
+Scroll by wheel or touch, drag the scrollbar, or focus it and press Home, End,
+or an arrow key. The submission count shows how many rows were drawn. Choose
+**Live inbox** for a variable-height example with insertion, resize, and
+removal while preserving the viewport. See the
+[capture and restore example](VIRTUAL_LIST.md#preserve-position-during-live-updates).

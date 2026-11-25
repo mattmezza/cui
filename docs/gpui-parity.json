@@ -6822,7 +6822,8 @@
       "tests": [
         "tests/unit/test_virtual.c",
         "tests/unit/test_base.c",
-        "tests/unit/test_virtual_styled.c"
+        "tests/unit/test_virtual_styled.c",
+        "tests/web/test_touch_components.py"
       ],
       "status": "tested",
       "platforms": {
@@ -6858,6 +6859,15 @@
           "evidence": [
             "tests/unit/test_virtual.c",
             "docs/VIRTUALIZATION.md"
+          ]
+        },
+        {
+          "name": "variable-height inbox with anchor-preserving edits",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_virtual_styled.c",
+            "tests/web/test_touch_components.py",
+            "docs/VIRTUAL_LIST.md"
           ]
         },
         {

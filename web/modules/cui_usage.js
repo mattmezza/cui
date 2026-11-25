@@ -4,6 +4,33 @@ const sizes = ['CUI_DESIGN_INHERIT', 'CUI_DESIGN_XS', 'CUI_DESIGN_SM',
  'CUI_DESIGN_2XL', 'CUI_DESIGN_3XL', 'CUI_DESIGN_4XL', 'CUI_DESIGN_5XL',
  'CUI_DESIGN_6XL', 'CUI_DESIGN_7XL', 'CUI_DESIGN_8XL', 'CUI_DESIGN_9XL'];
 
+export const virtualInboxUsage = `#include <cui/cui_virtual_scroll.h>
+
+/* Retain list and state. Supply the updated key order before drawing.
+ * NULL heights keeps previous measurements and gives new rows the default. */
+cui_virtual_result update_virtual_inbox(cui_virtual_list *list, cui_virtual_widget_state *state,
+    const uint64_t *next_keys, size_t next_count) {
+    cui_virtual_anchor anchor = cui_virtual_capture_anchor(list, state->scroll.y);
+    cui_virtual_result result = cui_virtual_rebuild(list, next_keys, NULL, next_count);
+    if (result == CUI_VIRTUAL_OK) {
+        size_t index;
+        if (anchor.valid && !cui_virtual_index(list, anchor.key, &index))
+            anchor.within = 0; /* Put the replacement row at the top. */
+        float viewport = state->last_viewport.height > 0 ? state->last_viewport.height : 172;
+        state->scroll.y = (float)cui_virtual_restore_anchor(list, anchor, viewport);
+    }
+    return result;
+}
+
+/* Inside a frame. The renderer runs only for visible rows and overscan. */
+cui_virtual_widget_result draw_virtual_inbox(cui_context *ui, cui_id id, const cui_theme *theme,
+    const cui_virtual_list *list, cui_virtual_widget_state *state,
+    cui_virtual_render_item_fn paint_row, void *userdata) {
+    return cui_virtual_list_draw(ui, id, theme, list, state,
+        (cui_virtual_widget_options){.scroll = {.width = 420, .height = 172}, .overscan = 1},
+        paint_row, userdata);
+}`;
+
 // These are complete C translation units. The application owns their state
 // and calls draw only between begin_frame and end_frame.
 export function selectedUsage(name, mode, size = 3, disabled = false) {

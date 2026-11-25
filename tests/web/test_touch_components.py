@@ -278,6 +278,57 @@ def run_cases(a):
         after = [s['name'] for s in a.snapshot() if s['f'][0] == 37]
         assert before != after and len(after) <= 10, 'Touch pan did not update bounded virtual row window'
     a.case('VirtualList', 'touch changes bounded visible row window', virtual)
+    def live_virtual_inbox():
+        def visible_rows():
+            owner = a.target('Scrollable content', 9)
+            top = owner['f'][2]
+            rows = [r for r in a.snapshot()
+                    if r['f'][0] == 37 and r['f'][2] < top + owner['f'][4]
+                    and r['f'][2] + r['f'][4] > top]
+            return owner, sorted(rows, key=lambda r: r['f'][31])
+
+        a.configure('virtual-axis', 2)
+        try:
+            assert 'cui_virtual_restore_anchor' in a.page.locator('#snippet').text_content()
+            owner, before = visible_rows()
+            first, successor = before[:2]
+            assert len(before) < 8 and first['f'][4] != successor['f'][4]
+            relative = first['f'][2] - owner['f'][2]
+            a.tap(a.target('Prepend message', 1))
+            updated, rows = visible_rows()
+            assert rows[0]['id'] == first['id'] and rows[0]['f'][31] == first['f'][31] + 1
+            assert rows[0]['f'][32] == first['f'][32] + 1
+            assert abs(rows[0]['f'][2] - updated['f'][2] - relative) < .2
+            assert abs(updated['f'][19] - owner['f'][19] - 62) < .2
+            owner = updated
+
+            a.tap(a.target('Resize row above', 1))
+            updated, rows = visible_rows()
+            assert rows[0]['id'] == first['id'] and rows[0]['f'][32] == first['f'][32] + 1
+            assert abs(rows[0]['f'][2] - updated['f'][2] - relative) < .2
+            assert abs(updated['f'][19] - owner['f'][19] - 32) < .2
+
+            a.tap(a.target('Remove first visible', 1))
+            updated, rows = visible_rows()
+            assert rows[0]['id'] == successor['id'] and rows[0]['f'][32] == first['f'][32]
+            assert abs(rows[0]['f'][2] - updated['f'][2]) < .2
+            assert all(r['id'] != first['id'] for r in a.snapshot())
+
+            a.page.set_viewport_size({'width': 390, 'height': 844})
+            a.configure('disabled', True)
+            prepend = a.target('Prepend message', 1)
+            remove = a.target('Remove first visible', 1)
+            assert prepend['f'][5] and remove['f'][5] and remove['f'][2] > prepend['f'][2]
+            canvas = a.page.locator('canvas').bounding_box()
+            assert remove['f'][1] + remove['f'][3] <= canvas['width']
+            a.tap(prepend)
+            assert visible_rows()[1][0]['f'][32] == first['f'][32]
+        finally:
+            a.page.set_viewport_size({'width': 1280, 'height': 900})
+            a.configure('disabled', False)
+            a.configure('virtual-axis', 0)
+    a.case('VirtualList', 'live inbox preserves anchor on prepend and resize and reveals successor on removal',
+           live_virtual_inbox)
     def table_selection():
         owner = a.target(predicate=lambda s: s['f'][17] and s['f'][21] > 40)
         cell = a.target(role=30, predicate=lambda s: s['f'][2] >= owner['f'][2] and not s['f'][11])

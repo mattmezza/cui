@@ -171,6 +171,53 @@ static void keyboard_and_scrollbars(void) {
         cui_virtual_destroy(v);
     }
 }
+static void live_updates_keep_view(void) {
+    cui_theme theme = cui_theme_light();
+    for (unsigned direction = 0; direction < 2; ++direction) {
+        bool horizontal = direction != 0;
+        cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
+        cui_virtual_list *v = model();
+        cui_virtual_widget_state s = {0};
+        row_probe probe = {0};
+        cui_virtual_widget_options o = {
+            .scroll = {.width = 100, .height = 60, .hide_scrollbars = true},
+            .horizontal = horizontal};
+        float *scroll = horizontal ? &s.scroll.x : &s.scroll.y;
+        *scroll = 24;
+        frame(ui, &theme, v, &s, o, &probe, NULL);
+        double viewport = horizontal ? s.last_viewport.width : s.last_viewport.height;
+        cui_virtual_anchor anchor = cui_virtual_capture_anchor(v, *scroll);
+        assert(anchor.key == 101 && anchor.within == 4 && probe.keys[0] == anchor.key);
+        cui_id item = probe.ids[0];
+
+        assert(cui_virtual_set_key_height(v, 0, 35) == CUI_VIRTUAL_OK);
+        *scroll = (float)cui_virtual_restore_anchor(v, anchor, viewport);
+        assert(*scroll == 39);
+        frame(ui, &theme, v, &s, o, &probe, NULL);
+        cui_rect first = cui_bounds(ui, item);
+        assert(probe.ids[0] == item && (horizontal ? first.x : first.y) == -4);
+
+        uint64_t inserted[] = {200, 0, 101, 102, 103, 104, 105, 106, 107};
+        assert(cui_virtual_rebuild(v, inserted, NULL, 9) == CUI_VIRTUAL_OK);
+        *scroll = (float)cui_virtual_restore_anchor(v, anchor, viewport);
+        assert(*scroll == 59);
+        frame(ui, &theme, v, &s, o, &probe, NULL);
+        first = cui_bounds(ui, item);
+        assert(probe.ids[0] == item && (horizontal ? first.x : first.y) == -4);
+
+        anchor = cui_virtual_capture_anchor(v, *scroll);
+        uint64_t removed[] = {200, 0, 102, 103, 104, 105, 106, 107};
+        assert(cui_virtual_rebuild(v, removed, NULL, 8) == CUI_VIRTUAL_OK);
+        assert(cui_virtual_restore_anchor(v, anchor, viewport) == 59);
+        anchor.within = 0;
+        *scroll = (float)cui_virtual_restore_anchor(v, anchor, viewport);
+        frame(ui, &theme, v, &s, o, &probe, NULL);
+        first = cui_bounds(ui, probe.ids[0]);
+        assert(*scroll == 55 && probe.keys[0] == 102 && (horizontal ? first.x : first.y) == 0);
+        cui_virtual_destroy(v);
+        cui_destroy(ui);
+    }
+}
 static void deferred_and_empty(void) {
     cui_context *ui = cui_create((cui_config){.width = 400, .height = 300});
     cui_virtual_list *v = model();
@@ -309,6 +356,7 @@ int main(void) {
     cross_axis_and_large_offsets();
     layout_and_wheel();
     keyboard_and_scrollbars();
+    live_updates_keep_view();
     deferred_and_empty();
     puts("styled virtual list passed");
     return 0;

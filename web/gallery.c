@@ -1675,41 +1675,125 @@ void gallery_hover_policy(int policy) {
 }
 static cui_virtual_list *virtual_list;
 static cui_virtual_list *virtual_horizontal;
+static cui_virtual_list *virtual_inbox;
 static cui_virtual_widget_state virtual_state;
-static int virtual_mode;
+typedef enum { VIRTUAL_TASKS, VIRTUAL_CARDS, VIRTUAL_INBOX } gallery_virtual_view;
+static gallery_virtual_view virtual_mode;
 static cui_virtual_widget_result virtual_result;
 static bool virtual_disabled;
+enum { VIRTUAL_INBOX_INITIAL = 32, VIRTUAL_INBOX_CAPACITY = 64, VIRTUAL_INBOX_HEIGHT = 172 };
+static uint64_t virtual_inbox_next = VIRTUAL_INBOX_INITIAL + 1;
+
+static cui_virtual_list *gallery_virtual_model(void) {
+    switch (virtual_mode) {
+    case VIRTUAL_INBOX:
+        return virtual_inbox;
+    case VIRTUAL_CARDS:
+        return virtual_horizontal;
+    default:
+        return virtual_list;
+    }
+}
 void gallery_virtual_mode(int mode) {
-    if (virtual_mode != (mode != 0)) {
-        virtual_mode = mode != 0;
+    if (mode >= VIRTUAL_TASKS && mode <= VIRTUAL_INBOX && mode != (int)virtual_mode) {
+        virtual_mode = (gallery_virtual_view)mode;
         virtual_state = (cui_virtual_widget_state){0};
+        if (virtual_mode == VIRTUAL_INBOX)
+            virtual_state.scroll.y = (float)cui_virtual_offset(virtual_inbox, 4) + 13;
     }
 }
 unsigned gallery_virtual_window_stat(int field) {
     return field == 0   ? (unsigned)virtual_result.view.begin
            : field == 1 ? (unsigned)virtual_result.view.end
-           : field == 2
-               ? (unsigned)cui_virtual_count(virtual_mode ? virtual_horizontal : virtual_list)
-               : (unsigned)virtual_result.error;
+           : field == 2 ? (unsigned)cui_virtual_count(gallery_virtual_model())
+                        : (unsigned)virtual_result.error;
+}
+typedef enum { VIRTUAL_PREPEND, VIRTUAL_RESIZE_ABOVE, VIRTUAL_REMOVE_VISIBLE } gallery_virtual_edit;
+
+static cui_virtual_result gallery_virtual_update(gallery_virtual_edit action,
+                                                 cui_virtual_anchor anchor) {
+    if (action == VIRTUAL_RESIZE_ABOVE) {
+        size_t i = anchor.fallback_index - 1;
+        double current = cui_virtual_height(virtual_inbox, i);
+        return cui_virtual_set_height(virtual_inbox, i, current < 78 ? 78 : 46);
+    }
+    uint64_t keys[VIRTUAL_INBOX_CAPACITY];
+    size_t output = 0, count = cui_virtual_count(virtual_inbox);
+    if (action == VIRTUAL_PREPEND)
+        keys[output++] = virtual_inbox_next;
+    for (size_t i = 0; i < count; ++i) {
+        if (action == VIRTUAL_REMOVE_VISIBLE && i == anchor.fallback_index)
+            continue;
+        if (!cui_virtual_key(virtual_inbox, i, &keys[output]))
+            return CUI_VIRTUAL_INVALID;
+        ++output;
+    }
+    cui_virtual_result result = cui_virtual_rebuild(virtual_inbox, keys, NULL, output);
+    if (result == CUI_VIRTUAL_OK && action == VIRTUAL_PREPEND)
+        ++virtual_inbox_next;
+    return result;
+}
+static void gallery_virtual_inbox_controls(cui_context *context, const cui_theme *theme,
+                                           float width, bool disabled) {
+    static const char *const labels[] = {"Prepend message", "Resize row above",
+                                         "Remove first visible"};
+    bool row = width >= 430;
+    cui_begin_box(context, 0, (cui_box){.width = width, .row = row, .gap = 6});
+    for (unsigned i = 0; i < sizeof labels / sizeof labels[0]; ++i) {
+        gallery_virtual_edit action = (gallery_virtual_edit)i;
+        cui_virtual_anchor anchor =
+            cui_virtual_capture_anchor(virtual_inbox, virtual_state.scroll.y);
+        bool available =
+            action == VIRTUAL_PREPEND
+                ? cui_virtual_count(virtual_inbox) < VIRTUAL_INBOX_CAPACITY
+                : anchor.valid && (action != VIRTUAL_RESIZE_ABOVE || anchor.fallback_index > 0);
+        cui_button_options options = {.width = row ? (width - 12) / 3 : width,
+                                      .variant = CUI_BUTTON_OUTLINE,
+                                      .size = CUI_CONTROL_SMALL,
+                                      .disabled = disabled || !available};
+        if (cui_button_ex(context, cui_id_from(context, labels[i]), theme, cui_string(labels[i]),
+                          options) &&
+            gallery_virtual_update(action, anchor) == CUI_VIRTUAL_OK) {
+            if (action == VIRTUAL_REMOVE_VISIBLE)
+                anchor.within = 0;
+            virtual_state.scroll.y =
+                (float)cui_virtual_restore_anchor(virtual_inbox, anchor, VIRTUAL_INBOX_HEIGHT);
+        }
+    }
+    cui_end_box(context);
 }
 static void gallery_virtual_row(cui_context *context, const cui_theme *theme, void *user,
                                 size_t index, uint64_t key, cui_id item, cui_size size) {
-    (void)user;
+    bool inbox = virtual_mode == VIRTUAL_INBOX;
+    static const struct {
+        const char *subject, *sender;
+    } messages[] = {{"Release notes", "Alex Morgan"},
+                    {"Build review", "Sam Rivera"},
+                    {"Design feedback", "Casey Chen"},
+                    {"Workspace update", "Jordan Ellis"}};
+    size_t message = key % (sizeof messages / sizeof messages[0]);
     char label[48];
-    snprintf(label, sizeof(label), "Task %06llu", (unsigned long long)key);
+    if (inbox)
+        snprintf(label, sizeof(label), "%s #%03llu", messages[message].subject,
+                 (unsigned long long)key);
+    else
+        snprintf(label, sizeof(label), "Task %06llu", (unsigned long long)key);
     cui_begin_box(context, item ^ UINT64_C(0x71d59f493a6ea132),
                   (cui_box){.width = size.width,
                             .height = size.height,
                             .align_y = CUI_ALIGN_CENTER,
+                            .padding = inbox ? 8 : 0,
+                            .gap = inbox ? 2 : 0,
                             .background = index % 2 ? theme->muted_background : theme->surface});
     cui_interact(context, item, CUI_ROLE_LISTITEM, cui_string(label), virtual_disabled, false, 0);
     cui_set_semantic_details(
         context, item,
         (cui_semantic_details){.parent = cui_id_from(context, "virtual-viewport"),
                                .pos_in_set = (unsigned)index + 1,
-                               .set_size = (unsigned)cui_virtual_count(
-                                   virtual_mode ? virtual_horizontal : virtual_list)});
+                               .set_size = (unsigned)cui_virtual_count(user)});
     cui_text(context, cui_string(label), 14, theme->text);
+    if (inbox)
+        cui_text(context, cui_string(messages[message].sender), 12, theme->muted);
     cui_end_box(context);
 }
 
@@ -2934,8 +3018,14 @@ int gallery_init(void) {
         keys[i] = i + 1;
     cui_virtual_result rebuilt = cui_virtual_rebuild(virtual_list, keys, NULL, 100000);
     virtual_horizontal = cui_virtual_create((cui_virtual_config){100, 140});
-    if (!virtual_horizontal ||
-        cui_virtual_rebuild(virtual_horizontal, keys, NULL, 100) != CUI_VIRTUAL_OK) {
+    virtual_inbox = cui_virtual_create((cui_virtual_config){VIRTUAL_INBOX_CAPACITY, 62});
+    double inbox_heights[VIRTUAL_INBOX_INITIAL];
+    for (size_t i = 0; i < VIRTUAL_INBOX_INITIAL; ++i)
+        inbox_heights[i] = (double)(46 + (i % 3) * 16);
+    if (!virtual_horizontal || !virtual_inbox ||
+        cui_virtual_rebuild(virtual_horizontal, keys, NULL, 100) != CUI_VIRTUAL_OK ||
+        cui_virtual_rebuild(virtual_inbox, keys, inbox_heights, VIRTUAL_INBOX_INITIAL) !=
+            CUI_VIRTUAL_OK) {
         free(keys);
         return 0;
     }
@@ -5586,26 +5676,32 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
         break;
     }
     case 26: {
+        bool horizontal = virtual_mode == VIRTUAL_CARDS, inbox = virtual_mode == VIRTUAL_INBOX;
+        cui_virtual_list *model = gallery_virtual_model();
         cui_label(ui, &t,
-                  cui_string(virtual_mode ? "100 wide tasks; scroll horizontally or use Left/Right."
+                  cui_string(inbox        ? "Inbox with variable-height messages"
+                             : horizontal ? "100 wide tasks; scroll horizontally or use Left/Right."
                                           : "100,000 tasks; only visible rows are drawn."));
         cui_id owner = cui_id_from(ui, "virtual-viewport");
         virtual_disabled = disabled != 0;
+        if (inbox)
+            gallery_virtual_inbox_controls(ui, &t, width - 48, virtual_disabled);
         virtual_result = cui_virtual_list_draw(
-            ui, owner, &t, virtual_mode ? virtual_horizontal : virtual_list, &virtual_state,
+            ui, owner, &t, model, &virtual_state,
             (cui_virtual_widget_options){.scroll = {.width = width - 48,
-                                                    .height = 144,
+                                                    .height = inbox ? VIRTUAL_INBOX_HEIGHT : 144,
                                                     .disabled = disabled,
                                                     .wheel_step = 24},
                                          .overscan = 1,
-                                         .horizontal = virtual_mode != 0,
+                                         .horizontal = horizontal,
                                          .no_item_semantics = true},
-            gallery_virtual_row, NULL);
+            gallery_virtual_row, model);
         char text[128];
         snprintf(text, sizeof(text), "Submitted %zu rows: %zu .. %zu / %zu",
-                 virtual_result.view.end - virtual_result.view.begin, virtual_result.view.begin + 1,
-                 virtual_result.view.end,
-                 cui_virtual_count(virtual_mode ? virtual_horizontal : virtual_list));
+                 virtual_result.view.end - virtual_result.view.begin,
+                 virtual_result.view.end > virtual_result.view.begin ? virtual_result.view.begin + 1
+                                                                     : 0,
+                 virtual_result.view.end, cui_virtual_count(model));
         cui_label(ui, &t, cui_string(text));
         break;
     }

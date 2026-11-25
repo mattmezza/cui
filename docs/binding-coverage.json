@@ -911,7 +911,10 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      }
+      },
+      "omissions": [
+        "Python, JavaScript, TypeScript, Go and Rust builders do not expose the C variable-extent model's anchor capture and restoration."
+      ]
     },
     {
       "name": "Chart",

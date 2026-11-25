@@ -91,6 +91,12 @@ def main():
             assert first['source'].startswith('blob:')
             def action(label):
                 page.locator('#accessible').get_by_role('button',name=label,exact=True).evaluate('(e)=>e.click()')
+            def part(page, label):
+                return page.evaluate('''label=>{const w=cuiGallery.exports,td=new TextDecoder();
+                    for(let i=0;i<w.gallery_semantic_count();i++){
+                        const name=td.decode(new Uint8Array(w.memory.buffer,w.gallery_semantic_name(i),w.gallery_semantic_length(i)));
+                        if(name===label)return {i,x:w.gallery_semantic(i,1),y:w.gallery_semantic(i,2),
+                            width:w.gallery_semantic(i,3),height:w.gallery_semantic(i,4)};}}''', label)
             # Actual canvas hit region, not an HTML media overlay.
             play=page.evaluate("""()=>{const w=cuiGallery.exports,decode=new TextDecoder();for(let i=0;i<w.gallery_semantic_count();i++){
                 const name=decode.decode(new Uint8Array(w.memory.buffer,w.gallery_semantic_name(i),w.gallery_semantic_length(i)));
@@ -111,8 +117,24 @@ def main():
             page.wait_for_function('cuiGallery.video.snapshot().paused')
             paused=snap();page.wait_for_timeout(350)
             assert abs(snap()['time']-paused['time'])<.05
+            action('Mute')
+            page.wait_for_function('cuiGallery.video.snapshot().muted')
+            assert snap()['volume']==1
+            page.locator('#accessible').get_by_role('button',name='Unmute',exact=True).wait_for(state='attached')
+            volume=part(page,'Volume')
+            page.evaluate('(i)=>{cuiGallery.exports.gallery_focus(i);cuiGallery.render();}',volume['i'])
+            page.locator('#preview').focus()
+            page.keyboard.press('ArrowLeft')
+            page.wait_for_function('Math.abs(cuiGallery.video.snapshot().volume-.95)<.001')
+            assert snap()['muted'], 'changing volume must preserve mute'
+            page.locator('#accessible [role="slider"][aria-label="Volume"][aria-valuetext="95%"]').wait_for(state='attached')
+            assert [r['kind'] for r in snap()['requests'][-2:]]==[5,6]
+            assert snap()['requests'][-1]['phase']==2 and snap()['generation']==paused['generation']
+            action('Unmute')
+            page.wait_for_function('!cuiGallery.video.snapshot().muted')
+            assert abs(snap()['volume']-.95)<.001
             # Both default skip glyphs must paint actual pixels, not only accessible labels.
-            for label in ('Skip backward', 'Skip forward'):
+            for label in ('Skip backward', 'Skip forward', 'Mute'):
                 proof=page.evaluate('''label=>{const w=cuiGallery.exports,td=new TextDecoder(),c=document.querySelector('#preview');
                     for(let i=0;i<w.gallery_semantic_count();i++){
                         const name=td.decode(new Uint8Array(w.memory.buffer,w.gallery_semantic_name(i),w.gallery_semantic_length(i)));
@@ -131,7 +153,7 @@ def main():
             assert snap()['generation']>first['generation']
             action('Playback rate');page.wait_for_function('cuiGallery.video.snapshot().rate===1.5')
             # Genuine keyboard input is delivered through the existing canvas route.
-            slider=page.evaluate('''()=>{let w=cuiGallery.exports;for(let i=0;i<w.gallery_semantic_count();i++)if(w.gallery_semantic(i,0)===5)return {i,x:w.gallery_semantic(i,1),y:w.gallery_semantic(i,2),width:w.gallery_semantic(i,3),height:w.gallery_semantic(i,4)};}''')
+            slider=part(page,'Playback position')
             page.evaluate('(i)=>{cuiGallery.exports.gallery_focus(i);cuiGallery.render();}',slider['i'])
             page.locator('#preview').focus()
             before=snap()['time'];page.keyboard.press('ArrowRight')
@@ -155,6 +177,10 @@ def main():
                 assert page.locator('.version').is_visible()
                 assert page.locator('.version').inner_text()==version
                 assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+                canvas=page.locator('#preview').bounding_box()
+                volume=part(page,'Volume')
+                assert volume['x']+volume['width']<=canvas['width']
+                assert volume['y']+volume['height']<=canvas['height']
             assert page.locator('#preview').evaluate('(c)=>c.width===Math.round(c.clientWidth*2)')
             assert page.evaluate('''()=>{let w=cuiGallery.exports;return Array.from({length:w.gallery_semantic_count()},(_,i)=>i).filter(i=>w.gallery_semantic(i,0)===1).every(i=>w.gallery_semantic(i,1)>=0&&w.gallery_semantic(i,1)+w.gallery_semantic(i,3)<=document.querySelector('#preview').clientWidth+1);}''')
             # Genuine stale-source/generation rejection at the staging boundary.
@@ -215,11 +241,31 @@ def main():
             assert snap()['paused']
             # Real queued keyboard requests overflow the bounded host batch;
             # no prefix is applied and the controls reset to confirmed state.
-            before=snap();page.evaluate("""()=>{const w=cuiGallery.exports;for(let i=0;i<w.gallery_semantic_count();i++)if(w.gallery_semantic(i,0)===5)w.gallery_focus(i);
-                const canvas=document.querySelector('#preview');for(let i=0;i<17;i++)canvas.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));}""")
+            before=snap();page.evaluate("""i=>{cuiGallery.exports.gallery_focus(i);
+                const canvas=document.querySelector('#preview');for(let i=0;i<17;i++)canvas.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));}""",part(page,'Playback position')['i'])
             page.wait_for_function('cuiGallery.video.snapshot().error.includes("entire batch rejected")')
             assert snap()['time']==before['time'] and snap()['paused']
             assert snap()['requests']==before['requests']
+            touch=browser.new_page(viewport={'width':360,'height':844},has_touch=True,device_scale_factor=2)
+            touch.goto(base_url+'#VideoPlayer')
+            touch.wait_for_function('window.cuiGallery?.video.snapshot().frames>0')
+            touch.locator('#preview').scroll_into_view_if_needed()
+            volume=part(touch,'Volume')
+            canvas=touch.locator('#preview').bounding_box()
+            assert volume['width']>=44 and volume['height']>=44
+            assert volume['y']+volume['height']<=canvas['height']
+            touch.touchscreen.tap(canvas['x']+volume['x']+volume['width']/2,
+                                  canvas['y']+volume['y']+volume['height']/2)
+            touch.wait_for_function('Math.abs(cuiGallery.video.snapshot().volume-.5)<.025')
+            assert touch.evaluate('cuiGallery.video.snapshot().requests.map(r=>r.kind).join(",")==="6"')
+            touch.close()
+            fixed=browser.new_page()
+            fixed.add_init_script("""const volume=Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype,'volume');
+                Object.defineProperty(HTMLMediaElement.prototype,'volume',{...volume,set(){}});""")
+            fixed.goto(base_url+'#VideoPlayer')
+            fixed.wait_for_function('window.cuiGallery?.video.snapshot().frames>0')
+            assert part(fixed,'Mute') and not part(fixed,'Volume')
+            fixed.close()
             # Delayed fetch completion after route exit cannot revive a decoder.
             pending=[]
             late=browser.new_page()
@@ -251,7 +297,7 @@ def main():
             oversized.close()
             assert not errors,errors
             browser.close()
-            print('PASS: VideoPlayer real video/audio decode, painted default skip glyphs, +/-2s seek, stage fullscreen/Escape, mobile DPR2 and cleanup')
+            print('PASS: VideoPlayer real video/audio decode, painted skip/mute glyphs, typed sound controls via keyboard and touch, seek, stage fullscreen/Escape, DPR2 and cleanup')
     finally:
         if server:
             server.shutdown();server.server_close()

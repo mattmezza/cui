@@ -9,7 +9,8 @@ there is no auto-hide policy. Rate is available explicitly, not shown by default
 Set both `surface.geometry` and `controls_options.width` when resizing. The host
 must supply capabilities and a request callback to enable actions. Fullscreen is
 visible by default but disabled without `CUI_VIDEO_CAP_FULLSCREEN`; it never
-silently changes a window or DOM element. No volume/audio state is invented.
+silently changes a window or DOM element. For host-confirmed mute and volume,
+use `cui_video_player_with_audio`.
 
 `compact` is an appended field of `cui_video_controls_options`. Rebuild C
 applications against matching headers and library; this prerelease does not
@@ -136,8 +137,7 @@ regions or semantics; visible unsupported actions are disabled. Seek additionall
 requires a known positive duration and a seekable timeline. Loading/buffering/error
 views disable playback/seek/rate; fullscreen remains a separate host capability.
 Fullscreen display follows only the confirmed `view.fullscreen` value.
-Volume/mute/captions have no invented state; supply separate host-backed controls
-when those features exist. This first bar has no auto-hide timer or overflow menu.
+The bar has no auto-hide timer or overflow menu.
 Buttons use 44-unit touch targets and flow into additional rows within the selected width (at least 160
 logical units).
 
@@ -146,6 +146,50 @@ surface geometry for caller-supplied loading/error content. Its frame wrapper ad
 source identity to the existing generation check. Mismatches fail before UI
 submission. Pixels remain borrowed until every renderer has consumed the draw
 list. No release callback or implicit decoder lease is provided.
+
+## Mute and volume
+
+Use `cui_video_player_with_audio` for a player or
+`cui_video_controls_with_audio` for a standalone bar. Retain a zero-initialized
+`cui_video_audio_state` beside the existing controls state. Pass the host's
+confirmed `cui_video_audio_view` each frame. A null audio view uses the regular
+bar. Hosts choose `CUI_VIDEO_AUDIO_CAP_MUTE` and
+`CUI_VIDEO_AUDIO_CAP_VOLUME` independently. A missing capability omits that
+control and its focus target. The audio entry points share the existing options
+and request callback. Existing calls and C structure layouts are preserved.
+
+```c
+/* Retain audio_state alongside controls for this player. Ask the media host
+ * for its actual capabilities and confirmed gain/mute before drawing. */
+cui_video_audio_view confirmed_audio = {
+    .capabilities = CUI_VIDEO_AUDIO_CAP_MUTE | CUI_VIDEO_AUDIO_CAP_VOLUME,
+    .muted = host_muted,
+    .volume = host_volume,
+};
+cui_video_player_with_audio(ui, id, theme, &controls, confirmed,
+                            decoded, options, &confirmed_audio, &audio_state);
+```
+
+- `CUI_VIDEO_MUTE` carries the requested boolean in `value.enabled`.
+  `CUI_VIDEO_VOLUME` carries the requested gain in `value.volume`, from 0 to 1.
+  Both use `CUI_SLIDER_COMMIT` and share source, generation and sequence with
+  playback requests.
+- A pointer drag previews the gain in the slider. Release sends one request.
+  Cancel, disappearing controls or switching source/generation discard the
+  drag. Arrow keys on the focused slider move five percentage points. Home and
+  End request 0% and 100%. The slider exposes the last confirmed value as a
+  percentage. Changing gain preserves mute.
+- The host applies requests after rendering and publishes updated state after
+  success. Rejected requests leave the displayed confirmation unchanged.
+  Controls are disabled while loading or failed, and remain usable while
+  buffering if the host advertises the capabilities. An omitted callback or
+  exhausted sequence makes the controls read-only.
+
+Mute uses the embedded `volume-2` and `volume-x` artwork. Override either with
+`theme.icon_loader`. At narrow widths the button and slider move together to a
+new row. Both targets are 44 logical units tall. This is a direct C API with a
+browser host example. It adds no language-binding facade, device-selection API,
+codec, or caption support.
 
 ## Extended Base slider
 
@@ -188,9 +232,10 @@ plays unmuted after the user presses Play; the bare Video surface autoplays mute
 to respect browser autoplay policies. The browser routes decoded audio to its
 normal output device and keeps audio/video synchronized. Fullscreen is a browser
 capability and may reject a request; host errors are displayed explicitly.
-Volume controls, audio-device selection and subtitles are not exposed by the CUI
-controls yet. Native hosts must supply their own audio output; the FFmpeg example
-remains silent. Universal codec/browser support and Safari are not validated.
+Mute follows the browser media element's confirmed `muted` flag. The slider is
+available when the host can write `volume`. Native hosts supply their own audio
+output. The [optional FFV1/PCM example](../examples/video_player_audio/README.md)
+uses FFmpeg and SDL audio. Safari and physical audio output remain unverified.
 
 The host chooses VP8 WebM or H.264 MP4 using `canPlayType`, with the alternate
 encoding available if decoding fails. It fetches at most 512 KiB into a Blob so
@@ -222,6 +267,7 @@ The focused Chromium test decodes both the actual WebM and MP4 assets, including
 alternate-source recovery after a deliberately invalid preferred encoding. It
 separates real encoded decoding/CUI interaction from
 injected host-error protocol checks. It checks rendered pixel changes, confirmed
-play/pause/seek/rate, keyboard routing, mobile DPR2 geometry, stale frame rejection,
+play/pause/seek/rate, independent mute/volume, keyboard and mobile touch routing,
+DPR2 geometry, stale frame rejection,
 route cleanup and the separate extension catalog. Other browser/platform codec
 and fullscreen combinations remain unverified.

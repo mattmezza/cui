@@ -640,18 +640,19 @@ if (decoded_frame)
     cui_video_surface(ui, id, &confirmed_view.timeline, &decoded_frame->frame, surface);
 /* Decoded RGBA pixels stay live and immutable until draw-list consumption. */`,
  VideoPlayer:`/* Called inside the host's begin_frame/end_frame composition.
-   Retain controls across frames. confirmed_view is acknowledged host state;
+   Retain controls across frames. confirmed_view and confirmed_audio come from the host;
    decoded_frame is NULL while loading, otherwise matching source_id/generation.
    The host supplies a queue_video_request callback and video_host queue. */
 static cui_video_controls_state controls = {0};
+static cui_video_audio_state audio_controls = {0};
 cui_video_player_options options = cui_video_player_defaults();
 options.controls_options.on_request = queue_video_request;
 options.controls_options.user = video_host;
-cui_video_player(ui, id, &theme, &controls, confirmed_view,
-                 decoded_frame, options);
+cui_video_player_with_audio(ui, id, &theme, &controls, confirmed_view,
+                            decoded_frame, options, &confirmed_audio, &audio_controls);
 /* Queue copied typed requests without mutating controls/view during callbacks.
    After ALL draw-list rendering completes, apply supported host requests and
-   acknowledge success in the next confirmed_view. Keep decoded RGBA8 pixels
+   acknowledge success in the next view. Volume changes preserve mute. Keep decoded RGBA8 pixels
    unchanged until rendering completes; increment bitmap.revision on edits.
    The host decodes/schedules frames and rejects stale source/generation requests. */`,
  'Root View':'cui_root_init(&root, plugins, 1, &registry, window);\ncui_root_bind_facilities(&root, dialogs, 2, &notifications);\ncui_root_render(ui, id, &root, &theme, viewport, NULL, content, user, now);'
@@ -805,6 +806,7 @@ function settingsPreviewHeight(scale,density){
 // The decoder is a host service, never an HTML control overlay. Its bounded
 // staging copy is completed before CUI composition and Canvas consumption.
 const videoHost=(()=>{
+ const CAP_MUTE=1,CAP_VOLUME=2,REQUEST_MUTE=5,REQUEST_VOLUME=6;
  let active=null,serial=0,decodedFrames=0;
  const snapshot=()=>active?{active:true,decodedFrames,session:active.session,generation:active.generation,
   time:active.media.currentTime,duration:active.media.duration,paused:active.media.paused,
@@ -825,7 +827,8 @@ const videoHost=(()=>{
   const ready=m.readyState>=2;
   const state=s.failed?3:!duration?1:m.seeking&&!s.scrubbing?2:ready?0:2;
   wasm.gallery_video_sync(s.session,s.generation,Math.max(0,m.currentTime),duration,m.playbackRate,
-   Number(!m.paused&&!m.ended),state,1|8|(m.seekable.length&&m.seekable.end(m.seekable.length-1)>0?2:0)|(document.fullscreenEnabled?4:0),Number(document.fullscreenElement===$('video-player-stage')));
+   Number(!m.paused&&!m.ended),state,1|8|(m.seekable.length&&m.seekable.end(m.seekable.length-1)>0?2:0)|(document.fullscreenEnabled?4:0),Number(document.fullscreenElement===$('video-player-stage')),
+   s.audioCaps,Number(m.muted),m.volume);
  }
  function cancelFrame(s){
   if(s.frameCallback!==null){if(s.media.cancelVideoFrameCallback)s.media.cancelVideoFrameCallback(s.frameCallback);else cancelAnimationFrame(s.frameCallback);s.frameCallback=null;}
@@ -867,12 +870,26 @@ const videoHost=(()=>{
   if(active?.mode===mode)return;
   if(active)stop();
   const media=document.createElement('video'),decoder=document.createElement('canvas');
-  decoder.width=320;decoder.height=180;media.muted=mode==='Video';media.volume=1;media.loop=true;media.playsInline=true;media.preload='auto';
+  decoder.width=320;decoder.height=180;media.muted=mode==='Video';media.loop=true;media.playsInline=true;media.preload='auto';
+  let audioCaps=0;
+  if(mode==='VideoPlayer'){
+   media.muted=true;
+   if(media.muted)audioCaps|=CAP_MUTE;
+   media.muted=false;
+   const initialVolume=media.volume;
+   try{
+    media.volume=.5;
+    if(media.volume===.5){
+     media.volume=initialVolume;
+     if(media.volume===initialVolume)audioCaps|=CAP_VOLUME;
+    }
+   }catch(_error){/* Some media hosts expose a read-only volume. */}
+  }
   const s={mode,media,decoder,context:decoder.getContext('2d',{willReadFrequently:true}),session:++serial,
-   generation:1,ticket:1,frames:0,checksum:0,frameCallback:null,listeners:[],requests:[],error:'',failed:false,scrubbing:false,seekOrigin:0,lastTime:0,operation:0,abort:new AbortController(),url:null,asset:''};
+   generation:1,ticket:1,frames:0,checksum:0,frameCallback:null,listeners:[],requests:[],error:'',failed:false,scrubbing:false,seekOrigin:0,lastTime:0,operation:0,abort:new AbortController(),url:null,asset:'',audioCaps};
   active=s;wasm.gallery_video_session(s.session);$('video-host-status').hidden=false;status(s);
   const on=(event,fn)=>{s.listeners.push([event,fn]);media.addEventListener(event,fn);};
-  for(const event of ['loadedmetadata','loadeddata','canplay','timeupdate','ratechange','waiting','playing','pause','ended'])on(event,()=>{
+  for(const event of ['loadedmetadata','loadeddata','canplay','timeupdate','ratechange','volumechange','waiting','playing','pause','ended'])on(event,()=>{
    if(!valid(s))return;if(event==='pause'||event==='ended')cancelFrame(s);
    sync();if(event==='loadeddata'){capture(s);if(mode==='Video')void media.play().catch(error=>{if(valid(s))status(s,`Autoplay rejected: ${error.message}`);});}schedule(s);requestFrame();
   });
@@ -918,7 +935,7 @@ const videoHost=(()=>{
   for(const [kind,phase,source,epoch,value] of requests){
    if(!valid(s)||source!==s.session||epoch!==generation)continue;
    s.requests.push({kind,phase,value});if(s.requests.length>32)s.requests.shift();s.error='';status(s);
-   const operation=++s.operation,ticket=s.ticket;
+   const operation=kind<REQUEST_MUTE?++s.operation:s.operation,ticket=s.ticket;
    const current=()=>valid(s)&&operation===s.operation&&ticket===s.ticket;
    try{
     if(kind===0){if(value){s.media.play().catch(error=>{if(current()){status(s,`Play rejected: ${error.message}`);sync();requestFrame();}});}else s.media.pause();}
@@ -926,6 +943,8 @@ const videoHost=(()=>{
     else if(kind===2)seek(s,s.media.currentTime+value,true);
     else if(kind===3){const operation=value?$('video-player-stage').requestFullscreen?.():document.exitFullscreen?.();if(!operation)status(s,'Fullscreen is unavailable.');else operation.catch(error=>{if(current()){status(s,`Fullscreen rejected: ${error.message}`);requestFrame();}});}
     else if(kind===4)s.media.playbackRate=value;
+    else if(kind===REQUEST_MUTE && (s.audioCaps&CAP_MUTE))s.media.muted=value!==0;
+    else if(kind===REQUEST_VOLUME && (s.audioCaps&CAP_VOLUME))s.media.volume=value;
    }catch(error){status(s,`Media request rejected: ${error.message}`);}
   }
   sync();if(requests.length)requestFrame();
@@ -948,7 +967,7 @@ function render(){
  const avatarDiameter=selected.name==='Avatar'?wasm.gallery_avatar_metric(designScale,Number($('avatar-rem').value),0):0;
  canvas.parentElement.style.overflowX=selected.name==='Avatar'?'auto':'';
  canvas.style.minWidth=selected.name==='Avatar'?`${avatarDiameter+48}px`:selected.name==='OtpInput'&&designScale>0?`${6*designHeights[designScale]+7*gaps[designScale]+48}px`:'0';
- const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):selected.name==='TimeField'?(width<420?560:360):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'&&$('popover-mode').value==='1'?520:selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<350?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
+ const width=canvas.clientWidth;let height=selected.name==='Slider'?($('slider-axis').value==='1'?420:300):selected.name==='TimeField'?(width<420?560:360):selected.name==='Dialog'?480:selected.name==='AlertDialog'?320:selected.name==='Popover'&&$('popover-mode').value==='1'?520:selected.name==='Avatar'?avatarDiameter+390:['Video','VideoPlayer'].includes(selected.name)?(document.fullscreenElement===$('video-player-stage')?innerHeight:Math.min(640,Math.max(160,width-48))*180/320+(selected.name==='VideoPlayer'?(width-48<268?240:width-48<488?200:144):48)):selected.example?840:selected.name==='Button'?buttonPreviewHeight(width,designScale?designHeights[designScale]*($('density').value==='1'?.875:1):40,designScale):selected.name==='Checkbox'?checkboxPreviewHeight(designScale):selected.name==='Alert'?540:selected.name==='Bubble'?540:selected.name==='Empty'?320:selected.name==='Toolbar'?460:selected.name==='Badge'?400:selected.name==='Editor'?560:selected.name==='Plot'?440:selected.name==='Dock'?520:selected.name==='VirtualList'?360:selected.name==='Message'?500:selected.name==='MessageScroller'?550:selected.name==='Sidebar'?500:selected.name==='Textarea'?360:selected.name==='Carousel'?420:selected.name==='Command'?480:selected.name==='Root View'?520:selected.name==='TextView'?640:selected.name==='Chart'?440:selected.name==='Speech'?400:selected.name==='Questionnaire'?560:selected.name==='Settings'?settingsPreviewHeight(designScale,($('density').value==='1'?.875:1)):selected.name==='Image'?320:selected.name==='Attachment'?attachmentPreviewHeight(designScale):selected.name==='DescriptionList'?descriptionPreviewHeight(width,designScale,($('density').value==='1'?.875:1)):selected.name==='Resizable'?($('resizable-nested').checked?440:360):selected.name==='Theme'?1150:selected.name==='Accordion'?650:selected.name==='Collapsible'?380:selected.name==='Notification'?720:selected.name==='Form'?Math.max(360,designScale>0?designHeights[designScale]*6+180:360):selected.name==='Stepper'?Math.max(520,$('stepper-mode').value==='1'?8*designHeights[Number($('stepper-design').value)]+240:520):selected.name==='Calendar'?560:selected.name==='DatePicker'?(wasm.gallery_control_stats(9)?680:520):selected.name==='ColorPicker'?820:selected.name==='DataTable'?420:selected.name==='Table'?Math.max(260,designScale>0?4*designHeights[designScale]*($('density').value==='1'?.875:1)+72:260):['Menu','ContextMenu'].includes(selected.name)?420:260;const dpr=Math.min(devicePixelRatio||1,3);
  if(designScale>=7&&['DropdownButton','Badge','Tag','Attachment','Progress','Settings','Tabs','DescriptionList','Icon','Toolbar','Questionnaire','Speech'].includes(selected.name))height=Math.max(height,designHeights[designScale]*(selected.name==='Questionnaire'?8:4)+140);
  canvas.style.height=`${height}px`;
  ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1166,6 +1185,7 @@ function syncSemantics(){
   if(role==='textbox'){el.setAttribute('aria-readonly',String(Boolean(f(26))));el.setAttribute('aria-required',String(Boolean(f(27))));el.setAttribute('aria-invalid',String(Boolean(f(28))));el.setAttribute('aria-multiline',String(Boolean(f(29))));}
   if(role==='progressbar'){el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));if(f(14))el.removeAttribute('aria-valuenow');else el.setAttribute('aria-valuenow',String(f(8)));}
   if(role==='slider'||role==='scrollbar'){el.setAttribute('aria-valuenow',String(f(8)));el.setAttribute('aria-valuemin',String(f(12)));el.setAttribute('aria-valuemax',String(f(13)));}
+  if(role==='slider'&&selected.name==='VideoPlayer'&&name==='Volume')el.setAttribute('aria-valuetext',description);else el.removeAttribute('aria-valuetext');
   if(selected.name==='Accordion'||selected.name==='Collapsible'||((selected.name==='Select'||selected.name==='Menu'||selected.name==='DatePicker')&&f(0)===1))el.setAttribute('aria-expanded',String(Boolean(f(10))));else el.removeAttribute('aria-expanded');
   entries.push({el,parent:`cui-semantic-${wasm.gallery_semantic_parent(i)}`,controls:`cui-semantic-${wasm.gallery_semantic_controls(i)}`,labelledBy:`cui-semantic-${wasm.gallery_semantic_labelled_by(i)}`});
  }

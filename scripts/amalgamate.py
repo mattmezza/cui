@@ -139,7 +139,7 @@ def generate(name,sources):
     if name == "cui_surface_events":
         lines += ['#ifndef CUI_SURFACE_IMPLEMENTATION', '#define CUI_SURFACE_IMPLEMENTATION', '#endif', '#include "cui_surface.h"']
     if name == "cui_video_controls":
-        for module in ["cui_components", "cui_video"]:
+        for module in ["cui_components", "cui_video", "cui_styled_slider_events"]:
             lines += [f'#ifndef {module.upper()}_IMPLEMENTATION', f'#define {module.upper()}_IMPLEMENTATION', '#endif', f'#include "{module}.h"']
     if name == "cui_plot_view":
         lines += ['#ifndef CUI_PLOT_IMPLEMENTATION', '#define CUI_PLOT_IMPLEMENTATION', '#endif', '#include "cui_plot.h"']

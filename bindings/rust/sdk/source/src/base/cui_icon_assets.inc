@@ -8563,21 +8563,13 @@ static const char cui_icon_svg_1761[] = "<svg\n  xmlns=\"http://www.w3.org/2000/
 #else
 #define cui_icon_svg_1761 NULL
 #endif
-#if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1762[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z\" />\n  <path d=\"M16 9a5 5 0 0 1 0 6\" />\n  <path d=\"M19.364 18.364a9 9 0 0 0 0-12.728\" />\n</svg>\n";
-#else
-#define cui_icon_svg_1762 NULL
-#endif
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1763[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"M16 9a5 5 0 0 1 .95 2.293\" />\n  <path d=\"M19.364 5.636a9 9 0 0 1 1.889 9.96\" />\n  <path d=\"m2 2 20 20\" />\n  <path d=\"m7 7-.587.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298V11\" />\n  <path d=\"M9.828 4.172A.686.686 0 0 1 11 4.657v.686\" />\n</svg>\n";
 #else
 #define cui_icon_svg_1763 NULL
 #endif
-#if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1764[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z\" />\n  <path d=\"m16.5 14.5 5-5\" />\n  <path d=\"m16.5 9.5 5 5\" />\n</svg>\n";
-#else
-#define cui_icon_svg_1764 NULL
-#endif
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
 static const char cui_icon_svg_1765[] = "<svg\n  xmlns=\"http://www.w3.org/2000/svg\"\n  width=\"24\"\n  height=\"24\"\n  viewBox=\"0 0 24 24\"\n  fill=\"none\"\n  stroke=\"currentColor\"\n  stroke-width=\"2\"\n  stroke-linecap=\"round\"\n  stroke-linejoin=\"round\"\n>\n  <path d=\"m9 12 2 2 4-4\" />\n  <path d=\"M5 7c0-1.1.9-2 2-2h10a2 2 0 0 1 2 2v12H5V7Z\" />\n  <path d=\"M22 19H2\" />\n</svg>\n";
 #else
@@ -10650,9 +10642,9 @@ static const cui_icon_asset_record cui_icon_assets[] = {
     {"volleyball", "icons/volleyball.svg", cui_icon_svg_1759, false},
     {"volume", "icons/volume.svg", cui_icon_svg_1760, false},
     {"volume-1", "icons/volume-1.svg", cui_icon_svg_1761, false},
-    {"volume-2", "icons/volume-2.svg", cui_icon_svg_1762, false},
+    {"volume-2", "icons/volume-2.svg", cui_icon_svg_1762, true},
     {"volume-off", "icons/volume-off.svg", cui_icon_svg_1763, false},
-    {"volume-x", "icons/volume-x.svg", cui_icon_svg_1764, false},
+    {"volume-x", "icons/volume-x.svg", cui_icon_svg_1764, true},
     {"vote", "icons/vote.svg", cui_icon_svg_1765, false},
     {"wallet", "icons/wallet.svg", cui_icon_svg_1766, false},
     {"wallet-cards", "icons/wallet-cards.svg", cui_icon_svg_1767, false},

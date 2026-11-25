@@ -3281,6 +3281,8 @@ void gallery_focus(unsigned index) {
 static unsigned char video_pixels[320 * 180 * 4];
 static cui_video_view video_view;
 static cui_video_controls_state video_controls;
+static cui_video_audio_view video_audio;
+static cui_video_audio_state video_audio_state;
 static cui_video_request video_requests[32];
 static unsigned video_request_count, video_session, video_epoch, video_revision;
 static bool video_frame_valid, video_request_overflow;
@@ -3301,15 +3303,19 @@ void gallery_video_session(unsigned session) {
     video_request_overflow = false;
     memset(&video_controls, 0, sizeof video_controls);
     memset(&video_view, 0, sizeof video_view);
+    video_audio = (cui_video_audio_view){0};
+    video_audio_state = (cui_video_audio_state){0};
     (void)cui_video_init(&video_view.timeline, (cui_video_config){.loop = true});
     video_view.source_id = session;
     video_view.status = CUI_VIDEO_LOADING;
 }
 void gallery_video_sync(unsigned session, unsigned epoch, double position, double duration,
-                        double rate, int playing, int status, unsigned caps, int fullscreen) {
+                        double rate, int playing, int status, unsigned caps, int fullscreen,
+                        unsigned audio_caps, int muted, double volume) {
     if (!session || session != video_session || !epoch || epoch < video_epoch ||
         !isfinite(position) || position < 0 || !isfinite(duration) || duration < 0 ||
-        !isfinite(rate) || rate <= 0 || status < 0 || status > CUI_VIDEO_FAILED || (caps & ~15u))
+        !isfinite(rate) || rate <= 0 || status < 0 || status > CUI_VIDEO_FAILED || (caps & ~15u) ||
+        (audio_caps & ~3u) || !isfinite(volume) || volume < 0 || volume > 1)
         return;
     if (epoch != video_epoch)
         video_frame_valid = false;
@@ -3325,6 +3331,8 @@ void gallery_video_sync(unsigned session, unsigned epoch, double position, doubl
     video_view.capabilities = caps;
     video_view.status = (cui_video_status)status;
     video_view.fullscreen = fullscreen != 0;
+    video_audio =
+        (cui_video_audio_view){.capabilities = audio_caps, .muted = muted != 0, .volume = volume};
     video_view.status_description =
         status == CUI_VIDEO_LOADING     ? cui_string("Loading browser-decoded sample")
         : status == CUI_VIDEO_BUFFERING ? cui_string("Seeking / buffering")
@@ -3361,10 +3369,12 @@ double gallery_video_request(unsigned i, unsigned field) {
     case 3:
         return r->generation;
     case 4:
-        return r->kind == CUI_VIDEO_PLAYING || r->kind == CUI_VIDEO_FULLSCREEN
+        return r->kind == CUI_VIDEO_PLAYING || r->kind == CUI_VIDEO_FULLSCREEN ||
+                       r->kind == CUI_VIDEO_MUTE
                    ? (double)r->value.enabled
-               : r->kind == CUI_VIDEO_RATE ? r->value.rate
-                                           : r->value.seconds;
+               : r->kind == CUI_VIDEO_RATE   ? r->value.rate
+               : r->kind == CUI_VIDEO_VOLUME ? r->value.volume
+                                             : r->value.seconds;
     default:
         return -1;
     }
@@ -3470,10 +3480,10 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
     switch (story) {
     case 81:
     case 82: {
-        float player_width =
-            video_view.fullscreen
-                ? fmaxf(1, fminf(width - 48, (height - (width - 48 < 350 ? 200 : 160)) * 320 / 180))
-                : fmaxf(160, fminf(width - 48, 640));
+        float chrome_height = width < 316 ? 240 : width < 536 ? 200 : 160;
+        float player_width = video_view.fullscreen
+                                 ? fmaxf(1, fminf(width - 48, (height - chrome_height) * 320 / 180))
+                                 : fmaxf(160, fminf(width - 48, 640));
         cui_video_player_options o = cui_video_player_defaults();
         o.controls = story == 82;
         o.surface.geometry = (cui_image_geometry){
@@ -3503,8 +3513,9 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
                 cui_end_box(ui);
             }
         } else
-            (void)cui_video_player(ui, cui_id_from(ui, "browser-video"), &t, &video_controls,
-                                   video_view, video_frame_valid ? &frame : NULL, o);
+            (void)cui_video_player_with_audio(
+                ui, cui_id_from(ui, "browser-video"), &t, &video_controls, video_view,
+                video_frame_valid ? &frame : NULL, o, &video_audio, &video_audio_state);
         break;
     }
     case 80:

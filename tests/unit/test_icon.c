@@ -49,7 +49,7 @@ static void test_assets(void) {
     const char *essential[] = {"pencil",  "pen-line",  "funnel",        "filter",    "archive",
                                "trash-2", "mail",      "more-vertical", "paperclip", "send",
                                "reply",   "reply-all", "forward",       "download",  "upload",
-                               "link",    "log-out",   "check-check"};
+                               "link",    "log-out",   "check-check",   "volume-2",  "volume-x"};
     for (size_t i = 0; i < sizeof essential / sizeof essential[0]; i++) {
         cui_icon_state icon = {0};
         assert(cui_icon_set_name(&icon, cui_string(essential[i]), NULL, NULL));
@@ -80,11 +80,11 @@ static void test_assets(void) {
         cui_icon_state_collect(&state);
         assert(state.cache_versions == 1);
     }
-    assert(defaults == 126);
+    assert(defaults == 128);
 #if defined(CUI_ICON_ALL_ASSETS) && CUI_ICON_ALL_ASSETS
     assert(embedded == 1830);
 #else
-    assert(embedded == 126);
+    assert(embedded == 128);
 #endif
     assert(!cui_icon_catalog_name(1830).length && !cui_icon_catalog_path(1830).length);
     assert(!cui_icon_asset(cui_string("missing"), &(cui_str){0}));

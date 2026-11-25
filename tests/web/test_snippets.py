@@ -62,7 +62,7 @@ def main():
     compiled = tuple(stories)
     extra = {
         'Video': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0;',
-        'VideoPlayer': 'cui_video_view confirmed_view = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
+        'VideoPlayer': 'cui_video_view confirmed_view = {0}; cui_video_audio_view confirmed_audio = {0}; const cui_video_player_frame *decoded_frame = 0; cui_video_request_fn queue_video_request = 0; void *video_host = 0;',
         'Avatar': 'cui_bitmap photo = {0};',
         'Button': 'cui_str label = {0};',
         'Checkbox': 'cui_str label = {0}; cui_check_state state = CUI_CHECK_UNCHECKED;',

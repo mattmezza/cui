@@ -88,11 +88,15 @@ int main(void) {
     assert(options.surface.geometry.fit == CUI_IMAGE_CONTAIN);
     assert(options.controls_options.visible == 15 && options.controls_options.skip_seconds == 10);
     assert(!cui_video_controls_defaults().compact); /* Legacy layout remains opt-in. */
-    cui_str names[] = {
-        options.controls_options.play_icon,       options.controls_options.pause_icon,
-        options.controls_options.back_icon,       options.controls_options.forward_icon,
-        options.controls_options.fullscreen_icon, options.controls_options.leave_fullscreen_icon,
-        options.controls_options.rate_icon};
+    cui_str names[] = {options.controls_options.play_icon,
+                       options.controls_options.pause_icon,
+                       options.controls_options.back_icon,
+                       options.controls_options.forward_icon,
+                       options.controls_options.fullscreen_icon,
+                       options.controls_options.leave_fullscreen_icon,
+                       options.controls_options.rate_icon,
+                       cui_string("volume-2"),
+                       cui_string("volume-x")};
     for (unsigned i = 0; i < sizeof names / sizeof names[0]; i++) {
         assert(cui_icon_query(names[i]) == CUI_ICON_EMBEDDED);
         cui_icon_state icon = {0};

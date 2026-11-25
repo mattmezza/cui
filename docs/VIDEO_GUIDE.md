@@ -138,7 +138,8 @@ existing CPU bitmap draws; the new tests prove software output, not every backen
 The surface submits no timeline/button hit targets. The controlled
 Styled composition is documented in [VIDEO_PLAYER.md](VIDEO_PLAYER.md). It emits
 requests against a read-only playback view, with optional controls and explicit
-host capabilities. The timeline and surface remain usable independently.
+host capabilities. The audio-enabled bar requests mute and gain independently.
+The timeline and surface remain usable independently.
 
 ## Headless evidence
 

@@ -47,6 +47,121 @@ static void key(cui_context *ui, cui_video_part part, cui_key k) {
     cui_focus(ui, cui_video_part_id(10, part));
     assert(cui_queue_event(ui, (cui_event){.type = CUI_EVENT_KEY_DOWN, .key = k}));
 }
+static void sound_frame(cui_context *ui, cui_video_controls_state *state, cui_video_view view,
+                        cui_video_controls_options o, const cui_video_audio_view *audio,
+                        cui_video_audio_state *sound, bool expected) {
+    cui_theme theme = cui_theme_light();
+    assert(cui_begin_frame(ui, 500, 250, .016f));
+    assert(cui_video_controls_with_audio(ui, 10, &theme, state, view, o, audio, sound) == expected);
+    cui_end_frame(ui);
+    assert(cui_last_error(ui) == CUI_OK);
+}
+static void volume_touch(cui_context *ui, cui_event_type type, double fraction) {
+    cui_rect track = cui_bounds(ui, cui_video_part_id(10, CUI_VIDEO_PART_VOLUME));
+    assert(track.w >= 44 && track.h >= 44);
+    assert(cui_queue_event(ui, (cui_event){.type = type,
+                                           .x = track.x + track.w * (float)fraction,
+                                           .y = track.y + track.h / 2,
+                                           .pointer_type = CUI_POINTER_TOUCH,
+                                           .pointer_id = 5}));
+}
+static void test_audio(cui_context *ui) {
+    cui_video_view view = {.source_id = 92, .capabilities = CUI_VIDEO_CAP_PLAY};
+    assert(cui_video_init(&view.timeline, (cui_video_config){0}));
+    cui_video_controls_state state = {0};
+    cui_video_audio_state sound = {0};
+    cui_video_audio_view audio = {
+        .capabilities = CUI_VIDEO_AUDIO_CAP_MUTE | CUI_VIDEO_AUDIO_CAP_VOLUME, .volume = .4};
+    log_t log = {0};
+    cui_video_controls_options o = cui_video_controls_defaults();
+    o.compact = true;
+    o.width = 160;
+    o.on_request = request;
+    o.user = &log;
+    sound_frame(ui, &state, view, o, &audio, NULL, false);
+    assert(!semantic(ui, CUI_VIDEO_PART_MUTE));
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    const cui_semantic *volume = semantic(ui, CUI_VIDEO_PART_VOLUME);
+    const cui_semantic *mute = semantic(ui, CUI_VIDEO_PART_MUTE);
+    assert(volume && mute && volume->role == CUI_ROLE_SLIDER && volume->value == .4f);
+    assert(volume->details.description.length == 3 &&
+           !memcmp(volume->details.description.data, "40%", 3));
+    cui_rect v = cui_bounds(ui, volume->id), m = cui_bounds(ui, mute->id);
+    assert(v.y == m.y && m.w >= 44 && m.h >= 44 && v.x >= m.x + m.w && v.x + v.w <= 160);
+    assert(cui_queue_accessibility_action(ui, mute->id, CUI_ACCESSIBILITY_ACTIVATE));
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(log.count == 1 && log.requests[0].kind == CUI_VIDEO_MUTE &&
+           log.requests[0].phase == CUI_SLIDER_COMMIT && log.requests[0].value.enabled);
+    assert(semantic(ui, CUI_VIDEO_PART_MUTE)->name.length == 4); /* Owner has not accepted. */
+    audio.muted = true;
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(semantic(ui, CUI_VIDEO_PART_MUTE)->name.length == 6);
+    key(ui, CUI_VIDEO_PART_VOLUME, CUI_KEY_RIGHT);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(log.count == 2 && log.requests[1].kind == CUI_VIDEO_VOLUME &&
+           log.requests[1].phase == CUI_SLIDER_COMMIT &&
+           fabs(log.requests[1].value.volume - .45) < 1e-9 && log.requests[1].sequence == 2 &&
+           log.requests[1].generation == 1 && log.requests[1].source_id == 92);
+    assert(audio.muted && semantic(ui, CUI_VIDEO_PART_VOLUME)->value == .4f);
+    volume_touch(ui, CUI_EVENT_POINTER_DOWN, .25);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(sound.volume_slider.dragging && log.count == 2);
+    volume_touch(ui, CUI_EVENT_POINTER_MOVE, .75);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(sound.volume_slider.preview == .75 && log.count == 2);
+    volume_touch(ui, CUI_EVENT_POINTER_UP, .75);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!sound.volume_slider.dragging && log.count == 3 && log.requests[2].value.volume == .75);
+    volume_touch(ui, CUI_EVENT_POINTER_DOWN, .25);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(sound.volume_slider.dragging);
+    view.timeline.generation++;
+    volume_touch(ui, CUI_EVENT_POINTER_UP, .75);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!sound.volume_slider.dragging && log.count == 3);
+    volume_touch(ui, CUI_EVENT_POINTER_DOWN, .25);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(sound.volume_slider.dragging);
+    volume_touch(ui, CUI_EVENT_CANCEL, .25);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!sound.volume_slider.dragging && log.count == 3);
+    volume_touch(ui, CUI_EVENT_POINTER_DOWN, .25);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(sound.volume_slider.dragging);
+    volume_touch(ui, CUI_EVENT_POINTER_UP, .75);
+    sound_frame(ui, &state, view, o, NULL, NULL, true);
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!sound.volume_slider.dragging && log.count == 3);
+    uint64_t last_active_frame = sound.frame;
+    key(ui, CUI_VIDEO_PART_VOLUME, CUI_KEY_END);
+    assert(cui_begin_frame(ui, 500, 250, .016f));
+    cui_begin_box(ui, 88, (cui_box){.inert = true});
+    cui_theme theme = cui_theme_light();
+    assert(cui_video_controls_with_audio(ui, 10, &theme, &state, view, o, &audio, &sound));
+    cui_end_box(ui);
+    cui_end_frame(ui);
+    assert(log.count == 3 && sound.frame == last_active_frame);
+    audio.volume = NAN;
+    sound_frame(ui, &state, view, o, &audio, &sound, false);
+    assert(!semantic(ui, CUI_VIDEO_PART_PLAY));
+    audio.capabilities = CUI_VIDEO_AUDIO_CAP_MUTE;
+    o.disabled = true;
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!semantic(ui, CUI_VIDEO_PART_VOLUME) && semantic(ui, CUI_VIDEO_PART_MUTE)->disabled);
+    o.disabled = false;
+    view.status = CUI_VIDEO_LOADING;
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(semantic(ui, CUI_VIDEO_PART_MUTE)->disabled);
+    view.status = CUI_VIDEO_BUFFERING;
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!semantic(ui, CUI_VIDEO_PART_MUTE)->disabled);
+    audio.capabilities = CUI_VIDEO_AUDIO_CAP_VOLUME;
+    audio.volume = .25;
+    o.on_request = NULL;
+    sound_frame(ui, &state, view, o, &audio, &sound, true);
+    assert(!semantic(ui, CUI_VIDEO_PART_MUTE) &&
+           semantic(ui, CUI_VIDEO_PART_VOLUME)->details.readonly);
+}
 int main(void) {
     cui_context *ui = cui_create((cui_config){.width = 500, .height = 200});
     assert(ui);
@@ -178,6 +293,7 @@ int main(void) {
     assert(list.count == 0);
     o.width = NAN;
     assert(!cui_video_controls(ui, 10, &theme, &state, v, o));
+    test_audio(ui);
     cui_destroy(ui);
     return 0;
 }

@@ -1,13 +1,14 @@
 /* SPDX-License-Identifier: MIT */
 #include "cui/cui_video_controls.h"
+#include "cui/cui_styled_slider_events.h"
 #include <math.h>
 #include <stdio.h>
 cui_id cui_video_part_id(cui_id id, cui_video_part part) {
-    static const uint64_t salts[] = {UINT64_C(0x27cb57021ee10101), UINT64_C(0x27cb57021ee10102),
-                                     UINT64_C(0x27cb57021ee10103), UINT64_C(0x27cb57021ee10104),
-                                     UINT64_C(0x27cb57021ee10105), UINT64_C(0x27cb57021ee10106),
-                                     UINT64_C(0x27cb57021ee10107)};
-    if (!id || part < CUI_VIDEO_PART_PLAY || part > CUI_VIDEO_PART_SURFACE)
+    static const uint64_t salts[] = {
+        UINT64_C(0x27cb57021ee10101), UINT64_C(0x27cb57021ee10102), UINT64_C(0x27cb57021ee10103),
+        UINT64_C(0x27cb57021ee10104), UINT64_C(0x27cb57021ee10105), UINT64_C(0x27cb57021ee10106),
+        UINT64_C(0x27cb57021ee10107), UINT64_C(0x27cb57021ee10108), UINT64_C(0x27cb57021ee10109)};
+    if (!id || part < CUI_VIDEO_PART_PLAY || part > CUI_VIDEO_PART_VOLUME)
         return 0;
     cui_id child = id ^ salts[part];
     return child ? child : UINT64_MAX;
@@ -75,11 +76,20 @@ static bool options_valid(cui_video_controls_options o) {
            str_valid(o.fullscreen_label) && str_valid(o.leave_fullscreen_label) &&
            str_valid(o.rate_label);
 }
+static bool audio_valid(const cui_video_audio_view *audio, const cui_video_audio_state *state) {
+    return !audio ||
+           (state &&
+            !(audio->capabilities & ~(CUI_VIDEO_AUDIO_CAP_MUTE | CUI_VIDEO_AUDIO_CAP_VOLUME)) &&
+            (!(audio->capabilities & CUI_VIDEO_AUDIO_CAP_VOLUME) ||
+             (isfinite(audio->volume) && audio->volume >= 0 && audio->volume <= 1)));
+}
+enum { CONTROL_HIT_SIZE = 44, CONTROL_GAP = 4, VOLUME_WIDTH = 92 };
 typedef struct {
     cui_video_controls_state *state;
     cui_video_view view;
     cui_video_controls_options options;
-    unsigned row_items, row_capacity;
+    float row_width;
+    bool wrapped;
 } request_context;
 static void emit(request_context *c, cui_video_request request) {
     if (!c->options.on_request || c->state->sequence == UINT64_MAX)
@@ -94,6 +104,12 @@ static void seek_request(void *user, const cui_slider_request *r) {
     emit(c,
          (cui_video_request){.kind = CUI_VIDEO_SEEK, .phase = r->phase, .value.seconds = r->value});
 }
+static void volume_request(void *user, const cui_component_slider_request *r) {
+    if (r->phase == CUI_SLIDER_COMMIT)
+        emit(user, (cui_video_request){.kind = CUI_VIDEO_VOLUME,
+                                       .phase = CUI_SLIDER_COMMIT,
+                                       .value.volume = r->requested});
+}
 typedef struct {
     request_context *context;
     cui_video_request request;
@@ -103,13 +119,18 @@ static void button_clicked(void *user, const cui_button_click_event *event) {
     button_request *b = user;
     emit(b->context, b->request);
 }
+static void reserve_row(cui_context *ui, request_context *c, float width) {
+    if (c->row_width + width > c->options.width) {
+        cui_end_box(ui);
+        cui_begin_box(ui, 0, (cui_box){.row = true, .gap = CONTROL_GAP});
+        c->row_width = 0;
+        c->wrapped = true;
+    }
+}
 static void button(cui_context *ui, cui_id id, const cui_theme *theme, request_context *c,
                    cui_str label, cui_str icon, bool enabled, cui_video_request request) {
-    if (c->row_items && c->row_items % c->row_capacity == 0) {
-        cui_end_box(ui);
-        cui_begin_box(ui, 0, (cui_box){.row = true, .gap = 4});
-    }
-    ++c->row_items;
+    reserve_row(ui, c, CONTROL_HIT_SIZE);
+    c->row_width += CONTROL_HIT_SIZE + CONTROL_GAP;
     bool disabled = c->options.disabled || !c->options.on_request || !enabled ||
                     c->state->sequence == UINT64_MAX;
     request.phase = CUI_SLIDER_COMMIT;
@@ -118,11 +139,56 @@ static void button(cui_context *ui, cui_id id, const cui_theme *theme, request_c
                   (cui_button_options){.icon = icon,
                                        .icon_only = true,
                                        .disabled = disabled,
-                                       .pixel_size = 44,
+                                       .pixel_size = CONTROL_HIT_SIZE,
                                        .icon_size = c->options.compact ? 20 : 0,
                                        .variant = CUI_BUTTON_GHOST,
                                        .on_click_event = button_clicked,
                                        .action_user = &b});
+}
+static void audio_controls(cui_context *ui, cui_id id, const cui_theme *theme, request_context *c,
+                           cui_video_audio_view audio, cui_video_audio_state *state) {
+    uint64_t frame = cui_frame_sequence(ui);
+    bool mute = (audio.capabilities & CUI_VIDEO_AUDIO_CAP_MUTE) != 0;
+    bool volume = (audio.capabilities & CUI_VIDEO_AUDIO_CAP_VOLUME) != 0;
+    cui_id slider = cui_video_part_id(id, CUI_VIDEO_PART_VOLUME);
+    cui_slider_state passive = {0};
+    cui_slider_state *slider_state = &passive;
+    if (frame) {
+        if (!volume || state->source_id != c->view.source_id ||
+            state->generation != c->view.timeline.generation || frame - state->frame != 1 ||
+            state->volume_slider.id != slider)
+            state->volume_slider = (cui_slider_state){0};
+        state->source_id = c->view.source_id;
+        state->generation = c->view.timeline.generation;
+        state->frame = frame;
+        slider_state = &state->volume_slider;
+    }
+    if (mute && volume)
+        reserve_row(ui, c, CONTROL_HIT_SIZE + CONTROL_GAP + VOLUME_WIDTH);
+    bool available = c->view.status == CUI_VIDEO_READY || c->view.status == CUI_VIDEO_BUFFERING;
+    if (mute)
+        button(ui, cui_video_part_id(id, CUI_VIDEO_PART_MUTE), theme, c,
+               cui_string(audio.muted ? "Unmute" : "Mute"),
+               cui_string(audio.muted ? "volume-x" : "volume-2"), available,
+               (cui_video_request){.kind = CUI_VIDEO_MUTE, .value.enabled = !audio.muted});
+    if (volume) {
+        reserve_row(ui, c, VOLUME_WIDTH);
+        c->row_width += VOLUME_WIDTH + CONTROL_GAP;
+        char label[8];
+        snprintf(label, sizeof label, "%u%%", (unsigned)lround(audio.volume * 100));
+        bool readonly = !c->options.on_request || c->state->sequence == UINT64_MAX;
+        cui_slider_events(ui, slider, theme, cui_string("Volume"), audio.volume, slider_state,
+                          (cui_slider_options){.maximum = 1,
+                                               .step = .05,
+                                               .disabled = c->options.disabled || !available,
+                                               .readonly = readonly,
+                                               .value_description = cui_string(label)},
+                          (cui_slider_style_options){.width = VOLUME_WIDTH,
+                                                     .track_height = 4,
+                                                     .hit_height = CONTROL_HIT_SIZE,
+                                                     .hide_label = true},
+                          (cui_component_slider_handler){.callback = volume_request, .user = c});
+    }
 }
 static void timeline(cui_context *ui, cui_id id, const cui_theme *theme, request_context *c) {
     cui_video_view view = c->view;
@@ -199,16 +265,15 @@ static void timeline(cui_context *ui, cui_id id, const cui_theme *theme, request
     } else
         state->scrub = (cui_slider_state){0};
 }
-bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
-                        cui_video_controls_state *state, cui_video_view view,
-                        cui_video_controls_options o) {
+bool cui_video_controls_with_audio(cui_context *ui, cui_id id, const cui_theme *theme,
+                                   cui_video_controls_state *state, cui_video_view view,
+                                   cui_video_controls_options o, const cui_video_audio_view *audio,
+                                   cui_video_audio_state *audio_state) {
     if (!ui || !cui_frame_is_submitting(ui) || !id || !theme || !state || !view_valid(view) ||
-        !options_valid(o))
+        !options_valid(o) || !audio_valid(audio, audio_state))
         return false;
-    request_context c = {.state = state,
-                         .view = view,
-                         .options = o,
-                         .row_capacity = (unsigned)fmin(5, floor((o.width + 4) / 48))};
+    cui_video_audio_view confirmed = audio ? *audio : (cui_video_audio_view){0};
+    request_context c = {.state = state, .view = view, .options = o};
     if (state->source_id != view.source_id || state->generation != view.timeline.generation) {
         state->scrub = (cui_slider_state){0};
         state->source_id = view.source_id;
@@ -218,10 +283,11 @@ bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
     cui_begin_box(ui, id, (cui_box){.width = o.width, .fixed_width = true, .gap = 6});
     if (o.compact)
         timeline(ui, id, theme, &c);
-    cui_begin_box(
-        ui, 0,
-        (cui_box){
-            .row = true, .gap = 4, .width = o.compact ? o.width : 0, .fixed_width = o.compact});
+    cui_begin_box(ui, 0,
+                  (cui_box){.row = true,
+                            .gap = CONTROL_GAP,
+                            .width = o.compact ? o.width : 0,
+                            .fixed_width = o.compact});
     if (o.visible & CUI_VIDEO_CONTROL_PLAY)
         button(ui, cui_video_part_id(id, CUI_VIDEO_PART_PLAY), theme, &c,
                view.timeline.playing ? o.pause_label : o.play_label,
@@ -248,6 +314,8 @@ bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
         button(ui, cui_video_part_id(id, CUI_VIDEO_PART_RATE), theme, &c, o.rate_label, o.rate_icon,
                ready && (view.capabilities & CUI_VIDEO_CAP_RATE),
                (cui_video_request){.kind = CUI_VIDEO_RATE, .value.rate = o.requested_rate});
+    if (audio)
+        audio_controls(ui, id, theme, &c, confirmed, audio_state);
     if (o.compact && (o.visible & CUI_VIDEO_CONTROL_TIMELINE)) {
         char position[32], duration[32], text[72];
         short_time(position, sizeof position,
@@ -255,9 +323,9 @@ bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
         short_time(duration, sizeof duration, view.timeline.duration);
         snprintf(text, sizeof text, "%s / %s", position,
                  view.timeline.duration_known ? duration : "--:--");
-        float available = o.width - c.row_items * 48;
+        float available = o.width - c.row_width;
         float text_width = cui_measure_text(ui, cui_string(text), 12).width;
-        if (c.row_items > c.row_capacity || available < text_width) {
+        if ((!confirmed.capabilities && c.wrapped) || available < text_width) {
             cui_end_box(ui);
             cui_begin_box(ui, 0, (cui_box){.width = o.width, .fixed_width = true});
             available = o.width;
@@ -288,13 +356,21 @@ bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
     cui_end_box(ui);
     return true;
 }
-bool cui_video_player(cui_context *ui, cui_id id, const cui_theme *theme,
-                      cui_video_controls_state *state, cui_video_view view,
-                      const cui_video_player_frame *frame, cui_video_player_options o) {
+bool cui_video_controls(cui_context *ui, cui_id id, const cui_theme *theme,
+                        cui_video_controls_state *state, cui_video_view view,
+                        cui_video_controls_options o) {
+    return cui_video_controls_with_audio(ui, id, theme, state, view, o, NULL, NULL);
+}
+bool cui_video_player_with_audio(cui_context *ui, cui_id id, const cui_theme *theme,
+                                 cui_video_controls_state *state, cui_video_view view,
+                                 const cui_video_player_frame *frame, cui_video_player_options o,
+                                 const cui_video_audio_view *audio,
+                                 cui_video_audio_state *audio_state) {
     cui_image_layout layout;
     if (!ui || !cui_frame_is_submitting(ui) || !id || !theme || !state || !view_valid(view) ||
-        (o.controls && !options_valid(o.controls_options)) || !isfinite(o.surface.opacity) ||
-        o.surface.opacity < 0 || o.surface.opacity > 1 || !str_valid(o.surface.description) ||
+        (o.controls && (!options_valid(o.controls_options) || !audio_valid(audio, audio_state))) ||
+        !isfinite(o.surface.opacity) || o.surface.opacity < 0 || o.surface.opacity > 1 ||
+        !str_valid(o.surface.description) ||
         !cui_image_layout_resolve(o.surface.geometry, frame ? frame->frame.bitmap.width : 1,
                                   frame ? frame->frame.bitmap.height : 1, &layout) ||
         (frame &&
@@ -318,9 +394,14 @@ bool cui_video_player(cui_context *ui, cui_id id, const cui_theme *theme,
         cui_end_box(ui);
     }
     if (o.controls)
-        ok = cui_video_controls(ui, id ^ UINT64_C(0x27cb57021ee10301), theme, state, view,
-                                o.controls_options) &&
+        ok = cui_video_controls_with_audio(ui, id ^ UINT64_C(0x27cb57021ee10301), theme, state,
+                                           view, o.controls_options, audio, audio_state) &&
              ok;
     cui_end_box(ui);
     return ok;
+}
+bool cui_video_player(cui_context *ui, cui_id id, const cui_theme *theme,
+                      cui_video_controls_state *state, cui_video_view view,
+                      const cui_video_player_frame *frame, cui_video_player_options o) {
+    return cui_video_player_with_audio(ui, id, theme, state, view, frame, o, NULL, NULL);
 }

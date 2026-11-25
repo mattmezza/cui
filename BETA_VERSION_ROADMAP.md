@@ -96,12 +96,12 @@ subsets. Detailed ledgers and headers remain authoritative.
 
 ### Next component slices
 
-Verify reported regressions against the current gallery as each slice lands. Ship the verified builders with the next release. VideoPlayer audio controls are the next new component API.
+Verify reported regressions against the current gallery as each slice lands. Ship the verified builders with the next release.
 
 | Order | Component | Next outcome |
 | --- | --- | --- |
 | 1 | Icon / Badge / Skeleton | Publish the verified SVG and Badge builders and responsive Skeleton example. Check custom artwork, an interactive Badge child, and the loading-to-content transition from installed consumers and the deployed gallery. |
-| 2 | VideoPlayer / Video | Add host-capability-gated mute and volume to the reusable player bar. Verify keyboard, touch and video-only fullscreen with audible media in the browser. Exercise the existing optional FFV1/PCM native example under isolated SDL audio tests. The gallery already verifies seek artwork, video-only fullscreen and unmuted decoding. [Player guide](docs/VIDEO_PLAYER.md) · [native sound example](examples/video_player_audio/README.md) |
+| 2 | VideoPlayer / Video | The C player and WASM gallery now have capability-gated mute and volume. Headless checks cover confirmed values, keyboard and touch, real audio decoding and player-only fullscreen. Connect controls to the optional native FFV1/PCM provider and verify host gain updates. Deployment and physical audio acceptance remain open. [Player guide](docs/VIDEO_PLAYER.md) · [native sound example](examples/video_player_audio/README.md) |
 | 3 | Sidebar | Verify that only navigation items scroll beneath the pinned header and account footer, including during narrow-mode changes with the account menu open. |
 | 3 | Resizable | Extend the existing X11 drag, keyboard and clamp checks to an actual app shell. Verify pane movement during native resize and preserve focused content at the minimum pane width. |
 | 3 | Tabs | Verify that the overflow menu reveals the chosen tab and returns focus to it in both orientations. Keep the existing bounded Shift-wheel and touch checks. |
@@ -128,7 +128,7 @@ Verify reported regressions against the current gallery as each slice lands. Shi
 | Charts/plots | Scales, axes/ticks, series/legend, layout/motion, tooltips, selection and accessibility; verify existing pan/zoom/touch. |
 | App structure | Carousel intrinsic layout, Sidebar clipping/scrolling, Settings, Command lifecycle/width and Root/window services; verify composed apps. |
 | Text/editing | TextView parser/plugins/selection/typography, Textarea behavior and Questionnaire model/navigation/semantics. Editor expansion remains lower priority. |
-| Video/audio/speech | Add reusable mute/volume, verify media lifecycle and device handling on advertised hosts, and keep browser decoding evidence separate from the native FFV1/PCM example and physical audio output. |
+| Video/audio/speech | Connect reusable mute/volume to the optional native provider. Verify media lifecycle and device handling on advertised hosts. Track browser decoding, native dummy audio and physical audio output as separate checks. |
 | Every other family | Audit current code, frozen behavior and limitations even when recorded feature rows are green. Fix outstanding reported demo regressions; do not infer whole-family completion. |
 
 For each family, verify applicable state ownership, callbacks/results,

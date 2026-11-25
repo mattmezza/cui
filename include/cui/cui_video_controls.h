@@ -11,7 +11,9 @@ typedef enum {
     CUI_VIDEO_SEEK,
     CUI_VIDEO_SKIP,
     CUI_VIDEO_FULLSCREEN,
-    CUI_VIDEO_RATE
+    CUI_VIDEO_RATE,
+    CUI_VIDEO_MUTE,
+    CUI_VIDEO_VOLUME
 } cui_video_request_kind;
 typedef struct {
     cui_video_request_kind kind;
@@ -21,6 +23,7 @@ typedef struct {
         bool enabled;
         double seconds;
         double rate;
+        double volume; /* CUI_VIDEO_VOLUME, normalized to [0, 1]. */
     } value;
 } cui_video_request;
 typedef void (*cui_video_request_fn)(void *, const cui_video_request *);
@@ -51,7 +54,9 @@ typedef enum {
     CUI_VIDEO_PART_TIMELINE,
     CUI_VIDEO_PART_FULLSCREEN,
     CUI_VIDEO_PART_RATE,
-    CUI_VIDEO_PART_SURFACE
+    CUI_VIDEO_PART_SURFACE,
+    CUI_VIDEO_PART_MUTE,
+    CUI_VIDEO_PART_VOLUME
 } cui_video_part;
 /* Stable deterministic child IDs, also useful for scoped focus/testing. */
 cui_id cui_video_part_id(cui_id, cui_video_part);
@@ -88,6 +93,26 @@ cui_video_controls_options cui_video_controls_defaults(void);
  * stale request. Hidden parts submit no semantics/hit targets. */
 bool cui_video_controls(cui_context *, cui_id, const cui_theme *, cui_video_controls_state *,
                         cui_video_view, cui_video_controls_options);
+enum { CUI_VIDEO_AUDIO_CAP_MUTE = 1u, CUI_VIDEO_AUDIO_CAP_VOLUME = 2u };
+typedef struct {
+    unsigned capabilities;
+    bool muted;
+    double volume; /* Confirmed gain [0, 1]; required when VOLUME is supported. */
+} cui_video_audio_view;
+typedef struct {
+    cui_slider_state volume_slider;
+    uint64_t source_id, generation, frame;
+} cui_video_audio_state;
+/* Pass NULL audio for legacy controls. Otherwise retain one zero-initialized
+ * audio state per control and supply independent host capabilities. Unsupported
+ * parts are omitted. Volume drag previews are local; release or a supported
+ * key requests a COMMIT. Cancellation and omission discard the preview.
+ * Mute requests use value.enabled (true means mute). Volume changes never
+ * imply unmute. The host publishes confirmed state after applying requests. */
+bool cui_video_controls_with_audio(cui_context *, cui_id, const cui_theme *,
+                                   cui_video_controls_state *, cui_video_view,
+                                   cui_video_controls_options, const cui_video_audio_view *,
+                                   cui_video_audio_state *);
 typedef struct {
     uint64_t source_id;
     cui_video_frame frame;
@@ -107,6 +132,11 @@ cui_video_player_options cui_video_player_defaults(void);
  * pixels stay borrowed through ALL renderer consumption; no lease is acquired. */
 bool cui_video_player(cui_context *, cui_id, const cui_theme *, cui_video_controls_state *,
                       cui_video_view, const cui_video_player_frame *, cui_video_player_options);
+/* Same player with optional confirmed audio controls. No device/codec ownership. */
+bool cui_video_player_with_audio(cui_context *, cui_id, const cui_theme *,
+                                 cui_video_controls_state *, cui_video_view,
+                                 const cui_video_player_frame *, cui_video_player_options,
+                                 const cui_video_audio_view *, cui_video_audio_state *);
 #ifdef __cplusplus
 }
 #endif

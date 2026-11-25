@@ -12,5 +12,9 @@ int main(void) {
     assert(cui_video_part_id(42, CUI_VIDEO_PART_PLAY) !=
            cui_video_part_id(42, CUI_VIDEO_PART_TIMELINE));
     assert(!cui_video_controls(NULL, 42, NULL, NULL, (cui_video_view){0}, options));
+    assert(cui_video_part_id(42, CUI_VIDEO_PART_MUTE) !=
+           cui_video_part_id(42, CUI_VIDEO_PART_VOLUME));
+    assert(!cui_video_controls_with_audio(NULL, 42, NULL, NULL, (cui_video_view){0}, options,
+                                          &(cui_video_audio_view){0}, NULL));
     return 0;
 }

@@ -144,6 +144,7 @@ Read these with `read PATH --source CUI_SOURCE`:
 | --- | --- |
 | Native C11 app and distribution | `docs/NATIVE_APP_STARTER.md`, `examples/native_bundle/README.md`, `examples/native_starter/README.md` |
 | Browser/WASM and Canvas host | `docs/WEB_GALLERY.md`, `docs/WASI.md`; inspect `web/gallery.c` and `web/gallery.js` |
+| Video surface and player | `docs/VIDEO_PLAYER.md`, `include/cui/cui_video_controls.h`. C audio controls require confirmed mute/gain and host capabilities. The browser demo and optional native FFV1/PCM example provide distinct host paths. No foreign player facade. |
 | Python, Node and TypeScript authoring | `docs/BINDING_BUILDERS.md`, `docs/BRIDGE_COMPONENTS.md`, `docs/binding-coverage.json` |
 | Go or Rust authoring | `docs/GO_BUILDERS.md` or `docs/RUST_BUILDERS.md`, then bridge coverage |
 | Hosting C-authored UI from another language | `docs/LANGUAGE_BINDINGS.md` (different from language component builders) |

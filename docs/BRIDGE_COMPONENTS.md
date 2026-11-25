@@ -75,7 +75,7 @@ event layout, and functions are unchanged. New kinds are appended.
 | Editor | `cui_editor` | Owned multiline UTF-8 model, native line-numbered editing, copied text CHANGE, language label and disabled state | 4096 UTF-8 bytes and 512 layout lines; no host syntax-highlighting, completion, search, or clipboard callbacks |
 | Chart | `cui_chart` | Copied up to 64 labeled numeric data points, native line/area/bar/pie raster and hover, data readback, disabled | Up to 512×512 pixels; one series, default native tooltip; no custom callbacks, candle, radar, or Sankey |
 | Table | `cui_table_begin_ex`, checked row/cell APIs | Item rows and nested Item cells with copied text, native table semantics and layout; first row is header | Up to 64 rows/64 cells per row; fixed equal column widths, text-only cells; no sort, selection, or virtualization |
-| DataTable | `cui_data_table` | Copied column headers and row-major cell matrix, native virtualized viewport, optional keyed replacement preserving position, explicit row/column/cell selection mode, sortable header state, queried cell/state/bounds, copied CHANGE JSON snapshot | Up to 32 rows×16 columns, 128 UTF-8 bytes per cell; row selection by default; sort direction is a request, caller must supply reordered rows; no custom cell content |
+| DataTable | `cui_data_table` | Copied matrix, virtualized viewport, optional keyed replacement, row/column/cell selection, sortable headers, cell/state/bounds queries, copied CHANGE snapshots, optional near-end polling in C | 32 rows × 16 columns, 128 UTF-8 bytes per cell, row selection by default, caller-owned sorting and page delivery, no custom cell content |
 | Plot | `cui_plot_dots` | Copied up to 256 Cartesian (x,y) samples, native themed point rendering, point readback | Dot plot only; coordinates within ±16384, no path, axis, zoom, or point hit model |
 | Command | `cui_command` | Up to 64 Item actions, owned UTF-8 query editor, native keyword filtering, keyboard/pointer selection, copied query/selection CHANGE and Item confirm CLICK | Flat palette; Item detail is one keyword string, no grouped headings, custom row content, or host action callback |
 | VirtualList | `cui_virtual_list_draw` | Up to 64 keyed Item rows, native overscanned vertical viewport, wheel/keyboard scroll, copied offset CHANGE, visible Item bounds, disabled | Fixed 32px rows, vertical only; no intrinsic row sizing or host data provider |
@@ -157,7 +157,48 @@ keys. Keyed updates are available in the
 [Go](GO_BUILDERS.md#keep-the-visible-datatable-row-during-a-go-update),
 and [Rust](RUST_BUILDERS.md#keep-the-visible-datatable-row-during-a-rust-update)
 builders.
-The keyed C bridge has no load-more event or network adapter.
+
+### Load another DataTable page
+
+Bind the initial rows, or an empty matrix with column headers, then call
+`cui_bridge_data_table_configure_load_more_v1(app, table, 1, threshold)`.
+Use a threshold of 0 through 32 remaining rows. With 0, the table raises
+an edge when the visible window reaches the end. Paging defaults to off.
+
+After a successful step, call `cui_bridge_data_table_poll_load_more_v1`
+with a `cui_bridge_data_table_load_more_v1` output and its exact size.
+`CUI_BRIDGE_OK` yields one copied record. `CUI_BRIDGE_EMPTY` means there
+is no request to claim. Neither polling nor replacing rows dispatches an
+event. Drain the regular event queue separately. The frame number,
+row count, visible index range, last row key, and bridge capacity describe
+the table when it raised the edge.
+
+Keep one in-flight request per data source. Use your own generation and
+service cursor to identify its response. Set paging off during loading to
+suppress subsequent edges while keeping the existing rows interactive.
+On an accepted completion, use keyed replacement to retain the visible row
+and selection. Turn paging on again for another page, or leave it off when
+the source is exhausted. To retry, cancel the old application request and
+enable paging again. This cancellation invalidates the logical response.
+How to stop network I/O belongs to the transport.
+
+A successful replacement clears any unclaimed edge and keeps the policy.
+Changing the policy or disabling the table also clears the edge. Removing
+the table retires its handle. A failed step discards edges first raised in
+that step. A full 32-row table cannot request another page. The C bridge
+does not fetch data. Python, JavaScript, TypeScript, Go and Rust still
+expose keyed replacement without this paging poll.
+
+The [offline inbox](../bindings/bridge/examples/data_table_paging.c) scrolls
+to the end, drives row selection while loading, retries, ignores the old
+response, and appends a final page without moving the selected row. From the
+repository root:
+
+```sh
+cmake -S . -B build -G Ninja -DCUI_BUILD_NATIVE=OFF -DCUI_BUILD_BRIDGE=ON
+cmake --build build --target bridge_data_table_paging_example
+python scripts/test_local.py --build-dir build -R '^bridge_data_table_paging_example$'
+```
 
 The visual families above expose their documented default variants. Avatar is
 an initials avatar with no image source. Marker is a single text child; Shimmer

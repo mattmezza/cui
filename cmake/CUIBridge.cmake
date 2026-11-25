@@ -54,6 +54,10 @@ add_executable(test_bridge_components ${CUI_BRIDGE_ROOT}/bindings/bridge/tests/t
 target_link_libraries(test_bridge_components PRIVATE cui_bridge)
 cui_warnings(test_bridge_components)
 add_test(NAME bridge_components COMMAND test_bridge_components)
+add_executable(bridge_data_table_paging_example ${CUI_BRIDGE_ROOT}/bindings/bridge/examples/data_table_paging.c)
+target_link_libraries(bridge_data_table_paging_example PRIVATE cui_bridge)
+cui_warnings(bridge_data_table_paging_example)
+add_test(NAME bridge_data_table_paging_example COMMAND bridge_data_table_paging_example)
 add_test(NAME bridge_python
  COMMAND ${CMAKE_COMMAND} -E env
   PYTHONPATH=${CUI_BRIDGE_ROOT}/bindings/python

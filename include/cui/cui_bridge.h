@@ -516,6 +516,30 @@ CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set(cui_bridge_app *, cui
 CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_set_keyed(
     cui_bridge_app *, cui_bridge_node, const char *const *headers, uint32_t column_count,
     const char *const *cells, const uint32_t *row_keys, uint32_t row_count);
+/* Retained near-end demand, copied after a successful step. The visible
+ * window is [visible_begin, visible_end) in the supplied matrix, without
+ * overscan. The last row key is zero for an empty matrix. A local key does
+ * not describe a remote service cursor. The V1 record is 32 bytes. */
+typedef struct {
+    uint64_t frame;
+    uint32_t row_count, visible_begin, visible_end, last_row_key, capacity, reserved;
+} cui_bridge_data_table_load_more_v1;
+CUI_BRIDGE_API uint32_t cui_bridge_data_table_load_more_size_v1(void);
+/* Owner thread, between steps, on a DataTable with bound columns. Off by
+ * default. Pass enabled 0 or 1 and threshold 0..32 remaining rows. Changing
+ * policy clears an unclaimed edge; applying the same values is idempotent.
+ * Successful data replacement preserves policy and clears the old edge.
+ * Disabled or full tables do not raise new edges. The application owns
+ * in-flight work, cancellation and stale-response checks. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_configure_load_more_v1(cui_bridge_app *,
+                                                                              cui_bridge_node,
+                                                                              uint32_t enabled,
+                                                                              uint32_t threshold);
+/* Consumes one pending edge on OK. EMPTY or error leaves out unchanged.
+ * Pass the exact V1 size. At most one unclaimed edge is retained per table.
+ * Polling does not dispatch callbacks or change any interaction state. */
+CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_poll_load_more_v1(
+    cui_bridge_app *, cui_bridge_node, uint32_t out_size, cui_bridge_data_table_load_more_v1 *out);
 CUI_BRIDGE_API cui_bridge_status cui_bridge_data_table_get_cell(cui_bridge_app *, cui_bridge_node,
                                                                 uint32_t row, uint32_t column,
                                                                 char *destination,

@@ -167,6 +167,7 @@ struct cui_bridge_app {
     bridge_time_app *time_fields; /* Lazy localized kind55 route. */
     bridge_icon_app *icons;       /* Lazy owned resources; no legacy allocation. */
     bridge_skeleton_app *skeletons; /* Lazy responsive presentation. */
+    bridge_data_table_owned *staged_table_load_more; /* Only during a step. */
 };
 /* Native functions are implemented only in the optional SDL bridge target. */
 cui_bridge_status cui_bridge_native_create(cui_bridge_app *, const char *, const char *,

@@ -7381,6 +7381,19 @@
           ]
         },
         {
+          "name": "retained C bridge DataTable paging observations",
+          "status": "tested",
+          "evidence": [
+            "include/cui/cui_bridge.h",
+            "bindings/bridge/tests/test_bridge_components.c",
+            "bindings/bridge/examples/data_table_paging.c",
+            "docs/BRIDGE_COMPONENTS.md"
+          ],
+          "limitations": [
+            "Opt-in C polling copies one coalesced near-end snapshot per retained table, independently of the legacy event queue. The bridge is capped at 32 rows. Language paging authoring and remote transport remain open."
+          ]
+        },
+        {
           "name": "remote data adapter",
           "status": "not_started",
           "evidence": []

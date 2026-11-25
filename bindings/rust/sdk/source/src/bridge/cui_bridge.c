@@ -139,23 +139,46 @@ static bridge_speech_owned *bridge_speech_create(cui_bridge_node_record *node) {
     }
     return speech;
 }
+enum { BRIDGE_DATA_TABLE_MAX_ROWS = 32 };
+_Static_assert(sizeof(cui_bridge_data_table_load_more_v1) == 32 &&
+                   offsetof(cui_bridge_data_table_load_more_v1, row_count) == 8 &&
+                   offsetof(cui_bridge_data_table_load_more_v1, reserved) == 28,
+               "DataTable load-more V1 ABI");
 struct bridge_data_table_owned {
     cui_table_model *model;
     cui_table_state state;
-    cui_table_row rows[32];
+    cui_table_row rows[BRIDGE_DATA_TABLE_MAX_ROWS];
     cui_table_column columns[16];
     char *headers[16];
-    char *cells[512];
+    char *cells[BRIDGE_DATA_TABLE_MAX_ROWS * 16];
     uint32_t row_count, column_count;
     float viewport_width, viewport_height;
+    cui_bridge_data_table_load_more_v1 load_more;
+    bridge_data_table_owned *next_load_more;
+    uint32_t load_more_threshold;
+    bool load_more_enabled, load_more_staged;
 };
+static void bridge_data_table_clear_load_more(bridge_data_table_owned *table) {
+    table->load_more.frame = 0;
+    table->state.load_pending = false;
+}
+static void bridge_data_table_finish_load_more(cui_bridge_app *app, cui_bridge_status status) {
+    while (app->staged_table_load_more) {
+        bridge_data_table_owned *table = app->staged_table_load_more;
+        app->staged_table_load_more = table->next_load_more;
+        table->next_load_more = NULL;
+        table->load_more_staged = false;
+        if (status != CUI_BRIDGE_OK)
+            bridge_data_table_clear_load_more(table);
+    }
+}
 static void bridge_data_table_free(bridge_data_table_owned *table) {
     if (!table)
         return;
     cui_table_destroy(table->model);
     for (size_t i = 0; i < 16; i++)
         free(table->headers[i]);
-    for (size_t i = 0; i < 512; i++)
+    for (size_t i = 0; i < BRIDGE_DATA_TABLE_MAX_ROWS * 16; i++)
         free(table->cells[i]);
     free(table);
 }
@@ -2032,7 +2055,7 @@ static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_n
         return status;
     if (node->kind != CUI_BRIDGE_DATA_TABLE)
         return CUI_BRIDGE_INVALID_STATE;
-    if (!column_count || column_count > 16 || row_count > 32 || !headers ||
+    if (!column_count || column_count > 16 || row_count > BRIDGE_DATA_TABLE_MAX_ROWS || !headers ||
         (row_count && (!cells || (preserve && !row_keys))))
         return CUI_BRIDGE_INVALID_ARGUMENT;
     bridge_data_table_owned *next = calloc(1, sizeof *next);
@@ -2059,7 +2082,7 @@ static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_n
         next->rows[r] = (cui_table_row){.key = row_keys ? row_keys[r] : r + 1,
                                         .label = cui_string(next->cells[r * column_count])};
     }
-    next->model = cui_table_create(32);
+    next->model = cui_table_create(BRIDGE_DATA_TABLE_MAX_ROWS);
     if (!next->model) {
         status = CUI_BRIDGE_OUT_OF_MEMORY;
         goto fail;
@@ -2072,8 +2095,12 @@ static cui_bridge_status bridge_data_table_set(cui_bridge_app *app, cui_bridge_n
                      : CUI_BRIDGE_CORE_ERROR;
         goto fail;
     }
-    if (preserve && node->data_table)
-        bridge_data_table_restore(node, next);
+    if (node->data_table) {
+        next->load_more_enabled = node->data_table->load_more_enabled;
+        next->load_more_threshold = node->data_table->load_more_threshold;
+        if (preserve)
+            bridge_data_table_restore(node, next);
+    }
     bridge_data_table_free(node->data_table);
     node->data_table = next;
     node->value = (double)next->state.row;
@@ -2095,6 +2122,49 @@ cui_bridge_status cui_bridge_data_table_set_keyed(cui_bridge_app *app, cui_bridg
                                                   const uint32_t *row_keys, uint32_t row_count) {
     return bridge_data_table_set(app, handle, headers, column_count, cells, row_keys, row_count,
                                  true);
+}
+
+uint32_t cui_bridge_data_table_load_more_size_v1(void) {
+    return sizeof(cui_bridge_data_table_load_more_v1);
+}
+
+cui_bridge_status cui_bridge_data_table_configure_load_more_v1(cui_bridge_app *app,
+                                                               cui_bridge_node handle,
+                                                               uint32_t enabled,
+                                                               uint32_t threshold) {
+    if (enabled > 1 || threshold > BRIDGE_DATA_TABLE_MAX_ROWS)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    bridge_data_table_owned *table = node->data_table;
+    if (!table)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (table->load_more_enabled != (enabled != 0) || table->load_more_threshold != threshold)
+        bridge_data_table_clear_load_more(table);
+    table->load_more_enabled = enabled != 0;
+    table->load_more_threshold = threshold;
+    return CUI_BRIDGE_OK;
+}
+
+cui_bridge_status cui_bridge_data_table_poll_load_more_v1(cui_bridge_app *app,
+                                                          cui_bridge_node handle, uint32_t out_size,
+                                                          cui_bridge_data_table_load_more_v1 *out) {
+    if (!out || out_size != sizeof *out)
+        return CUI_BRIDGE_INVALID_ARGUMENT;
+    cui_bridge_node_record *node;
+    cui_bridge_status status = bridge_valid_node(app, handle, &node);
+    if (status != CUI_BRIDGE_OK)
+        return status;
+    bridge_data_table_owned *table = node->data_table;
+    if (!table)
+        return CUI_BRIDGE_INVALID_STATE;
+    if (!table->load_more.frame)
+        return CUI_BRIDGE_EMPTY;
+    *out = table->load_more;
+    table->load_more.frame = 0;
+    return CUI_BRIDGE_OK;
 }
 
 cui_bridge_status cui_bridge_data_table_get_cell(cui_bridge_app *app, cui_bridge_node handle,
@@ -2637,6 +2707,8 @@ cui_bridge_status cui_bridge_set_disabled(cui_bridge_app *app, cui_bridge_node h
     if (disabled > 1)
         return CUI_BRIDGE_INVALID_ARGUMENT;
     node->disabled = disabled != 0;
+    if (node->disabled && node->data_table)
+        bridge_data_table_clear_load_more(node->data_table);
     return CUI_BRIDGE_OK;
 }
 cui_bridge_status cui_bridge_set_total(cui_bridge_app *app, cui_bridge_node handle,
@@ -4244,9 +4316,29 @@ static void bridge_render_data_table(cui_bridge_app *app, uint32_t slot,
         return;
     }
     cui_table_options options = bridge_data_table_options(node);
+    uint64_t frame = table->load_more_enabled ? cui_frame_sequence(app->ui) : 0;
+    if (options.disabled)
+        bridge_data_table_clear_load_more(table);
+    options.load_more = frame && !options.disabled && table->row_count < BRIDGE_DATA_TABLE_MAX_ROWS;
+    options.load_more_threshold = table->load_more_threshold;
     cui_table_result result =
         cui_data_table(app->ui, node->id, &app->theme, table->model, &table->state, options,
                        bridge_data_table_label, NULL, table);
+    if (result.load_more && !table->load_more.frame) {
+        table->load_more = (cui_bridge_data_table_load_more_v1){
+            .frame = frame,
+            .row_count = table->row_count,
+            .visible_begin = (uint32_t)result.rows.begin,
+            .visible_end = (uint32_t)result.rows.end,
+            .last_row_key = table->row_count ? (uint32_t)table->rows[table->row_count - 1].key : 0,
+            .capacity = BRIDGE_DATA_TABLE_MAX_ROWS,
+        };
+        if (!table->load_more_staged) {
+            table->load_more_staged = true;
+            table->next_load_more = app->staged_table_load_more;
+            app->staged_table_load_more = table;
+        }
+    }
     if (result.error != CUI_TABLE_OK) {
         app->frame_error =
             result.error == CUI_TABLE_CAPACITY ? CUI_BRIDGE_CAPACITY : CUI_BRIDGE_CORE_ERROR;
@@ -5313,6 +5405,7 @@ cui_bridge_status cui_bridge_step(cui_bridge_app *app, float dt) {
     if (status == CUI_BRIDGE_OK)
         status = app->frame_error;
 done:
+    bridge_data_table_finish_load_more(app, status);
     bridge_slider_finish(app, status);
     bridge_time_finish(app, status);
     if (app->skeletons)

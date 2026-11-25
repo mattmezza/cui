@@ -374,7 +374,10 @@ provider checks. See `docs/GO_BUILDERS.md` and
 `bindings/rust/examples/data_table_live.rs`.
 For paging, use `result.load_more` with an app-owned in-flight flag and keep
 the current rows interactive. See **Paged inbox** and the paging guide in
-`docs/TABLE.md`.
+`docs/TABLE.md`. Retained C owners configure the threshold with
+`cui_bridge_data_table_configure_load_more_v1` and poll a copied record via
+`cui_bridge_data_table_poll_load_more_v1`. See the paging inbox in
+`docs/BRIDGE_COMPONENTS.md`. That poll is C-only.
 For variable-height VirtualList updates in C, capture an anchor before
 rebuilding keys or changing heights and restore it before the next draw.
 Retain the within-row offset for surviving keys. Clear it if a removed item's

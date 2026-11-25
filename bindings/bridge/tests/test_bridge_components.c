@@ -1224,6 +1224,172 @@ static void test_data_table_keyed_rebind(void) {
            CUI_BRIDGE_INVALID_ARGUMENT);
     cui_bridge_destroy(app);
 }
+static cui_bridge_status poll_page(cui_bridge_app *app, cui_bridge_node table,
+                                   cui_bridge_data_table_load_more_v1 *request) {
+    return cui_bridge_data_table_poll_load_more_v1(app, table, sizeof *request, request);
+}
+
+static void test_data_table_paging(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .backend = CUI_BRIDGE_BACKEND_NONE,
+                                  .max_events = 1,
+                                  .width = 480,
+                                  .height = 360};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, table, button;
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_DATA_TABLE, "inbox", &table) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_BUTTON, "save", &button) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, button, "Save") == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_visual_size(app, table, 300, 160) == CUI_BRIDGE_OK);
+
+    const char *headers[] = {"Subject"};
+    const char *cells[32];
+    uint32_t keys[32];
+    for (uint32_t i = 0; i < 32; ++i) {
+        cells[i] = "Report";
+        keys[i] = i + 100;
+    }
+    keys[11] = UINT32_MAX;
+    assert(cui_bridge_data_table_load_more_size_v1() == 32);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 0) ==
+           CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 1, NULL, NULL, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_data_table_load_more_v1 request = {.frame = 1000};
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY && request.frame == 1000);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 2, 0) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 33) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(poll_page(app, button, &request) == CUI_BRIDGE_INVALID_STATE);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_poll_load_more_v1(app, table, sizeof request - 1, &request) ==
+               CUI_BRIDGE_INVALID_ARGUMENT &&
+           request.frame == 1000);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_OK);
+    assert(request.frame && !request.row_count && !request.visible_begin && !request.visible_end &&
+           !request.last_row_key && request.capacity == 32 && !request.reserved);
+    uint64_t empty_frame = request.frame;
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY && request.frame == empty_frame);
+
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 32) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 1, cells, keys, 32) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 1, cells, keys, 12) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+
+    /* The single-entry legacy event queue is already full before scrolling. */
+    press(app, button);
+    cui_bridge_rect row;
+    assert(cui_bridge_data_table_cell_bounds(app, table, 1, 0, &row) == CUI_BRIDGE_OK);
+    float x = row.x + 10, y = row.y + 10;
+    assert(cui_bridge_queue_scroll(app, x, y, 0, -20) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_scroll(app, x, y, 0, 20) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_queue_scroll(app, x, y, 0, -20) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_OK);
+    assert(request.frame == empty_frame + 5 && request.row_count == 12 &&
+           request.visible_begin > 0 && request.visible_begin < request.visible_end &&
+           request.visible_end == 12 && request.last_row_key == UINT32_MAX);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+    cui_bridge_event event;
+    assert(cui_bridge_poll_event(app, &event) == CUI_BRIDGE_OK);
+    assert(event.node.slot == button.slot && event.type == CUI_BRIDGE_EVENT_CLICK);
+
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 0, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_disabled(app, table, 1) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_set_disabled(app, table, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    uint32_t duplicate[] = {7, 7};
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 1, cells, duplicate, 2) ==
+           CUI_BRIDGE_INVALID_ARGUMENT);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_OK && request.row_count == 12);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, table, 1, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_set_keyed(app, table, headers, 1, NULL, NULL, 0) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, table, &request) == CUI_BRIDGE_OK && !request.row_count);
+    cui_bridge_destroy(app);
+}
+
+static void test_data_table_paging_failed_step(void) {
+    cui_bridge_options options = {.struct_size = sizeof options,
+                                  .abi_version = CUI_BRIDGE_ABI_VERSION,
+                                  .width = 480,
+                                  .height = 480};
+    cui_bridge_status status;
+    cui_bridge_app *app = cui_bridge_create(&options, &status);
+    assert(app && status == CUI_BRIDGE_OK);
+    cui_bridge_node root = {0}, first, panel, form, field, omitted, broken;
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLUMN, "root", &root) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_DATA_TABLE, "first", &first) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_COLLAPSIBLE, "details", &panel) ==
+           CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, panel, CUI_BRIDGE_FORM, "form", &form) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, form, CUI_BRIDGE_ITEM, "field", &field) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, field, CUI_BRIDGE_DATA_TABLE, "omitted", &omitted) ==
+           CUI_BRIDGE_OK);
+    const char *headers[] = {"Report"};
+    assert(cui_bridge_data_table_set(app, first, headers, 1, NULL, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_set(app, omitted, headers, 1, NULL, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, first, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, omitted, 1, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    cui_bridge_data_table_load_more_v1 first_page, recovered;
+    assert(poll_page(app, omitted, &recovered) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_set_open(app, panel, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_create(app, root, CUI_BRIDGE_ICON, "broken", &broken) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_text(app, broken, "unknown-icon-for-failure-test") == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_INVALID_STATE);
+    assert(poll_page(app, omitted, &recovered) == CUI_BRIDGE_EMPTY);
+    assert(poll_page(app, first, &first_page) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, broken) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, omitted, &recovered) == CUI_BRIDGE_OK);
+    assert(recovered.frame == first_page.frame + 2 && !recovered.row_count);
+    assert(cui_bridge_data_table_configure_load_more_v1(app, omitted, 1, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_set_disabled(app, form, 1) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, omitted, &recovered) == CUI_BRIDGE_EMPTY);
+    assert(cui_bridge_set_disabled(app, form, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(cui_bridge_node_remove(app, omitted) == CUI_BRIDGE_OK);
+    cui_bridge_node replacement;
+    assert(cui_bridge_node_create(app, field, CUI_BRIDGE_DATA_TABLE, "replacement", &replacement) ==
+           CUI_BRIDGE_OK);
+    assert(replacement.slot == omitted.slot && replacement.generation != omitted.generation);
+    assert(poll_page(app, omitted, &recovered) == CUI_BRIDGE_STALE_HANDLE);
+    assert(cui_bridge_data_table_set(app, replacement, headers, 1, NULL, 0) == CUI_BRIDGE_OK);
+    assert(cui_bridge_step(app, .016f) == CUI_BRIDGE_OK);
+    assert(poll_page(app, replacement, &recovered) == CUI_BRIDGE_EMPTY);
+    cui_bridge_destroy(app);
+}
+
 static void test_plot(void) {
     cui_bridge_options o = {.struct_size = sizeof o,
                             .abi_version = CUI_BRIDGE_ABI_VERSION,
@@ -2020,6 +2186,8 @@ int main(void) {
     test_table();
     test_data_table();
     test_data_table_keyed_rebind();
+    test_data_table_paging();
+    test_data_table_paging_failed_step();
     test_plot();
     test_command();
     test_virtual_list();

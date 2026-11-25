@@ -157,8 +157,7 @@ These C helpers only calculate offsets and allocate nothing. Selection and the
 keyboard cursor still follow their existing keyed contracts. Bind and scroll
 policy remain application-controlled, so a deliberate change such as sorting can
 choose a new scroll position. Supply valid replacement arrays to avoid changing
-the current borrowed rows on a failed bind. Foreign builders do not expose
-this workflow yet.
+the current borrowed rows on a failed bind.
 
 Choose **Live updates** in the DataTable gallery and scroll partway down.
 **Receive a file** schedules one update two seconds later, giving you time to
@@ -194,6 +193,11 @@ flag after completion or cancellation. To rearm after cancellation, submit with
 `load_more` off while disabled, as the gallery does. With a failed bind the
 gallery keeps its old rows and lets the user leave and re-enter the threshold
 to retry. The copyable C example shows the request and completion steps.
+
+Retained C applications can configure the threshold and poll one copied
+near-end snapshot after a successful step. The bridge example includes
+logical cancellation, rejection of a late response and final-page delivery.
+[Retained paging guide](BRIDGE_COMPONENTS.md#load-another-datatable-page)
 
 Custom leaf-header, group-header, row-header, whole-row and trailing-column render hooks use option userdata. Group headers accept up to sixteen levels of bounded spans. Every level must cover all data columns exactly, and no group may cross the fixed-column boundary; `cui_table_group_headers_valid` lets applications validate a configuration before rendering. Group cells expose column-header semantics at their first column; the callback receives the complete span. Whole-row callbacks run only for virtualized rows and can add row-level decoration or content before the cells. The optional trailing column uses a caller-selected width (12 logical pixels by default) and participates in horizontal scroll extent; its callback runs for each header level, the leaf header and visible rows. Loading replaces body rows with a busy status and suppresses input/load requests; empty and loading placeholders have optional render hooks and accessible default labels.
 

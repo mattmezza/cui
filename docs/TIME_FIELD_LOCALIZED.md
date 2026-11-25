@@ -1,7 +1,7 @@
-# Localized TimeField widget (unreleased)
+# Localized TimeField widget
 
-The additive C route has passed focused headless interaction/pixel and portable
-compile checks; it remains unreleased. Legacy TimeField is unchanged. See the
+The C widget supports explicit locale tokens, segmented editing and inclusive
+same-day bounds. See the
 [complete Base/Styled program](TIME_FIELD_LOCALIZED_EXAMPLE.md) and
 [verification receipt](validation/time-field-localized.json).
 Include `cui/cui_time_field_v1.h` for the new caller-owned state/options route.
@@ -54,8 +54,38 @@ Call compose during an ordinary frame. First/gap/recovery submissions establish
 geometry without applying queued edits. Disabled, readonly, inert and layout-only
 submissions freeze edits and notifications. Editing uses original-order targeted
 Core events, copied UTF-8 text payloads, token prefixes across TEXT events and
-atomic full formatted paste up to160bytes. Preedit/composition and host clipboard
-shortcuts are not implemented by this widget. No input dispatcher is added.
+atomic full formatted paste up to 160 bytes.
+
+## IME composition
+
+In working source, set `options.flags |= CUI_TIME_FIELD_IME_V1` to enable
+composition on the direct C widget. The gallery enables it by default. Styled
+shows preedit inside the focused segment and registers that segment's candidate
+anchor with the host. Owners using Base can call
+`cui_time_field_preedit_v1(ui, root_id, &segment_id)` after submission, paint
+the borrowed text in that segment, and register the anchor with
+`cui_set_text_input_geometry_rect`. Copy the text before the next frame if it
+must outlive composition.
+
+Start or update opens a session for the targeted segment. Preedit is bounded to
+160 UTF-8 bytes and leaves the value and callbacks alone. Commit accepts a
+complete formatted time, one or two locale digits for a numeric segment, or the
+complete locale AM/PM token for the period. Syntax, value or bound failures
+leave the time intact. Cancel, focus loss, gaps, read-only or disabled
+submission, and changes to the owner value or edit generation clear the
+session. The host delivers one commit for each accepted composition. The widget
+ignores plain text while that segment is composing.
+
+Headless Chromium covers localized preedit, commit, rejection and cancellation.
+SDL3 can send cancellation on an empty editing event before delivering the
+committed text. This sequence clears the session and the widget drops the late
+commit. Native IME and physical accessibility acceptance remain open. The
+optional bridge and Python, JavaScript, TypeScript, Go and Rust facades expose
+localized editing through their documented subset and omit C composition
+opt-in and preedit. Host clipboard shortcuts and composition range styling are
+outside this route.
+
+## Results and focus
 
 `changed` reports entry-to-final value difference independently of a handler.
 `change_count` counts actual aggregate callbacks0/1, **not accepted edits**.
@@ -74,16 +104,14 @@ Unset OWNER_INVALID only when the application's separate validation clears.
 All visible segments are ordinary global Tab stops. Forward/backward navigation
 exits at boundaries; the widget does not consume Tab or trap focus. This differs
 from the upstream one-root focus/selection-retaining behavior, which remains
-unfinished. Full source size/focus-ring styling, localized DateTimePicker, IME,
-physical native accessibility and Python/JS/TS/Go/Rust options/events remain open.
-Old scalar bindings and old by-value options/aggregate callbacks retain their
-existing behavior. See [design and test contract](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md).
+unfinished. Full source size/focus-ring styling and localized DateTimePicker
+also remain open. See the [original design](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md)
+and [binding contract](design/TIME_FIELD_BINDING_CHECKPOINT.md).
 
 The gallery's TimeField source uses this route by default with Arabic token,
 12-hour/seconds, inclusive-bound, readonly and invalid-appearance controls, plus
-live value/change/validation labels. Its C translation unit has been compiled;
-actual combined WASM rendering and browser interaction are integrator validation,
-not established by this worker's native proof.
+live value/change/validation labels. The headless test drives the gallery's
+actual WebAssembly draw list and Chromium input.
 
 Choose one side-effect path: observe the copied aggregate through
 `cui_time_handler`, or branch on result.changed after submission. Doing both

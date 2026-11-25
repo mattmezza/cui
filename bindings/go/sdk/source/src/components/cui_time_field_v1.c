@@ -43,6 +43,9 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
     bool invalid = (o->flags & CUI_TIME_FIELD_OWNER_INVALID_V1) ||
                    s->validation != CUI_TIME_TEXT_OK ||
                    cui_time_validate_v1(*t, &o->text) == CUI_TIME_TEXT_OUT_OF_RANGE;
+    bool ime = (o->flags & CUI_TIME_FIELD_IME_V1) != 0;
+    cui_id composing = 0;
+    cui_str preedit = ime ? cui_time_field_preedit_v1(ui, id, &composing) : (cui_str){0};
     cui_begin_box(ui, id,
                   (cui_box){.row = true,
                             .gap = 4,
@@ -58,17 +61,34 @@ static void cui_tfw_paint(cui_context *ui, cui_id id, const cui_theme *theme,
             cui_text(ui, l->period_separator, theme->font_size, theme->muted);
         cui_id child = cui_time_segment_id(id, i);
         bool focused = cui_focused(ui) == child;
+        bool show_preedit = child == composing && preedit.length;
+        float cell_width = i == 3 ? period : width;
         cui_begin_box(ui, child,
-                      (cui_box){.width = (i == 3 ? period : width) + 4,
+                      (cui_box){.width = cell_width + 4,
                                 .padding = 2,
                                 .radius = theme->radius,
+                                .clip = show_preedit,
                                 .background = focused ? theme->primary : theme->surface});
         char buffer[32];
-        cui_str label = cui_tfw_label(*t, o, l, i, buffer);
-        cui_text(ui, label, theme->font_size,
-                 (o->flags & CUI_TIME_FIELD_DISABLED_V1) ? theme->muted
-                 : focused                               ? theme->on_primary
-                                                         : theme->text);
+        cui_str label = show_preedit ? preedit : cui_tfw_label(*t, o, l, i, buffer);
+        cui_color foreground = (o->flags & CUI_TIME_FIELD_DISABLED_V1) ? theme->muted
+                               : focused                               ? theme->on_primary
+                                                                       : theme->text;
+        if (show_preedit)
+            cui_text_line(ui, label, theme->font_size, foreground, 0, (cui_text_style){0});
+        else
+            cui_text(ui, label, theme->font_size, foreground);
+        if (ime && focused &&
+            !(o->flags & (CUI_TIME_FIELD_DISABLED_V1 | CUI_TIME_FIELD_READONLY_V1)) &&
+            cui_frame_sequence(ui) && cui_pointer_scope_allowed(ui, 0)) {
+            /* A private anchor leaves the public cell available to application bounds tracking. */
+            cui_id anchor = child ^ UINT64_C(0xc678858a17bd9932);
+            float x = show_preedit ? cui_measure_text(ui, label, theme->font_size).width : 0;
+            cui_begin_absolute_box(ui, anchor, (cui_box){0},
+                                   (cui_rect){2 + fminf(x, cell_width), 2, 1, theme->font_size});
+            cui_end_box(ui);
+            (void)cui_set_text_input_geometry_rect(ui, child, anchor, theme->font_size);
+        }
         cui_end_box(ui);
         if (i == 0 || (i == 1 && o->text.precision))
             cui_text(ui, l->separator, theme->font_size, theme->muted);

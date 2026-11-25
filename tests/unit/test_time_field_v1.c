@@ -29,6 +29,10 @@ typedef struct {
     cui_id raw_targets[16];
     size_t raw_count;
     uint32_t consume_mask;
+    cui_id composing;
+    cui_rect hour_bounds;
+    size_t preedit_length;
+    char preedit[CUI_TIME_TEXT_MAX_BYTES_V1];
 } fixture;
 static bool same(cui_time a, cui_time b) {
     return a.hour == b.hour && a.minute == b.minute && a.second == b.second;
@@ -98,6 +102,8 @@ static cui_time_field_result_v1 frame(fixture *f) {
         cui_end_focus_scope(f->ui);
     }
     cui_time_field_result_v1 r = {0};
+    f->composing = 0;
+    f->preedit_length = 0;
     if (!f->omit) {
         cui_time_handler h = {.on_change = f->handler ? observe : NULL, .user = f};
         r = f->styled ? cui_time_field_v1(f->ui, 20, &f->theme, cui_string("Time"), &f->state,
@@ -105,6 +111,14 @@ static cui_time_field_result_v1 frame(fixture *f) {
                       : cui_base_time_field_v1(f->ui, 20, cui_string("Time"), &f->state, &f->time,
                                                &f->options, h);
         assert(r.status == CUI_TIME_TEXT_OK);
+        if (f->options.flags & CUI_TIME_FIELD_IME_V1) {
+            cui_str preedit = cui_time_field_preedit_v1(f->ui, 20, &f->composing);
+            f->preedit_length = preedit.length;
+            if (preedit.length)
+                memcpy(f->preedit, preedit.data, preedit.length);
+            if (f->styled)
+                assert(cui_track_bounds(f->ui, cui_time_segment_id(20, 0), &f->hour_bounds));
+        }
         if (!f->styled) {
             cui_begin_box(f->ui, 20, (cui_box){.row = true});
             for (unsigned i = 0; i < 4; i++)
@@ -139,6 +153,12 @@ static void text(fixture *f, cui_str value) {
     assert(cui_queue_event(
         f->ui,
         (cui_event){.type = CUI_EVENT_TEXT, .text_data = value.data, .text_length = value.length}));
+}
+static void composition(fixture *f, cui_event_type type, cui_id target, cui_str value) {
+    assert(cui_queue_event(f->ui, (cui_event){.type = type,
+                                              .composition_target = target,
+                                              .text_data = value.data,
+                                              .text_length = value.length}));
 }
 static void warm(fixture *f) {
     frame(f);
@@ -678,6 +698,122 @@ static void pixels_and_text(void) {
     cui_software_destroy(renderer);
     cui_destroy(f.ui);
 }
+static void composition_edits(bool styled) {
+    fixture f;
+    init(&f, styled);
+    f.options.flags = CUI_TIME_FIELD_IME_V1;
+    cui_time_locale_v1 locale;
+    cui_time_locale_init_v1(&locale);
+    const char *digits[] = {"٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"};
+    for (unsigned i = 0; i < 10; i++)
+        locale.digits[i] = cui_string(digits[i]);
+    f.options.text.locale = &locale;
+    f.options.text.cycle = CUI_TIME_TEXT_H12;
+    warm(&f);
+    focus(&f, 0);
+    cui_id hour = cui_time_segment_id(20, 0);
+    cui_id minute = cui_time_segment_id(20, 1);
+    const cui_str displayed = cui_string("٠١");
+    char queued[] = "٠١";
+    composition(&f, CUI_EVENT_COMPOSITION_START, hour, (cui_str){0});
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, hour, (cui_str){queued, sizeof(queued) - 1});
+    memset(queued, 'x', sizeof(queued));
+    text(&f, cui_string("٢"));
+    assert(!frame(&f).changed && f.calls == 0 && f.time.hour == 9);
+    assert(f.composing == hour && f.preedit_length == displayed.length &&
+           !memcmp(f.preedit, displayed.data, displayed.length));
+    if (styled) {
+        bool painted = false;
+        for (size_t i = 0; i < f.draw.count; i++) {
+            cui_draw_command c = f.draw.commands[i];
+            if (c.type == CUI_DRAW_TEXT && c.text.length == displayed.length &&
+                !memcmp(c.text.data, displayed.data, displayed.length))
+                painted = true;
+        }
+        assert(painted);
+        cui_rect caret;
+        assert(cui_text_input_rect(f.ui, &caret));
+        cui_rect cell = cui_bounds(f.ui, hour);
+        assert(caret.x > cell.x && caret.x < cell.x + cell.w && caret.h == f.theme.font_size);
+        assert(cell.x == f.hour_bounds.x && cell.w == f.hour_bounds.w);
+    }
+    assert(!frame(&f).changed && f.composing == hour);
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, hour, displayed);
+    cui_time_field_result_v1 r = frame(&f);
+    assert(r.changed && r.change_count == 1 && f.calls == 1 && f.time.hour == 1 &&
+           f.time.minute == 30 && !f.composing && cui_focused(f.ui) == minute);
+
+    /* Invalid multi-token and complete out-of-bounds candidates are atomic. */
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, cui_string("٩٩"));
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("٩٩"));
+    r = frame(&f);
+    assert(!r.changed && r.rejected_count == 1 && r.validation == CUI_TIME_TEXT_INVALID_VALUE &&
+           f.calls == 1 && f.time.minute == 30);
+    char oversized[CUI_TIME_TEXT_MAX_BYTES_V1 + 1];
+    memset(oversized, '9', sizeof(oversized));
+    composition(&f, CUI_EVENT_COMPOSITION_START, minute, (cui_str){0});
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, (cui_str){oversized, sizeof(oversized)});
+    assert(!frame(&f).changed && f.composing == minute && f.preedit_length == 0);
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, (cui_str){oversized, sizeof(oversized)});
+    r = frame(&f);
+    assert(!r.changed && r.rejected_count == 1 && r.validation == CUI_TIME_TEXT_INVALID_SYNTAX &&
+           f.calls == 1 && f.time.minute == 30);
+    f.options.text.flags = CUI_TIME_TEXT_HAS_MAXIMUM_V1;
+    f.options.text.maximum = (cui_time){11, 0, 0};
+    ++f.options.edit_generation;
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, cui_string("٠٢:٠٥ PM"));
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("٠٢:٠٥ PM"));
+    r = frame(&f);
+    assert(!r.changed && r.rejected_count == 1 && r.validation == CUI_TIME_TEXT_OUT_OF_RANGE &&
+           f.calls == 1 && f.time.hour == 1 && f.time.minute == 30);
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, cui_string("٠٢:٠٥ AM"));
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("٠٢:٠٥ AM"));
+    r = frame(&f);
+    assert(r.changed && r.change_count == 1 && f.calls == 2 && same(f.time, (cui_time){2, 5, 0}));
+
+    composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, cui_string("٤٢"));
+    composition(&f, CUI_EVENT_COMPOSITION_CANCEL, minute, (cui_str){0});
+    composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("٤٢"));
+    assert(!frame(&f).changed && !f.composing && f.calls == 2 && f.time.minute == 5);
+    for (unsigned mode = 0; mode < 7; mode++) {
+        focus(&f, 1);
+        composition(&f, CUI_EVENT_COMPOSITION_UPDATE, minute, cui_string("٤٢"));
+        frame(&f);
+        assert(f.composing == minute);
+        switch (mode) {
+        case 0:
+            f.options.flags |= CUI_TIME_FIELD_DISABLED_V1;
+            break;
+        case 1:
+            f.options.flags |= CUI_TIME_FIELD_READONLY_V1;
+            break;
+        case 2:
+            f.inert = true;
+            break;
+        case 3:
+            f.omit = true;
+            break;
+        case 4:
+            ++f.options.edit_generation;
+            break;
+        case 5:
+            focus(&f, 0);
+            break;
+        case 6:
+            f.options.flags = 0;
+            break;
+        }
+        frame(&f);
+        assert(!f.composing);
+        f.options.flags = CUI_TIME_FIELD_IME_V1;
+        f.inert = f.omit = false;
+        warm(&f);
+        focus(&f, 1);
+        composition(&f, CUI_EVENT_COMPOSITION_COMMIT, minute, cui_string("٤٢"));
+        assert(!frame(&f).changed && !f.composing && f.calls == 2 && f.time.minute == 5);
+    }
+    cui_destroy(f.ui);
+}
 int main(void) {
     for (unsigned styled = 0; styled < 2; styled++) {
         editing(styled != 0);
@@ -690,6 +826,7 @@ int main(void) {
         paste_and_bounds(styled != 0);
         inactive_and_generation(styled != 0);
         readiness_recovery(styled != 0);
+        composition_edits(styled != 0);
     }
     atomic_preflight();
     pixels_and_text();

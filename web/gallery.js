@@ -627,7 +627,29 @@ cui_end_box(ui);
  Calendar:'/* Supply today as a host-local civil date when desired. */\ncui_calendar_ex(ui, id, &theme, &state, &selection, options,\n    (cui_calendar_presentation_options){\n        .month_toggle = true, .neighboring_days = true});',
  DatePicker:'cui_date_picker_ex(ui, id, &theme, label, &state, &selection, options,\n    (cui_date_picker_calendar_options){.presentation = {\n        .month_toggle = true, .neighboring_days = true}});',
  ColorPicker:'cui_color_picker(ui, id, &theme,\n    &state, &color, options);',
- TimeField:'cui_time_field(ui, id, &theme, label,\n    &state, &time, options);',
+ TimeField:`#include <cui/cui_time_field_v1.h>
+
+/* Call init once per field. Keep the options, state and time between frames. */
+typedef struct {
+    cui_time_field_options_v1 options;
+    cui_time_field_state_v1 state;
+    cui_time value;
+} time_field_example;
+
+static bool time_field_init(time_field_example *field) {
+    field->value = (cui_time){9, 30, 0};
+    if (cui_time_field_options_init_v1(&field->options) != CUI_TIME_TEXT_OK)
+        return false;
+    field->options.flags = CUI_TIME_FIELD_IME_V1;
+    return cui_time_field_state_init_v1(&field->state, field->value,
+                                      &field->options) == CUI_TIME_TEXT_OK;
+}
+
+static cui_time_field_result_v1 time_field_draw(cui_context *ui, cui_id id,
+        const cui_theme *theme, time_field_example *field) {
+    return cui_time_field_v1(ui, id, theme, cui_string("Time"),
+        &field->state, &field->value, &field->options, (cui_time_handler){0});
+}`,
  Combobox:'cui_combobox(ui, id, &theme, label, query,\n    items, 4, scratch, 4, &selection,\n    &popup, options);',
  NumberInput:'cui_number_input(ui, id, &theme, label,\n    &state, &value, (cui_number_options){\n        .size = CUI_NUMBER_SMALL, .step = 1});',
  Pagination:'cui_pagination(ui, id, &theme,\n    &page, total_pages, true, false);',

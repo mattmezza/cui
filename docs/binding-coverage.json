@@ -1211,7 +1211,7 @@
     "limitations": [
       "Focused root receipts cover C/Python/Node and dynamic Go/Rust. Full-suite regression, installed packages and native interactive acceptance remain open.",
       "Default/shared WASM unsupported; same existing native TLS and explicit unshared policy as controlled Slider.",
-      "Global segment Tab remains a source-focus parity exception; IME/clipboard and physical AT remain pending."
+      "Global segment Tab remains a source-focus parity exception. The direct C widget offers optional IME composition and a preedit view. The bridge and its foreign facades omit both. Clipboard and physical AT remain open."
     ],
     "python_source_checkpoint": {
       "implementation": "Integrated Python facade passes sixteen configured root CTest entries, including fifteen localized methods with actual current/old/partial DSOs and the authored headless example. Canonical/installed-skill refresh and publication remain pending; native interactive execution unverified.",

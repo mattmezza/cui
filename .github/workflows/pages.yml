@@ -166,6 +166,9 @@ jobs:
       - name: Verify DateTime editing presets and copied usage
         if: ${{ matrix.shard == 3 }}
         run: uv run tests/web/test_date_time_picker_gallery.py --directory build/web
+      - name: Verify localized TimeField and Chromium composition
+        if: ${{ matrix.shard == 2 }}
+        run: uv run tests/web/test_time_field.py --directory build/web
       - name: Verify Questionnaire optional shortcuts and real touch selection
         if: ${{ matrix.shard == 1 }}
         run: uv run tests/web/test_questionnaire_shortcuts_gallery.py --directory build/web

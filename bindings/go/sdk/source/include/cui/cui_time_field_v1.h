@@ -10,7 +10,7 @@ extern "C" {
  * State is caller-owned per widget/context; initialize explicitly. Borrowed
  * options/locale/names/theme/handler remain immutable throughout submission.
  * All visible segments use ordinary global Tab, not source one-root focus.
- * No IME composition/clipboard shortcut or foreign binding support is claimed. */
+ * Host clipboard commands are outside this widget's editing contract. */
 #define CUI_TIME_FIELD_VERSION_V1 UINT32_C(1)
 #define CUI_TIME_FIELD_NAME_MAX_BYTES_V1 64u
 #define CUI_TIME_FIELD_PENDING_MAX_BYTES_V1 CUI_TIME_TOKEN_MAX_BYTES_V1
@@ -18,7 +18,8 @@ extern "C" {
 enum {
     CUI_TIME_FIELD_DISABLED_V1 = 1u << 0,
     CUI_TIME_FIELD_READONLY_V1 = 1u << 1,
-    CUI_TIME_FIELD_OWNER_INVALID_V1 = 1u << 2
+    CUI_TIME_FIELD_OWNER_INVALID_V1 = 1u << 2,
+    CUI_TIME_FIELD_IME_V1 = 1u << 3
 };
 typedef enum {
     CUI_TIME_FIELD_HOUR_V1 = 0,
@@ -60,6 +61,13 @@ cui_time_field_result_v1 cui_base_time_field_v1(cui_context *, cui_id, cui_str n
 cui_time_field_result_v1 cui_time_field_v1(cui_context *, cui_id, const cui_theme *, cui_str name,
                                            cui_time_field_state_v1 *, cui_time *,
                                            const cui_time_field_options_v1 *, cui_time_handler);
+/* With CUI_TIME_FIELD_IME_V1, query after submitting this frame's widget.
+ * Empty unless the focused segment has an active composition; if segment is
+ * supplied, it receives that segment ID or zero. Text is borrowed from the
+ * context until the next begin_frame or destruction. Copy to keep it longer.
+ * Preedit uses one bounded context resource, up to CUI_TIME_TEXT_MAX_BYTES_V1
+ * UTF-8 bytes. Commit accepts a formatted time or a token for one segment. */
+cui_str cui_time_field_preedit_v1(cui_context *, cui_id, cui_id *segment);
 /* changed is final value difference, independent of handler; change_count is
  * actual aggregate callbacks0/1, never accepted edits. Callback follows final
  * semantics/Base or paint/Styled. Copied CHANGE values survive teardown.

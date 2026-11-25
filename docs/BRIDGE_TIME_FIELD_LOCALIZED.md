@@ -1,15 +1,19 @@
-# Localized TimeField bridge (focused C proof, unreleased)
+# Localized TimeField bridge
 
 The additive C bridge has passed focused strict C/C++ compilation, headless UI,
 thread/queue/failure fixtures and matching Linux static example checks. The
 independent frozen legacy trace matches exactly under private Xvfb. Pinned WASM
 checks are compile-only. See the [first receipt](validation/time-field-bridge-first.json)
-for initial failures and exact limits. Canonical generation, complete integration
-and package gates remain pending; this is not released package functionality.
-The existing tested scalar builders in all five languages remain unchanged;
-none yet exposes this localized bridge mode. See the
+for the initial proof. Python, JavaScript, TypeScript, Go and Rust also expose
+localized options and copied change observations. The
+[binding matrix](binding-coverage.json) records the verified provider
+combinations and remaining package and native checks. See the
 [reviewed contract](design/TIME_FIELD_BINDING_CHECKPOINT.md) and
 [direct C widget guide](TIME_FIELD_LOCALIZED.md).
+
+The direct C widget's composition flag and borrowed preedit view are outside
+the bridge's localized configuration. This also applies to its language
+facades.
 
 The [complete C program](../bindings/bridge/examples/time_field_localized.c)
 authors two real TimeFields inside Row/Column UI, English24-hour and Arabic12-hour,

@@ -1,10 +1,8 @@
 # Complete localized TimeField composition example
 
-**Unreleased C example, compile-tested and run headlessly in Base/Styled modes.**
+**C example run headlessly in Base and Styled modes.**
 The exact code below is also [examples/time_field_localized.c](../examples/time_field_localized.c).
-Focused checks use the new widget translation units with the current cached
-engine, without rebuilding the engine. This does not establish release, browser
-or foreign-language support. See
+See
 [widget contract](design/TIME_FIELD_LOCALIZED_WIDGET_V1.md),
 [widget usage](TIME_FIELD_LOCALIZED.md) and [pure text helpers](TIME_FIELD_TEXT.md).
 
@@ -135,7 +133,7 @@ int main(int argc, char **argv) {
 }
 ```
 
-To reproduce after the matching implementation is integrated, save the code as
+To reproduce, save the code as
 `time_field_example.c` in a consumer directory. A C11 compiler, CMake and
 Ninja are prerequisites; see [dependencies](DEPENDENCIES.md). With `CUI_ROOT`
 pointing to the matching CUI source checkout, the intended portable commands are:
@@ -149,12 +147,9 @@ cc -std=c11 -Wall -Wextra -Wpedantic -Werror -I"$CUI_ROOT/include" \
 ./time_field_example base
 ```
 
-The sample's exact C code was compiled strictly and run in both modes against
-the cached matching engine plus the new widget objects. The complete portable
-CMake rebuild recipe above was not run by this worker; the integrator validates
-the actual combined targets. This is a windowless consumer, not a native runner
-or a renderer support claim. Automated native tests still use the repository's
-private-Xvfb `scripts/test_local.py` wrapper; never use the desktop display.
+The repository builds the sample with warnings and runs both modes through
+CTest. On Linux, run repository tests with the private-Xvfb
+`scripts/test_local.py` wrapper. This example is windowless.
 
 ## Ownership, resets and validation
 
@@ -181,7 +176,8 @@ owner value is displayed invalid, never automatically clamped. A complete valid
 formatted TEXT payload replaces the whole value atomically (up to160 UTF-8 bytes);
 Core copies queued text_data, and callbacks receive copied scalar values. A split
 token prefix is bounded to16 owned bytes and cannot carry across a genuine focus
-change. IME preedit/composition and clipboard shortcuts remain unsupported.
+change. See the [widget guide](TIME_FIELD_LOCALIZED.md#ime-composition) for
+the optional C composition flag, Base preedit query and host limitations.
 
 `result.status` is operation/preflight status. `result.validation` is the current
 edit validation outcome. `changed` means entry-to-final value difference whether
@@ -203,21 +199,14 @@ All visible segments use existing ordinary global Tab stops. Forward/backward
 boundary traversal exits the field without consuming Tab; source one-root focus
 and selection-retaining re-entry remain unfinished. Legacy functions keep their
 old Tab, by-value options/state and CHANGE timing. Full source size/focus-ring
-styling, localized DateTimePicker, IME and physical accessibility are not closed.
-
-| Language | New localized widget/options/typed observer |
-| --- | --- |
-| C | Focused C widget/example checks passed; unreleased |
-| Python | Omitted; legacy scalar widget subset only |
-| JavaScript | Omitted; legacy scalar widget subset only |
-| TypeScript | Omitted; legacy scalar widget subset only |
-| Go | Omitted; legacy scalar widget subset only |
-| Rust | Omitted; legacy scalar widget subset only |
+styling, localized DateTimePicker, native IME and physical accessibility remain
+open. For the foreign builders' localized options, copied event observations
+and remaining acceptance work, see the
+[binding contract](design/TIME_FIELD_BINDING_CHECKPOINT.md).
 
 Verified focused gates cover Base/Styled interactions and both example modes,
 split/coalesced input and actual focus transitions, copied UTF-8 paste and atomic
 range rejection, software border pixels/text-poison ownership, C++/WASM headers
 and source, and configured selective/umbrella module consumers. See the
-[receipt](validation/time-field-localized.json) for exact commands/limitations.
-Full combined engine/CMake acceptance and actual gallery WASM/browser checks
-remain integrator gates; no deployment or full-family claim is made.
+[original receipt](validation/time-field-localized.json) for the C commands and
+the [focused browser test](../tests/web/test_time_field.py) for WASM interaction.

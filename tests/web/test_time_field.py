@@ -41,6 +41,7 @@ def main():
             page.goto(f'http://127.0.0.1:{server.server_port}/cui/#TimeField')
             page.wait_for_function('window.cuiGallery?.renderedComponent==="TimeField"')
             page.locator('canvas').scroll_into_view_if_needed()
+            assert 'CUI_TIME_FIELD_IME_V1' in page.locator('#snippet').text_content()
 
             def click(name, role):
                 point = page.evaluate('''([name,role])=>{
@@ -91,9 +92,44 @@ def main():
             assert stats(16) == 103000 and stats(17) == callbacks
             click('Clear validation', 1)
             page.wait_for_function('cuiGallery.exports.gallery_control_stats(18)===0')
+            click('دقيقة', 6)
+            page.wait_for_function('document.activeElement.id==="cui-ime-input"')
+            cdp = page.context.new_cdp_session(page)
+
+            def candidate(value):
+                cdp.send('Input.imeSetComposition',
+                         {'text': value, 'selectionStart': len(value), 'selectionEnd': len(value)})
+
+            def painted(value, present=True):
+                page.wait_for_function('''([value,present])=>{
+                    const e=cuiGallery.exports, decoder=new TextDecoder();
+                    const found=Array.from({length:e.gallery_count()},(_,i)=>decoder.decode(
+                        new Uint8Array(e.memory.buffer,e.gallery_command_text(i),
+                                       e.gallery_command_length(i)))).includes(value);
+                    return found===present;
+                }''', arg=[value, present])
+
+            candidate('٢٠')
+            painted('٢٠')
+            assert stats(16) == 103000 and stats(17) == callbacks
+            cdp.send('Input.insertText', {'text': '٢٠'})
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(16)===102000')
+            assert stats(17) == callbacks + 1
+
+            candidate('٦٠')
+            painted('٦٠')
+            cdp.send('Input.insertText', {'text': '٦٠'})
+            page.wait_for_function('cuiGallery.exports.gallery_control_stats(18)===4')
+            assert stats(16) == 102000 and stats(17) == callbacks + 1
+
+            candidate('٤٢')
+            painted('٤٢')
+            candidate('')
+            painted('٤٢', present=False)
+            assert stats(16) == 102000 and stats(17) == callbacks + 1
             assert not errors, errors
             browser.close()
-            print('PASS: TimeField keyboard change, H12/Arabic locale, read-only, rejected bounds, validation reset')
+            print('PASS: TimeField keyboard, H12/Arabic locale, read-only, bounds, and IME paint/commit/rejection/cancel')
     finally:
         server.shutdown()
         server.server_close()

@@ -6990,7 +6990,8 @@ int gallery_frame(int story, int theme, int disabled, float width, float height)
             time_field_bounds ? CUI_TIME_TEXT_HAS_MINIMUM_V1 | CUI_TIME_TEXT_HAS_MAXIMUM_V1 : 0;
         time_field_options.text.minimum = (cui_time){9, 0, 0};
         time_field_options.text.maximum = (cui_time){17, 30, 0};
-        time_field_options.flags = (disabled ? CUI_TIME_FIELD_DISABLED_V1 : 0) |
+        time_field_options.flags = CUI_TIME_FIELD_IME_V1 |
+                                   (disabled ? CUI_TIME_FIELD_DISABLED_V1 : 0) |
                                    (time_field_readonly ? CUI_TIME_FIELD_READONLY_V1 : 0) |
                                    (time_field_invalid ? CUI_TIME_FIELD_OWNER_INVALID_V1 : 0);
         const char *names[] = {"ساعة", "دقيقة", "ثانية", "فترة"};

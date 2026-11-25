@@ -1284,16 +1284,17 @@
       "python": "tested_subset",
       "javascript": "tested_subset",
       "typescript": "tested_subset",
-      "go": "documented_omission",
+      "go": "tested_subset",
       "rust": "documented_omission"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript and TypeScript expose owned SVG resources and catalog/cache utilities. Those three builders also provide configured retained Icon and Badge with copied results and indicator geometry. See the guide for optional provider support.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript and Go expose owned SVG resources and catalog/cache utilities. Python, JavaScript and TypeScript also provide configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
     "python_guide": "docs/PYTHON_ICON_BADGE.md",
     "node_resources_guide": "docs/NODE_ICON_RESOURCES.md",
     "node_components_guide": "docs/NODE_ICON_BADGE.md",
+    "go_resources_guide": "docs/GO_ICON_RESOURCES.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

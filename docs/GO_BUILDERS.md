@@ -46,6 +46,9 @@ _ = app.Step(1.0/60)
 
 Grouped components use `Item` children. RadioGroup, Tabs, Select, and ComboBox expose a selected Item; Tabs and Accordion Item children form their panels. `Event.Selected` is a copied full handle snapshot for group changes. `Alert` takes title and message. Collapsible and Accordion Item state is available through `App.Checked`.
 
+Use the [Go SVG resource guide](GO_ICON_RESOURCES.md) to prepare copied coverage
+masks from embedded artwork or app-owned SVG and manage the resource cache.
+
 Select uses a name and placeholder; ComboBox uses a label and editable query. Their options are `Item` children. `App.Text(combo)` reads the current query.
 
 DropdownButton has separate action and menu areas. Use `App.DropdownPartBounds(button, false)` for the action and `true` for the menu. `OnClick` receives action presses; `OnChange` receives selected `Item` snapshots from menu choices.

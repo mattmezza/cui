@@ -1554,7 +1554,7 @@
       "limitations": [
         "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
         "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
-        "Optional retained C and Python presentation and Badge composition support copied configuration and app-owned resources. JavaScript and TypeScript also expose both the resource utilities and configured retained nodes. Configured authoring in Go and Rust remains open."
+        "Optional retained C and Python presentation and Badge composition support copied configuration and app-owned resources. JavaScript and TypeScript also expose both the resource utilities and configured retained nodes. Go exposes the resource utilities. Configured authoring in Go and Rust remains open."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

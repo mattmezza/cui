@@ -345,6 +345,7 @@ static cui_bridge_status go_part_query(cui_bridge_app *a,cui_bridge_node n,uint3
 #undef SHADOW_STATIC
 
 #include "skeleton_presentation_ffi.h"
+#include "icon_resources_ffi.h"
 
 static int bridge_open(const char *path) {
  if (bridge_initialized) return 0;
@@ -354,6 +355,7 @@ static int bridge_open(const char *path) {
  API(STATIC_LOAD, STATIC_LOAD)
 #undef STATIC_LOAD
  go_skeleton_initialize();
+ cui_go_icon_resources_init(bridge_lib);
  bridge_initialized = 1;
  return 0;
  }
@@ -379,6 +381,7 @@ static int bridge_open(const char *path) {
 #undef LOAD
  bridge_lib = lib;
  go_skeleton_initialize();
+ cui_go_icon_resources_init(bridge_lib);
  bridge_initialized = 1;
  return 0;
 }

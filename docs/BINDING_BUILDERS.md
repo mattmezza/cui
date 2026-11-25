@@ -158,6 +158,8 @@ and [public header](../include/cui/cui_bridge.h) for capacities and status codes
 
 [Go builders](GO_BUILDERS.md) and [Rust builders](RUST_BUILDERS.md) now construct
 real component trees in their own language and dispatch copied native events.
+The [Go SVG resource guide](GO_ICON_RESOURCES.md) shows how to prepare artwork
+with the bundled build or a compatible shared bridge.
 The older [C-host examples](LANGUAGE_BINDINGS.md) remain useful for embedding an
 existing C-authored application.
 

@@ -51,6 +51,8 @@ fn main() -> cui_builders::Result<()> {
   behind a stable path, and `reload_icon` invalidates a cached preparation.
   Call `collect_icon` after consuming prior frames to reclaim inactive masks.
   The [bridge contract](BRIDGE_ICON_RESOURCES.md) records the limits.
-- The Rust resource API copies SVG and local asset keys. Retained Icon and
-  Badge configuration and deferred loader callbacks remain outside Rust's
-  current coverage.
+- The Rust resource API copies SVG and local asset keys. Deferred loader
+  callbacks remain a direct C feature.
+
+See the [inbox example](RUST_ICON_BADGE.md) for retained Icon and Badge
+configuration with one shared resource.

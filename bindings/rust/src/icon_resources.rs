@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
 //! App-owned SVG resources and copied catalog and raster data.
+mod badge;
 mod ffi;
+mod presentation;
+mod presentation_ffi;
+
+pub use badge::{BadgeConfig, BadgeResult, BadgeSize, BadgeVariant};
+pub use presentation::{
+    IconAlign, IconBoxStyle, IconConfig, IconConstraints, IconOptions, IconResult, IconSize,
+};
 
 use self::ffi::{api, RawBitmap, RawHandle, RawInfo, RawLimits};
 use super::{check, App, Error, Rect, Result};

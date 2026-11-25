@@ -207,6 +207,7 @@
         "docs/PYTHON_ICON_BADGE.md",
         "docs/NODE_ICON_BADGE.md",
         "docs/GO_ICON_BADGE.md",
+        "docs/RUST_ICON_BADGE.md",
         "docs/COMPONENTS.md",
         "docs/ELEMENT_SHADOWS.md"
       ],
@@ -518,7 +519,8 @@
         "docs/NODE_ICON_BADGE.md",
         "docs/GO_ICON_RESOURCES.md",
         "docs/GO_ICON_BADGE.md",
-        "docs/RUST_ICON_RESOURCES.md"
+        "docs/RUST_ICON_RESOURCES.md",
+        "docs/RUST_ICON_BADGE.md"
       ],
       "callback_symbols": [
         "cui_icon_loader_fn"

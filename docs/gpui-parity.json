@@ -476,7 +476,8 @@
         "tests/unit/test_bridge_badge.c",
         "bindings/python/test_icons.py",
         "bindings/node/test/icon-badge.test.cjs",
-        "bindings/go/cui/icon_badge_test.go"
+        "bindings/go/cui/icon_badge_test.go",
+        "bindings/rust/tests/icon_badge.rs"
       ],
       "status": "tested",
       "platforms": {
@@ -486,7 +487,7 @@
       "limitations": [
         "Count, zero hiding, overflow, dot, configurable SVG icon, four sizes, colors and arbitrary content composition are headless tested; source corner geometry is covered on the first frame.",
         "Generic inherited style refinement remains ordinary Core composition; browser-specific interaction and visual evidence is recorded separately.",
-        "The retained C, Python, JavaScript, TypeScript and Go APIs support count, dot, named artwork and owned SVG around child nodes. Rust builders use the scalar text pill."
+        "The retained C, Python, JavaScript, TypeScript, Go and Rust APIs support count, dot, named artwork and owned SVG around child nodes. Older bridge providers expose the scalar text pill."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -517,7 +518,8 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_bridge_badge.c",
-            "docs/BRIDGE_BADGE.md"
+            "docs/BRIDGE_BADGE.md",
+            "bindings/rust/tests/icon_badge.rs"
           ]
         }
       ],
@@ -1548,7 +1550,8 @@
         "bindings/node/test/icon-resources.test.cjs",
         "bindings/node/test/icon-badge.test.cjs",
         "bindings/go/cui/icon_badge_test.go",
-        "bindings/rust/tests/icon_resources.rs"
+        "bindings/rust/tests/icon_resources.rs",
+        "bindings/rust/tests/icon_badge.rs"
       ],
       "status": "tested",
       "platforms": {
@@ -1557,7 +1560,7 @@
       "limitations": [
         "123 default SVGs plus optional full1830 catalog raster-tested; named/path/raw source, size/transform, tint and immutable bounded caches implemented. NanoSVG supports a subset of resvg; automatic inherited text scopes and browser/native visual audit remain pending.",
         "Icon is decorative by default. Callers can set an explicit accessible name or choose decorative rendering. Native assistive-technology coverage remains open.",
-        "The optional retained C, Python, JavaScript, TypeScript and Go APIs support copied Icon and Badge configuration and app-owned SVG resources. Rust supports owned resources. Configured retained Rust authoring remains open."
+        "The optional retained C, Python, JavaScript, TypeScript, Go and Rust APIs support copied Icon and Badge configuration and app-owned SVG resources. Resource and presentation support can differ by provider."
       ],
       "owner": "integrator",
       "last_verified_commit": null,
@@ -1611,7 +1614,8 @@
           "status": "tested",
           "evidence": [
             "tests/unit/test_bridge_icon_presentation.c",
-            "docs/BRIDGE_ICON_PRESENTATION.md"
+            "docs/BRIDGE_ICON_PRESENTATION.md",
+            "bindings/rust/tests/icon_badge.rs"
           ]
         }
       ],

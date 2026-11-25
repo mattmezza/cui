@@ -5,8 +5,9 @@ mod skeleton_presentation;
 mod slider_model;
 mod time_localized;
 pub use icon_resources::{
-    IconAvailability, IconBitmap, IconCatalogEntry, IconError, IconInfo, IconLimits, IconResource,
-    IconSource, IconSourceKind, IconTransform,
+    BadgeConfig, BadgeResult, BadgeSize, BadgeVariant, IconAlign, IconAvailability, IconBitmap,
+    IconBoxStyle, IconCatalogEntry, IconConfig, IconConstraints, IconError, IconInfo, IconLimits,
+    IconOptions, IconResource, IconResult, IconSize, IconSource, IconSourceKind, IconTransform,
 };
 pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};
 pub use skeleton_presentation::{SkeletonConfig, SkeletonPresentation, SkeletonWidth};

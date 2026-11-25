@@ -509,5 +509,5 @@ thread. Python supports those resources and retained builders. Run the Python
 inbox example from `docs/PYTHON_ICON_BADGE.md` or use the JavaScript and TypeScript
 builders in `docs/NODE_ICON_BADGE.md`. Go covers resources and retained
 authoring in `docs/GO_ICON_RESOURCES.md` and `docs/GO_ICON_BADGE.md`.
-Rust provides the owned SVG resource API in `docs/RUST_ICON_RESOURCES.md`.
-Rust retained builders currently use named Icons and scalar text Badges.
+Rust covers both the owned SVG resource API in `docs/RUST_ICON_RESOURCES.md`
+and retained Icon and Badge authoring in `docs/RUST_ICON_BADGE.md`.

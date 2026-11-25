@@ -74,23 +74,7 @@
         "typescript": "tested_subset",
         "go": "tested_subset",
         "rust": "tested_subset"
-      },
-      "omissions": [
-        {
-          "header": "include/cui/cui_bridge.h",
-          "languages": ["rust"],
-          "types": [
-            "cui_bridge_badge_config_v1",
-            "cui_bridge_badge_result_v1"
-          ],
-          "symbols": [
-            "cui_bridge_badge_create_v1",
-            "cui_bridge_badge_configure_v1",
-            "cui_bridge_badge_get_result_v1"
-          ],
-          "note": "C, Python, JavaScript, TypeScript and Go support configured Badge children and owned SVG. Rust exposes the scalar text pill."
-        }
-      ]
+      }
     },
     {
       "name": "Bubble",
@@ -244,19 +228,6 @@
         "rust": "tested_subset"
       },
       "omissions": [
-        {
-          "header": "include/cui/cui_bridge.h",
-          "languages": ["rust"],
-          "types": [
-            "cui_bridge_icon_options_v1",
-            "cui_bridge_icon_result_v1"
-          ],
-          "symbols": [
-            "cui_bridge_icon_configure_node_v1",
-            "cui_bridge_icon_get_node_result_v1"
-          ],
-          "note": "C, Python, JavaScript, TypeScript and Go support retained Icon configuration. Rust has owned SVG resources and the legacy named Icon builder."
-        },
         {
           "header": "include/cui/cui_icon.h",
           "languages": ["python", "javascript", "typescript", "go", "rust"],
@@ -1287,7 +1258,7 @@
       "go": "tested_subset",
       "rust": "tested_subset"
     },
-    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript, Go and Rust expose owned SVG resources and catalog/cache utilities. Python, JavaScript, TypeScript and Go also expose configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
+    "legacy": "Named Icon kind50 and scalar Badge kind11 remain supported subsets. Python, JavaScript, TypeScript, Go and Rust expose owned SVG resources, catalog/cache utilities and configured retained Icon and Badge with copied results and indicator geometry. See the guides for optional provider support.",
     "guide": "docs/BRIDGE_ICON_RESOURCES.md",
     "presentation_guide": "docs/BRIDGE_ICON_PRESENTATION.md",
     "badge_guide": "docs/BRIDGE_BADGE.md",
@@ -1297,6 +1268,7 @@
     "go_resources_guide": "docs/GO_ICON_RESOURCES.md",
     "go_components_guide": "docs/GO_ICON_BADGE.md",
     "rust_resources_guide": "docs/RUST_ICON_RESOURCES.md",
+    "rust_components_guide": "docs/RUST_ICON_BADGE.md",
     "receipt": "docs/validation/bridge-icon-resources-root.json"
   }
 }

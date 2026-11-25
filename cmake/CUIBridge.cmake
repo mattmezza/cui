@@ -196,7 +196,7 @@ if(CUI_RUST_SKELETON_TESTS)
    run --offline --locked -j1 --example skeleton_profile -- --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
-option(CUI_RUST_ICON_TESTS "Check owned Icon resources with Rust on Linux" OFF)
+option(CUI_RUST_ICON_TESTS "Check owned Icon resources and retained Icon/Badge with Rust on Linux" OFF)
 if(CUI_RUST_ICON_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   message(FATAL_ERROR "Rust Icon provider tests currently support Linux only")
@@ -205,10 +205,12 @@ if(CUI_RUST_ICON_TESTS)
  set(CUI_RUST_ICON_TARGET_DIR "${CUI_RUST_SKELETON_TARGET_DIR}" CACHE PATH "Reusable Cargo cache for shared Rust Icon tests")
  set(CUI_RUST_ICON_STATIC_TARGET_DIR "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" CACHE PATH "Reusable Cargo cache for bundled Rust Icon tests")
  function(cui_rust_icon_test suffix target library_dir unsupported)
+  string(REGEX REPLACE "^badge_" "" provider "${suffix}")
   add_test(NAME bridge_rust_icon_${suffix} COMMAND ${CMAKE_COMMAND} -E env
    --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
    CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings
-   CUI_TEST_ICON_RESOURCE_UNSUPPORTED=${unsupported} ${library_dir}
+   CUI_TEST_ICON_RESOURCE_UNSUPPORTED=${unsupported}
+   CUI_TEST_ICON_BADGE_PROVIDER=${provider} ${library_dir}
    ${CUI_RUST_ICON_CARGO} ${ARGN})
   set_tests_properties(bridge_rust_icon_${suffix} PROPERTIES
    WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
@@ -220,7 +222,17 @@ if(CUI_RUST_ICON_TESTS)
   test --offline --locked -j1 --test icon_resources -- --test-threads=1)
  cui_rust_icon_test(example "${CUI_RUST_ICON_STATIC_TARGET_DIR}" "" 0
   run --offline --locked -j1 --example icon_resource)
- foreach(provider LEGACY ALPHA4)
+ cui_rust_icon_test(badge_dynamic "${CUI_RUST_ICON_TARGET_DIR}" "${_cui_rust_icon_shared}" 0
+  test --offline --locked -j1 --test icon_badge -- --test-threads=1)
+ cui_rust_icon_test(badge_static "${CUI_RUST_ICON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --test icon_badge -- --test-threads=1)
+ cui_rust_icon_test(badge_inbox "${CUI_RUST_ICON_STATIC_TARGET_DIR}" "" 0
+  run --offline --locked -j1 --example icon_badge_inbox)
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_rust_icon_test(badge_native "${CUI_RUST_ICON_TARGET_DIR}" "${_cui_rust_icon_shared}" 0
+   run --offline --locked -j1 --example icon_badge_inbox -- --font ${CUI_TEST_FONT} --smoke)
+ endif()
+ foreach(provider LEGACY ALPHA4 PARTIAL_BADGE)
   set(CUI_RUST_ICON_${provider}_LIBRARY "" CACHE FILEPATH "Optional Rust Icon ${provider} provider")
   if(CUI_RUST_ICON_${provider}_LIBRARY)
    set(lib "${CUI_RUST_ICON_${provider}_LIBRARY}")
@@ -237,9 +249,13 @@ if(CUI_RUST_ICON_TESTS)
     set(selection --exact optional_provider_preserves_legacy)
     set(unsupported 1)
    endif()
-   cui_rust_icon_test(${suffix} "${CUI_RUST_ICON_TARGET_DIR}"
-    "${_cui_rust_icon_shared};LD_LIBRARY_PATH=${provider_dir}" ${unsupported}
-    test --offline --locked -j1 --test icon_resources -- --test-threads=1 ${selection})
+   set(library "${_cui_rust_icon_shared};LD_LIBRARY_PATH=${provider_dir}")
+   if(NOT provider STREQUAL "PARTIAL_BADGE")
+    cui_rust_icon_test(${suffix} "${CUI_RUST_ICON_TARGET_DIR}" "${library}" ${unsupported}
+     test --offline --locked -j1 --test icon_resources -- --test-threads=1 ${selection})
+   endif()
+   cui_rust_icon_test(badge_${suffix} "${CUI_RUST_ICON_TARGET_DIR}" "${library}" ${unsupported}
+    test --offline --locked -j1 --test icon_badge -- --exact optional_provider_preserves_legacy)
   endif()
  endforeach()
 endif()

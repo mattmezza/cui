@@ -3,7 +3,6 @@
 use std::{
     ffi::{c_char, c_void},
     mem::size_of,
-    sync::OnceLock,
 };
 
 #[repr(C)]
@@ -64,7 +63,7 @@ pub(super) struct RawBitmap {
 
 macro_rules! record {
     ($ty:ident, $size:literal) => {
-        const _: [(); $size] = [(); size_of::<$ty>()];
+        const _: [(); $size] = [(); std::mem::size_of::<$ty>()];
         impl $ty {
             pub(super) const SIZE: u32 = $size;
 
@@ -85,15 +84,16 @@ record!(RawInfo, 80);
 record!(RawBitmap, 64);
 
 // The linked static or shared provider remains live for the whole process.
-pub(super) fn api() -> Option<&'static Api> {
-    static API: OnceLock<Option<Api>> = OnceLock::new();
-    API.get_or_init(resolve).as_ref()
-}
-
-macro_rules! resource_group {
-    ($($field:ident = $func:ident($($arg:ident: $ty:ty),*) -> $ret:ty;)+) => {
-        pub(super) struct Api {
+macro_rules! optional_group {
+    ($api:ident, $get:ident, $resolve:ident, $compatible:expr;
+     $($field:ident = $func:ident($($arg:ident: $ty:ty),*) -> $ret:ty;)+) => {
+        pub(super) struct $api {
             $(pub(super) $field: unsafe extern "C" fn($($ty),*) -> $ret,)+
+        }
+
+        pub(super) fn $get() -> Option<&'static $api> {
+            static API: std::sync::OnceLock<Option<$api>> = std::sync::OnceLock::new();
+            API.get_or_init($resolve).as_ref()
         }
 
         #[cfg(cui_bridge_static)]
@@ -102,40 +102,42 @@ macro_rules! resource_group {
         }
 
         #[cfg(any(cui_bridge_static, unix, windows))]
-        fn resolve() -> Option<Api> {
+        fn $resolve() -> Option<$api> {
             #[cfg(cui_bridge_static)]
-            let api = Api { $($field: $func,)+ };
+            let api = $api { $($field: $func,)+ };
 
             #[cfg(not(cui_bridge_static))]
-            let api = Api {
+            let api = $api {
                 $($field: {
                     let name = concat!(stringify!($func), "\0");
-                    let symbol = unsafe { super::super::notification_symbol_v1(name.as_ptr().cast()) };
+                    let symbol = unsafe { crate::notification_symbol_v1(name.as_ptr().cast()) };
                     if symbol.is_null() {
                         return None;
                     }
                     // The signature matches the named export in cui_bridge.h.
-                    unsafe { std::mem::transmute::<*mut c_void, unsafe extern "C" fn($($ty),*) -> $ret>(symbol) }
+                    unsafe { std::mem::transmute::<*mut std::ffi::c_void, unsafe extern "C" fn($($ty),*) -> $ret>(symbol) }
                 },)+
             };
 
-            let compatible = unsafe {
-                (api.versions)() & 1 != 0
-                    && (api.record_size)(3) == RawLimits::SIZE
-                    && (api.record_size)(4) == RawInfo::SIZE
-                    && (api.record_size)(5) == RawBitmap::SIZE
-            };
-            compatible.then_some(api)
+            ($compatible)(&api).then_some(api)
         }
 
         #[cfg(not(any(cui_bridge_static, unix, windows)))]
-        fn resolve() -> Option<Api> {
+        fn $resolve() -> Option<$api> {
             None
         }
     };
 }
 
-resource_group! {
+pub(super) use {optional_group, record};
+
+optional_group! {
+    Api, api, resolve, |api: &Api| unsafe {
+        (api.versions)() & 1 != 0
+            && (api.record_size)(3) == RawLimits::SIZE
+            && (api.record_size)(4) == RawInfo::SIZE
+            && (api.record_size)(5) == RawBitmap::SIZE
+    };
     versions = cui_bridge_icon_versions() -> u32;
     record_size = cui_bridge_icon_record_size_v1(kind: u32) -> u32;
     default_limits = cui_bridge_icon_default_limits_v1(out: *mut RawLimits) -> u32;

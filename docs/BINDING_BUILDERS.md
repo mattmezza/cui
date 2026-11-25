@@ -162,6 +162,7 @@ The [Go SVG resource guide](GO_ICON_RESOURCES.md) shows how to prepare artwork
 with the bundled build or a compatible shared bridge.
 The [Go inbox](GO_ICON_BADGE.md) uses those resources in configured Icons and Badges.
 The [Rust SVG resource guide](RUST_ICON_RESOURCES.md) shows the headless preparation API.
+The [Rust inbox](RUST_ICON_BADGE.md) adds a shared retained Icon and Badge plus child callbacks.
 The older [C-host examples](LANGUAGE_BINDINGS.md) remain useful for embedding an
 existing C-authored application.
 

@@ -13,16 +13,15 @@ is available in alpha.4. Working source adds
 [configured Badge container](BRIDGE_BADGE.md). Python exposes these APIs through
 typed builders. The JavaScript and TypeScript resource facade works with the
 alpha.4 bridge. Current Node source also exposes retained Icon and Badge
-presentation. Go exposes the resource group and both retained components.
-Rust exposes the resource group. Configurable Spinner and retained Rust Icon
-and Badge presentation remain open.
+presentation. Go and Rust expose the resource group and both retained
+components. Configurable Spinner remains open.
 Legacy kind 11 text
 Badge and kind 50 named Icon keep their render paths. All 78 families remain.
 
 [Python usage](PYTHON_ICON_BADGE.md). [Node and TypeScript resources](NODE_ICON_RESOURCES.md).
 [Node and TypeScript retained components](NODE_ICON_BADGE.md).
 [Go resources](GO_ICON_RESOURCES.md). [Go retained components](GO_ICON_BADGE.md).
-[Rust resources](RUST_ICON_RESOURCES.md).
+[Rust resources](RUST_ICON_RESOURCES.md). [Rust retained components](RUST_ICON_BADGE.md).
 
 `cui_bridge_icon_versions()` bit 0 advertises the complete resource group on the
 existing supported owner-thread build. Default/shared WASM and NO_TLS are not

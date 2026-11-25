@@ -43,8 +43,8 @@ Node import library discovery and macOS Node linker settings are provided. See t
 
 The [responsive Skeleton guide](PYTHON_SKELETON.md) includes a Python-authored
 profile UI that replaces loading placeholders with content. See the
-[JavaScript and TypeScript examples](NODE_SKELETON.md) and
-[Go example](GO_SKELETON.md) use the same composition.
+[JavaScript and TypeScript](NODE_SKELETON.md), [Go](GO_SKELETON.md) and
+[Rust](RUST_SKELETON.md) examples use the same composition.
 
 ```sh
 cmake -S bindings/bridge -B build-bridge -G Ninja

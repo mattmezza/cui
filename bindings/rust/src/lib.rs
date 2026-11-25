@@ -1,8 +1,10 @@
 //! Owned Rust builders over the CUI bridge. All operations stay on the creating thread.
 mod shadows;
+mod skeleton_presentation;
 mod slider_model;
 mod time_localized;
 pub use shadows::{BoxShadow, CornerRadii, ShadowKind, ShadowPreset, ShadowStyle};
+pub use skeleton_presentation::{SkeletonConfig, SkeletonPresentation, SkeletonWidth};
 pub use slider_model::{
     SliderConfig, SliderDomain, SliderInput, SliderLayout, SliderOrientation, SliderPart,
     SliderPhase, SliderPresentation, SliderReceipt, SliderReceiptInfo, SliderRequest,

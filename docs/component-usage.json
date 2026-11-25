@@ -851,7 +851,8 @@
         "docs/BRIDGE_SKELETON.md",
         "docs/PYTHON_SKELETON.md",
         "docs/NODE_SKELETON.md",
-        "docs/GO_SKELETON.md"
+        "docs/GO_SKELETON.md",
+        "docs/RUST_SKELETON.md"
       ],
       "callback_symbols": [
         "cui_loading_ease_fn"

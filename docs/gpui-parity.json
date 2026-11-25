@@ -2692,7 +2692,9 @@
         "bindings/node/test/skeleton-presentation.test.cjs",
         "bindings/node/test/skeleton-presentation.types.ts",
         "bindings/go/cui/skeleton_presentation_test.go",
-        "bindings/go/examples/skeleton_profile/main.go"
+        "bindings/go/examples/skeleton_profile/main.go",
+        "bindings/rust/tests/skeleton_presentation.rs",
+        "bindings/rust/examples/skeleton_profile.rs"
       ],
       "status": "tested",
       "platforms": {
@@ -2701,7 +2703,7 @@
       },
       "limitations": [
         "Placeholder dimensions/radii, source-audited secondary-opacity quadratic pulse, custom content, caller-owned clocks and finite wake/reduced-motion quiescence tested. Skeleton is decorative in the pinned source; applications own meaningful loading announcements. Richer placeholder layouts remain application composition.",
-        "Alpha.4 ships owned palette and responsive C presentation. The subsequent profile gallery uses preset, secondary and custom colors and replaces decorative shapes with loaded content. The optional retained C bridge and Python, JavaScript, TypeScript and Go builders support responsive presentation. Rust uses the legacy route. See docs/SKELETON_RESPONSIVE.md."
+        "Alpha.4 ships owned palette and responsive C presentation. The subsequent profile gallery uses preset, secondary and custom colors and replaces decorative shapes with loaded content. The optional retained C bridge and Python, JavaScript, TypeScript, Go and Rust builders support responsive presentation. See docs/SKELETON_RESPONSIVE.md."
       ],
       "owner": "integrator",
       "last_verified_commit": null,

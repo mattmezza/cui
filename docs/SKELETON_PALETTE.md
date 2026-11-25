@@ -63,10 +63,11 @@ rendering or native/AT delivery. Caller checks the existing frame diagnostic.
 Omission keeps caller motion state; reset it explicitly to restart.
 
 This fixed-size API does not supply source full/fraction/flex root sizing or own-root
-Styled border/layout overrides; use the separate `cui_skeleton_present` route for
-those. Modern foreign options remain pending. Python, JS/TS, Go and
-Rust retain their existing legacy Skeleton constructors and timing; none exposes
-this new palette. Application-owned busy/status semantics remain as documented in
+Styled border/layout overrides. Use `cui_skeleton_present` for those. The
+[optional retained bridge](BRIDGE_SKELETON.md) and its language builders
+support responsive geometry and preset, secondary or custom fills. Use the
+direct C palette API to query named presets. Application-owned busy/status
+semantics remain as documented in
 [the semantic audit](design/ALERT_SKELETON_SEMANTICS_AUDIT.md). See
 [the parity checkpoint](design/SKELETON_PARITY_CHECKPOINT.md) for remaining scope.
 

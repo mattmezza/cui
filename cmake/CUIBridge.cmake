@@ -101,6 +101,50 @@ if(CUI_GO_SKELETON_TESTS)
    run -tags cui_dynamic ./examples/skeleton_profile --font ${CUI_TEST_FONT} --smoke)
  endif()
 endif()
+option(CUI_RUST_SKELETON_TESTS "Check responsive Skeleton authoring with Rust on Linux" OFF)
+set(CUI_RUST_SKELETON_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-target" CACHE PATH "Reusable Cargo cache for dynamic Skeleton checks")
+set(CUI_RUST_SKELETON_STATIC_TARGET_DIR "${CMAKE_BINARY_DIR}/rust-skeleton-static-target" CACHE PATH "Reusable Cargo cache for bundled Skeleton checks")
+if(CUI_RUST_SKELETON_TESTS)
+ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR "Rust Skeleton provider tests currently support Linux only")
+ endif()
+ find_program(CUI_RUST_SKELETON_CARGO cargo REQUIRED)
+ function(cui_rust_skeleton_test suffix target library_dir unsupported)
+  add_test(NAME bridge_rust_skeleton_${suffix} COMMAND ${CMAKE_COMMAND} -E env
+   --unset=CUI_BRIDGE_LIB_DIR --unset=LD_LIBRARY_PATH
+   CARGO_TARGET_DIR=${target} RUSTFLAGS=-Dwarnings
+   CUI_TEST_UNSUPPORTED_SKELETON=${unsupported} ${library_dir}
+   ${CUI_RUST_SKELETON_CARGO} ${ARGN})
+  set_tests_properties(bridge_rust_skeleton_${suffix} PROPERTIES
+   WORKING_DIRECTORY "${CUI_BRIDGE_ROOT}/bindings/rust" RUN_SERIAL TRUE TIMEOUT 600)
+ endfunction()
+ set(_cui_rust_current CUI_BRIDGE_LIB_DIR=$<TARGET_FILE_DIR:cui_bridge>)
+ cui_rust_skeleton_test(dynamic "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_current}" 0
+  test --offline --locked -j1 --test skeleton_presentation -- --test-threads=1)
+ cui_rust_skeleton_test(static "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  test --offline --locked -j1 --test skeleton_presentation -- --test-threads=1)
+ cui_rust_skeleton_test(example "${CUI_RUST_SKELETON_STATIC_TARGET_DIR}" "" 0
+  run --offline --locked -j1 --example skeleton_profile)
+ foreach(provider LEGACY PARTIAL)
+  set(CUI_RUST_SKELETON_${provider}_LIBRARY "" CACHE FILEPATH "Optional Rust Skeleton ${provider} provider")
+  if(CUI_RUST_SKELETON_${provider}_LIBRARY)
+   set(lib "${CUI_RUST_SKELETON_${provider}_LIBRARY}")
+   if(NOT EXISTS "${lib}" OR IS_DIRECTORY "${lib}")
+    message(FATAL_ERROR "CUI_RUST_SKELETON_${provider}_LIBRARY must name an existing provider")
+   endif()
+   string(TOLOWER ${provider} suffix)
+   set(provider_dir "${CMAKE_CURRENT_BINARY_DIR}/rust-skeleton-providers/${suffix}")
+   file(MAKE_DIRECTORY "${provider_dir}")
+   file(CREATE_LINK "${lib}" "${provider_dir}/libcui_bridge.so" SYMBOLIC)
+   cui_rust_skeleton_test(${suffix} "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_current};LD_LIBRARY_PATH=${provider_dir}" 1
+    test --offline --locked -j1 --test skeleton_presentation -- --exact optional_provider_preserves_legacy)
+  endif()
+ endforeach()
+ if(CUI_BRIDGE_NATIVE_TESTS)
+  cui_rust_skeleton_test(native "${CUI_RUST_SKELETON_TARGET_DIR}" "${_cui_rust_current}" 0
+   run --offline --locked -j1 --example skeleton_profile -- --font ${CUI_TEST_FONT} --smoke)
+ endif()
+endif()
 if(CUI_BRIDGE_NATIVE_TESTS)
  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR NOT TARGET cui_sdl3 OR NOT CUI_TEST_FONT)
   message(FATAL_ERROR "Binding native checks require Linux, SDL/text adapters and CUI_TEST_FONT")

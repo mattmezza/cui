@@ -147,3 +147,8 @@ signatures and scalar Slider autoacceptance. Its complete windowless authored UI
 is `bindings/rust/examples/slider_model.rs`. Linux dynamic current/old/provider, UI and matching bundled-static source
 checks passed on1.99.1; MSRV1.85.1 validation remains a required follow-up. Direct C custom style/motion and native numeric AT
 are not exposed by this subset.
+
+## Responsive loading placeholders
+
+The [responsive Skeleton guide](RUST_SKELETON.md) includes a native profile UI
+that replaces decorative placeholders with loaded content.

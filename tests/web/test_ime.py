@@ -3,13 +3,47 @@
 # requires-python = ">=3.11"
 # dependencies = ["playwright==1.58.0"]
 # ///
-"""Chromium native CDP IME composition against every built-in text consumer."""
+"""Chromium IME composition and Textarea soft-wrap keyboard navigation."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import threading
 from playwright.sync_api import sync_playwright
+
+
+def check_textarea_word_movement(page, session):
+    length = 120
+    stats = 'cuiGallery.exports.gallery_textarea_stats'
+    page.keyboard.press('Control+a')
+    session.send('Input.insertText', {'text': 'W' * length})
+    page.wait_for_function(f'(length) => {stats}(0) === length && {stats}(1) > 2',
+                           arg=length, timeout=3000)
+    page.keyboard.press('Control+Home')
+    page.wait_for_function(f'{stats}(2) === 0', timeout=3000)
+    page.keyboard.press('End')
+    page.wait_for_function(f'(length) => {stats}(2) > 0 && {stats}(2) < length',
+                           arg=length, timeout=3000)
+    wrap_byte = page.evaluate(f'{stats}(2)')
+    page.keyboard.press('Alt+Shift+ArrowRight')
+    page.wait_for_function(
+        f'([length, wrap]) => {stats}(2) === length && {stats}(3) === wrap',
+        arg=[length, wrap_byte], timeout=3000,
+    )
+
+    page.keyboard.press('Control+Home')
+    page.wait_for_function(f'{stats}(2) === 0 && {stats}(4) === 0', timeout=3000)
+    page.keyboard.press('End')
+    page.wait_for_function(f'(wrap) => {stats}(2) === wrap', arg=wrap_byte, timeout=3000)
+    first_row_y = page.evaluate('cuiGallery.exports.gallery_ime_rect(1)')
+    assert first_row_y >= 0
+    page.keyboard.press('ArrowRight')
+    page.wait_for_function(
+        f'([wrap, rowY]) => {stats}(2) === wrap && cuiGallery.exports.gallery_ime_rect(1) > rowY',
+        arg=[wrap_byte, first_row_y], timeout=3000,
+    )
+    page.keyboard.press('Alt+ArrowLeft')
+    page.wait_for_function(f'{stats}(2) === 0 && {stats}(3) === 0', timeout=3000)
 
 
 def main():
@@ -73,6 +107,8 @@ def main():
                 session.send('Input.imeSetComposition',{'text':'','selectionStart':0,'selectionEnd':0})
                 page.wait_for_timeout(50)
                 assert length()==before,(story,'cancel mutated document')
+                if story == 'Textarea':
+                    check_textarea_word_movement(page, session)
             page.evaluate('location.hash="Input"')
             page.wait_for_function('cuiGallery.renderedComponent==="Input"')
             page.wait_for_timeout(100)
@@ -108,6 +144,7 @@ def main():
     finally:
         server.shutdown()
     print('Native browser IME preedit/commit/cancel/undo passed for Input, Textarea, Editor and Questionnaire.')
+    print('Textarea soft-wrap caret placement and Alt+Arrow word selection passed.')
 
 if __name__=='__main__':
     main()

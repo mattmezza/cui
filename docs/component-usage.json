@@ -1650,7 +1650,7 @@
         "cui_textarea_line"
       ],
       "state_ownership": "Caller retains cui_edit, buffer, cui_textarea_state and line workspace.",
-      "interaction": "cui_textarea_result reports edit events and layout errors.",
+      "interaction": "cui_textarea_result reports edit events and layout errors. Ctrl+Left/Right and Alt+Left/Right move by word across wrapped rows. Shift extends the selection.",
       "usage": "Initialize line storage once and submit the multiline editor each frame.",
       "docs": [
         "docs/TEXTAREA.md",

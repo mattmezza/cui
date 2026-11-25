@@ -79,6 +79,15 @@ static void test_metrics_and_layout(void) {
     key(ui, CUI_KEY_RIGHT, 0);
     frame(ui, edit, &state, (cui_textarea_options){.width = 47.2f, .rows = 2});
     assert(cui_edit_get_state(edit).cursor == 3 && state.caret_line == 1);
+    key(ui, CUI_KEY_LEFT, CUI_MOD_ALT);
+    frame(ui, edit, &state, (cui_textarea_options){.width = 47.2f, .rows = 2});
+    assert(cui_edit_get_state(edit).cursor == 0);
+    key(ui, CUI_KEY_END, 0);
+    frame(ui, edit, &state, (cui_textarea_options){.width = 47.2f, .rows = 2});
+    assert(cui_edit_get_state(edit).cursor == 3 && state.upstream_affinity);
+    key(ui, CUI_KEY_RIGHT, CUI_MOD_ALT | CUI_MOD_SHIFT);
+    frame(ui, edit, &state, (cui_textarea_options){.width = 47.2f, .rows = 2});
+    assert(cui_edit_get_state(edit).cursor == 6 && cui_edit_get_state(edit).anchor == 3);
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
@@ -440,6 +449,45 @@ static void test_repeated_down_visible_rows(void) {
     frame(ui, edit, &state, options);
     assert(state.scroll_y == 0);
     assert_visible_line(&state, "Row 01");
+    cui_edit_destroy(edit);
+    cui_destroy(ui);
+}
+static cui_size exact_width(void *user, cui_str text, float size) {
+    (void)user;
+    (void)size;
+    return (cui_size){(float)text.length * 10, 20};
+}
+static void test_wrap_edge_caret(void) {
+    cui_context *ui = cui_create((cui_config){.measure = exact_width});
+    char buffer[32] = "abcdefgh";
+    cui_edit *edit = editor(buffer, sizeof buffer);
+    cui_textarea_line lines[8];
+    cui_textarea_state state;
+    assert(cui_textarea_state_init(&state, lines, 8));
+    cui_textarea_options options = {.width = 62, .rows = 2};
+    frame(ui, edit, &state, options);
+    assert(state.count == 2 && state.viewport.w == 40 && lines[0].end == 4);
+    cui_focus(ui, 10);
+    cui_set_reduced_motion(ui, true);
+    assert(cui_edit_select(edit, 0, 0) == CUI_EDIT_OK);
+    frame(ui, edit, &state, options);
+    key(ui, CUI_KEY_END, 0);
+    frame(ui, edit, &state, options);
+    assert(state.caret_line == 0 && state.upstream_affinity && state.cursor == 4);
+    assert(state.scroll_x == 0);
+    cui_rect ime;
+    assert(cui_text_input_rect(ui, &ime));
+    assert(ime.x + ime.w == state.viewport.x + state.viewport.w && ime.y == state.viewport.y);
+    bool painted = false;
+    for (size_t i = 0; i < drawing.count; ++i) {
+        const cui_draw_command *command = &drawing.commands[i];
+        if (command->type == CUI_DRAW_RECT && command->color.r == 17 && command->color.g == 91 &&
+            command->color.b == 203) {
+            assert(command->bounds.x == ime.x && command->bounds.w == 1);
+            painted = true;
+        }
+    }
+    assert(painted);
     cui_edit_destroy(edit);
     cui_destroy(ui);
 }
@@ -1189,6 +1237,7 @@ static void test_overlay_scrollbars(void) {
     cui_destroy(ui);
 }
 int main(void) {
+    test_wrap_edge_caret();
     test_overlay_scrollbars();
     test_ime_large_default_document();
     test_ime_virtual_rows();

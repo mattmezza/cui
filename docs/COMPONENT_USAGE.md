@@ -813,7 +813,7 @@ API: `cui_speech_init`, `cui_speech_pump`, `cui_speech_button`, `cui_speech_disp
 
 **State:** Caller retains cui_edit, buffer, cui_textarea_state and line workspace.
 
-**Interaction:** cui_textarea_result reports edit events and layout errors.
+**Interaction:** cui_textarea_result reports edit events and layout errors. Ctrl+Left/Right and Alt+Left/Right move by word across wrapped rows. Shift extends the selection.
 
 **Usage:** Initialize line storage once and submit the multiline editor each frame.
 

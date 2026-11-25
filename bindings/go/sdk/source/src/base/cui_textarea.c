@@ -935,6 +935,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             error = cui_edit_select_atomic(edit, shift ? selection.anchor : cursor, cursor);
             move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN && !command &&
+                   !(event.modifiers & CUI_MOD_ALT) &&
                    ((event.key == CUI_KEY_RIGHT && state->upstream_affinity &&
                      state->caret_line + 1 < state->count &&
                      state->cursor == state->lines[state->caret_line].end &&

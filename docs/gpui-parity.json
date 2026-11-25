@@ -4950,6 +4950,15 @@
           ]
         },
         {
+          "name": "soft-wrap word modifiers and full-width caret placement",
+          "status": "tested",
+          "evidence": [
+            "tests/unit/test_textarea.c",
+            "tests/web/test_ime.py"
+          ],
+          "scope": "Alt+Left/Right navigate across a wrap, with Shift selection and the plain-arrow two-position behavior preserved. Fixed-width native geometry verifies that the painted caret and host IME anchor stay within the viewport."
+        },
+        {
           "name": "clipboard, undo history and multiline semantics",
           "status": "tested",
           "evidence": [

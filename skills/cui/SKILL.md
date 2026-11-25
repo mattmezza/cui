@@ -292,6 +292,12 @@ Browser tests run headless. GPU observations unsupported by the virtual display
 remain explicitly deferred. Never auto-launch a native example on the desktop
 as an automated check. Report what actually ran and which host/backend it used.
 
+For Input and Textarea keyboard behavior, see `docs/INPUT.md` and
+`docs/TEXTAREA.md`. Both support Ctrl/Alt+Left/Right word movement and Shift
+selection. Single-line Input keeps its caret in place on Up/Down. Textarea
+navigates visual rows and keeps a full-width wrap caret and its IME anchor inside
+the viewport. Growing fields still have documented same-frame resize limits.
+
 For validated color text, read `docs/COLOR_ENTRY.md` and
 `include/cui/cui_color_entry.h`. ColorEntry is an additive inline byte-RGBA field
 with an address-stable owned draft/editor and explicit preview/commit state.

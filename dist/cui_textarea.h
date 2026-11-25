@@ -1092,6 +1092,7 @@ cui_textarea_result cui_base_textarea(cui_context *ui, cui_id id, cui_str name, 
             error = cui_edit_select_atomic(edit, shift ? selection.anchor : cursor, cursor);
             move = handled = true;
         } else if (event.type == CUI_EVENT_KEY_DOWN && !command &&
+                   !(event.modifiers & CUI_MOD_ALT) &&
                    ((event.key == CUI_KEY_RIGHT && state->upstream_affinity &&
                      state->caret_line + 1 < state->count &&
                      state->cursor == state->lines[state->caret_line].end &&
@@ -1410,12 +1411,19 @@ cui_textarea_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str 
     cui_edit_state selection = cui_edit_composition_selection(edit, state->composition);
     size_t first = selection.anchor < selection.cursor ? selection.anchor : selection.cursor;
     size_t last = selection.anchor > selection.cursor ? selection.anchor : selection.cursor;
+    float caret_x = 0;
     if (focused && state->count) {
         cui_textarea_line caret_row = state->lines[state->caret_line];
-        float cx = cui_textarea_prefix(ui, text, caret_row, selection.cursor, metrics.font_size,
-                                       options.text_style);
+        caret_x = cui_textarea_visual_x(
+            ui, text, caret_row, selection.cursor, metrics.font_size, options.text_style,
+            state->visual_affinity_valid && state->visual_caret_byte == selection.cursor
+                ? state->visual_affinity
+                : CUI_TEXT_DOWNSTREAM);
+        /* A full-width wrapped row has no horizontal scroll space for the caret. */
+        if (!options.no_wrap)
+            caret_x = fminf(caret_x, state->viewport.w - 1);
         cui_set_text_input_rect(ui, id,
-                                (cui_rect){state->viewport.x + cx - state->scroll_x,
+                                (cui_rect){state->viewport.x + caret_x - state->scroll_x,
                                            state->viewport.y +
                                                state->caret_line * metrics.line_height -
                                                state->scroll_y,
@@ -1484,14 +1492,9 @@ cui_textarea_common(cui_context *ui, cui_id id, const cui_theme *theme, cui_str 
             }
         }
         if (focused && row == state->caret_line) {
-            float x = cui_textarea_visual_x(
-                ui, text, line, selection.cursor, metrics.font_size, options.text_style,
-                state->visual_affinity_valid && state->visual_caret_byte == selection.cursor
-                    ? state->visual_affinity
-                    : CUI_TEXT_DOWNSTREAM);
             cui_begin_absolute_box(ui, cui_textarea_child(id, row, 11),
                                    (cui_box){.background = caret ? theme->caret : (cui_color){0}},
-                                   (cui_rect){x, 0, 1, metrics.line_height});
+                                   (cui_rect){caret_x, 0, 1, metrics.line_height});
             cui_set_text_input_geometry_rect(ui, id, cui_textarea_child(id, row, 11),
                                              metrics.line_height);
             cui_end_box(ui);
